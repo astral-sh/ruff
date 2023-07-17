@@ -1392,7 +1392,6 @@ impl Truthiness {
                 Constant::Float(float) => Some(*float != 0.0),
                 Constant::Complex { real, imag } => Some(*real != 0.0 || *imag != 0.0),
                 Constant::Ellipsis => Some(true),
-                Constant::Tuple(elts) => Some(!elts.is_empty()),
             },
             Expr::JoinedStr(ast::ExprJoinedStr {
                 values,

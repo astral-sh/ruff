@@ -1249,23 +1249,6 @@ impl<'a> Generator<'a> {
             Constant::None => self.p("None"),
             Constant::Bool(b) => self.p(if *b { "True" } else { "False" }),
             Constant::Int(i) => self.p(&format!("{i}")),
-            Constant::Tuple(tup) => {
-                if let [elt] = &**tup {
-                    self.p("(");
-                    self.unparse_constant(elt);
-                    self.p(",");
-                    self.p(")");
-                } else {
-                    self.p("(");
-                    for (i, elt) in tup.iter().enumerate() {
-                        if i != 0 {
-                            self.p(", ");
-                        }
-                        self.unparse_constant(elt);
-                    }
-                    self.p(")");
-                }
-            }
             Constant::Float(fp) => {
                 if fp.is_infinite() {
                     self.p(inf_str);

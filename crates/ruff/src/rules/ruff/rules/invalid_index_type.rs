@@ -209,7 +209,6 @@ fn constant_type_name(constant: &Constant) -> &'static str {
         Constant::Str(_) => "str",
         Constant::Bytes(_) => "bytes",
         Constant::Int(_) => "int",
-        Constant::Tuple(_) => "tuple",
         Constant::Float(_) => "float",
         Constant::Complex { .. } => "complex",
         Constant::Ellipsis => "ellipsis",

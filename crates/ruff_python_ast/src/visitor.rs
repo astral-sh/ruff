@@ -3,8 +3,8 @@
 pub mod preorder;
 
 use rustpython_parser::ast::{
-    self, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Constant, Decorator, ExceptHandler,
-    Expr, ExprContext, Keyword, MatchCase, Operator, Pattern, Stmt, UnaryOp, WithItem,
+    self, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Decorator, ExceptHandler, Expr,
+    ExprContext, Keyword, MatchCase, Operator, Pattern, Stmt, UnaryOp, WithItem,
 };
 
 /// A trait for AST visitors. Visits all nodes in the AST recursively in evaluation-order.
@@ -26,9 +26,6 @@ pub trait Visitor<'a> {
     }
     fn visit_expr(&mut self, expr: &'a Expr) {
         walk_expr(self, expr);
-    }
-    fn visit_constant(&mut self, constant: &'a Constant) {
-        walk_constant(self, constant);
     }
     fn visit_expr_context(&mut self, expr_context: &'a ExprContext) {
         walk_expr_context(self, expr_context);
@@ -507,7 +504,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
                 visitor.visit_expr(expr);
             }
         }
-        Expr::Constant(ast::ExprConstant { value, .. }) => visitor.visit_constant(value),
+        Expr::Constant(_) => {}
         Expr::Attribute(ast::ExprAttribute { value, ctx, .. }) => {
             visitor.visit_expr(value);
             visitor.visit_expr_context(ctx);
@@ -568,14 +565,6 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
             if let Some(expr) = step {
                 visitor.visit_expr(expr);
             }
-        }
-    }
-}
-
-pub fn walk_constant<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, constant: &'a Constant) {
-    if let Constant::Tuple(constants) = constant {
-        for constant in constants {
-            visitor.visit_constant(constant);
         }
     }
 }
@@ -675,12 +664,7 @@ pub fn walk_pattern<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, pattern: &'a P
             value,
             range: _range,
         }) => visitor.visit_expr(value),
-        Pattern::MatchSingleton(ast::PatternMatchSingleton {
-            value,
-            range: _range,
-        }) => {
-            visitor.visit_constant(value);
-        }
+        Pattern::MatchSingleton(_) => {}
         Pattern::MatchSequence(ast::PatternMatchSequence {
             patterns,
             range: _range,
