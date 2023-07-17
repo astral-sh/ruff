@@ -405,8 +405,14 @@ pub struct StmtClassDef {
 
 impl Node for StmtClassDef {
     const NAME: &'static str = "ClassDef";
-    const FIELD_NAMES: &'static [&'static str] =
-        &["name", "bases", "keywords", "body", "decorator_list", "type_params"];
+    const FIELD_NAMES: &'static [&'static str] = &[
+        "name",
+        "bases",
+        "keywords",
+        "body",
+        "decorator_list",
+        "type_params",
+    ];
 }
 impl From<StmtClassDef> for Stmt {
     fn from(payload: StmtClassDef) -> Self {
@@ -462,7 +468,6 @@ impl From<StmtDelete> for Ast {
         Stmt::from(payload).into()
     }
 }
-
 
 /// See also [TypeAlias](https://docs.python.org/3/library/ast.html#ast.TypeAlias)
 #[derive(Clone, Debug, PartialEq)]
@@ -3122,7 +3127,6 @@ impl Node for TypeIgnore {
     const NAME: &'static str = "type_ignore";
     const FIELD_NAMES: &'static [&'static str] = &[];
 }
-
 
 /// See also [type_param](https://docs.python.org/3/library/ast.html#ast.type_param)
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
