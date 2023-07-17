@@ -42,6 +42,7 @@ impl FormatRule<Stmt, PyFormatContext<'_>> for FormatStmt {
             Stmt::ClassDef(x) => x.format().fmt(f),
             Stmt::Return(x) => x.format().fmt(f),
             Stmt::Delete(x) => x.format().fmt(f),
+            Stmt::TypeAlias(_) => todo!(),
             Stmt::Assign(x) => x.format().fmt(f),
             Stmt::AugAssign(x) => x.format().fmt(f),
             Stmt::AnnAssign(x) => x.format().fmt(f),

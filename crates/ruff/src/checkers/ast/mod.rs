@@ -590,6 +590,7 @@ where
                     keywords,
                     decorator_list,
                     body,
+                    type_params: _,
                     range: _,
                 },
             ) => {

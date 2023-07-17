@@ -225,6 +225,7 @@ fn function(
                 decorator_list: vec![],
                 returns: Some(Box::new(return_type)),
                 type_comment: None,
+                type_params: vec![],
                 range: TextRange::default(),
             });
             return generator.stmt(&func);
@@ -237,6 +238,7 @@ fn function(
         decorator_list: vec![],
         returns: None,
         type_comment: None,
+        type_params: vec![],
         range: TextRange::default(),
     });
     generator.stmt(&func)
