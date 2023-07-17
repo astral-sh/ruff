@@ -2900,7 +2900,7 @@ where
                     Rule::FStringInGetTextFuncCall,
                     Rule::FormatInGetTextFuncCall,
                     Rule::PrintfInGetTextFuncCall,
-                ]) && flake8_gettext::rules::is_gettext_func_call(
+                ]) && flake8_gettext::is_gettext_func_call(
                     func,
                     &self.settings.flake8_gettext.functions_names,
                 ) {
