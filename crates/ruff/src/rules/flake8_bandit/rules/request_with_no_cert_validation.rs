@@ -63,18 +63,18 @@ pub(crate) fn request_with_no_cert_validation(
             _ => None,
         })
     {
-        if let Some(arg) = keywords.iter().find(|keyword| {
+        if let Some(keyword) = keywords.iter().find(|keyword| {
             keyword
                 .arg
                 .as_ref()
                 .map_or(false, |arg| arg.as_str() == "verify")
         }) {
-            if is_const_false(&arg.value) {
+            if is_const_false(&keyword.value) {
                 checker.diagnostics.push(Diagnostic::new(
                     RequestWithNoCertValidation {
                         string: target.to_string(),
                     },
-                    arg.range(),
+                    keyword.range(),
                 ));
             }
         }

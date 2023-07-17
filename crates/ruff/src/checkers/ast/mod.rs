@@ -2623,7 +2623,7 @@ where
                     }
                 }
                 if self.enabled(Rule::NoExplicitStacklevel) {
-                    flake8_bugbear::rules::no_explicit_stacklevel(self, func, args, keywords);
+                    flake8_bugbear::rules::no_explicit_stacklevel(self, func, keywords);
                 }
                 if self.enabled(Rule::UnnecessaryDictKwargs) {
                     flake8_pie::rules::unnecessary_dict_kwargs(self, expr, keywords);
@@ -2647,7 +2647,7 @@ where
                     flake8_bandit::rules::snmp_weak_cryptography(self, func, args, keywords);
                 }
                 if self.enabled(Rule::Jinja2AutoescapeFalse) {
-                    flake8_bandit::rules::jinja2_autoescape_false(self, func, args, keywords);
+                    flake8_bandit::rules::jinja2_autoescape_false(self, func, keywords);
                 }
                 if self.enabled(Rule::HardcodedPasswordFuncArg) {
                     flake8_bandit::rules::hardcoded_password_func_arg(self, keywords);
@@ -2661,15 +2661,13 @@ where
                     );
                 }
                 if self.enabled(Rule::RequestWithoutTimeout) {
-                    flake8_bandit::rules::request_without_timeout(self, func, args, keywords);
+                    flake8_bandit::rules::request_without_timeout(self, func, keywords);
                 }
                 if self.enabled(Rule::ParamikoCall) {
                     flake8_bandit::rules::paramiko_call(self, func);
                 }
                 if self.enabled(Rule::LoggingConfigInsecureListen) {
-                    flake8_bandit::rules::logging_config_insecure_listen(
-                        self, func, args, keywords,
-                    );
+                    flake8_bandit::rules::logging_config_insecure_listen(self, func, keywords);
                 }
                 if self.any_enabled(&[
                     Rule::SubprocessWithoutShellEqualsTrue,
