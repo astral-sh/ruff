@@ -228,6 +228,7 @@ enum Message {
 fn format_dev_multi_project(args: &Args) -> bool {
     let mut total_errors = 0;
     let mut total_files = 0;
+    let mut num_projects: usize = 0;
     let start = Instant::now();
 
     rayon::scope(|scope| {
@@ -236,6 +237,7 @@ fn format_dev_multi_project(args: &Args) -> bool {
         // Workers, to check is subdirectory in parallel
         for base_dir in &args.files {
             for dir in base_dir.read_dir().unwrap() {
+                num_projects += 1;
                 let path = dir.unwrap().path().clone();
 
                 let sender = sender.clone();
@@ -258,36 +260,39 @@ fn format_dev_multi_project(args: &Args) -> bool {
         }
 
         // Main thread, writing to stdout
+        #[allow(clippy::print_stdout)]
         scope.spawn(|_| {
             let mut error_file = args.error_file.as_ref().map(|error_file| {
                 BufWriter::new(File::create(error_file).expect("Couldn't open error file"))
             });
 
-            let bar = ProgressBar::new(args.files.len() as u64);
+            let bar = ProgressBar::new(num_projects as u64);
             for message in receiver {
                 match message {
                     Message::Start { path } => {
-                        bar.println(path.display().to_string());
+                        bar.suspend(|| println!("Starting {}", path.display()));
                     }
                     Message::Finished { path, result } => {
                         total_errors += result.error_count();
                         total_files += result.file_count;
 
-                        bar.println(format!(
-                            "Finished {} with {} files (similarity index {:.3}) in {:.2}s",
-                            path.display(),
-                            result.file_count,
-                            result.statistics.similarity_index(),
-                            result.duration.as_secs_f32(),
-                        ));
-                        bar.println(result.display(args.format).to_string().trim_end());
+                        bar.suspend(|| {
+                            println!(
+                                "Finished {} with {} files (similarity index {:.3}) in {:.2}s",
+                                path.display(),
+                                result.file_count,
+                                result.statistics.similarity_index(),
+                                result.duration.as_secs_f32(),
+                            );
+                        });
+                        bar.suspend(|| print!("{}", result.display(args.format)));
                         if let Some(error_file) = &mut error_file {
                             write!(error_file, "{}", result.display(args.format)).unwrap();
                         }
                         bar.inc(1);
                     }
                     Message::Failed { path, error } => {
-                        bar.println(format!("Failed {}: {}", path.display(), error));
+                        bar.suspend(|| println!("Failed {}: {}", path.display(), error));
                         bar.inc(1);
                     }
                 }
