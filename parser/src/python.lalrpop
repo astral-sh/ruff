@@ -966,7 +966,7 @@ WithItem<Goal>: ast::WithItem = {
 };
 
 FuncDef: ast::Stmt = {
-    <decorator_list:Decorator*> <location:@L> <is_async:"async"?> "def" <name:Identifier> <type_params:TypeParamList?> <args:Parameters> <r:("->" <Test<"all">>)?> ":" <body:Suite> => {
+     <location:@L> <decorator_list:Decorator*> <is_async:"async"?> "def" <name:Identifier> <type_params:TypeParamList?> <args:Parameters> <r:("->" <Test<"all">>)?> ":" <body:Suite> => {
         let args = Box::new(args);
         let returns = r.map(|x| Box::new(x));
         let end_location = body.last().unwrap().end();
@@ -1152,7 +1152,7 @@ KwargParameter<ArgType>: Option<Box<ast::Arg>> = {
 };
 
 ClassDef: ast::Stmt = {
-    <decorator_list:Decorator*> <location:@L> "class" <name:Identifier> <type_params:TypeParamList?> <a:("(" ArgumentList ")")?> ":" <body:Suite> => {
+    <location:@L>  <decorator_list:Decorator*> "class" <name:Identifier> <type_params:TypeParamList?> <a:("(" ArgumentList ")")?> ":" <body:Suite> => {
         let (bases, keywords) = match a {
             Some((_, arg, _)) => (arg.args, arg.keywords),
             None => (vec![], vec![]),
