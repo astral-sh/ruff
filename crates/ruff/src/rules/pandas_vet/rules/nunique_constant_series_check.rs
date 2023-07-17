@@ -13,12 +13,21 @@ use crate::rules::pandas_vet::helpers::{test_expression, Resolution};
 /// (i.e., contains only one unique value).
 ///
 /// ## Why is this bad?
+/// `.nunique()` is computationally inefficient for checking if a Series is
+/// constant.
 ///
+/// Consider, for example, a Series of length `n` that consists of increasing
+/// integer values (e.g., 1, 2, 3, 4). The `.nunique()` method will iterate
+/// over the entire Series to count the number of unique values. But in this
+/// case, we can detect that the Series is non-constant after visiting the
+/// first two values, which are non-equal.
 ///
-/// Let's take the example of a series of increasing integers (1, 2, 3, 4) of length `n`.
-/// While walking through the series, we already know at observing the second value that
-/// the series is not unique. However, using `.nunique()`, we will count till the end of
-/// the series before returning the result. This is computationally inefficient.
+/// In general, `.nunique()` requires iterating over the entire Series, while a
+/// more efficient approach allows short-circuiting the operation as soon as a
+/// non-equal value is found.
+///
+/// Instead of calling `.nunique()`, convert the Series to a NumPy array, and
+/// check if all values in the array are equal to the first observed value.
 ///
 /// ## Example
 /// ```python
@@ -34,15 +43,14 @@ use crate::rules::pandas_vet::helpers::{test_expression, Resolution};
 /// import pandas as pd
 ///
 /// data = pd.Series(range(1000))
-/// v = s.to_numpy()
-/// if v.shape[0] == 0 or (s[0] == s).all():
+/// array = data.to_numpy()
+/// if array.shape[0] == 0 or (array[0] == array).all():
 ///     print("Series is constant")
 /// ```
 ///
-/// The [Pandas Cookbook](https://pandas.pydata.org/docs/user_guide/cookbook.html#constant-series) provides additional examples in case that the Series contain missing values.
-///
 /// ## References
-/// - [Pandas documentation: `nunique`](https://pandas.pydata.org/docs/reference/api/pandas.Series.nuniqu .html)
+/// - [Pandas Cookbook: "Constant Series"](https://pandas.pydata.org/docs/user_guide/cookbook.html#constant-series)
+/// - [Pandas documentation: `nunique`](https://pandas.pydata.org/docs/reference/api/pandas.Series.nunique.html)
 #[violation]
 pub struct PandasNuniqueConstantSeriesCheck;
 
@@ -76,7 +84,7 @@ pub(crate) fn nunique_constant_series_check(
     }
 
     // Check if call is `.nuniuqe()`.
-    let Expr::Call(ast::ExprCall {func, .. }) = left else {
+    let Expr::Call(ast::ExprCall { func, .. }) = left else {
         return;
     };
 
