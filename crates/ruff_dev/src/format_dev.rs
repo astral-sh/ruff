@@ -1,15 +1,18 @@
-use anyhow::{bail, Context};
+use anyhow::{bail, format_err, Context};
 use clap::{CommandFactory, FromArgMatches};
 use ignore::DirEntry;
 use indicatif::ProgressBar;
-
+use log::debug;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use ruff::resolver::python_files_in_path;
 use ruff::settings::types::{FilePattern, FilePatternSet};
 use ruff_cli::args::CheckArgs;
 use ruff_cli::resolve::resolve;
-use ruff_formatter::{FormatError, PrintError};
-use ruff_python_formatter::{format_module, FormatModuleError, PyFormatOptions};
+use ruff_formatter::{FormatError, LineWidth, PrintError};
+use ruff_python_formatter::{
+    format_module, FormatModuleError, MagicTrailingComma, PyFormatOptions,
+};
+use serde::Deserialize;
 use similar::{ChangeTag, TextDiff};
 use std::fmt::{Display, Formatter};
 use std::fs::File;
@@ -314,6 +317,24 @@ fn format_dev_project(
 ) -> anyhow::Result<CheckRepoResult> {
     let start = Instant::now();
 
+    // TODO(konstin): The assumptions between this script (one repo) and ruff (pass in a bunch of
+    // files) mismatch.
+    let black_options = read_black_options(&files[0])?;
+    let mut options = PyFormatOptions::default();
+    let options = options
+        .with_line_width(
+            LineWidth::try_from(black_options.line_length).expect("Invalid line length limit"),
+        )
+        .with_magic_trailing_comma(if black_options.skip_magic_trailing_comma {
+            MagicTrailingComma::Ignore
+        } else {
+            MagicTrailingComma::Respect
+        });
+
+    debug!("Options for {}: {options:?}", files[0].display());
+
+    // TODO(konstin): black excludes
+
     // Find files to check (or in this case, format twice). Adapted from ruff_cli
     // First argument is ignored
     let paths = ruff_check_paths(files)?;
@@ -335,7 +356,9 @@ fn format_dev_project(
 
             let file = dir_entry.path().to_path_buf();
             // Handle panics (mostly in `debug_assert!`)
-            let result = match catch_unwind(|| format_dev_file(&file, stability_check, write)) {
+            let result = match catch_unwind(|| {
+                format_dev_file(&file, stability_check, write, options.clone())
+            }) {
                 Ok(result) => result,
                 Err(panic) => {
                     if let Some(message) = panic.downcast_ref::<String>() {
@@ -600,11 +623,12 @@ fn format_dev_file(
     input_path: &Path,
     stability_check: bool,
     write: bool,
+    options: PyFormatOptions,
 ) -> Result<Statistics, CheckFileError> {
     let content = fs::read_to_string(input_path)?;
     #[cfg(not(debug_assertions))]
     let start = Instant::now();
-    let printed = match format_module(&content, PyFormatOptions::default()) {
+    let printed = match format_module(&content, options.clone()) {
         Ok(printed) => printed,
         Err(err @ (FormatModuleError::LexError(_) | FormatModuleError::ParseError(_))) => {
             return Err(CheckFileError::SyntaxErrorInInput(err));
@@ -631,7 +655,7 @@ fn format_dev_file(
     }
 
     if stability_check {
-        let reformatted = match format_module(formatted, PyFormatOptions::default()) {
+        let reformatted = match format_module(formatted, options) {
             Ok(reformatted) => reformatted,
             Err(err @ (FormatModuleError::LexError(_) | FormatModuleError::ParseError(_))) => {
                 return Err(CheckFileError::SyntaxErrorInOutput {
@@ -661,4 +685,67 @@ fn format_dev_file(
     }
 
     Ok(Statistics::from_versions(&content, formatted))
+}
+
+#[derive(Deserialize, Default)]
+struct PyprojectToml {
+    tool: Option<PyprojectTomlTool>,
+}
+
+#[derive(Deserialize, Default)]
+struct PyprojectTomlTool {
+    black: Option<BlackOptions>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(default)]
+struct BlackOptions {
+    // Black actually allows both snake case and kebab case
+    #[serde(alias = "line-length")]
+    line_length: u16,
+    #[serde(alias = "skip-magic-trailing-comma")]
+    skip_magic_trailing_comma: bool,
+    #[allow(unused)]
+    #[serde(alias = "force-exclude")]
+    force_exclude: Option<String>,
+}
+
+impl Default for BlackOptions {
+    fn default() -> Self {
+        Self {
+            line_length: 88,
+            skip_magic_trailing_comma: false,
+            force_exclude: None,
+        }
+    }
+}
+
+fn read_black_options(repo: &Path) -> anyhow::Result<BlackOptions> {
+    let path = repo.join("pyproject.toml");
+    if !path.is_file() {
+        debug!(
+            "No pyproject.toml at {}, using black option defaults",
+            path.display()
+        );
+        return Ok(BlackOptions::default());
+    }
+
+    let pyproject_toml: PyprojectToml =
+        toml::from_str(&fs::read_to_string(&path)?).map_err(|e| {
+            format_err!(
+                "Not a valid pyproject.toml toml file at {}: {e}",
+                path.display()
+            )
+        })?;
+    let black_options = pyproject_toml
+        .tool
+        .unwrap_or_default()
+        .black
+        .unwrap_or_default();
+    debug!(
+        "Found {}, setting black options: {:?}",
+        path.display(),
+        &black_options
+    );
+    Ok(black_options)
 }

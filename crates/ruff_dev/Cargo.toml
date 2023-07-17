@@ -28,13 +28,15 @@ libcst = { workspace = true }
 log = { workspace = true }
 once_cell = { workspace = true }
 pretty_assertions = { version = "1.3.0" }
-regex = { workspace = true }
 rayon = "1.7.0"
+regex = { workspace = true }
 rustpython-format = { workspace = true }
 rustpython-parser = { workspace = true }
 schemars = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 similar = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 tempfile = "3.6.0"
+toml = { version = "0.7.6", features = ["parse"] }
