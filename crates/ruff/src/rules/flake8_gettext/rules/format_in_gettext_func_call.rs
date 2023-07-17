@@ -9,19 +9,17 @@ use crate::checkers::ast::Checker;
 /// Checks for `str.format` calls in `gettext` function calls.
 ///
 /// ## Why is this bad?
-/// In the `gettext` API, the `gettext` function (usually aliased to `_`)
-/// returns a translation of the given string by looking it up in a translation
-/// catalogue.
+/// In the `gettext` API, the `gettext` function (often aliased to `_`) returns
+/// a translation of its input argument by looking it up in a translation
+/// catalog.
 ///
-/// Formatting strings in the function call means the formatted string will be
-/// passed to the function, which will then look it up in the translation
-/// catalogue.
+/// Calling `gettext` with a formatted string as its argument can cause
+/// unexpected behavior. Since the formatted string is resolved before the
+/// function call, the translation catalog will look up the formatted string,
+/// rather than the `str.format`-style template.
 ///
-/// This is likely unintended. Even if such behavior is intended, it is
-/// error-prone as the translation catalogue may not contain the formatted
-/// string.
-///
-/// Instead, consider formatting the result of the function call.
+/// Instead, format the value returned by the function call, rather than
+/// its argument.
 ///
 /// ## Example
 /// ```python
