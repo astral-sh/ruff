@@ -14,3 +14,12 @@ f((1) for _ in (a))
 
 # combination of the two above
 f(((1) for _ in (a)))
+
+
+# black keeps the extra parens atm: https://github.com/psf/black/issues/2943
+len(
+    ( # leading
+    a for b in c
+     # trailing
+    )
+)
