@@ -2635,15 +2635,13 @@ where
                     flake8_bandit::rules::bad_file_permissions(self, func, args, keywords);
                 }
                 if self.enabled(Rule::RequestWithNoCertValidation) {
-                    flake8_bandit::rules::request_with_no_cert_validation(
-                        self, func, args, keywords,
-                    );
+                    flake8_bandit::rules::request_with_no_cert_validation(self, func, keywords);
                 }
                 if self.enabled(Rule::UnsafeYAMLLoad) {
                     flake8_bandit::rules::unsafe_yaml_load(self, func, args, keywords);
                 }
                 if self.enabled(Rule::SnmpInsecureVersion) {
-                    flake8_bandit::rules::snmp_insecure_version(self, func, args, keywords);
+                    flake8_bandit::rules::snmp_insecure_version(self, func, keywords);
                 }
                 if self.enabled(Rule::SnmpWeakCryptography) {
                     flake8_bandit::rules::snmp_weak_cryptography(self, func, args, keywords);
