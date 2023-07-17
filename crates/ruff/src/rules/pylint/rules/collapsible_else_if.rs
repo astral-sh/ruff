@@ -49,7 +49,9 @@ impl Violation for CollapsibleElseIf {
 /// PLR5501
 pub(crate) fn collapsible_else_if(elif_else_clauses: &[ElifElseClause]) -> Option<Diagnostic> {
     let Some(ElifElseClause {
-        body, test: None, range
+        body,
+        test: None,
+        range,
     }) = elif_else_clauses.last()
     else {
         return None;

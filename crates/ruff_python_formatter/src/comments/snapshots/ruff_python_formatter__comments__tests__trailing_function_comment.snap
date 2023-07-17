@@ -19,9 +19,9 @@ expression: comments.debug(test_case.source_code)
         ],
     },
     Node {
-        kind: StmtExpr,
-        range: 101..117,
-        source: `print("Greater")`,
+        kind: StmtPass,
+        range: 40..44,
+        source: `pass`,
     }: {
         "leading": [],
         "dangling": [],

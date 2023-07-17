@@ -456,10 +456,36 @@ fn handle_trailing_body_comment<'a>(
         return CommentPlacement::Default(comment);
     }
 
-    // Only do something if the preceding node has a body (has indented statements).
-    let Some(preceding_node) = comment.preceding_node() else {
-        return CommentPlacement::Default(comment);
-    };
+    // Handle the special cases of StmtIf, since there are ElifElseClauses which other nodes don't
+    // have
+    let preceding_node =
+        if let (stmt_if @ AnyNodeRef::StmtIf(..), Some(AnyNodeRef::ElifElseClause(..))) =
+            (comment.enclosing_node(), comment.following_node())
+        {
+            // The comment is between if body and an elif/else clause. We have to handle this
+            // separately since StmtIf spans the entire range, so it's not the preceding node
+            if let Some(preceding_node @ AnyNodeRef::ElifElseClause(..)) = comment.preceding_node()
+            {
+                preceding_node
+            } else {
+                stmt_if
+            }
+        } else if let Some(preceding_node @ AnyNodeRef::StmtIf(stmt_if_inner)) =
+            comment.preceding_node()
+        {
+            if let Some(clause) = stmt_if_inner.elif_else_clauses.last() {
+                // After the last elif or else branch
+                clause.into()
+            } else {
+                // After an if without any elif/else
+                preceding_node
+            }
+        } else if let Some(preceding_node) = comment.preceding_node() {
+            preceding_node
+        } else {
+            // Only do something if the preceding node has a body (has indented statements).
+            return CommentPlacement::Default(comment);
+        };
 
     let Some(last_child) = last_child_in_body(preceding_node) else {
         return CommentPlacement::Default(comment);
@@ -580,6 +606,22 @@ fn handle_trailing_end_of_line_body_comment<'a>(
         return CommentPlacement::Default(comment);
     };
 
+    // Handle the StmtIf special case
+    // ```python
+    // if True:
+    //     pass
+    // elif True:
+    //     pass # 14 end-of-line trailing `pass` comment, set preceding to the ElifElseClause
+    // ```
+    let preceding = if let AnyNodeRef::StmtIf(stmt_if) = preceding {
+        stmt_if
+            .elif_else_clauses
+            .last()
+            .map_or(preceding, AnyNodeRef::from)
+    } else {
+        preceding
+    };
+
     // Recursively get the last child of statements with a body.
     let last_children = std::iter::successors(last_child_in_body(preceding), |parent| {
         last_child_in_body(*parent)
@@ -614,39 +656,36 @@ fn handle_trailing_end_of_line_condition_comment<'a>(
         return CommentPlacement::Default(comment);
     }
 
+    // We handle trailing else comments separately because we the preceding node is None for their
+    // case
+    // ```python
+    // if True:
+    //     pass
+    // else: # 12 trailing else condition
+    //     pass
+    // ```
+    if let AnyNodeRef::ElifElseClause(ast::ElifElseClause {
+        body, test: None, ..
+    }) = comment.enclosing_node()
+    {
+        if comment.start() < body.first().unwrap().start() {
+            return CommentPlacement::dangling(comment.enclosing_node(), comment);
+        }
+    }
+
     // Must be between the condition expression and the first body element
     let (Some(preceding), Some(following)) = (comment.preceding_node(), comment.following_node())
     else {
         return CommentPlacement::Default(comment);
     };
 
-    // Mutable for the `StmtIf` special case where we might want to set this to the elif or else node
-    let mut enclosing_node = comment.enclosing_node();
+    let enclosing_node = comment.enclosing_node();
     let expression_before_colon = match enclosing_node {
-        AnyNodeRef::StmtIf(ast::StmtIf {
-            test,
-            elif_else_clauses,
-            ..
-        }) => {
-            // The default enclosing node is always the entire if statement, but comments can also
-            // be after an `elif`, in which case we update the enclosing node. This is special for
-            // if statements because normally alternate branches don't have their own nodes
-            let (node, inner_test) = elif_else_clauses
-                .iter()
-                .find_map(|clause| {
-                    if clause.range().contains(comment.slice().start()) {
-                        if let Some(test) = &clause.test {
-                            return Some((clause.into(), test));
-                        }
-                    }
-                    None
-                })
-                // If there's no matching elif or else, use the original if
-                .unwrap_or((enclosing_node, test.as_ref()));
-            enclosing_node = node;
-            Some(AnyNodeRef::from(inner_test))
-        }
-        AnyNodeRef::StmtWhile(ast::StmtWhile { test: expr, .. })
+        AnyNodeRef::ElifElseClause(ast::ElifElseClause {
+            test: Some(expr), ..
+        }) => Some(AnyNodeRef::from(expr)),
+        AnyNodeRef::StmtIf(ast::StmtIf { test: expr, .. })
+        | AnyNodeRef::StmtWhile(ast::StmtWhile { test: expr, .. })
         | AnyNodeRef::StmtFor(ast::StmtFor { iter: expr, .. })
         | AnyNodeRef::StmtAsyncFor(ast::StmtAsyncFor { iter: expr, .. }) => {
             Some(AnyNodeRef::from(expr.as_ref()))
@@ -1476,19 +1515,9 @@ fn last_child_in_body(node: AnyNodeRef) -> Option<AnyNodeRef> {
         | AnyNodeRef::MatchCase(ast::MatchCase { body, .. })
         | AnyNodeRef::ExceptHandlerExceptHandler(ast::ExceptHandlerExceptHandler {
             body, ..
-        }) => body,
-
-        AnyNodeRef::StmtIf(ast::StmtIf {
-            body,
-            elif_else_clauses,
-            ..
-        }) => {
-            if let Some(last) = elif_else_clauses.last() {
-                &last.body
-            } else {
-                body
-            }
-        }
+        })
+        | AnyNodeRef::StmtIf(ast::StmtIf { body, .. })
+        | AnyNodeRef::ElifElseClause(ast::ElifElseClause { body, .. }) => body,
 
         AnyNodeRef::StmtFor(ast::StmtFor { body, orelse, .. })
         | AnyNodeRef::StmtAsyncFor(ast::StmtAsyncFor { body, orelse, .. })
@@ -1501,7 +1530,7 @@ fn last_child_in_body(node: AnyNodeRef) -> Option<AnyNodeRef> {
         }
 
         AnyNodeRef::StmtMatch(ast::StmtMatch { cases, .. }) => {
-            return cases.last().map(AnyNodeRef::from)
+            return cases.last().map(AnyNodeRef::from);
         }
 
         AnyNodeRef::StmtTry(ast::StmtTry {

@@ -65,8 +65,8 @@ expression: comments.debug(test_case.source_code)
     },
     Node {
         kind: StmtExpr,
-        range: 327..340,
-        source: `print("else")`,
+        range: 281..292,
+        source: `print("if")`,
     }: {
         "leading": [],
         "dangling": [],
