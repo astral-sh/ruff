@@ -4119,6 +4119,7 @@ where
     }
 
     fn visit_arguments(&mut self, arguments: &'b Arguments) {
+        // Phase 1: Analysis
         if self.enabled(Rule::MutableArgumentDefault) {
             flake8_bugbear::rules::mutable_argument_default(self, arguments);
         }
@@ -4137,6 +4138,7 @@ where
             }
         }
 
+        // Phase 2: Binding.
         // Bind, but intentionally avoid walking default expressions, as we handle them
         // upstream.
         for arg_with_default in &arguments.posonlyargs {
@@ -4157,15 +4159,7 @@ where
     }
 
     fn visit_arg(&mut self, arg: &'b Arg) {
-        // Bind, but intentionally avoid walking the annotation, as we handle it
-        // upstream.
-        self.add_binding(
-            &arg.arg,
-            arg.identifier(),
-            BindingKind::Argument,
-            BindingFlags::empty(),
-        );
-
+        // Phase 1: Analysis
         if self.enabled(Rule::AmbiguousVariableName) {
             if let Some(diagnostic) =
                 pycodestyle::rules::ambiguous_variable_name(&arg.arg, arg.range())
@@ -4185,9 +4179,20 @@ where
         if self.enabled(Rule::BuiltinArgumentShadowing) {
             flake8_builtins::rules::builtin_argument_shadowing(self, arg);
         }
+
+        // Phase 2: Binding.
+        // Bind, but intentionally avoid walking the annotation, as we handle it
+        // upstream.
+        self.add_binding(
+            &arg.arg,
+            arg.identifier(),
+            BindingKind::Argument,
+            BindingFlags::empty(),
+        );
     }
 
     fn visit_pattern(&mut self, pattern: &'b Pattern) {
+        // Phase 2: Binding
         if let Pattern::MatchAs(ast::PatternMatchAs {
             name: Some(name), ..
         })
@@ -4207,24 +4212,29 @@ where
             );
         }
 
+        // Phase 3: Recursion
         walk_pattern(self, pattern);
     }
 
     fn visit_body(&mut self, body: &'b [Stmt]) {
+        // Phase 1: Analysis
         if self.enabled(Rule::UnnecessaryPass) {
             flake8_pie::rules::no_unnecessary_pass(self, body);
         }
 
+        // Phase 2: Binding
         let prev_body = self.semantic.body;
         let prev_body_index = self.semantic.body_index;
         self.semantic.body = body;
         self.semantic.body_index = 0;
 
+        // Phase 3: Recursion
         for stmt in body {
             self.visit_stmt(stmt);
             self.semantic.body_index += 1;
         }
 
+        // Phase 4: Clean-up
         self.semantic.body = prev_body;
         self.semantic.body_index = prev_body_index;
     }
