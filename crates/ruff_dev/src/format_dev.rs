@@ -324,18 +324,7 @@ fn format_dev_project(
 
     // TODO(konstin): The assumptions between this script (one repo) and ruff (pass in a bunch of
     // files) mismatch.
-    let black_options = read_black_options(&files[0])?;
-    let mut options = PyFormatOptions::default();
-    let options = options
-        .with_line_width(
-            LineWidth::try_from(black_options.line_length).expect("Invalid line length limit"),
-        )
-        .with_magic_trailing_comma(if black_options.skip_magic_trailing_comma {
-            MagicTrailingComma::Ignore
-        } else {
-            MagicTrailingComma::Respect
-        });
-
+    let options = BlackOptions::from_file(&files[0])?.to_py_format_options();
     debug!("Options for {}: {options:?}", files[0].display());
 
     // TODO(konstin): black excludes
@@ -725,32 +714,97 @@ impl Default for BlackOptions {
     }
 }
 
-fn read_black_options(repo: &Path) -> anyhow::Result<BlackOptions> {
-    let path = repo.join("pyproject.toml");
-    if !path.is_file() {
-        debug!(
-            "No pyproject.toml at {}, using black option defaults",
-            path.display()
-        );
-        return Ok(BlackOptions::default());
-    }
-
-    let pyproject_toml: PyprojectToml =
-        toml::from_str(&fs::read_to_string(&path)?).map_err(|e| {
+impl BlackOptions {
+    /// TODO(konstin): For the real version, fix printing of error chains and remove the path
+    /// argument
+    fn from_toml(toml: &str, path: &Path) -> anyhow::Result<Self> {
+        let pyproject_toml: PyprojectToml = toml::from_str(toml).map_err(|e| {
             format_err!(
                 "Not a valid pyproject.toml toml file at {}: {e}",
                 path.display()
             )
         })?;
-    let black_options = pyproject_toml
-        .tool
-        .unwrap_or_default()
-        .black
-        .unwrap_or_default();
-    debug!(
-        "Found {}, setting black options: {:?}",
-        path.display(),
-        &black_options
-    );
-    Ok(black_options)
+        let black_options = pyproject_toml
+            .tool
+            .unwrap_or_default()
+            .black
+            .unwrap_or_default();
+        debug!(
+            "Found {}, setting black options: {:?}",
+            path.display(),
+            &black_options
+        );
+        Ok(black_options)
+    }
+
+    fn from_file(repo: &Path) -> anyhow::Result<Self> {
+        let path = repo.join("pyproject.toml");
+        if !path.is_file() {
+            debug!(
+                "No pyproject.toml at {}, using black option defaults",
+                path.display()
+            );
+            return Ok(Self::default());
+        }
+        Self::from_toml(&fs::read_to_string(&path)?, repo)
+    }
+
+    fn to_py_format_options(&self) -> PyFormatOptions {
+        let mut options = PyFormatOptions::default();
+        options
+            .with_line_width(
+                LineWidth::try_from(self.line_length).expect("Invalid line length limit"),
+            )
+            .with_magic_trailing_comma(if self.skip_magic_trailing_comma {
+                MagicTrailingComma::Ignore
+            } else {
+                MagicTrailingComma::Respect
+            });
+        options
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::format_dev::BlackOptions;
+    use indoc::indoc;
+    use ruff_formatter::{FormatOptions, LineWidth};
+    use ruff_python_formatter::MagicTrailingComma;
+    use std::path::Path;
+
+    #[test]
+    fn test_transformers() {
+        let toml = indoc! {"
+            [tool.black]
+            line-length = 119
+            target-version = ['py37']
+        "};
+        let options = BlackOptions::from_toml(toml, Path::new("pyproject.toml"))
+            .unwrap()
+            .to_py_format_options();
+        assert_eq!(options.line_width(), LineWidth::try_from(119).unwrap());
+        assert!(matches!(
+            options.magic_trailing_comma(),
+            MagicTrailingComma::Respect
+        ));
+    }
+
+    #[test]
+    fn test_typeshed() {
+        let toml = indoc! {r#"
+            [tool.black]
+            line_length = 130
+            target_version = ["py310"]
+            skip_magic_trailing_comma = true
+            force-exclude = ".*_pb2.pyi"
+        "#};
+        let options = BlackOptions::from_toml(toml, Path::new("pyproject.toml"))
+            .unwrap()
+            .to_py_format_options();
+        assert_eq!(options.line_width(), LineWidth::try_from(130).unwrap());
+        assert!(matches!(
+            options.magic_trailing_comma(),
+            MagicTrailingComma::Ignore
+        ));
+    }
 }

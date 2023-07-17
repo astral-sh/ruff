@@ -40,3 +40,6 @@ strum = { workspace = true }
 strum_macros = { workspace = true }
 tempfile = "3.6.0"
 toml = { version = "0.7.6", features = ["parse"] }
+
+[dev-dependencies]
+indoc = "2.0.3"
