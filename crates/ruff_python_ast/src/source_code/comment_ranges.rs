@@ -31,8 +31,8 @@ impl CommentRanges {
         let start = self
             .raw
             .partition_point(|comment| comment.start() < range.start());
-        let end = self
-            .raw
+        let end = start + self
+            .raw[start..]
             .partition_point(|comment| comment.end() < range.end());
         &self.raw[start..end]
     }
