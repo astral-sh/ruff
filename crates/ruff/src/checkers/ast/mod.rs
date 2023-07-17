@@ -12,7 +12,7 @@ use rustpython_parser::ast::{
 use ruff_diagnostics::{Diagnostic, Fix, IsolationLevel};
 use ruff_python_ast::all::{extract_all_names, AllNamesFlags};
 use ruff_python_ast::helpers::{extract_handled_exceptions, to_module_path};
-use ruff_python_ast::identifier::{Identifier, TryIdentifier};
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::source_code::{Generator, Indexer, Locator, Quote, Stylist};
 use ruff_python_ast::str::trailing_quote;
 use ruff_python_ast::types::Node;
@@ -2635,15 +2635,13 @@ where
                     flake8_bandit::rules::bad_file_permissions(self, func, args, keywords);
                 }
                 if self.enabled(Rule::RequestWithNoCertValidation) {
-                    flake8_bandit::rules::request_with_no_cert_validation(
-                        self, func, args, keywords,
-                    );
+                    flake8_bandit::rules::request_with_no_cert_validation(self, func, keywords);
                 }
                 if self.enabled(Rule::UnsafeYAMLLoad) {
                     flake8_bandit::rules::unsafe_yaml_load(self, func, args, keywords);
                 }
                 if self.enabled(Rule::SnmpInsecureVersion) {
-                    flake8_bandit::rules::snmp_insecure_version(self, func, args, keywords);
+                    flake8_bandit::rules::snmp_insecure_version(self, func, keywords);
                 }
                 if self.enabled(Rule::SnmpWeakCryptography) {
                     flake8_bandit::rules::snmp_weak_cryptography(self, func, args, keywords);
@@ -2788,7 +2786,9 @@ where
                     pandas_vet::rules::inplace_argument(self, expr, func, args, keywords);
                 }
                 pandas_vet::rules::call(self, func);
-
+                if self.enabled(Rule::PandasUseOfDotReadTable) {
+                    pandas_vet::rules::use_of_read_table(self, func, keywords);
+                }
                 if self.enabled(Rule::PandasUseOfPdMerge) {
                     pandas_vet::rules::use_of_pd_merge(self, func);
                 }
@@ -3282,6 +3282,15 @@ where
                 }
                 if self.enabled(Rule::YodaConditions) {
                     flake8_simplify::rules::yoda_conditions(self, expr, left, ops, comparators);
+                }
+                if self.enabled(Rule::PandasNuniqueConstantSeriesCheck) {
+                    pandas_vet::rules::nunique_constant_series_check(
+                        self,
+                        expr,
+                        left,
+                        ops,
+                        comparators,
+                    );
                 }
             }
             Expr::Constant(ast::ExprConstant {
@@ -4085,7 +4094,7 @@ where
         {
             self.add_binding(
                 name,
-                pattern.try_identifier().unwrap(),
+                name.range(),
                 BindingKind::Assignment,
                 BindingFlags::empty(),
             );
