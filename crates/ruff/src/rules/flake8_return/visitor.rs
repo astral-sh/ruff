@@ -120,7 +120,6 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                 elif_else_clauses,
                 ..
             }) => {
-                // TODO(konstin): What's the rational here/is the condition right? -> https://github.com/astral-sh/ruff/pull/2881
                 if let Some(first) = elif_else_clauses.first() {
                     self.stack.elifs_elses.push((body, first));
                 }
