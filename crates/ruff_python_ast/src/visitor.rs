@@ -239,7 +239,7 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
                 if let Some(test) = &clause.test {
                     visitor.visit_expr(test);
                 }
-                visitor.visit_body(&clause.body);
+                walk_elif_else_clause(&clause);
             }
         }
         Stmt::With(ast::StmtWith { items, body, .. }) => {
