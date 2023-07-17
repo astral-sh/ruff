@@ -50,7 +50,7 @@ impl Violation for PandasNuniqueConstantSeriesCheck {
     }
 }
 
-/// PD801
+/// PD101
 pub(crate) fn nunique_constant_series_check(
     checker: &mut Checker,
     expr: &Expr,
