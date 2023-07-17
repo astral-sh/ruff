@@ -6,7 +6,8 @@ use std::ops::Deref;
 use rustpython_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
 use rustpython_parser::ast::{
     self, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Constant, ConversionFlag,
-    ExceptHandler, Expr, Identifier, MatchCase, Operator, Pattern, Stmt, Suite, WithItem, TypeParam,  TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple
+    ExceptHandler, Expr, Identifier, MatchCase, Operator, Pattern, Stmt, Suite, TypeParam,
+    TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
 };
 
 use ruff_python_whitespace::LineEnding;
@@ -539,7 +540,12 @@ impl<'a> Generator<'a> {
                     self.indent_depth = self.indent_depth.saturating_sub(1);
                 }
             }
-            Stmt::TypeAlias(ast::StmtTypeAlias { name, range: _range, type_params, value}) => {
+            Stmt::TypeAlias(ast::StmtTypeAlias {
+                name,
+                range: _range,
+                type_params,
+                value,
+            }) => {
                 self.p("type ");
                 self.unparse_expr(name, precedence::MAX);
                 for type_param in type_params {

@@ -214,10 +214,7 @@ where
             }
         }
 
-
-        Stmt::TypeAlias(ast::StmtTypeAlias { value, .. }) => {
-            visitor.visit_expr(value)
-        }
+        Stmt::TypeAlias(ast::StmtTypeAlias { value, .. }) => visitor.visit_expr(value),
 
         Stmt::Assign(ast::StmtAssign {
             targets,
