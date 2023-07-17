@@ -9,9 +9,12 @@ use crate::checkers::ast::Checker;
 use crate::rules::pandas_vet::helpers::{test_expression, Resolution};
 
 /// ## What it does
-/// Check for the use of `.nunique()` for determining if a Pandas Series is constant.
+/// Check for uses of `.nunique()` to check if a Pandas Series is constant
+/// (i.e., contains only one unique value).
 ///
 /// ## Why is this bad?
+///
+///
 /// Let's take the example of a series of increasing integers (1, 2, 3, 4) of length `n`.
 /// While walking through the series, we already know at observing the second value that
 /// the series is not unique. However, using `.nunique()`, we will count till the end of
@@ -39,7 +42,7 @@ use crate::rules::pandas_vet::helpers::{test_expression, Resolution};
 /// The [Pandas Cookbook](https://pandas.pydata.org/docs/user_guide/cookbook.html#constant-series) provides additional examples in case that the Series contain missing values.
 ///
 /// ## References
-/// - [Pandas documentation: `nunique`](https://pandas.pydata.org/docs/reference/api/pandas.Series.nunique.html)
+/// - [Pandas documentation: `nunique`](https://pandas.pydata.org/docs/reference/api/pandas.Series.nuniqu .html)
 #[violation]
 pub struct PandasNuniqueConstantSeriesCheck;
 
@@ -62,17 +65,17 @@ pub(crate) fn nunique_constant_series_check(
         return;
     };
 
-    // Operators may be ==, !=, <=, >
+    // Operators may be ==, !=, <=, >.
     if !matches!(op, CmpOp::Eq | CmpOp::NotEq | CmpOp::LtE | CmpOp::Gt,) {
         return;
     }
 
-    // Right should be the integer 1
+    // Right should be the integer 1.
     if !is_constant_one(right) {
         return;
     }
 
-    // Check if call is .nuniuqe()
+    // Check if call is `.nuniuqe()`.
     let Expr::Call(ast::ExprCall {func, .. }) = left else {
         return;
     };
