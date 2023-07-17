@@ -26,9 +26,7 @@ pub trait PreorderVisitor<'a> {
         walk_decorator(self, decorator);
     }
 
-    fn visit_constant(&mut self, constant: &'a Constant) {
-        walk_constant(self, constant);
-    }
+    fn visit_constant(&mut self, _constant: &'a Constant) {}
 
     fn visit_bool_op(&mut self, bool_op: &'a BoolOp) {
         walk_bool_op(self, bool_op);
@@ -689,17 +687,6 @@ where
             if let Some(expr) = step {
                 visitor.visit_expr(expr);
             }
-        }
-    }
-}
-
-pub fn walk_constant<'a, V>(visitor: &mut V, constant: &'a Constant)
-where
-    V: PreorderVisitor<'a> + ?Sized,
-{
-    if let Constant::Tuple(constants) = constant {
-        for constant in constants {
-            visitor.visit_constant(constant);
         }
     }
 }

@@ -88,7 +88,6 @@ impl From<&Expr> for PythonType {
                 Constant::None => PythonType::None,
                 Constant::Ellipsis => PythonType::Ellipsis,
                 Constant::Bytes(_) => PythonType::Bytes,
-                Constant::Tuple(_) => PythonType::Tuple,
             },
             _ => PythonType::Unknown,
         }

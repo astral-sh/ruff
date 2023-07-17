@@ -329,7 +329,6 @@ impl<'a> From<&'a ast::Constant> for ComparableConstant<'a> {
             ast::Constant::Str(value) => Self::Str(value),
             ast::Constant::Bytes(value) => Self::Bytes(value),
             ast::Constant::Int(value) => Self::Int(value),
-            ast::Constant::Tuple(value) => Self::Tuple(value.iter().map(Into::into).collect()),
             ast::Constant::Float(value) => Self::Float(value.to_bits()),
             ast::Constant::Complex { real, imag } => Self::Complex {
                 real: real.to_bits(),
