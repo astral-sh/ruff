@@ -51,12 +51,6 @@ impl FormatNodeRule<ExprCall> for FormatExprCall {
             let mut joiner = f.join_comma_separated(item.end());
             match args.as_slice() {
                 [argument] if keywords.is_empty() => {
-                    let parentheses =
-                        if is_single_argument_parenthesized(argument, item.end(), source) {
-                            Parentheses::Always
-                        } else {
-                            Parentheses::Never
-                        };
                     match argument {
                         Expr::GeneratorExp(generator_exp) => joiner.entry(
                             generator_exp,
@@ -64,7 +58,15 @@ impl FormatNodeRule<ExprCall> for FormatExprCall {
                                 .format()
                                 .with_options(GeneratorExpParentheses::StripIfOnlyFunctionArg),
                         ),
-                        other => joiner.entry(other, &other.format().with_options(parentheses)),
+                        other => {
+                            let parentheses =
+                                if is_single_argument_parenthesized(argument, item.end(), source) {
+                                    Parentheses::Always
+                                } else {
+                                    Parentheses::Never
+                                };
+                            joiner.entry(other, &other.format().with_options(parentheses))
+                        }
                     };
                 }
                 arguments => {
