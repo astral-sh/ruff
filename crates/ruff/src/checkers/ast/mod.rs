@@ -3285,6 +3285,15 @@ where
                 if self.enabled(Rule::YodaConditions) {
                     flake8_simplify::rules::yoda_conditions(self, expr, left, ops, comparators);
                 }
+                if self.enabled(Rule::PandasNuniqueConstantSeriesCheck) {
+                    pandas_vet::rules::nunique_constant_series_check(
+                        self,
+                        expr,
+                        left,
+                        ops,
+                        comparators,
+                    );
+                }
             }
             Expr::Constant(ast::ExprConstant {
                 value: Constant::Int(_) | Constant::Float(_) | Constant::Complex { .. },

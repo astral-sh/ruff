@@ -344,6 +344,7 @@ mod tests {
         Path::new("pandas_use_of_dot_read_table.py")
     )]
     #[test_case(Rule::PandasUseOfInplaceArgument, Path::new("PD002.py"))]
+    #[test_case(Rule::PandasNuniqueConstantSeriesCheck, Path::new("PD101.py"))]
     fn paths(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
