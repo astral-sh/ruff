@@ -4057,7 +4057,7 @@ where
         }
 
         // Step 2: Binding
-        let bindings = match except_handler {
+        let binding = match except_handler {
             ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                 type_: _,
                 name,
@@ -4066,17 +4066,17 @@ where
             }) => {
                 if let Some(name) = name {
                     // Store the existing binding, if any.
-                    let existing_id = self.semantic.lookup_symbol(name.as_str());
+                    let binding_id = self.semantic.lookup_symbol(name.as_str());
 
                     // Add the bound exception name to the scope.
-                    let binding_id = self.add_binding(
+                    self.add_binding(
                         name.as_str(),
                         name.range(),
-                        BindingKind::Assignment,
+                        BindingKind::BoundException,
                         BindingFlags::empty(),
                     );
 
-                    Some((name, existing_id, binding_id))
+                    Some((name, binding_id))
                 } else {
                     None
                 }
@@ -4087,30 +4087,11 @@ where
         walk_except_handler(self, except_handler);
 
         // Step 4: Clean-up
-        if let Some((name, existing_id, binding_id)) = bindings {
-            // If the exception name wasn't used in the scope, emit a diagnostic.
-            if !self.semantic.is_used(binding_id) {
-                if self.enabled(Rule::UnusedVariable) {
-                    let mut diagnostic = Diagnostic::new(
-                        pyflakes::rules::UnusedVariable {
-                            name: name.to_string(),
-                        },
-                        name.range(),
-                    );
-                    if self.patch(Rule::UnusedVariable) {
-                        diagnostic.try_set_fix(|| {
-                            pyflakes::fixes::remove_exception_handler_assignment(name, self.locator)
-                                .map(Fix::automatic)
-                        });
-                    }
-                    self.diagnostics.push(diagnostic);
-                }
-            }
-
+        if let Some((name, binding_id)) = binding {
             self.add_binding(
                 name.as_str(),
                 name.range(),
-                BindingKind::UnboundException(existing_id),
+                BindingKind::UnboundException(binding_id),
                 BindingFlags::empty(),
             );
         }
@@ -4797,6 +4778,37 @@ impl<'a> Checker<'a> {
         }
     }
 
+    /// Run any lint rules that operate over a single [`Binding`].
+    fn check_bindings(&mut self) {
+        if !self.any_enabled(&[Rule::UnusedVariable]) {
+            return;
+        }
+
+        for binding in self.semantic.bindings.iter() {
+            // F841
+            if self.enabled(Rule::UnusedVariable) {
+                if binding.kind.is_bound_exception() && !binding.is_used() {
+                    let mut diagnostic = Diagnostic::new(
+                        pyflakes::rules::UnusedVariable {
+                            name: binding.name(self.locator).to_string(),
+                        },
+                        binding.range,
+                    );
+                    if self.patch(Rule::UnusedVariable) {
+                        diagnostic.try_set_fix(|| {
+                            pyflakes::fixes::remove_exception_handler_assignment(
+                                binding,
+                                self.locator,
+                            )
+                            .map(Fix::automatic)
+                        });
+                    }
+                    self.diagnostics.push(diagnostic);
+                }
+            }
+        }
+    }
+
     fn check_deferred_scopes(&mut self) {
         if !self.any_enabled(&[
             Rule::GlobalVariableNotAssigned,
@@ -5475,6 +5487,7 @@ pub(crate) fn check_ast(
     checker.semantic.scope_id = ScopeId::global();
     checker.deferred.scopes.push(ScopeId::global());
     checker.check_deferred_scopes();
+    checker.check_bindings();
 
     checker.diagnostics
 }

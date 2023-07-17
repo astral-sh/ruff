@@ -1,9 +1,10 @@
 use anyhow::{Context, Ok, Result};
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{Expr, Identifier, Ranged};
+use rustpython_parser::ast::{Expr, Ranged};
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python_semantic::Binding;
 use ruff_python_whitespace::{SimpleTokenizer, TokenKind};
 
 use crate::autofix::codemods::CodegenStylist;
@@ -90,12 +91,12 @@ pub(crate) fn remove_unused_positional_arguments_from_format_call(
 
 /// Generate a [`Edit`] to remove the binding from an exception handler.
 pub(crate) fn remove_exception_handler_assignment(
-    bound_exception: &Identifier,
+    bound_exception: &Binding,
     locator: &Locator,
 ) -> Result<Edit> {
     // Lex backwards, to the token just before the `as`.
     let mut tokenizer =
-        SimpleTokenizer::up_to(bound_exception.start(), locator.contents()).skip_trivia();
+        SimpleTokenizer::up_to(bound_exception.range.start(), locator.contents()).skip_trivia();
 
     // Eat the `as` token.
     let preceding = tokenizer
@@ -109,7 +110,7 @@ pub(crate) fn remove_exception_handler_assignment(
         .context("expected the exception name to be preceded by a token")?;
 
     // Lex forwards, to the `:` token.
-    let following = SimpleTokenizer::starts_at(bound_exception.end(), locator.contents())
+    let following = SimpleTokenizer::starts_at(bound_exception.range.end(), locator.contents())
         .next()
         .context("expected the exception name to be followed by a colon")?;
     debug_assert!(matches!(following.kind, TokenKind::Colon));
