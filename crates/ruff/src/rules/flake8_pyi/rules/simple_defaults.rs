@@ -97,6 +97,22 @@ impl Violation for UnassignedSpecialVariableInStub {
     }
 }
 
+/// ## What it does
+/// Checks for `typehint.TypeAlias` annotation in type aliases.
+///
+/// ## Why is this bad?
+/// It makes harder for someone reading the code to differentiate
+/// between a value assignment and a type alias.
+///
+/// ## Example
+/// ```python
+/// IntOrStr = int | str
+/// ```
+///
+/// Use instead:
+/// ```python
+/// IntOrStr: TypeAlias = int | str
+/// ```
 #[violation]
 pub struct TypeAliasCheck {
     name: String,
@@ -413,9 +429,10 @@ pub(crate) fn argument_simple_defaults(checker: &mut Checker, arguments: &Argume
 
 /// PYI015
 pub(crate) fn assignment_default_in_stub(checker: &mut Checker, targets: &[Expr], value: &Expr) {
-    let [target] = targets else {
+    if targets.len() != 1 {
         return;
-    };
+    }
+    let target = &targets[0];
     if !target.is_name_expr() {
         return;
     }
@@ -484,9 +501,10 @@ pub(crate) fn unannotated_assignment_in_stub(
     targets: &[Expr],
     value: &Expr,
 ) {
-    let [target] = targets else {
+    if targets.len() != 1 {
         return;
-    };
+    }
+    let target = &targets[0];
     let Expr::Name(ast::ExprName { id, .. }) = target else {
         return;
     };
