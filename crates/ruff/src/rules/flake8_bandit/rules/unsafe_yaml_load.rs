@@ -7,15 +7,16 @@ use ruff_python_ast::helpers::SimpleCallArgs;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for uses of the Python `yaml.load` function.
+/// Checks for uses of the `yaml.load` function.
 ///
 /// ## Why is this bad?
-/// Using the `yaml.load` function with untrusted YAML files is insecure as it
-/// allows for the creation of arbitrary objects, which can then be used to
-/// achieve arbitrary code execution and otherwise unexpected behavior.
+/// Running the `yaml.load` function over untrusted YAML files is insecure, as
+/// `yaml.load` allows for the creation of arbitrary Python objects, which can
+/// then be used to execute arbitrary code.
 ///
 /// Instead, consider using `yaml.safe_load`, which allows for the creation of
-/// simple Python objects like integers and lists.
+/// simple Python objects like integers and lists, but prohibits the creation of
+/// more complex objects like functions and classes.
 ///
 /// ## Example
 /// ```python

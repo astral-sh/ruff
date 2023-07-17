@@ -7,11 +7,11 @@ use ruff_python_ast::helpers::SimpleCallArgs;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for uses of SNMPv3 without encryption.
+/// Checks for uses of the SNMPv3 protocol without encryption.
 ///
 /// ## Why is this bad?
 /// Unencrypted SNMPv3 communication can be intercepted and read by
-/// unauthorized parties. Instead, consider using SNMPv3 with encryption.
+/// unauthorized parties. Instead, enable encryption when using SNMPv3.
 ///
 /// ## Example
 /// ```python
