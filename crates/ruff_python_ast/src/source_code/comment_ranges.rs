@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use std::fmt::{Debug, Formatter};
 use std::ops::Deref;
 
@@ -31,10 +32,14 @@ impl CommentRanges {
         let start = self
             .raw
             .partition_point(|comment| comment.start() < range.start());
-        let end = start + self
-            .raw[start..]
-            .partition_point(|comment| comment.end() < range.end());
-        &self.raw[start..end]
+        // We expect there are few comments, so switching to find should be faster
+        match self.raw[start..]
+            .iter()
+            .find_position(|comment| comment.end() > range.end())
+        {
+            Some((in_range, _element)) => &self.raw[start..start + in_range],
+            None => &self.raw[start..],
+        }
     }
 }
 
