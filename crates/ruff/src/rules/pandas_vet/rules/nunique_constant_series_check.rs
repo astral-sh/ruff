@@ -1,11 +1,12 @@
 use num_traits::One;
+use rustpython_parser::ast::{self, CmpOp, Constant, Expr, Ranged};
+
+use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
-use rustpython_parser::ast::{self, CmpOp, Constant, Expr, Ranged};
 
 use crate::checkers::ast::Checker;
 use crate::rules::pandas_vet::helpers::{test_expression, Resolution};
-use ruff_diagnostics::Diagnostic;
 
 /// ## What it does
 /// Check for the use of `.nunique()` for determining if a Pandas Series is constant.
@@ -49,19 +50,8 @@ impl Violation for PandasNuniqueConstantSeriesCheck {
     }
 }
 
-/// Return `true` if an [`Expr`] is a constant `1`.
-fn is_constant_one(expr: &Expr) -> bool {
-    match expr {
-        Expr::Constant(constant) => match &constant.value {
-            Constant::Int(int) => int.is_one(),
-            _ => false,
-        },
-        _ => false,
-    }
-}
-
 /// PD801
-pub(crate) fn pandas_nunique_constant_series_check(
+pub(crate) fn nunique_constant_series_check(
     checker: &mut Checker,
     expr: &Expr,
     left: &Expr,
@@ -107,4 +97,15 @@ pub(crate) fn pandas_nunique_constant_series_check(
         PandasNuniqueConstantSeriesCheck,
         expr.range(),
     ));
+}
+
+/// Return `true` if an [`Expr`] is a constant `1`.
+fn is_constant_one(expr: &Expr) -> bool {
+    match expr {
+        Expr::Constant(constant) => match &constant.value {
+            Constant::Int(int) => int.is_one(),
+            _ => false,
+        },
+        _ => false,
+    }
 }

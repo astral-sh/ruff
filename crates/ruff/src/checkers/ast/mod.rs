@@ -3284,7 +3284,7 @@ where
                     flake8_simplify::rules::yoda_conditions(self, expr, left, ops, comparators);
                 }
                 if self.enabled(Rule::PandasNuniqueConstantSeriesCheck) {
-                    pandas_vet::rules::pandas_nunique_constant_series_check(
+                    pandas_vet::rules::nunique_constant_series_check(
                         self,
                         expr,
                         left,
