@@ -50,7 +50,7 @@ pub(crate) fn snmp_insecure_version(checker: &mut Checker, func: &Expr, keywords
             matches!(call_path.as_slice(), ["pysnmp", "hlapi", "CommunityData"])
         })
     {
-        if let Some(arg) = keywords.iter().find(|keyword| {
+        if let Some(keyword) = keywords.iter().find(|keyword| {
             keyword
                 .arg
                 .as_ref()
@@ -59,12 +59,12 @@ pub(crate) fn snmp_insecure_version(checker: &mut Checker, func: &Expr, keywords
             if let Expr::Constant(ast::ExprConstant {
                 value: Constant::Int(value),
                 ..
-            }) = &arg.value
+            }) = &keyword.value
             {
                 if value.is_zero() || value.is_one() {
                     checker
                         .diagnostics
-                        .push(Diagnostic::new(SnmpInsecureVersion, arg.range()));
+                        .push(Diagnostic::new(SnmpInsecureVersion, keyword.range()));
                 }
             }
         }

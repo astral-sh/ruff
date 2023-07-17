@@ -2,7 +2,6 @@ use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::SimpleCallArgs;
 
 use crate::checkers::ast::Checker;
 
@@ -30,12 +29,7 @@ impl Violation for Jinja2AutoescapeFalse {
 }
 
 /// S701
-pub(crate) fn jinja2_autoescape_false(
-    checker: &mut Checker,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
-) {
+pub(crate) fn jinja2_autoescape_false(checker: &mut Checker, func: &Expr, keywords: &[Keyword]) {
     if checker
         .semantic()
         .resolve_call_path(func)
@@ -43,10 +37,13 @@ pub(crate) fn jinja2_autoescape_false(
             matches!(call_path.as_slice(), ["jinja2", "Environment"])
         })
     {
-        let call_args = SimpleCallArgs::new(args, keywords);
-
-        if let Some(autoescape_arg) = call_args.keyword_argument("autoescape") {
-            match autoescape_arg {
+        if let Some(keyword) = keywords.iter().find(|keyword| {
+            keyword
+                .arg
+                .as_ref()
+                .map_or(false, |arg| arg.as_str() == "autoescape")
+        }) {
+            match &keyword.value {
                 Expr::Constant(ast::ExprConstant {
                     value: Constant::Bool(true),
                     ..
@@ -56,14 +53,14 @@ pub(crate) fn jinja2_autoescape_false(
                         if id != "select_autoescape" {
                             checker.diagnostics.push(Diagnostic::new(
                                 Jinja2AutoescapeFalse { value: true },
-                                autoescape_arg.range(),
+                                keyword.range(),
                             ));
                         }
                     }
                 }
                 _ => checker.diagnostics.push(Diagnostic::new(
                     Jinja2AutoescapeFalse { value: true },
-                    autoescape_arg.range(),
+                    keyword.range(),
                 )),
             }
         } else {
