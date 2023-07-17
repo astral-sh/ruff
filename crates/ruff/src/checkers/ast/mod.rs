@@ -12,7 +12,7 @@ use rustpython_parser::ast::{
 use ruff_diagnostics::{Diagnostic, Fix, IsolationLevel};
 use ruff_python_ast::all::{extract_all_names, AllNamesFlags};
 use ruff_python_ast::helpers::{extract_handled_exceptions, to_module_path};
-use ruff_python_ast::identifier::{Identifier, TryIdentifier};
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::source_code::{Generator, Indexer, Locator, Quote, Stylist};
 use ruff_python_ast::str::trailing_quote;
 use ruff_python_ast::types::Node;
@@ -2788,7 +2788,9 @@ where
                     pandas_vet::rules::inplace_argument(self, expr, func, args, keywords);
                 }
                 pandas_vet::rules::call(self, func);
-
+                if self.enabled(Rule::PandasUseOfDotReadTable) {
+                    pandas_vet::rules::use_of_read_table(self, func, keywords);
+                }
                 if self.enabled(Rule::PandasUseOfPdMerge) {
                     pandas_vet::rules::use_of_pd_merge(self, func);
                 }
@@ -4094,7 +4096,7 @@ where
         {
             self.add_binding(
                 name,
-                pattern.try_identifier().unwrap(),
+                name.range(),
                 BindingKind::Assignment,
                 BindingFlags::empty(),
             );
