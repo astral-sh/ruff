@@ -419,6 +419,13 @@ Summary
   159.43 ± 2.48 times faster than 'pycodestyle crates/ruff/resources/test/cpython'
 ```
 
+To benchmark a subset of rules, e.g. `LineTooLong` and `DocLineTooLong`:
+
+```shell
+cargo build --release && hyperfine --warmup 10 \
+  "./target/release/ruff ./crates/ruff/resources/test/cpython/ --no-cache -e --select W505,E501"
+```
+
 You can run `poetry install` from `./scripts/benchmarks` to create a working environment for the
 above. All reported benchmarks were computed using the versions specified by
 `./scripts/benchmarks/pyproject.toml` on Python 3.11.
