@@ -296,7 +296,7 @@ where
             visitor.visit_expr(test);
             visitor.visit_body(body);
             for clause in elif_else_clauses {
-                visitor.visit_elif_else_clause(visitor, clause);
+                visitor.visit_elif_else_clause(clause);
             }
         }
 
