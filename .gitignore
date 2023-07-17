@@ -11,6 +11,7 @@ schemastore
 .venv*
 # Formatter debugging (crates/ruff_python_formatter/README.md)
 scratch.py
+scratch.pyi
 # Created by `perf` (CONTRIBUTING.md)
 perf.data
 perf.data.old
