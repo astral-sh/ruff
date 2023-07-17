@@ -205,6 +205,7 @@ where
     'b: 'a,
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
+        // Phase 0: Pre-processing
         self.semantic.push_stmt(stmt);
 
         // Track whether we've seen docstrings, non-imports, etc.
@@ -247,28 +248,9 @@ where
         // the node.
         let flags_snapshot = self.semantic.flags;
 
-        // Pre-visit.
+        // Phase 1: Analysis
         match stmt {
             Stmt::Global(ast::StmtGlobal { names, range: _ }) => {
-                if !self.semantic.scope_id.is_global() {
-                    for name in names {
-                        if let Some(binding_id) = self.semantic.global_scope().get(name) {
-                            // Mark the binding in the global scope as "rebound" in the current scope.
-                            self.semantic
-                                .add_rebinding_scope(binding_id, self.semantic.scope_id);
-                        }
-
-                        // Add a binding to the current scope.
-                        let binding_id = self.semantic.push_binding(
-                            name.range(),
-                            BindingKind::Global,
-                            BindingFlags::GLOBAL,
-                        );
-                        let scope = self.semantic.scope_mut();
-                        scope.add(name, binding_id);
-                    }
-                }
-
                 if self.enabled(Rule::AmbiguousVariableName) {
                     self.diagnostics.extend(names.iter().filter_map(|name| {
                         pycodestyle::rules::ambiguous_variable_name(name, name.range())
@@ -276,41 +258,6 @@ where
                 }
             }
             Stmt::Nonlocal(ast::StmtNonlocal { names, range: _ }) => {
-                if !self.semantic.scope_id.is_global() {
-                    for name in names {
-                        if let Some((scope_id, binding_id)) = self.semantic.nonlocal(name) {
-                            // Mark the binding as "used".
-                            self.semantic.add_local_reference(
-                                binding_id,
-                                name.range(),
-                                ExecutionContext::Runtime,
-                            );
-
-                            // Mark the binding in the enclosing scope as "rebound" in the current
-                            // scope.
-                            self.semantic
-                                .add_rebinding_scope(binding_id, self.semantic.scope_id);
-
-                            // Add a binding to the current scope.
-                            let binding_id = self.semantic.push_binding(
-                                name.range(),
-                                BindingKind::Nonlocal(scope_id),
-                                BindingFlags::NONLOCAL,
-                            );
-                            let scope = self.semantic.scope_mut();
-                            scope.add(name, binding_id);
-                        } else {
-                            if self.enabled(Rule::NonlocalWithoutBinding) {
-                                self.diagnostics.push(Diagnostic::new(
-                                    pylint::rules::NonlocalWithoutBinding {
-                                        name: name.to_string(),
-                                    },
-                                    name.range(),
-                                ));
-                            }
-                        }
-                    }
-                }
                 if self.enabled(Rule::AmbiguousVariableName) {
                     self.diagnostics.extend(names.iter().filter_map(|name| {
                         pycodestyle::rules::ambiguous_variable_name(name, name.range())
@@ -357,9 +304,7 @@ where
                     flake8_django::rules::non_leading_receiver_decorator(self, decorator_list);
                 }
                 if self.enabled(Rule::AmbiguousFunctionName) {
-                    if let Some(diagnostic) =
-                        pycodestyle::rules::ambiguous_function_name(name, || stmt.identifier())
-                    {
+                    if let Some(diagnostic) = pycodestyle::rules::ambiguous_function_name(name) {
                         self.diagnostics.push(diagnostic);
                     }
                 }
@@ -403,7 +348,6 @@ where
                         self.diagnostics.push(diagnostic);
                     }
                 }
-
                 if self.is_stub {
                     if self.enabled(Rule::PassStatementStubBody) {
                         flake8_pyi::rules::pass_statement_stub_body(self, body);
@@ -459,15 +403,15 @@ where
                 if self.enabled(Rule::GlobalStatement) {
                     pylint::rules::global_statement(self, name);
                 }
-                if self.enabled(Rule::LRUCacheWithoutParameters)
-                    && self.settings.target_version >= PythonVersion::Py38
-                {
-                    pyupgrade::rules::lru_cache_without_parameters(self, decorator_list);
+                if self.enabled(Rule::LRUCacheWithoutParameters) {
+                    if self.settings.target_version >= PythonVersion::Py38 {
+                        pyupgrade::rules::lru_cache_without_parameters(self, decorator_list);
+                    }
                 }
-                if self.enabled(Rule::LRUCacheWithMaxsizeNone)
-                    && self.settings.target_version >= PythonVersion::Py39
-                {
-                    pyupgrade::rules::lru_cache_with_maxsize_none(self, decorator_list);
+                if self.enabled(Rule::LRUCacheWithMaxsizeNone) {
+                    if self.settings.target_version >= PythonVersion::Py39 {
+                        pyupgrade::rules::lru_cache_with_maxsize_none(self, decorator_list);
+                    }
                 }
                 if self.enabled(Rule::CachedInstanceMethod) {
                     flake8_bugbear::rules::cached_instance_method(self, decorator_list);
@@ -684,9 +628,7 @@ where
                     pyupgrade::rules::unnecessary_class_parentheses(self, class_def);
                 }
                 if self.enabled(Rule::AmbiguousClassName) {
-                    if let Some(diagnostic) =
-                        pycodestyle::rules::ambiguous_class_name(name, || stmt.identifier())
-                    {
+                    if let Some(diagnostic) = pycodestyle::rules::ambiguous_class_name(name) {
                         self.diagnostics.push(diagnostic);
                     }
                 }
@@ -794,47 +736,13 @@ where
                 }
 
                 for alias in names {
-                    if alias.name.contains('.') && alias.asname.is_none() {
-                        // Given `import foo.bar`, `name` would be "foo", and `qualified_name` would be
-                        // "foo.bar".
-                        let name = alias.name.split('.').next().unwrap();
-                        let qualified_name = &alias.name;
-                        self.add_binding(
-                            name,
-                            alias.identifier(),
-                            BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }),
-                            BindingFlags::EXTERNAL,
-                        );
-                    } else {
-                        let mut flags = BindingFlags::EXTERNAL;
-                        if alias.asname.is_some() {
-                            flags |= BindingFlags::ALIAS;
-                        }
-                        if alias
-                            .asname
-                            .as_ref()
-                            .map_or(false, |asname| asname.as_str() == alias.name.as_str())
-                        {
-                            flags |= BindingFlags::EXPLICIT_EXPORT;
-                        }
-
-                        let name = alias.asname.as_ref().unwrap_or(&alias.name);
-                        let qualified_name = &alias.name;
-                        self.add_binding(
-                            name,
-                            alias.identifier(),
-                            BindingKind::Import(Import { qualified_name }),
-                            flags,
-                        );
-
-                        if let Some(asname) = &alias.asname {
-                            if self.enabled(Rule::BuiltinVariableShadowing) {
-                                flake8_builtins::rules::builtin_variable_shadowing(
-                                    self,
-                                    asname,
-                                    asname.range(),
-                                );
-                            }
+                    if let Some(asname) = &alias.asname {
+                        if self.enabled(Rule::BuiltinVariableShadowing) {
+                            flake8_builtins::rules::builtin_variable_shadowing(
+                                self,
+                                asname,
+                                asname.range(),
+                            );
                         }
                     }
                     if self.enabled(Rule::Debugger) {
@@ -866,7 +774,6 @@ where
                             self.diagnostics.push(diagnostic);
                         }
                     }
-
                     if let Some(asname) = &alias.asname {
                         let name = alias.name.split('.').last().unwrap();
                         if self.enabled(Rule::ConstantImportedAsNonConstant) {
@@ -982,11 +889,11 @@ where
                         }
                     }
                 }
-                if self.enabled(Rule::UnnecessaryFutureImport)
-                    && self.settings.target_version >= PythonVersion::Py37
-                {
-                    if let Some("__future__") = module {
-                        pyupgrade::rules::unnecessary_future_import(self, stmt, names);
+                if self.enabled(Rule::UnnecessaryFutureImport) {
+                    if self.settings.target_version >= PythonVersion::Py37 {
+                        if let Some("__future__") = module {
+                            pyupgrade::rules::unnecessary_future_import(self, stmt, names);
+                        }
                     }
                 }
                 if self.enabled(Rule::DeprecatedMockImport) {
@@ -1028,7 +935,6 @@ where
                         self.diagnostics.push(diagnostic);
                     }
                 }
-
                 if self.is_stub {
                     if self.enabled(Rule::FutureAnnotationsInStub) {
                         flake8_pyi::rules::from_future_import(self, import_from);
@@ -1036,15 +942,6 @@ where
                 }
                 for alias in names {
                     if let Some("__future__") = module {
-                        let name = alias.asname.as_ref().unwrap_or(&alias.name);
-
-                        self.add_binding(
-                            name,
-                            alias.identifier(),
-                            BindingKind::FutureImport,
-                            BindingFlags::empty(),
-                        );
-
                         if self.enabled(Rule::FutureFeatureNotDefined) {
                             pyflakes::rules::future_feature_not_defined(self, alias);
                         }
@@ -1057,13 +954,8 @@ where
                             }
                         }
                     } else if &alias.name == "*" {
-                        self.semantic
-                            .scope_mut()
-                            .add_star_import(StarImport { level, module });
-
                         if self.enabled(Rule::UndefinedLocalWithNestedImportStarUsage) {
-                            let scope = self.semantic.scope();
-                            if !matches!(scope.kind, ScopeKind::Module) {
+                            if !matches!(self.semantic.scope().kind, ScopeKind::Module) {
                                 self.diagnostics.push(Diagnostic::new(
                                     pyflakes::rules::UndefinedLocalWithNestedImportStarUsage {
                                         name: helpers::format_import_from(level, module),
@@ -1090,31 +982,6 @@ where
                                 );
                             }
                         }
-
-                        let mut flags = BindingFlags::EXTERNAL;
-                        if alias.asname.is_some() {
-                            flags |= BindingFlags::ALIAS;
-                        }
-                        if alias
-                            .asname
-                            .as_ref()
-                            .map_or(false, |asname| asname.as_str() == alias.name.as_str())
-                        {
-                            flags |= BindingFlags::EXPLICIT_EXPORT;
-                        }
-
-                        // Given `from foo import bar`, `name` would be "bar" and `qualified_name` would
-                        // be "foo.bar". Given `from foo import bar as baz`, `name` would be "baz"
-                        // and `qualified_name` would be "foo.bar".
-                        let name = alias.asname.as_ref().unwrap_or(&alias.name);
-                        let qualified_name =
-                            helpers::format_import_from_member(level, module, &alias.name);
-                        self.add_binding(
-                            name,
-                            alias.identifier(),
-                            BindingKind::FromImport(FromImport { qualified_name }),
-                            flags,
-                        );
                     }
                     if self.enabled(Rule::RelativeImports) {
                         if let Some(diagnostic) = flake8_tidy_imports::rules::banned_relative_import(
@@ -1283,20 +1150,25 @@ where
                 }
             }
             Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
-                self.handle_node_load(target);
-
                 if self.enabled(Rule::GlobalStatement) {
                     if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
                         pylint::rules::global_statement(self, id);
                     }
                 }
             }
-            Stmt::If(ast::StmtIf {
-                test,
-                body,
-                orelse,
-                range: _,
-            }) => {
+            Stmt::If(
+                stmt_if @ ast::StmtIf {
+                    test,
+                    body,
+                    orelse,
+                    range: _,
+                },
+            ) => {
+                if self.enabled(Rule::EmptyTypeCheckingBlock) {
+                    if typing::is_type_checking_block(stmt_if, &self.semantic) {
+                        flake8_type_checking::rules::empty_type_checking_block(self, stmt_if);
+                    }
+                }
                 if self.enabled(Rule::IfTuple) {
                     pyflakes::rules::if_tuple(self, stmt, test);
                 }
@@ -1778,17 +1650,169 @@ where
                     pylint::rules::named_expr_without_context(self, value);
                 }
                 if self.enabled(Rule::AsyncioDanglingTask) {
-                    if let Some(diagnostic) = ruff::rules::asyncio_dangling_task(value, |expr| {
-                        self.semantic.resolve_call_path(expr)
-                    }) {
-                        self.diagnostics.push(diagnostic);
+                    ruff::rules::asyncio_dangling_task(self, value);
+                }
+            }
+            _ => {}
+        }
+
+        // Phase 2: Binding
+        match stmt {
+            Stmt::AugAssign(ast::StmtAugAssign {
+                target,
+                op: _,
+                value: _,
+                range: _,
+            }) => {
+                self.handle_node_load(target);
+            }
+            Stmt::Import(ast::StmtImport { names, range: _ }) => {
+                for alias in names {
+                    if alias.name.contains('.') && alias.asname.is_none() {
+                        // Given `import foo.bar`, `name` would be "foo", and `qualified_name` would be
+                        // "foo.bar".
+                        let name = alias.name.split('.').next().unwrap();
+                        let qualified_name = &alias.name;
+                        self.add_binding(
+                            name,
+                            alias.identifier(),
+                            BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }),
+                            BindingFlags::EXTERNAL,
+                        );
+                    } else {
+                        let mut flags = BindingFlags::EXTERNAL;
+                        if alias.asname.is_some() {
+                            flags |= BindingFlags::ALIAS;
+                        }
+                        if alias
+                            .asname
+                            .as_ref()
+                            .map_or(false, |asname| asname.as_str() == alias.name.as_str())
+                        {
+                            flags |= BindingFlags::EXPLICIT_EXPORT;
+                        }
+
+                        let name = alias.asname.as_ref().unwrap_or(&alias.name);
+                        let qualified_name = &alias.name;
+                        self.add_binding(
+                            name,
+                            alias.identifier(),
+                            BindingKind::Import(Import { qualified_name }),
+                            flags,
+                        );
+                    }
+                }
+            }
+            Stmt::ImportFrom(ast::StmtImportFrom {
+                names,
+                module,
+                level,
+                range: _,
+            }) => {
+                let module = module.as_deref();
+                let level = level.map(|level| level.to_u32());
+                for alias in names {
+                    if let Some("__future__") = module {
+                        let name = alias.asname.as_ref().unwrap_or(&alias.name);
+                        self.add_binding(
+                            name,
+                            alias.identifier(),
+                            BindingKind::FutureImport,
+                            BindingFlags::empty(),
+                        );
+                    } else if &alias.name == "*" {
+                        self.semantic
+                            .scope_mut()
+                            .add_star_import(StarImport { level, module });
+                    } else {
+                        let mut flags = BindingFlags::EXTERNAL;
+                        if alias.asname.is_some() {
+                            flags |= BindingFlags::ALIAS;
+                        }
+                        if alias
+                            .asname
+                            .as_ref()
+                            .map_or(false, |asname| asname.as_str() == alias.name.as_str())
+                        {
+                            flags |= BindingFlags::EXPLICIT_EXPORT;
+                        }
+
+                        // Given `from foo import bar`, `name` would be "bar" and `qualified_name` would
+                        // be "foo.bar". Given `from foo import bar as baz`, `name` would be "baz"
+                        // and `qualified_name` would be "foo.bar".
+                        let name = alias.asname.as_ref().unwrap_or(&alias.name);
+                        let qualified_name =
+                            helpers::format_import_from_member(level, module, &alias.name);
+                        self.add_binding(
+                            name,
+                            alias.identifier(),
+                            BindingKind::FromImport(FromImport { qualified_name }),
+                            flags,
+                        );
+                    }
+                }
+            }
+            Stmt::Global(ast::StmtGlobal { names, range: _ }) => {
+                if !self.semantic.scope_id.is_global() {
+                    for name in names {
+                        if let Some(binding_id) = self.semantic.global_scope().get(name) {
+                            // Mark the binding in the global scope as "rebound" in the current scope.
+                            self.semantic
+                                .add_rebinding_scope(binding_id, self.semantic.scope_id);
+                        }
+
+                        // Add a binding to the current scope.
+                        let binding_id = self.semantic.push_binding(
+                            name.range(),
+                            BindingKind::Global,
+                            BindingFlags::GLOBAL,
+                        );
+                        let scope = self.semantic.scope_mut();
+                        scope.add(name, binding_id);
+                    }
+                }
+            }
+            Stmt::Nonlocal(ast::StmtNonlocal { names, range: _ }) => {
+                if !self.semantic.scope_id.is_global() {
+                    for name in names {
+                        if let Some((scope_id, binding_id)) = self.semantic.nonlocal(name) {
+                            // Mark the binding as "used".
+                            self.semantic.add_local_reference(
+                                binding_id,
+                                name.range(),
+                                ExecutionContext::Runtime,
+                            );
+
+                            // Mark the binding in the enclosing scope as "rebound" in the current
+                            // scope.
+                            self.semantic
+                                .add_rebinding_scope(binding_id, self.semantic.scope_id);
+
+                            // Add a binding to the current scope.
+                            let binding_id = self.semantic.push_binding(
+                                name.range(),
+                                BindingKind::Nonlocal(scope_id),
+                                BindingFlags::NONLOCAL,
+                            );
+                            let scope = self.semantic.scope_mut();
+                            scope.add(name, binding_id);
+                        } else {
+                            if self.enabled(Rule::NonlocalWithoutBinding) {
+                                self.diagnostics.push(Diagnostic::new(
+                                    pylint::rules::NonlocalWithoutBinding {
+                                        name: name.to_string(),
+                                    },
+                                    name.range(),
+                                ));
+                            }
+                        }
                     }
                 }
             }
             _ => {}
         }
 
-        // Recurse.
+        // Phase 3: Recursion
         match stmt {
             Stmt::FunctionDef(ast::StmtFunctionDef {
                 body,
@@ -2039,10 +2063,6 @@ where
                     if self.semantic.at_top_level() {
                         self.importer.visit_type_checking_block(stmt);
                     }
-                    if self.enabled(Rule::EmptyTypeCheckingBlock) {
-                        flake8_type_checking::rules::empty_type_checking_block(self, stmt_if);
-                    }
-
                     self.visit_type_checking_block(body);
                 } else {
                     self.visit_body(body);
@@ -2053,7 +2073,7 @@ where
             _ => visitor::walk_stmt(self, stmt),
         };
 
-        // Post-visit.
+        // Phase 4: Clean-up
         match stmt {
             Stmt::FunctionDef(ast::StmtFunctionDef { name, .. })
             | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { name, .. }) => {
@@ -2095,6 +2115,7 @@ where
     }
 
     fn visit_expr(&mut self, expr: &'b Expr) {
+        // Phase 0: Pre-processing
         if !self.semantic.in_f_string()
             && !self.semantic.in_deferred_type_definition()
             && self.semantic.in_type_definition()
@@ -2137,7 +2158,7 @@ where
             self.semantic.flags -= SemanticModelFlags::BOOLEAN_TEST;
         }
 
-        // Pre-visit.
+        // Phase 1: Analysis
         match expr {
             Expr::Subscript(subscript @ ast::ExprSubscript { value, slice, .. }) => {
                 // Ex) Optional[...], Union[...]
@@ -2245,7 +2266,7 @@ where
                 ctx,
                 range: _,
             }) => {
-                if matches!(ctx, ExprContext::Store) {
+                if ctx.is_store() {
                     let check_too_many_expressions =
                         self.enabled(Rule::ExpressionsInStarAssignment);
                     let check_two_starred_expressions =
@@ -2263,8 +2284,6 @@ where
             Expr::Name(ast::ExprName { id, ctx, range }) => {
                 match ctx {
                     ExprContext::Load => {
-                        self.handle_node_load(expr);
-
                         if self.enabled(Rule::TypingTextStrAlias) {
                             pyupgrade::rules::typing_text_str_alias(self, expr);
                         }
@@ -2320,8 +2339,37 @@ where
                         }
                     }
                     ExprContext::Store => {
-                        self.handle_node_store(id, expr);
-
+                        if self.enabled(Rule::UndefinedLocal) {
+                            pyflakes::rules::undefined_local(self, id);
+                        }
+                        if self.enabled(Rule::NonLowercaseVariableInFunction) {
+                            if self.semantic.scope().kind.is_any_function() {
+                                // Ignore globals.
+                                if !self.semantic.scope().get(id).map_or(false, |binding_id| {
+                                    self.semantic.binding(binding_id).is_global()
+                                }) {
+                                    pep8_naming::rules::non_lowercase_variable_in_function(
+                                        self, expr, id,
+                                    );
+                                }
+                            }
+                        }
+                        if self.enabled(Rule::MixedCaseVariableInClassScope) {
+                            if let ScopeKind::Class(ast::StmtClassDef { bases, .. }) =
+                                &self.semantic.scope().kind
+                            {
+                                pep8_naming::rules::mixed_case_variable_in_class_scope(
+                                    self, expr, id, bases,
+                                );
+                            }
+                        }
+                        if self.enabled(Rule::MixedCaseVariableInGlobalScope) {
+                            if matches!(self.semantic.scope().kind, ScopeKind::Module) {
+                                pep8_naming::rules::mixed_case_variable_in_global_scope(
+                                    self, expr, id,
+                                );
+                            }
+                        }
                         if self.enabled(Rule::AmbiguousVariableName) {
                             if let Some(diagnostic) =
                                 pycodestyle::rules::ambiguous_variable_name(id, expr.range())
@@ -2329,7 +2377,6 @@ where
                                 self.diagnostics.push(diagnostic);
                             }
                         }
-
                         if let ScopeKind::Class(class_def) = self.semantic.scope().kind {
                             if self.enabled(Rule::BuiltinAttributeShadowing) {
                                 flake8_builtins::rules::builtin_attribute_shadowing(
@@ -2344,7 +2391,32 @@ where
                             }
                         }
                     }
-                    ExprContext::Del => self.handle_node_delete(expr),
+                    ExprContext::Del => {
+                        if let Some(binding_id) = self.semantic.scope().get(id) {
+                            // If the name is unbound, then it's an error.
+                            if self.enabled(Rule::UndefinedName) {
+                                let binding = self.semantic.binding(binding_id);
+                                if binding.is_unbound() {
+                                    self.diagnostics.push(Diagnostic::new(
+                                        pyflakes::rules::UndefinedName {
+                                            name: id.to_string(),
+                                        },
+                                        expr.range(),
+                                    ));
+                                }
+                            }
+                        } else {
+                            // If the name isn't bound at all, then it's an error.
+                            if self.enabled(Rule::UndefinedName) {
+                                self.diagnostics.push(Diagnostic::new(
+                                    pyflakes::rules::UndefinedName {
+                                        name: id.to_string(),
+                                    },
+                                    expr.range(),
+                                ));
+                            }
+                        }
+                    }
                 }
                 if self.enabled(Rule::SixPY3) {
                     flake8_2020::rules::name_or_attribute(self, expr);
@@ -2386,10 +2458,10 @@ where
                         }
                     }
                 }
-                if self.enabled(Rule::DatetimeTimezoneUTC)
-                    && self.settings.target_version >= PythonVersion::Py311
-                {
-                    pyupgrade::rules::datetime_utc_alias(self, expr);
+                if self.enabled(Rule::DatetimeTimezoneUTC) {
+                    if self.settings.target_version >= PythonVersion::Py311 {
+                        pyupgrade::rules::datetime_utc_alias(self, expr);
+                    }
                 }
                 if self.enabled(Rule::TypingTextStrAlias) {
                     pyupgrade::rules::typing_text_str_alias(self, expr);
@@ -2427,13 +2499,6 @@ where
                     range: _,
                 },
             ) => {
-                if let Expr::Name(ast::ExprName { id, ctx, range: _ }) = func.as_ref() {
-                    if id == "locals" && matches!(ctx, ExprContext::Load) {
-                        let scope = self.semantic.scope_mut();
-                        scope.set_uses_locals();
-                    }
-                }
-
                 if self.any_enabled(&[
                     // pyflakes
                     Rule::StringDotFormatInvalidFormat,
@@ -2479,7 +2544,6 @@ where
                                                 self, &summary, keywords, location,
                                             );
                                         }
-
                                         if self
                                             .enabled(Rule::StringDotFormatExtraPositionalArguments)
                                         {
@@ -2488,23 +2552,19 @@ where
                                                 &summary, args, location,
                                             );
                                         }
-
                                         if self.enabled(Rule::StringDotFormatMissingArguments) {
                                             pyflakes::rules::string_dot_format_missing_argument(
                                                 self, &summary, args, keywords, location,
                                             );
                                         }
-
                                         if self.enabled(Rule::StringDotFormatMixingAutomatic) {
                                             pyflakes::rules::string_dot_format_mixing_automatic(
                                                 self, &summary, location,
                                             );
                                         }
-
                                         if self.enabled(Rule::FormatLiterals) {
                                             pyupgrade::rules::format_literals(self, &summary, expr);
                                         }
-
                                         if self.enabled(Rule::FString) {
                                             pyupgrade::rules::f_strings(
                                                 self,
@@ -3314,16 +3374,6 @@ where
                 kind,
                 range: _,
             }) => {
-                if self.semantic.in_type_definition()
-                    && !self.semantic.in_literal()
-                    && !self.semantic.in_f_string()
-                {
-                    self.deferred.string_type_definitions.push((
-                        expr.range(),
-                        value,
-                        self.semantic.snapshot(),
-                    ));
-                }
                 if self.enabled(Rule::HardcodedBindAllInterfaces) {
                     if let Some(diagnostic) =
                         flake8_bandit::rules::hardcoded_bind_all_interfaces(value, expr.range())
@@ -3343,8 +3393,10 @@ where
                 if self.enabled(Rule::UnicodeKindPrefix) {
                     pyupgrade::rules::unicode_kind_prefix(self, expr, kind.as_deref());
                 }
-                if self.is_stub && self.enabled(Rule::StringOrBytesTooLong) {
-                    flake8_pyi::rules::string_or_bytes_too_long(self, expr);
+                if self.is_stub {
+                    if self.enabled(Rule::StringOrBytesTooLong) {
+                        flake8_pyi::rules::string_or_bytes_too_long(self, expr);
+                    }
                 }
             }
             Expr::Lambda(
@@ -3504,7 +3556,30 @@ where
             _ => {}
         };
 
-        // Recurse.
+        // Phase 2: Binding
+        match expr {
+            Expr::Call(ast::ExprCall {
+                func,
+                args: _,
+                keywords: _,
+                range: _,
+            }) => {
+                if let Expr::Name(ast::ExprName { id, ctx, range: _ }) = func.as_ref() {
+                    if id == "locals" && ctx.is_load() {
+                        let scope = self.semantic.scope_mut();
+                        scope.set_uses_locals();
+                    }
+                }
+            }
+            Expr::Name(ast::ExprName { id, ctx, range: _ }) => match ctx {
+                ExprContext::Load => self.handle_node_load(expr),
+                ExprContext::Store => self.handle_node_store(id, expr),
+                ExprContext::Del => self.handle_node_delete(expr),
+            },
+            _ => {}
+        }
+
+        // Phase 3: Recursion
         match expr {
             Expr::ListComp(ast::ExprListComp {
                 elt,
@@ -3837,6 +3912,22 @@ where
                     }
                 }
             }
+            Expr::Constant(ast::ExprConstant {
+                value: Constant::Str(value),
+                kind: _,
+                range: _,
+            }) => {
+                if self.semantic.in_type_definition()
+                    && !self.semantic.in_literal()
+                    && !self.semantic.in_f_string()
+                {
+                    self.deferred.string_type_definitions.push((
+                        expr.range(),
+                        value,
+                        self.semantic.snapshot(),
+                    ));
+                }
+            }
             Expr::JoinedStr(_) => {
                 self.semantic.flags |= if self.semantic.in_f_string() {
                     SemanticModelFlags::NESTED_F_STRING
@@ -3848,7 +3939,7 @@ where
             _ => visitor::walk_expr(self, expr),
         }
 
-        // Post-visit.
+        // Phase 4: Clean-up
         match expr {
             Expr::Lambda(_)
             | Expr::GeneratorExp(_)
@@ -3869,6 +3960,7 @@ where
         let flags_snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::EXCEPTION_HANDLER;
 
+        // Phase 1: Analysis
         match except_handler {
             ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                 type_,
@@ -3931,7 +4023,6 @@ where
                 if self.enabled(Rule::BinaryOpException) {
                     pylint::rules::binary_op_exception(self, except_handler);
                 }
-
                 if let Some(name) = name {
                     if self.enabled(Rule::AmbiguousVariableName) {
                         if let Some(diagnostic) =
@@ -3947,7 +4038,19 @@ where
                             name.range(),
                         );
                     }
+                }
+            }
+        }
 
+        // Phase 2: Binding
+        let bindings = match except_handler {
+            ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+                type_: _,
+                name,
+                body: _,
+                range: _,
+            }) => {
+                if let Some(name) = name {
                     // Store the existing binding, if any.
                     let existing_id = self.semantic.lookup_symbol(name.as_str());
 
@@ -3959,40 +4062,46 @@ where
                         BindingFlags::empty(),
                     );
 
-                    walk_except_handler(self, except_handler);
-
-                    // If the exception name wasn't used in the scope, emit a diagnostic.
-                    if !self.semantic.is_used(binding_id) {
-                        if self.enabled(Rule::UnusedVariable) {
-                            let mut diagnostic = Diagnostic::new(
-                                pyflakes::rules::UnusedVariable {
-                                    name: name.to_string(),
-                                },
-                                name.range(),
-                            );
-                            if self.patch(Rule::UnusedVariable) {
-                                diagnostic.try_set_fix(|| {
-                                    pyflakes::fixes::remove_exception_handler_assignment(
-                                        except_handler,
-                                        self.locator,
-                                    )
-                                    .map(Fix::automatic)
-                                });
-                            }
-                            self.diagnostics.push(diagnostic);
-                        }
-                    }
-
-                    self.add_binding(
-                        name.as_str(),
-                        name.range(),
-                        BindingKind::UnboundException(existing_id),
-                        BindingFlags::empty(),
-                    );
+                    Some((name, existing_id, binding_id))
                 } else {
-                    walk_except_handler(self, except_handler);
+                    None
                 }
             }
+        };
+
+        // Phase 3: Recursion
+        walk_except_handler(self, except_handler);
+
+        // Phase 4: Clean-up
+        if let Some((name, existing_id, binding_id)) = bindings {
+            // If the exception name wasn't used in the scope, emit a diagnostic.
+            if !self.semantic.is_used(binding_id) {
+                if self.enabled(Rule::UnusedVariable) {
+                    let mut diagnostic = Diagnostic::new(
+                        pyflakes::rules::UnusedVariable {
+                            name: name.to_string(),
+                        },
+                        name.range(),
+                    );
+                    if self.patch(Rule::UnusedVariable) {
+                        diagnostic.try_set_fix(|| {
+                            pyflakes::fixes::remove_exception_handler_assignment(
+                                except_handler,
+                                self.locator,
+                            )
+                            .map(Fix::automatic)
+                        });
+                    }
+                    self.diagnostics.push(diagnostic);
+                }
+            }
+
+            self.add_binding(
+                name.as_str(),
+                name.range(),
+                BindingKind::UnboundException(existing_id),
+                BindingFlags::empty(),
+            );
         }
 
         self.semantic.flags = flags_snapshot;
@@ -4360,12 +4469,7 @@ impl<'a> Checker<'a> {
                     }
 
                     // Avoid flagging if `NameError` is handled.
-                    if self
-                        .semantic
-                        .handled_exceptions
-                        .iter()
-                        .any(|handler_names| handler_names.contains(Exceptions::NAME_ERROR))
-                    {
+                    if self.semantic.exceptions().contains(Exceptions::NAME_ERROR) {
                         return;
                     }
 
@@ -4382,32 +4486,6 @@ impl<'a> Checker<'a> {
 
     fn handle_node_store(&mut self, id: &'a str, expr: &Expr) {
         let parent = self.semantic.stmt();
-
-        if self.enabled(Rule::UndefinedLocal) {
-            pyflakes::rules::undefined_local(self, id);
-        }
-        if self.enabled(Rule::NonLowercaseVariableInFunction) {
-            if self.semantic.scope().kind.is_any_function() {
-                // Ignore globals.
-                if !self.semantic.scope().get(id).map_or(false, |binding_id| {
-                    self.semantic.binding(binding_id).is_global()
-                }) {
-                    pep8_naming::rules::non_lowercase_variable_in_function(self, expr, parent, id);
-                }
-            }
-        }
-        if self.enabled(Rule::MixedCaseVariableInClassScope) {
-            if let ScopeKind::Class(ast::StmtClassDef { bases, .. }) = &self.semantic.scope().kind {
-                pep8_naming::rules::mixed_case_variable_in_class_scope(
-                    self, expr, parent, id, bases,
-                );
-            }
-        }
-        if self.enabled(Rule::MixedCaseVariableInGlobalScope) {
-            if matches!(self.semantic.scope().kind, ScopeKind::Module) {
-                pep8_naming::rules::mixed_case_variable_in_global_scope(self, expr, parent, id);
-            }
-        }
 
         if matches!(
             parent,
@@ -4526,29 +4604,6 @@ impl<'a> Checker<'a> {
         if let Some(binding_id) = self.semantic.scope().get(id) {
             self.semantic
                 .add_local_reference(binding_id, expr.range(), ExecutionContext::Runtime);
-
-            // If the name is unbound, then it's an error.
-            if self.enabled(Rule::UndefinedName) {
-                let binding = self.semantic.binding(binding_id);
-                if binding.is_unbound() {
-                    self.diagnostics.push(Diagnostic::new(
-                        pyflakes::rules::UndefinedName {
-                            name: id.to_string(),
-                        },
-                        expr.range(),
-                    ));
-                }
-            }
-        } else {
-            // If the name isn't bound at all, then it's an error.
-            if self.enabled(Rule::UndefinedName) {
-                self.diagnostics.push(Diagnostic::new(
-                    pyflakes::rules::UndefinedName {
-                        name: id.to_string(),
-                    },
-                    expr.range(),
-                ));
-            }
         }
 
         if helpers::on_conditional_branch(&mut self.semantic.parents()) {
