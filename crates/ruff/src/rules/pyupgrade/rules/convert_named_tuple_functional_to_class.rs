@@ -155,8 +155,8 @@ fn create_properties_from_keywords(keywords: &[Keyword]) -> Result<Vec<Stmt>> {
         .map(|keyword| {
             let Keyword { arg, value, .. } = keyword;
             let Some(arg) = arg else {
-                    bail!("Expected `keyword` to have an `arg`")
-                };
+                bail!("Expected `keyword` to have an `arg`")
+            };
             Ok(create_property_assignment_stmt(arg.as_str(), value))
         })
         .collect()
@@ -205,29 +205,34 @@ pub(crate) fn convert_named_tuple_functional_to_class(
 
     let properties = match (&args[1..], keywords) {
         // Ex) NamedTuple("MyType")
-        ([], []) => {
-            let node = Stmt::Pass(ast::StmtPass {
-                range: TextRange::default(),
-            });
-            Ok(vec![node])
-        }
+        ([], []) => vec![Stmt::Pass(ast::StmtPass {
+            range: TextRange::default(),
+        })],
         // Ex) NamedTuple("MyType", [("a", int), ("b", str)])
-        ([fields], []) => create_properties_from_fields_arg(fields),
+        ([fields], []) => {
+            if let Ok(properties) = create_properties_from_fields_arg(fields) {
+                properties
+            } else {
+                debug!("Skipping `NamedTuple` \"{typename}\": unable to parse fields");
+                return;
+            }
+        }
         // Ex) NamedTuple("MyType", a=int, b=str)
-        ([], keywords) => create_properties_from_keywords(keywords),
+        ([], keywords) => {
+            if let Ok(properties) = create_properties_from_keywords(keywords) {
+                properties
+            } else {
+                debug!("Skipping `NamedTuple` \"{typename}\": unable to parse keywords");
+                return;
+            }
+        }
         // Unfixable
         _ => {
-            debug!("Skipping `NamedTuple` \"{typename}\": unfixable");
+            debug!("Skipping `NamedTuple` \"{typename}\": mixed fields and keywords");
             return;
         }
     };
-    let properties = match properties {
-        Ok(properties) => properties,
-        Err(err) => {
-            debug!("Skipping `NamedTuple` \"{typename}\": {err}");
-            return;
-        }
-    };
+
     let mut diagnostic = Diagnostic::new(
         ConvertNamedTupleFunctionalToClass {
             name: typename.to_string(),
