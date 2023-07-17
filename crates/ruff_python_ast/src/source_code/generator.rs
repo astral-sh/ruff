@@ -6,7 +6,7 @@ use std::ops::Deref;
 use rustpython_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
 use rustpython_parser::ast::{
     self, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Constant, ConversionFlag,
-    ExceptHandler, Expr, Identifier, MatchCase, Operator, Pattern, Stmt, Suite, WithItem,
+    ExceptHandler, Expr, Identifier, MatchCase, Operator, Pattern, Stmt, Suite, WithItem, TypeParam,  TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple
 };
 
 use ruff_python_whitespace::LineEnding;
@@ -271,6 +271,7 @@ impl<'a> Generator<'a> {
                 keywords,
                 body,
                 decorator_list,
+                type_params: _,
                 range: _range,
             }) => {
                 self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
@@ -537,6 +538,16 @@ impl<'a> Generator<'a> {
                     });
                     self.indent_depth = self.indent_depth.saturating_sub(1);
                 }
+            }
+            Stmt::TypeAlias(ast::StmtTypeAlias { name, range: _range, type_params, value}) => {
+                self.p("type ");
+                self.unparse_expr(name, precedence::MAX);
+                for type_param in type_params {
+                    self.unparse_type_param(type_param);
+                    self.p(", ")
+                }
+                self.p(" = ");
+                self.unparse_expr(value, precedence::MAX);
             }
             Stmt::Raise(ast::StmtRaise {
                 exc,
@@ -840,6 +851,26 @@ impl<'a> Generator<'a> {
         }
         self.p(":");
         self.body(&ast.body);
+    }
+
+    pub(crate) fn unparse_type_param(&mut self, ast: &TypeParam) {
+        match ast {
+            TypeParam::TypeVar(TypeParamTypeVar { name, bound, .. }) => {
+                self.p_id(name);
+                if let Some(expr) = bound {
+                    self.p(": ");
+                    self.unparse_expr(expr, precedence::MAX);
+                }
+            }
+            TypeParam::TypeVarTuple(TypeParamTypeVarTuple { name, .. }) => {
+                self.p("*");
+                self.p_id(name);
+            }
+            TypeParam::ParamSpec(TypeParamParamSpec { name, .. }) => {
+                self.p("**");
+                self.p_id(name);
+            }
+        }
     }
 
     pub(crate) fn unparse_expr(&mut self, ast: &Expr, level: u8) {

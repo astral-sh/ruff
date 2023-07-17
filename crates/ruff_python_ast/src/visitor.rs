@@ -151,6 +151,9 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
                 visitor.visit_expr(expr);
             }
         }
+        Stmt::TypeAlias(ast::StmtTypeAlias { value, .. }) => {
+            visitor.visit_expr(value)
+        }
         Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
             visitor.visit_expr(value);
             for expr in targets {

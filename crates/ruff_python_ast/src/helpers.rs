@@ -7,7 +7,7 @@ use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::FxHashMap;
 use rustpython_ast::CmpOp;
 use rustpython_parser::ast::{
-    self, Arguments, Constant, ExceptHandler, Expr, Keyword, MatchCase, Pattern, Ranged, Stmt,
+    self, Arguments, Constant, ExceptHandler, Expr, Keyword, MatchCase, Pattern, Ranged, Stmt, TypeParam
 };
 use rustpython_parser::{lexer, Mode, Tok};
 use smallvec::SmallVec;
@@ -265,6 +265,24 @@ where
     }
 }
 
+
+pub fn any_over_type_param<F>(type_param: &TypeParam, func: &F) -> bool
+where
+    F: Fn(&Expr) -> bool,
+{
+    match type_param {
+        TypeParam::TypeVar(ast::TypeParamTypeVar { bound, .. }) => {
+            bound.as_ref().map_or(false, |value| any_over_expr(value, func))
+        }
+        TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { .. }) => {
+            false
+        }
+        TypeParam::ParamSpec(ast::TypeParamParamSpec { .. }) => {
+            false
+        }
+    }
+}
+
 pub fn any_over_pattern<F>(pattern: &Pattern, func: &F) -> bool
 where
     F: Fn(&Expr) -> bool,
@@ -391,6 +409,11 @@ where
             targets,
             range: _range,
         }) => targets.iter().any(|expr| any_over_expr(expr, func)),
+        Stmt::TypeAlias(ast::StmtTypeAlias { name, type_params, value, .. }) => {
+            any_over_expr(name, func)
+             || type_params.iter().any(|type_param| any_over_type_param(type_param, func)) 
+             || any_over_expr(value, func)
+        }
         Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
             targets.iter().any(|expr| any_over_expr(expr, func)) || any_over_expr(value, func)
         }
