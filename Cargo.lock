@@ -2134,11 +2134,7 @@ dependencies = [
 [[package]]
 name = "ruff_text_size"
 version = "0.0.0"
-<<<<<<< HEAD
-source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=b996b21ffca562ecb2086f632a6a0b05c245c24a#b996b21ffca562ecb2086f632a6a0b05c245c24a"
-=======
 source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=126652b684910c29a7bcc32293d4ca0f81454e34#126652b684910c29a7bcc32293d4ca0f81454e34"
->>>>>>> 86957a9a9 (Bump RustPython-Parser to include PEP-695)
 dependencies = [
  "schemars",
  "serde",
@@ -2249,11 +2245,7 @@ dependencies = [
 [[package]]
 name = "rustpython-ast"
 version = "0.2.0"
-<<<<<<< HEAD
-source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=b996b21ffca562ecb2086f632a6a0b05c245c24a#b996b21ffca562ecb2086f632a6a0b05c245c24a"
-=======
 source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=126652b684910c29a7bcc32293d4ca0f81454e34#126652b684910c29a7bcc32293d4ca0f81454e34"
->>>>>>> 86957a9a9 (Bump RustPython-Parser to include PEP-695)
 dependencies = [
  "is-macro",
  "num-bigint",
@@ -2264,11 +2256,7 @@ dependencies = [
 [[package]]
 name = "rustpython-format"
 version = "0.2.0"
-<<<<<<< HEAD
-source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=b996b21ffca562ecb2086f632a6a0b05c245c24a#b996b21ffca562ecb2086f632a6a0b05c245c24a"
-=======
 source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=126652b684910c29a7bcc32293d4ca0f81454e34#126652b684910c29a7bcc32293d4ca0f81454e34"
->>>>>>> 86957a9a9 (Bump RustPython-Parser to include PEP-695)
 dependencies = [
  "bitflags 2.3.3",
  "itertools",
@@ -2280,11 +2268,7 @@ dependencies = [
 [[package]]
 name = "rustpython-literal"
 version = "0.2.0"
-<<<<<<< HEAD
-source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=b996b21ffca562ecb2086f632a6a0b05c245c24a#b996b21ffca562ecb2086f632a6a0b05c245c24a"
-=======
 source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=126652b684910c29a7bcc32293d4ca0f81454e34#126652b684910c29a7bcc32293d4ca0f81454e34"
->>>>>>> 86957a9a9 (Bump RustPython-Parser to include PEP-695)
 dependencies = [
  "hexf-parse",
  "is-macro",
@@ -2296,11 +2280,7 @@ dependencies = [
 [[package]]
 name = "rustpython-parser"
 version = "0.2.0"
-<<<<<<< HEAD
-source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=b996b21ffca562ecb2086f632a6a0b05c245c24a#b996b21ffca562ecb2086f632a6a0b05c245c24a"
-=======
 source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=126652b684910c29a7bcc32293d4ca0f81454e34#126652b684910c29a7bcc32293d4ca0f81454e34"
->>>>>>> 86957a9a9 (Bump RustPython-Parser to include PEP-695)
 dependencies = [
  "anyhow",
  "is-macro",
@@ -2323,11 +2303,7 @@ dependencies = [
 [[package]]
 name = "rustpython-parser-core"
 version = "0.2.0"
-<<<<<<< HEAD
-source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=b996b21ffca562ecb2086f632a6a0b05c245c24a#b996b21ffca562ecb2086f632a6a0b05c245c24a"
-=======
 source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=126652b684910c29a7bcc32293d4ca0f81454e34#126652b684910c29a7bcc32293d4ca0f81454e34"
->>>>>>> 86957a9a9 (Bump RustPython-Parser to include PEP-695)
 dependencies = [
  "is-macro",
  "memchr",
