@@ -5,9 +5,9 @@ use rustpython_parser::{lexer, Mode, Tok};
 use std::iter;
 
 /// Return the `Range` of the first `Elif` or `Else` token in an `If` statement.
-pub fn elif_else_range(stmt: &ElifElseClause, locator: &Locator) -> Option<TextRange> {
-    let contents = &locator.contents()[stmt.range];
-    let token = lexer::lex_starts_at(contents, Mode::Module, stmt.range.start())
+pub fn elif_else_range(clause: &ElifElseClause, locator: &Locator) -> Option<TextRange> {
+    let contents = &locator.contents()[clause.range];
+    let token = lexer::lex_starts_at(contents, Mode::Module, clause.range.start())
         .flatten()
         .next()?;
     if matches!(token.0, Tok::Elif | Tok::Else) {
