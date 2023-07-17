@@ -343,6 +343,7 @@ where
                 returns,
                 args,
                 body,
+                range,
                 ..
             })
             | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
@@ -351,10 +352,11 @@ where
                 returns,
                 args,
                 body,
+                range,
                 ..
             }) => {
                 if self.enabled(Rule::MutableArgumentDefault) {
-                    flake8_bugbear::rules::mutable_argument_default(self, args, body);
+                    flake8_bugbear::rules::mutable_argument_default(self, args, body, *range);
                 }
                 if self.enabled(Rule::DjangoNonLeadingReceiverDecorator) {
                     flake8_django::rules::non_leading_receiver_decorator(self, decorator_list);

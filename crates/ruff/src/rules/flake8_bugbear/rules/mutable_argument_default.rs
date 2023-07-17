@@ -4,9 +4,12 @@ use crate::registry::AsRule;
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::docstrings::leading_space;
+use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::whitespace::indentation_at_offset;
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
 use ruff_text_size::TextRange;
+use rustpython_parser::lexer::lex_starts_at;
+use rustpython_parser::{Mode, Tok};
 
 use crate::checkers::ast::Checker;
 
@@ -72,6 +75,7 @@ pub(crate) fn mutable_argument_default(
     checker: &mut Checker,
     arguments: &Arguments,
     body: &[Stmt],
+    func_range: TextRange,
 ) {
     // Scan in reverse order to right-align zip().
     for ArgWithDefault {
@@ -95,11 +99,9 @@ pub(crate) fn mutable_argument_default(
         {
             let mut diagnostic = Diagnostic::new(MutableArgumentDefault, default.range());
 
+            // If the function body is on the same line as the function def, do not fix
             if checker.patch(diagnostic.kind.rule())
-                // Do not try to fix if the function is only one line.
-                && checker
-                    .locator
-                    .contains_line_break(TextRange::new(arguments.range().end(), body[0].start()))
+                && !is_single_line(checker.locator, func_range, body)
             {
                 // Set the default arg value to None
                 let arg_edit = Edit::range_replacement("None".to_string(), default.range());
@@ -131,4 +133,17 @@ pub(crate) fn mutable_argument_default(
             checker.diagnostics.push(diagnostic);
         }
     }
+}
+
+fn is_single_line(locator: &Locator, func_range: TextRange, body: &[Stmt]) -> bool {
+    let arg_string = locator.slice(func_range);
+    for (tok, range) in lex_starts_at(arg_string, Mode::Module, func_range.start()).flatten() {
+        match tok {
+            Tok::Colon => {
+                return !locator.contains_line_break(TextRange::new(range.end(), body[0].start()))
+            }
+            _ => continue,
+        }
+    }
+    false
 }
