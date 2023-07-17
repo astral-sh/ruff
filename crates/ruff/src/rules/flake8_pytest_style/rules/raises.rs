@@ -1,3 +1,4 @@
+use ruff_python_ast::helpers::find_keyword;
 use rustpython_parser::ast::{self, Expr, Keyword, Ranged, Stmt, WithItem};
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -74,13 +75,7 @@ pub(crate) fn raises_call(checker: &mut Checker, func: &Expr, args: &[Expr], key
         }
 
         if checker.enabled(Rule::PytestRaisesTooBroad) {
-            let match_keyword = keywords.iter().find(|keyword| {
-                keyword
-                    .arg
-                    .as_ref()
-                    .map_or(false, |arg| arg.as_str() == "match")
-            });
-
+            let match_keyword = find_keyword(keywords, "match");
             if let Some(exception) = args.first() {
                 if let Some(match_keyword) = match_keyword {
                     if is_empty_or_null_string(&match_keyword.value) {
