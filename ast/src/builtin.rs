@@ -121,7 +121,6 @@ pub enum Constant {
     Str(String),
     Bytes(Vec<u8>),
     Int(BigInt),
-    Tuple(Vec<Constant>),
     Float(f64),
     Complex { real: f64, imag: f64 },
     Ellipsis,
@@ -178,20 +177,6 @@ impl std::fmt::Display for Constant {
                 f.pad(&repr)
             }
             Constant::Int(i) => i.fmt(f),
-            Constant::Tuple(tup) => {
-                if let [elt] = &**tup {
-                    write!(f, "({elt},)")
-                } else {
-                    f.write_str("(")?;
-                    for (i, elt) in tup.iter().enumerate() {
-                        if i != 0 {
-                            f.write_str(", ")?;
-                        }
-                        elt.fmt(f)?;
-                    }
-                    f.write_str(")")
-                }
-            }
             Constant::Float(fp) => f.pad(&rustpython_literal::float::to_string(*fp)),
             Constant::Complex { real, imag } => {
                 if *real == 0.0 {

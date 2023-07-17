@@ -17,7 +17,6 @@ impl Expr {
                 | Constant::Float(_)
                 | Constant::Complex { .. }
                 | Constant::Bytes(_) => "literal",
-                Constant::Tuple(_) => "tuple",
                 Constant::Bool(b) => {
                     if *b {
                         "True"
