@@ -97,6 +97,20 @@ impl Violation for UnassignedSpecialVariableInStub {
     }
 }
 
+#[violation]
+pub struct TypeAliasCheck {
+    name: String,
+    value: String,
+}
+
+impl Violation for TypeAliasCheck {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let TypeAliasCheck { name, value } = self;
+        format!("Use `typing.TypeAlias` for type aliases in `{name}`, e.g. \"{name}: typing.TypeAlias = {value}\"")
+    }
+}
+
 fn is_allowed_negated_math_attribute(call_path: &CallPath) -> bool {
     matches!(call_path.as_slice(), ["math", "inf" | "e" | "pi" | "tau"])
 }
@@ -521,5 +535,38 @@ pub(crate) fn unassigned_special_variable_in_stub(
             name: id.to_string(),
         },
         stmt.range(),
+    ));
+}
+
+/// PIY026
+pub(crate) fn type_alias_check(checker: &mut Checker, value: &Expr, targets: &[Expr]) {
+    let is_any = |expr: &Expr| {
+        let Expr::Name(ast::ExprName { id, .. }) = expr else {
+            return false;
+        };
+        id == "Any"
+    };
+
+    let target = &targets[0];
+    if is_special_assignment(target, checker.semantic()) {
+        return;
+    }
+    if matches!(value, Expr::Name(_)) && !is_any(value) {
+        return;
+    }
+    if !is_valid_pep_604_union(value) {
+        return;
+    }
+
+    let Expr::Name(ast::ExprName { id, .. }) = target else {
+            return;
+    };
+
+    checker.diagnostics.push(Diagnostic::new(
+        TypeAliasCheck {
+            name: id.to_string(),
+            value: checker.generator().expr(value),
+        },
+        target.range(),
     ));
 }

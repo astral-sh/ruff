@@ -1,0 +1,52 @@
+---
+source: crates/ruff/src/rules/flake8_pyi/mod.rs
+---
+PYI026.pyi:4:1: PYI026 Use `typing.TypeAlias` for type aliases in `NewAny`, e.g. "NewAny: typing.TypeAlias = Any"
+  |
+2 | from typing import TypeAlias, Literal, Any
+3 | 
+4 | NewAny = Any
+  | ^^^^^^ PYI026
+5 | OptinalStr = typing.Optional[str]
+6 | Foo = Literal["foo"]
+  |
+
+PYI026.pyi:5:1: PYI026 Use `typing.TypeAlias` for type aliases in `OptinalStr`, e.g. "OptinalStr: typing.TypeAlias = typing.Optional[str]"
+  |
+4 | NewAny = Any
+5 | OptinalStr = typing.Optional[str]
+  | ^^^^^^^^^^ PYI026
+6 | Foo = Literal["foo"]
+7 | IntOrStr = int | str
+  |
+
+PYI026.pyi:6:1: PYI026 Use `typing.TypeAlias` for type aliases in `Foo`, e.g. "Foo: typing.TypeAlias = Literal["foo"]"
+  |
+4 | NewAny = Any
+5 | OptinalStr = typing.Optional[str]
+6 | Foo = Literal["foo"]
+  | ^^^ PYI026
+7 | IntOrStr = int | str
+8 | AliasNone = None
+  |
+
+PYI026.pyi:7:1: PYI026 Use `typing.TypeAlias` for type aliases in `IntOrStr`, e.g. "IntOrStr: typing.TypeAlias = int | str"
+  |
+5 | OptinalStr = typing.Optional[str]
+6 | Foo = Literal["foo"]
+7 | IntOrStr = int | str
+  | ^^^^^^^^ PYI026
+8 | AliasNone = None
+  |
+
+PYI026.pyi:8:1: PYI026 Use `typing.TypeAlias` for type aliases in `AliasNone`, e.g. "AliasNone: typing.TypeAlias = None"
+   |
+ 6 | Foo = Literal["foo"]
+ 7 | IntOrStr = int | str
+ 8 | AliasNone = None
+   | ^^^^^^^^^ PYI026
+ 9 | 
+10 | NewAny: typing.TypeAlias = Any
+   |
+
+
