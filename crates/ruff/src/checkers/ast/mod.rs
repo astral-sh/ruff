@@ -1404,11 +1404,7 @@ where
                 }
                 if stmt.is_for_stmt() {
                     if self.enabled(Rule::ReimplementedBuiltin) {
-                        flake8_simplify::rules::convert_for_loop_to_any_all(
-                            self,
-                            stmt,
-                            self.semantic.sibling_stmt(),
-                        );
+                        flake8_simplify::rules::convert_for_loop_to_any_all(self, stmt);
                     }
                     if self.enabled(Rule::InDictKeys) {
                         flake8_simplify::rules::key_in_dict_for(self, target, iter);
@@ -4240,21 +4236,10 @@ where
             flake8_pie::rules::no_unnecessary_pass(self, body);
         }
 
-        // Step 2: Binding
-        let prev_body = self.semantic.body;
-        let prev_body_index = self.semantic.body_index;
-        self.semantic.body = body;
-        self.semantic.body_index = 0;
-
         // Step 3: Traversal
         for stmt in body {
             self.visit_stmt(stmt);
-            self.semantic.body_index += 1;
         }
-
-        // Step 4: Clean-up
-        self.semantic.body = prev_body;
-        self.semantic.body_index = prev_body_index;
     }
 }
 
