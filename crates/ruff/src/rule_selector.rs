@@ -249,6 +249,9 @@ mod schema {
                                 (!prefix.is_empty()).then(|| prefix.to_string())
                             })),
                     )
+                    // Filter out rule gated behind `#[cfg(feature = "unreachable-code")]`, which is
+                    // off-by-default
+                    .filter(|prefix| prefix != "RUF0014")
                     .sorted()
                     .map(Value::String)
                     .collect(),
