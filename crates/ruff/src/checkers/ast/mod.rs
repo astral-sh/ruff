@@ -2948,6 +2948,10 @@ where
                     Rule::OsPathSplitext,
                     Rule::BuiltinOpen,
                     Rule::PyPath,
+                    Rule::OsPathGetsize,
+                    Rule::OsPathGetatime,
+                    Rule::OsPathGetmtime,
+                    Rule::OsPathGetctime,
                 ]) {
                     flake8_use_pathlib::rules::replaceable_by_pathlib(self, func);
                 }
