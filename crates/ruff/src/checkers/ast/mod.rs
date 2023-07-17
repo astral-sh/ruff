@@ -2951,6 +2951,9 @@ where
                 ]) {
                     flake8_use_pathlib::rules::replaceable_by_pathlib(self, func);
                 }
+                if self.enabled(Rule::PathConstructorCurrentDirectory) {
+                    flake8_use_pathlib::rules::path_constructor_current_directory(self, expr, func);
+                }
                 if self.enabled(Rule::NumpyLegacyRandom) {
                     numpy::rules::legacy_random(self, func);
                 }
