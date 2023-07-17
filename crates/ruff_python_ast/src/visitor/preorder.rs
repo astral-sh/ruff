@@ -296,10 +296,7 @@ where
             visitor.visit_expr(test);
             visitor.visit_body(body);
             for clause in elif_else_clauses {
-                if let Some(test) = &clause.test {
-                    visitor.visit_expr(test);
-                }
-                visitor.visit_body(&clause.body);
+                visitor.visit_elif_else_clause(visitor, clause);
             }
         }
 
