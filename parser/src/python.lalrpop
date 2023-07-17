@@ -86,6 +86,7 @@ SmallStatement: ast::Stmt = {
     GlobalStatement,
     NonlocalStatement,
     AssertStatement,
+    TypeAliasStatement,
 };
 
 PassStatement: ast::Stmt = {
@@ -978,6 +979,25 @@ FuncDef: ast::Stmt = {
     },
 };
 
+TypeAliasName: ast::Expr = {
+    <location:@L> <name:Identifier> <end_location:@R> => ast::Expr::Name(
+        ast::ExprName { id: name.into(), ctx: ast::ExprContext::Load, range: (location..end_location).into() },
+    ),
+}
+
+TypeAliasStatement: ast::Stmt = {
+    <location:@L> "type" <name:TypeAliasName> <type_params:TypeParamList?> "=" <value:Test<"all">> <end_location:@R> => {
+        ast::Stmt::TypeAlias(
+            ast::StmtTypeAlias {
+                name: Box::new(name),
+                value: Box::new(value),
+                type_params: type_params.unwrap_or_default(),
+                range: (location..end_location).into()
+            },
+        )
+    },
+};
+
 Parameters: ast::Arguments = {
     <location:@L> "(" <a: (ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>)?> ")" <end_location:@R> =>? {
         a.as_ref().map(validate_arguments).transpose()?;
@@ -1757,6 +1777,7 @@ extern {
         "raise" => token::Tok::Raise,
         "return" => token::Tok::Return,
         "try" => token::Tok::Try,
+        "type" => token::Tok::Type,
         "while" => token::Tok::While,
         "match" => token::Tok::Match,
         "case" => token::Tok::Case,

@@ -154,6 +154,7 @@ fn gen_phf(out_dir: &Path) {
         .entry("raise", "Tok::Raise")
         .entry("return", "Tok::Return")
         .entry("try", "Tok::Try")
+        .entry("type", "Tok::Type")
         .entry("while", "Tok::While")
         .entry("with", "Tok::With")
         .entry("yield", "Tok::Yield")
