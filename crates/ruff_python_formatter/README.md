@@ -271,7 +271,7 @@ It is also possible large number of repositories using ruff. This dataset is lar
 only do this occasionally:
 
 ```shell
-curl https://raw.githubusercontent.com/akx/ruff-usage-aggregate/master/data/known-github-tomls.jsonl > github_search.jsonl
+curl https://raw.githubusercontent.com/akx/ruff-usage-aggregate/master/data/known-github-tomls-clean.jsonl> github_search.jsonl
 python scripts/check_ecosystem.py --checkouts target/checkouts --projects github_search.jsonl -v $(which true) $(which true)
 cargo run --bin ruff_dev -- format-dev --stability-check --multi-project target/checkouts
 ```
