@@ -1,31 +1,135 @@
 use rustpython_parser::ast::{self, Expr};
-use smallvec::smallvec;
+use smallvec::{smallvec, SmallVec};
 
 /// A representation of a qualified name, like `typing.List`.
-pub type CallPath<'a> = smallvec::SmallVec<[&'a str; 8]>;
-
-fn collect_call_path_inner<'a>(expr: &'a Expr, parts: &mut CallPath<'a>) -> bool {
-    match expr {
-        Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
-            if collect_call_path_inner(value, parts) {
-                parts.push(attr.as_str());
-                true
-            } else {
-                false
-            }
-        }
-        Expr::Name(ast::ExprName { id, .. }) => {
-            parts.push(id.as_str());
-            true
-        }
-        _ => false,
-    }
-}
+pub type CallPath<'a> = SmallVec<[&'a str; 8]>;
 
 /// Convert an `Expr` to its [`CallPath`] segments (like `["typing", "List"]`).
 pub fn collect_call_path(expr: &Expr) -> Option<CallPath> {
-    let mut segments = smallvec![];
-    collect_call_path_inner(expr, &mut segments).then_some(segments)
+    // Unroll the loop up to eight times, to match the maximum number of expected attributes.
+    // In practice, unrolling appears to give about a 4x speed-up on this hot path.
+    let attr1 = match expr {
+        Expr::Attribute(attr1) => attr1,
+        // Ex) `foo`
+        Expr::Name(ast::ExprName { id, .. }) => return Some(CallPath::from_slice(&[id.as_str()])),
+        _ => return None,
+    };
+
+    let attr2 = match attr1.value.as_ref() {
+        Expr::Attribute(attr2) => attr2,
+        // Ex) `foo.bar`
+        Expr::Name(ast::ExprName { id, .. }) => {
+            return Some(CallPath::from_slice(&[id.as_str(), attr1.attr.as_str()]))
+        }
+        _ => return None,
+    };
+
+    let attr3 = match attr2.value.as_ref() {
+        Expr::Attribute(attr3) => attr3,
+        // Ex) `foo.bar.baz`
+        Expr::Name(ast::ExprName { id, .. }) => {
+            return Some(CallPath::from_slice(&[
+                id.as_str(),
+                attr2.attr.as_str(),
+                attr1.attr.as_str(),
+            ]));
+        }
+        _ => return None,
+    };
+
+    let attr4 = match attr3.value.as_ref() {
+        Expr::Attribute(attr4) => attr4,
+        // Ex) `foo.bar.baz.bop`
+        Expr::Name(ast::ExprName { id, .. }) => {
+            return Some(CallPath::from_slice(&[
+                id.as_str(),
+                attr3.attr.as_str(),
+                attr2.attr.as_str(),
+                attr1.attr.as_str(),
+            ]));
+        }
+        _ => return None,
+    };
+
+    let attr5 = match attr4.value.as_ref() {
+        Expr::Attribute(attr5) => attr5,
+        // Ex) `foo.bar.baz.bop.bap`
+        Expr::Name(ast::ExprName { id, .. }) => {
+            return Some(CallPath::from_slice(&[
+                id.as_str(),
+                attr4.attr.as_str(),
+                attr3.attr.as_str(),
+                attr2.attr.as_str(),
+                attr1.attr.as_str(),
+            ]));
+        }
+        _ => return None,
+    };
+
+    let attr6 = match attr5.value.as_ref() {
+        Expr::Attribute(attr6) => attr6,
+        // Ex) `foo.bar.baz.bop.bap.bab`
+        Expr::Name(ast::ExprName { id, .. }) => {
+            return Some(CallPath::from_slice(&[
+                id.as_str(),
+                attr5.attr.as_str(),
+                attr4.attr.as_str(),
+                attr3.attr.as_str(),
+                attr2.attr.as_str(),
+                attr1.attr.as_str(),
+            ]));
+        }
+        _ => return None,
+    };
+
+    let attr7 = match attr6.value.as_ref() {
+        Expr::Attribute(attr7) => attr7,
+        // Ex) `foo.bar.baz.bop.bap.bab.bob`
+        Expr::Name(ast::ExprName { id, .. }) => {
+            return Some(CallPath::from_slice(&[
+                id.as_str(),
+                attr6.attr.as_str(),
+                attr5.attr.as_str(),
+                attr4.attr.as_str(),
+                attr3.attr.as_str(),
+                attr2.attr.as_str(),
+                attr1.attr.as_str(),
+            ]));
+        }
+        _ => return None,
+    };
+
+    let attr8 = match attr7.value.as_ref() {
+        Expr::Attribute(attr8) => attr8,
+        // Ex) `foo.bar.baz.bop.bap.bab.bob.bib`
+        Expr::Name(ast::ExprName { id, .. }) => {
+            return Some(CallPath::from_slice(&[
+                id.as_str(),
+                attr7.attr.as_str(),
+                attr6.attr.as_str(),
+                attr5.attr.as_str(),
+                attr4.attr.as_str(),
+                attr3.attr.as_str(),
+                attr2.attr.as_str(),
+                attr1.attr.as_str(),
+            ]));
+        }
+        _ => return None,
+    };
+
+    collect_call_path(&attr8.value).map(|mut segments| {
+        segments.extend([
+            attr8.attr.as_str(),
+            attr7.attr.as_str(),
+            attr6.attr.as_str(),
+            attr5.attr.as_str(),
+            attr4.attr.as_str(),
+            attr3.attr.as_str(),
+            attr2.attr.as_str(),
+            attr1.attr.as_str(),
+        ]);
+        segments
+    })
 }
 
 /// Convert an `Expr` to its call path (like `List`, or `typing.List`).
