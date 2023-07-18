@@ -49,21 +49,9 @@ impl FormatNodeRule<StmtIf> for FormatStmtIf {
     }
 }
 
-/// Note that this implementation misses the leading newlines before the leading comments because
-/// it does not have access to the last node of the previous branch. The `StmtIf` therefore doesn't
-/// call this but `format_elif_else_clause` directly.
-#[derive(Default)]
-pub struct FormatElifElseClause;
-
-impl FormatNodeRule<ElifElseClause> for FormatElifElseClause {
-    fn fmt_fields(&self, item: &ElifElseClause, f: &mut PyFormatter) -> FormatResult<()> {
-        format_elif_else_clause(item, f, None)
-    }
-}
-
 /// Extracted so we can implement `FormatElifElseClause` but also pass in `last_node` from
 /// `FormatStmtIf`
-fn format_elif_else_clause(
+pub(crate) fn format_elif_else_clause(
     item: &ElifElseClause,
     f: &mut PyFormatter,
     last_node: Option<AnyNodeRef>,
