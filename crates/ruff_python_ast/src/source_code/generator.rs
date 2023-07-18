@@ -541,7 +541,7 @@ impl<'a> Generator<'a> {
                 self.unparse_expr(name, precedence::MAX);
                 self.unparse_type_params(type_params);
                 self.p(" = ");
-                self.unparse_expr(value, precedence::MAX);
+                self.unparse_expr(value, precedence::ASSIGN);
             }
             Stmt::Raise(ast::StmtRaise {
                 exc,
@@ -1683,7 +1683,7 @@ class Foo:
         );
 
         // Type aliases
-        assert_round_trip!(r#"type Foo = (int | str)"#);
+        assert_round_trip!(r#"type Foo = int | str"#);
         assert_round_trip!(r#"type Foo[T] = list[T]"#);
         assert_round_trip!(r#"type Foo[*Ts] = ..."#);
         assert_round_trip!(r#"type Foo[**P] = ..."#);
