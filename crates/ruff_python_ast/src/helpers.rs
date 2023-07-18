@@ -1818,17 +1818,16 @@ y = 2
             value: Box::new(constant_three.clone()),
             range: TextRange::default(),
         });
-        assert_eq!(
-            any_over_stmt(&type_alias, &|expr| {
+        assert!(
+            !any_over_stmt(&type_alias, &|expr| {
                 seen.borrow_mut().push(expr.clone());
                 false
-            }),
-            false
+            })
         );
         assert_eq!(
             seen.take(),
             vec![name, constant_one, constant_two, constant_three]
-        )
+        );
     }
 
     #[test]
@@ -1838,9 +1837,8 @@ y = 2
             bound: None,
             name: Identifier::new("x", TextRange::default()),
         });
-        assert_eq!(
-            any_over_type_param(&type_var_no_bound, &|_expr| true),
-            false
+        assert!(
+            !any_over_type_param(&type_var_no_bound, &|_expr| true)
         );
 
         let bound = Expr::Constant(ExprConstant {
@@ -1854,7 +1852,7 @@ y = 2
             bound: Some(Box::new(bound.clone())),
             name: Identifier::new("x", TextRange::default()),
         });
-        assert_eq!(
+        assert!(
             any_over_type_param(&type_var_with_bound, &|expr| {
                 assert_eq!(
                     *expr, bound,
@@ -1862,7 +1860,6 @@ y = 2
                 );
                 true
             }),
-            true,
             "if true is returned from `func` it should be respected"
         );
     }
@@ -1873,9 +1870,8 @@ y = 2
             range: TextRange::default(),
             name: Identifier::new("x", TextRange::default()),
         });
-        assert_eq!(
-            any_over_type_param(&type_var_tuple, &|_expr| true),
-            false,
+        assert!(
+            !any_over_type_param(&type_var_tuple, &|_expr| true),
             "type var tuples have no expressions to visit"
         );
     }
@@ -1886,9 +1882,8 @@ y = 2
             range: TextRange::default(),
             name: Identifier::new("x", TextRange::default()),
         });
-        assert_eq!(
-            any_over_type_param(&type_param_spec, &|_expr| true),
-            false,
+        assert!(
+            !any_over_type_param(&type_param_spec, &|_expr| true),
             "param specs have no expressions to visit"
         );
     }
