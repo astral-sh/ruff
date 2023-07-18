@@ -606,7 +606,7 @@ UP032_0.py:65:1: UP032 [*] Use f-string instead of `format` call
 67 | | """.format(1)
    | |_____________^ UP032
 68 |   
-69 |   ###
+69 |   aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = """
    |
    = help: Convert to f-string
 
@@ -620,57 +620,89 @@ UP032_0.py:65:1: UP032 [*] Use f-string instead of `format` call
 66    |-{}
 67    |-""".format(1)
 68 68 | 
-69 69 | ###
-70 70 | # Non-errors
+69 69 | aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = """
+70 70 | {}
 
-UP032_0.py:126:11: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:69:85: UP032 [*] Use f-string instead of `format` call
+   |
+67 |   """.format(1)
+68 |   
+69 |   aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = """
+   |  _____________________________________________________________________________________^
+70 | | {}
+71 | | """.format(
+72 | |     111111
+73 | | )
+   | |_^ UP032
+74 |   
+75 |   ###
+   |
+   = help: Convert to f-string
+
+ℹ Suggested fix
+66 66 | {}
+67 67 | """.format(1)
+68 68 | 
+69    |-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = """
+70    |-{}
+71    |-""".format(
+72    |-    111111
+73    |-)
+   69 |+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = f"""
+   70 |+{111111}
+   71 |+"""
+74 72 | 
+75 73 | ###
+76 74 | # Non-errors
+
+UP032_0.py:136:11: UP032 [*] Use f-string instead of `format` call
     |
-125 | def d(osname, version, release):
-126 |     return"{}-{}.{}".format(osname, version, release)
+135 | def d(osname, version, release):
+136 |     return"{}-{}.{}".format(osname, version, release)
     |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP032
     |
     = help: Convert to f-string
 
 ℹ Suggested fix
-123 123 | 
-124 124 | 
-125 125 | def d(osname, version, release):
-126     |-    return"{}-{}.{}".format(osname, version, release)
-    126 |+    return f"{osname}-{version}.{release}"
-127 127 | 
-128 128 | 
-129 129 | def e():
+133 133 | 
+134 134 | 
+135 135 | def d(osname, version, release):
+136     |-    return"{}-{}.{}".format(osname, version, release)
+    136 |+    return f"{osname}-{version}.{release}"
+137 137 | 
+138 138 | 
+139 139 | def e():
 
-UP032_0.py:130:10: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:140:10: UP032 [*] Use f-string instead of `format` call
     |
-129 | def e():
-130 |     yield"{}".format(1)
+139 | def e():
+140 |     yield"{}".format(1)
     |          ^^^^^^^^^^^^^^ UP032
     |
     = help: Convert to f-string
 
 ℹ Suggested fix
-127 127 | 
-128 128 | 
-129 129 | def e():
-130     |-    yield"{}".format(1)
-    130 |+    yield f"{1}"
-131 131 | 
-132 132 | 
-133 133 | assert"{}".format(1)
+137 137 | 
+138 138 | 
+139 139 | def e():
+140     |-    yield"{}".format(1)
+    140 |+    yield f"{1}"
+141 141 | 
+142 142 | 
+143 143 | assert"{}".format(1)
 
-UP032_0.py:133:7: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:143:7: UP032 [*] Use f-string instead of `format` call
     |
-133 | assert"{}".format(1)
+143 | assert"{}".format(1)
     |       ^^^^^^^^^^^^^^ UP032
     |
     = help: Convert to f-string
 
 ℹ Suggested fix
-130 130 |     yield"{}".format(1)
-131 131 | 
-132 132 | 
-133     |-assert"{}".format(1)
-    133 |+assert f"{1}"
+140 140 |     yield"{}".format(1)
+141 141 | 
+142 142 | 
+143     |-assert"{}".format(1)
+    143 |+assert f"{1}"
 
 
