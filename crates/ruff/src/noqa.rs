@@ -223,6 +223,7 @@ impl FileExemption {
     /// Extract the [`FileExemption`] for a given Python source file, enumerating any rules that are
     /// globally ignored within the file.
     pub(crate) fn try_extract(
+        path: &Path,
         contents: &str,
         comment_ranges: &[TextRange],
         locator: &Locator,
@@ -234,7 +235,8 @@ impl FileExemption {
                 Err(err) => {
                     #[allow(deprecated)]
                     let line = locator.compute_line_index(range.start());
-                    warn!("Invalid `# noqa` directive on line {line}: {err}");
+                    let path_display = path.display();
+                    warn!("Invalid `# noqa` directive on {path_display}:{line}: {err}");
                 }
                 Ok(Some(ParsedFileExemption::All)) => {
                     return Some(Self::All);
@@ -437,6 +439,7 @@ pub(crate) fn add_noqa(
     line_ending: LineEnding,
 ) -> Result<usize> {
     let (count, output) = add_noqa_inner(
+        path,
         diagnostics,
         locator,
         commented_lines,
@@ -448,6 +451,7 @@ pub(crate) fn add_noqa(
 }
 
 fn add_noqa_inner(
+    path: &Path,
     diagnostics: &[Diagnostic],
     locator: &Locator,
     commented_ranges: &[TextRange],
@@ -460,8 +464,8 @@ fn add_noqa_inner(
 
     // Whether the file is exempted from all checks.
     // Codes that are globally exempted (within the current file).
-    let exemption = FileExemption::try_extract(locator.contents(), commented_ranges, locator);
-    let directives = NoqaDirectives::from_commented_ranges(commented_ranges, locator);
+    let exemption = FileExemption::try_extract(path, locator.contents(), commented_ranges, locator);
+    let directives = NoqaDirectives::from_commented_ranges(path, commented_ranges, locator);
 
     // Mark any non-ignored diagnostics.
     for diagnostic in diagnostics {
@@ -624,6 +628,7 @@ pub(crate) struct NoqaDirectives<'a> {
 
 impl<'a> NoqaDirectives<'a> {
     pub(crate) fn from_commented_ranges(
+        path: &Path,
         comment_ranges: &[TextRange],
         locator: &'a Locator<'a>,
     ) -> Self {
@@ -634,7 +639,8 @@ impl<'a> NoqaDirectives<'a> {
                 Err(err) => {
                     #[allow(deprecated)]
                     let line = locator.compute_line_index(range.start());
-                    warn!("Invalid `# noqa` directive on line {line}: {err}");
+                    let path_display = path.display();
+                    warn!("Invalid `# noqa` directive on {path_display}:{line}: {err}");
                 }
                 Ok(Some(directive)) => {
                     // noqa comments are guaranteed to be single line.

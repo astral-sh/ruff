@@ -1,5 +1,7 @@
 //! `NoQA` enforcement and validation.
 
+use std::path::Path;
+
 use itertools::Itertools;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustpython_parser::ast::Ranged;
@@ -15,6 +17,7 @@ use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
 use crate::settings::Settings;
 
 pub(crate) fn check_noqa(
+    path: &Path,
     diagnostics: &mut Vec<Diagnostic>,
     locator: &Locator,
     comment_ranges: &[TextRange],
@@ -23,10 +26,10 @@ pub(crate) fn check_noqa(
     settings: &Settings,
 ) -> Vec<usize> {
     // Identify any codes that are globally exempted (within the current file).
-    let exemption = FileExemption::try_extract(locator.contents(), comment_ranges, locator);
+    let exemption = FileExemption::try_extract(path, locator.contents(), comment_ranges, locator);
 
     // Extract all `noqa` directives.
-    let mut noqa_directives = NoqaDirectives::from_commented_ranges(comment_ranges, locator);
+    let mut noqa_directives = NoqaDirectives::from_commented_ranges(path, comment_ranges, locator);
 
     // Indices of diagnostics that were ignored by a `noqa` directive.
     let mut ignored_diagnostics = vec![];
