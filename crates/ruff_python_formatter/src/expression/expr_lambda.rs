@@ -20,22 +20,17 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
         } = item;
 
         write!(f, [text("lambda")])?;
-
-        if args.args.is_empty() {
-            write!(f, [text(":")])?;
-        } else {
+        if !args.args.is_empty() {
             write!(
                 f,
                 [
                     space(),
                     args.format()
                         .with_options(ArgumentsParentheses::SkipInsideLambda),
-                    text(":"),
                 ]
             )?;
         }
-
-        write!(f, [space(), body.format()])
+        write!(f, [text(":"), space(), body.format()])
     }
 }
 
