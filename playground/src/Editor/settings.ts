@@ -24,7 +24,7 @@ export function stringify(settings: Settings): string {
  */
 export async function persist(settingsSource: string, pythonSource: string) {
   const hash = lzstring.compressToEncodedURIComponent(
-    settingsSource + "$$$" + pythonSource,
+    settingsSource.replaceAll("$$$", "$$$$$$") + "$$$" + pythonSource,
   );
   await navigator.clipboard.writeText(
     window.location.href.split("#")[0] + "#" + hash,
@@ -39,11 +39,9 @@ export function restore(): [string, string] | null {
     window.location.hash.slice(1),
   );
 
-  if (value) {
-    const parts = value.split("$$$");
-    const settingsSource = parts[0];
-    const pythonSource = parts[1];
-    return [settingsSource, pythonSource];
+  if (value != null) {
+    const [settingsSource, pythonSource] = value.split("$$$");
+    return [settingsSource.replaceAll("$$$$$$", "$$$"), pythonSource];
   } else {
     return null;
   }
