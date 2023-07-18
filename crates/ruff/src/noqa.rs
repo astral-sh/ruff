@@ -764,6 +764,8 @@ impl FromIterator<TextRange> for NoqaMapping {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use insta::assert_debug_snapshot;
     use ruff_text_size::{TextRange, TextSize};
 
