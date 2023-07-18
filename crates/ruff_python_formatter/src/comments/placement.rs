@@ -439,6 +439,64 @@ fn handle_in_between_bodies_end_of_line_comment<'a>(
     }
 }
 
+/// Without the `StmtIf` special, this function would just be the following:
+/// ```ignore
+/// if let Some(preceding_node) = comment.preceding_node() {
+///     Some((preceding_node, last_child_in_body(preceding_node)?))
+/// } else {
+///     None
+/// }
+/// ```
+/// We handle two special cases here:
+/// ```python
+/// if True:
+///     pass
+///     # Comment between if and elif/else clause, needs to be manually attached to the `StmtIf`
+/// else:
+///     pass
+///     # Comment after the `StmtIf`, needs to be manually attached to the ElifElseClause
+/// ```
+/// The problem is that `StmtIf` spans the whole range (there is no "inner if" node), so the first
+/// comment doesn't see it as preceding node, and the second comment takes the entire `StmtIf` when
+/// it should only take the `ElifElseClause`
+fn find_preceding_and_handle_stmt_if_special_cases<'a>(
+    comment: &DecoratedComment<'a>,
+) -> Option<(AnyNodeRef<'a>, AnyNodeRef<'a>)> {
+    if let (stmt_if @ AnyNodeRef::StmtIf(stmt_if_inner), Some(AnyNodeRef::ElifElseClause(..))) =
+        (comment.enclosing_node(), comment.following_node())
+    {
+        if let Some(preceding_node @ AnyNodeRef::ElifElseClause(..)) = comment.preceding_node() {
+            // We're already after and elif or else, defaults work
+            Some((preceding_node, last_child_in_body(preceding_node)?))
+        } else {
+            // Special case 1: The comment is between if body and an elif/else clause. We have
+            // to handle this separately since StmtIf spans the entire range, so it's not the
+            // preceding node
+            Some((
+                stmt_if,
+                AnyNodeRef::from(stmt_if_inner.body.last().unwrap()),
+            ))
+        }
+    } else if let Some(preceding_node @ AnyNodeRef::StmtIf(stmt_if_inner)) =
+        comment.preceding_node()
+    {
+        if let Some(clause) = stmt_if_inner.elif_else_clauses.last() {
+            // Special case 2: We're after an if statement and need to narrow the preceding
+            // down to the elif/else clause
+            Some((clause.into(), last_child_in_body(clause.into())?))
+        } else {
+            // After an if without any elif/else, defaults work
+            Some((preceding_node, last_child_in_body(preceding_node)?))
+        }
+    } else if let Some(preceding_node) = comment.preceding_node() {
+        // The normal case
+        Some((preceding_node, last_child_in_body(preceding_node)?))
+    } else {
+        // Only do something if the preceding node has a body (has indented statements).
+        None
+    }
+}
+
 /// Handles trailing comments at the end of a body block (or any other block that is indented).
 /// ```python
 /// def test():
@@ -456,38 +514,7 @@ fn handle_trailing_body_comment<'a>(
         return CommentPlacement::Default(comment);
     }
 
-    // Handle the special cases of StmtIf, since there are ElifElseClauses which other nodes don't
-    // have
-    let preceding_node =
-        if let (stmt_if @ AnyNodeRef::StmtIf(..), Some(AnyNodeRef::ElifElseClause(..))) =
-            (comment.enclosing_node(), comment.following_node())
-        {
-            // The comment is between if body and an elif/else clause. We have to handle this
-            // separately since StmtIf spans the entire range, so it's not the preceding node
-            if let Some(preceding_node @ AnyNodeRef::ElifElseClause(..)) = comment.preceding_node()
-            {
-                preceding_node
-            } else {
-                stmt_if
-            }
-        } else if let Some(preceding_node @ AnyNodeRef::StmtIf(stmt_if_inner)) =
-            comment.preceding_node()
-        {
-            if let Some(clause) = stmt_if_inner.elif_else_clauses.last() {
-                // After the last elif or else branch
-                clause.into()
-            } else {
-                // After an if without any elif/else
-                preceding_node
-            }
-        } else if let Some(preceding_node) = comment.preceding_node() {
-            preceding_node
-        } else {
-            // Only do something if the preceding node has a body (has indented statements).
-            return CommentPlacement::Default(comment);
-        };
-
-    let Some(last_child) = last_child_in_body(preceding_node) else {
+    let Some((preceding_node, last_child)) = find_preceding_and_handle_stmt_if_special_cases(&comment) else {
         return CommentPlacement::Default(comment);
     };
 
@@ -1516,8 +1543,15 @@ fn last_child_in_body(node: AnyNodeRef) -> Option<AnyNodeRef> {
         | AnyNodeRef::ExceptHandlerExceptHandler(ast::ExceptHandlerExceptHandler {
             body, ..
         })
-        | AnyNodeRef::StmtIf(ast::StmtIf { body, .. })
         | AnyNodeRef::ElifElseClause(ast::ElifElseClause { body, .. }) => body,
+        AnyNodeRef::StmtIf(ast::StmtIf {
+            body,
+            elif_else_clauses,
+            ..
+        }) => elif_else_clauses
+            .last()
+            .map(|clause| &clause.body)
+            .unwrap_or(&body),
 
         AnyNodeRef::StmtFor(ast::StmtFor { body, orelse, .. })
         | AnyNodeRef::StmtAsyncFor(ast::StmtAsyncFor { body, orelse, .. })

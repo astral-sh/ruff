@@ -75,3 +75,14 @@ else:  # Comment
     if False:
         pass
     pass
+
+
+# Regression test for `last_child_in_body` special casing of `StmtIf`
+# https://github.com/python/cpython/blob/aecf6aca515a203a823a87c711f15cbb82097c8b/Lib/test/test_pty.py#L260-L275
+def f():
+    if True:
+        pass
+    else:
+        pass
+
+        # comment
