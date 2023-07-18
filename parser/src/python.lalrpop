@@ -760,25 +760,24 @@ ClassPattern: ast::Pattern = {
 }
 
 IfStatement: ast::Stmt = {
-    <location:@L> "if" <test:NamedExpressionTest> ":" <body:Suite> <s2:(<@L> "elif" <NamedExpressionTest> ":" <Suite>)*> <s3:("else" ":" <Suite>)?> => {
-        // Determine last else:
-        let mut last = s3.unwrap_or_default();
-        let end_location = last
+    <location:@L> "if" <test:NamedExpressionTest> ":" <body:Suite> <s2:(<@L> "elif" <NamedExpressionTest> ":" <Suite>)*> <s3:(<@L> "else" ":" <Suite>)?> => {
+        let elif_else_clauses: Vec<_> = s2.into_iter().map(|(start, test, body)| ast::ElifElseClause {
+            range: (start..body.last().unwrap().end()).into(),
+            test: Some(test),
+            body,
+        }).chain(s3.into_iter().map(|(start, body)| ast::ElifElseClause {
+            range: (start..body.last().unwrap().end()).into(),
+            test: None,
+            body,
+        })).collect();
+
+        let end_location = elif_else_clauses
             .last()
-            .or_else(|| s2.last().and_then(|last| last.2.last()))
-            .or_else(|| body.last())
-            .unwrap()
-            .end();
-        // handle elif:
-        for i in s2.into_iter().rev() {
-            let x = ast::Stmt::If(
-                ast::StmtIf { test: Box::new(i.1), body: i.2, orelse: last, range: (i.0..end_location).into() }
-            );
-            last = vec![x];
-        }
+            .map(|last| last.end())
+            .unwrap_or_else(|| body.last().unwrap().end());
 
         ast::Stmt::If(
-            ast::StmtIf { test: Box::new(test), body, orelse: last, range: (location..end_location).into() }
+            ast::StmtIf { test: Box::new(test), body, elif_else_clauses, range: (location..end_location).into() }
         )
     },
 };

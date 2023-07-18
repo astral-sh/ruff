@@ -627,7 +627,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            orelse: [],
+            elif_else_clauses: [],
         },
     ),
     Match(

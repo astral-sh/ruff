@@ -650,12 +650,12 @@ pub struct StmtIf {
     pub range: TextRange,
     pub test: Box<Expr>,
     pub body: Vec<Stmt>,
-    pub orelse: Vec<Stmt>,
+    pub elif_else_clauses: Vec<ElifElseClause>,
 }
 
 impl Node for StmtIf {
     const NAME: &'static str = "If";
-    const FIELD_NAMES: &'static [&'static str] = &["test", "body", "orelse"];
+    const FIELD_NAMES: &'static [&'static str] = &["test", "body", "elif_else_clauses"];
 }
 impl From<StmtIf> for Stmt {
     fn from(payload: StmtIf) -> Self {
@@ -666,6 +666,18 @@ impl From<StmtIf> for Ast {
     fn from(payload: StmtIf) -> Self {
         Stmt::from(payload).into()
     }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ElifElseClause {
+    pub range: TextRange,
+    pub test: Option<Expr>,
+    pub body: Vec<Stmt>,
+}
+
+impl Node for ElifElseClause {
+    const NAME: &'static str = "ElifElse";
+    const FIELD_NAMES: &'static [&'static str] = &["test", "body"];
 }
 
 /// See also [With](https://docs.python.org/3/library/ast.html#ast.With)

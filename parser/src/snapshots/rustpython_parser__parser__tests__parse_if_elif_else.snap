@@ -31,11 +31,11 @@ expression: parse_ast
                     },
                 ),
             ],
-            orelse: [
-                If(
-                    StmtIf {
-                        range: 9..28,
-                        test: Constant(
+            elif_else_clauses: [
+                ElifElseClause {
+                    range: 9..19,
+                    test: Some(
+                        Constant(
                             ExprConstant {
                                 range: 14..15,
                                 value: Int(
@@ -44,40 +44,44 @@ expression: parse_ast
                                 kind: None,
                             },
                         ),
-                        body: [
-                            Expr(
-                                StmtExpr {
-                                    range: 17..19,
-                                    value: Constant(
-                                        ExprConstant {
-                                            range: 17..19,
-                                            value: Int(
-                                                20,
-                                            ),
-                                            kind: None,
-                                        },
-                                    ),
-                                },
-                            ),
-                        ],
-                        orelse: [
-                            Expr(
-                                StmtExpr {
-                                    range: 26..28,
-                                    value: Constant(
-                                        ExprConstant {
-                                            range: 26..28,
-                                            value: Int(
-                                                30,
-                                            ),
-                                            kind: None,
-                                        },
-                                    ),
-                                },
-                            ),
-                        ],
-                    },
-                ),
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 17..19,
+                                value: Constant(
+                                    ExprConstant {
+                                        range: 17..19,
+                                        value: Int(
+                                            20,
+                                        ),
+                                        kind: None,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+                ElifElseClause {
+                    range: 20..28,
+                    test: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 26..28,
+                                value: Constant(
+                                    ExprConstant {
+                                        range: 26..28,
+                                        value: Int(
+                                            30,
+                                        ),
+                                        kind: None,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
             ],
         },
     ),

@@ -127,6 +127,11 @@ impl Ranged for crate::generic::StmtIf {
         self.range
     }
 }
+impl Ranged for crate::generic::ElifElseClause {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
 impl Ranged for crate::generic::StmtWith {
     fn range(&self) -> TextRange {
         self.range
