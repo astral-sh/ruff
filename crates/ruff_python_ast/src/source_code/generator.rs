@@ -271,7 +271,8 @@ impl<'a> Generator<'a> {
                 keywords,
                 body,
                 decorator_list,
-                range: _range,
+                range: _,
+                type_params: _,
             }) => {
                 self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
                 for decorator in decorator_list {
@@ -701,6 +702,7 @@ impl<'a> Generator<'a> {
                     self.p("continue");
                 });
             }
+            Stmt::TypeAlias(_) => todo!(),
         }
     }
 

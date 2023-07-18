@@ -18,6 +18,7 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
             bases,
             keywords,
             body,
+            type_params: _,
             decorator_list,
         } = item;
 

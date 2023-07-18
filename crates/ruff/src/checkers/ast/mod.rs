@@ -588,6 +588,7 @@ where
                     name,
                     bases,
                     keywords,
+                    type_params: _,
                     decorator_list,
                     body,
                     range: _,

@@ -1138,7 +1138,8 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                 decorator_list,
                 returns,
                 type_comment,
-                range: _range,
+                range: _,
+                type_params: _,
             }) => Self::FunctionDef(StmtFunctionDef {
                 name: name.as_str(),
                 args: args.into(),
@@ -1154,7 +1155,8 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                 decorator_list,
                 returns,
                 type_comment,
-                range: _range,
+                range: _,
+                type_params: _,
             }) => Self::AsyncFunctionDef(StmtAsyncFunctionDef {
                 name: name.as_str(),
                 args: args.into(),
@@ -1169,7 +1171,8 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                 keywords,
                 body,
                 decorator_list,
-                range: _range,
+                range: _,
+                type_params: _,
             }) => Self::ClassDef(StmtClassDef {
                 name: name.as_str(),
                 bases: bases.iter().map(Into::into).collect(),
@@ -1374,6 +1377,7 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
             ast::Stmt::Pass(_) => Self::Pass,
             ast::Stmt::Break(_) => Self::Break,
             ast::Stmt::Continue(_) => Self::Continue,
+            ast::Stmt::TypeAlias(_) => todo!(),
         }
     }
 }

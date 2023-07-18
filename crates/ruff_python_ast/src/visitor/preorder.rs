@@ -400,6 +400,7 @@ where
         | Stmt::Continue(_)
         | Stmt::Global(_)
         | Stmt::Nonlocal(_) => {}
+        Stmt::TypeAlias(_) => todo!(),
     }
 }
 
