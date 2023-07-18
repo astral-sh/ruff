@@ -339,7 +339,7 @@ pub(crate) fn f_strings(
     // Avoid refactors that exceed the line length limit.
     let col_offset = template.start() - checker.locator.line_start(template.start());
     if contents
-        .split('\n')
+        .lines()
         .any(|line| col_offset.to_usize() + line.len() > line_length.get())
     {
         return;
