@@ -514,7 +514,9 @@ fn handle_trailing_body_comment<'a>(
         return CommentPlacement::Default(comment);
     }
 
-    let Some((preceding_node, last_child)) = find_preceding_and_handle_stmt_if_special_cases(&comment) else {
+    let Some((preceding_node, last_child)) =
+        find_preceding_and_handle_stmt_if_special_cases(&comment)
+    else {
         return CommentPlacement::Default(comment);
     };
 
@@ -1548,10 +1550,7 @@ fn last_child_in_body(node: AnyNodeRef) -> Option<AnyNodeRef> {
             body,
             elif_else_clauses,
             ..
-        }) => elif_else_clauses
-            .last()
-            .map(|clause| &clause.body)
-            .unwrap_or(&body),
+        }) => elif_else_clauses.last().map_or(body, |clause| &clause.body),
 
         AnyNodeRef::StmtFor(ast::StmtFor { body, orelse, .. })
         | AnyNodeRef::StmtAsyncFor(ast::StmtAsyncFor { body, orelse, .. })
