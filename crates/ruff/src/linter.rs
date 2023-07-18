@@ -213,8 +213,8 @@ pub fn check_path(
             .any(|rule_code| rule_code.lint_source().is_noqa())
     {
         let ignored = check_noqa(
-            path,
             &mut diagnostics,
+            path,
             locator,
             indexer.comment_ranges(),
             &directives.noqa_line_for,

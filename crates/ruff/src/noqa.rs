@@ -16,6 +16,7 @@ use ruff_python_ast::source_code::Locator;
 use ruff_python_whitespace::LineEnding;
 
 use crate::codes::NoqaCode;
+use crate::fs::relativize_path;
 use crate::registry::{AsRule, Rule, RuleSet};
 use crate::rule_redirects::get_redirect_target;
 
@@ -223,9 +224,9 @@ impl FileExemption {
     /// Extract the [`FileExemption`] for a given Python source file, enumerating any rules that are
     /// globally ignored within the file.
     pub(crate) fn try_extract(
-        path: &Path,
         contents: &str,
         comment_ranges: &[TextRange],
+        path: &Path,
         locator: &Locator,
     ) -> Option<Self> {
         let mut exempt_codes: Vec<NoqaCode> = vec![];
@@ -464,8 +465,8 @@ fn add_noqa_inner(
 
     // Whether the file is exempted from all checks.
     // Codes that are globally exempted (within the current file).
-    let exemption = FileExemption::try_extract(path, locator.contents(), commented_ranges, locator);
-    let directives = NoqaDirectives::from_commented_ranges(path, commented_ranges, locator);
+    let exemption = FileExemption::try_extract(locator.contents(), commented_ranges, path, locator);
+    let directives = NoqaDirectives::from_commented_ranges(commented_ranges, path, locator);
 
     // Mark any non-ignored diagnostics.
     for diagnostic in diagnostics {
@@ -628,8 +629,8 @@ pub(crate) struct NoqaDirectives<'a> {
 
 impl<'a> NoqaDirectives<'a> {
     pub(crate) fn from_commented_ranges(
-        path: &Path,
         comment_ranges: &[TextRange],
+        path: &Path,
         locator: &'a Locator<'a>,
     ) -> Self {
         let mut directives = Vec::new();
@@ -639,7 +640,7 @@ impl<'a> NoqaDirectives<'a> {
                 Err(err) => {
                     #[allow(deprecated)]
                     let line = locator.compute_line_index(range.start());
-                    let path_display = path.display();
+                    let path_display = relativize_path(path);
                     warn!("Invalid `# noqa` directive on {path_display}:{line}: {err}");
                 }
                 Ok(Some(directive)) => {
