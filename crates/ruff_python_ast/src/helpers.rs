@@ -1781,43 +1781,42 @@ y = 2
 
     #[test]
     fn any_over_stmt_type_alias() {
-        let range = TextRange::new(TextSize::from(0), TextSize::from(0));
         let seen = RefCell::new(Vec::new());
         let name = Expr::Name(ExprName {
             id: "x".to_string(),
-            range,
+            range: TextRange::default(),
             ctx: ExprContext::Load,
         });
         let constant_one = Expr::Constant(ExprConstant {
             value: Constant::Int(1.into()),
             kind: Some("x".to_string()),
-            range: range.clone(),
+            range: TextRange::default(),
         });
         let constant_two = Expr::Constant(ExprConstant {
             value: Constant::Int(2.into()),
             kind: Some("y".to_string()),
-            range: range.clone(),
+            range: TextRange::default(),
         });
         let constant_three = Expr::Constant(ExprConstant {
             value: Constant::Int(3.into()),
             kind: Some("z".to_string()),
-            range: range.clone(),
+            range: TextRange::default(),
         });
         let type_var_one = TypeParam::TypeVar(TypeParamTypeVar {
-            range: range.clone(),
+            range: TextRange::default(),
             bound: Some(Box::new(constant_one.clone())),
-            name: Identifier::new("x", range.clone()),
+            name: Identifier::new("x", TextRange::default()),
         });
         let type_var_two = TypeParam::TypeVar(TypeParamTypeVar {
-            range: range.clone(),
+            range: TextRange::default(),
             bound: Some(Box::new(constant_two.clone())),
-            name: Identifier::new("x", range.clone()),
+            name: Identifier::new("x", TextRange::default()),
         });
         let type_alias = Stmt::TypeAlias(StmtTypeAlias {
             name: Box::new(name.clone()),
             type_params: vec![type_var_one, type_var_two],
             value: Box::new(constant_three.clone()),
-            range: range.clone(),
+            range: TextRange::default(),
         });
         assert_eq!(
             any_over_stmt(&type_alias, &|expr| {
@@ -1835,9 +1834,9 @@ y = 2
     #[test]
     fn any_over_type_param_type_var() {
         let type_var_no_bound = TypeParam::TypeVar(TypeParamTypeVar {
-            range: TextRange::new(TextSize::from(0), TextSize::from(0)),
+            range: TextRange::default(),
             bound: None,
-            name: Identifier::new("x", TextRange::new(TextSize::from(0), TextSize::from(0))),
+            name: Identifier::new("x", TextRange::default()),
         });
         assert_eq!(
             any_over_type_param(&type_var_no_bound, &|_expr| true),
@@ -1847,13 +1846,13 @@ y = 2
         let bound = Expr::Constant(ExprConstant {
             value: Constant::Int(1.into()),
             kind: Some("x".to_string()),
-            range: TextRange::new(TextSize::from(0), TextSize::from(0)),
+            range: TextRange::default(),
         });
 
         let type_var_with_bound = TypeParam::TypeVar(TypeParamTypeVar {
-            range: TextRange::new(TextSize::from(0), TextSize::from(0)),
+            range: TextRange::default(),
             bound: Some(Box::new(bound.clone())),
-            name: Identifier::new("x", TextRange::new(TextSize::from(0), TextSize::from(0))),
+            name: Identifier::new("x", TextRange::default()),
         });
         assert_eq!(
             any_over_type_param(&type_var_with_bound, &|expr| {
@@ -1871,8 +1870,8 @@ y = 2
     #[test]
     fn any_over_type_param_type_var_tuple() {
         let type_var_tuple = TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
-            range: TextRange::new(TextSize::from(0), TextSize::from(0)),
-            name: Identifier::new("x", TextRange::new(TextSize::from(0), TextSize::from(0))),
+            range: TextRange::default(),
+            name: Identifier::new("x", TextRange::default()),
         });
         assert_eq!(
             any_over_type_param(&type_var_tuple, &|_expr| true),
@@ -1884,8 +1883,8 @@ y = 2
     #[test]
     fn any_over_type_param_param_spec() {
         let type_param_spec = TypeParam::ParamSpec(TypeParamParamSpec {
-            range: TextRange::new(TextSize::from(0), TextSize::from(0)),
-            name: Identifier::new("x", TextRange::new(TextSize::from(0), TextSize::from(0))),
+            range: TextRange::default(),
+            name: Identifier::new("x", TextRange::default()),
         });
         assert_eq!(
             any_over_type_param(&type_param_spec, &|_expr| true),
