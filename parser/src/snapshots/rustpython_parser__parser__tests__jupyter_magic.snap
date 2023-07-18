@@ -1,0 +1,135 @@
+---
+source: parser/src/parser.rs
+expression: parse_ast
+---
+Module(
+    ModModule {
+        range: 0..736,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 21..42,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 27..40,
+                            left: Name(
+                                ExprName {
+                                    range: 27..28,
+                                    id: "a",
+                                    ctx: Load,
+                                },
+                            ),
+                            op: Mod,
+                            right: Name(
+                                ExprName {
+                                    range: 39..40,
+                                    id: "b",
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 566..626,
+                    name: Identifier {
+                        id: "foo",
+                        range: 570..573,
+                    },
+                    args: Arguments {
+                        range: 573..575,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    body: [
+                        Return(
+                            StmtReturn {
+                                range: 581..626,
+                                value: Some(
+                                    Compare(
+                                        ExprCompare {
+                                            range: 598..620,
+                                            left: Name(
+                                                ExprName {
+                                                    range: 598..599,
+                                                    id: "a",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            ops: [
+                                                NotEq,
+                                            ],
+                                            comparators: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 619..620,
+                                                        id: "b",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                        },
+                                    ),
+                                ),
+                            },
+                        ),
+                    ],
+                    decorator_list: [],
+                    returns: None,
+                    type_comment: None,
+                },
+            ),
+            For(
+                StmtFor {
+                    range: 701..736,
+                    target: Name(
+                        ExprName {
+                            range: 705..706,
+                            id: "a",
+                            ctx: Store,
+                        },
+                    ),
+                    iter: Call(
+                        ExprCall {
+                            range: 710..718,
+                            func: Name(
+                                ExprName {
+                                    range: 710..715,
+                                    id: "range",
+                                    ctx: Load,
+                                },
+                            ),
+                            args: [
+                                Constant(
+                                    ExprConstant {
+                                        range: 716..717,
+                                        value: Int(
+                                            5,
+                                        ),
+                                        kind: None,
+                                    },
+                                ),
+                            ],
+                            keywords: [],
+                        },
+                    ),
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 732..736,
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                    type_comment: None,
+                },
+            ),
+        ],
+        type_ignores: [],
+    },
+)

@@ -250,7 +250,7 @@ impl Parse for ast::Constant {
 }
 
 /// Parse a full Python program usually consisting of multiple lines.
-///  
+///
 /// This is a convenience function that can be used to parse a full Python program without having to
 /// specify the [`Mode`] or the location. It is probably what you want to use most of the time.
 ///
@@ -326,7 +326,8 @@ pub fn parse_expression_starts_at(
 /// Parse the given Python source code using the specified [`Mode`].
 ///
 /// This function is the most general function to parse Python code. Based on the [`Mode`] supplied,
-/// it can be used to parse a single expression, a full Python program or an interactive expression.
+/// it can be used to parse a single expression, a full Python program, an interactive expression
+/// or a Python program containing Jupyter magics.
 ///
 /// # Example
 ///
@@ -352,6 +353,20 @@ pub fn parse_expression_starts_at(
 ///    print("Hello, world!")
 /// "#;
 /// let program = parse(source, Mode::Module, "<embedded>");
+/// assert!(program.is_ok());
+/// ```
+///
+/// Additionally, we can parse a Python program containing Jupyter magics:
+///
+/// ```
+/// use rustpython_parser::{Mode, parse};
+///
+/// let source = r#"
+/// %timeit 1 + 2
+/// ?str.replace
+/// !ls
+/// "#;
+/// let program = parse(source, Mode::Jupyter, "<embedded>");
 /// assert!(program.is_ok());
 /// ```
 pub fn parse(source: &str, mode: Mode, source_path: &str) -> Result<ast::Mod, ParseError> {
@@ -394,6 +409,9 @@ pub fn parse_starts_at(
 ///
 /// This could allow you to perform some preprocessing on the tokens before parsing them.
 ///
+/// When in [`Mode::Jupyter`], this will filter out all the Jupyter magic commands
+/// before parsing the tokens.
+///
 /// # Example
 ///
 /// As an example, instead of parsing a string, we can parse a list of tokens after we generate
@@ -414,7 +432,12 @@ pub fn parse_tokens(
     #[cfg(feature = "full-lexer")]
     let lxr =
         lxr.filter_ok(|(tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline));
-    parse_filtered_tokens(lxr, mode, source_path)
+    if mode == Mode::Jupyter {
+        let lxr = lxr.filter_ok(|(tok, _)| !matches!(tok, Tok::MagicCommand { .. }));
+        parse_filtered_tokens(lxr, mode, source_path)
+    } else {
+        parse_filtered_tokens(lxr, mode, source_path)
+    }
 }
 
 fn parse_filtered_tokens(
@@ -1233,6 +1256,67 @@ class Abcd:
     pass
 "#
             .trim(),
+            "<test>",
+        )
+        .unwrap();
+        insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
+    fn test_jupyter_magic() {
+        let parse_ast = parse(
+            r#"
+# Normal Python code
+(
+    a
+    %
+    b
+)
+
+# Dynamic object info
+??a.foo
+?a.foo
+?a.foo?
+??a.foo()??
+
+# Line magic
+%timeit a = b
+%timeit foo(b) % 3
+%alias showPath pwd && ls -a
+%timeit a =\
+  foo(b); b = 2
+%matplotlib --inline
+%matplotlib \
+    --inline
+
+# System shell access
+!pwd && ls -a | sed 's/^/\    /'
+!pwd \
+  && ls -a | sed 's/^/\\    /'
+!!cd /Users/foo/Library/Application\ Support/
+
+# Let's add some Python code to make sure that earlier escapes were handled
+# correctly and that we didn't consume any of the following code as a result
+# of the escapes.
+def foo():
+    return (
+        a
+        !=
+        b
+    )
+
+# Transforms into `foo(..)`
+/foo 1 2
+;foo 1 2
+,foo 1 2
+
+# Indented magic
+for a in range(5):
+    %ls
+    pass
+"#
+            .trim(),
+            Mode::Jupyter,
             "<test>",
         )
         .unwrap();

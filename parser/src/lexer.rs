@@ -32,7 +32,7 @@ use crate::{
     soft_keywords::SoftKeywordTransformer,
     string::FStringErrorType,
     text_size::{TextLen, TextRange, TextSize},
-    token::{StringKind, Tok},
+    token::{MagicKind, StringKind, Tok},
     Mode,
 };
 use log::trace;
@@ -175,6 +175,8 @@ pub struct Lexer<T: Iterator<Item = char>> {
     pending: Vec<Spanned>,
     // The current location.
     location: TextSize,
+    // Lexer mode.
+    mode: Mode,
 }
 
 // generated in build.rs, in gen_phf()
@@ -213,7 +215,7 @@ pub fn lex_starts_at(
     mode: Mode,
     start_offset: TextSize,
 ) -> SoftKeywordTransformer<Lexer<std::str::Chars<'_>>> {
-    SoftKeywordTransformer::new(Lexer::new(source.chars(), start_offset), mode)
+    SoftKeywordTransformer::new(Lexer::new(source.chars(), mode, start_offset), mode)
 }
 
 impl<T> Lexer<T>
@@ -222,7 +224,7 @@ where
 {
     /// Create a new lexer from T and a starting location. You probably want to use
     /// [`lex`] instead.
-    pub fn new(input: T, start: TextSize) -> Self {
+    pub fn new(input: T, mode: Mode, start: TextSize) -> Self {
         let mut lxr = Lexer {
             at_begin_of_line: true,
             nesting: 0,
@@ -231,6 +233,7 @@ where
             pending: Vec::with_capacity(5),
             location: start,
             window: CharWindow::new(input),
+            mode,
         };
         // Fill the window.
         lxr.window.slide();
@@ -494,6 +497,59 @@ where
         Ok(())
     }
 
+    /// Lex a single magic command.
+    fn lex_magic_command(&mut self, kind: MagicKind) -> (Tok, TextRange) {
+        let start_pos = self.get_pos();
+        for _ in 0..u32::from(kind.prefix_len()) {
+            self.next_char();
+        }
+        let mut value = String::new();
+        loop {
+            match self.window[0] {
+                Some('\\') => {
+                    // Only skip the line continuation if it is followed by a newline
+                    // otherwise it is a normal backslash which is part of the magic command:
+                    //
+                    //        Skip this backslash
+                    //        v
+                    //   !pwd \
+                    //      && ls -a | sed 's/^/\\    /'
+                    //                          ^^
+                    //                          Don't skip these backslashes
+                    if matches!(self.window[1], Some('\n' | '\r')) {
+                        self.next_char();
+                        self.next_char();
+                        continue;
+                    }
+                }
+                Some('\n' | '\r') | None => {
+                    let end_pos = self.get_pos();
+                    return (
+                        Tok::MagicCommand { kind, value },
+                        TextRange::new(start_pos, end_pos),
+                    );
+                }
+                Some(_) => {}
+            }
+            value.push(self.next_char().unwrap());
+        }
+    }
+
+    fn lex_and_emit_magic_command(&mut self) {
+        let kind = match self.window[..2] {
+            [Some(c1), Some(c2)] => {
+                MagicKind::try_from([c1, c2]).map_or_else(|_| MagicKind::try_from(c1), Ok)
+            }
+            // When the escape character is the last character of the file.
+            [Some(c), None] => MagicKind::try_from(c),
+            _ => return,
+        };
+        if let Ok(kind) = kind {
+            let magic_command = self.lex_magic_command(kind);
+            self.emit(magic_command);
+        }
+    }
+
     /// Lex a string literal.
     fn lex_string(&mut self, kind: StringKind) -> LexResult {
         let start_pos = self.get_pos();
@@ -643,6 +699,10 @@ where
                     self.lex_and_emit_comment()?;
                     spaces = 0;
                     tabs = 0;
+                }
+                // https://github.com/ipython/ipython/blob/635815e8f1ded5b764d66cacc80bbe25e9e2587f/IPython/core/inputtransformer2.py#L345
+                Some('%' | '!' | '?' | '/' | ';' | ',') if self.mode == Mode::Jupyter => {
+                    self.lex_and_emit_magic_command();
                 }
                 Some('\x0C') => {
                     // Form feed character!
@@ -1381,6 +1441,11 @@ mod tests {
         lexer.map(|x| x.unwrap().0).collect()
     }
 
+    pub fn lex_jupyter_source(source: &str) -> Vec<Tok> {
+        let lexer = lex(source, Mode::Jupyter);
+        lexer.map(|x| x.unwrap().0).collect()
+    }
+
     fn str_tok(s: &str) -> Tok {
         Tok::String {
             value: s.to_owned(),
@@ -1395,6 +1460,213 @@ mod tests {
             kind: StringKind::RawString,
             triple_quoted: false,
         }
+    }
+
+    fn assert_jupyter_magic_line_continuation_with_eol(eol: &str) {
+        let source = format!("%matplotlib \\{}  --inline", eol);
+        let tokens = lex_jupyter_source(&source);
+        assert_eq!(
+            tokens,
+            vec![Tok::MagicCommand {
+                value: "matplotlib   --inline".to_string(),
+                kind: MagicKind::Magic
+            },]
+        )
+    }
+
+    #[test]
+    fn test_jupyter_magic_line_continuation_unix_eol() {
+        assert_jupyter_magic_line_continuation_with_eol(UNIX_EOL);
+    }
+
+    #[test]
+    fn test_jupyter_magic_line_continuation_mac_eol() {
+        assert_jupyter_magic_line_continuation_with_eol(MAC_EOL);
+    }
+
+    #[test]
+    fn test_jupyter_magic_line_continuation_windows_eol() {
+        assert_jupyter_magic_line_continuation_with_eol(WINDOWS_EOL);
+    }
+
+    fn assert_jupyter_magic_line_continuation_with_eol_and_eof(eol: &str) {
+        let source = format!("%matplotlib \\{}", eol);
+        let tokens = lex_jupyter_source(&source);
+        assert_eq!(
+            tokens,
+            vec![Tok::MagicCommand {
+                value: "matplotlib ".to_string(),
+                kind: MagicKind::Magic
+            },]
+        )
+    }
+
+    #[test]
+    fn test_jupyter_magic_line_continuation_unix_eol_and_eof() {
+        assert_jupyter_magic_line_continuation_with_eol_and_eof(UNIX_EOL);
+    }
+
+    #[test]
+    fn test_jupyter_magic_line_continuation_mac_eol_and_eof() {
+        assert_jupyter_magic_line_continuation_with_eol_and_eof(MAC_EOL);
+    }
+
+    #[test]
+    fn test_jupyter_magic_line_continuation_windows_eol_and_eof() {
+        assert_jupyter_magic_line_continuation_with_eol_and_eof(WINDOWS_EOL);
+    }
+
+    #[test]
+    fn test_empty_jupyter_magic() {
+        let source = "%\n%%\n!\n!!\n?\n??\n/\n,\n;";
+        let tokens = lex_jupyter_source(source);
+        assert_eq!(
+            tokens,
+            vec![
+                Tok::MagicCommand {
+                    value: "".to_string(),
+                    kind: MagicKind::Magic,
+                },
+                #[cfg(feature = "full-lexer")]
+                Tok::NonLogicalNewline,
+                Tok::MagicCommand {
+                    value: "".to_string(),
+                    kind: MagicKind::Magic2,
+                },
+                #[cfg(feature = "full-lexer")]
+                Tok::NonLogicalNewline,
+                Tok::MagicCommand {
+                    value: "".to_string(),
+                    kind: MagicKind::Shell,
+                },
+                #[cfg(feature = "full-lexer")]
+                Tok::NonLogicalNewline,
+                Tok::MagicCommand {
+                    value: "".to_string(),
+                    kind: MagicKind::ShCap,
+                },
+                #[cfg(feature = "full-lexer")]
+                Tok::NonLogicalNewline,
+                Tok::MagicCommand {
+                    value: "".to_string(),
+                    kind: MagicKind::Help,
+                },
+                #[cfg(feature = "full-lexer")]
+                Tok::NonLogicalNewline,
+                Tok::MagicCommand {
+                    value: "".to_string(),
+                    kind: MagicKind::Help2,
+                },
+                #[cfg(feature = "full-lexer")]
+                Tok::NonLogicalNewline,
+                Tok::MagicCommand {
+                    value: "".to_string(),
+                    kind: MagicKind::Paren,
+                },
+                #[cfg(feature = "full-lexer")]
+                Tok::NonLogicalNewline,
+                Tok::MagicCommand {
+                    value: "".to_string(),
+                    kind: MagicKind::Quote,
+                },
+                #[cfg(feature = "full-lexer")]
+                Tok::NonLogicalNewline,
+                Tok::MagicCommand {
+                    value: "".to_string(),
+                    kind: MagicKind::Quote2,
+                },
+            ]
+        )
+    }
+
+    #[test]
+    fn test_jupyter_magic() {
+        let source = r"
+?foo
+??foo
+%timeit a = b
+%timeit a % 3
+%matplotlib \
+    --inline
+!pwd \
+  && ls -a | sed 's/^/\\    /'
+!!cd /Users/foo/Library/Application\ Support/
+/foo 1 2
+,foo 1 2
+;foo 1 2
+    !ls
+"
+        .trim();
+        let tokens = lex_jupyter_source(source);
+        assert_eq!(
+            tokens,
+            vec![
+                Tok::MagicCommand {
+                    value: "foo".to_string(),
+                    kind: MagicKind::Help,
+                },
+                #[cfg(feature = "full-lexer")]
+                Tok::NonLogicalNewline,
+                Tok::MagicCommand {
+                    value: "foo".to_string(),
+                    kind: MagicKind::Help2,
+                },
+                #[cfg(feature = "full-lexer")]
+                Tok::NonLogicalNewline,
+                Tok::MagicCommand {
+                    value: "timeit a = b".to_string(),
+                    kind: MagicKind::Magic,
+                },
+                #[cfg(feature = "full-lexer")]
+                Tok::NonLogicalNewline,
+                Tok::MagicCommand {
+                    value: "timeit a % 3".to_string(),
+                    kind: MagicKind::Magic,
+                },
+                #[cfg(feature = "full-lexer")]
+                Tok::NonLogicalNewline,
+                Tok::MagicCommand {
+                    value: "matplotlib     --inline".to_string(),
+                    kind: MagicKind::Magic,
+                },
+                #[cfg(feature = "full-lexer")]
+                Tok::NonLogicalNewline,
+                Tok::MagicCommand {
+                    value: "pwd   && ls -a | sed 's/^/\\\\    /'".to_string(),
+                    kind: MagicKind::Shell,
+                },
+                #[cfg(feature = "full-lexer")]
+                Tok::NonLogicalNewline,
+                Tok::MagicCommand {
+                    value: "cd /Users/foo/Library/Application\\ Support/".to_string(),
+                    kind: MagicKind::ShCap,
+                },
+                #[cfg(feature = "full-lexer")]
+                Tok::NonLogicalNewline,
+                Tok::MagicCommand {
+                    value: "foo 1 2".to_string(),
+                    kind: MagicKind::Paren,
+                },
+                #[cfg(feature = "full-lexer")]
+                Tok::NonLogicalNewline,
+                Tok::MagicCommand {
+                    value: "foo 1 2".to_string(),
+                    kind: MagicKind::Quote,
+                },
+                #[cfg(feature = "full-lexer")]
+                Tok::NonLogicalNewline,
+                Tok::MagicCommand {
+                    value: "foo 1 2".to_string(),
+                    kind: MagicKind::Quote2,
+                },
+                #[cfg(feature = "full-lexer")]
+                Tok::NonLogicalNewline,
+                Tok::MagicCommand {
+                    value: "ls".to_string(),
+                    kind: MagicKind::Shell,
+                },
+            ]
+        )
     }
 
     #[test]
