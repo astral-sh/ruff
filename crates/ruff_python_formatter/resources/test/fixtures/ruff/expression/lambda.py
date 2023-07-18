@@ -55,3 +55,9 @@ lambda x: lambda y: lambda z: (
     y,
 z)  # Trailing
 # Trailing
+
+
+a = (
+    lambda  # Dangling
+           : 1
+)
