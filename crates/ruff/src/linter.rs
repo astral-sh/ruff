@@ -214,6 +214,7 @@ pub fn check_path(
     {
         let ignored = check_noqa(
             &mut diagnostics,
+            path,
             locator,
             indexer.comment_ranges(),
             &directives.noqa_line_for,
