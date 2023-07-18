@@ -959,7 +959,7 @@ mod tests {
         let contents = "x = 1";
         let noqa_line_for = NoqaMapping::default();
         let (count, output) = add_noqa_inner(
-            &path,
+            path,
             &[],
             &Locator::new(contents),
             &[],
@@ -979,7 +979,7 @@ mod tests {
         let contents = "x = 1";
         let noqa_line_for = NoqaMapping::default();
         let (count, output) = add_noqa_inner(
-            &path,
+            path,
             &diagnostics,
             &Locator::new(contents),
             &[],
@@ -1004,7 +1004,7 @@ mod tests {
         let contents = "x = 1  # noqa: E741\n";
         let noqa_line_for = NoqaMapping::default();
         let (count, output) = add_noqa_inner(
-            &path,
+            path,
             &diagnostics,
             &Locator::new(contents),
             &[TextRange::new(TextSize::from(7), TextSize::from(19))],
@@ -1029,7 +1029,7 @@ mod tests {
         let contents = "x = 1  # noqa";
         let noqa_line_for = NoqaMapping::default();
         let (count, output) = add_noqa_inner(
-            &path,
+            path,
             &diagnostics,
             &Locator::new(contents),
             &[TextRange::new(TextSize::from(7), TextSize::from(13))],
