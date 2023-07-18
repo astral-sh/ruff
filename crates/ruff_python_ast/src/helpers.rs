@@ -1818,12 +1818,10 @@ y = 2
             value: Box::new(constant_three.clone()),
             range: TextRange::default(),
         });
-        assert!(
-            !any_over_stmt(&type_alias, &|expr| {
-                seen.borrow_mut().push(expr.clone());
-                false
-            })
-        );
+        assert!(!any_over_stmt(&type_alias, &|expr| {
+            seen.borrow_mut().push(expr.clone());
+            false
+        }));
         assert_eq!(
             seen.take(),
             vec![name, constant_one, constant_two, constant_three]
@@ -1837,9 +1835,7 @@ y = 2
             bound: None,
             name: Identifier::new("x", TextRange::default()),
         });
-        assert!(
-            !any_over_type_param(&type_var_no_bound, &|_expr| true)
-        );
+        assert!(!any_over_type_param(&type_var_no_bound, &|_expr| true));
 
         let bound = Expr::Constant(ExprConstant {
             value: Constant::Int(1.into()),
