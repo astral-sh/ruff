@@ -15,7 +15,8 @@ html,
 }
 
 .shadow-copied {
-  --tw-shadow: 0 0 0 1px #f07171, inset 0 0 0 1px #f07171;
+  --tw-shadow: 0 0 0 1px theme("colors.radiate"),
+    inset 0 0 0 1px theme("colors.radiate");
   --tw-shadow-colored: 0 0 0 1px var(--tw-shadow-color),
     inset 0 0 0 1px var(--tw-shadow-color);
 

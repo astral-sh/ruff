@@ -13,6 +13,7 @@ import { persist, restore, stringify } from "./settings";
 import SettingsEditor from "./SettingsEditor";
 import SourceEditor from "./SourceEditor";
 import MonacoThemes from "./MonacoThemes";
+import SideBar from "./SideBar";
 
 type Tab = "Source" | "Settings";
 
@@ -111,26 +112,21 @@ export default function Editor() {
   }, []);
 
   return (
-    <main
-      className={
-        "h-full w-full flex flex-auto bg-ayu-background dark:bg-ayu-background-dark"
-      }
-    >
+    <main className="flex flex-col h-full bg-ayu-background dark:bg-ayu-background-dark">
       <Header
         edit={source.revision}
-        tab={tab}
         theme={theme}
         version={ruffVersion}
-        onChangeTab={setTab}
         onChangeTheme={setTheme}
         onShare={handleShare}
       />
 
       <MonacoThemes />
 
-      <div className={"mt-12 relative flex-auto"}>
+      <div className="flex flex-grow">
         {initialized ? (
           <>
+            <SideBar onSelectTool={(tool) => setTab(tool)} selected={tab} />
             <SourceEditor
               visible={tab === "Source"}
               source={source.pythonSource}

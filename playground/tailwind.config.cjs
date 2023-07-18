@@ -12,6 +12,12 @@ module.exports = {
           DEFAULT: "#f8f9fa",
           dark: "#0b0e14",
         },
+        galaxy: "#261230",
+        space: "#30173D",
+        starlight: "#F4F4F1",
+        nebula: "#CDCBFB",
+        rock: "#78876E",
+        radiate: "#D7FF64",
       },
       fontFamily: {
         sans: ["Inter var", ...defaultTheme.fontFamily.sans],
