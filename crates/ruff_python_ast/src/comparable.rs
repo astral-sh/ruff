@@ -988,18 +988,20 @@ pub enum ComparableTypeParam<'a> {
 impl<'a> From<&'a ast::TypeParam> for ComparableTypeParam<'a> {
     fn from(type_param: &'a ast::TypeParam) -> Self {
         match type_param {
-            ast::TypeParam::TypeVar(ast::TypeParamTypeVar { name, bound, .. }) => {
-                Self::TypeVar(TypeParamTypeVar {
-                    name: name.as_str(),
-                    bound: bound.as_ref().map(Into::into),
-                })
-            }
-            ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { name, .. }) => {
+            ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
+                name,
+                bound,
+                range: _,
+            }) => Self::TypeVar(TypeParamTypeVar {
+                name: name.as_str(),
+                bound: bound.as_ref().map(Into::into),
+            }),
+            ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { name, range: _ }) => {
                 Self::TypeVarTuple(TypeParamTypeVarTuple {
                     name: name.as_str(),
                 })
             }
-            ast::TypeParam::ParamSpec(ast::TypeParamParamSpec { name, .. }) => {
+            ast::TypeParam::ParamSpec(ast::TypeParamParamSpec { name, range: _ }) => {
                 Self::ParamSpec(TypeParamParamSpec {
                     name: name.as_str(),
                 })
