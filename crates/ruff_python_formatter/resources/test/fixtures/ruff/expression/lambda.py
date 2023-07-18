@@ -22,3 +22,36 @@ lambda x: lambda y: lambda z: x  # Trailing
 lambda x: lambda y: lambda z: (x, y, z)  # Trailing
 # Trailing
 
+# Leading
+lambda x: lambda y: lambda z: (
+    x,
+    y,
+z)  # Trailing
+# Trailing
+
+# Leading
+lambda x: lambda y: lambda z: (
+    x,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+z)  # Trailing
+# Trailing
