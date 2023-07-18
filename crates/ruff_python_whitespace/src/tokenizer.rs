@@ -1,3 +1,4 @@
+use memchr::memrchr3_iter;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use unic_ucd_ident::{is_xid_continue, is_xid_start};
 
@@ -419,36 +420,45 @@ impl<'a> SimpleTokenizer<'a> {
 
             // For all other tokens, test if the character isn't part of a comment.
             c => {
-                let mut comment_offset = None;
-
                 // Skip the test whether there's a preceding comment if it has been performed before.
-                if !self.back_line_has_no_comment {
-                    for (back_index, c) in self.cursor.chars().rev().enumerate() {
-                        match c {
-                            '#' => {
-                                // Potentially a comment
-                                comment_offset = Some(back_index + 1);
-                            }
-                            '\r' | '\n' | '\\' => {
-                                break;
-                            }
-                            c => {
-                                if !is_python_whitespace(c)
-                                    && TokenKind::from_non_trivia_char(c) == TokenKind::Other
-                                {
-                                    comment_offset = None;
-                                }
-                            }
+                let comment_offset = if self.back_line_has_no_comment {
+                    None
+                } else {
+                    let bytes = self.cursor.chars().as_str().as_bytes();
+                    let mut line_start = 0;
+                    let mut last_comment_offset = None;
+
+                    // Find the start of the line, or any potential comments.
+                    for index in memrchr3_iter(b'\n', b'\r', b'#', bytes) {
+                        if bytes[index] == b'#' {
+                            // Potentially a comment, but not guaranteed
+                            last_comment_offset = Some(index);
+                        } else {
+                            line_start = index + 1;
+                            break;
                         }
                     }
-                }
+
+                    // Verify if this is indeed a comment. Doing this only when we've found a comment is significantly
+                    // faster because comments are rare.
+                    last_comment_offset.filter(|last_comment_offset| {
+                        let before_comment =
+                            &self.cursor.chars().as_str()[line_start..*last_comment_offset];
+
+                        before_comment.chars().all(|c| {
+                            is_python_whitespace(c)
+                                || TokenKind::from_non_trivia_char(c) != TokenKind::Other
+                        })
+                    })
+                };
 
                 // From here on it is guaranteed that this line has no other comment.
                 self.back_line_has_no_comment = true;
 
                 if let Some(comment_offset) = comment_offset {
+                    let comment_length = self.cursor.chars().as_str().len() - comment_offset;
                     // It is a comment, bump all tokens
-                    for _ in 0..comment_offset {
+                    for _ in 0..comment_length {
                         self.cursor.bump_back().unwrap();
                     }
 
