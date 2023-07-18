@@ -1,3 +1,31 @@
+//! [`Checker`] for AST-based lint rules.
+//!
+//! The [`Checker`] is responsible for traversing over the AST, building up the [`SemanticModel`],
+//! and running any enabled [`Rule`]s at the appropriate place and time.
+//!
+//! The [`Checker`] is structured as a single pass over the AST that proceeds in "evaluation" order.
+//! That is: the [`Checker`] typically iterates over nodes in the order in which they're evaluated
+//! by the Python interpreter. This includes, e.g., deferring function body traversal until after
+//! parent scopes have been fully traversed. Individual rules may also perform internal traversals
+//! of the AST.
+//!
+//! While the [`Checker`] is typically passed by mutable reference to the individual lint rule
+//! implementations, most of its constituent components are intended to be treated immutably, with
+//! the exception of the [`Diagnostic`] vector, which is intended to be mutated by the individual
+//! lint rules. In the future, this should be formalized in the API.
+//!
+//! The individual [`Visitor`] implementations within the [`Checker`] typically proceed in four
+//! steps:
+//!
+//! 1. Analysis: Run any relevant lint rules on the current node.
+//! 2. Binding: Bind any names introduced by the current node.
+//! 3. Recursion: Recurse into the children of the current node.
+//! 4. Clean-up: Perform any necessary clean-up after the current node has been fully traversed.
+//!
+//! The first step represents the lint-rule analysis phase, while the remaining steps together
+//! compose the semantic analysis phase. In the future, these phases may be separated into distinct
+//! passes over the AST.
+
 use std::path::Path;
 
 use itertools::Itertools;
@@ -54,23 +82,39 @@ use crate::{docstrings, noqa, warn_user};
 mod deferred;
 
 pub(crate) struct Checker<'a> {
-    // Settings, static metadata, etc.
+    /// The [`Path`] to the file under analysis.
     path: &'a Path,
-    module_path: Option<&'a [String]>,
+    /// The [`Path`] to the package containing the current file.
     package: Option<&'a Path>,
+    /// The module representation of the current file (e.g., `foo.bar`).
+    module_path: Option<&'a [String]>,
+    /// Whether the current file is a stub (`.pyi`) file.
     is_stub: bool,
+    /// The [`flags::Noqa`] for the current analysis (i.e., whether to respect suppression
+    /// comments).
     noqa: flags::Noqa,
+    /// The [`NoqaMapping`] for the current analysis (i.e., the mapping from line number to
+    /// suppression commented line number).
     noqa_line_for: &'a NoqaMapping,
+    /// The [`Settings`] for the current analysis, including the enabled rules.
     pub(crate) settings: &'a Settings,
+    /// The [`Locator`] for the current file, which enables extraction of source code from byte
+    /// offsets.
     pub(crate) locator: &'a Locator<'a>,
+    /// The [`Stylist`] for the current file, which detects the current line ending, quote, and
+    /// indentation style.
     pub(crate) stylist: &'a Stylist<'a>,
+    /// The [`Indexer`] for the current file, which contains the offsets of all comments and more.
     pub(crate) indexer: &'a Indexer,
+    /// The [`Importer`] for the current file, which enables importing of other modules.
     pub(crate) importer: Importer<'a>,
-    // Stateful fields.
+    /// The [`SemanticModel`], built up over the course of the AST traversal.
     semantic: SemanticModel<'a>,
+    /// A set of deferred nodes to be processed after the current traversal (e.g., function bodies).
     deferred: Deferred<'a>,
+    /// The cumulative set of diagnostics computed across all lint rules.
     pub(crate) diagnostics: Vec<Diagnostic>,
-    // Check-specific state.
+    /// The list of names already seen by flake8-bugbear diagnostics, to avoid duplicate violations..
     pub(crate) flake8_bugbear_seen: Vec<&'a ast::ExprName>,
 }
 
@@ -205,7 +249,7 @@ where
     'b: 'a,
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
-        // Phase 0: Pre-processing
+        // Step 0: Pre-processing
         self.semantic.push_stmt(stmt);
 
         // Track whether we've seen docstrings, non-imports, etc.
@@ -248,7 +292,7 @@ where
         // the node.
         let flags_snapshot = self.semantic.flags;
 
-        // Phase 1: Analysis
+        // Step 1: Analysis
         match stmt {
             Stmt::Global(ast::StmtGlobal { names, range: _ }) => {
                 if self.enabled(Rule::AmbiguousVariableName) {
@@ -1656,7 +1700,7 @@ where
             _ => {}
         }
 
-        // Phase 2: Binding
+        // Step 2: Binding
         match stmt {
             Stmt::AugAssign(ast::StmtAugAssign {
                 target,
@@ -1812,7 +1856,7 @@ where
             _ => {}
         }
 
-        // Phase 3: Recursion
+        // Step 3: Traversal
         match stmt {
             Stmt::FunctionDef(ast::StmtFunctionDef {
                 body,
@@ -2073,7 +2117,7 @@ where
             _ => visitor::walk_stmt(self, stmt),
         };
 
-        // Phase 4: Clean-up
+        // Step 4: Clean-up
         match stmt {
             Stmt::FunctionDef(ast::StmtFunctionDef { name, .. })
             | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { name, .. }) => {
@@ -2115,7 +2159,7 @@ where
     }
 
     fn visit_expr(&mut self, expr: &'b Expr) {
-        // Phase 0: Pre-processing
+        // Step 0: Pre-processing
         if !self.semantic.in_f_string()
             && !self.semantic.in_deferred_type_definition()
             && self.semantic.in_type_definition()
@@ -2158,7 +2202,7 @@ where
             self.semantic.flags -= SemanticModelFlags::BOOLEAN_TEST;
         }
 
-        // Phase 1: Analysis
+        // Step 1: Analysis
         match expr {
             Expr::Subscript(subscript @ ast::ExprSubscript { value, slice, .. }) => {
                 // Ex) Optional[...], Union[...]
@@ -3556,7 +3600,7 @@ where
             _ => {}
         };
 
-        // Phase 2: Binding
+        // Step 2: Binding
         match expr {
             Expr::Call(ast::ExprCall {
                 func,
@@ -3579,7 +3623,7 @@ where
             _ => {}
         }
 
-        // Phase 3: Recursion
+        // Step 3: Traversal
         match expr {
             Expr::ListComp(ast::ExprListComp {
                 elt,
@@ -3939,7 +3983,7 @@ where
             _ => visitor::walk_expr(self, expr),
         }
 
-        // Phase 4: Clean-up
+        // Step 4: Clean-up
         match expr {
             Expr::Lambda(_)
             | Expr::GeneratorExp(_)
@@ -3960,7 +4004,7 @@ where
         let flags_snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::EXCEPTION_HANDLER;
 
-        // Phase 1: Analysis
+        // Step 1: Analysis
         match except_handler {
             ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                 type_,
@@ -4042,7 +4086,7 @@ where
             }
         }
 
-        // Phase 2: Binding
+        // Step 2: Binding
         let bindings = match except_handler {
             ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                 type_: _,
@@ -4069,10 +4113,10 @@ where
             }
         };
 
-        // Phase 3: Recursion
+        // Step 3: Traversal
         walk_except_handler(self, except_handler);
 
-        // Phase 4: Clean-up
+        // Step 4: Clean-up
         if let Some((name, existing_id, binding_id)) = bindings {
             // If the exception name wasn't used in the scope, emit a diagnostic.
             if !self.semantic.is_used(binding_id) {
@@ -4119,7 +4163,7 @@ where
     }
 
     fn visit_arguments(&mut self, arguments: &'b Arguments) {
-        // Phase 1: Analysis
+        // Step 1: Analysis
         if self.enabled(Rule::MutableArgumentDefault) {
             flake8_bugbear::rules::mutable_argument_default(self, arguments);
         }
@@ -4138,7 +4182,7 @@ where
             }
         }
 
-        // Phase 2: Binding.
+        // Step 2: Binding.
         // Bind, but intentionally avoid walking default expressions, as we handle them
         // upstream.
         for arg_with_default in &arguments.posonlyargs {
@@ -4159,7 +4203,7 @@ where
     }
 
     fn visit_arg(&mut self, arg: &'b Arg) {
-        // Phase 1: Analysis
+        // Step 1: Analysis
         if self.enabled(Rule::AmbiguousVariableName) {
             if let Some(diagnostic) =
                 pycodestyle::rules::ambiguous_variable_name(&arg.arg, arg.range())
@@ -4180,7 +4224,7 @@ where
             flake8_builtins::rules::builtin_argument_shadowing(self, arg);
         }
 
-        // Phase 2: Binding.
+        // Step 2: Binding.
         // Bind, but intentionally avoid walking the annotation, as we handle it
         // upstream.
         self.add_binding(
@@ -4192,7 +4236,7 @@ where
     }
 
     fn visit_pattern(&mut self, pattern: &'b Pattern) {
-        // Phase 2: Binding
+        // Step 2: Binding
         if let Pattern::MatchAs(ast::PatternMatchAs {
             name: Some(name), ..
         })
@@ -4212,29 +4256,29 @@ where
             );
         }
 
-        // Phase 3: Recursion
+        // Step 3: Traversal
         walk_pattern(self, pattern);
     }
 
     fn visit_body(&mut self, body: &'b [Stmt]) {
-        // Phase 1: Analysis
+        // Step 1: Analysis
         if self.enabled(Rule::UnnecessaryPass) {
             flake8_pie::rules::no_unnecessary_pass(self, body);
         }
 
-        // Phase 2: Binding
+        // Step 2: Binding
         let prev_body = self.semantic.body;
         let prev_body_index = self.semantic.body_index;
         self.semantic.body = body;
         self.semantic.body_index = 0;
 
-        // Phase 3: Recursion
+        // Step 3: Traversal
         for stmt in body {
             self.visit_stmt(stmt);
             self.semantic.body_index += 1;
         }
 
-        // Phase 4: Clean-up
+        // Step 4: Clean-up
         self.semantic.body = prev_body;
         self.semantic.body_index = prev_body_index;
     }
