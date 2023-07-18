@@ -236,7 +236,7 @@ impl FileExemption {
                 Err(err) => {
                     #[allow(deprecated)]
                     let line = locator.compute_line_index(range.start());
-                    let path_display = relativize_path(path.display());
+                    let path_display = relativize_path(path);
                     warn!("Invalid `# noqa` directive on {path_display}:{line}: {err}");
                 }
                 Ok(Some(ParsedFileExemption::All)) => {
