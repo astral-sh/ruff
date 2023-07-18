@@ -4103,11 +4103,8 @@ where
                     );
                     if self.patch(Rule::UnusedVariable) {
                         diagnostic.try_set_fix(|| {
-                            pyflakes::fixes::remove_exception_handler_assignment(
-                                except_handler,
-                                self.locator,
-                            )
-                            .map(Fix::automatic)
+                            pyflakes::fixes::remove_exception_handler_assignment(name, self.locator)
+                                .map(Fix::automatic)
                         });
                     }
                     self.diagnostics.push(diagnostic);

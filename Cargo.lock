@@ -2157,7 +2157,6 @@ dependencies = [
  "similar",
  "smallvec",
  "thiserror",
- "unic-ucd-ident",
 ]
 
 [[package]]
@@ -2195,8 +2194,10 @@ version = "0.0.0"
 name = "ruff_python_whitespace"
 version = "0.0.0"
 dependencies = [
+ "insta",
  "memchr",
  "ruff_text_size",
+ "unic-ucd-ident",
 ]
 
 [[package]]

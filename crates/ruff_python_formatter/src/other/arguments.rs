@@ -1,9 +1,11 @@
 use std::usize;
 
+use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::{Arguments, Ranged};
 
 use ruff_formatter::{format_args, write};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
+use ruff_python_whitespace::{first_non_trivia_token, SimpleTokenizer, Token, TokenKind};
 
 use crate::comments::{
     dangling_comments, leading_comments, leading_node_comments, trailing_comments,
@@ -12,9 +14,7 @@ use crate::comments::{
 use crate::context::NodeLevel;
 use crate::expression::parentheses::parenthesized;
 use crate::prelude::*;
-use crate::trivia::{first_non_trivia_token, SimpleTokenizer, Token, TokenKind};
 use crate::FormatNodeRule;
-use ruff_text_size::{TextRange, TextSize};
 
 #[derive(Default)]
 pub struct FormatArguments;

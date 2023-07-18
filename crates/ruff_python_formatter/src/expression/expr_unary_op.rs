@@ -1,14 +1,16 @@
-use crate::comments::trailing_comments;
-use crate::context::PyFormatContext;
-use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
-use crate::trivia::{SimpleTokenizer, TokenKind};
-use crate::{AsFormat, FormatNodeRule, PyFormatter};
-use ruff_formatter::prelude::{hard_line_break, space, text};
-use ruff_formatter::{Format, FormatContext, FormatResult};
-use ruff_python_ast::node::AnyNodeRef;
 use ruff_text_size::{TextLen, TextRange};
 use rustpython_parser::ast::UnaryOp;
 use rustpython_parser::ast::{ExprUnaryOp, Ranged};
+
+use ruff_formatter::prelude::{hard_line_break, space, text};
+use ruff_formatter::{Format, FormatContext, FormatResult};
+use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_whitespace::{SimpleTokenizer, TokenKind};
+
+use crate::comments::trailing_comments;
+use crate::context::PyFormatContext;
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
+use crate::{AsFormat, FormatNodeRule, PyFormatter};
 
 #[derive(Default)]
 pub struct FormatExprUnaryOp;
