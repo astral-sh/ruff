@@ -191,6 +191,10 @@ impl FormatNodeRule<Arguments> for FormatArguments {
             + usize::from(kwarg.is_some());
 
         if self.parentheses == ArgumentsParentheses::SkipInsideLambda {
+            debug_assert!(
+                dangling.is_empty(),
+                "This node's parentheses cannot be skipped with dangling comments"
+            );
             group(&format_inner).fmt(f)?;
         } else if num_arguments == 0 {
             // No arguments, format any dangling comments between `()`
