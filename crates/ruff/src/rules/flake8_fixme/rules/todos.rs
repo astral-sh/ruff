@@ -3,39 +3,105 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::directives::{TodoComment, TodoDirectiveKind};
 
+/// ## What it does
+/// Checks for "TODO" comments.
+///
+/// ## Why is this bad?
+/// "TODO" comments are used to describe an issue that should be resolved
+/// (usually, a missing feature, optimization, or refactoring opportunity).
+///
+/// Consider resolving the issue before deploying the code.
+///
+/// ## Example
+/// ```python
+/// def greet(name):
+///     return f"Hello, {name}!"  # TODO: Add support for custom greetings.
+/// ```
 #[violation]
 pub struct LineContainsTodo;
 impl Violation for LineContainsTodo {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Line contains TODO")
+        format!("Line contains TODO, consider resolving the issue")
     }
 }
 
+/// ## What it does
+/// Checks for "FIXME" comments.
+///
+/// ## Why is this bad?
+/// "FIXME" comments are used to describe an issue that should be resolved
+/// (usually, a bug or unexpected behavior).
+///
+/// Consider resolving the issue before deploying the code.
+///
+/// ## Example
+/// ```python
+/// def speed(distance, time):
+///     return distance / time  # FIXME: Raises ZeroDivisionError for time = 0.
+/// ```
 #[violation]
 pub struct LineContainsFixme;
 impl Violation for LineContainsFixme {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Line contains FIXME")
+        format!("Line contains FIXME, consider resolving the issue")
     }
 }
 
+/// ## What it does
+/// Checks for "XXX" comments.
+///
+/// ## Why is this bad?
+/// "XXX" comments are used to describe an issue that should be resolved.
+///
+/// Consider resolving the issue before deploying the code. Additionally,
+/// consider using a more descriptive comment tag (such as "TODO", "FIXME", or
+/// "HACK").
+///
+/// ## Example
+/// ```python
+/// def speed(distance, time):
+///     return distance / time  # XXX: Raises ZeroDivisionError for time = 0.
+/// ```
 #[violation]
 pub struct LineContainsXxx;
 impl Violation for LineContainsXxx {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Line contains XXX")
+        format!("Line contains XXX, consider resolving the issue")
     }
 }
 
+/// ## What it does
+/// Checks for "HACK" comments.
+///
+/// ## Why is this bad?
+/// "HACK" comments are used to describe an issue that should be resolved
+/// (usually, a suboptimal solution or temporary workaround).
+///
+/// Consider resolving the issue before deploying the code.
+///
+/// ## Example
+/// ```python
+/// import os
+///
+///
+/// def running_windows():  # HACK: Use platform module instead.
+///     try:
+///         os.mkdir("C:\\Windows\\System32\\")
+///     except FileExistsError:
+///         return True
+///     else:
+///         os.rmdir("C:\\Windows\\System32\\")
+///         return False
+/// ```
 #[violation]
 pub struct LineContainsHack;
 impl Violation for LineContainsHack {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Line contains HACK")
+        format!("Line contains HACK, consider resolving the issue")
     }
 }
 
