@@ -17,6 +17,8 @@ use crate::ScopeId;
 pub struct Binding<'a> {
     pub kind: BindingKind<'a>,
     pub range: TextRange,
+    /// The [`ScopeId`] of the scope in which the [`Binding`] was defined.
+    pub scope: ScopeId,
     /// The context in which the [`Binding`] was created.
     pub context: ExecutionContext,
     /// The statement in which the [`Binding`] was defined.
