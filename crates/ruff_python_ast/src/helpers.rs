@@ -1589,17 +1589,21 @@ pub fn locate_cmp_ops(expr: &Expr, locator: &Locator) -> Vec<LocatedCmpOp> {
 mod tests {
     use std::borrow::Cow;
 
+    use std::cell::RefCell;
+
+    use std::vec;
+
     use anyhow::Result;
     use ruff_text_size::{TextLen, TextRange, TextSize};
     use rustpython_ast::{
-        self, CmpOp, Constant, Expr, ExprConstant, Identifier, Ranged, TypeParam,
-        TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
+        self, CmpOp, Constant, Expr, ExprConstant, ExprContext, ExprName, Identifier, Ranged, Stmt,
+        StmtTypeAlias, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
     };
     use rustpython_parser::ast::Suite;
     use rustpython_parser::Parse;
 
     use crate::helpers::{
-        any_over_type_param, first_colon_range, has_trailing_content,
+        any_over_stmt, any_over_type_param, first_colon_range, has_trailing_content,
         locate_cmp_ops, resolve_imported_module_path, LocatedCmpOp,
     };
     use crate::source_code::Locator;
@@ -1775,6 +1779,58 @@ y = 2
         Ok(())
     }
 
+    #[test]
+    fn any_over_stmt_type_alias() {
+        let range = TextRange::new(TextSize::from(0), TextSize::from(0));
+        let seen = RefCell::new(Vec::new());
+        let name = Expr::Name(ExprName {
+            id: "x".to_string(),
+            range,
+            ctx: ExprContext::Load,
+        });
+        let constant_one = Expr::Constant(ExprConstant {
+            value: Constant::Int(1.into()),
+            kind: Some("x".to_string()),
+            range: range.clone(),
+        });
+        let constant_two = Expr::Constant(ExprConstant {
+            value: Constant::Int(2.into()),
+            kind: Some("y".to_string()),
+            range: range.clone(),
+        });
+        let constant_three = Expr::Constant(ExprConstant {
+            value: Constant::Int(3.into()),
+            kind: Some("z".to_string()),
+            range: range.clone(),
+        });
+        let type_var_one = TypeParam::TypeVar(TypeParamTypeVar {
+            range: range.clone(),
+            bound: Some(Box::new(constant_one.clone())),
+            name: Identifier::new("x", range.clone()),
+        });
+        let type_var_two = TypeParam::TypeVar(TypeParamTypeVar {
+            range: range.clone(),
+            bound: Some(Box::new(constant_two.clone())),
+            name: Identifier::new("x", range.clone()),
+        });
+        let type_alias = Stmt::TypeAlias(StmtTypeAlias {
+            name: Box::new(name.clone()),
+            type_params: vec![type_var_one, type_var_two],
+            value: Box::new(constant_three.clone()),
+            range: range.clone(),
+        });
+        assert_eq!(
+            any_over_stmt(&type_alias, &|expr| {
+                seen.borrow_mut().push(expr.clone());
+                false
+            }),
+            false
+        );
+        assert_eq!(
+            seen.take(),
+            vec![name, constant_one, constant_two, constant_three]
+        )
+    }
 
     #[test]
     fn any_over_type_param_type_var() {
