@@ -271,7 +271,8 @@ impl<'a> Generator<'a> {
                 keywords,
                 body,
                 decorator_list,
-                range: _range,
+                range: _,
+                type_params: _,
             }) => {
                 self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
                 for decorator in decorator_list {
@@ -457,7 +458,7 @@ impl<'a> Generator<'a> {
             Stmt::If(ast::StmtIf {
                 test,
                 body,
-                orelse,
+                elif_else_clauses,
                 range: _range,
             }) => {
                 statement!({
@@ -467,33 +468,19 @@ impl<'a> Generator<'a> {
                 });
                 self.body(body);
 
-                let mut orelse_: &[Stmt] = orelse;
-                loop {
-                    if orelse_.len() == 1 && matches!(orelse_[0], Stmt::If(_)) {
-                        if let Stmt::If(ast::StmtIf {
-                            body,
-                            test,
-                            orelse,
-                            range: _range,
-                        }) = &orelse_[0]
-                        {
-                            statement!({
-                                self.p("elif ");
-                                self.unparse_expr(test, precedence::IF);
-                                self.p(":");
-                            });
-                            self.body(body);
-                            orelse_ = orelse;
-                        }
+                for clause in elif_else_clauses {
+                    if let Some(test) = &clause.test {
+                        statement!({
+                            self.p("elif ");
+                            self.unparse_expr(test, precedence::IF);
+                            self.p(":");
+                        });
                     } else {
-                        if !orelse_.is_empty() {
-                            statement!({
-                                self.p("else:");
-                            });
-                            self.body(orelse_);
-                        }
-                        break;
+                        statement!({
+                            self.p("else:");
+                        });
                     }
+                    self.body(&clause.body);
                 }
             }
             Stmt::With(ast::StmtWith { items, body, .. }) => {
@@ -715,6 +702,7 @@ impl<'a> Generator<'a> {
                     self.p("continue");
                 });
             }
+            Stmt::TypeAlias(_) => todo!(),
         }
     }
 

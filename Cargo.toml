@@ -54,12 +54,12 @@ libcst = { git = "https://github.com/Instagram/LibCST.git", rev = "3cacca1a1029f
 
 # Please tag the RustPython version every time you update its revision here and in fuzz/Cargo.toml
 # Tagging the version ensures that older ruff versions continue to build from source even when we rebase our RustPython fork.
-# Current tag: v0.0.7
-ruff_text_size = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "b996b21ffca562ecb2086f632a6a0b05c245c24a" }
-rustpython-ast = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "b996b21ffca562ecb2086f632a6a0b05c245c24a" , default-features = false, features = ["num-bigint"]}
-rustpython-format = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "b996b21ffca562ecb2086f632a6a0b05c245c24a", default-features = false, features = ["num-bigint"] }
-rustpython-literal = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "b996b21ffca562ecb2086f632a6a0b05c245c24a", default-features = false }
-rustpython-parser = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "b996b21ffca562ecb2086f632a6a0b05c245c24a" , default-features = false, features = ["full-lexer", "num-bigint"] }
+# Current tag: v0.0.9
+ruff_text_size = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "db04fd415774032e1e2ceb03bcbf5305e0d22c8c" }
+rustpython-ast = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "db04fd415774032e1e2ceb03bcbf5305e0d22c8c" , default-features = false, features = ["num-bigint"]}
+rustpython-format = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "db04fd415774032e1e2ceb03bcbf5305e0d22c8c", default-features = false, features = ["num-bigint"] }
+rustpython-literal = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "db04fd415774032e1e2ceb03bcbf5305e0d22c8c", default-features = false }
+rustpython-parser = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "db04fd415774032e1e2ceb03bcbf5305e0d22c8c" , default-features = false, features = ["full-lexer", "num-bigint"] }
 
 [profile.release]
 lto = "fat"

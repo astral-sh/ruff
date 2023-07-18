@@ -437,9 +437,19 @@ where
         Stmt::If(ast::StmtIf {
             test,
             body,
-            orelse,
+            elif_else_clauses,
             range: _range,
-        }) => any_over_expr(test, func) || any_over_body(body, func) || any_over_body(orelse, func),
+        }) => {
+            any_over_expr(test, func)
+                || any_over_body(body, func)
+                || elif_else_clauses.iter().any(|clause| {
+                    clause
+                        .test
+                        .as_ref()
+                        .map_or(false, |test| any_over_expr(test, func))
+                        || any_over_body(&clause.body, func)
+                })
+        }
         Stmt::With(ast::StmtWith { items, body, .. })
         | Stmt::AsyncWith(ast::StmtAsyncWith { items, body, .. }) => {
             items.iter().any(|with_item| {
@@ -529,6 +539,7 @@ where
             range: _range,
         }) => any_over_expr(value, func),
         Stmt::Pass(_) | Stmt::Break(_) | Stmt::Continue(_) => false,
+        Stmt::TypeAlias(_) => todo!(),
     }
 }
 
@@ -944,9 +955,15 @@ where
             | Stmt::AsyncFunctionDef(_)
             | Stmt::Try(_)
             | Stmt::TryStar(_) => {}
-            Stmt::If(ast::StmtIf { body, orelse, .. }) => {
+            Stmt::If(ast::StmtIf {
+                body,
+                elif_else_clauses,
+                ..
+            }) => {
                 walk_body(self, body);
-                walk_body(self, orelse);
+                for clause in elif_else_clauses {
+                    self.visit_elif_else_clause(clause);
+                }
             }
             Stmt::While(ast::StmtWhile { body, .. })
             | Stmt::With(ast::StmtWith { body, .. })
@@ -1061,25 +1078,6 @@ pub fn first_colon_range(range: TextRange, locator: &Locator) -> Option<TextRang
         .find(|(tok, _)| tok.is_colon())
         .map(|(_, range)| range);
     range
-}
-
-/// Return the `Range` of the first `Elif` or `Else` token in an `If` statement.
-pub fn elif_else_range(stmt: &ast::StmtIf, locator: &Locator) -> Option<TextRange> {
-    let ast::StmtIf { body, orelse, .. } = stmt;
-
-    let start = body.last().expect("Expected body to be non-empty").end();
-
-    let end = match &orelse[..] {
-        [Stmt::If(ast::StmtIf { test, .. })] => test.start(),
-        [stmt, ..] => stmt.start(),
-        _ => return None,
-    };
-
-    let contents = &locator.contents()[TextRange::new(start, end)];
-    lexer::lex_starts_at(contents, Mode::Module, start)
-        .flatten()
-        .find(|(kind, _)| matches!(kind, Tok::Elif | Tok::Else))
-        .map(|(_, range)| range)
 }
 
 /// Given an offset at the end of a line (including newlines), return the offset of the
@@ -1568,13 +1566,13 @@ mod tests {
 
     use anyhow::Result;
     use ruff_text_size::{TextLen, TextRange, TextSize};
-    use rustpython_ast::{CmpOp, Expr, Ranged, Stmt};
+    use rustpython_ast::{CmpOp, Expr, Ranged};
     use rustpython_parser::ast::Suite;
     use rustpython_parser::Parse;
 
     use crate::helpers::{
-        elif_else_range, first_colon_range, has_trailing_content, locate_cmp_ops,
-        resolve_imported_module_path, LocatedCmpOp,
+        first_colon_range, has_trailing_content, locate_cmp_ops, resolve_imported_module_path,
+        LocatedCmpOp,
     };
     use crate::source_code::Locator;
 
@@ -1665,35 +1663,6 @@ y = 2
         .unwrap();
         assert_eq!(&contents[range], ":");
         assert_eq!(range, TextRange::new(TextSize::from(6), TextSize::from(7)));
-    }
-
-    #[test]
-    fn extract_elif_else_range() -> Result<()> {
-        let contents = "if a:
-    ...
-elif b:
-    ...
-";
-        let stmt = Stmt::parse(contents, "<filename>")?;
-        let stmt = Stmt::as_if_stmt(&stmt).unwrap();
-        let locator = Locator::new(contents);
-        let range = elif_else_range(stmt, &locator).unwrap();
-        assert_eq!(range.start(), TextSize::from(14));
-        assert_eq!(range.end(), TextSize::from(18));
-
-        let contents = "if a:
-    ...
-else:
-    ...
-";
-        let stmt = Stmt::parse(contents, "<filename>")?;
-        let stmt = Stmt::as_if_stmt(&stmt).unwrap();
-        let locator = Locator::new(contents);
-        let range = elif_else_range(stmt, &locator).unwrap();
-        assert_eq!(range.start(), TextSize::from(14));
-        assert_eq!(range.end(), TextSize::from(18));
-
-        Ok(())
     }
 
     #[test]

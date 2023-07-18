@@ -5,8 +5,8 @@ use log::error;
 use ruff_text_size::{TextRange, TextSize};
 use rustpython_format::cformat::{CFormatError, CFormatErrorType};
 use rustpython_parser::ast::{
-    self, Arg, ArgWithDefault, Arguments, Comprehension, Constant, ExceptHandler, Expr,
-    ExprContext, Keyword, Operator, Pattern, Ranged, Stmt, Suite, UnaryOp,
+    self, Arg, ArgWithDefault, Arguments, Comprehension, Constant, ElifElseClause, ExceptHandler,
+    Expr, ExprContext, Keyword, Operator, Pattern, Ranged, Stmt, Suite, UnaryOp,
 };
 
 use ruff_diagnostics::{Diagnostic, Fix, IsolationLevel};
@@ -588,6 +588,7 @@ where
                     name,
                     bases,
                     keywords,
+                    type_params: _,
                     decorator_list,
                     body,
                     range: _,
@@ -1159,9 +1160,8 @@ where
             Stmt::If(
                 stmt_if @ ast::StmtIf {
                     test,
-                    body,
-                    orelse,
-                    range: _,
+                    elif_else_clauses,
+                    ..
                 },
             ) => {
                 if self.enabled(Rule::EmptyTypeCheckingBlock) {
@@ -1170,70 +1170,42 @@ where
                     }
                 }
                 if self.enabled(Rule::IfTuple) {
-                    pyflakes::rules::if_tuple(self, stmt, test);
+                    pyflakes::rules::if_tuple(self, stmt_if);
                 }
                 if self.enabled(Rule::CollapsibleIf) {
                     flake8_simplify::rules::nested_if_statements(
                         self,
-                        stmt,
-                        test,
-                        body,
-                        orelse,
+                        stmt_if,
                         self.semantic.stmt_parent(),
                     );
                 }
                 if self.enabled(Rule::IfWithSameArms) {
-                    flake8_simplify::rules::if_with_same_arms(
-                        self,
-                        stmt,
-                        self.semantic.stmt_parent(),
-                    );
+                    flake8_simplify::rules::if_with_same_arms(self, self.locator, stmt_if);
                 }
                 if self.enabled(Rule::NeedlessBool) {
                     flake8_simplify::rules::needless_bool(self, stmt);
                 }
                 if self.enabled(Rule::IfElseBlockInsteadOfDictLookup) {
-                    flake8_simplify::rules::manual_dict_lookup(
-                        self,
-                        stmt,
-                        test,
-                        body,
-                        orelse,
-                        self.semantic.stmt_parent(),
-                    );
+                    flake8_simplify::rules::manual_dict_lookup(self, stmt_if);
                 }
                 if self.enabled(Rule::IfElseBlockInsteadOfIfExp) {
-                    flake8_simplify::rules::use_ternary_operator(
-                        self,
-                        stmt,
-                        self.semantic.stmt_parent(),
-                    );
+                    flake8_simplify::rules::use_ternary_operator(self, stmt);
                 }
                 if self.enabled(Rule::IfElseBlockInsteadOfDictGet) {
-                    flake8_simplify::rules::use_dict_get_with_default(
-                        self,
-                        stmt,
-                        test,
-                        body,
-                        orelse,
-                        self.semantic.stmt_parent(),
-                    );
+                    flake8_simplify::rules::use_dict_get_with_default(self, stmt_if);
                 }
                 if self.enabled(Rule::TypeCheckWithoutTypeError) {
                     tryceratops::rules::type_check_without_type_error(
                         self,
-                        body,
-                        test,
-                        orelse,
+                        stmt_if,
                         self.semantic.stmt_parent(),
                     );
                 }
                 if self.enabled(Rule::OutdatedVersionBlock) {
-                    pyupgrade::rules::outdated_version_block(self, stmt, test, body, orelse);
+                    pyupgrade::rules::outdated_version_block(self, stmt_if);
                 }
                 if self.enabled(Rule::CollapsibleElseIf) {
-                    if let Some(diagnostic) =
-                        pylint::rules::collapsible_else_if(orelse, self.locator)
+                    if let Some(diagnostic) = pylint::rules::collapsible_else_if(elif_else_clauses)
                     {
                         self.diagnostics.push(diagnostic);
                     }
@@ -2053,7 +2025,7 @@ where
                 stmt_if @ ast::StmtIf {
                     test,
                     body,
-                    orelse,
+                    elif_else_clauses,
                     range: _,
                 },
             ) => {
@@ -2068,7 +2040,9 @@ where
                     self.visit_body(body);
                 }
 
-                self.visit_body(orelse);
+                for clause in elif_else_clauses {
+                    self.visit_elif_else_clause(clause);
+                }
             }
             _ => visitor::walk_stmt(self, stmt),
         };
@@ -4342,6 +4316,14 @@ impl<'a> Checker<'a> {
         self.semantic.flags |= SemanticModelFlags::BOOLEAN_TEST;
         self.visit_expr(expr);
         self.semantic.flags = snapshot;
+    }
+
+    /// Visit an [`ElifElseClause`]
+    fn visit_elif_else_clause(&mut self, clause: &'a ElifElseClause) {
+        if let Some(test) = &clause.test {
+            self.visit_boolean_test(test);
+        }
+        self.visit_body(&clause.body);
     }
 
     /// Add a [`Binding`] to the current scope, bound to the given name.

@@ -25,6 +25,32 @@ SIM108.py:2:1: SIM108 [*] Use ternary operator `b = c if a else d` instead of `i
 7 4 | # OK
 8 5 | b = c if a else d
 
+SIM108.py:30:5: SIM108 [*] Use ternary operator `b = 1 if a else 2` instead of `if`-`else`-block
+   |
+28 |       pass
+29 |   else:
+30 |       if a:
+   |  _____^
+31 | |         b = 1
+32 | |     else:
+33 | |         b = 2
+   | |_____________^ SIM108
+   |
+   = help: Replace `if`-`else`-block with `b = 1 if a else 2`
+
+ℹ Suggested fix
+27 27 | if True:
+28 28 |     pass
+29 29 | else:
+30    |-    if a:
+31    |-        b = 1
+32    |-    else:
+33    |-        b = 2
+   30 |+    b = 1 if a else 2
+34 31 | 
+35 32 | 
+36 33 | import sys
+
 SIM108.py:58:1: SIM108 Use ternary operator `abc = x if x > 0 else -x` instead of `if`-`else`-block
    |
 57 |   # SIM108 (without fix due to comments)
