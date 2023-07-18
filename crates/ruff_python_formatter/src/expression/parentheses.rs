@@ -1,10 +1,12 @@
-use crate::context::NodeLevel;
-use crate::prelude::*;
-use crate::trivia::{first_non_trivia_token, SimpleTokenizer, Token, TokenKind};
+use rustpython_parser::ast::Ranged;
+
 use ruff_formatter::prelude::tag::Condition;
 use ruff_formatter::{format_args, write, Argument, Arguments};
 use ruff_python_ast::node::AnyNodeRef;
-use rustpython_parser::ast::Ranged;
+use ruff_python_whitespace::{first_non_trivia_token, SimpleTokenizer, Token, TokenKind};
+
+use crate::context::NodeLevel;
+use crate::prelude::*;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum OptionalParentheses {

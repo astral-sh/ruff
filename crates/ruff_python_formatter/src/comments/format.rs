@@ -3,11 +3,11 @@ use rustpython_parser::ast::Ranged;
 
 use ruff_formatter::{format_args, write, FormatError, SourceCode};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
+use ruff_python_whitespace::{lines_after, lines_before, skip_trailing_trivia};
 
 use crate::comments::SourceComment;
 use crate::context::NodeLevel;
 use crate::prelude::*;
-use crate::trivia::{lines_after, lines_before, skip_trailing_trivia};
 
 /// Formats the leading comments of a node.
 pub(crate) fn leading_node_comments<T>(node: &T) -> FormatLeadingComments

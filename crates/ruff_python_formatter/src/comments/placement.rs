@@ -7,14 +7,16 @@ use rustpython_parser::ast::{Expr, ExprIfExp, ExprSlice, Ranged};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::whitespace;
-use ruff_python_whitespace::{PythonWhitespace, UniversalNewlines};
+use ruff_python_whitespace::{
+    first_non_trivia_token_rev, PythonWhitespace, SimpleTokenizer, Token, TokenKind,
+    UniversalNewlines,
+};
 
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
 use crate::expression::expr_slice::{assign_comment_in_slice, ExprSliceCommentSection};
 use crate::other::arguments::{
     assign_argument_separator_comment_placement, find_argument_separators,
 };
-use crate::trivia::{first_non_trivia_token_rev, SimpleTokenizer, Token, TokenKind};
 
 /// Implements the custom comment placement logic.
 pub(super) fn place_comment<'a>(

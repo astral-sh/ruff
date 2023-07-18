@@ -3,14 +3,13 @@ use rustpython_parser::ast::{Expr, ExprCall, Ranged};
 
 use ruff_formatter::write;
 use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_whitespace::{SimpleTokenizer, TokenKind};
 
 use crate::comments::dangling_comments;
-
 use crate::expression::parentheses::{
     parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
 };
 use crate::prelude::*;
-use crate::trivia::{SimpleTokenizer, TokenKind};
 use crate::FormatNodeRule;
 
 #[derive(Default)]
