@@ -340,7 +340,7 @@ pub(crate) fn f_strings(
     let col_offset = template.start() - checker.locator.line_start(template.start());
     if contents.lines().enumerate().any(|(idx, line)| {
         // If `template` is a multiline string, `col_offset` should only be applied to the first
-        // line. See this example:
+        // line:
         // ```
         // a = """{}        -> offset = col_offset (= 4)
         // {}               -> offset = 0
