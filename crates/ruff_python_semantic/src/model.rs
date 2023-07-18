@@ -108,10 +108,6 @@ pub struct SemanticModel<'a> {
     /// by way of the `global x` statement.
     rebinding_scopes: HashMap<BindingId, Vec<ScopeId>, BuildNoHashHasher<BindingId>>,
 
-    /// Body iteration; used to peek at siblings.
-    pub body: &'a [Stmt],
-    pub body_index: usize,
-
     /// Flags for the semantic model.
     pub flags: SemanticModelFlags,
 
@@ -137,8 +133,6 @@ impl<'a> SemanticModel<'a> {
             shadowed_bindings: IntMap::default(),
             delayed_annotations: IntMap::default(),
             rebinding_scopes: IntMap::default(),
-            body: &[],
-            body_index: 0,
             flags: SemanticModelFlags::new(path),
             handled_exceptions: Vec::default(),
         }
@@ -755,11 +749,6 @@ impl<'a> SemanticModel<'a> {
     /// Return an [`Iterator`] over the current `Expr` parents.
     pub fn expr_ancestors(&self) -> impl Iterator<Item = &&Expr> {
         self.exprs.iter().rev().skip(1)
-    }
-
-    /// Return the `Stmt` that immediately follows the current `Stmt`, if any.
-    pub fn sibling_stmt(&self) -> Option<&'a Stmt> {
-        self.body.get(self.body_index + 1)
     }
 
     /// Returns a reference to the global scope
