@@ -26,6 +26,12 @@ use crate::settings::{flags, Settings};
 use crate::source_kind::SourceKind;
 
 #[cfg(not(fuzzing))]
+#[test]
+pub(crate) fn intentionally_failing() {
+    assert_eq!(true, false);
+}
+
+#[cfg(not(fuzzing))]
 pub(crate) fn read_jupyter_notebook(path: &Path) -> Result<Notebook> {
     let path = test_resource_path("fixtures/jupyter").join(path);
     Notebook::read(&path).map_err(|err| {
