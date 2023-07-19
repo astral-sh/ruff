@@ -279,30 +279,23 @@ if True:
     #[test]
     fn quick_test() {
         let src = r#"
-with (
-    [
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        "bbbbbbbbbb",
-        "cccccccccccccccccccccccccccccccccccccccccc",
-        dddddddddddddddddddddddddddddddd,
-    ] as example1,
-    aaaaaaaaaaaaaaaaaaaaaaaaaa
-    + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-    + cccccccccccccccccccccccccccc
-    + ddddddddddddddddd as example2,
-    CtxManager2() as example2,
-    CtxManager2() as example2,
-    CtxManager2() as example2,
-):
-    ...
+(
+    # leading
+    "a" # trailing part comment
 
-with [
-    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "bbbbbbbbbb",
-    "cccccccccccccccccccccccccccccccccccccccccc",
-    dddddddddddddddddddddddddddddddd,
-] as example1, aaaaaaaaaaaaaaaaaaaaaaaaaa * bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb * cccccccccccccccccccccccccccc + ddddddddddddddddd as example2, CtxManager222222222222222() as example2:
-    ...
+    # leading part comment
+
+    "b" # trailing second part comment
+    # trailing
+)
+
+(
+    # leading
+    "a"  # trailing part comment
+    # leading part comment
+    "b"  # trailing second part comment
+    # trailing
+)
 
 "#;
         // Tokenize once

@@ -1,8 +1,8 @@
-use memchr::memrchr3_iter;
+use memchr::{memchr2, memchr3, memrchr3_iter};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use unic_ucd_ident::{is_xid_continue, is_xid_start};
 
-use crate::{is_python_whitespace, Cursor};
+use crate::Cursor;
 
 /// Searches for the first non-trivia character in `range`.
 ///
@@ -423,45 +423,40 @@ impl<'a> SimpleTokenizer<'a> {
             // For all other tokens, test if the character isn't part of a comment.
             c => {
                 // Skip the test whether there's a preceding comment if it has been performed before.
-                let comment_offset = if self.back_line_has_no_comment {
+                let comment_length = if self.back_line_has_no_comment {
                     None
                 } else {
                     let bytes = self.cursor.chars().as_str().as_bytes();
-                    let mut line_start = 0;
-                    let mut last_comment_offset = None;
+                    let mut potential_comment_starts: smallvec::SmallVec<[TextSize; 2]> =
+                        smallvec::SmallVec::new();
 
                     // Find the start of the line, or any potential comments.
                     for index in memrchr3_iter(b'\n', b'\r', b'#', bytes) {
                         if bytes[index] == b'#' {
                             // Potentially a comment, but not guaranteed
-                            last_comment_offset = Some(index);
+                            // SAFETY: Safe, because ruff only supports files up to 4GB
+                            potential_comment_starts.push(TextSize::try_from(index).unwrap());
                         } else {
-                            line_start = index + 1;
                             break;
                         }
                     }
 
-                    // Verify if this is indeed a comment. Doing this only when we've found a comment is significantly
-                    // faster because comments are rare.
-                    last_comment_offset.filter(|last_comment_offset| {
-                        let before_comment =
-                            &self.cursor.chars().as_str()[line_start..*last_comment_offset];
-
-                        before_comment.chars().all(|c| {
-                            is_python_whitespace(c)
-                                || SimpleTokenKind::from_non_trivia_char(c)
-                                    != SimpleTokenKind::Other
-                        })
-                    })
+                    // No comments
+                    if potential_comment_starts.is_empty() {
+                        None
+                    } else {
+                        // The line contains at least one `#` token. The `#` can indicate the start of a
+                        // comment, meaning the current token is commented out, or it is a regular `#` inside of a string.
+                        self.comment_from_hash_positions(&potential_comment_starts)
+                    }
                 };
 
                 // From here on it is guaranteed that this line has no other comment.
                 self.back_line_has_no_comment = true;
 
-                if let Some(comment_offset) = comment_offset {
-                    let comment_length = self.cursor.chars().as_str().len() - comment_offset;
+                if let Some(comment_length) = comment_length {
                     // It is a comment, bump all tokens
-                    for _ in 0..comment_length {
+                    for _ in 0..usize::from(comment_length) {
                         self.cursor.bump_back().unwrap();
                     }
 
@@ -519,6 +514,141 @@ impl<'a> SimpleTokenizer<'a> {
     pub fn skip_trivia(self) -> impl Iterator<Item = SimpleToken> + DoubleEndedIterator + 'a {
         self.filter(|t| !t.kind().is_trivia())
     }
+
+    /// Given the position of `#` tokens on a line, test if any `#` is the start of a comment and, if so, return the
+    /// length of the comment.
+    ///
+    /// The challenge is that `#` tokens can also appear inside of strings:
+    ///
+    /// ```python
+    /// ' #not a comment'
+    /// ```
+    ///
+    /// This looks innocent but is the `'` really the start of the new string or could it be a closing delimiter
+    /// of a previously started string:
+    ///
+    /// ```python
+    /// ' a string\
+    /// ` # a comment '
+    /// ```
+    ///
+    /// The only way to reliability tell whether the `#` is a comment when the comment contains a quote char is
+    /// to forward lex all strings and comments and test if there's any unclosed string literal. If so, then
+    /// the hash cannot be a comment.
+    fn comment_from_hash_positions(&self, hash_positions: &[TextSize]) -> Option<TextSize> {
+        // Iterate over the `#` positions from the start to the end of the line.
+        // This is necessary to correctly support `a # comment # comment`.
+        for possible_start in hash_positions.iter().rev() {
+            let comment_bytes =
+                self.source[TextRange::new(*possible_start, self.back_offset)].as_bytes();
+
+            // Test if the comment contains any quotes. If so, then it's possible that the `#` token isn't
+            // the start of a comment, but instead part of a string:
+            // ```python
+            // a + 'a string # not a comment'
+            // a + '''a string
+            // # not a comment'''
+            // ```
+            match memchr2(b'\'', b'"', comment_bytes) {
+                // Most comments don't contain quotes, and most strings don't contain comments.
+                // For these it's safe to assume that they are comments.
+                None => return Some(self.cursor.chars().as_str().text_len() - possible_start),
+                // Now it gets complicated... There's no good way to know whether this is a string or not.
+                // It is necessary to lex all strings and comments from the start to know if it is one or the other.
+                Some(_) => {
+                    if find_unterminated_string_kind(
+                        &self.cursor.chars().as_str()[TextRange::up_to(*possible_start)],
+                    )
+                    .is_none()
+                    {
+                        // There's no unterminated string at the comment's start position. This *must*
+                        // be a comment.
+                        return Some(self.cursor.chars().as_str().text_len() - possible_start);
+                    }
+
+                    // This is a hash inside of a string: `'test # not a comment'` continue with the next potential comment on the line.
+                }
+            }
+        }
+
+        None
+    }
+}
+
+fn find_unterminated_string_kind(input: &str) -> Option<StringKind> {
+    let mut rest = input;
+
+    while let Some(comment_or_string_start) = memchr3(b'#', b'\'', b'\"', rest.as_bytes()) {
+        let c = rest.as_bytes()[comment_or_string_start];
+        let after = &rest[comment_or_string_start + 1..];
+
+        if c == b'#' {
+            let comment_end =
+                memchr2(b'\n', b'\r', after.as_bytes()).unwrap_or_else(|| after.len());
+            rest = &after[comment_end..];
+        } else {
+            let mut cursor = Cursor::new(after);
+            let quote_kind = if c == b'\'' {
+                QuoteKind::Single
+            } else {
+                QuoteKind::Double
+            };
+
+            let string_kind = if cursor.eat_char(quote_kind.as_char()) {
+                // `''` or `""`
+                if cursor.eat_char(quote_kind.as_char()) {
+                    // `'''` or `"""`
+                    StringKind::Triple(quote_kind)
+                } else {
+                    // empty string literal, nothing more to lex
+                    continue;
+                }
+            } else {
+                StringKind::Single(quote_kind)
+            };
+
+            if !is_string_terminated(string_kind, &mut cursor) {
+                return Some(string_kind);
+            }
+
+            rest = cursor.chars().as_str();
+        }
+    }
+
+    None
+}
+
+fn is_string_terminated(kind: StringKind, cursor: &mut Cursor) -> bool {
+    let quote_char = kind.quote_kind().as_char();
+
+    while let Some(c) = cursor.bump() {
+        match c {
+            '\n' | '\r' if kind.is_single() => {
+                // Reached the end of the line without a closing quote, this is an unterminated string literal.
+                return false;
+            }
+            '\\' => {
+                // Eat over line continuation
+                if cursor.eat_char('\r') {
+                    cursor.eat_char('\n');
+                } else {
+                    cursor.eat_char('\n');
+                }
+            }
+            c if c == quote_char => {
+                if kind.is_single() || (cursor.eat_char(quote_char) && cursor.eat_char(quote_char))
+                {
+                    return true;
+                }
+            }
+            _ => {
+                // continue
+            }
+        }
+    }
+
+    // Reached end without a closing quote
+    false
 }
 
 impl Iterator for SimpleTokenizer<'_> {
@@ -543,6 +673,45 @@ impl DoubleEndedIterator for SimpleTokenizer<'_> {
             None
         } else {
             Some(token)
+        }
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+enum StringKind {
+    /// `'...'` or `"..."`
+    Single(QuoteKind),
+    /// `'''...'''` or `"""..."""`
+    Triple(QuoteKind),
+}
+
+impl StringKind {
+    const fn quote_kind(self) -> QuoteKind {
+        match self {
+            StringKind::Single(kind) => kind,
+            StringKind::Triple(kind) => kind,
+        }
+    }
+
+    const fn is_single(self) -> bool {
+        matches!(self, StringKind::Single(_))
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+enum QuoteKind {
+    /// `'``
+    Single,
+
+    /// `"`
+    Double,
+}
+
+impl QuoteKind {
+    const fn as_char(self) -> char {
+        match self {
+            QuoteKind::Single => '\'',
+            QuoteKind::Double => '"',
         }
     }
 }
@@ -706,6 +875,58 @@ mod tests {
 
         assert_debug_snapshot!(test_case.tokens());
         assert_debug_snapshot!("Reverse", test_case.tokenize_reverse());
+    }
+
+    #[test]
+    fn single_quoted_multiline_string_containing_comment() {
+        let test_case = tokenize(
+            r#"'This string contains a hash looking like a comment\
+# This is not a comment'"#,
+        );
+
+        assert_debug_snapshot!(test_case.tokenize_reverse());
+    }
+
+    #[test]
+    fn single_quoted_multiline_string_implicit_concatenation() {
+        let test_case = tokenize(
+            r#"'This string contains a hash looking like a comment\
+# This is' "not_a_comment""#,
+        );
+
+        assert_debug_snapshot!(test_case.tokenize_reverse());
+    }
+
+    #[test]
+    fn triple_quoted_multiline_string_containing_comment() {
+        let test_case = tokenize(
+            r#"'''This string contains a hash looking like a comment
+# This is not a comment'''"#,
+        );
+
+        assert_debug_snapshot!(test_case.tokenize_reverse());
+    }
+
+    #[test]
+    fn comment_containing_triple_quoted_string() {
+        let test_case = tokenize("'''leading string''' # a comment '''not a string'''");
+
+        assert_debug_snapshot!(test_case.tokenize_reverse());
+    }
+
+    #[test]
+    fn comment_containing_single_quoted_string() {
+        let test_case = tokenize("'leading string' # a comment 'not a string'");
+
+        assert_debug_snapshot!(test_case.tokenize_reverse());
+    }
+
+    #[test]
+    fn string_followed_by_multiple_comments() {
+        let test_case =
+            tokenize(r#"'a string # containing a hash " # and another hash ' # finally a comment"#);
+
+        assert_debug_snapshot!(test_case.tokenize_reverse());
     }
 
     #[test]

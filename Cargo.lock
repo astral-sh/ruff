@@ -2197,6 +2197,7 @@ dependencies = [
  "insta",
  "memchr",
  "ruff_text_size",
+ "smallvec",
  "unic-ucd-ident",
 ]
 
