@@ -3,20 +3,24 @@ use rustpython_parser::ast::{self, Constant, Expr, Stmt};
 
 bitflags! {
     #[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
-    pub struct AllNamesFlags: u8 {
-        const INVALID_FORMAT = 0b0000_0001;
-        const INVALID_OBJECT = 0b0000_0010;
+    pub struct DunderAllFlags: u8 {
+        /// The right-hand-side assignment to __all__ uses an invalid expression (i.e., an
+        /// expression that doesn't evaluate to a container type, like `__all__ = 1`).
+        const INVALID_FORMAT = 1 << 0;
+        /// The right-hand-side assignment to __all__ contains an invalid member (i.e., a
+        /// non-string, like `__all__ = [1]`).
+        const INVALID_OBJECT = 1 << 1;
     }
 }
 
 /// Extract the names bound to a given __all__ assignment.
 ///
 /// Accepts a closure that determines whether a given name (e.g., `"list"`) is a Python builtin.
-pub fn extract_all_names<F>(stmt: &Stmt, is_builtin: F) -> (Vec<&str>, AllNamesFlags)
+pub fn extract_all_names<F>(stmt: &Stmt, is_builtin: F) -> (Vec<&str>, DunderAllFlags)
 where
     F: Fn(&str) -> bool,
 {
-    fn add_to_names<'a>(elts: &'a [Expr], names: &mut Vec<&'a str>, flags: &mut AllNamesFlags) {
+    fn add_to_names<'a>(elts: &'a [Expr], names: &mut Vec<&'a str>, flags: &mut DunderAllFlags) {
         for elt in elts {
             if let Expr::Constant(ast::ExprConstant {
                 value: Constant::Str(value),
@@ -25,36 +29,36 @@ where
             {
                 names.push(value);
             } else {
-                *flags |= AllNamesFlags::INVALID_OBJECT;
+                *flags |= DunderAllFlags::INVALID_OBJECT;
             }
         }
     }
 
-    fn extract_elts<F>(expr: &Expr, is_builtin: F) -> (Option<&[Expr]>, AllNamesFlags)
+    fn extract_elts<F>(expr: &Expr, is_builtin: F) -> (Option<&[Expr]>, DunderAllFlags)
     where
         F: Fn(&str) -> bool,
     {
         match expr {
             Expr::List(ast::ExprList { elts, .. }) => {
-                return (Some(elts), AllNamesFlags::empty());
+                return (Some(elts), DunderAllFlags::empty());
             }
             Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                return (Some(elts), AllNamesFlags::empty());
+                return (Some(elts), DunderAllFlags::empty());
             }
             Expr::ListComp(_) => {
                 // Allow comprehensions, even though we can't statically analyze them.
-                return (None, AllNamesFlags::empty());
+                return (None, DunderAllFlags::empty());
             }
             Expr::Name(ast::ExprName { id, .. }) => {
                 // Ex) `__all__ = __all__ + multiprocessing.__all__`
                 if id == "__all__" {
-                    return (None, AllNamesFlags::empty());
+                    return (None, DunderAllFlags::empty());
                 }
             }
             Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
                 // Ex) `__all__ = __all__ + multiprocessing.__all__`
                 if attr == "__all__" {
-                    return (None, AllNamesFlags::empty());
+                    return (None, DunderAllFlags::empty());
                 }
             }
             Expr::Call(ast::ExprCall {
@@ -67,26 +71,22 @@ where
                 if keywords.is_empty() && args.len() <= 1 {
                     if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                         let id = id.as_str();
-                        if id == "tuple" || id == "list" {
-                            if is_builtin(id) {
-                                if args.is_empty() {
-                                    return (None, AllNamesFlags::empty());
+                        if matches!(id, "tuple" | "list") && is_builtin(id) {
+                            let [arg] = args.as_slice() else {
+                                return (None, DunderAllFlags::empty());
+                            };
+                            match arg {
+                                Expr::List(ast::ExprList { elts, .. })
+                                | Expr::Set(ast::ExprSet { elts, .. })
+                                | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                                    return (Some(elts), DunderAllFlags::empty());
                                 }
-                                match &args[0] {
-                                    Expr::List(ast::ExprList { elts, .. })
-                                    | Expr::Set(ast::ExprSet { elts, .. })
-                                    | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                                        return (Some(elts), AllNamesFlags::empty());
-                                    }
-                                    Expr::ListComp(_)
-                                    | Expr::SetComp(_)
-                                    | Expr::GeneratorExp(_) => {
-                                        // Allow comprehensions, even though we can't statically analyze
-                                        // them.
-                                        return (None, AllNamesFlags::empty());
-                                    }
-                                    _ => {}
+                                Expr::ListComp(_) | Expr::SetComp(_) | Expr::GeneratorExp(_) => {
+                                    // Allow comprehensions, even though we can't statically analyze
+                                    // them.
+                                    return (None, DunderAllFlags::empty());
                                 }
+                                _ => {}
                             }
                         }
                     }
@@ -94,11 +94,11 @@ where
             }
             _ => {}
         }
-        (None, AllNamesFlags::INVALID_FORMAT)
+        (None, DunderAllFlags::INVALID_FORMAT)
     }
 
     let mut names: Vec<&str> = vec![];
-    let mut flags = AllNamesFlags::empty();
+    let mut flags = DunderAllFlags::empty();
 
     if let Some(value) = match stmt {
         Stmt::Assign(ast::StmtAssign { value, .. }) => Some(value),

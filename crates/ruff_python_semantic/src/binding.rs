@@ -73,6 +73,18 @@ impl<'a> Binding<'a> {
         self.flags.contains(BindingFlags::GLOBAL)
     }
 
+    /// Return `true` if this [`Binding`] represents an assignment to `__all__` with an invalid
+    /// value (e.g., `__all__ = "Foo"`).
+    pub const fn is_invalid_all_format(&self) -> bool {
+        self.flags.contains(BindingFlags::INVALID_ALL_FORMAT)
+    }
+
+    /// Return `true` if this [`Binding`] represents an assignment to `__all__` that includes an
+    /// invalid member (e.g., `__all__ = ["Foo", 1]`).
+    pub const fn is_invalid_all_object(&self) -> bool {
+        self.flags.contains(BindingFlags::INVALID_ALL_OBJECT)
+    }
+
     /// Return `true` if this [`Binding`] represents an unbound variable
     /// (e.g., `x` in `x = 1; del x`).
     pub const fn is_unbound(&self) -> bool {
@@ -234,6 +246,24 @@ bitflags! {
         ///     x = 1
         /// ```
         const GLOBAL = 1 << 4;
+
+        /// The binding represents an export via `__all__`, but the assigned value uses an invalid
+        /// expression (i.e., a non-container type).
+        ///
+        /// For example:
+        /// ```python
+        /// __all__ = 1
+        /// ```
+        const INVALID_ALL_FORMAT = 1 << 5;
+
+        /// The binding represents an export via `__all__`, but the assigned value contains an
+        /// invalid member (i.e., a non-string).
+        ///
+        /// For example:
+        /// ```python
+        /// __all__ = [1]
+        /// ```
+        const INVALID_ALL_OBJECT = 1 << 6;
     }
 }
 

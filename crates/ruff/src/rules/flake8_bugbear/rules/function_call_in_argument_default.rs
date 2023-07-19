@@ -45,7 +45,7 @@ use crate::checkers::ast::Checker;
 /// - `flake8-bugbear.extend-immutable-calls`
 #[violation]
 pub struct FunctionCallInDefaultArgument {
-    pub name: Option<String>,
+    name: Option<String>,
 }
 
 impl Violation for FunctionCallInDefaultArgument {
@@ -96,7 +96,9 @@ where
                 }
                 visitor::walk_expr(self, expr);
             }
-            Expr::Lambda(_) => {}
+            Expr::Lambda(_) => {
+                // Don't recurse.
+            }
             _ => visitor::walk_expr(self, expr),
         }
     }

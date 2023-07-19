@@ -38,7 +38,7 @@ use rustpython_parser::ast::{
 };
 
 use ruff_diagnostics::{Diagnostic, Fix, IsolationLevel};
-use ruff_python_ast::all::{extract_all_names, AllNamesFlags};
+use ruff_python_ast::all::{extract_all_names, DunderAllFlags};
 use ruff_python_ast::helpers::{extract_handled_exceptions, to_module_path};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::source_code::{Generator, Indexer, Locator, Quote, Stylist};
@@ -4543,29 +4543,24 @@ impl<'a> Checker<'a> {
                 _ => false,
             }
         {
-            let (names, flags) = extract_all_names(parent, |name| self.semantic.is_builtin(name));
+            let (all_names, all_flags) =
+                extract_all_names(parent, |name| self.semantic.is_builtin(name));
 
-            if self.enabled(Rule::InvalidAllFormat) {
-                if matches!(flags, AllNamesFlags::INVALID_FORMAT) {
-                    self.diagnostics
-                        .push(pylint::rules::invalid_all_format(expr));
-                }
+            let mut flags = BindingFlags::empty();
+            if all_flags.contains(DunderAllFlags::INVALID_OBJECT) {
+                flags |= BindingFlags::INVALID_ALL_OBJECT;
             }
-
-            if self.enabled(Rule::InvalidAllObject) {
-                if matches!(flags, AllNamesFlags::INVALID_OBJECT) {
-                    self.diagnostics
-                        .push(pylint::rules::invalid_all_object(expr));
-                }
+            if all_flags.contains(DunderAllFlags::INVALID_FORMAT) {
+                flags |= BindingFlags::INVALID_ALL_FORMAT;
             }
 
             self.add_binding(
                 id,
                 expr.range(),
                 BindingKind::Export(Export {
-                    names: names.into_boxed_slice(),
+                    names: all_names.into_boxed_slice(),
                 }),
-                BindingFlags::empty(),
+                flags,
             );
             return;
         }
@@ -4779,9 +4774,11 @@ impl<'a> Checker<'a> {
     /// Run any lint rules that operate over a single [`Binding`].
     fn check_bindings(&mut self) {
         if !self.any_enabled(&[
-            Rule::UnusedVariable,
-            Rule::UnconventionalImportAlias,
+            Rule::InvalidAllFormat,
+            Rule::InvalidAllObject,
             Rule::UnaliasedCollectionsAbcSetImport,
+            Rule::UnconventionalImportAlias,
+            Rule::UnusedVariable,
         ]) {
             return;
         }
@@ -4808,7 +4805,16 @@ impl<'a> Checker<'a> {
                     self.diagnostics.push(diagnostic);
                 }
             }
-
+            if self.enabled(Rule::InvalidAllFormat) {
+                if let Some(diagnostic) = pylint::rules::invalid_all_format(binding) {
+                    self.diagnostics.push(diagnostic);
+                }
+            }
+            if self.enabled(Rule::InvalidAllObject) {
+                if let Some(diagnostic) = pylint::rules::invalid_all_object(binding) {
+                    self.diagnostics.push(diagnostic);
+                }
+            }
             if self.enabled(Rule::UnconventionalImportAlias) {
                 if let Some(diagnostic) =
                     flake8_import_conventions::rules::unconventional_import_alias(
