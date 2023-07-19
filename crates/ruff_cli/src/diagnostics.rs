@@ -204,12 +204,26 @@ pub(crate) fn lint_path(
             (result, fixed)
         } else {
             // If we fail to autofix, lint the original source code.
-            let result = lint_only(&contents, path, package, &settings.lib, noqa);
+            let result = lint_only(
+                &contents,
+                path,
+                package,
+                &settings.lib,
+                noqa,
+                Some(&source_kind),
+            );
             let fixed = FxHashMap::default();
             (result, fixed)
         }
     } else {
-        let result = lint_only(&contents, path, package, &settings.lib, noqa);
+        let result = lint_only(
+            &contents,
+            path,
+            package,
+            &settings.lib,
+            noqa,
+            Some(&source_kind),
+        );
         let fixed = FxHashMap::default();
         (result, fixed)
     };
@@ -316,6 +330,7 @@ pub(crate) fn lint_stdin(
                 package,
                 settings,
                 noqa,
+                Some(&source_kind),
             );
             let fixed = FxHashMap::default();
 
@@ -333,6 +348,7 @@ pub(crate) fn lint_stdin(
             package,
             settings,
             noqa,
+            Some(&source_kind),
         );
         let fixed = FxHashMap::default();
         (result, fixed)
