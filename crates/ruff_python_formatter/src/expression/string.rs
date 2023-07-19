@@ -91,9 +91,9 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
                     continue;
                 }
                 Err(_) => {
-                    return Err(FormatError::SyntaxError {
-                        message: "Unexpected lexer error in string formatting",
-                    });
+                    return Err(FormatError::syntax_error(
+                        "Unexpected lexer error in string formatting",
+                    ));
                 }
             };
 
@@ -169,9 +169,9 @@ impl Format<PyFormatContext<'_>> for FormatStringPart {
         let prefix = StringPrefix::parse(string_content);
         let after_prefix = &string_content[usize::from(prefix.text_len())..];
 
-        let quotes = StringQuotes::parse(after_prefix).ok_or(FormatError::SyntaxError {
-            message: "Didn't find string quotes after prefix",
-        })?;
+        let quotes = StringQuotes::parse(after_prefix).ok_or(FormatError::syntax_error(
+            "Didn't find string quotes after prefix",
+        ))?;
         let relative_raw_content_range = TextRange::new(
             prefix.text_len() + quotes.text_len(),
             string_content.text_len() - quotes.text_len(),

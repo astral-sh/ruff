@@ -59,6 +59,12 @@ impl From<&PrintError> for FormatError {
     }
 }
 
+impl FormatError {
+    pub fn syntax_error(message: &'static str) -> Self {
+        Self::SyntaxError { message }
+    }
+}
+
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum InvalidDocumentError {
