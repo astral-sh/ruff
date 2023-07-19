@@ -314,19 +314,7 @@ last_call()
  ()
  (1,)
  (1, 2)
-@@ -101,7 +108,10 @@
- {a: b * -2 for a, b in dictionary.items()}
- {
-     k: v
--    for k, v in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
-+    for (
-+        k,
-+        v,
-+    ) in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
- }
- Python3 > Python2 > COBOL
- Life is Life
-@@ -115,7 +125,7 @@
+@@ -115,7 +122,7 @@
      arg,
      another,
      kwarg="hey",
@@ -335,7 +323,7 @@ last_call()
  )  # note: no trailing comma pre-3.6
  call(*gidgets[:2])
  call(a, *gidgets[:2])
-@@ -152,13 +162,13 @@
+@@ -152,13 +159,13 @@
  slice[0:1]
  slice[0:1:2]
  slice[:]
@@ -352,7 +340,7 @@ last_call()
  numpy[0, :]
  numpy[:, i]
  numpy[0, :2]
-@@ -172,7 +182,7 @@
+@@ -172,7 +179,7 @@
  numpy[1 : c + 1, c]
  numpy[-(c + 1) :, d]
  numpy[:, l[-2]]
@@ -361,10 +349,11 @@ last_call()
  numpy[np.newaxis, :]
  (str or None) if (sys.version_info[0] > (3,)) else (str or bytes or None)
  {"2.7": dead, "3.7": long_live or die_hard}
-@@ -208,24 +218,14 @@
+@@ -207,25 +214,15 @@
+ )
  what_is_up_with_those_new_coord_names = (coord_names | set(vars_to_create)) - set(
      vars_to_remove
- )
+-)
 -result = (
 -    session.query(models.Customer.id)
 -    .filter(
@@ -372,7 +361,7 @@ last_call()
 -    )
 -    .order_by(models.Customer.id.asc())
 -    .all()
--)
+ )
 -result = (
 -    session.query(models.Customer.id)
 -    .filter(
@@ -394,7 +383,7 @@ last_call()
  Ø = set()
  authors.łukasz.say_thanks()
  mapping = {
-@@ -237,10 +237,10 @@
+@@ -237,10 +234,10 @@
  
  
  def gen():
@@ -409,7 +398,7 @@ last_call()
  
  
  async def f():
-@@ -328,13 +328,18 @@
+@@ -328,13 +325,18 @@
  ):
      return True
  if (
@@ -431,7 +420,7 @@ last_call()
      ^ aaaaaaaa.i << aaaaaaaa.k >> aaaaaaaa.l**aaaaaaaa.m // aaaaaaaa.n
  ):
      return True
-@@ -342,7 +347,8 @@
+@@ -342,7 +344,8 @@
      ~aaaaaaaaaaaaaaaa.a
      + aaaaaaaaaaaaaaaa.b
      - aaaaaaaaaaaaaaaa.c * aaaaaaaaaaaaaaaa.d @ aaaaaaaaaaaaaaaa.e
@@ -556,10 +545,7 @@ str or None if (1 if True else 2) else str or bytes or None
 {a: b * -2 for a, b in dictionary.items()}
 {
     k: v
-    for (
-        k,
-        v,
-    ) in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
+    for k, v in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
 }
 Python3 > Python2 > COBOL
 Life is Life
