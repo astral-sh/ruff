@@ -143,12 +143,6 @@ pub(crate) fn run(
             }
             .unwrap_or_else(|(path, message)| {
                 if let Some(path) = &path {
-                    error!(
-                        "{}{}{} {message}",
-                        "Failed to lint ".bold(),
-                        fs::relativize_path(path).bold(),
-                        ":".bold()
-                    );
                     let settings = resolver.resolve(path, pyproject_config);
                     if settings.rules.enabled(Rule::IOError) {
                         let dummy =
@@ -163,10 +157,16 @@ pub(crate) fn run(
                             ImportMap::default(),
                         )
                     } else {
+                        warn!(
+                            "{}{}{} {message}",
+                            "Failed to lint ".bold(),
+                            fs::relativize_path(path).bold(),
+                            ":".bold()
+                        );
                         Diagnostics::default()
                     }
                 } else {
-                    error!("{} {message}", "Encountered error:".bold());
+                    warn!("{} {message}", "Encountered error:".bold());
                     Diagnostics::default()
                 }
             })
@@ -228,7 +228,7 @@ with the relevant file contents, the `pyproject.toml` settings, and the followin
 }
 
 #[cfg(test)]
-#[cfg(unix)] // Remove when adding a second test
+#[cfg(unix)] // If you need to add a second test, move this cfg
 mod test {
     use super::run;
     use crate::args::Overrides;
@@ -294,12 +294,15 @@ mod test {
             )
             .unwrap();
 
-        // Remove the tempdir from the messages
-        let messages = String::from_utf8(output)
-            .unwrap()
-            .replace(tempdir.path().to_str().unwrap(), "");
+        let messages = String::from_utf8(output).unwrap();
 
-        insta::with_settings!({ omit_expression => true }, {
+        insta::with_settings!({
+            omit_expression => true,
+            filters => vec![
+                // The tempdir is always different (and platform dependent)
+                (tempdir.path().to_str().unwrap(), "/home/ferris/project"),
+            ]
+        }, {
             insta::assert_snapshot!(snapshot, messages);
         });
         Ok(())

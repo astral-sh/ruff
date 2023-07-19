@@ -8,7 +8,7 @@ use std::path::Path;
 
 use anyhow::{anyhow, Result};
 use colored::Colorize;
-use log::{debug, error};
+use log::{debug, error, warn};
 use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::FxHashMap;
 use similar::TextDiff;
@@ -18,6 +18,7 @@ use ruff::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult};
 use ruff::logging::DisplayParseError;
 use ruff::message::Message;
 use ruff::pyproject_toml::lint_pyproject_toml;
+use ruff::registry::Rule;
 use ruff::settings::{flags, AllSettings, Settings};
 use ruff::source_kind::SourceKind;
 use ruff::{fs, IOError};
@@ -130,17 +131,27 @@ pub(crate) fn lint_path(
 
     // In case of an io error we want to exit early
     let io_error_diagnostics = |err: io::Error, path: &Path| -> Diagnostics {
-        let io_err = Diagnostic::new(
-            IOError {
-                message: err.to_string(),
-            },
-            TextRange::default(),
-        );
-        let dummy = SourceFileBuilder::new(path.to_string_lossy().as_ref(), "").finish();
-        Diagnostics::new(
-            vec![Message::from_diagnostic(io_err, dummy, TextSize::default())],
-            ImportMap::default(),
-        )
+        if settings.lib.rules.enabled(Rule::IOError) {
+            let io_err = Diagnostic::new(
+                IOError {
+                    message: err.to_string(),
+                },
+                TextRange::default(),
+            );
+            let dummy = SourceFileBuilder::new(path.to_string_lossy().as_ref(), "").finish();
+            Diagnostics::new(
+                vec![Message::from_diagnostic(io_err, dummy, TextSize::default())],
+                ImportMap::default(),
+            )
+        } else {
+            warn!(
+                "{}{}{} {err}",
+                "Failed to lint ".bold(),
+                fs::relativize_path(path).bold(),
+                ":".bold()
+            );
+            Diagnostics::default()
+        }
     };
 
     // We have to special case this here since the Python tokenizer doesn't work with TOML.

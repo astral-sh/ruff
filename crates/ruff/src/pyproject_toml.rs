@@ -1,3 +1,5 @@
+use colored::Colorize;
+use log::warn;
 use pyproject_toml::{BuildSystem, Project};
 use ruff_text_size::{TextRange, TextSize};
 use serde::{Deserialize, Serialize};
@@ -26,28 +28,33 @@ pub fn lint_pyproject_toml(source_file: SourceFile, settings: &Settings) -> Vec<
         return Vec::default();
     };
 
-    let mut messages = vec![];
+    let mut messages = Vec::new();
     let range = match err.span() {
         // This is bad but sometimes toml and/or serde just don't give us spans
         // TODO(konstin,micha): https://github.com/astral-sh/ruff/issues/4571
         None => TextRange::default(),
         Some(range) => {
             let Ok(end) = TextSize::try_from(range.end) else {
-                return if settings.rules.enabled(Rule::IOError) {
-                    let message = format!(
-                        "{} is larger than 4GB, but ruff assumes all files to be smaller",
-                        source_file.name(),
-                    );
+                let message = format!(
+                    "{} is larger than 4GB, but ruff assumes all files to be smaller",
+                    source_file.name(),
+                );
+                if settings.rules.enabled(Rule::IOError) {
                     let diagnostic = Diagnostic::new(IOError { message }, TextRange::default());
                     messages.push(Message::from_diagnostic(
                         diagnostic,
                         source_file,
                         TextSize::default(),
                     ));
-                    messages
                 } else {
-                    Vec::new()
-                };
+                    warn!(
+                        "{}{}{} {message}",
+                        "Failed to lint ".bold(),
+                        source_file.name().bold(),
+                        ":".bold()
+                    );
+                }
+                return messages;
             };
             TextRange::new(
                 // start <= end, so if end < 4GB follows start < 4GB
