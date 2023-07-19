@@ -182,7 +182,7 @@ pub(crate) struct Args {
 
 pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
     let all_success = if args.multi_project {
-        format_dev_multi_project(args)
+        format_dev_multi_project(args)?
     } else {
         let result = format_dev_project(&args.files, args.stability_check, args.write, true)?;
         let error_count = result.error_count();
@@ -209,27 +209,39 @@ pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
 }
 
 /// Checks a directory of projects
-fn format_dev_multi_project(args: &Args) -> bool {
+fn format_dev_multi_project(args: &Args) -> anyhow::Result<bool> {
     let mut total_errors = 0;
     let mut total_files = 0;
     let start = Instant::now();
 
-    let project_paths: Vec<_> = args
-        .files
-        .iter()
-        .flat_map(|dir| dir.read_dir().unwrap())
-        .map(|dir| dir.unwrap().path().clone())
-        .collect();
+    let mut project_paths = Vec::new();
+
+    for directory in &args.files {
+        for project_directory in directory
+            .read_dir()
+            .with_context(|| "Failed to read projects directory '{directory}'")?
+        {
+            project_paths.push(
+                project_directory
+                    .with_context(|| "Failed to read project directory '{project_directory}'")?
+                    .path(),
+            );
+        }
+    }
 
     let num_projects = project_paths.len();
     let bar = ProgressBar::new(num_projects as u64);
 
-    let mut error_file = args.error_file.as_ref().map(|error_file| {
-        BufWriter::new(File::create(error_file).expect("Couldn't open error file"))
-    });
+    let mut error_file = match &args.error_file {
+        Some(error_file) => Some(BufWriter::new(
+            File::create(error_file).context("Couldn't open error file")?,
+        )),
+        None => None,
+    };
 
+    #[allow(clippy::print_stdout)]
     for project_path in project_paths {
-        bar.println(format!("Starting {}", project_path.display()));
+        bar.suspend(|| println!("Starting {}", project_path.display()));
 
         match format_dev_project(
             &[project_path.clone()],
@@ -241,23 +253,25 @@ fn format_dev_multi_project(args: &Args) -> bool {
                 total_errors += result.error_count();
                 total_files += result.file_count;
 
-                bar.println(format!(
-                    "Finished {} with {} files (similarity index {:.3}) in {:.2}s",
-                    project_path.display(),
-                    result.file_count,
-                    result.statistics.similarity_index(),
-                    result.duration.as_secs_f32(),
-                ));
-                bar.println(result.display(args.format).to_string());
+                bar.suspend(|| {
+                    println!(
+                        "Finished {} with {} files (similarity index {:.3}) in {:.2}s",
+                        project_path.display(),
+                        result.file_count,
+                        result.statistics.similarity_index(),
+                        result.duration.as_secs_f32(),
+                    );
+                    println!("{}", result.display(args.format).to_string().trim_end());
+                });
                 if let Some(error_file) = &mut error_file {
                     write!(error_file, "{}", result.display(args.format)).unwrap();
                     error_file.flush().unwrap();
                 }
-                bar.println(result.display(args.format).to_string().trim_end());
+
                 bar.inc(1);
             }
             Err(error) => {
-                bar.println(format!("Failed {}: {}", project_path.display(), error));
+                bar.suspend(|| println!("Failed {}: {}", project_path.display(), error));
                 bar.inc(1);
             }
         }
@@ -273,7 +287,7 @@ fn format_dev_multi_project(args: &Args) -> bool {
         );
     }
 
-    total_errors == 0
+    Ok(total_errors == 0)
 }
 
 fn format_dev_project(
