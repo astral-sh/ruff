@@ -10,7 +10,7 @@ use ruff_python_ast::source_code::Locator;
 use crate::context::ExecutionContext;
 use crate::model::SemanticModel;
 use crate::node::NodeId;
-use crate::reference::ReferenceId;
+use crate::reference::ResolvedReferenceId;
 use crate::ScopeId;
 
 #[derive(Debug, Clone)]
@@ -24,7 +24,7 @@ pub struct Binding<'a> {
     /// The statement in which the [`Binding`] was defined.
     pub source: Option<NodeId>,
     /// The references to the [`Binding`].
-    pub references: Vec<ReferenceId>,
+    pub references: Vec<ResolvedReferenceId>,
     /// The exceptions that were handled when the [`Binding`] was defined.
     pub exceptions: Exceptions,
     /// Flags for the [`Binding`].
@@ -38,7 +38,7 @@ impl<'a> Binding<'a> {
     }
 
     /// Returns an iterator over all references for the current [`Binding`].
-    pub fn references(&self) -> impl Iterator<Item = ReferenceId> + '_ {
+    pub fn references(&self) -> impl Iterator<Item = ResolvedReferenceId> + '_ {
         self.references.iter().copied()
     }
 

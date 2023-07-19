@@ -1026,8 +1026,8 @@ mod tests {
             &[
                 Rule::UndefinedName,
                 Rule::UndefinedName,
-                Rule::UndefinedName,
                 Rule::UnusedVariable,
+                Rule::UndefinedName,
                 Rule::UndefinedName,
             ],
         );
@@ -2115,7 +2115,7 @@ mod tests {
         try: pass
         except Exception as fu: pass
         "#,
-            &[Rule::RedefinedWhileUnused, Rule::UnusedVariable],
+            &[Rule::UnusedVariable, Rule::RedefinedWhileUnused],
         );
     }
 

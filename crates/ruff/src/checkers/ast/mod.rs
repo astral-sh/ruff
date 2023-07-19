@@ -50,8 +50,8 @@ use ruff_python_ast::{cast, helpers, str, visitor};
 use ruff_python_semantic::analyze::{branch_detection, typing, visibility};
 use ruff_python_semantic::{
     Binding, BindingFlags, BindingId, BindingKind, ContextualizedDefinition, Exceptions,
-    ExecutionContext, Export, FromImport, Globals, Import, Module, ModuleKind, ResolvedRead, Scope,
-    ScopeId, ScopeKind, SemanticModel, SemanticModelFlags, StarImport, SubmoduleImport,
+    ExecutionContext, Export, FromImport, Globals, Import, Module, ModuleKind, ScopeId, ScopeKind,
+    SemanticModel, SemanticModelFlags, StarImport, SubmoduleImport,
 };
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
 use ruff_python_stdlib::path::is_python_stub_file;
@@ -4428,55 +4428,7 @@ impl<'a> Checker<'a> {
         let Expr::Name(ast::ExprName { id, .. }) = expr else {
             return;
         };
-        match self.semantic.resolve_read(id, expr.range()) {
-            ResolvedRead::Resolved(_) | ResolvedRead::ImplicitGlobal => {
-                // Nothing to do.
-            }
-            ResolvedRead::WildcardImport => {
-                // F405
-                if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
-                    let sources: Vec<String> = self
-                        .semantic
-                        .scopes
-                        .iter()
-                        .flat_map(Scope::star_imports)
-                        .map(|StarImport { level, module }| {
-                            helpers::format_import_from(*level, *module)
-                        })
-                        .sorted()
-                        .dedup()
-                        .collect();
-                    self.diagnostics.push(Diagnostic::new(
-                        pyflakes::rules::UndefinedLocalWithImportStarUsage {
-                            name: id.to_string(),
-                            sources,
-                        },
-                        expr.range(),
-                    ));
-                }
-            }
-            ResolvedRead::NotFound | ResolvedRead::UnboundLocal(_) => {
-                // F821
-                if self.enabled(Rule::UndefinedName) {
-                    // Allow __path__.
-                    if self.path.ends_with("__init__.py") && id == "__path__" {
-                        return;
-                    }
-
-                    // Avoid flagging if `NameError` is handled.
-                    if self.semantic.exceptions().contains(Exceptions::NAME_ERROR) {
-                        return;
-                    }
-
-                    self.diagnostics.push(Diagnostic::new(
-                        pyflakes::rules::UndefinedName {
-                            name: id.to_string(),
-                        },
-                        expr.range(),
-                    ));
-                }
-            }
-        }
+        self.semantic.resolve_read(id, expr.range());
     }
 
     fn handle_node_store(&mut self, id: &'a str, expr: &Expr) {
@@ -4771,6 +4723,47 @@ impl<'a> Checker<'a> {
         }
     }
 
+    /// Run any lint rules that operate over a single [`UnresolvedReference`].
+    fn check_unresolved_references(&mut self) {
+        if !self.any_enabled(&[Rule::UndefinedLocalWithImportStarUsage, Rule::UndefinedName]) {
+            return;
+        }
+
+        for reference in self.semantic.unresolved_references() {
+            if reference.wildcard_import() {
+                if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
+                    self.diagnostics.push(Diagnostic::new(
+                        pyflakes::rules::UndefinedLocalWithImportStarUsage {
+                            name: reference.name(self.locator).to_string(),
+                        },
+                        reference.range(),
+                    ));
+                }
+            } else {
+                if self.enabled(Rule::UndefinedName) {
+                    // Avoid flagging if `NameError` is handled.
+                    if reference.exceptions().contains(Exceptions::NAME_ERROR) {
+                        continue;
+                    }
+
+                    // Allow __path__.
+                    if self.path.ends_with("__init__.py") {
+                        if reference.name(self.locator) == "__path__" {
+                            continue;
+                        }
+                    }
+
+                    self.diagnostics.push(Diagnostic::new(
+                        pyflakes::rules::UndefinedName {
+                            name: reference.name(self.locator).to_string(),
+                        },
+                        reference.range(),
+                    ));
+                }
+            }
+        }
+    }
+
     /// Run any lint rules that operate over a single [`Binding`].
     fn check_bindings(&mut self) {
         if !self.any_enabled(&[
@@ -4838,6 +4831,55 @@ impl<'a> Checker<'a> {
         }
     }
 
+    /// Run any lint rules that operate over the module exports (i.e., members of `__all__`).
+    fn check_exports(&mut self) {
+        let exports: Vec<(&str, TextRange)> = self
+            .semantic
+            .global_scope()
+            .get_all("__all__")
+            .map(|binding_id| &self.semantic.bindings[binding_id])
+            .filter_map(|binding| match &binding.kind {
+                BindingKind::Export(Export { names }) => {
+                    Some(names.iter().map(|name| (*name, binding.range)))
+                }
+                _ => None,
+            })
+            .flatten()
+            .collect();
+
+        for (name, range) in exports {
+            if let Some(binding_id) = self.semantic.global_scope().get(name) {
+                // Mark anything referenced in `__all__` as used.
+                self.semantic
+                    .add_global_reference(binding_id, range, ExecutionContext::Runtime);
+            } else {
+                if self.semantic.global_scope().uses_star_imports() {
+                    // F405
+                    if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
+                        self.diagnostics.push(Diagnostic::new(
+                            pyflakes::rules::UndefinedLocalWithImportStarUsage {
+                                name: (*name).to_string(),
+                            },
+                            range,
+                        ));
+                    }
+                } else {
+                    // F822
+                    if self.enabled(Rule::UndefinedExport) {
+                        if !self.path.ends_with("__init__.py") {
+                            self.diagnostics.push(Diagnostic::new(
+                                pyflakes::rules::UndefinedExport {
+                                    name: (*name).to_string(),
+                                },
+                                range,
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     fn check_deferred_scopes(&mut self) {
         if !self.any_enabled(&[
             Rule::GlobalVariableNotAssigned,
@@ -4847,35 +4889,9 @@ impl<'a> Checker<'a> {
             Rule::TypingOnlyFirstPartyImport,
             Rule::TypingOnlyStandardLibraryImport,
             Rule::TypingOnlyThirdPartyImport,
-            Rule::UndefinedExport,
-            Rule::UndefinedLocalWithImportStarUsage,
-            Rule::UndefinedLocalWithImportStarUsage,
             Rule::UnusedImport,
         ]) {
             return;
-        }
-
-        // Mark anything referenced in `__all__` as used.
-        let exports: Vec<(&str, TextRange)> = {
-            self.semantic
-                .global_scope()
-                .get_all("__all__")
-                .map(|binding_id| &self.semantic.bindings[binding_id])
-                .filter_map(|binding| match &binding.kind {
-                    BindingKind::Export(Export { names }) => {
-                        Some(names.iter().map(|name| (*name, binding.range)))
-                    }
-                    _ => None,
-                })
-                .flatten()
-                .collect()
-        };
-
-        for (name, range) in &exports {
-            if let Some(binding_id) = self.semantic.global_scope().get(name) {
-                self.semantic
-                    .add_global_reference(binding_id, *range, ExecutionContext::Runtime);
-            }
         }
 
         // Identify any valid runtime imports. If a module is imported at runtime, and
@@ -4919,43 +4935,6 @@ impl<'a> Checker<'a> {
         let mut diagnostics: Vec<Diagnostic> = vec![];
         for scope_id in self.deferred.scopes.iter().rev().copied() {
             let scope = &self.semantic.scopes[scope_id];
-
-            if scope.kind.is_module() {
-                // F822
-                if self.enabled(Rule::UndefinedExport) {
-                    if !self.path.ends_with("__init__.py") {
-                        for (name, range) in &exports {
-                            diagnostics
-                                .extend(pyflakes::rules::undefined_export(name, *range, scope));
-                        }
-                    }
-                }
-
-                // F405
-                if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
-                    let sources: Vec<String> = scope
-                        .star_imports()
-                        .map(|StarImport { level, module }| {
-                            helpers::format_import_from(*level, *module)
-                        })
-                        .sorted()
-                        .dedup()
-                        .collect();
-                    if !sources.is_empty() {
-                        for (name, range) in &exports {
-                            if !scope.has(name) {
-                                diagnostics.push(Diagnostic::new(
-                                    pyflakes::rules::UndefinedLocalWithImportStarUsage {
-                                        name: (*name).to_string(),
-                                        sources: sources.clone(),
-                                    },
-                                    *range,
-                                ));
-                            }
-                        }
-                    }
-                }
-            }
 
             // PLW0602
             if self.enabled(Rule::GlobalVariableNotAssigned) {
@@ -5226,8 +5205,8 @@ impl<'a> Checker<'a> {
 
         // Compute visibility of all definitions.
         let exports: Option<Vec<&str>> = {
-            let global_scope = self.semantic.global_scope();
-            global_scope
+            self.semantic
+                .global_scope()
                 .get_all("__all__")
                 .map(|binding_id| &self.semantic.bindings[binding_id])
                 .filter_map(|binding| match &binding.kind {
@@ -5490,14 +5469,16 @@ pub(crate) fn check_ast(
     checker.check_deferred_assignments();
     checker.check_deferred_for_loops();
 
-    // Check docstrings.
+    // Check docstrings, exports, bindings, and unresolved references.
     checker.check_definitions();
+    checker.check_exports();
+    checker.check_bindings();
+    checker.check_unresolved_references();
 
     // Reset the scope to module-level, and check all consumed scopes.
     checker.semantic.scope_id = ScopeId::global();
     checker.deferred.scopes.push(ScopeId::global());
     checker.check_deferred_scopes();
-    checker.check_bindings();
 
     checker.diagnostics
 }
