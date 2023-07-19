@@ -8,6 +8,7 @@
     "build": "tsc && vite build",
     "check": "npm run lint && npm run tsc",
     "dev": "vite",
+    "dev:wasm": "wasm-pack build ../crates/ruff_wasm --dev --target web --out-dir ../../playground/src/pkg",
     "fmt": "prettier --cache -w .",
     "lint": "eslint --cache --ext .ts,.tsx src",
     "preview": "vite preview",
