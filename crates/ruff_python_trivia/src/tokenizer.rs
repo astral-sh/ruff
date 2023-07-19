@@ -12,7 +12,7 @@ use crate::{is_python_whitespace, Cursor};
 /// of the character, the second item the non-trivia character.
 ///
 /// Returns `None` if the range is empty or only contains trivia (whitespace or comments).
-pub fn first_non_trivia_token(offset: TextSize, code: &str) -> Option<Token> {
+pub fn first_non_trivia_token(offset: TextSize, code: &str) -> Option<SimpleToken> {
     SimpleTokenizer::starts_at(offset, code)
         .skip_trivia()
         .next()
@@ -24,7 +24,7 @@ pub fn first_non_trivia_token(offset: TextSize, code: &str) -> Option<Token> {
 /// ## Notes
 ///
 /// Prefer [`first_non_trivia_token`] whenever possible because reverse lookup is expensive because of comments.
-pub fn first_non_trivia_token_rev(offset: TextSize, code: &str) -> Option<Token> {
+pub fn first_non_trivia_token_rev(offset: TextSize, code: &str) -> Option<SimpleToken> {
     SimpleTokenizer::up_to(offset, code)
         .skip_trivia()
         .next_back()
@@ -37,10 +37,10 @@ pub fn lines_before(offset: TextSize, code: &str) -> u32 {
 
     for token in tokens.rev() {
         match token.kind() {
-            TokenKind::Newline => {
+            SimpleTokenKind::Newline => {
                 newlines += 1;
             }
-            TokenKind::Whitespace => {
+            SimpleTokenKind::Whitespace => {
                 // ignore
             }
             _ => {
@@ -59,10 +59,10 @@ pub fn lines_after(offset: TextSize, code: &str) -> u32 {
 
     for token in tokens {
         match token.kind() {
-            TokenKind::Newline => {
+            SimpleTokenKind::Newline => {
                 newlines += 1;
             }
-            TokenKind::Whitespace => {
+            SimpleTokenKind::Whitespace => {
                 // ignore
             }
             _ => {
@@ -80,7 +80,9 @@ pub fn skip_trailing_trivia(offset: TextSize, code: &str) -> TextSize {
 
     for token in tokenizer {
         match token.kind() {
-            TokenKind::Whitespace | TokenKind::Comment | TokenKind::Continuation => {
+            SimpleTokenKind::Whitespace
+            | SimpleTokenKind::Comment
+            | SimpleTokenKind::Continuation => {
                 // No op
             }
             _ => {
@@ -111,13 +113,13 @@ fn is_non_ascii_identifier_start(c: char) -> bool {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct Token {
-    pub kind: TokenKind,
+pub struct SimpleToken {
+    pub kind: SimpleTokenKind,
     pub range: TextRange,
 }
 
-impl Token {
-    pub const fn kind(&self) -> TokenKind {
+impl SimpleToken {
+    pub const fn kind(&self) -> SimpleTokenKind {
         self.kind
     }
 
@@ -136,7 +138,7 @@ impl Token {
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-pub enum TokenKind {
+pub enum SimpleTokenKind {
     /// A comment, not including the trailing new line.
     Comment,
 
@@ -209,35 +211,35 @@ pub enum TokenKind {
     /// Any other non trivia token.
     Other,
 
-    /// Returned for each character after [`TokenKind::Other`] has been returned once.
+    /// Returned for each character after [`SimpleTokenKind::Other`] has been returned once.
     Bogus,
 }
 
-impl TokenKind {
-    const fn from_non_trivia_char(c: char) -> TokenKind {
+impl SimpleTokenKind {
+    const fn from_non_trivia_char(c: char) -> SimpleTokenKind {
         match c {
-            '(' => TokenKind::LParen,
-            ')' => TokenKind::RParen,
-            '[' => TokenKind::LBracket,
-            ']' => TokenKind::RBracket,
-            '{' => TokenKind::LBrace,
-            '}' => TokenKind::RBrace,
-            ',' => TokenKind::Comma,
-            ':' => TokenKind::Colon,
-            '/' => TokenKind::Slash,
-            '*' => TokenKind::Star,
-            '.' => TokenKind::Dot,
-            _ => TokenKind::Other,
+            '(' => SimpleTokenKind::LParen,
+            ')' => SimpleTokenKind::RParen,
+            '[' => SimpleTokenKind::LBracket,
+            ']' => SimpleTokenKind::RBracket,
+            '{' => SimpleTokenKind::LBrace,
+            '}' => SimpleTokenKind::RBrace,
+            ',' => SimpleTokenKind::Comma,
+            ':' => SimpleTokenKind::Colon,
+            '/' => SimpleTokenKind::Slash,
+            '*' => SimpleTokenKind::Star,
+            '.' => SimpleTokenKind::Dot,
+            _ => SimpleTokenKind::Other,
         }
     }
 
     const fn is_trivia(self) -> bool {
         matches!(
             self,
-            TokenKind::Whitespace
-                | TokenKind::Newline
-                | TokenKind::Comment
-                | TokenKind::Continuation
+            SimpleTokenKind::Whitespace
+                | SimpleTokenKind::Newline
+                | SimpleTokenKind::Comment
+                | SimpleTokenKind::Continuation
         )
     }
 }
@@ -246,8 +248,8 @@ impl TokenKind {
 ///
 /// The tokenizer must start at an offset that is trivia (e.g. not inside of a multiline string).
 ///
-/// The tokenizer doesn't guarantee any correctness after it returned a [`TokenKind::Other`]. That's why it
-/// will return [`TokenKind::Bogus`] for every character after until it reaches the end of the file.
+/// The tokenizer doesn't guarantee any correctness after it returned a [`SimpleTokenKind::Other`]. That's why it
+/// will return [`SimpleTokenKind::Bogus`] for every character after until it reaches the end of the file.
 pub struct SimpleTokenizer<'a> {
     offset: TextSize,
     back_offset: TextSize,
@@ -289,34 +291,34 @@ impl<'a> SimpleTokenizer<'a> {
         tokenizer
     }
 
-    fn to_keyword_or_other(&self, range: TextRange) -> TokenKind {
+    fn to_keyword_or_other(&self, range: TextRange) -> SimpleTokenKind {
         let source = &self.source[range];
         match source {
-            "as" => TokenKind::As,
-            "async" => TokenKind::Async,
-            "else" => TokenKind::Else,
-            "if" => TokenKind::If,
-            "in" => TokenKind::In,
-            "match" => TokenKind::Match, // Match is a soft keyword that depends on the context but we can always lex it as a keyword and leave it to the caller (parser) to decide if it should be handled as an identifier or keyword.
-            "with" => TokenKind::With,
+            "as" => SimpleTokenKind::As,
+            "async" => SimpleTokenKind::Async,
+            "else" => SimpleTokenKind::Else,
+            "if" => SimpleTokenKind::If,
+            "in" => SimpleTokenKind::In,
+            "match" => SimpleTokenKind::Match, // Match is a soft keyword that depends on the context but we can always lex it as a keyword and leave it to the caller (parser) to decide if it should be handled as an identifier or keyword.
+            "with" => SimpleTokenKind::With,
             // ...,
-            _ => TokenKind::Other, // Potentially an identifier, but only if it isn't a string prefix. We can ignore this for now https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals
+            _ => SimpleTokenKind::Other, // Potentially an identifier, but only if it isn't a string prefix. We can ignore this for now https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals
         }
     }
 
-    fn next_token(&mut self) -> Token {
+    fn next_token(&mut self) -> SimpleToken {
         self.cursor.start_token();
 
         let Some(first) = self.cursor.bump() else {
-            return Token {
-                kind: TokenKind::EndOfFile,
+            return SimpleToken {
+                kind: SimpleTokenKind::EndOfFile,
                 range: TextRange::empty(self.offset),
             };
         };
 
         if self.bogus {
-            let token = Token {
-                kind: TokenKind::Bogus,
+            let token = SimpleToken {
+                kind: SimpleTokenKind::Bogus,
                 range: TextRange::at(self.offset, first.text_len()),
             };
 
@@ -327,22 +329,22 @@ impl<'a> SimpleTokenizer<'a> {
         let kind = match first {
             ' ' | '\t' => {
                 self.cursor.eat_while(|c| matches!(c, ' ' | '\t'));
-                TokenKind::Whitespace
+                SimpleTokenKind::Whitespace
             }
 
-            '\n' => TokenKind::Newline,
+            '\n' => SimpleTokenKind::Newline,
 
             '\r' => {
                 self.cursor.eat_char('\n');
-                TokenKind::Newline
+                SimpleTokenKind::Newline
             }
 
             '#' => {
                 self.cursor.eat_while(|c| !matches!(c, '\n' | '\r'));
-                TokenKind::Comment
+                SimpleTokenKind::Comment
             }
 
-            '\\' => TokenKind::Continuation,
+            '\\' => SimpleTokenKind::Continuation,
 
             c => {
                 let kind = if is_identifier_start(c) {
@@ -352,10 +354,10 @@ impl<'a> SimpleTokenizer<'a> {
                     let range = TextRange::at(self.offset, token_len);
                     self.to_keyword_or_other(range)
                 } else {
-                    TokenKind::from_non_trivia_char(c)
+                    SimpleTokenKind::from_non_trivia_char(c)
                 };
 
-                if kind == TokenKind::Other {
+                if kind == SimpleTokenKind::Other {
                     self.bogus = true;
                 }
                 kind
@@ -364,7 +366,7 @@ impl<'a> SimpleTokenizer<'a> {
 
         let token_len = self.cursor.token_len();
 
-        let token = Token {
+        let token = SimpleToken {
             kind,
             range: TextRange::at(self.offset, token_len),
         };
@@ -376,19 +378,19 @@ impl<'a> SimpleTokenizer<'a> {
 
     /// Returns the next token from the back. Prefer iterating forwards. Iterating backwards is significantly more expensive
     /// because it needs to check if the line has any comments when encountering any non-trivia token.
-    pub fn next_token_back(&mut self) -> Token {
+    pub fn next_token_back(&mut self) -> SimpleToken {
         self.cursor.start_token();
 
         let Some(last) = self.cursor.bump_back() else {
-            return Token {
-                kind: TokenKind::EndOfFile,
+            return SimpleToken {
+                kind: SimpleTokenKind::EndOfFile,
                 range: TextRange::empty(self.back_offset),
             };
         };
 
         if self.bogus {
-            let token = Token {
-                kind: TokenKind::Bogus,
+            let token = SimpleToken {
+                kind: SimpleTokenKind::Bogus,
                 range: TextRange::at(self.back_offset - last.text_len(), last.text_len()),
             };
 
@@ -401,22 +403,22 @@ impl<'a> SimpleTokenizer<'a> {
             // as whitespace rather than being part of the token. This shouldn't matter for what we use the lexer for.
             ' ' | '\t' => {
                 self.cursor.eat_back_while(|c| matches!(c, ' ' | '\t'));
-                TokenKind::Whitespace
+                SimpleTokenKind::Whitespace
             }
 
             '\r' => {
                 self.back_line_has_no_comment = false;
-                TokenKind::Newline
+                SimpleTokenKind::Newline
             }
 
             '\n' => {
                 self.back_line_has_no_comment = false;
                 self.cursor.eat_char_back('\r');
-                TokenKind::Newline
+                SimpleTokenKind::Newline
             }
 
             // Empty comment (could also be a comment nested in another comment, but this shouldn't matter for what we use the lexer for)
-            '#' => TokenKind::Comment,
+            '#' => SimpleTokenKind::Comment,
 
             // For all other tokens, test if the character isn't part of a comment.
             c => {
@@ -447,7 +449,8 @@ impl<'a> SimpleTokenizer<'a> {
 
                         before_comment.chars().all(|c| {
                             is_python_whitespace(c)
-                                || TokenKind::from_non_trivia_char(c) != TokenKind::Other
+                                || SimpleTokenKind::from_non_trivia_char(c)
+                                    != SimpleTokenKind::Other
                         })
                     })
                 };
@@ -462,9 +465,9 @@ impl<'a> SimpleTokenizer<'a> {
                         self.cursor.bump_back().unwrap();
                     }
 
-                    TokenKind::Comment
+                    SimpleTokenKind::Comment
                 } else if c == '\\' {
-                    TokenKind::Continuation
+                    SimpleTokenKind::Continuation
                 } else {
                     let kind = if is_identifier_continuation(c) {
                         // if we only have identifier continuations but no start (e.g. 555) we
@@ -484,13 +487,13 @@ impl<'a> SimpleTokenizer<'a> {
                             self.to_keyword_or_other(range)
                         } else {
                             self.cursor = savepoint;
-                            TokenKind::Other
+                            SimpleTokenKind::Other
                         }
                     } else {
-                        TokenKind::from_non_trivia_char(c)
+                        SimpleTokenKind::from_non_trivia_char(c)
                     };
 
-                    if kind == TokenKind::Other {
+                    if kind == SimpleTokenKind::Other {
                         self.bogus = true;
                     }
 
@@ -503,7 +506,7 @@ impl<'a> SimpleTokenizer<'a> {
 
         let start = self.back_offset - token_len;
 
-        let token = Token {
+        let token = SimpleToken {
             kind,
             range: TextRange::at(start, token_len),
         };
@@ -513,18 +516,18 @@ impl<'a> SimpleTokenizer<'a> {
         token
     }
 
-    pub fn skip_trivia(self) -> impl Iterator<Item = Token> + DoubleEndedIterator + 'a {
+    pub fn skip_trivia(self) -> impl Iterator<Item = SimpleToken> + DoubleEndedIterator + 'a {
         self.filter(|t| !t.kind().is_trivia())
     }
 }
 
 impl Iterator for SimpleTokenizer<'_> {
-    type Item = Token;
+    type Item = SimpleToken;
 
     fn next(&mut self) -> Option<Self::Item> {
         let token = self.next_token();
 
-        if token.kind == TokenKind::EndOfFile {
+        if token.kind == SimpleTokenKind::EndOfFile {
             None
         } else {
             Some(token)
@@ -536,7 +539,7 @@ impl DoubleEndedIterator for SimpleTokenizer<'_> {
     fn next_back(&mut self) -> Option<Self::Item> {
         let token = self.next_token_back();
 
-        if token.kind == TokenKind::EndOfFile {
+        if token.kind == SimpleTokenKind::EndOfFile {
             None
         } else {
             Some(token)
@@ -549,12 +552,12 @@ mod tests {
     use insta::assert_debug_snapshot;
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
-    use crate::tokenizer::{lines_after, lines_before, SimpleTokenizer, Token};
+    use crate::tokenizer::{lines_after, lines_before, SimpleToken, SimpleTokenizer};
 
     struct TokenizationTestCase {
         source: &'static str,
         range: TextRange,
-        tokens: Vec<Token>,
+        tokens: Vec<SimpleToken>,
     }
 
     impl TokenizationTestCase {
@@ -567,13 +570,13 @@ mod tests {
             assert_eq!(&backwards, &self.tokens);
         }
 
-        fn tokenize_reverse(&self) -> Vec<Token> {
+        fn tokenize_reverse(&self) -> Vec<SimpleToken> {
             SimpleTokenizer::new(self.source, self.range)
                 .rev()
                 .collect()
         }
 
-        fn tokens(&self) -> &[Token] {
+        fn tokens(&self) -> &[SimpleToken] {
             &self.tokens
         }
     }

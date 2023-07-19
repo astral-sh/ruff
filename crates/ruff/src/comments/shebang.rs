@@ -1,4 +1,4 @@
-use ruff_python_whitespace::{is_python_whitespace, Cursor};
+use ruff_python_trivia::{is_python_whitespace, Cursor};
 use ruff_text_size::{TextLen, TextSize};
 
 /// A shebang directive (e.g., `#!/usr/bin/env python3`).

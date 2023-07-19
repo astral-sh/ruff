@@ -1,7 +1,7 @@
 use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::Ranged;
 
-use ruff_python_whitespace::is_python_whitespace;
+use ruff_python_trivia::is_python_whitespace;
 
 use crate::source_code::Locator;
 

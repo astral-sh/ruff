@@ -5,7 +5,7 @@ use rustpython_parser::ast::{ExprUnaryOp, Ranged};
 use ruff_formatter::prelude::{hard_line_break, space, text};
 use ruff_formatter::{Format, FormatContext, FormatResult};
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_whitespace::{SimpleTokenizer, TokenKind};
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 
 use crate::comments::trailing_comments;
 use crate::context::PyFormatContext;
@@ -97,7 +97,7 @@ fn is_operand_parenthesized(unary: &ExprUnaryOp, source: &str) -> bool {
         .skip_trivia()
         .next()
     {
-        debug_assert_eq!(token.kind(), TokenKind::LParen);
+        debug_assert_eq!(token.kind(), SimpleTokenKind::LParen);
         true
     } else {
         false

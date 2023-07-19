@@ -3,7 +3,7 @@ use rustpython_parser::ast::{Ranged, Stmt, Suite};
 use ruff_formatter::{
     format_args, write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions,
 };
-use ruff_python_whitespace::lines_before;
+use ruff_python_trivia::lines_before;
 
 use crate::context::NodeLevel;
 use crate::prelude::*;

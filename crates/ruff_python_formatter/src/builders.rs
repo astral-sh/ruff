@@ -2,8 +2,8 @@ use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::Ranged;
 
 use ruff_formatter::{format_args, write, Argument, Arguments};
-use ruff_python_whitespace::{
-    lines_after, skip_trailing_trivia, SimpleTokenizer, Token, TokenKind,
+use ruff_python_trivia::{
+    lines_after, skip_trailing_trivia, SimpleToken, SimpleTokenKind, SimpleTokenizer,
 };
 
 use crate::context::NodeLevel;
@@ -294,12 +294,12 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
                         )
                         .skip_trivia()
                         // Skip over any closing parentheses belonging to the expression
-                        .find(|token| token.kind() != TokenKind::RParen);
+                        .find(|token| token.kind() != SimpleTokenKind::RParen);
 
                         matches!(
                             first_token,
-                            Some(Token {
-                                kind: TokenKind::Comma,
+                            Some(SimpleToken {
+                                kind: SimpleTokenKind::Comma,
                                 ..
                             })
                         )

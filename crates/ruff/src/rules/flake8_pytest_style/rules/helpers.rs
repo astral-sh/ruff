@@ -3,7 +3,7 @@ use rustpython_parser::ast::{self, Constant, Decorator, Expr, Keyword};
 use ruff_python_ast::call_path::{collect_call_path, CallPath};
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_semantic::SemanticModel;
-use ruff_python_whitespace::PythonWhitespace;
+use ruff_python_trivia::PythonWhitespace;
 
 pub(super) fn get_mark_decorators(
     decorators: &[Decorator],

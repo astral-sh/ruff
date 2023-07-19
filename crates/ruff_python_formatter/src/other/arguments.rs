@@ -5,7 +5,7 @@ use rustpython_parser::ast::{Arguments, Ranged};
 
 use ruff_formatter::{format_args, write, FormatRuleWithOptions};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
-use ruff_python_whitespace::{first_non_trivia_token, SimpleTokenizer, Token, TokenKind};
+use ruff_python_trivia::{first_non_trivia_token, SimpleToken, SimpleTokenKind, SimpleTokenizer};
 
 use crate::comments::{
     dangling_comments, leading_comments, leading_node_comments, trailing_comments,
@@ -166,17 +166,17 @@ impl FormatNodeRule<Arguments> for FormatArguments {
                             .skip_trivia();
 
                     let comma = tokens.next();
-                    assert!(matches!(comma, Some(Token { kind: TokenKind::Comma, .. })), "The last positional only argument must be separated by a `,` from the positional only arguments separator `/` but found '{comma:?}'.");
+                    assert!(matches!(comma, Some(SimpleToken { kind: SimpleTokenKind::Comma, .. })), "The last positional only argument must be separated by a `,` from the positional only arguments separator `/` but found '{comma:?}'.");
 
                     let slash = tokens.next();
-                    assert!(matches!(slash, Some(Token { kind: TokenKind::Slash, .. })), "The positional argument separator must be present for a function that has positional only arguments but found '{slash:?}'.");
+                    assert!(matches!(slash, Some(SimpleToken { kind: SimpleTokenKind::Slash, .. })), "The positional argument separator must be present for a function that has positional only arguments but found '{slash:?}'.");
 
                     tokens.next()
                 } else {
                     first_non_trivia_token(last_node.end(), f.context().source())
                 };
 
-                if maybe_comma_token.map_or(false, |token| token.kind() == TokenKind::Comma) {
+                if maybe_comma_token.map_or(false, |token| token.kind() == SimpleTokenKind::Comma) {
                     write!(f, [hard_line_break()])?;
                 }
             }
@@ -298,11 +298,11 @@ pub(crate) fn find_argument_separators(
         let comma = tokens
             .next()
             .expect("The function definition can't end here");
-        debug_assert!(comma.kind() == TokenKind::Comma, "{comma:?}");
+        debug_assert!(comma.kind() == SimpleTokenKind::Comma, "{comma:?}");
         let slash = tokens
             .next()
             .expect("The function definition can't end here");
-        debug_assert!(slash.kind() == TokenKind::Slash, "{slash:?}");
+        debug_assert!(slash.kind() == SimpleTokenKind::Slash, "{slash:?}");
 
         Some((preceding_end, slash.range))
     } else {
@@ -331,11 +331,11 @@ pub(crate) fn find_argument_separators(
             let comma = tokens
                 .next()
                 .expect("The function definition can't end here");
-            debug_assert!(comma.kind() == TokenKind::Comma, "{comma:?}");
+            debug_assert!(comma.kind() == SimpleTokenKind::Comma, "{comma:?}");
             let star = tokens
                 .next()
                 .expect("The function definition can't end here");
-            debug_assert!(star.kind() == TokenKind::Star, "{star:?}");
+            debug_assert!(star.kind() == SimpleTokenKind::Star, "{star:?}");
 
             Some(ArgumentSeparator {
                 preceding_end,
@@ -348,11 +348,11 @@ pub(crate) fn find_argument_separators(
             let lparen = tokens
                 .next()
                 .expect("The function definition can't end here");
-            debug_assert!(lparen.kind() == TokenKind::LParen, "{lparen:?}");
+            debug_assert!(lparen.kind() == SimpleTokenKind::LParen, "{lparen:?}");
             let star = tokens
                 .next()
                 .expect("The function definition can't end here");
-            debug_assert!(star.kind() == TokenKind::Star, "{star:?}");
+            debug_assert!(star.kind() == SimpleTokenKind::Star, "{star:?}");
             Some(ArgumentSeparator {
                 preceding_end: arguments.range.start(),
                 separator: star.range,

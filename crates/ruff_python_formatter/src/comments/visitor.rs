@@ -13,7 +13,7 @@ use ruff_python_ast::source_code::{CommentRanges, Locator};
 // pre-order.
 #[allow(clippy::wildcard_imports)]
 use ruff_python_ast::visitor::preorder::*;
-use ruff_python_whitespace::is_python_whitespace;
+use ruff_python_trivia::is_python_whitespace;
 
 use crate::comments::node_key::NodeRefEqualityKey;
 use crate::comments::placement::place_comment;

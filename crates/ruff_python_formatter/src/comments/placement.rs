@@ -7,8 +7,8 @@ use rustpython_parser::ast::{Expr, ExprIfExp, ExprSlice, Ranged};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::whitespace;
-use ruff_python_whitespace::{
-    first_non_trivia_token_rev, PythonWhitespace, SimpleTokenizer, Token, TokenKind,
+use ruff_python_trivia::{
+    first_non_trivia_token_rev, PythonWhitespace, SimpleToken, SimpleTokenKind, SimpleTokenizer,
     UniversalNewlines,
 };
 
@@ -756,7 +756,7 @@ fn handle_trailing_end_of_line_condition_comment<'a>(
 
         for token in tokens {
             match token.kind() {
-                TokenKind::Colon => {
+                SimpleTokenKind::Colon => {
                     if comment.slice().start() > token.start() {
                         // Comment comes after the colon
                         // ```python
@@ -775,10 +775,10 @@ fn handle_trailing_end_of_line_condition_comment<'a>(
                     // ```
                     break;
                 }
-                TokenKind::RParen => {
+                SimpleTokenKind::RParen => {
                     // Skip over any closing parentheses
                 }
-                TokenKind::Comma => {
+                SimpleTokenKind::Comma => {
                     // Skip over any trailing comma
                 }
                 kind => {
@@ -884,12 +884,12 @@ fn handle_trailing_binary_expression_left_or_operator_comment<'a>(
     );
 
     let mut tokens = SimpleTokenizer::new(locator.contents(), between_operands_range).skip_trivia();
-    let operator_offset = if let Some(non_r_paren) = tokens.find(|t| t.kind() != TokenKind::RParen)
-    {
-        non_r_paren.start()
-    } else {
-        return CommentPlacement::Default(comment);
-    };
+    let operator_offset =
+        if let Some(non_r_paren) = tokens.find(|t| t.kind() != SimpleTokenKind::RParen) {
+            non_r_paren.start()
+        } else {
+            return CommentPlacement::Default(comment);
+        };
 
     let comment_range = comment.slice().range();
 
@@ -1061,8 +1061,8 @@ fn handle_slice_comments<'a>(
     // Check for `foo[ # comment`, but only if they are on the same line
     let after_lbracket = matches!(
         first_non_trivia_token_rev(comment.slice().start(), locator.contents()),
-        Some(Token {
-            kind: TokenKind::LBracket,
+        Some(SimpleToken {
+            kind: SimpleTokenKind::LBracket,
             ..
         })
     );
@@ -1182,11 +1182,11 @@ fn handle_dict_unpacking_comment<'a>(
     // we start from the preceding node but we skip its token
     for token in tokens.by_ref() {
         // Skip closing parentheses that are not part of the node range
-        if token.kind == TokenKind::RParen {
+        if token.kind == SimpleTokenKind::RParen {
             continue;
         }
         // The Keyword case
-        if token.kind == TokenKind::Star {
+        if token.kind == SimpleTokenKind::Star {
             count += 1;
             break;
         }
@@ -1194,8 +1194,8 @@ fn handle_dict_unpacking_comment<'a>(
         debug_assert!(
             matches!(
                 token,
-                Token {
-                    kind: TokenKind::LBrace | TokenKind::Comma | TokenKind::Colon,
+                SimpleToken {
+                    kind: SimpleTokenKind::LBrace | SimpleTokenKind::Comma | SimpleTokenKind::Colon,
                     ..
                 }
             ),
@@ -1205,7 +1205,7 @@ fn handle_dict_unpacking_comment<'a>(
     }
 
     for token in tokens {
-        if token.kind != TokenKind::Star {
+        if token.kind != SimpleTokenKind::Star {
             return CommentPlacement::Default(comment);
         }
         count += 1;
@@ -1302,12 +1302,12 @@ fn handle_expr_if_comment<'a>(
     let if_token = find_only_token_in_range(
         TextRange::new(body.end(), test.start()),
         locator,
-        TokenKind::If,
+        SimpleTokenKind::If,
     );
     let else_token = find_only_token_in_range(
         TextRange::new(test.end(), orelse.start()),
         locator,
-        TokenKind::Else,
+        SimpleTokenKind::Else,
     );
 
     // Between `if` and `test`
@@ -1369,7 +1369,7 @@ fn handle_with_item_comment<'a>(
     let as_token = find_only_token_in_range(
         TextRange::new(context_expr.end(), optional_vars.start()),
         locator,
-        TokenKind::As,
+        SimpleTokenKind::As,
     );
 
     // If before the `as` keyword, then it must be a trailing comment of the context expression.
@@ -1386,13 +1386,17 @@ fn handle_with_item_comment<'a>(
 
 /// Looks for a token in the range that contains no other tokens except for parentheses outside
 /// the expression ranges
-fn find_only_token_in_range(range: TextRange, locator: &Locator, token_kind: TokenKind) -> Token {
+fn find_only_token_in_range(
+    range: TextRange,
+    locator: &Locator,
+    token_kind: SimpleTokenKind,
+) -> SimpleToken {
     let mut tokens = SimpleTokenizer::new(locator.contents(), range)
         .skip_trivia()
-        .skip_while(|token| token.kind == TokenKind::RParen);
+        .skip_while(|token| token.kind == SimpleTokenKind::RParen);
     let token = tokens.next().expect("Expected a token");
     debug_assert_eq!(token.kind(), token_kind);
-    let mut tokens = tokens.skip_while(|token| token.kind == TokenKind::LParen);
+    let mut tokens = tokens.skip_while(|token| token.kind == SimpleTokenKind::LParen);
     debug_assert_eq!(tokens.next(), None);
     token
 }
@@ -1446,7 +1450,7 @@ fn handle_comprehension_comment<'a>(
             comprehension.iter.range().start(),
         ),
         locator,
-        TokenKind::In,
+        SimpleTokenKind::In,
     );
 
     // Comments between the target and the `in`
@@ -1509,7 +1513,7 @@ fn handle_comprehension_comment<'a>(
         let if_token = find_only_token_in_range(
             TextRange::new(last_end, if_node.range().start()),
             locator,
-            TokenKind::If,
+            SimpleTokenKind::If,
         );
         if is_own_line {
             if last_end < comment.slice().start() && comment.slice().start() < if_token.start() {

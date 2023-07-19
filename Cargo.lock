@@ -1928,7 +1928,7 @@ dependencies = [
  "ruff_python_ast",
  "ruff_python_semantic",
  "ruff_python_stdlib",
- "ruff_python_whitespace",
+ "ruff_python_trivia",
  "ruff_rustpython",
  "ruff_text_size",
  "ruff_textwrap",
@@ -2124,7 +2124,7 @@ dependencies = [
  "num-bigint",
  "num-traits",
  "once_cell",
- "ruff_python_whitespace",
+ "ruff_python_trivia",
  "ruff_text_size",
  "rustc-hash",
  "rustpython-ast",
@@ -2148,7 +2148,7 @@ dependencies = [
  "once_cell",
  "ruff_formatter",
  "ruff_python_ast",
- "ruff_python_whitespace",
+ "ruff_python_trivia",
  "ruff_text_size",
  "rustc-hash",
  "rustpython-parser",
@@ -2191,7 +2191,7 @@ name = "ruff_python_stdlib"
 version = "0.0.0"
 
 [[package]]
-name = "ruff_python_whitespace"
+name = "ruff_python_trivia"
 version = "0.0.0"
 dependencies = [
  "insta",
@@ -2237,7 +2237,7 @@ dependencies = [
 name = "ruff_textwrap"
 version = "0.0.0"
 dependencies = [
- "ruff_python_whitespace",
+ "ruff_python_trivia",
  "ruff_text_size",
 ]
 

@@ -3,7 +3,7 @@ use rustpython_parser::ast::{Expr, ExprCall, Ranged};
 
 use ruff_formatter::write;
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_whitespace::{SimpleTokenizer, TokenKind};
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 
 use crate::comments::dangling_comments;
 use crate::expression::expr_generator_exp::GeneratorExpParentheses;
@@ -132,14 +132,14 @@ fn is_single_argument_parenthesized(argument: &Expr, call_end: TextSize, source:
         SimpleTokenizer::new(source, TextRange::new(argument.end(), call_end)).skip_trivia()
     {
         match token.kind() {
-            TokenKind::RParen => {
+            SimpleTokenKind::RParen => {
                 if has_seen_r_paren {
                     return true;
                 }
                 has_seen_r_paren = true;
             }
             // Skip over any trailing comma
-            TokenKind::Comma => continue,
+            SimpleTokenKind::Comma => continue,
             _ => {
                 // Passed the arguments
                 break;
