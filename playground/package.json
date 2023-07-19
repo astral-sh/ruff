@@ -20,7 +20,8 @@
     "lz-string": "^1.4.4",
     "monaco-editor": "^0.40.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "react-resizable-panels": "^0.0.54"
   },
   "devDependencies": {
     "@types/react": "^18.0.26",

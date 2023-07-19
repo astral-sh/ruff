@@ -1,43 +1,32 @@
-import { FileIcon, SettingsIcon } from "./Icons";
 import { type ReactNode } from "react";
-
-type Tool = "Settings" | "Source";
+import classNames from "classnames";
 
 type SideBarProps = {
-  selected: Tool;
-  onSelectTool(tool: Tool): void;
+  children: ReactNode;
+  position: "right" | "left";
 };
 
-export default function SideBar({ selected, onSelectTool }: SideBarProps) {
+export default function SideBar({ children, position }: SideBarProps) {
   return (
-    <ul className="w-12 flex-initial border-r bg-galaxy flex flex-col items-stretch">
-      <SideBarEntry
-        title="Source"
-        onClick={() => onSelectTool("Source")}
-        selected={selected == "Source"}
-      >
-        <FileIcon />
-      </SideBarEntry>
-
-      <SideBarEntry
-        title="Settings"
-        onClick={() => onSelectTool("Settings")}
-        selected={selected == "Settings"}
-      >
-        <SettingsIcon />
-      </SideBarEntry>
+    <ul
+      className={classNames(
+        "w-12 flex-initial  flex flex-col items-stretch bg-galaxy",
+        position === "left" ? "border-r" : "border-l",
+      )}
+    >
+      {children}
     </ul>
   );
 }
 
-interface SideBarEntryProps {
+export interface SideBarEntryProps {
   title: string;
   selected: boolean;
-  onClick?(): void;
   children: ReactNode;
+  onClick?(): void;
 }
 
-function SideBarEntry({
+export function SideBarEntry({
   title,
   onClick,
   children,
@@ -49,12 +38,12 @@ function SideBarEntry({
       onClick={onClick}
       role="button"
       className={`py-4 px-2 relative flex items-center flex-col ${
-        selected ? "fill-white" : "fill-slate-500"
+        selected ? "fill-white text-white" : "fill-slate-500 text-slate-500"
       }`}
     >
       {children}
       {selected && (
-        <span className="absolute start-0 inset-y-0 bg-white w-0.5 rounded-full transition-opacity duration-150 opacity-100"></span>
+        <span className="absolute start-0 inset-y-0 bg-white w-0.5"></span>
       )}
     </li>
   );
