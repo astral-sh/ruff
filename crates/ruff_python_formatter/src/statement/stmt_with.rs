@@ -3,7 +3,7 @@ use rustpython_parser::ast::{Ranged, StmtAsyncWith, StmtWith, Suite, WithItem};
 
 use ruff_formatter::{format_args, write, FormatError};
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_whitespace::{SimpleTokenizer, TokenKind};
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 
 use crate::comments::trailing_comments;
 use crate::expression::parentheses::{
@@ -117,24 +117,29 @@ fn are_with_items_parenthesized(
     with: &AnyStatementWith,
     context: &PyFormatContext,
 ) -> FormatResult<bool> {
-    let first_with_item = with.items().first().ok_or(FormatError::SyntaxError)?;
+    let first_with_item = with
+        .items()
+        .first()
+        .ok_or(FormatError::syntax_error("Expected at least one with item"))?;
     let before_first_with_item = TextRange::new(with.start(), first_with_item.start());
 
     let mut tokenizer = SimpleTokenizer::new(context.source(), before_first_with_item)
         .skip_trivia()
-        .skip_while(|t| t.kind() == TokenKind::Async);
+        .skip_while(|t| t.kind() == SimpleTokenKind::Async);
 
-    let with_keyword = tokenizer.next().ok_or(FormatError::SyntaxError)?;
+    let with_keyword = tokenizer.next().ok_or(FormatError::syntax_error(
+        "Expected a with keyword, didn't find any token",
+    ))?;
 
     debug_assert_eq!(
         with_keyword.kind(),
-        TokenKind::With,
+        SimpleTokenKind::With,
         "Expected with keyword but at {with_keyword:?}"
     );
 
     match tokenizer.next() {
         Some(left_paren) => {
-            debug_assert_eq!(left_paren.kind(), TokenKind::LParen);
+            debug_assert_eq!(left_paren.kind(), SimpleTokenKind::LParen);
             Ok(true)
         }
         None => Ok(false),

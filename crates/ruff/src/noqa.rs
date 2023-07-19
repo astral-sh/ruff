@@ -13,7 +13,7 @@ use rustpython_parser::ast::Ranged;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::source_code::Locator;
-use ruff_python_whitespace::LineEnding;
+use ruff_python_trivia::LineEnding;
 
 use crate::codes::NoqaCode;
 use crate::fs::relativize_path;
@@ -772,7 +772,7 @@ mod tests {
 
     use ruff_diagnostics::Diagnostic;
     use ruff_python_ast::source_code::Locator;
-    use ruff_python_whitespace::LineEnding;
+    use ruff_python_trivia::LineEnding;
 
     use crate::noqa::{add_noqa_inner, Directive, NoqaMapping, ParsedFileExemption};
     use crate::rules::pycodestyle::rules::AmbiguousVariableName;

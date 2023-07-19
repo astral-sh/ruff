@@ -283,7 +283,7 @@ impl<'a> FromIterator<Binding<'a>> for Bindings<'a> {
 #[derive(Debug, Clone)]
 pub struct Export<'a> {
     /// The names of the bindings exported via `__all__`.
-    pub names: Vec<&'a str>,
+    pub names: Box<[&'a str]>,
 }
 
 /// A binding for an `import`, keyed on the name to which the import is bound.

@@ -5,7 +5,7 @@ use ruff_text_size::TextSize;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
-use ruff_python_whitespace::UniversalNewlines;
+use ruff_python_trivia::UniversalNewlines;
 
 use crate::comments::shebang::ShebangDirective;
 use crate::registry::Rule;

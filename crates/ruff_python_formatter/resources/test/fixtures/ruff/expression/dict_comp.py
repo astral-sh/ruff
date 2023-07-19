@@ -43,3 +43,35 @@
     if
     gggggggggggggggggggggggggggggggggggggggggggg
 }
+
+# Useful for tuple target (see https://github.com/astral-sh/ruff/issues/5779#issuecomment-1637614763)
+{k: v for a, a, a, a, a, a, a, a, a, a, [a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a]  in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension}
+{k: v for a, a, a, a, a, a, a, a, a, a, (a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a,)  in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension}
+
+# Leading
+{  # Leading
+    k: v  # Trailing
+    for a, a, a, a, a, a, a, a, a, a, (  # Trailing
+        a,
+        a,
+        a,
+        a,
+        a,
+        a,
+        a,
+        a,
+        a,  # Trailing
+        a,
+        a,
+        a,
+        a,
+        a,
+        a,
+        a,
+        a,
+        a,
+        a,
+        a,  # Trailing
+    ) in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension  # Trailing
+}  # Trailing
+# Trailing

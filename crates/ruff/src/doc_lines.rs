@@ -10,7 +10,7 @@ use rustpython_parser::Tok;
 
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
-use ruff_python_whitespace::UniversalNewlineIterator;
+use ruff_python_trivia::UniversalNewlineIterator;
 
 /// Extract doc lines (standalone comments) from a token sequence.
 pub(crate) fn doc_lines_from_tokens(lxr: &[LexResult]) -> DocLines {

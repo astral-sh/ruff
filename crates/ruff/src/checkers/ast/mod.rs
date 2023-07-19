@@ -4112,7 +4112,7 @@ where
             flake8_bugbear::rules::mutable_argument_default(self, arguments);
         }
         if self.enabled(Rule::FunctionCallInDefaultArgument) {
-            flake8_bugbear::rules::function_call_argument_default(self, arguments);
+            flake8_bugbear::rules::function_call_in_argument_default(self, arguments);
         }
         if self.settings.rules.enabled(Rule::ImplicitOptional) {
             ruff::rules::implicit_optional(self, arguments);
@@ -4562,7 +4562,9 @@ impl<'a> Checker<'a> {
             self.add_binding(
                 id,
                 expr.range(),
-                BindingKind::Export(Export { names }),
+                BindingKind::Export(Export {
+                    names: names.into_boxed_slice(),
+                }),
                 BindingFlags::empty(),
             );
             return;
@@ -4571,7 +4573,7 @@ impl<'a> Checker<'a> {
         if self
             .semantic
             .expr_ancestors()
-            .any(|expr| matches!(expr, Expr::NamedExpr(_)))
+            .any(|expr| expr.is_named_expr_expr())
         {
             self.add_binding(
                 id,

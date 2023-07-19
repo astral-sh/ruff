@@ -133,8 +133,8 @@ At time of writing, the repository includes the following crates:
     refer to?"
 - `crates/ruff_python_stdlib`: library crate containing Python-specific standard library data, e.g.
     the names of all built-in exceptions and which standard library types are immutable.
-- `crates/ruff_python_whitespace`: library crate containing Python-specific whitespace analysis
-    logic (indentation and newlines).
+- `crates/ruff_python_trivia`: library crate containing Python-specific trivia utilities (e.g.,
+    for analyzing indentation, newlines, etc.).
 - `crates/ruff_rustpython`: library crate containing `RustPython`-specific utilities.
 - `crates/ruff_textwrap`: library crate to indent and dedent Python source code.
 - `crates/ruff_wasm`: library crate for exposing Ruff as a WebAssembly module. Powers the

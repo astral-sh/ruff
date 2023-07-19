@@ -5,7 +5,7 @@ use rustpython_parser::ast::{Expr, Ranged};
 use ruff_formatter::prelude::{hard_line_break, line_suffix_boundary, space, text};
 use ruff_formatter::{write, Buffer, Format, FormatError, FormatResult};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
-use ruff_python_whitespace::{first_non_trivia_token, Token, TokenKind};
+use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 
 use crate::comments::{dangling_comments, SourceComment};
 use crate::context::PyFormatContext;
@@ -158,28 +158,35 @@ pub(crate) fn find_colons(
     range: TextRange,
     lower: &Option<Box<Expr>>,
     upper: &Option<Box<Expr>>,
-) -> FormatResult<(Token, Option<Token>)> {
+) -> FormatResult<(SimpleToken, Option<SimpleToken>)> {
     let after_lower = lower
         .as_ref()
         .map_or(range.start(), |lower| lower.range().end());
-    let first_colon =
-        first_non_trivia_token(after_lower, contents).ok_or(FormatError::SyntaxError)?;
-    if first_colon.kind != TokenKind::Colon {
-        return Err(FormatError::SyntaxError);
+    let mut tokens = SimpleTokenizer::new(contents, TextRange::new(after_lower, range.end()))
+        .skip_trivia()
+        .skip_while(|token| token.kind == SimpleTokenKind::RParen);
+    let first_colon = tokens.next().ok_or(FormatError::syntax_error(
+        "Din't find any token for slice first colon",
+    ))?;
+    if first_colon.kind != SimpleTokenKind::Colon {
+        return Err(FormatError::syntax_error(
+            "slice first colon token was not a colon",
+        ));
     }
 
     let after_upper = upper
         .as_ref()
         .map_or(first_colon.end(), |upper| upper.range().end());
-    // At least the closing bracket must exist, so there must be a token there
-    let next_token =
-        first_non_trivia_token(after_upper, contents).ok_or(FormatError::SyntaxError)?;
-    let second_colon = if next_token.kind == TokenKind::Colon {
-        debug_assert!(
-            next_token.range.start() < range.end(),
-            "The next token in a slice must either be a colon or the closing bracket"
-        );
-        Some(next_token)
+    let mut tokens = SimpleTokenizer::new(contents, TextRange::new(after_upper, range.end()))
+        .skip_trivia()
+        .skip_while(|token| token.kind == SimpleTokenKind::RParen);
+    let second_colon = if let Some(token) = tokens.next() {
+        if token.kind != SimpleTokenKind::Colon {
+            return Err(FormatError::syntax_error(
+                "Expected a colon for the second colon token",
+            ));
+        }
+        Some(token)
     } else {
         None
     };

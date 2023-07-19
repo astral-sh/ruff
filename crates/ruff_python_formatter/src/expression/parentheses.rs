@@ -3,7 +3,7 @@ use rustpython_parser::ast::Ranged;
 use ruff_formatter::prelude::tag::Condition;
 use ruff_formatter::{format_args, write, Argument, Arguments};
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_whitespace::{first_non_trivia_token, SimpleTokenizer, Token, TokenKind};
+use ruff_python_trivia::{first_non_trivia_token, SimpleToken, SimpleTokenKind, SimpleTokenizer};
 
 use crate::context::NodeLevel;
 use crate::prelude::*;
@@ -77,8 +77,8 @@ pub(crate) fn is_expression_parenthesized(expr: AnyNodeRef, contents: &str) -> b
     // First test if there's a closing parentheses because it tends to be cheaper.
     if matches!(
         first_non_trivia_token(expr.end(), contents),
-        Some(Token {
-            kind: TokenKind::RParen,
+        Some(SimpleToken {
+            kind: SimpleTokenKind::RParen,
             ..
         })
     ) {
@@ -87,8 +87,8 @@ pub(crate) fn is_expression_parenthesized(expr: AnyNodeRef, contents: &str) -> b
 
         matches!(
             tokenizer.next_back(),
-            Some(Token {
-                kind: TokenKind::LParen,
+            Some(SimpleToken {
+                kind: SimpleTokenKind::LParen,
                 ..
             })
         )

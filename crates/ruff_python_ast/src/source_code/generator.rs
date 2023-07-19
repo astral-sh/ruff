@@ -10,7 +10,7 @@ use rustpython_parser::ast::{
     TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
 };
 
-use ruff_python_whitespace::LineEnding;
+use ruff_python_trivia::LineEnding;
 
 use crate::source_code::stylist::{Indentation, Quote, Stylist};
 
@@ -1470,7 +1470,7 @@ mod tests {
     use rustpython_ast::Stmt;
     use rustpython_parser::Parse;
 
-    use ruff_python_whitespace::LineEnding;
+    use ruff_python_trivia::LineEnding;
 
     use crate::source_code::stylist::{Indentation, Quote};
     use crate::source_code::Generator;

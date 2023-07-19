@@ -997,9 +997,9 @@ dependencies = [
 
 [[package]]
 name = "insta"
-version = "1.30.0"
+version = "1.31.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28491f7753051e5704d4d0ae7860d45fae3238d7d235bc4289dcd45c48d3cec3"
+checksum = "a0770b0a3d4c70567f0d58331f3088b0e4c4f56c9b8d764efe654b4a5d46de3a"
 dependencies = [
  "console",
  "globset",
@@ -1928,7 +1928,7 @@ dependencies = [
  "ruff_python_ast",
  "ruff_python_semantic",
  "ruff_python_stdlib",
- "ruff_python_whitespace",
+ "ruff_python_trivia",
  "ruff_rustpython",
  "ruff_text_size",
  "ruff_textwrap",
@@ -2124,7 +2124,7 @@ dependencies = [
  "num-bigint",
  "num-traits",
  "once_cell",
- "ruff_python_whitespace",
+ "ruff_python_trivia",
  "ruff_text_size",
  "rustc-hash",
  "rustpython-ast",
@@ -2148,7 +2148,7 @@ dependencies = [
  "once_cell",
  "ruff_formatter",
  "ruff_python_ast",
- "ruff_python_whitespace",
+ "ruff_python_trivia",
  "ruff_text_size",
  "rustc-hash",
  "rustpython-parser",
@@ -2191,7 +2191,7 @@ name = "ruff_python_stdlib"
 version = "0.0.0"
 
 [[package]]
-name = "ruff_python_whitespace"
+name = "ruff_python_trivia"
 version = "0.0.0"
 dependencies = [
  "insta",
@@ -2237,7 +2237,7 @@ dependencies = [
 name = "ruff_textwrap"
 version = "0.0.0"
 dependencies = [
- "ruff_python_whitespace",
+ "ruff_python_trivia",
  "ruff_text_size",
 ]
 
@@ -2252,6 +2252,7 @@ dependencies = [
  "ruff",
  "ruff_diagnostics",
  "ruff_python_ast",
+ "ruff_python_formatter",
  "ruff_rustpython",
  "rustpython-parser",
  "serde",
