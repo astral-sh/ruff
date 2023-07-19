@@ -4776,7 +4776,11 @@ impl<'a> Checker<'a> {
 
     /// Run any lint rules that operate over a single [`Binding`].
     fn check_bindings(&mut self) {
-        if !self.any_enabled(&[Rule::UnusedVariable]) {
+        if !self.any_enabled(&[
+            Rule::UnusedVariable,
+            Rule::UnconventionalImportAlias,
+            Rule::UnaliasedCollectionsAbcSetImport,
+        ]) {
             return;
         }
 
@@ -4802,6 +4806,27 @@ impl<'a> Checker<'a> {
                     self.diagnostics.push(diagnostic);
                 }
             }
+
+            if self.enabled(Rule::UnconventionalImportAlias) {
+                if let Some(diagnostic) =
+                    flake8_import_conventions::rules::unconventional_import_alias(
+                        self,
+                        binding,
+                        &self.settings.flake8_import_conventions.aliases,
+                    )
+                {
+                    self.diagnostics.push(diagnostic);
+                }
+            }
+            if self.is_stub {
+                if self.enabled(Rule::UnaliasedCollectionsAbcSetImport) {
+                    if let Some(diagnostic) =
+                        flake8_pyi::rules::unaliased_collections_abc_set_import(self, binding)
+                    {
+                        self.diagnostics.push(diagnostic);
+                    }
+                }
+            }
         }
     }
 
@@ -4814,8 +4839,6 @@ impl<'a> Checker<'a> {
             Rule::TypingOnlyFirstPartyImport,
             Rule::TypingOnlyStandardLibraryImport,
             Rule::TypingOnlyThirdPartyImport,
-            Rule::UnaliasedCollectionsAbcSetImport,
-            Rule::UnconventionalImportAlias,
             Rule::UndefinedExport,
             Rule::UndefinedLocalWithImportStarUsage,
             Rule::UndefinedLocalWithImportStarUsage,
@@ -5114,23 +5137,6 @@ impl<'a> Checker<'a> {
 
             if self.enabled(Rule::UnusedImport) {
                 pyflakes::rules::unused_import(self, scope, &mut diagnostics);
-            }
-            if self.enabled(Rule::UnconventionalImportAlias) {
-                flake8_import_conventions::rules::unconventional_import_alias(
-                    self,
-                    scope,
-                    &mut diagnostics,
-                    &self.settings.flake8_import_conventions.aliases,
-                );
-            }
-            if self.is_stub {
-                if self.enabled(Rule::UnaliasedCollectionsAbcSetImport) {
-                    flake8_pyi::rules::unaliased_collections_abc_set_import(
-                        self,
-                        scope,
-                        &mut diagnostics,
-                    );
-                }
             }
         }
         self.diagnostics.extend(diagnostics);
