@@ -26,7 +26,7 @@ pub(super) fn match_function_def(
         }) => (
             name,
             args,
-            returns.as_ref().map(|expr| &**expr),
+            returns.as_ref().map(AsRef::as_ref),
             body,
             decorator_list,
         ),

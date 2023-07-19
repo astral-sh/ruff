@@ -411,7 +411,7 @@ where
                             stmt,
                             name,
                             decorator_list,
-                            returns.as_ref().map(|expr| &**expr),
+                            returns.as_ref().map(AsRef::as_ref),
                             args,
                             stmt.is_async_function_def_stmt(),
                         );
@@ -470,18 +470,14 @@ where
                     Rule::SuperfluousElseContinue,
                     Rule::SuperfluousElseBreak,
                 ]) {
-                    flake8_return::rules::function(
-                        self,
-                        body,
-                        returns.as_ref().map(|expr| &**expr),
-                    );
+                    flake8_return::rules::function(self, body, returns.as_ref().map(AsRef::as_ref));
                 }
                 if self.enabled(Rule::UselessReturn) {
                     pylint::rules::useless_return(
                         self,
                         stmt,
                         body,
-                        returns.as_ref().map(|expr| &**expr),
+                        returns.as_ref().map(AsRef::as_ref),
                     );
                 }
                 if self.enabled(Rule::ComplexStructure) {
