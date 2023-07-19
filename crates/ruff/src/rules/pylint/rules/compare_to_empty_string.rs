@@ -21,12 +21,16 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 /// ```python
+/// x: str
+///
 /// if x == "":
 ///     print("x is empty")
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// x: str
+///
 /// if not x:
 ///     print("x is empty")
 /// ```
