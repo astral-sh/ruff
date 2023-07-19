@@ -27,6 +27,7 @@ pub(crate) mod stmt_raise;
 pub(crate) mod stmt_return;
 pub(crate) mod stmt_try;
 pub(crate) mod stmt_try_star;
+pub(crate) mod stmt_type_alias;
 pub(crate) mod stmt_while;
 pub(crate) mod stmt_with;
 pub(crate) mod suite;
