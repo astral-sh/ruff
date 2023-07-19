@@ -127,7 +127,9 @@ lambda x: lambda y: lambda z: (
 # Trailing
 
 
-a = lambda: 1  # Dangling
+a = (
+    lambda: 1  # Dangling
+)
 ```
 
 
