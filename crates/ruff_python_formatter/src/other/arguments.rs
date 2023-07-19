@@ -3,7 +3,7 @@ use std::usize;
 use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::{Arguments, Ranged};
 
-use ruff_formatter::{format_args, write};
+use ruff_formatter::{format_args, write, FormatRuleWithOptions};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
 use ruff_python_whitespace::{first_non_trivia_token, SimpleTokenizer, Token, TokenKind};
 
@@ -16,8 +16,28 @@ use crate::expression::parentheses::parenthesized;
 use crate::prelude::*;
 use crate::FormatNodeRule;
 
+#[derive(Eq, PartialEq, Debug, Default)]
+pub enum ArgumentsParentheses {
+    #[default]
+    Default,
+
+    /// Arguments should never be inside parentheses for lambda expressions.
+    SkipInsideLambda,
+}
+
 #[derive(Default)]
-pub struct FormatArguments;
+pub struct FormatArguments {
+    parentheses: ArgumentsParentheses,
+}
+
+impl FormatRuleWithOptions<Arguments, PyFormatContext<'_>> for FormatArguments {
+    type Options = ArgumentsParentheses;
+
+    fn with_options(mut self, options: Self::Options) -> Self {
+        self.parentheses = options;
+        self
+    }
+}
 
 impl FormatNodeRule<Arguments> for FormatArguments {
     fn fmt_fields(&self, item: &Arguments, f: &mut PyFormatter) -> FormatResult<()> {
@@ -170,7 +190,9 @@ impl FormatNodeRule<Arguments> for FormatArguments {
             + kwonlyargs.len()
             + usize::from(kwarg.is_some());
 
-        if num_arguments == 0 {
+        if self.parentheses == ArgumentsParentheses::SkipInsideLambda {
+            group(&format_inner).fmt(f)?;
+        } else if num_arguments == 0 {
             // No arguments, format any dangling comments between `()`
             write!(
                 f,

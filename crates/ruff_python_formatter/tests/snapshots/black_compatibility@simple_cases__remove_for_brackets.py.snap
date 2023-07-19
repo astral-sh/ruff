@@ -31,15 +31,6 @@ for (((((k, v))))) in d.items():
 ```diff
 --- Black
 +++ Ruff
-@@ -5,7 +5,7 @@
- # Don't touch tuple brackets after `in`
- for module in (core, _unicodefun):
-     if hasattr(module, "_verify_python3_env"):
--        module._verify_python3_env = lambda: None
-+        module._verify_python3_env = lambda NOT_YET_IMPLEMENTED_lambda: True
- 
- # Brackets remain for long for loop lines
- for (
 @@ -17,9 +17,7 @@
  for (
      k,
@@ -63,7 +54,7 @@ for k, v in d.items():
 # Don't touch tuple brackets after `in`
 for module in (core, _unicodefun):
     if hasattr(module, "_verify_python3_env"):
-        module._verify_python3_env = lambda NOT_YET_IMPLEMENTED_lambda: True
+        module._verify_python3_env = lambda: None
 
 # Brackets remain for long for loop lines
 for (
