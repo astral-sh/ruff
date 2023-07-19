@@ -50,6 +50,8 @@ const STRATEGIES: &[&dyn Strategy] = &[
     (&StrategyReplaceStatementWithPass),
     (&StrategyRemoveLine),
     (&StrategyRemoveNewline),
+    (&StrategyRemoveToken),
+    (&StrategyRemoveChar),
 ];
 
 /// Each strategy is a way of producing possible minimizations
@@ -269,8 +271,57 @@ impl Strategy for StrategyRemoveNewline {
             .collect();
         let iter = newline_positions.into_iter().map(move |newline_position| {
             // trim to remove the indentation
-            input[..newline_position].to_string() + input[newline_position + 1..].trim_start()
+            input[..newline_position].to_string()
+                + input[newline_position + '\n'.len_utf8()..].trim_start()
         });
+        Ok(Box::new(iter))
+    }
+}
+
+/// Try removing each python token. This is really slow and runs at the end
+struct StrategyRemoveToken;
+
+impl Strategy for StrategyRemoveToken {
+    fn name(&self) -> &'static str {
+        "remove token"
+    }
+
+    fn candidates<'a>(
+        &self,
+        input: &'a str,
+        _ast: &'a Suite,
+    ) -> Result<Box<dyn ExactSizeStringIter + 'a>> {
+        let token_ranges: Vec<_> = ruff_rustpython::tokenize(input)
+            .into_iter()
+            .map(|token| token.unwrap())
+            .filter(|token| token.1.len().to_usize() > 0)
+            .map(|token| token.1)
+            .collect();
+
+        let iter = token_ranges.into_iter().map(move |range| {
+            input[..range.start().to_usize()].to_string() + &input[range.end().to_usize()..]
+        });
+        Ok(Box::new(iter))
+    }
+}
+
+/// Try removing each individual character in the file. This is really slow and runs at the end
+struct StrategyRemoveChar;
+
+impl Strategy for StrategyRemoveChar {
+    fn name(&self) -> &'static str {
+        "remove character"
+    }
+
+    fn candidates<'a>(
+        &self,
+        input: &'a str,
+        _ast: &'a Suite,
+    ) -> Result<Box<dyn ExactSizeStringIter + 'a>> {
+        let char_indices: Vec<_> = input.char_indices().collect();
+        let iter = char_indices
+            .into_iter()
+            .map(move |(pos, char)| input[..pos].to_string() + &input[pos + char.len_utf8()..]);
         Ok(Box::new(iter))
     }
 }
