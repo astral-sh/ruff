@@ -30,7 +30,7 @@ pub struct ComplexAssignment;
 impl Violation for ComplexAssignment {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Stubs should not contain assignments with multiple targets or non-name targets.")
+        format!("Stubs should not contain assignments to attributes or multiple targets.")
     }
 }
 
