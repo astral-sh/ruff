@@ -23,7 +23,6 @@ use crate::checkers::ast::Checker;
 /// b = int
 ///
 /// TODO
-///
 /// ```
 #[violation]
 pub struct ComplexAssignment;
