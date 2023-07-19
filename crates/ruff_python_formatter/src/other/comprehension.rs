@@ -115,7 +115,7 @@ impl Format<PyFormatContext<'_>> for ExprTupleWithoutParentheses<'_> {
                 .format()
                 .with_options(TupleParentheses::Comprehension)
                 .fmt(f),
-            other => write!(f, [other.format()]),
+            other => other.format().fmt(f),
         }
     }
 }

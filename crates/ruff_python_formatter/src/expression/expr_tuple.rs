@@ -121,9 +121,10 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
             }
             _ => match self.parentheses {
                 TupleParentheses::Comprehension => {
-                    let separator = format_with(|f| write!(f, [text(","), space()]));
+                    let separator =
+                        format_with(|f| group(&format_args![text(","), space()]).fmt(f));
                     f.join_with(separator)
-                        .entries(item.elts.iter().formatted())
+                        .entries(elts.iter().formatted())
                         .finish()
                 }
                 TupleParentheses::Subscript => group(&ExprSequence::new(item)).fmt(f),
