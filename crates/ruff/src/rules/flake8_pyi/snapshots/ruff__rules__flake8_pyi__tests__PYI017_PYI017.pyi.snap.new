@@ -1,0 +1,29 @@
+---
+source: crates/ruff/src/rules/flake8_pyi/mod.rs
+assertion_line: 98
+---
+PYI017.pyi:4:1: PYI017 Stubs should not contain assignments with multiple targets or non-name targets.
+  |
+4 | b = c = int  # PYI017
+  | ^^^^^^^^^^^ PYI017
+  |
+
+PYI017.pyi:7:1: PYI017 Stubs should not contain assignments with multiple targets or non-name targets.
+  |
+7 | a.b = int  # PYI017
+  | ^^^^^^^^^ PYI017
+  |
+
+PYI017.pyi:10:1: PYI017 Stubs should not contain assignments with multiple targets or non-name targets.
+   |
+10 | d, e = int, str # PYI017
+   | ^^^^^^^^^^^^^^^ PYI017
+   |
+
+PYI017.pyi:13:1: PYI017 Stubs should not contain assignments with multiple targets or non-name targets.
+   |
+13 | f, g, h = int, str, TypeVar("T") # PYI017
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI017
+   |
+
+

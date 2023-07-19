@@ -1492,7 +1492,7 @@ where
                     tryceratops::rules::error_instead_of_exception(self, handlers);
                 }
             }
-            Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
+            Stmt::Assign(stmt_assign @ ast::StmtAssign { targets, value, .. }) => {
                 if self.enabled(Rule::LambdaAssignment) {
                     if let [target] = &targets[..] {
                         pycodestyle::rules::lambda_assignment(self, target, value, None, stmt);
@@ -1557,6 +1557,7 @@ where
                         Rule::UnprefixedTypeParam,
                         Rule::AssignmentDefaultInStub,
                         Rule::UnannotatedAssignmentInStub,
+                        Rule::ComplexAssignment,
                         Rule::TypeAliasWithoutAnnotation,
                     ]) {
                         // Ignore assignments in function bodies; those are covered by other rules.
@@ -1575,6 +1576,9 @@ where
                                 flake8_pyi::rules::unannotated_assignment_in_stub(
                                     self, targets, value,
                                 );
+                            }
+                            if self.enabled(Rule::ComplexAssignment) {
+                                flake8_pyi::rules::complex_assignment(self, stmt_assign);
                             }
                             if self.enabled(Rule::TypeAliasWithoutAnnotation) {
                                 flake8_pyi::rules::type_alias_without_annotation(
