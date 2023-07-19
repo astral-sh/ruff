@@ -7,9 +7,7 @@ use ruff_python_ast::node::AnyNodeRef;
 
 use crate::builders::parenthesize_if_expands;
 use crate::comments::{dangling_comments, CommentLinePosition};
-use crate::expression::parentheses::{
-    parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
-};
+use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 
 #[derive(Eq, PartialEq, Debug, Default)]
@@ -17,8 +15,6 @@ pub enum TupleParentheses {
     /// Effectively `None` in `Option<Parentheses>`
     #[default]
     Default,
-    /// Effectively `Some(Parentheses)` in `Option<Parentheses>`
-    Expr(Parentheses),
     /// TODO(cnpryer): Why not TupleParentheses::Expr(Parentheses::Never)?
     Never,
 
