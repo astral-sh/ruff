@@ -5,6 +5,7 @@ use ruff_text_size::TextRange;
 use rustpython_parser::ast::Ranged;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
+use ruff_python_ast::source_code::Locator;
 
 use crate::context::ExecutionContext;
 use crate::model::SemanticModel;
@@ -161,6 +162,11 @@ impl<'a> Binding<'a> {
             ),
             _ => None,
         }
+    }
+
+    /// Returns the name of the binding (e.g., `x` in `x = 1`).
+    pub fn name<'b>(&self, locator: &'b Locator) -> &'b str {
+        locator.slice(self.range)
     }
 
     /// Returns the range of the binding's parent.
@@ -417,7 +423,16 @@ pub enum BindingKind<'a> {
     /// ```
     Deletion,
 
-    /// A binding to unbind the local variable, like `x` in:
+    /// A binding to bind an exception to a local variable, like `x` in:
+    /// ```python
+    /// try:
+    ///    ...
+    /// except Exception as x:
+    ///   ...
+    /// ```
+    BoundException,
+
+    /// A binding to unbind a bound local exception, like `x` in:
     /// ```python
     /// try:
     ///    ...
@@ -427,7 +442,6 @@ pub enum BindingKind<'a> {
     ///
     /// After the `except` block, `x` is unbound, despite the lack
     /// of an explicit `del` statement.
-    ///
     ///
     /// Stores the ID of the binding that was shadowed in the enclosing
     /// scope, if any.
