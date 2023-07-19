@@ -251,7 +251,9 @@ impl Format<PyFormatContext<'_>> for FormatComment<'_> {
         let trailing_whitespace_len = comment_text.text_len() - trimmed.text_len();
 
         let Some(content) = trimmed.strip_prefix('#') else {
-            return Err(FormatError::SyntaxError);
+            return Err(FormatError::SyntaxError {
+                message: "Didn't find expected comment token `#`",
+            });
         };
 
         // Fast path for correctly formatted comments:

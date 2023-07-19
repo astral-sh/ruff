@@ -163,9 +163,13 @@ pub(crate) fn find_colons(
         .as_ref()
         .map_or(range.start(), |lower| lower.range().end());
     let first_colon =
-        first_non_trivia_token(after_lower, contents).ok_or(FormatError::SyntaxError)?;
+        first_non_trivia_token(after_lower, contents).ok_or(FormatError::SyntaxError {
+            message: "Din't find any token for slice first colon",
+        })?;
     if first_colon.kind != TokenKind::Colon {
-        return Err(FormatError::SyntaxError);
+        return Err(FormatError::SyntaxError {
+            message: "slice first colon token was not a colon",
+        });
     }
 
     let after_upper = upper
@@ -173,7 +177,9 @@ pub(crate) fn find_colons(
         .map_or(first_colon.end(), |upper| upper.range().end());
     // At least the closing bracket must exist, so there must be a token there
     let next_token =
-        first_non_trivia_token(after_upper, contents).ok_or(FormatError::SyntaxError)?;
+        first_non_trivia_token(after_upper, contents).ok_or(FormatError::SyntaxError {
+            message: "Din't find any token for slice second colon",
+        })?;
     let second_colon = if next_token.kind == TokenKind::Colon {
         debug_assert!(
             next_token.range.start() < range.end(),

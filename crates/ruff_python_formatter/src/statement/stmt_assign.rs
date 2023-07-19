@@ -20,7 +20,9 @@ impl FormatNodeRule<StmtAssign> for FormatStmtAssign {
             type_comment: _,
         } = item;
 
-        let (first, rest) = targets.split_first().ok_or(FormatError::SyntaxError)?;
+        let (first, rest) = targets.split_first().ok_or(FormatError::SyntaxError {
+            message: "Expected at least on assignment target",
+        })?;
 
         write!(
             f,
