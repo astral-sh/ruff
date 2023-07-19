@@ -16,3 +16,7 @@ license = { workspace = true }
 ruff_text_size = { workspace = true }
 
 memchr = { workspace = true }
+unic-ucd-ident = "0.9.0"
+
+[dev-dependencies]
+insta = { workspace = true }

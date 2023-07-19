@@ -64,9 +64,12 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, target: &Expr, bo
         //         filtered.append(x)
         // ```
         [Stmt::If(ast::StmtIf {
-            body, orelse, test, ..
+            body,
+            elif_else_clauses,
+            test,
+            ..
         })] => {
-            if !orelse.is_empty() {
+            if !elif_else_clauses.is_empty() {
                 return;
             }
             let [stmt] = body.as_slice() else {

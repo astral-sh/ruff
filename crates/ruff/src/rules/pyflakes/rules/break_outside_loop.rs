@@ -33,7 +33,6 @@ pub(crate) fn break_outside_loop<'a>(
     stmt: &'a Stmt,
     parents: &mut impl Iterator<Item = &'a Stmt>,
 ) -> Option<Diagnostic> {
-    let mut allowed: bool = false;
     let mut child = stmt;
     for parent in parents {
         match parent {
@@ -41,8 +40,7 @@ pub(crate) fn break_outside_loop<'a>(
             | Stmt::AsyncFor(ast::StmtAsyncFor { orelse, .. })
             | Stmt::While(ast::StmtWhile { orelse, .. }) => {
                 if !orelse.contains(child) {
-                    allowed = true;
-                    break;
+                    return None;
                 }
             }
             Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) | Stmt::ClassDef(_) => {
@@ -53,9 +51,5 @@ pub(crate) fn break_outside_loop<'a>(
         child = parent;
     }
 
-    if allowed {
-        None
-    } else {
-        Some(Diagnostic::new(BreakOutsideLoop, stmt.range()))
-    }
+    Some(Diagnostic::new(BreakOutsideLoop, stmt.range()))
 }

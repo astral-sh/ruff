@@ -1,11 +1,12 @@
-use crate::comments::trailing_comments;
-
-use crate::expression::parentheses::{parenthesized, Parentheses};
-use crate::prelude::*;
-use crate::trivia::{SimpleTokenizer, TokenKind};
-use ruff_formatter::write;
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Ranged, StmtClassDef};
+
+use ruff_formatter::write;
+use ruff_python_whitespace::{SimpleTokenizer, TokenKind};
+
+use crate::comments::trailing_comments;
+use crate::expression::parentheses::{parenthesized, Parentheses};
+use crate::prelude::*;
 
 #[derive(Default)]
 pub struct FormatStmtClassDef;
@@ -18,6 +19,7 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
             bases,
             keywords,
             body,
+            type_params: _,
             decorator_list,
         } = item;
 

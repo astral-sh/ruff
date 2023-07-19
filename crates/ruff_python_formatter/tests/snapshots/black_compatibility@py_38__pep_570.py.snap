@@ -56,21 +56,15 @@ lambda a, b=1, /, c=2, d=3, *, e=4, f=5: 1
 ```diff
 --- Black
 +++ Ruff
-@@ -35,10 +35,10 @@
+@@ -35,7 +35,7 @@
      pass
  
  
 -lambda a, /: a
-+lambda NOT_YET_IMPLEMENTED_lambda: True
++lambda: a
  
--lambda a, b, /, c, d, *, e, f: a
-+lambda NOT_YET_IMPLEMENTED_lambda: True
+ lambda a, b, /, c, d, *, e, f: a
  
--lambda a, b, /, c, d, *args, e, f, **kwargs: args
-+lambda NOT_YET_IMPLEMENTED_lambda: True
- 
--lambda a, b=1, /, c=2, d=3, *, e=4, f=5: 1
-+lambda NOT_YET_IMPLEMENTED_lambda: True
 ```
 
 ## Ruff Output
@@ -113,13 +107,13 @@ def long_one_with_long_parameter_names(
     pass
 
 
-lambda NOT_YET_IMPLEMENTED_lambda: True
+lambda: a
 
-lambda NOT_YET_IMPLEMENTED_lambda: True
+lambda a, b, /, c, d, *, e, f: a
 
-lambda NOT_YET_IMPLEMENTED_lambda: True
+lambda a, b, /, c, d, *args, e, f, **kwargs: args
 
-lambda NOT_YET_IMPLEMENTED_lambda: True
+lambda a, b=1, /, c=2, d=3, *, e=4, f=5: 1
 ```
 
 ## Black Output

@@ -3,13 +3,13 @@ use rustpython_parser::ast::{Ranged, StmtAsyncWith, StmtWith, Suite, WithItem};
 
 use ruff_formatter::{format_args, write, FormatError};
 use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_whitespace::{SimpleTokenizer, TokenKind};
 
 use crate::comments::trailing_comments;
 use crate::expression::parentheses::{
     in_parentheses_only_soft_line_break_or_space, optional_parentheses,
 };
 use crate::prelude::*;
-use crate::trivia::{SimpleTokenizer, TokenKind};
 use crate::FormatNodeRule;
 
 pub(super) enum AnyStatementWith<'a> {

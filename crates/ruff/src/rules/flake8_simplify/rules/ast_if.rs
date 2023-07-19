@@ -1,14 +1,16 @@
 use log::error;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
-use rustpython_parser::ast::{self, CmpOp, Constant, Expr, ExprContext, Identifier, Ranged, Stmt};
+use rustpython_parser::ast::{
+    self, CmpOp, Constant, ElifElseClause, Expr, ExprContext, Identifier, Ranged, Stmt, StmtIf,
+};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::{ComparableConstant, ComparableExpr, ComparableStmt};
-use ruff_python_ast::helpers::{
-    any_over_expr, contains_effect, first_colon_range, has_comments, has_comments_in,
-};
+use ruff_python_ast::helpers::{any_over_expr, contains_effect, first_colon_range, has_comments};
+use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::stmt_if::if_elif_branches;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_whitespace::UniversalNewlines;
 
@@ -23,16 +25,6 @@ fn compare_expr(expr1: &ComparableExpr, expr2: &ComparableExpr) -> bool {
 
 fn compare_stmt(stmt1: &ComparableStmt, stmt2: &ComparableStmt) -> bool {
     stmt1.eq(stmt2)
-}
-
-fn compare_body(body1: &[Stmt], body2: &[Stmt]) -> bool {
-    if body1.len() != body2.len() {
-        return false;
-    }
-    body1
-        .iter()
-        .zip(body2.iter())
-        .all(|(stmt1, stmt2)| compare_stmt(&stmt1.into(), &stmt2.into()))
 }
 
 /// ## What it does
@@ -289,7 +281,7 @@ fn is_main_check(expr: &Expr) -> bool {
 }
 
 /// Find the last nested if statement and return the test expression and the
-/// first statement.
+/// last statement.
 ///
 /// ```python
 /// if xxx:
@@ -303,13 +295,13 @@ fn find_last_nested_if(body: &[Stmt]) -> Option<(&Expr, &Stmt)> {
     let [Stmt::If(ast::StmtIf {
         test,
         body: inner_body,
-        orelse,
+        elif_else_clauses,
         ..
     })] = body
     else {
         return None;
     };
-    if !orelse.is_empty() {
+    if !elif_else_clauses.is_empty() {
         return None;
     }
     find_last_nested_if(inner_body).or_else(|| {
@@ -320,30 +312,36 @@ fn find_last_nested_if(body: &[Stmt]) -> Option<(&Expr, &Stmt)> {
     })
 }
 
-/// SIM102
-pub(crate) fn nested_if_statements(
-    checker: &mut Checker,
-    stmt: &Stmt,
-    test: &Expr,
-    body: &[Stmt],
-    orelse: &[Stmt],
-    parent: Option<&Stmt>,
-) {
-    // If the parent could contain a nested if-statement, abort.
-    if let Some(Stmt::If(ast::StmtIf { body, orelse, .. })) = parent {
-        if orelse.is_empty() && body.len() == 1 {
-            return;
-        }
-    }
+fn nested_if_body(stmt_if: &StmtIf) -> Option<(&[Stmt], TextRange)> {
+    let StmtIf {
+        test,
+        body,
+        elif_else_clauses,
+        ..
+    } = stmt_if;
 
-    // If this if-statement has an else clause, or more than one child, abort.
-    if !(orelse.is_empty() && body.len() == 1) {
-        return;
+    // It must be the last condition, otherwise there could be another `elif` or `else` that only
+    // depends on the outer of the two conditions
+    let (test, body, range) = if let Some(clause) = elif_else_clauses.last() {
+        if let Some(test) = &clause.test {
+            (test, &clause.body, clause.range())
+        } else {
+            // The last condition is an `else` (different rule)
+            return None;
+        }
+    } else {
+        (test.as_ref(), body, stmt_if.range())
+    };
+
+    // The nested if must be the only child, otherwise there is at least one more statement that
+    // only depends on the outer condition
+    if body.len() > 1 {
+        return None;
     }
 
     // Allow `if __name__ == "__main__":` statements.
     if is_main_check(test) {
-        return;
+        return None;
     }
 
     // Allow `if True:` and `if False:` statements.
@@ -354,8 +352,17 @@ pub(crate) fn nested_if_statements(
             ..
         })
     ) {
-        return;
+        return None;
     }
+
+    Some((body, range))
+}
+
+/// SIM102
+pub(crate) fn nested_if_statements(checker: &mut Checker, stmt_if: &StmtIf, parent: Option<&Stmt>) {
+    let Some((body, range)) = nested_if_body(stmt_if) else {
+        return;
+    };
 
     // Find the deepest nested if-statement, to inform the range.
     let Some((test, first_stmt)) = find_last_nested_if(body) else {
@@ -367,22 +374,33 @@ pub(crate) fn nested_if_statements(
         checker.locator,
     );
 
+    // Check if the parent is already emitting a larger diagnostic including this if statement
+    if let Some(Stmt::If(stmt_if)) = parent {
+        if let Some((body, _range)) = nested_if_body(stmt_if) {
+            // In addition to repeating the `nested_if_body` and `find_last_nested_if` check, we
+            // also need to be the first child in the parent
+            if matches!(&body[0], Stmt::If(inner) if inner == stmt_if)
+                && find_last_nested_if(body).is_some()
+            {
+                return;
+            }
+        }
+    }
+
     let mut diagnostic = Diagnostic::new(
         CollapsibleIf,
-        colon.map_or_else(
-            || stmt.range(),
-            |colon| TextRange::new(stmt.start(), colon.end()),
-        ),
+        colon.map_or(range, |colon| TextRange::new(range.start(), colon.end())),
     );
     if checker.patch(diagnostic.kind.rule()) {
         // The fixer preserves comments in the nested body, but removes comments between
         // the outer and inner if statements.
         let nested_if = &body[0];
-        if !has_comments_in(
-            TextRange::new(stmt.start(), nested_if.start()),
-            checker.locator,
-        ) {
-            match fix_if::fix_nested_if_statements(checker.locator, checker.stylist, stmt) {
+        if !checker
+            .indexer
+            .comment_ranges()
+            .intersects(TextRange::new(range.start(), nested_if.start()))
+        {
+            match fix_if::fix_nested_if_statements(checker.locator, checker.stylist, range) {
                 Ok(edit) => {
                     if edit
                         .content()
@@ -438,17 +456,43 @@ fn is_one_line_return_bool(stmts: &[Stmt]) -> Option<Bool> {
 /// SIM103
 pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
     let Stmt::If(ast::StmtIf {
-        test,
-        body,
-        orelse,
+        test: if_test,
+        body: if_body,
+        elif_else_clauses,
         range: _,
     }) = stmt
     else {
         return;
     };
+    // Extract an `if` or `elif` (that returns) followed by an else (that returns the same value)
+    let (if_test, if_body, else_body, range) = match elif_else_clauses.as_slice() {
+        // if-else case
+        [ElifElseClause {
+            body: else_body,
+            test: None,
+            ..
+        }] => (if_test.as_ref(), if_body, else_body, stmt.range()),
+        // elif-else case
+        [.., ElifElseClause {
+            body: elif_body,
+            test: Some(elif_test),
+            range: elif_range,
+        }, ElifElseClause {
+            body: else_body,
+            test: None,
+            range: else_range,
+        }] => (
+            elif_test,
+            elif_body,
+            else_body,
+            TextRange::new(elif_range.start(), else_range.end()),
+        ),
+        _ => return,
+    };
+
     let (Some(if_return), Some(else_return)) = (
-        is_one_line_return_bool(body),
-        is_one_line_return_bool(orelse),
+        is_one_line_return_bool(if_body),
+        is_one_line_return_bool(else_body),
     ) else {
         return;
     };
@@ -459,23 +503,23 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
         return;
     }
 
-    let condition = checker.generator().expr(test);
-    let mut diagnostic = Diagnostic::new(NeedlessBool { condition }, stmt.range());
+    let condition = checker.generator().expr(if_test);
+    let mut diagnostic = Diagnostic::new(NeedlessBool { condition }, range);
     if checker.patch(diagnostic.kind.rule()) {
         if matches!(if_return, Bool::True)
             && matches!(else_return, Bool::False)
-            && !has_comments(stmt, checker.locator)
-            && (test.is_compare_expr() || checker.semantic().is_builtin("bool"))
+            && !has_comments(&range, checker.locator, checker.indexer)
+            && (if_test.is_compare_expr() || checker.semantic().is_builtin("bool"))
         {
-            if test.is_compare_expr() {
+            if if_test.is_compare_expr() {
                 // If the condition is a comparison, we can replace it with the condition.
                 let node = ast::StmtReturn {
-                    value: Some(test.clone()),
+                    value: Some(Box::new(if_test.clone())),
                     range: TextRange::default(),
                 };
                 diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                     checker.generator().stmt(&node.into()),
-                    stmt.range(),
+                    range,
                 )));
             } else {
                 // Otherwise, we need to wrap the condition in a call to `bool`. (We've already
@@ -487,7 +531,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
                 };
                 let node1 = ast::ExprCall {
                     func: Box::new(node.into()),
-                    args: vec![(**test).clone()],
+                    args: vec![if_test.clone()],
                     keywords: vec![],
                     range: TextRange::default(),
                 };
@@ -497,7 +541,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
                 };
                 diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                     checker.generator().stmt(&node2.into()),
-                    stmt.range(),
+                    range,
                 )));
             };
         }
@@ -521,97 +565,69 @@ fn ternary(target_var: &Expr, body_value: &Expr, test: &Expr, orelse_value: &Exp
     node1.into()
 }
 
-/// Return `true` if the `Expr` contains a reference to `${module}.${target}`.
-fn contains_call_path(expr: &Expr, target: &[&str], semantic: &SemanticModel) -> bool {
+/// Return `true` if the `Expr` contains a reference to any of the given `${module}.${target}`.
+fn contains_call_path(expr: &Expr, targets: &[&[&str]], semantic: &SemanticModel) -> bool {
     any_over_expr(expr, &|expr| {
-        semantic
-            .resolve_call_path(expr)
-            .map_or(false, |call_path| call_path.as_slice() == target)
+        semantic.resolve_call_path(expr).map_or(false, |call_path| {
+            targets.iter().any(|target| &call_path.as_slice() == target)
+        })
     })
 }
 
 /// SIM108
-pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&Stmt>) {
+pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt) {
     let Stmt::If(ast::StmtIf {
         test,
         body,
-        orelse,
+        elif_else_clauses,
         range: _,
     }) = stmt
     else {
         return;
     };
-    if body.len() != 1 || orelse.len() != 1 {
+    // `test: None` to only match an `else` clause
+    let [ElifElseClause {
+        body: else_body,
+        test: None,
+        ..
+    }] = elif_else_clauses.as_slice()
+    else {
         return;
-    }
-    let Stmt::Assign(ast::StmtAssign {
+    };
+    let [Stmt::Assign(ast::StmtAssign {
         targets: body_targets,
         value: body_value,
         ..
-    }) = &body[0]
+    })] = body.as_slice()
     else {
         return;
     };
-    let Stmt::Assign(ast::StmtAssign {
-        targets: orelse_targets,
-        value: orelse_value,
+    let [Stmt::Assign(ast::StmtAssign {
+        targets: else_targets,
+        value: else_value,
         ..
-    }) = &orelse[0]
+    })] = else_body.as_slice()
     else {
         return;
     };
-    if body_targets.len() != 1 || orelse_targets.len() != 1 {
-        return;
-    }
-    let Expr::Name(ast::ExprName { id: body_id, .. }) = &body_targets[0] else {
+    let ([body_target], [else_target]) = (body_targets.as_slice(), else_targets.as_slice()) else {
         return;
     };
-    let Expr::Name(ast::ExprName { id: orelse_id, .. }) = &orelse_targets[0] else {
+    let Expr::Name(ast::ExprName { id: body_id, .. }) = body_target else {
         return;
     };
-    if body_id != orelse_id {
+    let Expr::Name(ast::ExprName { id: else_id, .. }) = else_target else {
+        return;
+    };
+    if body_id != else_id {
         return;
     }
 
-    // Avoid suggesting ternary for `if sys.version_info >= ...`-style checks.
-    if contains_call_path(test, &["sys", "version_info"], checker.semantic()) {
+    // Avoid suggesting ternary for `if sys.version_info >= ...`-style and
+    // `if sys.platform.startswith("...")`-style checks.
+    let ignored_call_paths: &[&[&str]] = &[&["sys", "version_info"], &["sys", "platform"]];
+    if contains_call_path(test, ignored_call_paths, checker.semantic()) {
         return;
-    }
-
-    // Avoid suggesting ternary for `if sys.platform.startswith("...")`-style
-    // checks.
-    if contains_call_path(test, &["sys", "platform"], checker.semantic()) {
-        return;
-    }
-
-    // It's part of a bigger if-elif block:
-    // https://github.com/MartinThoma/flake8-simplify/issues/115
-    if let Some(Stmt::If(ast::StmtIf {
-        orelse: parent_orelse,
-        ..
-    })) = parent
-    {
-        if parent_orelse.len() == 1 && stmt == &parent_orelse[0] {
-            // TODO(charlie): These two cases have the same AST:
-            //
-            // if True:
-            //     pass
-            // elif a:
-            //     b = 1
-            // else:
-            //     b = 2
-            //
-            // if True:
-            //     pass
-            // else:
-            //     if a:
-            //         b = 1
-            //     else:
-            //         b = 2
-            //
-            // We want to flag the latter, but not the former. Right now, we flag neither.
-            return;
-        }
     }
 
     // Avoid suggesting ternary for `if (yield ...)`-style checks.
@@ -623,14 +639,14 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: O
         return;
     }
     if matches!(
-        orelse_value.as_ref(),
+        else_value.as_ref(),
         Expr::Yield(_) | Expr::YieldFrom(_) | Expr::Await(_)
     ) {
         return;
     }
 
-    let target_var = &body_targets[0];
-    let ternary = ternary(target_var, body_value, test, orelse_value);
+    let target_var = &body_target;
+    let ternary = ternary(target_var, body_value, test, else_value);
     let contents = checker.generator().stmt(&ternary);
 
     // Don't flag if the resulting expression would exceed the maximum line length.
@@ -650,7 +666,7 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: O
         stmt.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        if !has_comments(stmt, checker.locator) {
+        if !has_comments(stmt, checker.locator, checker.indexer) {
             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                 contents,
                 stmt.range(),
@@ -660,135 +676,85 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: O
     checker.diagnostics.push(diagnostic);
 }
 
-fn get_if_body_pairs<'a>(
-    test: &'a Expr,
-    body: &'a [Stmt],
-    orelse: &'a [Stmt],
-) -> Vec<(&'a Expr, &'a [Stmt])> {
-    let mut pairs = vec![(test, body)];
-    let mut orelse = orelse;
-    loop {
-        if orelse.len() != 1 {
-            break;
-        }
-        let Stmt::If(ast::StmtIf {
-            test,
-            body,
-            orelse: orelse_orelse,
-            range: _,
-        }) = &orelse[0]
-        else {
-            break;
-        };
-        pairs.push((test, body));
-        orelse = orelse_orelse;
-    }
-    pairs
-}
-
 /// SIM114
-pub(crate) fn if_with_same_arms(checker: &mut Checker, stmt: &Stmt, parent: Option<&Stmt>) {
-    let Stmt::If(ast::StmtIf {
-        test,
-        body,
-        orelse,
-        range: _,
-    }) = stmt
-    else {
-        return;
-    };
+pub(crate) fn if_with_same_arms(checker: &mut Checker, locator: &Locator, stmt_if: &StmtIf) {
+    let mut branches_iter = if_elif_branches(stmt_if).peekable();
+    while let Some(current_branch) = branches_iter.next() {
+        let Some(following_branch) = branches_iter.peek() else {
+            continue;
+        };
 
-    // It's part of a bigger if-elif block:
-    // https://github.com/MartinThoma/flake8-simplify/issues/115
-    if let Some(Stmt::If(ast::StmtIf {
-        orelse: parent_orelse,
-        ..
-    })) = parent
-    {
-        if parent_orelse.len() == 1 && stmt == &parent_orelse[0] {
-            // TODO(charlie): These two cases have the same AST:
-            //
-            // if True:
-            //     pass
-            // elif a:
-            //     b = 1
-            // else:
-            //     b = 2
-            //
-            // if True:
-            //     pass
-            // else:
-            //     if a:
-            //         b = 1
-            //     else:
-            //         b = 2
-            //
-            // We want to flag the latter, but not the former. Right now, we flag neither.
-            return;
+        // The bodies must have the same code ...
+        if current_branch.body.len() != following_branch.body.len() {
+            continue;
         }
-    }
+        if !current_branch
+            .body
+            .iter()
+            .zip(following_branch.body.iter())
+            .all(|(stmt1, stmt2)| compare_stmt(&stmt1.into(), &stmt2.into()))
+        {
+            continue;
+        }
 
-    let if_body_pairs = get_if_body_pairs(test, body, orelse);
-    for i in 0..(if_body_pairs.len() - 1) {
-        let (test, body) = &if_body_pairs[i];
-        let (.., next_body) = &if_body_pairs[i + 1];
-        if compare_body(body, next_body) {
-            checker.diagnostics.push(Diagnostic::new(
-                IfWithSameArms,
-                TextRange::new(
-                    if i == 0 { stmt.start() } else { test.start() },
-                    next_body.last().unwrap().end(),
-                ),
-            ));
+        // ...and the same comments
+        let first_comments: Vec<_> = checker
+            .indexer
+            .comments_in_range(current_branch.range, locator)
+            .collect();
+        let second_comments: Vec<_> = checker
+            .indexer
+            .comments_in_range(following_branch.range, locator)
+            .collect();
+        if first_comments != second_comments {
+            continue;
         }
+
+        checker.diagnostics.push(Diagnostic::new(
+            IfWithSameArms,
+            TextRange::new(
+                current_branch.range.start(),
+                following_branch.body.last().unwrap().end(),
+            ),
+        ));
     }
 }
 
 /// SIM116
-pub(crate) fn manual_dict_lookup(
-    checker: &mut Checker,
-    stmt: &Stmt,
-    test: &Expr,
-    body: &[Stmt],
-    orelse: &[Stmt],
-    parent: Option<&Stmt>,
-) {
+pub(crate) fn manual_dict_lookup(checker: &mut Checker, stmt_if: &StmtIf) {
     // Throughout this rule:
-    // * Each if-statement's test must consist of a constant equality check with the same variable.
-    // * Each if-statement's body must consist of a single `return`.
-    // * Each if-statement's orelse must be either another if-statement or empty.
-    // * The final if-statement's orelse must be empty, or a single `return`.
+    // * Each if or elif statement's test must consist of a constant equality check with the same variable.
+    // * Each if or elif statement's body must consist of a single `return`.
+    // * The else clause must be empty, or a single `return`.
+    let StmtIf {
+        body,
+        test,
+        elif_else_clauses,
+        ..
+    } = stmt_if;
+
     let Expr::Compare(ast::ExprCompare {
         left,
         ops,
         comparators,
         range: _,
-    }) = &test
+    }) = test.as_ref()
     else {
         return;
     };
     let Expr::Name(ast::ExprName { id: target, .. }) = left.as_ref() else {
         return;
     };
-    if body.len() != 1 {
+    if ops != &[CmpOp::Eq] {
         return;
     }
-    if orelse.len() != 1 {
-        return;
-    }
-    if !(ops.len() == 1 && ops[0] == CmpOp::Eq) {
-        return;
-    }
-    if comparators.len() != 1 {
-        return;
-    }
-    let Expr::Constant(ast::ExprConstant {
+    let [Expr::Constant(ast::ExprConstant {
         value: constant, ..
-    }) = &comparators[0]
+    })] = comparators.as_slice()
     else {
         return;
     };
-    let Stmt::Return(ast::StmtReturn { value, range: _ }) = &body[0] else {
+    let [Stmt::Return(ast::StmtReturn { value, range: _ })] = body.as_slice() else {
         return;
     };
     if value.as_ref().map_or(false, |value| {
@@ -797,99 +763,60 @@ pub(crate) fn manual_dict_lookup(
         return;
     }
 
-    // It's part of a bigger if-elif block:
-    // https://github.com/MartinThoma/flake8-simplify/issues/115
-    if let Some(Stmt::If(ast::StmtIf {
-        orelse: parent_orelse,
-        ..
-    })) = parent
-    {
-        if parent_orelse.len() == 1 && stmt == &parent_orelse[0] {
-            // TODO(charlie): These two cases have the same AST:
-            //
-            // if True:
-            //     pass
-            // elif a:
-            //     b = 1
-            // else:
-            //     b = 2
-            //
-            // if True:
-            //     pass
-            // else:
-            //     if a:
-            //         b = 1
-            //     else:
-            //         b = 2
-            //
-            // We want to flag the latter, but not the former. Right now, we flag neither.
-            return;
-        }
-    }
-
     let mut constants: FxHashSet<ComparableConstant> = FxHashSet::default();
     constants.insert(constant.into());
 
-    let mut child: Option<&Stmt> = orelse.get(0);
-    while let Some(current) = child.take() {
-        let Stmt::If(ast::StmtIf {
-            test,
-            body,
-            orelse,
-            range: _,
-        }) = &current
-        else {
-            return;
-        };
-        if body.len() != 1 {
-            return;
-        }
-        if orelse.len() > 1 {
-            return;
-        }
-        let Expr::Compare(ast::ExprCompare {
-            left,
-            ops,
-            comparators,
-            range: _,
-        }) = test.as_ref()
-        else {
-            return;
-        };
-        let Expr::Name(ast::ExprName { id, .. }) = left.as_ref() else {
-            return;
-        };
-        if !(id == target && matches!(ops.as_slice(), [CmpOp::Eq])) {
-            return;
-        }
-        let [Expr::Constant(ast::ExprConstant {
-            value: constant, ..
-        })] = comparators.as_slice()
-        else {
-            return;
-        };
-        let Stmt::Return(ast::StmtReturn { value, range: _ }) = &body[0] else {
-            return;
-        };
-        if value.as_ref().map_or(false, |value| {
-            contains_effect(value, |id| checker.semantic().is_builtin(id))
-        }) {
+    for clause in elif_else_clauses {
+        let ElifElseClause { test, body, .. } = clause;
+        let [Stmt::Return(ast::StmtReturn { value, range: _ })] = body.as_slice() else {
             return;
         };
 
-        constants.insert(constant.into());
-        if let Some(orelse) = orelse.first() {
-            match orelse {
-                Stmt::If(_) => {
-                    child = Some(orelse);
-                }
-                Stmt::Return(_) => {
-                    child = None;
-                }
-                _ => return,
+        match test.as_ref() {
+            // `else`
+            None => {
+                // The else must also be a single effect-free return statement
+                let [Stmt::Return(ast::StmtReturn { value, range: _ })] = body.as_slice() else {
+                    return;
+                };
+                if value.as_ref().map_or(false, |value| {
+                    contains_effect(value, |id| checker.semantic().is_builtin(id))
+                }) {
+                    return;
+                };
             }
-        } else {
-            child = None;
+            // `elif`
+            Some(Expr::Compare(ast::ExprCompare {
+                left,
+                ops,
+                comparators,
+                range: _,
+            })) => {
+                let Expr::Name(ast::ExprName { id, .. }) = left.as_ref() else {
+                    return;
+                };
+                if id != target || ops != &[CmpOp::Eq] {
+                    return;
+                }
+                let [Expr::Constant(ast::ExprConstant {
+                    value: constant, ..
+                })] = comparators.as_slice()
+                else {
+                    return;
+                };
+
+                if value.as_ref().map_or(false, |value| {
+                    contains_effect(value, |id| checker.semantic().is_builtin(id))
+                }) {
+                    return;
+                };
+
+                constants.insert(constant.into());
+            }
+            // Different `elif`
+            _ => {
+                return;
+            }
         }
     }
 
@@ -899,27 +826,38 @@ pub(crate) fn manual_dict_lookup(
 
     checker.diagnostics.push(Diagnostic::new(
         IfElseBlockInsteadOfDictLookup,
-        stmt.range(),
+        stmt_if.range(),
     ));
 }
 
 /// SIM401
-pub(crate) fn use_dict_get_with_default(
-    checker: &mut Checker,
-    stmt: &Stmt,
-    test: &Expr,
-    body: &[Stmt],
-    orelse: &[Stmt],
-    parent: Option<&Stmt>,
-) {
-    if body.len() != 1 || orelse.len() != 1 {
+pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &StmtIf) {
+    let StmtIf {
+        test,
+        body,
+        elif_else_clauses,
+        ..
+    } = stmt_if;
+
+    let [body_stmt] = body.as_slice() else {
         return;
-    }
+    };
+    let [ElifElseClause {
+        body: else_body,
+        test: None,
+        ..
+    }] = elif_else_clauses.as_slice()
+    else {
+        return;
+    };
+    let [else_body_stmt] = else_body.as_slice() else {
+        return;
+    };
     let Stmt::Assign(ast::StmtAssign {
         targets: body_var,
         value: body_value,
         ..
-    }) = &body[0]
+    }) = &body_stmt
     else {
         return;
     };
@@ -930,7 +868,7 @@ pub(crate) fn use_dict_get_with_default(
         targets: orelse_var,
         value: orelse_value,
         ..
-    }) = &orelse[0]
+    }) = &else_body_stmt
     else {
         return;
     };
@@ -942,7 +880,7 @@ pub(crate) fn use_dict_get_with_default(
         ops,
         comparators: test_dict,
         range: _,
-    }) = &test
+    }) = test.as_ref()
     else {
         return;
     };
@@ -950,8 +888,18 @@ pub(crate) fn use_dict_get_with_default(
         return;
     }
     let (expected_var, expected_value, default_var, default_value) = match ops[..] {
-        [CmpOp::In] => (&body_var[0], body_value, &orelse_var[0], orelse_value),
-        [CmpOp::NotIn] => (&orelse_var[0], orelse_value, &body_var[0], body_value),
+        [CmpOp::In] => (
+            &body_var[0],
+            body_value,
+            &orelse_var[0],
+            orelse_value.as_ref(),
+        ),
+        [CmpOp::NotIn] => (
+            &orelse_var[0],
+            orelse_value,
+            &body_var[0],
+            body_value.as_ref(),
+        ),
         _ => {
             return;
         }
@@ -980,37 +928,7 @@ pub(crate) fn use_dict_get_with_default(
         return;
     }
 
-    // It's part of a bigger if-elif block:
-    // https://github.com/MartinThoma/flake8-simplify/issues/115
-    if let Some(Stmt::If(ast::StmtIf {
-        orelse: parent_orelse,
-        ..
-    })) = parent
-    {
-        if parent_orelse.len() == 1 && stmt == &parent_orelse[0] {
-            // TODO(charlie): These two cases have the same AST:
-            //
-            // if True:
-            //     pass
-            // elif a:
-            //     b = 1
-            // else:
-            //     b = 2
-            //
-            // if True:
-            //     pass
-            // else:
-            //     if a:
-            //         b = 1
-            //     else:
-            //         b = 2
-            //
-            // We want to flag the latter, but not the former. Right now, we flag neither.
-            return;
-        }
-    }
-
-    let node = *default_value.clone();
+    let node = default_value.clone();
     let node1 = *test_key.clone();
     let node2 = ast::ExprAttribute {
         value: expected_subscript.clone(),
@@ -1034,9 +952,9 @@ pub(crate) fn use_dict_get_with_default(
     let contents = checker.generator().stmt(&node5.into());
 
     // Don't flag if the resulting expression would exceed the maximum line length.
-    let line_start = checker.locator.line_start(stmt.start());
+    let line_start = checker.locator.line_start(stmt_if.start());
     if LineWidth::new(checker.settings.tab_size)
-        .add_str(&checker.locator.contents()[TextRange::new(line_start, stmt.start())])
+        .add_str(&checker.locator.contents()[TextRange::new(line_start, stmt_if.start())])
         .add_str(&contents)
         > checker.settings.line_length
     {
@@ -1047,13 +965,13 @@ pub(crate) fn use_dict_get_with_default(
         IfElseBlockInsteadOfDictGet {
             contents: contents.clone(),
         },
-        stmt.range(),
+        stmt_if.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        if !has_comments(stmt, checker.locator) {
+        if !has_comments(stmt_if, checker.locator, checker.indexer) {
             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                 contents,
-                stmt.range(),
+                stmt_if.range(),
             )));
         }
     }

@@ -1,13 +1,14 @@
 use std::ops::Add;
 
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
+use rustpython_parser::ast::{self, ElifElseClause, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_none;
-use ruff_python_ast::helpers::{elif_else_range, is_const_false, is_const_true};
+use ruff_python_ast::helpers::{is_const_false, is_const_true};
+use ruff_python_ast::stmt_if::elif_else_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_semantic::SemanticModel;
@@ -387,13 +388,25 @@ fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
 /// RET503
 fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
     match stmt {
-        Stmt::If(ast::StmtIf { body, orelse, .. }) => {
+        Stmt::If(ast::StmtIf {
+            body,
+            elif_else_clauses,
+            ..
+        }) => {
             if let Some(last_stmt) = body.last() {
                 implicit_return(checker, last_stmt);
             }
-            if let Some(last_stmt) = orelse.last() {
-                implicit_return(checker, last_stmt);
-            } else {
+            for clause in elif_else_clauses {
+                if let Some(last_stmt) = clause.body.last() {
+                    implicit_return(checker, last_stmt);
+                }
+            }
+
+            // Check if we don't have an else clause
+            if matches!(
+                elif_else_clauses.last(),
+                None | Some(ast::ElifElseClause { test: Some(_), .. })
+            ) {
                 let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(indent) = indentation(checker.locator, stmt) {
@@ -564,13 +577,21 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
 }
 
 /// RET505, RET506, RET507, RET508
-fn superfluous_else_node(checker: &mut Checker, stmt: &ast::StmtIf, branch: Branch) -> bool {
-    let ast::StmtIf { body, .. } = stmt;
-    for child in body {
+fn superfluous_else_node(
+    checker: &mut Checker,
+    if_elif_body: &[Stmt],
+    elif_else: &ElifElseClause,
+) -> bool {
+    let branch = if elif_else.test.is_some() {
+        Branch::Elif
+    } else {
+        Branch::Else
+    };
+    for child in if_elif_body {
         if child.is_return_stmt() {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseReturn { branch },
-                elif_else_range(stmt, checker.locator).unwrap_or_else(|| stmt.range()),
+                elif_else_range(elif_else, checker.locator).unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
@@ -579,7 +600,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &ast::StmtIf, branch: Bran
         } else if child.is_break_stmt() {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseBreak { branch },
-                elif_else_range(stmt, checker.locator).unwrap_or_else(|| stmt.range()),
+                elif_else_range(elif_else, checker.locator).unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
@@ -588,7 +609,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &ast::StmtIf, branch: Bran
         } else if child.is_raise_stmt() {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseRaise { branch },
-                elif_else_range(stmt, checker.locator).unwrap_or_else(|| stmt.range()),
+                elif_else_range(elif_else, checker.locator).unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
@@ -597,7 +618,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &ast::StmtIf, branch: Bran
         } else if child.is_continue_stmt() {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseContinue { branch },
-                elif_else_range(stmt, checker.locator).unwrap_or_else(|| stmt.range()),
+                elif_else_range(elif_else, checker.locator).unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
@@ -609,16 +630,9 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &ast::StmtIf, branch: Bran
 }
 
 /// RET505, RET506, RET507, RET508
-fn superfluous_elif(checker: &mut Checker, stack: &Stack) {
-    for stmt in &stack.elifs {
-        superfluous_else_node(checker, stmt, Branch::Elif);
-    }
-}
-
-/// RET505, RET506, RET507, RET508
-fn superfluous_else(checker: &mut Checker, stack: &Stack) {
-    for stmt in &stack.elses {
-        superfluous_else_node(checker, stmt, Branch::Else);
+fn superfluous_elif_else(checker: &mut Checker, stack: &Stack) {
+    for (if_elif_body, elif_else) in &stack.elifs_elses {
+        superfluous_else_node(checker, if_elif_body, elif_else);
     }
 }
 
@@ -655,8 +669,7 @@ pub(crate) fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Ex
         Rule::SuperfluousElseContinue,
         Rule::SuperfluousElseBreak,
     ]) {
-        superfluous_elif(checker, &stack);
-        superfluous_else(checker, &stack);
+        superfluous_elif_else(checker, &stack);
     }
 
     // Skip any functions without return statements.

@@ -224,6 +224,7 @@ fn function(
                 body: vec![body],
                 decorator_list: vec![],
                 returns: Some(Box::new(return_type)),
+                type_params: vec![],
                 type_comment: None,
                 range: TextRange::default(),
             });
@@ -236,6 +237,7 @@ fn function(
         body: vec![body],
         decorator_list: vec![],
         returns: None,
+        type_params: vec![],
         type_comment: None,
         range: TextRange::default(),
     });

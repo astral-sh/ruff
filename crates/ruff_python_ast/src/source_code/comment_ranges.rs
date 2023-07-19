@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use std::fmt::{Debug, Formatter};
 use std::ops::Deref;
 
@@ -8,6 +9,38 @@ use rustpython_parser::Tok;
 #[derive(Clone)]
 pub struct CommentRanges {
     raw: Vec<TextRange>,
+}
+
+impl CommentRanges {
+    /// Returns `true` if the given range includes a comment.
+    pub fn intersects(&self, target: TextRange) -> bool {
+        self.raw
+            .binary_search_by(|range| {
+                if target.contains_range(*range) {
+                    std::cmp::Ordering::Equal
+                } else if range.end() < target.start() {
+                    std::cmp::Ordering::Less
+                } else {
+                    std::cmp::Ordering::Greater
+                }
+            })
+            .is_ok()
+    }
+
+    /// Returns the comments who are within the range
+    pub fn comments_in_range(&self, range: TextRange) -> &[TextRange] {
+        let start = self
+            .raw
+            .partition_point(|comment| comment.start() < range.start());
+        // We expect there are few comments, so switching to find should be faster
+        match self.raw[start..]
+            .iter()
+            .find_position(|comment| comment.end() > range.end())
+        {
+            Some((in_range, _element)) => &self.raw[start..start + in_range],
+            None => &self.raw[start..],
+        }
+    }
 }
 
 impl Deref for CommentRanges {

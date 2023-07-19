@@ -5,7 +5,7 @@ use bitflags::bitflags;
 use nohash_hasher::{BuildNoHashHasher, IntMap};
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Expr, Ranged, Stmt};
-use smallvec::smallvec;
+use smallvec::SmallVec;
 
 use ruff_python_ast::call_path::{collect_call_path, from_unqualified_name, CallPath};
 use ruff_python_ast::helpers::from_relative_import;
@@ -108,10 +108,6 @@ pub struct SemanticModel<'a> {
     /// by way of the `global x` statement.
     rebinding_scopes: HashMap<BindingId, Vec<ScopeId>, BuildNoHashHasher<BindingId>>,
 
-    /// Body iteration; used to peek at siblings.
-    pub body: &'a [Stmt],
-    pub body_index: usize,
-
     /// Flags for the semantic model.
     pub flags: SemanticModelFlags,
 
@@ -137,8 +133,6 @@ impl<'a> SemanticModel<'a> {
             shadowed_bindings: IntMap::default(),
             delayed_annotations: IntMap::default(),
             rebinding_scopes: IntMap::default(),
-            body: &[],
-            body_index: 0,
             flags: SemanticModelFlags::new(path),
             handled_exceptions: Vec::default(),
         }
@@ -195,6 +189,7 @@ impl<'a> SemanticModel<'a> {
         self.bindings.push(Binding {
             range: TextRange::default(),
             kind: BindingKind::Builtin,
+            scope: ScopeId::global(),
             references: Vec::new(),
             flags: BindingFlags::empty(),
             source: None,
@@ -215,6 +210,7 @@ impl<'a> SemanticModel<'a> {
             kind,
             flags,
             references: Vec::new(),
+            scope: self.scope_id,
             source: self.stmt_id,
             context: self.execution_context(),
             exceptions: self.exceptions(),
@@ -526,7 +522,7 @@ impl<'a> SemanticModel<'a> {
     /// ...then `resolve_call_path(${python_version})` will resolve to `sys.version_info`.
     pub fn resolve_call_path(&'a self, value: &'a Expr) -> Option<CallPath<'a>> {
         let call_path = collect_call_path(value)?;
-        let head = call_path.first()?;
+        let (head, tail) = call_path.split_first()?;
         let binding = self.find_binding(head)?;
         match &binding.kind {
             BindingKind::Import(Import {
@@ -537,12 +533,12 @@ impl<'a> SemanticModel<'a> {
                     if source_path.is_empty() {
                         None
                     } else {
-                        source_path.extend(call_path.into_iter().skip(1));
+                        source_path.extend_from_slice(tail);
                         Some(source_path)
                     }
                 } else {
                     let mut source_path: CallPath = from_unqualified_name(name);
-                    source_path.extend(call_path.into_iter().skip(1));
+                    source_path.extend_from_slice(tail);
                     Some(source_path)
                 }
             }
@@ -551,7 +547,7 @@ impl<'a> SemanticModel<'a> {
             }) => {
                 let name = name.split('.').next().unwrap_or(name);
                 let mut source_path: CallPath = from_unqualified_name(name);
-                source_path.extend(call_path.into_iter().skip(1));
+                source_path.extend_from_slice(tail);
                 Some(source_path)
             }
             BindingKind::FromImport(FromImport {
@@ -562,19 +558,19 @@ impl<'a> SemanticModel<'a> {
                     if source_path.is_empty() {
                         None
                     } else {
-                        source_path.extend(call_path.into_iter().skip(1));
+                        source_path.extend_from_slice(tail);
                         Some(source_path)
                     }
                 } else {
                     let mut source_path: CallPath = from_unqualified_name(name);
-                    source_path.extend(call_path.into_iter().skip(1));
+                    source_path.extend_from_slice(tail);
                     Some(source_path)
                 }
             }
             BindingKind::Builtin => {
-                let mut source_path: CallPath = smallvec![];
+                let mut source_path: CallPath = SmallVec::with_capacity(1 + call_path.len());
                 source_path.push("");
-                source_path.extend(call_path);
+                source_path.extend_from_slice(call_path.as_slice());
                 Some(source_path)
             }
             _ => None,
@@ -757,11 +753,6 @@ impl<'a> SemanticModel<'a> {
         self.exprs.iter().rev().skip(1)
     }
 
-    /// Return the `Stmt` that immediately follows the current `Stmt`, if any.
-    pub fn sibling_stmt(&self) -> Option<&'a Stmt> {
-        self.body.get(self.body_index + 1)
-    }
-
     /// Returns a reference to the global scope
     pub fn global_scope(&self) -> &Scope<'a> {
         self.scopes.global()
@@ -806,6 +797,7 @@ impl<'a> SemanticModel<'a> {
                     kind: BindingKind::Assignment,
                     range: *range,
                     references: Vec::new(),
+                    scope: self.scope_id,
                     source: self.stmt_id,
                     context: self.execution_context(),
                     exceptions: self.exceptions(),

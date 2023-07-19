@@ -29,11 +29,11 @@ fn empty_config() {
             message: "If test is a tuple, which is always `True`".to_string(),
             location: SourceLocation {
                 row: OneIndexed::from_zero_indexed(0),
-                column: OneIndexed::from_zero_indexed(0)
+                column: OneIndexed::from_zero_indexed(3)
             },
             end_location: SourceLocation {
-                row: OneIndexed::from_zero_indexed(1),
-                column: OneIndexed::from_zero_indexed(8)
+                row: OneIndexed::from_zero_indexed(0),
+                column: OneIndexed::from_zero_indexed(9)
             },
             fix: None,
         }]

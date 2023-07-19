@@ -2,10 +2,34 @@ use rustpython_parser::ast::{Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{is_const_false, SimpleCallArgs};
+use ruff_python_ast::helpers::{find_keyword, is_const_false};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for HTTPS requests that disable SSL certificate checks.
+///
+/// ## Why is this bad?
+/// If SSL certificates are not verified, an attacker could perform a "man in
+/// the middle" attack by intercepting and modifying traffic between the client
+/// and server.
+///
+/// ## Example
+/// ```python
+/// import requests
+///
+/// requests.get("https://www.example.com", verify=False)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import requests
+///
+/// requests.get("https://www.example.com")  # By default, `verify=True`.
+/// ```
+///
+/// ## References
+/// - [Common Weakness Enumeration: CWE-295](https://cwe.mitre.org/data/definitions/295.html)
 #[violation]
 pub struct RequestWithNoCertValidation {
     string: String,
@@ -25,7 +49,6 @@ impl Violation for RequestWithNoCertValidation {
 pub(crate) fn request_with_no_cert_validation(
     checker: &mut Checker,
     func: &Expr,
-    args: &[Expr],
     keywords: &[Keyword],
 ) {
     if let Some(target) = checker
@@ -40,14 +63,13 @@ pub(crate) fn request_with_no_cert_validation(
             _ => None,
         })
     {
-        let call_args = SimpleCallArgs::new(args, keywords);
-        if let Some(verify_arg) = call_args.keyword_argument("verify") {
-            if is_const_false(verify_arg) {
+        if let Some(keyword) = find_keyword(keywords, "verify") {
+            if is_const_false(&keyword.value) {
                 checker.diagnostics.push(Diagnostic::new(
                     RequestWithNoCertValidation {
                         string: target.to_string(),
                     },
-                    verify_arg.range(),
+                    keyword.range(),
                 ));
             }
         }

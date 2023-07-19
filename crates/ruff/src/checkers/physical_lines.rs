@@ -115,7 +115,6 @@ pub(crate) fn check_physical_lines(
                             diagnostics.push(diagnostic);
                         }
                     }
-                } else {
                 }
             }
         }

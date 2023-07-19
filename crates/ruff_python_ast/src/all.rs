@@ -65,7 +65,7 @@ where
             }) => {
                 // Allow `tuple()` and `list()` calls.
                 if keywords.is_empty() && args.len() <= 1 {
-                    if let Expr::Name(ast::ExprName { id, .. }) = &**func {
+                    if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                         let id = id.as_str();
                         if id == "tuple" || id == "list" {
                             if is_builtin(id) {
@@ -106,7 +106,7 @@ where
         Stmt::AugAssign(ast::StmtAugAssign { value, .. }) => Some(value),
         _ => None,
     } {
-        if let Expr::BinOp(ast::ExprBinOp { left, right, .. }) = &**value {
+        if let Expr::BinOp(ast::ExprBinOp { left, right, .. }) = value.as_ref() {
             let mut current_left = left;
             let mut current_right = right;
             loop {
@@ -119,7 +119,7 @@ where
 
                 // Process the left side, which can be a "real" value or the "rest" of the
                 // binary operation.
-                if let Expr::BinOp(ast::ExprBinOp { left, right, .. }) = &**current_left {
+                if let Expr::BinOp(ast::ExprBinOp { left, right, .. }) = current_left.as_ref() {
                     current_left = left;
                     current_right = right;
                 } else {

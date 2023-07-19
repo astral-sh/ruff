@@ -1,5 +1,5 @@
 ---
-source: crates/ruff_python_formatter/src/trivia.rs
+source: crates/ruff_python_whitespace/src/tokenizer.rs
 expression: test_case.tokenize_reverse()
 ---
 [

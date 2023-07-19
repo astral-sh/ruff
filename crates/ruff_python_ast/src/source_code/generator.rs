@@ -6,7 +6,8 @@ use std::ops::Deref;
 use rustpython_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
 use rustpython_parser::ast::{
     self, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Constant, ConversionFlag,
-    ExceptHandler, Expr, Identifier, MatchCase, Operator, Pattern, Stmt, Suite, WithItem,
+    ExceptHandler, Expr, Identifier, MatchCase, Operator, Pattern, Stmt, Suite, TypeParam,
+    TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
 };
 
 use ruff_python_whitespace::LineEnding;
@@ -207,6 +208,7 @@ impl<'a> Generator<'a> {
                 body,
                 returns,
                 decorator_list,
+                type_params,
                 ..
             }) => {
                 self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
@@ -219,6 +221,7 @@ impl<'a> Generator<'a> {
                 statement!({
                     self.p("def ");
                     self.p_id(name);
+                    self.unparse_type_params(type_params);
                     self.p("(");
                     self.unparse_args(args);
                     self.p(")");
@@ -239,6 +242,7 @@ impl<'a> Generator<'a> {
                 body,
                 returns,
                 decorator_list,
+                type_params,
                 ..
             }) => {
                 self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
@@ -251,6 +255,7 @@ impl<'a> Generator<'a> {
                 statement!({
                     self.p("async def ");
                     self.p_id(name);
+                    self.unparse_type_params(type_params);
                     self.p("(");
                     self.unparse_args(args);
                     self.p(")");
@@ -271,7 +276,8 @@ impl<'a> Generator<'a> {
                 keywords,
                 body,
                 decorator_list,
-                range: _range,
+                type_params,
+                range: _,
             }) => {
                 self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
                 for decorator in decorator_list {
@@ -283,6 +289,7 @@ impl<'a> Generator<'a> {
                 statement!({
                     self.p("class ");
                     self.p_id(name);
+                    self.unparse_type_params(type_params);
                     let mut first = true;
                     for base in bases {
                         self.p_if(first, "(");
@@ -457,7 +464,7 @@ impl<'a> Generator<'a> {
             Stmt::If(ast::StmtIf {
                 test,
                 body,
-                orelse,
+                elif_else_clauses,
                 range: _range,
             }) => {
                 statement!({
@@ -467,33 +474,19 @@ impl<'a> Generator<'a> {
                 });
                 self.body(body);
 
-                let mut orelse_: &[Stmt] = orelse;
-                loop {
-                    if orelse_.len() == 1 && matches!(orelse_[0], Stmt::If(_)) {
-                        if let Stmt::If(ast::StmtIf {
-                            body,
-                            test,
-                            orelse,
-                            range: _range,
-                        }) = &orelse_[0]
-                        {
-                            statement!({
-                                self.p("elif ");
-                                self.unparse_expr(test, precedence::IF);
-                                self.p(":");
-                            });
-                            self.body(body);
-                            orelse_ = orelse;
-                        }
+                for clause in elif_else_clauses {
+                    if let Some(test) = &clause.test {
+                        statement!({
+                            self.p("elif ");
+                            self.unparse_expr(test, precedence::IF);
+                            self.p(":");
+                        });
                     } else {
-                        if !orelse_.is_empty() {
-                            statement!({
-                                self.p("else:");
-                            });
-                            self.body(orelse_);
-                        }
-                        break;
+                        statement!({
+                            self.p("else:");
+                        });
                     }
+                    self.body(&clause.body);
                 }
             }
             Stmt::With(ast::StmtWith { items, body, .. }) => {
@@ -537,6 +530,18 @@ impl<'a> Generator<'a> {
                     });
                     self.indent_depth = self.indent_depth.saturating_sub(1);
                 }
+            }
+            Stmt::TypeAlias(ast::StmtTypeAlias {
+                name,
+                range: _range,
+                type_params,
+                value,
+            }) => {
+                self.p("type ");
+                self.unparse_expr(name, precedence::MAX);
+                self.unparse_type_params(type_params);
+                self.p(" = ");
+                self.unparse_expr(value, precedence::ASSIGN);
             }
             Stmt::Raise(ast::StmtRaise {
                 exc,
@@ -842,6 +847,38 @@ impl<'a> Generator<'a> {
         self.body(&ast.body);
     }
 
+    fn unparse_type_params(&mut self, type_params: &Vec<TypeParam>) {
+        if !type_params.is_empty() {
+            self.p("[");
+            let mut first = true;
+            for type_param in type_params {
+                self.p_delim(&mut first, ", ");
+                self.unparse_type_param(type_param);
+            }
+            self.p("]");
+        }
+    }
+
+    pub(crate) fn unparse_type_param(&mut self, ast: &TypeParam) {
+        match ast {
+            TypeParam::TypeVar(TypeParamTypeVar { name, bound, .. }) => {
+                self.p_id(name);
+                if let Some(expr) = bound {
+                    self.p(": ");
+                    self.unparse_expr(expr, precedence::MAX);
+                }
+            }
+            TypeParam::TypeVarTuple(TypeParamTypeVarTuple { name, .. }) => {
+                self.p("*");
+                self.p_id(name);
+            }
+            TypeParam::ParamSpec(TypeParamParamSpec { name, .. }) => {
+                self.p("**");
+                self.p_id(name);
+            }
+        }
+    }
+
     pub(crate) fn unparse_expr(&mut self, ast: &Expr, level: u8) {
         macro_rules! opprec {
             ($opty:ident, $x:expr, $enu:path, $($var:ident($op:literal, $prec:ident)),*$(,)?) => {
@@ -1119,7 +1156,7 @@ impl<'a> Generator<'a> {
                         range: _range,
                     })],
                     [],
-                ) = (&**args, &**keywords)
+                ) = (args.as_slice(), keywords.as_slice())
                 {
                     // Ensure that a single generator doesn't get double-parenthesized.
                     self.unparse_expr(elt, precedence::COMMA);
@@ -1249,23 +1286,6 @@ impl<'a> Generator<'a> {
             Constant::None => self.p("None"),
             Constant::Bool(b) => self.p(if *b { "True" } else { "False" }),
             Constant::Int(i) => self.p(&format!("{i}")),
-            Constant::Tuple(tup) => {
-                if let [elt] = &**tup {
-                    self.p("(");
-                    self.unparse_constant(elt);
-                    self.p(",");
-                    self.p(")");
-                } else {
-                    self.p("(");
-                    for (i, elt) in tup.iter().enumerate() {
-                        if i != 0 {
-                            self.p(", ");
-                        }
-                        self.unparse_constant(elt);
-                    }
-                    self.p(")");
-                }
-            }
             Constant::Float(fp) => {
                 if fp.is_infinite() {
                     self.p(inf_str);
@@ -1542,6 +1562,26 @@ mod tests {
     pass"#
         );
         assert_round_trip!(
+            r#"class Foo[T]:
+    pass"#
+        );
+        assert_round_trip!(
+            r#"class Foo[T](Bar):
+    pass"#
+        );
+        assert_round_trip!(
+            r#"class Foo[*Ts]:
+    pass"#
+        );
+        assert_round_trip!(
+            r#"class Foo[**P]:
+    pass"#
+        );
+        assert_round_trip!(
+            r#"class Foo[T, U, *Ts, **P]:
+    pass"#
+        );
+        assert_round_trip!(
             r#"def f() -> (int, str):
     pass"#
         );
@@ -1570,6 +1610,22 @@ mod tests {
         );
         assert_round_trip!(
             r#"def test(a, b=4, /, c=8, d=9):
+    pass"#
+        );
+        assert_round_trip!(
+            r#"def test[T]():
+    pass"#
+        );
+        assert_round_trip!(
+            r#"def test[*Ts]():
+    pass"#
+        );
+        assert_round_trip!(
+            r#"def test[**P]():
+    pass"#
+        );
+        assert_round_trip!(
+            r#"def test[T, U, *Ts, **P]():
     pass"#
         );
         assert_round_trip!(
@@ -1625,6 +1681,13 @@ class Foo:
     def f():
         pass"#
         );
+
+        // Type aliases
+        assert_round_trip!(r#"type Foo = int | str"#);
+        assert_round_trip!(r#"type Foo[T] = list[T]"#);
+        assert_round_trip!(r#"type Foo[*Ts] = ..."#);
+        assert_round_trip!(r#"type Foo[**P] = ..."#);
+        assert_round_trip!(r#"type Foo[T, U, *Ts, **P] = ..."#);
     }
 
     #[test]
