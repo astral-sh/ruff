@@ -235,8 +235,22 @@ bitflags! {
         /// ```
         const GLOBAL = 1 << 4;
 
-
+        /// The binding represents an export via `__all__`, but the assigned value uses an invalid
+        /// expression (i.e., a non-container type).
+        ///
+        /// For example:
+        /// ```python
+        /// __all__ = 1
+        /// ```
         const INVALID_ALL_FORMAT = 1 << 5;
+
+        /// The binding represents an export via `__all__`, but the assigned value contains an
+        /// invalid member (i.e., a non-string).
+        ///
+        /// For example:
+        /// ```python
+        /// __all__ = [1]
+        /// ```
         const INVALID_ALL_OBJECT = 1 << 6;
     }
 }
