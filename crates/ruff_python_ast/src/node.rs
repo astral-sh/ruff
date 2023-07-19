@@ -30,6 +30,7 @@ pub enum AnyNode {
     StmtClassDef(ast::StmtClassDef),
     StmtReturn(ast::StmtReturn),
     StmtDelete(ast::StmtDelete),
+    StmtTypeAlias(ast::StmtTypeAlias),
     StmtAssign(ast::StmtAssign),
     StmtAugAssign(ast::StmtAugAssign),
     StmtAnnAssign(ast::StmtAnnAssign),
@@ -98,6 +99,7 @@ pub enum AnyNode {
     WithItem(WithItem),
     MatchCase(MatchCase),
     Decorator(Decorator),
+    ElifElseClause(ast::ElifElseClause),
 }
 
 impl AnyNode {
@@ -108,6 +110,7 @@ impl AnyNode {
             AnyNode::StmtClassDef(node) => Some(Stmt::ClassDef(node)),
             AnyNode::StmtReturn(node) => Some(Stmt::Return(node)),
             AnyNode::StmtDelete(node) => Some(Stmt::Delete(node)),
+            AnyNode::StmtTypeAlias(node) => Some(Stmt::TypeAlias(node)),
             AnyNode::StmtAssign(node) => Some(Stmt::Assign(node)),
             AnyNode::StmtAugAssign(node) => Some(Stmt::AugAssign(node)),
             AnyNode::StmtAnnAssign(node) => Some(Stmt::AnnAssign(node)),
@@ -180,7 +183,8 @@ impl AnyNode {
             | AnyNode::Alias(_)
             | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
-            | AnyNode::Decorator(_) => None,
+            | AnyNode::Decorator(_)
+            | AnyNode::ElifElseClause(_) => None,
         }
     }
 
@@ -223,6 +227,7 @@ impl AnyNode {
             | AnyNode::StmtClassDef(_)
             | AnyNode::StmtReturn(_)
             | AnyNode::StmtDelete(_)
+            | AnyNode::StmtTypeAlias(_)
             | AnyNode::StmtAssign(_)
             | AnyNode::StmtAugAssign(_)
             | AnyNode::StmtAnnAssign(_)
@@ -263,7 +268,8 @@ impl AnyNode {
             | AnyNode::Alias(_)
             | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
-            | AnyNode::Decorator(_) => None,
+            | AnyNode::Decorator(_)
+            | AnyNode::ElifElseClause(_) => None,
         }
     }
 
@@ -279,6 +285,7 @@ impl AnyNode {
             | AnyNode::StmtClassDef(_)
             | AnyNode::StmtReturn(_)
             | AnyNode::StmtDelete(_)
+            | AnyNode::StmtTypeAlias(_)
             | AnyNode::StmtAssign(_)
             | AnyNode::StmtAugAssign(_)
             | AnyNode::StmtAnnAssign(_)
@@ -346,7 +353,8 @@ impl AnyNode {
             | AnyNode::Alias(_)
             | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
-            | AnyNode::Decorator(_) => None,
+            | AnyNode::Decorator(_)
+            | AnyNode::ElifElseClause(_) => None,
         }
     }
 
@@ -370,6 +378,7 @@ impl AnyNode {
             | AnyNode::StmtClassDef(_)
             | AnyNode::StmtReturn(_)
             | AnyNode::StmtDelete(_)
+            | AnyNode::StmtTypeAlias(_)
             | AnyNode::StmtAssign(_)
             | AnyNode::StmtAugAssign(_)
             | AnyNode::StmtAnnAssign(_)
@@ -429,7 +438,8 @@ impl AnyNode {
             | AnyNode::Alias(_)
             | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
-            | AnyNode::Decorator(_) => None,
+            | AnyNode::Decorator(_)
+            | AnyNode::ElifElseClause(_) => None,
         }
     }
 
@@ -446,6 +456,7 @@ impl AnyNode {
             | AnyNode::StmtClassDef(_)
             | AnyNode::StmtReturn(_)
             | AnyNode::StmtDelete(_)
+            | AnyNode::StmtTypeAlias(_)
             | AnyNode::StmtAssign(_)
             | AnyNode::StmtAugAssign(_)
             | AnyNode::StmtAnnAssign(_)
@@ -512,7 +523,8 @@ impl AnyNode {
             | AnyNode::Alias(_)
             | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
-            | AnyNode::Decorator(_) => None,
+            | AnyNode::Decorator(_)
+            | AnyNode::ElifElseClause(_) => None,
         }
     }
 
@@ -529,6 +541,7 @@ impl AnyNode {
             | AnyNode::StmtClassDef(_)
             | AnyNode::StmtReturn(_)
             | AnyNode::StmtDelete(_)
+            | AnyNode::StmtTypeAlias(_)
             | AnyNode::StmtAssign(_)
             | AnyNode::StmtAugAssign(_)
             | AnyNode::StmtAnnAssign(_)
@@ -595,7 +608,8 @@ impl AnyNode {
             | AnyNode::Alias(_)
             | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
-            | AnyNode::Decorator(_) => None,
+            | AnyNode::Decorator(_)
+            | AnyNode::ElifElseClause(_) => None,
         }
     }
 
@@ -634,6 +648,7 @@ impl AnyNode {
             Self::StmtClassDef(node) => AnyNodeRef::StmtClassDef(node),
             Self::StmtReturn(node) => AnyNodeRef::StmtReturn(node),
             Self::StmtDelete(node) => AnyNodeRef::StmtDelete(node),
+            Self::StmtTypeAlias(node) => AnyNodeRef::StmtTypeAlias(node),
             Self::StmtAssign(node) => AnyNodeRef::StmtAssign(node),
             Self::StmtAugAssign(node) => AnyNodeRef::StmtAugAssign(node),
             Self::StmtAnnAssign(node) => AnyNodeRef::StmtAnnAssign(node),
@@ -702,6 +717,7 @@ impl AnyNode {
             Self::WithItem(node) => AnyNodeRef::WithItem(node),
             Self::MatchCase(node) => AnyNodeRef::MatchCase(node),
             Self::Decorator(node) => AnyNodeRef::Decorator(node),
+            Self::ElifElseClause(node) => AnyNodeRef::ElifElseClause(node),
         }
     }
 
@@ -963,6 +979,34 @@ impl AstNode for ast::StmtDelete {
         AnyNode::from(self)
     }
 }
+impl AstNode for ast::StmtTypeAlias {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::StmtTypeAlias(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::StmtTypeAlias(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
 impl AstNode for ast::StmtAssign {
     fn cast(kind: AnyNode) -> Option<Self>
     where
@@ -1145,6 +1189,34 @@ impl AstNode for ast::StmtIf {
 
     fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
         if let AnyNodeRef::StmtIf(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+impl AstNode for ast::ElifElseClause {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ElifElseClause(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ElifElseClause(node) = kind {
             Some(node)
         } else {
             None
@@ -2878,6 +2950,7 @@ impl From<Stmt> for AnyNode {
             Stmt::ClassDef(node) => AnyNode::StmtClassDef(node),
             Stmt::Return(node) => AnyNode::StmtReturn(node),
             Stmt::Delete(node) => AnyNode::StmtDelete(node),
+            Stmt::TypeAlias(node) => AnyNode::StmtTypeAlias(node),
             Stmt::Assign(node) => AnyNode::StmtAssign(node),
             Stmt::AugAssign(node) => AnyNode::StmtAugAssign(node),
             Stmt::AnnAssign(node) => AnyNode::StmtAnnAssign(node),
@@ -3034,6 +3107,12 @@ impl From<ast::StmtDelete> for AnyNode {
     }
 }
 
+impl From<ast::StmtTypeAlias> for AnyNode {
+    fn from(node: ast::StmtTypeAlias) -> Self {
+        AnyNode::StmtTypeAlias(node)
+    }
+}
+
 impl From<ast::StmtAssign> for AnyNode {
     fn from(node: ast::StmtAssign) -> Self {
         AnyNode::StmtAssign(node)
@@ -3073,6 +3152,12 @@ impl From<ast::StmtWhile> for AnyNode {
 impl From<ast::StmtIf> for AnyNode {
     fn from(node: ast::StmtIf) -> Self {
         AnyNode::StmtIf(node)
+    }
+}
+
+impl From<ast::ElifElseClause> for AnyNode {
+    fn from(node: ast::ElifElseClause) -> Self {
+        AnyNode::ElifElseClause(node)
     }
 }
 
@@ -3446,6 +3531,7 @@ impl Ranged for AnyNode {
             AnyNode::StmtClassDef(node) => node.range(),
             AnyNode::StmtReturn(node) => node.range(),
             AnyNode::StmtDelete(node) => node.range(),
+            AnyNode::StmtTypeAlias(node) => node.range(),
             AnyNode::StmtAssign(node) => node.range(),
             AnyNode::StmtAugAssign(node) => node.range(),
             AnyNode::StmtAnnAssign(node) => node.range(),
@@ -3514,6 +3600,7 @@ impl Ranged for AnyNode {
             AnyNode::WithItem(node) => node.range(),
             AnyNode::MatchCase(node) => node.range(),
             AnyNode::Decorator(node) => node.range(),
+            AnyNode::ElifElseClause(node) => node.range(),
         }
     }
 }
@@ -3529,6 +3616,7 @@ pub enum AnyNodeRef<'a> {
     StmtClassDef(&'a ast::StmtClassDef),
     StmtReturn(&'a ast::StmtReturn),
     StmtDelete(&'a ast::StmtDelete),
+    StmtTypeAlias(&'a ast::StmtTypeAlias),
     StmtAssign(&'a ast::StmtAssign),
     StmtAugAssign(&'a ast::StmtAugAssign),
     StmtAnnAssign(&'a ast::StmtAnnAssign),
@@ -3597,6 +3685,7 @@ pub enum AnyNodeRef<'a> {
     WithItem(&'a WithItem),
     MatchCase(&'a MatchCase),
     Decorator(&'a Decorator),
+    ElifElseClause(&'a ast::ElifElseClause),
 }
 
 impl AnyNodeRef<'_> {
@@ -3611,6 +3700,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::StmtClassDef(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtReturn(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtDelete(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::StmtTypeAlias(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtAssign(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtAugAssign(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtAnnAssign(node) => NonNull::from(*node).cast(),
@@ -3679,6 +3769,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::WithItem(node) => NonNull::from(*node).cast(),
             AnyNodeRef::MatchCase(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Decorator(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ElifElseClause(node) => NonNull::from(*node).cast(),
         }
     }
 
@@ -3699,6 +3790,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::StmtClassDef(_) => NodeKind::StmtClassDef,
             AnyNodeRef::StmtReturn(_) => NodeKind::StmtReturn,
             AnyNodeRef::StmtDelete(_) => NodeKind::StmtDelete,
+            AnyNodeRef::StmtTypeAlias(_) => NodeKind::StmtTypeAlias,
             AnyNodeRef::StmtAssign(_) => NodeKind::StmtAssign,
             AnyNodeRef::StmtAugAssign(_) => NodeKind::StmtAugAssign,
             AnyNodeRef::StmtAnnAssign(_) => NodeKind::StmtAnnAssign,
@@ -3767,6 +3859,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::WithItem(_) => NodeKind::WithItem,
             AnyNodeRef::MatchCase(_) => NodeKind::MatchCase,
             AnyNodeRef::Decorator(_) => NodeKind::Decorator,
+            AnyNodeRef::ElifElseClause(_) => NodeKind::ElifElseClause,
         }
     }
 
@@ -3777,6 +3870,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtClassDef(_)
             | AnyNodeRef::StmtReturn(_)
             | AnyNodeRef::StmtDelete(_)
+            | AnyNodeRef::StmtTypeAlias(_)
             | AnyNodeRef::StmtAssign(_)
             | AnyNodeRef::StmtAugAssign(_)
             | AnyNodeRef::StmtAnnAssign(_)
@@ -3849,7 +3943,8 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::Alias(_)
             | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
-            | AnyNodeRef::Decorator(_) => false,
+            | AnyNodeRef::Decorator(_)
+            | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
 
@@ -3892,6 +3987,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtClassDef(_)
             | AnyNodeRef::StmtReturn(_)
             | AnyNodeRef::StmtDelete(_)
+            | AnyNodeRef::StmtTypeAlias(_)
             | AnyNodeRef::StmtAssign(_)
             | AnyNodeRef::StmtAugAssign(_)
             | AnyNodeRef::StmtAnnAssign(_)
@@ -3932,7 +4028,8 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::Alias(_)
             | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
-            | AnyNodeRef::Decorator(_) => false,
+            | AnyNodeRef::Decorator(_)
+            | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
 
@@ -3948,6 +4045,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtClassDef(_)
             | AnyNodeRef::StmtReturn(_)
             | AnyNodeRef::StmtDelete(_)
+            | AnyNodeRef::StmtTypeAlias(_)
             | AnyNodeRef::StmtAssign(_)
             | AnyNodeRef::StmtAugAssign(_)
             | AnyNodeRef::StmtAnnAssign(_)
@@ -4015,7 +4113,8 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::Alias(_)
             | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
-            | AnyNodeRef::Decorator(_) => false,
+            | AnyNodeRef::Decorator(_)
+            | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
 
@@ -4039,6 +4138,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtClassDef(_)
             | AnyNodeRef::StmtReturn(_)
             | AnyNodeRef::StmtDelete(_)
+            | AnyNodeRef::StmtTypeAlias(_)
             | AnyNodeRef::StmtAssign(_)
             | AnyNodeRef::StmtAugAssign(_)
             | AnyNodeRef::StmtAnnAssign(_)
@@ -4098,7 +4198,8 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::Alias(_)
             | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
-            | AnyNodeRef::Decorator(_) => false,
+            | AnyNodeRef::Decorator(_)
+            | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
 
@@ -4115,6 +4216,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtClassDef(_)
             | AnyNodeRef::StmtReturn(_)
             | AnyNodeRef::StmtDelete(_)
+            | AnyNodeRef::StmtTypeAlias(_)
             | AnyNodeRef::StmtAssign(_)
             | AnyNodeRef::StmtAugAssign(_)
             | AnyNodeRef::StmtAnnAssign(_)
@@ -4181,7 +4283,8 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::Alias(_)
             | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
-            | AnyNodeRef::Decorator(_) => false,
+            | AnyNodeRef::Decorator(_)
+            | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
 
@@ -4198,6 +4301,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtClassDef(_)
             | AnyNodeRef::StmtReturn(_)
             | AnyNodeRef::StmtDelete(_)
+            | AnyNodeRef::StmtTypeAlias(_)
             | AnyNodeRef::StmtAssign(_)
             | AnyNodeRef::StmtAugAssign(_)
             | AnyNodeRef::StmtAnnAssign(_)
@@ -4264,7 +4368,8 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::Alias(_)
             | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
-            | AnyNodeRef::Decorator(_) => false,
+            | AnyNodeRef::Decorator(_)
+            | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
 
@@ -4341,6 +4446,12 @@ impl<'a> From<&'a ast::StmtDelete> for AnyNodeRef<'a> {
     }
 }
 
+impl<'a> From<&'a ast::StmtTypeAlias> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::StmtTypeAlias) -> Self {
+        AnyNodeRef::StmtTypeAlias(node)
+    }
+}
+
 impl<'a> From<&'a ast::StmtAssign> for AnyNodeRef<'a> {
     fn from(node: &'a ast::StmtAssign) -> Self {
         AnyNodeRef::StmtAssign(node)
@@ -4380,6 +4491,12 @@ impl<'a> From<&'a ast::StmtWhile> for AnyNodeRef<'a> {
 impl<'a> From<&'a ast::StmtIf> for AnyNodeRef<'a> {
     fn from(node: &'a ast::StmtIf) -> Self {
         AnyNodeRef::StmtIf(node)
+    }
+}
+
+impl<'a> From<&'a ast::ElifElseClause> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::ElifElseClause) -> Self {
+        AnyNodeRef::ElifElseClause(node)
     }
 }
 
@@ -4709,6 +4826,7 @@ impl<'a> From<&'a Stmt> for AnyNodeRef<'a> {
             Stmt::ClassDef(node) => AnyNodeRef::StmtClassDef(node),
             Stmt::Return(node) => AnyNodeRef::StmtReturn(node),
             Stmt::Delete(node) => AnyNodeRef::StmtDelete(node),
+            Stmt::TypeAlias(node) => AnyNodeRef::StmtTypeAlias(node),
             Stmt::Assign(node) => AnyNodeRef::StmtAssign(node),
             Stmt::AugAssign(node) => AnyNodeRef::StmtAugAssign(node),
             Stmt::AnnAssign(node) => AnyNodeRef::StmtAnnAssign(node),
@@ -4866,6 +4984,7 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::StmtClassDef(node) => node.range(),
             AnyNodeRef::StmtReturn(node) => node.range(),
             AnyNodeRef::StmtDelete(node) => node.range(),
+            AnyNodeRef::StmtTypeAlias(node) => node.range(),
             AnyNodeRef::StmtAssign(node) => node.range(),
             AnyNodeRef::StmtAugAssign(node) => node.range(),
             AnyNodeRef::StmtAnnAssign(node) => node.range(),
@@ -4934,6 +5053,7 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::WithItem(node) => node.range(),
             AnyNodeRef::MatchCase(node) => node.range(),
             AnyNodeRef::Decorator(node) => node.range(),
+            AnyNodeRef::ElifElseClause(node) => node.range(),
         }
     }
 }
@@ -4949,6 +5069,7 @@ pub enum NodeKind {
     StmtClassDef,
     StmtReturn,
     StmtDelete,
+    StmtTypeAlias,
     StmtAssign,
     StmtAugAssign,
     StmtAnnAssign,
@@ -5017,4 +5138,5 @@ pub enum NodeKind {
     WithItem,
     MatchCase,
     Decorator,
+    ElifElseClause,
 }

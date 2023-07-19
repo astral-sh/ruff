@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { DEFAULT_PYTHON_SOURCE } from "../constants";
 import init, {
   check,
@@ -16,90 +16,98 @@ import MonacoThemes from "./MonacoThemes";
 
 type Tab = "Source" | "Settings";
 
+interface Source {
+  pythonSource: string;
+  settingsSource: string;
+  revision: number;
+}
+
+interface CheckResult {
+  diagnostics: Diagnostic[];
+  error: string | null;
+}
+
 export default function Editor() {
-  const [initialized, setInitialized] = useState<boolean>(false);
-  const [version, setVersion] = useState<string | null>(null);
+  const [ruffVersion, setRuffVersion] = useState<string | null>(null);
+  const [checkResult, setCheckResult] = useState<CheckResult>({
+    diagnostics: [],
+    error: null,
+  });
+  const [source, setSource] = useState<Source>({
+    pythonSource: "",
+    settingsSource: "",
+    revision: 0,
+  });
+
   const [tab, setTab] = useState<Tab>("Source");
-  const [edit, setEdit] = useState<number>(0);
-  const [settingsSource, setSettingsSource] = useState<string | null>(null);
-  const [pythonSource, setPythonSource] = useState<string | null>(null);
-  const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
-  const [error, setError] = useState<string | null>(null);
   const [theme, setTheme] = useTheme();
 
+  const initialized = ruffVersion != null;
+
   useEffect(() => {
-    init().then(() => setInitialized(true));
+    init().then(() => {
+      setRuffVersion(currentVersion());
+
+      const [settingsSource, pythonSource] = restore() ?? [
+        stringify(defaultSettings()),
+        DEFAULT_PYTHON_SOURCE,
+      ];
+
+      setSource({
+        pythonSource,
+        revision: 0,
+        settingsSource,
+      });
+    });
   }, []);
 
   useEffect(() => {
-    if (!initialized || settingsSource == null || pythonSource == null) {
-      return;
-    }
-
-    let config: any;
-    let diagnostics: Diagnostic[];
-
-    try {
-      config = JSON.parse(settingsSource);
-    } catch (e) {
-      setDiagnostics([]);
-      setError((e as Error).message);
-      return;
-    }
-
-    try {
-      diagnostics = check(pythonSource, config);
-    } catch (e) {
-      setError(e as string);
-      return;
-    }
-
-    setError(null);
-    setDiagnostics(diagnostics);
-  }, [initialized, settingsSource, pythonSource]);
-
-  useEffect(() => {
     if (!initialized) {
       return;
     }
 
-    if (settingsSource == null || pythonSource == null) {
-      const payload = restore();
-      if (payload) {
-        const [settingsSource, pythonSource] = payload;
-        setSettingsSource(settingsSource);
-        setPythonSource(pythonSource);
-      } else {
-        setSettingsSource(stringify(defaultSettings()));
-        setPythonSource(DEFAULT_PYTHON_SOURCE);
-      }
-    }
-  }, [initialized, settingsSource, pythonSource]);
+    const { settingsSource, pythonSource } = source;
 
-  useEffect(() => {
+    try {
+      const config = JSON.parse(settingsSource);
+      const diagnostics = check(pythonSource, config);
+
+      setCheckResult({
+        diagnostics,
+        error: null,
+      });
+    } catch (e) {
+      setCheckResult({
+        diagnostics: [],
+        error: (e as Error).message,
+      });
+    }
+  }, [initialized, source]);
+
+  const handleShare = useMemo(() => {
     if (!initialized) {
-      return;
+      return undefined;
     }
 
-    setVersion(currentVersion());
-  }, [initialized]);
-
-  const handleShare = useCallback(() => {
-    if (!initialized || settingsSource == null || pythonSource == null) {
-      return;
-    }
-
-    persist(settingsSource, pythonSource);
-  }, [initialized, settingsSource, pythonSource]);
+    return () => {
+      persist(source.settingsSource, source.pythonSource);
+    };
+  }, [source, initialized]);
 
   const handlePythonSourceChange = useCallback((pythonSource: string) => {
-    setEdit((edit) => edit + 1);
-    setPythonSource(pythonSource);
+    setSource((state) => ({
+      ...state,
+      pythonSource,
+      revision: state.revision + 1,
+    }));
   }, []);
 
   const handleSettingsSourceChange = useCallback((settingsSource: string) => {
-    setEdit((edit) => edit + 1);
-    setSettingsSource(settingsSource);
+    setSource((state) => ({
+      ...state,
+      settingsSource,
+      revision: state.revision + 1,
+    }));
   }, []);
 
   return (
@@ -109,37 +117,37 @@ export default function Editor() {
       }
     >
       <Header
-        edit={edit}
+        edit={source.revision}
         tab={tab}
         theme={theme}
-        version={version}
+        version={ruffVersion}
         onChangeTab={setTab}
         onChangeTheme={setTheme}
-        onShare={initialized ? handleShare : undefined}
+        onShare={handleShare}
       />
 
       <MonacoThemes />
 
       <div className={"mt-12 relative flex-auto"}>
-        {initialized && settingsSource != null && pythonSource != null ? (
+        {initialized ? (
           <>
             <SourceEditor
               visible={tab === "Source"}
-              source={pythonSource}
+              source={source.pythonSource}
               theme={theme}
-              diagnostics={diagnostics}
+              diagnostics={checkResult.diagnostics}
               onChange={handlePythonSourceChange}
             />
             <SettingsEditor
               visible={tab === "Settings"}
-              source={settingsSource}
+              source={source.settingsSource}
               theme={theme}
               onChange={handleSettingsSourceChange}
             />
           </>
         ) : null}
       </div>
-      {error && tab === "Source" ? (
+      {checkResult.error && tab === "Source" ? (
         <div
           style={{
             position: "fixed",
@@ -148,7 +156,7 @@ export default function Editor() {
             bottom: "10%",
           }}
         >
-          <ErrorMessage>{error}</ErrorMessage>
+          <ErrorMessage>{checkResult.error}</ErrorMessage>
         </div>
       ) : null}
     </main>

@@ -604,6 +604,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (PandasVet, "012") => (RuleGroup::Unspecified, rules::pandas_vet::rules::PandasUseOfDotReadTable),
         (PandasVet, "013") => (RuleGroup::Unspecified, rules::pandas_vet::rules::PandasUseOfDotStack),
         (PandasVet, "015") => (RuleGroup::Unspecified, rules::pandas_vet::rules::PandasUseOfPdMerge),
+        (PandasVet, "101") => (RuleGroup::Unspecified, rules::pandas_vet::rules::PandasNuniqueConstantSeriesCheck),
         (PandasVet, "901") => (RuleGroup::Unspecified, rules::pandas_vet::rules::PandasDfVariableName),
 
         // flake8-errmsg

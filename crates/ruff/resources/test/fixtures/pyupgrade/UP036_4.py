@@ -7,20 +7,20 @@ if True:
 
 if True:
     if foo:
-        pass
+        print()
     elif sys.version_info < (3, 3):
         cmd = [sys.executable, "-m", "test.regrtest"]
 
 if True:
     if foo:
-        pass
+        print()
     elif sys.version_info < (3, 3):
         cmd = [sys.executable, "-m", "test.regrtest"]
     elif foo:
         cmd = [sys.executable, "-m", "test", "-j0"]
 
     if foo:
-        pass
+        print()
     elif sys.version_info < (3, 3):
         cmd = [sys.executable, "-m", "test.regrtest"]
 
@@ -28,7 +28,7 @@ if True:
         cmd = [sys.executable, "-m", "test.regrtest"]
 
     if foo:
-        pass
+        print()
     elif sys.version_info < (3, 3):
         cmd = [sys.executable, "-m", "test.regrtest"]
     else:

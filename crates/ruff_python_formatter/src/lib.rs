@@ -33,7 +33,6 @@ pub(crate) mod other;
 pub(crate) mod pattern;
 mod prelude;
 pub(crate) mod statement;
-mod trivia;
 
 include!("../../ruff_formatter/shared_traits.rs");
 

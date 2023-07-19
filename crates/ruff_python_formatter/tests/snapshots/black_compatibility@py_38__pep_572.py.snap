@@ -68,12 +68,9 @@ while x := f(x):
      pass
  [y := f(x), y**2, y**3]
  filtered_data = [y for x in data if (y := f(x)) is None]
-@@ -31,9 +31,9 @@
- len(lines := f.readlines())
- foo(x := 3, cat="vector")
+@@ -33,7 +33,7 @@
  foo(cat=(category := "vector"))
--if any(len(longline := l) >= 100 for l in lines):
-+if any((NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])):
+ if any(len(longline := l) >= 100 for l in lines):
      print(longline)
 -if env_base := os.environ.get("PYTHONUSERBASE", None):
 +if (env_base := os.environ.get("PYTHONUSERBASE", None)):
@@ -128,7 +125,7 @@ x = (y := 0)
 len(lines := f.readlines())
 foo(x := 3, cat="vector")
 foo(cat=(category := "vector"))
-if any((NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])):
+if any(len(longline := l) >= 100 for l in lines):
     print(longline)
 if (env_base := os.environ.get("PYTHONUSERBASE", None)):
     return env_base

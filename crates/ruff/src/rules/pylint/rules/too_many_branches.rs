@@ -88,74 +88,74 @@ impl Violation for TooManyBranches {
 fn num_branches(stmts: &[Stmt]) -> usize {
     stmts
         .iter()
-        .map(|stmt| {
-            match stmt {
-                Stmt::If(ast::StmtIf { body, orelse, .. }) => {
-                    1 + num_branches(body)
-                        + (if let Some(stmt) = orelse.first() {
-                            // `elif:` and `else: if:` have the same AST representation.
-                            // Avoid treating `elif:` as two statements.
-                            usize::from(!stmt.is_if_stmt())
-                        } else {
-                            0
-                        })
-                        + num_branches(orelse)
-                }
-                Stmt::Match(ast::StmtMatch { cases, .. }) => {
-                    1 + cases
+        .map(|stmt| match stmt {
+            Stmt::If(ast::StmtIf {
+                body,
+                elif_else_clauses,
+                ..
+            }) => {
+                1 + num_branches(body)
+                    + elif_else_clauses.len()
+                    + elif_else_clauses
                         .iter()
-                        .map(|case| num_branches(&case.body))
+                        .map(|clause| num_branches(&clause.body))
                         .sum::<usize>()
-                }
-                Stmt::For(ast::StmtFor { body, orelse, .. })
-                | Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. })
-                | Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
-                    1 + num_branches(body)
-                        + (if orelse.is_empty() {
-                            0
-                        } else {
-                            1 + num_branches(orelse)
-                        })
-                }
-                Stmt::Try(ast::StmtTry {
-                    body,
-                    handlers,
-                    orelse,
-                    finalbody,
-                    range: _,
-                })
-                | Stmt::TryStar(ast::StmtTryStar {
-                    body,
-                    handlers,
-                    orelse,
-                    finalbody,
-                    range: _,
-                }) => {
-                    1 + num_branches(body)
-                        + (if orelse.is_empty() {
-                            0
-                        } else {
-                            1 + num_branches(orelse)
-                        })
-                        + (if finalbody.is_empty() {
-                            0
-                        } else {
-                            1 + num_branches(finalbody)
-                        })
-                        + handlers
-                            .iter()
-                            .map(|handler| {
-                                1 + {
-                                    let ExceptHandler::ExceptHandler(
-                                        ast::ExceptHandlerExceptHandler { body, .. },
-                                    ) = handler;
-                                    num_branches(body)
-                                }
-                            })
-                            .sum::<usize>()
-                }
-                _ => 0,
             }
+            Stmt::Match(ast::StmtMatch { cases, .. }) => {
+                1 + cases
+                    .iter()
+                    .map(|case| num_branches(&case.body))
+                    .sum::<usize>()
+            }
+            Stmt::For(ast::StmtFor { body, orelse, .. })
+            | Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. })
+            | Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
+                1 + num_branches(body)
+                    + (if orelse.is_empty() {
+                        0
+                    } else {
+                        1 + num_branches(orelse)
+                    })
+            }
+            Stmt::Try(ast::StmtTry {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+                range: _,
+            })
+            | Stmt::TryStar(ast::StmtTryStar {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+                range: _,
+            }) => {
+                1 + num_branches(body)
+                    + (if orelse.is_empty() {
+                        0
+                    } else {
+                        1 + num_branches(orelse)
+                    })
+                    + (if finalbody.is_empty() {
+                        0
+                    } else {
+                        1 + num_branches(finalbody)
+                    })
+                    + handlers
+                        .iter()
+                        .map(|handler| {
+                            1 + {
+                                let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+                                    body,
+                                    ..
+                                }) = handler;
+                                num_branches(body)
+                            }
+                        })
+                        .sum::<usize>()
+            }
+            _ => 0,
         })
         .sum()
 }
@@ -205,8 +205,7 @@ else:
     else:
         pass
 "#;
-
-        test_helper(source, 3)?;
+        test_helper(source, 4)?;
         Ok(())
     }
 

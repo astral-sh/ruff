@@ -1,7 +1,8 @@
+use memchr::memrchr3_iter;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use unic_ucd_ident::{is_xid_continue, is_xid_start};
 
-use ruff_python_whitespace::{is_python_whitespace, Cursor};
+use crate::{is_python_whitespace, Cursor};
 
 /// Searches for the first non-trivia character in `range`.
 ///
@@ -11,7 +12,7 @@ use ruff_python_whitespace::{is_python_whitespace, Cursor};
 /// of the character, the second item the non-trivia character.
 ///
 /// Returns `None` if the range is empty or only contains trivia (whitespace or comments).
-pub(crate) fn first_non_trivia_token(offset: TextSize, code: &str) -> Option<Token> {
+pub fn first_non_trivia_token(offset: TextSize, code: &str) -> Option<Token> {
     SimpleTokenizer::starts_at(offset, code)
         .skip_trivia()
         .next()
@@ -23,14 +24,14 @@ pub(crate) fn first_non_trivia_token(offset: TextSize, code: &str) -> Option<Tok
 /// ## Notes
 ///
 /// Prefer [`first_non_trivia_token`] whenever possible because reverse lookup is expensive because of comments.
-pub(crate) fn first_non_trivia_token_rev(offset: TextSize, code: &str) -> Option<Token> {
+pub fn first_non_trivia_token_rev(offset: TextSize, code: &str) -> Option<Token> {
     SimpleTokenizer::up_to(offset, code)
         .skip_trivia()
         .next_back()
 }
 
 /// Returns the number of newlines between `offset` and the first non whitespace character in the source code.
-pub(crate) fn lines_before(offset: TextSize, code: &str) -> u32 {
+pub fn lines_before(offset: TextSize, code: &str) -> u32 {
     let tokens = SimpleTokenizer::up_to(offset, code);
     let mut newlines = 0u32;
 
@@ -52,7 +53,7 @@ pub(crate) fn lines_before(offset: TextSize, code: &str) -> u32 {
 }
 
 /// Counts the empty lines between `offset` and the first non-whitespace character.
-pub(crate) fn lines_after(offset: TextSize, code: &str) -> u32 {
+pub fn lines_after(offset: TextSize, code: &str) -> u32 {
     let tokens = SimpleTokenizer::starts_at(offset, code);
     let mut newlines = 0u32;
 
@@ -74,7 +75,7 @@ pub(crate) fn lines_after(offset: TextSize, code: &str) -> u32 {
 }
 
 /// Returns the position after skipping any trailing trivia up to, but not including the newline character.
-pub(crate) fn skip_trailing_trivia(offset: TextSize, code: &str) -> TextSize {
+pub fn skip_trailing_trivia(offset: TextSize, code: &str) -> TextSize {
     let tokenizer = SimpleTokenizer::starts_at(offset, code);
 
     for token in tokenizer {
@@ -110,32 +111,32 @@ fn is_non_ascii_identifier_start(c: char) -> bool {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub(crate) struct Token {
-    pub(crate) kind: TokenKind,
-    pub(crate) range: TextRange,
+pub struct Token {
+    pub kind: TokenKind,
+    pub range: TextRange,
 }
 
 impl Token {
-    pub(crate) const fn kind(&self) -> TokenKind {
+    pub const fn kind(&self) -> TokenKind {
         self.kind
     }
 
     #[allow(unused)]
-    pub(crate) const fn range(&self) -> TextRange {
+    pub const fn range(&self) -> TextRange {
         self.range
     }
 
-    pub(crate) const fn start(&self) -> TextSize {
+    pub const fn start(&self) -> TextSize {
         self.range.start()
     }
 
-    pub(crate) const fn end(&self) -> TextSize {
+    pub const fn end(&self) -> TextSize {
         self.range.end()
     }
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-pub(crate) enum TokenKind {
+pub enum TokenKind {
     /// A comment, not including the trailing new line.
     Comment,
 
@@ -247,7 +248,7 @@ impl TokenKind {
 ///
 /// The tokenizer doesn't guarantee any correctness after it returned a [`TokenKind::Other`]. That's why it
 /// will return [`TokenKind::Bogus`] for every character after until it reaches the end of the file.
-pub(crate) struct SimpleTokenizer<'a> {
+pub struct SimpleTokenizer<'a> {
     offset: TextSize,
     back_offset: TextSize,
     /// `true` when it is known that the current `back` line has no comment for sure.
@@ -258,7 +259,7 @@ pub(crate) struct SimpleTokenizer<'a> {
 }
 
 impl<'a> SimpleTokenizer<'a> {
-    pub(crate) fn new(source: &'a str, range: TextRange) -> Self {
+    pub fn new(source: &'a str, range: TextRange) -> Self {
         Self {
             offset: range.start(),
             back_offset: range.end(),
@@ -269,13 +270,23 @@ impl<'a> SimpleTokenizer<'a> {
         }
     }
 
-    pub(crate) fn starts_at(offset: TextSize, source: &'a str) -> Self {
+    pub fn starts_at(offset: TextSize, source: &'a str) -> Self {
         let range = TextRange::new(offset, source.text_len());
         Self::new(source, range)
     }
 
-    pub(crate) fn up_to(offset: TextSize, source: &'a str) -> Self {
+    /// Creates a tokenizer that lexes tokens from the start of `source` up to `offset`.
+    pub fn up_to(offset: TextSize, source: &'a str) -> Self {
         Self::new(source, TextRange::up_to(offset))
+    }
+
+    /// Creates a tokenizer that lexes tokens from the start of `source` up to `offset`, and informs
+    /// the lexer that the line at `offset` contains no comments. This can significantly speed up backwards lexing
+    /// because the lexer doesn't need to scan for comments.
+    pub fn up_to_without_back_comment(offset: TextSize, source: &'a str) -> Self {
+        let mut tokenizer = Self::up_to(offset, source);
+        tokenizer.back_line_has_no_comment = true;
+        tokenizer
     }
 
     fn to_keyword_or_other(&self, range: TextRange) -> TokenKind {
@@ -365,7 +376,7 @@ impl<'a> SimpleTokenizer<'a> {
 
     /// Returns the next token from the back. Prefer iterating forwards. Iterating backwards is significantly more expensive
     /// because it needs to check if the line has any comments when encountering any non-trivia token.
-    pub(crate) fn next_token_back(&mut self) -> Token {
+    pub fn next_token_back(&mut self) -> Token {
         self.cursor.start_token();
 
         let Some(last) = self.cursor.bump_back() else {
@@ -409,36 +420,45 @@ impl<'a> SimpleTokenizer<'a> {
 
             // For all other tokens, test if the character isn't part of a comment.
             c => {
-                let mut comment_offset = None;
-
                 // Skip the test whether there's a preceding comment if it has been performed before.
-                if !self.back_line_has_no_comment {
-                    for (back_index, c) in self.cursor.chars().rev().enumerate() {
-                        match c {
-                            '#' => {
-                                // Potentially a comment
-                                comment_offset = Some(back_index + 1);
-                            }
-                            '\r' | '\n' | '\\' => {
-                                break;
-                            }
-                            c => {
-                                if !is_python_whitespace(c)
-                                    && TokenKind::from_non_trivia_char(c) == TokenKind::Other
-                                {
-                                    comment_offset = None;
-                                }
-                            }
+                let comment_offset = if self.back_line_has_no_comment {
+                    None
+                } else {
+                    let bytes = self.cursor.chars().as_str().as_bytes();
+                    let mut line_start = 0;
+                    let mut last_comment_offset = None;
+
+                    // Find the start of the line, or any potential comments.
+                    for index in memrchr3_iter(b'\n', b'\r', b'#', bytes) {
+                        if bytes[index] == b'#' {
+                            // Potentially a comment, but not guaranteed
+                            last_comment_offset = Some(index);
+                        } else {
+                            line_start = index + 1;
+                            break;
                         }
                     }
-                }
+
+                    // Verify if this is indeed a comment. Doing this only when we've found a comment is significantly
+                    // faster because comments are rare.
+                    last_comment_offset.filter(|last_comment_offset| {
+                        let before_comment =
+                            &self.cursor.chars().as_str()[line_start..*last_comment_offset];
+
+                        before_comment.chars().all(|c| {
+                            is_python_whitespace(c)
+                                || TokenKind::from_non_trivia_char(c) != TokenKind::Other
+                        })
+                    })
+                };
 
                 // From here on it is guaranteed that this line has no other comment.
                 self.back_line_has_no_comment = true;
 
                 if let Some(comment_offset) = comment_offset {
+                    let comment_length = self.cursor.chars().as_str().len() - comment_offset;
                     // It is a comment, bump all tokens
-                    for _ in 0..comment_offset {
+                    for _ in 0..comment_length {
                         self.cursor.bump_back().unwrap();
                     }
 
@@ -493,7 +513,7 @@ impl<'a> SimpleTokenizer<'a> {
         token
     }
 
-    pub(crate) fn skip_trivia(self) -> impl Iterator<Item = Token> + DoubleEndedIterator + 'a {
+    pub fn skip_trivia(self) -> impl Iterator<Item = Token> + DoubleEndedIterator + 'a {
         self.filter(|t| !t.kind().is_trivia())
     }
 }
@@ -529,7 +549,7 @@ mod tests {
     use insta::assert_debug_snapshot;
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
-    use crate::trivia::{lines_after, lines_before, SimpleTokenizer, Token};
+    use crate::tokenizer::{lines_after, lines_before, SimpleTokenizer, Token};
 
     struct TokenizationTestCase {
         source: &'static str,

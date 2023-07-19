@@ -16,6 +16,7 @@ use ruff_python_ast::source_code::Locator;
 use ruff_python_whitespace::LineEnding;
 
 use crate::codes::NoqaCode;
+use crate::fs::relativize_path;
 use crate::registry::{AsRule, Rule, RuleSet};
 use crate::rule_redirects::get_redirect_target;
 
@@ -225,6 +226,7 @@ impl FileExemption {
     pub(crate) fn try_extract(
         contents: &str,
         comment_ranges: &[TextRange],
+        path: &Path,
         locator: &Locator,
     ) -> Option<Self> {
         let mut exempt_codes: Vec<NoqaCode> = vec![];
@@ -234,7 +236,8 @@ impl FileExemption {
                 Err(err) => {
                     #[allow(deprecated)]
                     let line = locator.compute_line_index(range.start());
-                    warn!("Invalid `# noqa` directive on line {line}: {err}");
+                    let path_display = relativize_path(path);
+                    warn!("Invalid `# noqa` directive on {path_display}:{line}: {err}");
                 }
                 Ok(Some(ParsedFileExemption::All)) => {
                     return Some(Self::All);
@@ -437,6 +440,7 @@ pub(crate) fn add_noqa(
     line_ending: LineEnding,
 ) -> Result<usize> {
     let (count, output) = add_noqa_inner(
+        path,
         diagnostics,
         locator,
         commented_lines,
@@ -448,6 +452,7 @@ pub(crate) fn add_noqa(
 }
 
 fn add_noqa_inner(
+    path: &Path,
     diagnostics: &[Diagnostic],
     locator: &Locator,
     commented_ranges: &[TextRange],
@@ -460,8 +465,8 @@ fn add_noqa_inner(
 
     // Whether the file is exempted from all checks.
     // Codes that are globally exempted (within the current file).
-    let exemption = FileExemption::try_extract(locator.contents(), commented_ranges, locator);
-    let directives = NoqaDirectives::from_commented_ranges(commented_ranges, locator);
+    let exemption = FileExemption::try_extract(locator.contents(), commented_ranges, path, locator);
+    let directives = NoqaDirectives::from_commented_ranges(commented_ranges, path, locator);
 
     // Mark any non-ignored diagnostics.
     for diagnostic in diagnostics {
@@ -625,6 +630,7 @@ pub(crate) struct NoqaDirectives<'a> {
 impl<'a> NoqaDirectives<'a> {
     pub(crate) fn from_commented_ranges(
         comment_ranges: &[TextRange],
+        path: &Path,
         locator: &'a Locator<'a>,
     ) -> Self {
         let mut directives = Vec::new();
@@ -634,7 +640,8 @@ impl<'a> NoqaDirectives<'a> {
                 Err(err) => {
                     #[allow(deprecated)]
                     let line = locator.compute_line_index(range.start());
-                    warn!("Invalid `# noqa` directive on line {line}: {err}");
+                    let path_display = relativize_path(path);
+                    warn!("Invalid `# noqa` directive on {path_display}:{line}: {err}");
                 }
                 Ok(Some(directive)) => {
                     // noqa comments are guaranteed to be single line.
@@ -758,6 +765,8 @@ impl FromIterator<TextRange> for NoqaMapping {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use insta::assert_debug_snapshot;
     use ruff_text_size::{TextRange, TextSize};
 
@@ -946,9 +955,12 @@ mod tests {
 
     #[test]
     fn modification() {
+        let path = Path::new("/tmp/foo.txt");
+
         let contents = "x = 1";
         let noqa_line_for = NoqaMapping::default();
         let (count, output) = add_noqa_inner(
+            path,
             &[],
             &Locator::new(contents),
             &[],
@@ -968,6 +980,7 @@ mod tests {
         let contents = "x = 1";
         let noqa_line_for = NoqaMapping::default();
         let (count, output) = add_noqa_inner(
+            path,
             &diagnostics,
             &Locator::new(contents),
             &[],
@@ -992,6 +1005,7 @@ mod tests {
         let contents = "x = 1  # noqa: E741\n";
         let noqa_line_for = NoqaMapping::default();
         let (count, output) = add_noqa_inner(
+            path,
             &diagnostics,
             &Locator::new(contents),
             &[TextRange::new(TextSize::from(7), TextSize::from(19))],
@@ -1016,6 +1030,7 @@ mod tests {
         let contents = "x = 1  # noqa";
         let noqa_line_for = NoqaMapping::default();
         let (count, output) = add_noqa_inner(
+            path,
             &diagnostics,
             &Locator::new(contents),
             &[TextRange::new(TextSize::from(7), TextSize::from(13))],
