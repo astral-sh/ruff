@@ -12,6 +12,8 @@ html,
   margin: 0;
   height: 100%;
   width: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .shadow-copied {
@@ -22,4 +24,44 @@ html,
 
   box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000),
     var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+}
+
+@font-face {
+  font-family: "Alliance Text";
+  src:
+    url("../public/fonts/Alliance-TextRegular.woff2") format("woff2"),
+    url("../public/fonts/Alliance-TextRegular.woff") format("woff");
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Alliance Text";
+  src:
+    url("../public/fonts/Alliance-TextMedium.woff2") format("woff2"),
+    url("../public/fonts/Alliance-TextMedium.woff") format("woff");
+  font-weight: 500;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Alliance Platt";
+  src:
+    url("../public/fonts/Alliance-PlattMedium.woff2") format("woff2"),
+    url("../public/fonts/Alliance-PlattMedium.woff") format("woff");
+  font-weight: 500;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Alliance Platt";
+  src:
+    url("../public/fonts/Alliance-PlattRegular.woff2") format("woff2"),
+    url("../public/fonts/Alliance-PlattRegular.woff") format("woff");
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
 }

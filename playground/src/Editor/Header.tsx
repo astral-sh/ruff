@@ -65,9 +65,7 @@ export default function Header({
         <Divider />
         <RepoButton />
         <Divider />
-        <div className="hidden sm:block">
-          <ShareButton key={edit} onShare={onShare} />
-        </div>
+        <ShareButton key={edit} onShare={onShare} />
         <Divider />
         <ThemeButton theme={theme} onChange={onChangeTheme} />
       </div>

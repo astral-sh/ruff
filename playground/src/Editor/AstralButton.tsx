@@ -9,16 +9,21 @@ export default function AstralButton({
   return (
     <button
       className={classNames(
+        "uppercase",
+        "ease-in-out",
+        "font-heading",
+        "transition-all duration-200",
         "bg-radiate",
         "text-black",
-        "hover:text-radiate",
+        "hover:text-white",
         "hover:bg-galaxy",
         "outline-1",
         "dark:outline",
-        "dark:hover:outline-radiate",
+        "dark:hover:outline-white",
         "rounded-md",
+        "tracking-[.08em]",
         "text-sm",
-        "font-semibold",
+        "font-medium",
         "enabled:hover:bg-galaxy",
         className,
       )}
