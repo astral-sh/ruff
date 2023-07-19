@@ -14,7 +14,6 @@ use crate::prelude::*;
 
 #[derive(Eq, PartialEq, Debug, Default)]
 pub enum TupleParentheses {
-    /// TODO(cnpryer): Why not `Never`?
     /// Black omits parentheses for tuples inside of comprehensions.
     Comprehension,
 
