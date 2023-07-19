@@ -625,6 +625,10 @@ fn is_string_terminated(kind: StringKind, cursor: &mut Cursor) -> bool {
                 return false;
             }
             '\\' => {
+                // Skip over escaped quotes that match this strings quotes or double escaped backslashes
+                if cursor.eat_char(quote_char) || cursor.eat_char('\\') {
+                    continue;
+                }
                 // Eat over line continuation
                 cursor.eat_char('\r');
                 cursor.eat_char('\n');
@@ -919,6 +923,20 @@ mod tests {
     fn string_followed_by_multiple_comments() {
         let test_case =
             tokenize(r#"'a string # containing a hash " # and another hash ' # finally a comment"#);
+
+        assert_debug_snapshot!(test_case.tokenize_reverse());
+    }
+
+    #[test]
+    fn string_with_escaped_quote() {
+        let test_case = tokenize(r#"'a string \' # containing a hash ' # finally a comment"#);
+
+        assert_debug_snapshot!(test_case.tokenize_reverse());
+    }
+
+    #[test]
+    fn string_with_double_escaped_backslash() {
+        let test_case = tokenize(r#"'a string \\' # a comment '"#);
 
         assert_debug_snapshot!(test_case.tokenize_reverse());
     }
