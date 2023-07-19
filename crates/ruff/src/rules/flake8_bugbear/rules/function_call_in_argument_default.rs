@@ -103,7 +103,7 @@ where
 }
 
 /// B008
-pub(crate) fn function_call_argument_default(checker: &mut Checker, arguments: &Arguments) {
+pub(crate) fn function_call_in_argument_default(checker: &mut Checker, arguments: &Arguments) {
     // Map immutable calls to (module, member) format.
     let extend_immutable_calls: Vec<CallPath> = checker
         .settings

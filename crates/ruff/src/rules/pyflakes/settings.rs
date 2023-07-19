@@ -22,6 +22,9 @@ pub struct Options {
     /// Additional functions or classes to consider generic, such that any
     /// subscripts should be treated as type annotation (e.g., `ForeignKey` in
     /// `django.db.models.ForeignKey["User"]`.
+    ///
+    /// Expects to receive a list of fully-qualified names (e.g., `django.db.models.ForeignKey`,
+    /// rather than `ForeignKey`).
     pub extend_generics: Option<Vec<String>>,
 }
 
