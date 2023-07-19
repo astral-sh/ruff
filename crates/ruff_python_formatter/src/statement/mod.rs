@@ -65,7 +65,7 @@ impl FormatRule<Stmt, PyFormatContext<'_>> for FormatStmt {
             Stmt::Pass(x) => x.format().fmt(f),
             Stmt::Break(x) => x.format().fmt(f),
             Stmt::Continue(x) => x.format().fmt(f),
-            Stmt::TypeAlias(_) => todo!(),
+            Stmt::TypeAlias(x) => x.format().fmt(f),
         }
     }
 }
