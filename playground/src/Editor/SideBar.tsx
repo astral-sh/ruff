@@ -48,7 +48,7 @@ function SideBarEntry({
       title={title}
       onClick={onClick}
       role="button"
-      className={`py-4 px-2 relative ${
+      className={`py-4 px-2 relative flex items-center flex-col ${
         selected ? "fill-white" : "fill-slate-500"
       }`}
     >
