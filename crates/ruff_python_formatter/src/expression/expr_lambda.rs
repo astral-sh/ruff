@@ -54,7 +54,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
     }
 
     fn fmt_dangling_comments(&self, _node: &ExprLambda, _f: &mut PyFormatter) -> FormatResult<()> {
-        // Override. Danlging comments are handled in `fmt_fields`.
+        // Override. Dangling comments are handled in `fmt_fields`.
         Ok(())
     }
 }
