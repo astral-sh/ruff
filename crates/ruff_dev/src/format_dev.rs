@@ -21,7 +21,6 @@ use std::ops::{Add, AddAssign};
 use std::panic::catch_unwind;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
-use std::sync::mpsc::channel;
 use std::time::{Duration, Instant};
 use std::{fmt, fs, io};
 use tempfile::NamedTempFile;
@@ -209,99 +208,60 @@ pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
     }
 }
 
-/// Each `path` is one of the `files` in `Args`
-enum Message {
-    Start {
-        path: PathBuf,
-    },
-    Failed {
-        path: PathBuf,
-        error: anyhow::Error,
-    },
-    Finished {
-        path: PathBuf,
-        result: CheckRepoResult,
-    },
-}
-
 /// Checks a directory of projects
 fn format_dev_multi_project(args: &Args) -> bool {
     let mut total_errors = 0;
     let mut total_files = 0;
-    let mut num_projects: usize = 0;
     let start = Instant::now();
 
-    rayon::scope(|scope| {
-        let (sender, receiver) = channel();
+    let project_paths: Vec<_> = args
+        .files
+        .iter()
+        .flat_map(|dir| dir.read_dir().unwrap())
+        .map(|dir| dir.unwrap().path().clone())
+        .collect();
 
-        // Workers, to check is subdirectory in parallel
-        for base_dir in &args.files {
-            for dir in base_dir.read_dir().unwrap() {
-                num_projects += 1;
-                let path = dir.unwrap().path().clone();
+    let num_projects = project_paths.len();
+    let bar = ProgressBar::new(num_projects as u64);
 
-                let sender = sender.clone();
+    let mut error_file = args.error_file.as_ref().map(|error_file| {
+        BufWriter::new(File::create(error_file).expect("Couldn't open error file"))
+    });
 
-                scope.spawn(move |_| {
-                    sender.send(Message::Start { path: path.clone() }).unwrap();
+    for project_path in project_paths {
+        bar.println(format!("Starting {}", project_path.display()));
 
-                    match format_dev_project(
-                        &[path.clone()],
-                        args.stability_check,
-                        args.write,
-                        false,
-                    ) {
-                        Ok(result) => sender.send(Message::Finished { result, path }),
-                        Err(error) => sender.send(Message::Failed { error, path }),
-                    }
-                    .unwrap();
-                });
+        match format_dev_project(
+            &[project_path.clone()],
+            args.stability_check,
+            args.write,
+            false,
+        ) {
+            Ok(result) => {
+                total_errors += result.error_count();
+                total_files += result.file_count;
+
+                bar.println(format!(
+                    "Finished {} with {} files (similarity index {:.3}) in {:.2}s",
+                    project_path.display(),
+                    result.file_count,
+                    result.statistics.similarity_index(),
+                    result.duration.as_secs_f32(),
+                ));
+                bar.println(result.display(args.format).to_string());
+                if let Some(error_file) = &mut error_file {
+                    write!(error_file, "{}", result.display(args.format)).unwrap();
+                    error_file.flush().unwrap();
+                }
+                bar.println(result.display(args.format).to_string().trim_end());
+                bar.inc(1);
+            }
+            Err(error) => {
+                bar.println(format!("Failed {}: {}", project_path.display(), error));
+                bar.inc(1);
             }
         }
-
-        // Main thread, writing to stdout
-        #[allow(clippy::print_stdout)]
-        scope.spawn(|_| {
-            let mut error_file = args.error_file.as_ref().map(|error_file| {
-                BufWriter::new(File::create(error_file).expect("Couldn't open error file"))
-            });
-
-            let bar = ProgressBar::new(num_projects as u64);
-            for message in receiver {
-                match message {
-                    Message::Start { path } => {
-                        bar.suspend(|| println!("Starting {}", path.display()));
-                    }
-                    Message::Finished { path, result } => {
-                        total_errors += result.error_count();
-                        total_files += result.file_count;
-
-                        bar.suspend(|| {
-                            println!(
-                                "Finished {} with {} files (similarity index {:.3}) in {:.2}s",
-                                path.display(),
-                                result.file_count,
-                                result.statistics.similarity_index(),
-                                result.duration.as_secs_f32(),
-                            );
-                        });
-                        bar.suspend(|| print!("{}", result.display(args.format)));
-                        if let Some(error_file) = &mut error_file {
-                            write!(error_file, "{}", result.display(args.format)).unwrap();
-                            error_file.flush().unwrap();
-                        }
-                        bar.println(result.display(args.format).to_string().trim_end());
-                        bar.inc(1);
-                    }
-                    Message::Failed { path, error } => {
-                        bar.suspend(|| println!("Failed {}: {}", path.display(), error));
-                        bar.inc(1);
-                    }
-                }
-            }
-            bar.finish();
-        });
-    });
+    }
 
     let duration = start.elapsed();
 
