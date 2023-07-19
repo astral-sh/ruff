@@ -234,6 +234,10 @@ bitflags! {
         ///     x = 1
         /// ```
         const GLOBAL = 1 << 4;
+
+
+        const INVALID_ALL_FORMAT = 1 << 5;
+        const INVALID_ALL_OBJECT = 1 << 6;
     }
 }
 

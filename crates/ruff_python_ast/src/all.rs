@@ -67,26 +67,22 @@ where
                 if keywords.is_empty() && args.len() <= 1 {
                     if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                         let id = id.as_str();
-                        if id == "tuple" || id == "list" {
-                            if is_builtin(id) {
-                                if args.is_empty() {
+                        if matches!(id, "tuple" | "list") && is_builtin(id) {
+                            let [arg] = args.as_slice() else {
+                                    return (None, AllNamesFlags::empty());
+                                };
+                            match arg {
+                                Expr::List(ast::ExprList { elts, .. })
+                                | Expr::Set(ast::ExprSet { elts, .. })
+                                | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                                    return (Some(elts), AllNamesFlags::empty());
+                                }
+                                Expr::ListComp(_) | Expr::SetComp(_) | Expr::GeneratorExp(_) => {
+                                    // Allow comprehensions, even though we can't statically analyze
+                                    // them.
                                     return (None, AllNamesFlags::empty());
                                 }
-                                match &args[0] {
-                                    Expr::List(ast::ExprList { elts, .. })
-                                    | Expr::Set(ast::ExprSet { elts, .. })
-                                    | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                                        return (Some(elts), AllNamesFlags::empty());
-                                    }
-                                    Expr::ListComp(_)
-                                    | Expr::SetComp(_)
-                                    | Expr::GeneratorExp(_) => {
-                                        // Allow comprehensions, even though we can't statically analyze
-                                        // them.
-                                        return (None, AllNamesFlags::empty());
-                                    }
-                                    _ => {}
-                                }
+                                _ => {}
                             }
                         }
                     }
