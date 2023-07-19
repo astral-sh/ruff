@@ -331,16 +331,22 @@ pub(crate) fn init(path: &Path) -> Result<()> {
 mod tests {
     use std::env::temp_dir;
     use std::fs;
-    use std::io::{self, Write};
+    use std::io;
+    use std::io::Write;
     use std::path::{Path, PathBuf};
-    use std::sync::atomic::AtomicU64;
 
+    use itertools::Itertools;
     use ruff::settings::{flags, AllSettings};
     use ruff_cache::CACHE_DIR_NAME;
-    use ruff_python_ast::imports::ImportMap;
 
+    use crate::cache::RelativePathBuf;
     use crate::cache::{self, Cache, FileCache};
     use crate::diagnostics::{lint_path, Diagnostics};
+
+    use std::sync::atomic::AtomicU64;
+
+    use anyhow::Result;
+    use ruff_python_ast::imports::ImportMap;
 
     #[test]
     fn same_results() {
@@ -443,57 +449,95 @@ mod tests {
     }
 
     #[test]
-    fn invalidation() {
-        // NOTE: keep in sync with actual file.
-        const SOURCE: &[u8] = b"# NOTE: sync with cache::invalidation test\na = 1\n\n__all__ = list([\"a\", \"b\"])\n";
+    fn cache_adds_file_on_lint() {
+        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\", \"b\"])\n";
 
-        let mut cache_dir = temp_dir();
-        cache_dir.push("ruff_tests/cache_invalidation");
-        let _ = fs::remove_dir_all(&cache_dir);
-        cache::init(&cache_dir).unwrap();
-
-        let settings = AllSettings::default();
-        let package_root = fs::canonicalize("resources/test/fixtures/cache_mutable").unwrap();
-        let cache = Cache::open(&cache_dir, package_root.clone(), &settings.lib);
+        let test_cache = TestCache::new("cache_adds_file_on_lint");
+        let cache = test_cache.open();
+        test_cache.write_source_file("source.py", source);
         assert_eq!(cache.new_files.lock().unwrap().len(), 0);
 
-        let path = package_root.join("source.py");
-        let mut expected_diagnostics = lint_path(
-            &path,
-            Some(&package_root),
-            &settings,
-            Some(&cache),
-            flags::Noqa::Enabled,
-            flags::FixMode::Generate,
-        )
-        .unwrap();
-        assert_eq!(cache.new_files.lock().unwrap().len(), 1);
+        cache.store().unwrap();
+        let cache = test_cache.open();
+
+        test_cache
+            .lint_file_with_cache("source.py", &cache)
+            .expect("Failed to lint test file");
+        assert_eq!(
+            cache.new_files.lock().unwrap().len(),
+            1,
+            "A single new file should be added to the cache"
+        );
 
         cache.store().unwrap();
+    }
 
-        let tests = [
-            // File change.
-            (|path| {
-                let mut file = fs::OpenOptions::new()
-                    .write(true)
-                    .truncate(true)
-                    .open(path)?;
-                file.write_all(SOURCE)?;
-                file.sync_data()?;
-                Ok(|_| Ok(()))
-            }) as fn(&Path) -> io::Result<fn(&Path) -> io::Result<()>>,
-            // Regression for issue #3086.
-            #[cfg(unix)]
-            |path| {
-                flip_execute_permission_bit(path)?;
-                Ok(flip_execute_permission_bit)
-            },
-            #[cfg(windows)]
-            |path| {
-                flip_read_only_permission(path)?;
-                Ok(flip_read_only_permission)
-            },
-        ];
+    #[test]
+    fn cache_adds_files_on_lint() {
+        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\", \"b\"])\n";
+
+        let test_cache = TestCache::new("cache_adds_files_on_lint");
+        let cache = test_cache.open();
+        test_cache.write_source_file("source_1.py", source);
+        test_cache.write_source_file("source_2.py", source);
+        assert_eq!(cache.new_files.lock().unwrap().len(), 0);
+
+        cache.store().unwrap();
+        let cache = test_cache.open();
+
+        test_cache
+            .lint_file_with_cache("source_1.py", &cache)
+            .expect("Failed to lint test file");
+        test_cache
+            .lint_file_with_cache("source_2.py", &cache)
+            .expect("Failed to lint test file");
+        assert_eq!(
+            cache.new_files.lock().unwrap().len(),
+            2,
+            "Both files should be added to the cache"
+        );
+
+        cache.store().unwrap();
+    }
+
+    #[test]
+    fn cache_invalidated_on_file_modified_time() {
+        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\", \"b\"])\n";
+
+        let test_cache = TestCache::new("cache_invalidated_on_file_modified_time");
+        let cache = test_cache.open();
+        test_cache.write_source_file("source.py", source);
+        assert_eq!(cache.new_files.lock().unwrap().len(), 0);
+
+        let expected_diagnostics = test_cache
+            .lint_file_with_cache("source.py", &cache)
+            .expect("Failed to lint test file");
+
+        cache.store().unwrap();
+        let cache = test_cache.open();
+
+        // Write the same contents to the source file (updating the modified time)
+        test_cache.write_source_file("source.py", source);
+
+        let got_diagnostics = test_cache
+            .lint_file_with_cache("source.py", &cache)
+            .expect("Failed to lint test file");
+
+        assert_eq!(
+            cache.new_files.lock().unwrap().len(),
+            1,
+            "Cache should not be used, the file should be treated as new and added to the cache"
+        );
+
+        assert!(
+            expected_diagnostics == got_diagnostics,
+            "The diagnostics should not change"
+        );
+    }
+
+    #[test]
+    fn cache_invalidated_on_permission_change() {
+        // Regression test for issue #3086.
 
         #[cfg(unix)]
         #[allow(clippy::items_after_statements)]
@@ -513,53 +557,51 @@ mod tests {
             file.set_permissions(perms)
         }
 
-        for change_file in tests {
-            let cleanup = change_file(&path).unwrap();
+        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\", \"b\"])\n";
 
-            let cache = Cache::open(&cache_dir, package_root.clone(), &settings.lib);
+        let test_cache = TestCache::new("cache_invalidated_on_permission_change");
+        let cache = test_cache.open();
+        let path = test_cache.write_source_file("source.py", source);
+        assert_eq!(cache.new_files.lock().unwrap().len(), 0);
 
-            let mut got_diagnostics = lint_path(
-                &path,
-                Some(&package_root),
-                &settings,
-                Some(&cache),
-                flags::Noqa::Enabled,
-                flags::FixMode::Generate,
-            )
+        let expected_diagnostics = test_cache
+            .lint_file_with_cache("source.py", &cache)
             .unwrap();
 
-            cleanup(&path).unwrap();
+        cache.store().unwrap();
+        let cache = test_cache.open();
 
-            assert_eq!(
-                cache.new_files.lock().unwrap().len(),
-                1,
-                "cache must not be used"
-            );
+        // Flip the permissions on the file
+        #[cfg(unix)]
+        flip_execute_permission_bit(&path).unwrap();
+        #[cfg(windows)]
+        flip_read_only_permission(&path).unwrap();
 
-            // Not store in the cache.
-            expected_diagnostics.source_kind.clear();
-            got_diagnostics.source_kind.clear();
-            assert!(expected_diagnostics == got_diagnostics);
-        }
+        let got_diagnostics = test_cache
+            .lint_file_with_cache("source.py", &cache)
+            .unwrap();
+
+        assert_eq!(
+            cache.new_files.lock().unwrap().len(),
+            1,
+            "Cache should not be used, the file should be treated as new and added to the cache"
+        );
+
+        assert!(
+            expected_diagnostics == got_diagnostics,
+            "The diagnostics should not change"
+        );
     }
 
     #[test]
-    fn remove_old_files() {
-        let mut cache_dir = temp_dir();
-        cache_dir.push("ruff_tests/cache_remove_old_files");
-        let _ = fs::remove_dir_all(&cache_dir);
-        cache::init(&cache_dir).unwrap();
+    fn cache_removes_stale_files_on_store() {
+        let test_cache = TestCache::new("cache_removes_stale_files_on_store");
+        let mut cache = test_cache.open();
 
-        let settings = AllSettings::default();
-        let package_root =
-            fs::canonicalize("resources/test/fixtures/cache_remove_old_files").unwrap();
-        let mut cache = Cache::open(&cache_dir, package_root.clone(), &settings.lib);
-        assert_eq!(cache.new_files.lock().unwrap().len(), 0);
-
-        // Add a file to the cache that hasn't been linted or seen since the
-        // '70s!
+        // Add a file to the cache that hasn't been linted or seen since the '70s!
+        let old_path_key = RelativePathBuf::from("old.py");
         cache.package.files.insert(
-            PathBuf::from("old.py"),
+            old_path_key,
             FileCache {
                 key: 123,
                 last_seen: AtomicU64::new(123),
@@ -570,26 +612,97 @@ mod tests {
         );
 
         // Now actually lint a file.
-        let path = package_root.join("source.py");
-        lint_path(
-            &path,
-            Some(&package_root),
-            &settings,
-            Some(&cache),
-            flags::Noqa::Enabled,
-            flags::FixMode::Generate,
-        )
-        .unwrap();
+        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\", \"b\"])\n";
+        test_cache.write_source_file("new.py", source);
+        let new_path_key = RelativePathBuf::from("new.py");
+        assert_eq!(cache.new_files.lock().unwrap().len(), 0);
+
+        test_cache
+            .lint_file_with_cache("new.py", &cache)
+            .expect("Failed to lint test file");
 
         // Storing the cache should remove the old (`old.py`) file.
         cache.store().unwrap();
         // So we when we open the cache again it shouldn't contain `old.py`.
-        let cache = Cache::open(&cache_dir, package_root, &settings.lib);
+        let cache = test_cache.open();
 
-        assert_eq!(cache.package.files.len(), 1, "didn't remove the old file");
         assert!(
-            !cache.package.files.contains_key(&path),
-            "removed the wrong file"
+            cache.package.files.keys().collect_vec() == vec![&new_path_key],
+            "Only the new file should be present"
         );
+    }
+
+    struct TestCache {
+        cache_dir: PathBuf,
+        package_root: PathBuf,
+        settings: AllSettings,
+    }
+
+    impl TestCache {
+        fn new(name: &str) -> Self {
+            // Build a new cache directory and clear it
+            let mut test_dir = temp_dir();
+            test_dir.push("ruff_tests/cache");
+            test_dir.push(name);
+
+            let _ = fs::remove_dir_all(&test_dir);
+
+            // Create separate directories for the cache and the test package
+            let cache_dir = test_dir.join("cache");
+            let package_root = test_dir.join("package");
+
+            cache::init(&cache_dir).unwrap();
+            fs::create_dir(package_root.clone()).unwrap();
+
+            let settings = AllSettings::default();
+
+            Self {
+                cache_dir,
+                package_root,
+                settings,
+            }
+        }
+
+        fn write_source_file(&self, path: &str, contents: &[u8]) -> PathBuf {
+            let path = self.package_root.join(path);
+            let mut file = fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(&*path)
+                .unwrap();
+            file.write_all(contents).unwrap();
+            file.sync_data().unwrap();
+            path
+        }
+
+        fn open(&self) -> Cache {
+            Cache::open(
+                &self.cache_dir,
+                self.package_root.clone(),
+                &self.settings.lib,
+            )
+        }
+
+        fn lint_file_with_cache(
+            &self,
+            path: &str,
+            cache: &Cache,
+        ) -> Result<Diagnostics, anyhow::Error> {
+            lint_path(
+                &self.package_root.join(path),
+                Some(&self.package_root),
+                &self.settings,
+                Some(cache),
+                flags::Noqa::Enabled,
+                flags::FixMode::Generate,
+            )
+        }
+    }
+
+    impl Drop for TestCache {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.cache_dir);
+        }
     }
 }

@@ -9,9 +9,7 @@ use std::path::Path;
 use anyhow::{anyhow, Result};
 use colored::Colorize;
 use filetime::FileTime;
-use log::{debug, error};
 use log::{debug, error, warn};
-use ruff_text_size::TextSize;
 use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::FxHashMap;
 use similar::TextDiff;
@@ -19,7 +17,6 @@ use similar::TextDiff;
 use std::os::unix::fs::PermissionsExt;
 
 use crate::cache::Cache;
-use ruff::fs;
 use ruff::jupyter::Notebook;
 use ruff::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult};
 use ruff::logging::DisplayParseError;
