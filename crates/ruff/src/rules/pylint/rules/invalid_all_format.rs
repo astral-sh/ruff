@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::{Binding, BindingFlags};
+use ruff_python_semantic::Binding;
 
 /// ## What it does
 /// Checks for invalid assignments to `__all__`.
@@ -36,7 +36,7 @@ impl Violation for InvalidAllFormat {
 
 /// PLE0605
 pub(crate) fn invalid_all_format(binding: &Binding) -> Option<Diagnostic> {
-    if binding.flags.contains(BindingFlags::INVALID_ALL_FORMAT) {
+    if binding.is_invalid_all_format() {
         Some(Diagnostic::new(InvalidAllFormat, binding.range))
     } else {
         None

@@ -73,8 +73,8 @@ where
                         let id = id.as_str();
                         if matches!(id, "tuple" | "list") && is_builtin(id) {
                             let [arg] = args.as_slice() else {
-                                    return (None, DunderAllFlags::empty());
-                                };
+                                return (None, DunderAllFlags::empty());
+                            };
                             match arg {
                                 Expr::List(ast::ExprList { elts, .. })
                                 | Expr::Set(ast::ExprSet { elts, .. })
