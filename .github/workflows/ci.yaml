@@ -53,10 +53,12 @@ jobs:
       - uses: actions/checkout@v3
       - name: "Install Rust toolchain"
         run: rustup show
-      - uses: Swatinem/rust-cache@v2
-      # cargo insta 1.30.0 fails for some reason (https://github.com/mitsuhiko/insta/issues/392)
-      - run: cargo install cargo-insta@=1.29.0
+      - name: "Install cargo insta"
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-insta
       - run: pip install black[d]==23.1.0
+      - uses: Swatinem/rust-cache@v2
       - name: "Run tests (Ubuntu)"
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: cargo insta test --all --all-features --unreferenced reject
