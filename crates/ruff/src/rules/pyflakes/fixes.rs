@@ -95,8 +95,11 @@ pub(crate) fn remove_exception_handler_assignment(
     locator: &Locator,
 ) -> Result<Edit> {
     // Lex backwards, to the token just before the `as`.
-    let mut tokenizer =
-        SimpleTokenizer::up_to(bound_exception.range.start(), locator.contents()).skip_trivia();
+    let mut tokenizer = SimpleTokenizer::up_to_without_back_comment(
+        bound_exception.range.start(),
+        locator.contents(),
+    )
+    .skip_trivia();
 
     // Eat the `as` token.
     let preceding = tokenizer

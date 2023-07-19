@@ -2,7 +2,7 @@ use memchr::{memchr2, memchr3, memrchr3_iter};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use unic_ucd_ident::{is_xid_continue, is_xid_start};
 
-use crate::Cursor;
+use crate::{is_python_whitespace, Cursor};
 
 /// Searches for the first non-trivia character in `range`.
 ///
@@ -18,30 +18,22 @@ pub fn first_non_trivia_token(offset: TextSize, code: &str) -> Option<SimpleToke
         .next()
 }
 
-/// Returns the first non-trivia token right before `offset` or `None` if at the start of the file
-/// or all preceding tokens are trivia tokens.
-///
-/// ## Notes
-///
-/// Prefer [`first_non_trivia_token`] whenever possible because reverse lookup is expensive because of comments.
-pub fn first_non_trivia_token_rev(offset: TextSize, code: &str) -> Option<SimpleToken> {
-    SimpleTokenizer::up_to(offset, code)
-        .skip_trivia()
-        .next_back()
-}
-
 /// Returns the number of newlines between `offset` and the first non whitespace character in the source code.
 pub fn lines_before(offset: TextSize, code: &str) -> u32 {
-    let tokens = SimpleTokenizer::up_to(offset, code);
-    let mut newlines = 0u32;
+    let mut cursor = Cursor::new(&code[TextRange::up_to(offset)]);
 
-    for token in tokens.rev() {
-        match token.kind() {
-            SimpleTokenKind::Newline => {
+    let mut newlines = 0u32;
+    while let Some(c) = cursor.bump_back() {
+        match c {
+            '\n' => {
+                cursor.eat_char_back('\r');
                 newlines += 1;
             }
-            SimpleTokenKind::Whitespace => {
-                // ignore
+            '\r' => {
+                newlines += 1;
+            }
+            c if is_python_whitespace(c) => {
+                continue;
             }
             _ => {
                 break;
@@ -54,16 +46,20 @@ pub fn lines_before(offset: TextSize, code: &str) -> u32 {
 
 /// Counts the empty lines between `offset` and the first non-whitespace character.
 pub fn lines_after(offset: TextSize, code: &str) -> u32 {
-    let tokens = SimpleTokenizer::starts_at(offset, code);
-    let mut newlines = 0u32;
+    let mut cursor = Cursor::new(&code[offset.to_usize()..]);
 
-    for token in tokens {
-        match token.kind() {
-            SimpleTokenKind::Newline => {
+    let mut newlines = 0u32;
+    while let Some(c) = cursor.bump() {
+        match c {
+            '\n' => {
                 newlines += 1;
             }
-            SimpleTokenKind::Whitespace => {
-                // ignore
+            '\r' => {
+                cursor.eat_char('\n');
+                newlines += 1;
+            }
+            c if is_python_whitespace(c) => {
+                continue;
             }
             _ => {
                 break;
@@ -278,6 +274,8 @@ impl<'a> SimpleTokenizer<'a> {
     }
 
     /// Creates a tokenizer that lexes tokens from the start of `source` up to `offset`.
+    ///
+    /// Consider using [`SimpleTokenizer::up_to_without_back_comment`] if intend to lex backwards.
     pub fn up_to(offset: TextSize, source: &'a str) -> Self {
         Self::new(source, TextRange::up_to(offset))
     }
@@ -583,8 +581,7 @@ fn find_unterminated_string_kind(input: &str) -> Option<StringKind> {
         let after = &rest[comment_or_string_start + 1..];
 
         if c == b'#' {
-            let comment_end =
-                memchr2(b'\n', b'\r', after.as_bytes()).unwrap_or_else(|| after.len());
+            let comment_end = memchr2(b'\n', b'\r', after.as_bytes()).unwrap_or(after.len());
             rest = &after[comment_end..];
         } else {
             let mut cursor = Cursor::new(after);
@@ -629,11 +626,8 @@ fn is_string_terminated(kind: StringKind, cursor: &mut Cursor) -> bool {
             }
             '\\' => {
                 // Eat over line continuation
-                if cursor.eat_char('\r') {
-                    cursor.eat_char('\n');
-                } else {
-                    cursor.eat_char('\n');
-                }
+                cursor.eat_char('\r');
+                cursor.eat_char('\n');
             }
             c if c == quote_char => {
                 if kind.is_single() || (cursor.eat_char(quote_char) && cursor.eat_char(quote_char))
