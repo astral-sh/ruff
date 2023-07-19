@@ -21,7 +21,7 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 /// ```python
-/// x: str
+/// x: str = ...
 ///
 /// if x == "":
 ///     print("x is empty")
@@ -29,7 +29,7 @@ use crate::checkers::ast::Checker;
 ///
 /// Use instead:
 /// ```python
-/// x: str
+/// x: str = ...
 ///
 /// if not x:
 ///     print("x is empty")
