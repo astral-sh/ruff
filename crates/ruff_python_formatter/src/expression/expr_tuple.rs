@@ -15,14 +15,18 @@ pub enum TupleParentheses {
     /// Effectively `None` in `Option<Parentheses>`
     #[default]
     Default,
-    /// TODO(cnpryer): Why not TupleParentheses::Expr(Parentheses::Never)?
-    Never,
 
     /// Handle special cases where parentheses are not introduced if they are not already present.
     ///
     /// Black omits parentheses for tuples inside subscripts except if the tuple is already
     /// parenthesized in the source code.
-    NeverIntroduce,
+    /// ```python
+    /// x[a, :]
+    /// x[a, b:]
+    /// x[(a, b):]
+    /// ```
+    Preserve,
+
     /// Handle the special cases where we don't include parentheses if they are not required.
     ///
     /// Normally, black keeps parentheses, but in the case of for loops it formats
@@ -93,7 +97,7 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                 )
             }
             [single] => match self.parentheses {
-                TupleParentheses::NeverIntroduce
+                TupleParentheses::Preserve
                     if !is_parenthesized(*range, elts, f.context().source()) =>
                 {
                     write!(f, [single.format(), text(",")])
@@ -115,7 +119,7 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                 parenthesized("(", &ExprSequence::new(item), ")").fmt(f)
             }
             _ => match self.parentheses {
-                TupleParentheses::NeverIntroduce => group(&ExprSequence::new(item)).fmt(f),
+                TupleParentheses::Preserve => group(&ExprSequence::new(item)).fmt(f),
                 _ => parenthesize_if_expands(&ExprSequence::new(item)).fmt(f),
             },
         }
