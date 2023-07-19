@@ -274,7 +274,7 @@ impl<'a> From<&'a ast::Pattern> for ComparablePattern<'a> {
 
 impl<'a> From<&'a Box<ast::Pattern>> for Box<ComparablePattern<'a>> {
     fn from(pattern: &'a Box<ast::Pattern>) -> Self {
-        Box::new((&**pattern).into())
+        Box::new((pattern.as_ref()).into())
     }
 }
 
@@ -362,13 +362,13 @@ impl<'a> From<&'a ast::Arguments> for ComparableArguments<'a> {
 
 impl<'a> From<&'a Box<ast::Arguments>> for ComparableArguments<'a> {
     fn from(arguments: &'a Box<ast::Arguments>) -> Self {
-        (&**arguments).into()
+        (arguments.as_ref()).into()
     }
 }
 
 impl<'a> From<&'a Box<ast::Arg>> for ComparableArg<'a> {
     fn from(arg: &'a Box<ast::Arg>) -> Self {
-        (&**arg).into()
+        (arg.as_ref()).into()
     }
 }
 
@@ -685,13 +685,13 @@ pub enum ComparableExpr<'a> {
 
 impl<'a> From<&'a Box<ast::Expr>> for Box<ComparableExpr<'a>> {
     fn from(expr: &'a Box<ast::Expr>) -> Self {
-        Box::new((&**expr).into())
+        Box::new((expr.as_ref()).into())
     }
 }
 
 impl<'a> From<&'a Box<ast::Expr>> for ComparableExpr<'a> {
     fn from(expr: &'a Box<ast::Expr>) -> Self {
-        (&**expr).into()
+        (expr.as_ref()).into()
     }
 }
 
@@ -737,7 +737,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 body,
                 range: _range,
             }) => Self::Lambda(ExprLambda {
-                args: (&**args).into(),
+                args: (args.as_ref()).into(),
                 body: body.into(),
             }),
             ast::Expr::IfExp(ast::ExprIfExp {

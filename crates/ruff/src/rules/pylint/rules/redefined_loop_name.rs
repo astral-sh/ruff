@@ -274,7 +274,7 @@ fn assignment_targets_from_expr<'a>(
             ctx: ExprContext::Store,
             value,
             range: _,
-        }) => Box::new(iter::once(&**value)),
+        }) => Box::new(iter::once(value.as_ref())),
         Expr::Name(ast::ExprName {
             ctx: ExprContext::Store,
             id,

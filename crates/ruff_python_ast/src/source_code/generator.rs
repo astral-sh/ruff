@@ -1156,7 +1156,7 @@ impl<'a> Generator<'a> {
                         range: _range,
                     })],
                     [],
-                ) = (&**args, &**keywords)
+                ) = (args.as_slice(), keywords.as_slice())
                 {
                     // Ensure that a single generator doesn't get double-parenthesized.
                     self.unparse_expr(elt, precedence::COMMA);
