@@ -20,8 +20,11 @@ use crate::context::ExecutionContext;
 use crate::definition::{Definition, DefinitionId, Definitions, Member, Module};
 use crate::globals::{Globals, GlobalsArena};
 use crate::node::{NodeId, Nodes};
-use crate::reference::{Reference, ReferenceId, References};
+use crate::reference::{
+    ResolvedReference, ResolvedReferenceId, ResolvedReferences, UnresolvedReferences,
+};
 use crate::scope::{Scope, ScopeId, ScopeKind, Scopes};
+use crate::{UnresolvedReference, UnresolvedReferenceFlags};
 
 /// A semantic model for a Python module, to enable querying the module's semantic information.
 pub struct SemanticModel<'a> {
@@ -51,7 +54,10 @@ pub struct SemanticModel<'a> {
     pub bindings: Bindings<'a>,
 
     /// Stack of all references created in any scope, at any point in execution.
-    references: References,
+    resolved_references: ResolvedReferences,
+
+    /// Stack of all unresolved references created in any scope, at any point in execution.
+    unresolved_references: UnresolvedReferences,
 
     /// Arena of global bindings.
     globals: GlobalsArena<'a>,
@@ -128,7 +134,8 @@ impl<'a> SemanticModel<'a> {
             definitions: Definitions::for_module(module),
             definition_id: DefinitionId::module(),
             bindings: Bindings::default(),
-            references: References::default(),
+            resolved_references: ResolvedReferences::default(),
+            unresolved_references: UnresolvedReferences::default(),
             globals: GlobalsArena::default(),
             shadowed_bindings: IntMap::default(),
             delayed_annotations: IntMap::default(),
@@ -144,10 +151,10 @@ impl<'a> SemanticModel<'a> {
         &self.bindings[id]
     }
 
-    /// Resolve the [`Reference`] for the given [`ReferenceId`].
+    /// Resolve the [`ResolvedReference`] for the given [`ResolvedReferenceId`].
     #[inline]
-    pub fn reference(&self, id: ReferenceId) -> &Reference {
-        &self.references[id]
+    pub fn reference(&self, id: ResolvedReferenceId) -> &ResolvedReference {
+        &self.resolved_references[id]
     }
 
     /// Return `true` if the `Expr` is a reference to `typing.${target}`.
@@ -245,7 +252,7 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Resolve a read reference to `symbol` at `range`.
-    pub fn resolve_read(&mut self, symbol: &str, range: TextRange) -> ResolvedRead {
+    pub fn resolve_read(&mut self, symbol: &str, range: TextRange) -> ReadResult {
         // PEP 563 indicates that if a forward reference can be resolved in the module scope, we
         // should prefer it over local resolutions.
         if self.in_forward_reference() {
@@ -253,18 +260,22 @@ impl<'a> SemanticModel<'a> {
                 if !self.bindings[binding_id].is_unbound() {
                     // Mark the binding as used.
                     let context = self.execution_context();
-                    let reference_id = self.references.push(ScopeId::global(), range, context);
+                    let reference_id =
+                        self.resolved_references
+                            .push(ScopeId::global(), range, context);
                     self.bindings[binding_id].references.push(reference_id);
 
                     // Mark any submodule aliases as used.
                     if let Some(binding_id) =
                         self.resolve_submodule(symbol, ScopeId::global(), binding_id)
                     {
-                        let reference_id = self.references.push(ScopeId::global(), range, context);
+                        let reference_id =
+                            self.resolved_references
+                                .push(ScopeId::global(), range, context);
                         self.bindings[binding_id].references.push(reference_id);
                     }
 
-                    return ResolvedRead::Resolved(binding_id);
+                    return ReadResult::Resolved(binding_id);
                 }
             }
         }
@@ -282,7 +293,7 @@ impl<'a> SemanticModel<'a> {
                 //         print(__class__)
                 // ```
                 if seen_function && matches!(symbol, "__class__") {
-                    return ResolvedRead::ImplicitGlobal;
+                    return ReadResult::ImplicitGlobal;
                 }
                 if index > 0 {
                     continue;
@@ -292,12 +303,12 @@ impl<'a> SemanticModel<'a> {
             if let Some(binding_id) = scope.get(symbol) {
                 // Mark the binding as used.
                 let context = self.execution_context();
-                let reference_id = self.references.push(self.scope_id, range, context);
+                let reference_id = self.resolved_references.push(self.scope_id, range, context);
                 self.bindings[binding_id].references.push(reference_id);
 
                 // Mark any submodule aliases as used.
                 if let Some(binding_id) = self.resolve_submodule(symbol, scope_id, binding_id) {
-                    let reference_id = self.references.push(self.scope_id, range, context);
+                    let reference_id = self.resolved_references.push(self.scope_id, range, context);
                     self.bindings[binding_id].references.push(reference_id);
                 }
 
@@ -336,7 +347,12 @@ impl<'a> SemanticModel<'a> {
                     //
                     // The `x` in `print(x)` should be treated as unresolved.
                     BindingKind::Deletion | BindingKind::UnboundException(None) => {
-                        return ResolvedRead::UnboundLocal(binding_id)
+                        self.unresolved_references.push(
+                            range,
+                            self.exceptions(),
+                            UnresolvedReferenceFlags::empty(),
+                        );
+                        return ReadResult::UnboundLocal(binding_id);
                     }
 
                     // If we hit an unbound exception that shadowed a bound name, resole to the
@@ -357,22 +373,24 @@ impl<'a> SemanticModel<'a> {
                     BindingKind::UnboundException(Some(binding_id)) => {
                         // Mark the binding as used.
                         let context = self.execution_context();
-                        let reference_id = self.references.push(self.scope_id, range, context);
+                        let reference_id =
+                            self.resolved_references.push(self.scope_id, range, context);
                         self.bindings[binding_id].references.push(reference_id);
 
                         // Mark any submodule aliases as used.
                         if let Some(binding_id) =
                             self.resolve_submodule(symbol, scope_id, binding_id)
                         {
-                            let reference_id = self.references.push(self.scope_id, range, context);
+                            let reference_id =
+                                self.resolved_references.push(self.scope_id, range, context);
                             self.bindings[binding_id].references.push(reference_id);
                         }
 
-                        return ResolvedRead::Resolved(binding_id);
+                        return ReadResult::Resolved(binding_id);
                     }
 
                     // Otherwise, treat it as resolved.
-                    _ => return ResolvedRead::Resolved(binding_id),
+                    _ => return ReadResult::Resolved(binding_id),
                 }
             }
 
@@ -393,7 +411,7 @@ impl<'a> SemanticModel<'a> {
             // ```
             if index == 0 && scope.kind.is_class() {
                 if matches!(symbol, "__module__" | "__qualname__") {
-                    return ResolvedRead::ImplicitGlobal;
+                    return ReadResult::ImplicitGlobal;
                 }
             }
 
@@ -402,9 +420,19 @@ impl<'a> SemanticModel<'a> {
         }
 
         if import_starred {
-            ResolvedRead::WildcardImport
+            self.unresolved_references.push(
+                range,
+                self.exceptions(),
+                UnresolvedReferenceFlags::WILDCARD_IMPORT,
+            );
+            ReadResult::WildcardImport
         } else {
-            ResolvedRead::NotFound
+            self.unresolved_references.push(
+                range,
+                self.exceptions(),
+                UnresolvedReferenceFlags::empty(),
+            );
+            ReadResult::NotFound
         }
     }
 
@@ -875,7 +903,7 @@ impl<'a> SemanticModel<'a> {
         range: TextRange,
         context: ExecutionContext,
     ) {
-        let reference_id = self.references.push(self.scope_id, range, context);
+        let reference_id = self.resolved_references.push(self.scope_id, range, context);
         self.bindings[binding_id].references.push(reference_id);
     }
 
@@ -886,7 +914,9 @@ impl<'a> SemanticModel<'a> {
         range: TextRange,
         context: ExecutionContext,
     ) {
-        let reference_id = self.references.push(ScopeId::global(), range, context);
+        let reference_id = self
+            .resolved_references
+            .push(ScopeId::global(), range, context);
         self.bindings[binding_id].references.push(reference_id);
     }
 
@@ -916,6 +946,11 @@ impl<'a> SemanticModel<'a> {
     /// as `global` or `nonlocal`).
     pub fn rebinding_scopes(&self, binding_id: BindingId) -> Option<&[ScopeId]> {
         self.rebinding_scopes.get(&binding_id).map(Vec::as_slice)
+    }
+
+    /// Return an iterator over all [`UnresolvedReference`]s in the semantic model.
+    pub fn unresolved_references(&self) -> impl Iterator<Item = &UnresolvedReference> {
+        self.unresolved_references.iter()
     }
 
     /// Return the [`ExecutionContext`] of the current scope.
@@ -1360,7 +1395,7 @@ pub struct Snapshot {
 }
 
 #[derive(Debug)]
-pub enum ResolvedRead {
+pub enum ReadResult {
     /// The read reference is resolved to a specific binding.
     ///
     /// For example, given:
