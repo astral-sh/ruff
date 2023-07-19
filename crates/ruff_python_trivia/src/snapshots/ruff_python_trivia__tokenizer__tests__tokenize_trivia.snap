@@ -1,21 +1,21 @@
 ---
-source: crates/ruff_python_whitespace/src/tokenizer.rs
+source: crates/ruff_python_trivia/src/tokenizer.rs
 expression: test_case.tokens()
 ---
 [
-    Token {
+    SimpleToken {
         kind: Comment,
         range: 0..9,
     },
-    Token {
+    SimpleToken {
         kind: Newline,
         range: 9..10,
     },
-    Token {
+    SimpleToken {
         kind: Whitespace,
         range: 10..14,
     },
-    Token {
+    SimpleToken {
         kind: Comment,
         range: 14..23,
     },

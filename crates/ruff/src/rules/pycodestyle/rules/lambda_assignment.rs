@@ -8,7 +8,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{has_leading_content, has_trailing_content};
 use ruff_python_ast::source_code::Generator;
 use ruff_python_semantic::SemanticModel;
-use ruff_python_whitespace::{leading_indentation, UniversalNewlines};
+use ruff_python_trivia::{leading_indentation, UniversalNewlines};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;

@@ -1,5 +1,5 @@
 [package]
-name = "ruff_python_whitespace"
+name = "ruff_python_trivia"
 version = "0.0.0"
 publish = false
 authors = { workspace = true }

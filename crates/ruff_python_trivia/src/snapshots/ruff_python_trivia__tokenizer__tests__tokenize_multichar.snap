@@ -1,33 +1,33 @@
 ---
-source: crates/ruff_python_whitespace/src/tokenizer.rs
+source: crates/ruff_python_trivia/src/tokenizer.rs
 expression: test_case.tokens()
 ---
 [
-    Token {
+    SimpleToken {
         kind: If,
         range: 0..2,
     },
-    Token {
+    SimpleToken {
         kind: Whitespace,
         range: 2..3,
     },
-    Token {
+    SimpleToken {
         kind: In,
         range: 3..5,
     },
-    Token {
+    SimpleToken {
         kind: Whitespace,
         range: 5..6,
     },
-    Token {
+    SimpleToken {
         kind: Else,
         range: 6..10,
     },
-    Token {
+    SimpleToken {
         kind: Whitespace,
         range: 10..11,
     },
-    Token {
+    SimpleToken {
         kind: Match,
         range: 11..16,
     },

@@ -4,7 +4,7 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers;
 use ruff_python_ast::source_code::{Indexer, Locator};
-use ruff_python_whitespace::Line;
+use ruff_python_trivia::Line;
 
 use crate::registry::Rule;
 use crate::settings::Settings;

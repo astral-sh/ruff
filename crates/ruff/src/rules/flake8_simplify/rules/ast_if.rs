@@ -12,7 +12,7 @@ use ruff_python_ast::helpers::{any_over_expr, contains_effect, first_colon_range
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::stmt_if::if_elif_branches;
 use ruff_python_semantic::SemanticModel;
-use ruff_python_whitespace::UniversalNewlines;
+use ruff_python_trivia::UniversalNewlines;
 
 use crate::checkers::ast::Checker;
 use crate::line_width::LineWidth;

@@ -12,7 +12,7 @@ use rustpython_parser::ast::{
 use rustpython_parser::{lexer, Mode, Tok};
 use smallvec::SmallVec;
 
-use ruff_python_whitespace::{is_python_whitespace, PythonWhitespace, UniversalNewlineIterator};
+use ruff_python_trivia::{is_python_whitespace, PythonWhitespace, UniversalNewlineIterator};
 
 use crate::call_path::CallPath;
 use crate::source_code::{Indexer, Locator};

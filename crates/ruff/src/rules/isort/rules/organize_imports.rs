@@ -10,7 +10,7 @@ use ruff_python_ast::helpers::{
     followed_by_multi_statement_line, preceded_by_multi_statement_line, trailing_lines_end,
 };
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
-use ruff_python_whitespace::{leading_indentation, PythonWhitespace, UniversalNewlines};
+use ruff_python_trivia::{leading_indentation, PythonWhitespace, UniversalNewlines};
 use ruff_textwrap::indent;
 
 use crate::line_width::LineWidth;
