@@ -9,6 +9,7 @@ use ruff_python_ast::source_code::Locator;
 use ruff_python_semantic::{ScopeKind, SemanticModel};
 
 use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
 use crate::registry::AsRule;
 
 #[violation]
@@ -101,7 +102,7 @@ impl Violation for UnassignedSpecialVariableInStub {
 /// Checks for `typehint.TypeAlias` annotation in type aliases.
 ///
 /// ## Why is this bad?
-/// It makes harder for someone reading the code to differentiate
+/// It makes it harder for someone reading the code to differentiate
 /// between a value assignment and a type alias.
 ///
 /// ## Example
@@ -119,11 +120,15 @@ pub struct TypeAliasCheck {
     value: String,
 }
 
-impl Violation for TypeAliasCheck {
+impl AlwaysAutofixableViolation for TypeAliasCheck {
     #[derive_message_formats]
     fn message(&self) -> String {
         let TypeAliasCheck { name, value } = self;
-        format!("Use `typing.TypeAlias` for type aliases in `{name}`, e.g. \"{name}: typing.TypeAlias = {value}\"")
+        format!("Use `typing.TypeAlias` for type alias `{name}`, e.g. \"{name}: typing.TypeAlias = {value}\"")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Add `typing.TypeAlias` annotation".to_string()
     }
 }
 
@@ -262,6 +267,20 @@ fn is_valid_default_value_with_annotation(
     false
 }
 
+/// Returns `true` if an [`Expr`] appears to be a valid PEP 604 union member.
+fn is_valid_pep_604_union_member(value: &Expr) -> bool {
+    matches!(
+        value,
+        Expr::Name(_)
+            | Expr::Subscript(_)
+            | Expr::Attribute(_)
+            | Expr::Constant(ast::ExprConstant {
+                value: Constant::None,
+                ..
+            })
+    )
+}
+
 /// Returns `true` if an [`Expr`] appears to be a valid PEP 604 union. (e.g. `int | None`)
 fn is_valid_pep_604_union(annotation: &Expr) -> bool {
     match annotation {
@@ -270,14 +289,10 @@ fn is_valid_pep_604_union(annotation: &Expr) -> bool {
             op: Operator::BitOr,
             right,
             range: _,
-        }) => is_valid_pep_604_union(left) && is_valid_pep_604_union(right),
-        Expr::Name(_)
-        | Expr::Subscript(_)
-        | Expr::Attribute(_)
-        | Expr::Constant(ast::ExprConstant {
-            value: Constant::None,
-            ..
-        }) => true,
+        }) => {
+            (is_valid_pep_604_union_member(left) || is_valid_pep_604_union(left))
+                && is_valid_pep_604_union_member(right)
+        }
         _ => false,
     }
 }
@@ -351,6 +366,20 @@ fn is_enum(bases: &[Expr], semantic: &SemanticModel) -> bool {
             )
         })
     });
+}
+
+/// Returns `true` if an [`Expr`] is valid for a type alias check.
+fn validate_type_alias_value(value: &Expr, semantic: &SemanticModel) -> bool {
+    is_valid_pep_604_union(value)
+        || semantic.match_typing_expr(value, "Any")
+        || matches!(
+            value,
+            Expr::Subscript(_)
+                | Expr::Constant(ast::ExprConstant {
+                    value: Constant::None,
+                    ..
+                }),
+        )
 }
 
 /// PYI011
@@ -429,10 +458,9 @@ pub(crate) fn argument_simple_defaults(checker: &mut Checker, arguments: &Argume
 
 /// PYI015
 pub(crate) fn assignment_default_in_stub(checker: &mut Checker, targets: &[Expr], value: &Expr) {
-    if targets.len() != 1 {
+    let [target] = targets else {
         return;
-    }
-    let target = &targets[0];
+    };
     if !target.is_name_expr() {
         return;
     }
@@ -501,10 +529,9 @@ pub(crate) fn unannotated_assignment_in_stub(
     targets: &[Expr],
     value: &Expr,
 ) {
-    if targets.len() != 1 {
+    let [target] = targets else {
         return;
-    }
-    let target = &targets[0];
+    };
     let Expr::Name(ast::ExprName { id, .. }) = target else {
         return;
     };
@@ -558,33 +585,36 @@ pub(crate) fn unassigned_special_variable_in_stub(
 
 /// PIY026
 pub(crate) fn type_alias_check(checker: &mut Checker, value: &Expr, targets: &[Expr]) {
-    let is_any = |expr: &Expr| {
-        let Expr::Name(ast::ExprName { id, .. }) = expr else {
-            return false;
-        };
-        id == "Any"
+    let [target] = targets else {
+        return;
     };
-
-    let target = &targets[0];
-    if is_special_assignment(target, checker.semantic()) {
-        return;
-    }
-    if matches!(value, Expr::Name(_)) && !is_any(value) {
-        return;
-    }
-    if !is_valid_pep_604_union(value) {
+    if !validate_type_alias_value(value, checker.semantic()) {
         return;
     }
 
     let Expr::Name(ast::ExprName { id, .. }) = target else {
-            return;
+        return;
     };
 
-    checker.diagnostics.push(Diagnostic::new(
+    let mut diagnostic = Diagnostic::new(
         TypeAliasCheck {
             name: id.to_string(),
             value: checker.generator().expr(value),
         },
         target.range(),
-    ));
+    );
+    if checker.patch(diagnostic.kind.rule()) {
+        diagnostic.try_set_fix(|| {
+            let (import_edit, binding) = checker.importer.get_or_import_symbol(
+                &ImportRequest::import("typing", "TypeAlias"),
+                target.start(),
+                checker.semantic(),
+            )?;
+            Ok(Fix::suggested_edits(
+                Edit::range_replacement(format!("{id}: {binding}"), target.range()),
+                [import_edit],
+            ))
+        });
+    }
+    checker.diagnostics.push(diagnostic);
 }

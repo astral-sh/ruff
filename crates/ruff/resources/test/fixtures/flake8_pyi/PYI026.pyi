@@ -1,5 +1,4 @@
-import typing
-from typing import TypeAlias, Literal, Any
+from typing import Literal, Any
 
 NewAny = Any
 OptionalStr = typing.Optional[str]
