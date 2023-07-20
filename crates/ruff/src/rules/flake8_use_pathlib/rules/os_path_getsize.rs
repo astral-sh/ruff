@@ -5,12 +5,15 @@ use ruff_macros::{derive_message_formats, violation};
 /// Checks for uses of `os.path.getsize`.
 ///
 /// ## Why is this bad?
-/// `pathlib` offers high-level path manipulations of paths, `os` offers low-level manipulation of paths.
-/// Where possible, using `Path` object methods such as `Path.stat()` improve readability over their `os`
-/// counterparts such as `os.path.getsize()`.
+/// `pathlib` offers a high-level API for path manipulation, as compared to
+/// the lower-level API offered by `os`.
 ///
-/// There are situations where creating many `Path` object causes overhead. `os` functions therefore remain
-/// preferable in heavy loops and data structures storing paths (e.g. pandas).
+/// When possible, using `Path` object methods such as `Path.stat()` can
+/// improve readability over the `os` module's counterparts (e.g.,
+/// `os.path.getsize()`).
+///
+/// Note that `os` functions may be preferable if performance is a concern,
+/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
