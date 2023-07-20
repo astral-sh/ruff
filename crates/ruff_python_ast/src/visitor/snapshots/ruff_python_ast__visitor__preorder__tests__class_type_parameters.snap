@@ -1,0 +1,11 @@
+---
+source: crates/ruff_python_ast/src/visitor/preorder.rs
+expression: trace
+---
+- ModModule
+  - StmtClassDef
+    - ExprName
+    - StmtExpr
+      - ExprConstant
+        - Ellipsis
+
