@@ -17,12 +17,12 @@
 //! The individual [`Visitor`] implementations within the [`Checker`] typically proceed in four
 //! steps:
 //!
-//! 1. Analysis: Run any relevant lint rules on the current node.
-//! 2. Binding: Bind any names introduced by the current node.
-//! 3. Recursion: Recurse into the children of the current node.
-//! 4. Clean-up: Perform any necessary clean-up after the current node has been fully traversed.
+//! 1. Binding: Bind any names introduced by the current node.
+//! 2. Recursion: Recurse into the children of the current node.
+//! 3. Clean-up: Perform any necessary clean-up after the current node has been fully traversed.
+//! 4. Analysis: Run any relevant lint rules on the current node.
 //!
-//! The first step represents the lint-rule analysis phase, while the remaining steps together
+//! The final step represents the lint-rule analysis phase, while the remaining steps together
 //! compose the semantic analysis phase. In the future, these phases may be separated into distinct
 //! passes over the AST.
 
@@ -292,7 +292,456 @@ where
         // the node.
         let flags_snapshot = self.semantic.flags;
 
-        // Step 1: Analysis
+        // Step 1: Binding
+        match stmt {
+            Stmt::AugAssign(ast::StmtAugAssign {
+                target,
+                op: _,
+                value: _,
+                range: _,
+            }) => {
+                self.handle_node_load(target);
+            }
+            Stmt::Import(ast::StmtImport { names, range: _ }) => {
+                for alias in names {
+                    if alias.name.contains('.') && alias.asname.is_none() {
+                        // Given `import foo.bar`, `name` would be "foo", and `qualified_name` would be
+                        // "foo.bar".
+                        let name = alias.name.split('.').next().unwrap();
+                        let qualified_name = &alias.name;
+                        self.add_binding(
+                            name,
+                            alias.identifier(),
+                            BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }),
+                            BindingFlags::EXTERNAL,
+                        );
+                    } else {
+                        let mut flags = BindingFlags::EXTERNAL;
+                        if alias.asname.is_some() {
+                            flags |= BindingFlags::ALIAS;
+                        }
+                        if alias
+                            .asname
+                            .as_ref()
+                            .map_or(false, |asname| asname.as_str() == alias.name.as_str())
+                        {
+                            flags |= BindingFlags::EXPLICIT_EXPORT;
+                        }
+
+                        let name = alias.asname.as_ref().unwrap_or(&alias.name);
+                        let qualified_name = &alias.name;
+                        self.add_binding(
+                            name,
+                            alias.identifier(),
+                            BindingKind::Import(Import { qualified_name }),
+                            flags,
+                        );
+                    }
+                }
+            }
+            Stmt::ImportFrom(ast::StmtImportFrom {
+                names,
+                module,
+                level,
+                range: _,
+            }) => {
+                let module = module.as_deref();
+                let level = level.map(|level| level.to_u32());
+                for alias in names {
+                    if let Some("__future__") = module {
+                        let name = alias.asname.as_ref().unwrap_or(&alias.name);
+                        self.add_binding(
+                            name,
+                            alias.identifier(),
+                            BindingKind::FutureImport,
+                            BindingFlags::empty(),
+                        );
+                    } else if &alias.name == "*" {
+                        self.semantic
+                            .scope_mut()
+                            .add_star_import(StarImport { level, module });
+                    } else {
+                        let mut flags = BindingFlags::EXTERNAL;
+                        if alias.asname.is_some() {
+                            flags |= BindingFlags::ALIAS;
+                        }
+                        if alias
+                            .asname
+                            .as_ref()
+                            .map_or(false, |asname| asname.as_str() == alias.name.as_str())
+                        {
+                            flags |= BindingFlags::EXPLICIT_EXPORT;
+                        }
+
+                        // Given `from foo import bar`, `name` would be "bar" and `qualified_name` would
+                        // be "foo.bar". Given `from foo import bar as baz`, `name` would be "baz"
+                        // and `qualified_name` would be "foo.bar".
+                        let name = alias.asname.as_ref().unwrap_or(&alias.name);
+                        let qualified_name =
+                            helpers::format_import_from_member(level, module, &alias.name);
+                        self.add_binding(
+                            name,
+                            alias.identifier(),
+                            BindingKind::FromImport(FromImport { qualified_name }),
+                            flags,
+                        );
+                    }
+                }
+            }
+            Stmt::Global(ast::StmtGlobal { names, range: _ }) => {
+                if !self.semantic.scope_id.is_global() {
+                    for name in names {
+                        if let Some(binding_id) = self.semantic.global_scope().get(name) {
+                            // Mark the binding in the global scope as "rebound" in the current scope.
+                            self.semantic
+                                .add_rebinding_scope(binding_id, self.semantic.scope_id);
+                        }
+
+                        // Add a binding to the current scope.
+                        let binding_id = self.semantic.push_binding(
+                            name.range(),
+                            BindingKind::Global,
+                            BindingFlags::GLOBAL,
+                        );
+                        let scope = self.semantic.scope_mut();
+                        scope.add(name, binding_id);
+                    }
+                }
+            }
+            Stmt::Nonlocal(ast::StmtNonlocal { names, range: _ }) => {
+                if !self.semantic.scope_id.is_global() {
+                    for name in names {
+                        if let Some((scope_id, binding_id)) = self.semantic.nonlocal(name) {
+                            // Mark the binding as "used".
+                            self.semantic.add_local_reference(
+                                binding_id,
+                                name.range(),
+                                ExecutionContext::Runtime,
+                            );
+
+                            // Mark the binding in the enclosing scope as "rebound" in the current
+                            // scope.
+                            self.semantic
+                                .add_rebinding_scope(binding_id, self.semantic.scope_id);
+
+                            // Add a binding to the current scope.
+                            let binding_id = self.semantic.push_binding(
+                                name.range(),
+                                BindingKind::Nonlocal(scope_id),
+                                BindingFlags::NONLOCAL,
+                            );
+                            let scope = self.semantic.scope_mut();
+                            scope.add(name, binding_id);
+                        } else {
+                            if self.enabled(Rule::NonlocalWithoutBinding) {
+                                self.diagnostics.push(Diagnostic::new(
+                                    pylint::rules::NonlocalWithoutBinding {
+                                        name: name.to_string(),
+                                    },
+                                    name.range(),
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+
+        // Step 2: Traversal
+        match stmt {
+            Stmt::FunctionDef(ast::StmtFunctionDef {
+                body,
+                args,
+                decorator_list,
+                returns,
+                ..
+            })
+            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
+                body,
+                args,
+                decorator_list,
+                returns,
+                ..
+            }) => {
+                // Visit the decorators and arguments, but avoid the body, which will be
+                // deferred.
+                for decorator in decorator_list {
+                    self.visit_decorator(decorator);
+                }
+
+                // Function annotations are always evaluated at runtime, unless future annotations
+                // are enabled.
+                let runtime_annotation = !self.semantic.future_annotations();
+
+                for arg_with_default in args
+                    .posonlyargs
+                    .iter()
+                    .chain(&args.args)
+                    .chain(&args.kwonlyargs)
+                {
+                    if let Some(expr) = &arg_with_default.def.annotation {
+                        if runtime_annotation {
+                            self.visit_runtime_annotation(expr);
+                        } else {
+                            self.visit_annotation(expr);
+                        };
+                    }
+                    if let Some(expr) = &arg_with_default.default {
+                        self.visit_expr(expr);
+                    }
+                }
+                if let Some(arg) = &args.vararg {
+                    if let Some(expr) = &arg.annotation {
+                        if runtime_annotation {
+                            self.visit_runtime_annotation(expr);
+                        } else {
+                            self.visit_annotation(expr);
+                        };
+                    }
+                }
+                if let Some(arg) = &args.kwarg {
+                    if let Some(expr) = &arg.annotation {
+                        if runtime_annotation {
+                            self.visit_runtime_annotation(expr);
+                        } else {
+                            self.visit_annotation(expr);
+                        };
+                    }
+                }
+                for expr in returns {
+                    if runtime_annotation {
+                        self.visit_runtime_annotation(expr);
+                    } else {
+                        self.visit_annotation(expr);
+                    };
+                }
+
+                let definition = docstrings::extraction::extract_definition(
+                    ExtractionTarget::Function,
+                    stmt,
+                    self.semantic.definition_id,
+                    &self.semantic.definitions,
+                );
+                self.semantic.push_definition(definition);
+
+                self.semantic.push_scope(match &stmt {
+                    Stmt::FunctionDef(stmt) => ScopeKind::Function(stmt),
+                    Stmt::AsyncFunctionDef(stmt) => ScopeKind::AsyncFunction(stmt),
+                    _ => unreachable!("Expected Stmt::FunctionDef | Stmt::AsyncFunctionDef"),
+                });
+
+                self.deferred.functions.push(self.semantic.snapshot());
+
+                // Extract any global bindings from the function body.
+                if let Some(globals) = Globals::from_body(body) {
+                    self.semantic.set_globals(globals);
+                }
+            }
+            Stmt::ClassDef(
+                class_def @ ast::StmtClassDef {
+                    body,
+                    bases,
+                    keywords,
+                    decorator_list,
+                    ..
+                },
+            ) => {
+                for expr in bases {
+                    self.visit_expr(expr);
+                }
+                for keyword in keywords {
+                    self.visit_keyword(keyword);
+                }
+                for decorator in decorator_list {
+                    self.visit_decorator(decorator);
+                }
+
+                let definition = docstrings::extraction::extract_definition(
+                    ExtractionTarget::Class,
+                    stmt,
+                    self.semantic.definition_id,
+                    &self.semantic.definitions,
+                );
+                self.semantic.push_definition(definition);
+
+                self.semantic.push_scope(ScopeKind::Class(class_def));
+
+                // Extract any global bindings from the class body.
+                if let Some(globals) = Globals::from_body(body) {
+                    self.semantic.set_globals(globals);
+                }
+
+                self.visit_body(body);
+            }
+            Stmt::Try(ast::StmtTry {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+                range: _,
+            })
+            | Stmt::TryStar(ast::StmtTryStar {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+                range: _,
+            }) => {
+                let mut handled_exceptions = Exceptions::empty();
+                for type_ in extract_handled_exceptions(handlers) {
+                    if let Some(call_path) = self.semantic.resolve_call_path(type_) {
+                        match call_path.as_slice() {
+                            ["", "NameError"] => {
+                                handled_exceptions |= Exceptions::NAME_ERROR;
+                            }
+                            ["", "ModuleNotFoundError"] => {
+                                handled_exceptions |= Exceptions::MODULE_NOT_FOUND_ERROR;
+                            }
+                            ["", "ImportError"] => {
+                                handled_exceptions |= Exceptions::IMPORT_ERROR;
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+
+                self.semantic.handled_exceptions.push(handled_exceptions);
+                self.visit_body(body);
+                self.semantic.handled_exceptions.pop();
+
+                for except_handler in handlers {
+                    self.visit_except_handler(except_handler);
+                }
+
+                self.visit_body(orelse);
+                self.visit_body(finalbody);
+            }
+            Stmt::AnnAssign(ast::StmtAnnAssign {
+                target,
+                annotation,
+                value,
+                ..
+            }) => {
+                // If we're in a class or module scope, then the annotation needs to be
+                // available at runtime.
+                // See: https://docs.python.org/3/reference/simple_stmts.html#annotated-assignment-statements
+                let runtime_annotation = if self.semantic.future_annotations() {
+                    if self.semantic.scope().kind.is_class() {
+                        let baseclasses = &self
+                            .settings
+                            .flake8_type_checking
+                            .runtime_evaluated_base_classes;
+                        let decorators = &self
+                            .settings
+                            .flake8_type_checking
+                            .runtime_evaluated_decorators;
+                        flake8_type_checking::helpers::runtime_evaluated(
+                            baseclasses,
+                            decorators,
+                            &self.semantic,
+                        )
+                    } else {
+                        false
+                    }
+                } else {
+                    matches!(
+                        self.semantic.scope().kind,
+                        ScopeKind::Class(_) | ScopeKind::Module
+                    )
+                };
+
+                if runtime_annotation {
+                    self.visit_runtime_annotation(annotation);
+                } else {
+                    self.visit_annotation(annotation);
+                }
+                if let Some(expr) = value {
+                    if self.semantic.match_typing_expr(annotation, "TypeAlias") {
+                        self.visit_type_definition(expr);
+                    } else {
+                        self.visit_expr(expr);
+                    }
+                }
+                self.visit_expr(target);
+            }
+            Stmt::Assert(ast::StmtAssert {
+                test,
+                msg,
+                range: _,
+            }) => {
+                self.visit_boolean_test(test);
+                if let Some(expr) = msg {
+                    self.visit_expr(expr);
+                }
+            }
+            Stmt::While(ast::StmtWhile {
+                test,
+                body,
+                orelse,
+                range: _,
+            }) => {
+                self.visit_boolean_test(test);
+                self.visit_body(body);
+                self.visit_body(orelse);
+            }
+            Stmt::If(
+                stmt_if @ ast::StmtIf {
+                    test,
+                    body,
+                    elif_else_clauses,
+                    range: _,
+                },
+            ) => {
+                self.visit_boolean_test(test);
+
+                if typing::is_type_checking_block(stmt_if, &self.semantic) {
+                    if self.semantic.at_top_level() {
+                        self.importer.visit_type_checking_block(stmt);
+                    }
+                    self.visit_type_checking_block(body);
+                } else {
+                    self.visit_body(body);
+                }
+
+                for clause in elif_else_clauses {
+                    self.visit_elif_else_clause(clause);
+                }
+            }
+            _ => visitor::walk_stmt(self, stmt),
+        };
+
+        // Step 3: Clean-up
+        match stmt {
+            Stmt::FunctionDef(ast::StmtFunctionDef { name, .. })
+            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { name, .. }) => {
+                let scope_id = self.semantic.scope_id;
+                self.deferred.scopes.push(scope_id);
+                self.semantic.pop_scope();
+                self.semantic.pop_definition();
+                self.add_binding(
+                    name,
+                    stmt.identifier(),
+                    BindingKind::FunctionDefinition(scope_id),
+                    BindingFlags::empty(),
+                );
+            }
+            Stmt::ClassDef(ast::StmtClassDef { name, .. }) => {
+                let scope_id = self.semantic.scope_id;
+                self.deferred.scopes.push(scope_id);
+                self.semantic.pop_scope();
+                self.semantic.pop_definition();
+                self.add_binding(
+                    name,
+                    stmt.identifier(),
+                    BindingKind::ClassDefinition(scope_id),
+                    BindingFlags::empty(),
+                );
+            }
+            _ => {}
+        }
+
+        // Step 4: Analysis
         match stmt {
             Stmt::Global(ast::StmtGlobal { names, range: _ }) => {
                 if self.enabled(Rule::AmbiguousVariableName) {
@@ -1494,7 +1943,7 @@ where
             }
             Stmt::Assign(stmt_assign @ ast::StmtAssign { targets, value, .. }) => {
                 if self.enabled(Rule::LambdaAssignment) {
-                    if let [target] = &targets[..] {
+                    if let [target] = targets.as_slice() {
                         pycodestyle::rules::lambda_assignment(self, target, value, None, stmt);
                     }
                 }
@@ -1674,455 +2123,6 @@ where
             _ => {}
         }
 
-        // Step 2: Binding
-        match stmt {
-            Stmt::AugAssign(ast::StmtAugAssign {
-                target,
-                op: _,
-                value: _,
-                range: _,
-            }) => {
-                self.handle_node_load(target);
-            }
-            Stmt::Import(ast::StmtImport { names, range: _ }) => {
-                for alias in names {
-                    if alias.name.contains('.') && alias.asname.is_none() {
-                        // Given `import foo.bar`, `name` would be "foo", and `qualified_name` would be
-                        // "foo.bar".
-                        let name = alias.name.split('.').next().unwrap();
-                        let qualified_name = &alias.name;
-                        self.add_binding(
-                            name,
-                            alias.identifier(),
-                            BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }),
-                            BindingFlags::EXTERNAL,
-                        );
-                    } else {
-                        let mut flags = BindingFlags::EXTERNAL;
-                        if alias.asname.is_some() {
-                            flags |= BindingFlags::ALIAS;
-                        }
-                        if alias
-                            .asname
-                            .as_ref()
-                            .map_or(false, |asname| asname.as_str() == alias.name.as_str())
-                        {
-                            flags |= BindingFlags::EXPLICIT_EXPORT;
-                        }
-
-                        let name = alias.asname.as_ref().unwrap_or(&alias.name);
-                        let qualified_name = &alias.name;
-                        self.add_binding(
-                            name,
-                            alias.identifier(),
-                            BindingKind::Import(Import { qualified_name }),
-                            flags,
-                        );
-                    }
-                }
-            }
-            Stmt::ImportFrom(ast::StmtImportFrom {
-                names,
-                module,
-                level,
-                range: _,
-            }) => {
-                let module = module.as_deref();
-                let level = level.map(|level| level.to_u32());
-                for alias in names {
-                    if let Some("__future__") = module {
-                        let name = alias.asname.as_ref().unwrap_or(&alias.name);
-                        self.add_binding(
-                            name,
-                            alias.identifier(),
-                            BindingKind::FutureImport,
-                            BindingFlags::empty(),
-                        );
-                    } else if &alias.name == "*" {
-                        self.semantic
-                            .scope_mut()
-                            .add_star_import(StarImport { level, module });
-                    } else {
-                        let mut flags = BindingFlags::EXTERNAL;
-                        if alias.asname.is_some() {
-                            flags |= BindingFlags::ALIAS;
-                        }
-                        if alias
-                            .asname
-                            .as_ref()
-                            .map_or(false, |asname| asname.as_str() == alias.name.as_str())
-                        {
-                            flags |= BindingFlags::EXPLICIT_EXPORT;
-                        }
-
-                        // Given `from foo import bar`, `name` would be "bar" and `qualified_name` would
-                        // be "foo.bar". Given `from foo import bar as baz`, `name` would be "baz"
-                        // and `qualified_name` would be "foo.bar".
-                        let name = alias.asname.as_ref().unwrap_or(&alias.name);
-                        let qualified_name =
-                            helpers::format_import_from_member(level, module, &alias.name);
-                        self.add_binding(
-                            name,
-                            alias.identifier(),
-                            BindingKind::FromImport(FromImport { qualified_name }),
-                            flags,
-                        );
-                    }
-                }
-            }
-            Stmt::Global(ast::StmtGlobal { names, range: _ }) => {
-                if !self.semantic.scope_id.is_global() {
-                    for name in names {
-                        if let Some(binding_id) = self.semantic.global_scope().get(name) {
-                            // Mark the binding in the global scope as "rebound" in the current scope.
-                            self.semantic
-                                .add_rebinding_scope(binding_id, self.semantic.scope_id);
-                        }
-
-                        // Add a binding to the current scope.
-                        let binding_id = self.semantic.push_binding(
-                            name.range(),
-                            BindingKind::Global,
-                            BindingFlags::GLOBAL,
-                        );
-                        let scope = self.semantic.scope_mut();
-                        scope.add(name, binding_id);
-                    }
-                }
-            }
-            Stmt::Nonlocal(ast::StmtNonlocal { names, range: _ }) => {
-                if !self.semantic.scope_id.is_global() {
-                    for name in names {
-                        if let Some((scope_id, binding_id)) = self.semantic.nonlocal(name) {
-                            // Mark the binding as "used".
-                            self.semantic.add_local_reference(
-                                binding_id,
-                                name.range(),
-                                ExecutionContext::Runtime,
-                            );
-
-                            // Mark the binding in the enclosing scope as "rebound" in the current
-                            // scope.
-                            self.semantic
-                                .add_rebinding_scope(binding_id, self.semantic.scope_id);
-
-                            // Add a binding to the current scope.
-                            let binding_id = self.semantic.push_binding(
-                                name.range(),
-                                BindingKind::Nonlocal(scope_id),
-                                BindingFlags::NONLOCAL,
-                            );
-                            let scope = self.semantic.scope_mut();
-                            scope.add(name, binding_id);
-                        } else {
-                            if self.enabled(Rule::NonlocalWithoutBinding) {
-                                self.diagnostics.push(Diagnostic::new(
-                                    pylint::rules::NonlocalWithoutBinding {
-                                        name: name.to_string(),
-                                    },
-                                    name.range(),
-                                ));
-                            }
-                        }
-                    }
-                }
-            }
-            _ => {}
-        }
-
-        // Step 3: Traversal
-        match stmt {
-            Stmt::FunctionDef(ast::StmtFunctionDef {
-                body,
-                args,
-                decorator_list,
-                returns,
-                ..
-            })
-            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-                body,
-                args,
-                decorator_list,
-                returns,
-                ..
-            }) => {
-                // Visit the decorators and arguments, but avoid the body, which will be
-                // deferred.
-                for decorator in decorator_list {
-                    self.visit_decorator(decorator);
-                }
-
-                // Function annotations are always evaluated at runtime, unless future annotations
-                // are enabled.
-                let runtime_annotation = !self.semantic.future_annotations();
-
-                for arg_with_default in args
-                    .posonlyargs
-                    .iter()
-                    .chain(&args.args)
-                    .chain(&args.kwonlyargs)
-                {
-                    if let Some(expr) = &arg_with_default.def.annotation {
-                        if runtime_annotation {
-                            self.visit_runtime_annotation(expr);
-                        } else {
-                            self.visit_annotation(expr);
-                        };
-                    }
-                    if let Some(expr) = &arg_with_default.default {
-                        self.visit_expr(expr);
-                    }
-                }
-                if let Some(arg) = &args.vararg {
-                    if let Some(expr) = &arg.annotation {
-                        if runtime_annotation {
-                            self.visit_runtime_annotation(expr);
-                        } else {
-                            self.visit_annotation(expr);
-                        };
-                    }
-                }
-                if let Some(arg) = &args.kwarg {
-                    if let Some(expr) = &arg.annotation {
-                        if runtime_annotation {
-                            self.visit_runtime_annotation(expr);
-                        } else {
-                            self.visit_annotation(expr);
-                        };
-                    }
-                }
-                for expr in returns {
-                    if runtime_annotation {
-                        self.visit_runtime_annotation(expr);
-                    } else {
-                        self.visit_annotation(expr);
-                    };
-                }
-
-                let definition = docstrings::extraction::extract_definition(
-                    ExtractionTarget::Function,
-                    stmt,
-                    self.semantic.definition_id,
-                    &self.semantic.definitions,
-                );
-                self.semantic.push_definition(definition);
-
-                self.semantic.push_scope(match &stmt {
-                    Stmt::FunctionDef(stmt) => ScopeKind::Function(stmt),
-                    Stmt::AsyncFunctionDef(stmt) => ScopeKind::AsyncFunction(stmt),
-                    _ => unreachable!("Expected Stmt::FunctionDef | Stmt::AsyncFunctionDef"),
-                });
-
-                self.deferred.functions.push(self.semantic.snapshot());
-
-                // Extract any global bindings from the function body.
-                if let Some(globals) = Globals::from_body(body) {
-                    self.semantic.set_globals(globals);
-                }
-            }
-            Stmt::ClassDef(
-                class_def @ ast::StmtClassDef {
-                    body,
-                    bases,
-                    keywords,
-                    decorator_list,
-                    ..
-                },
-            ) => {
-                for expr in bases {
-                    self.visit_expr(expr);
-                }
-                for keyword in keywords {
-                    self.visit_keyword(keyword);
-                }
-                for decorator in decorator_list {
-                    self.visit_decorator(decorator);
-                }
-
-                let definition = docstrings::extraction::extract_definition(
-                    ExtractionTarget::Class,
-                    stmt,
-                    self.semantic.definition_id,
-                    &self.semantic.definitions,
-                );
-                self.semantic.push_definition(definition);
-
-                self.semantic.push_scope(ScopeKind::Class(class_def));
-
-                // Extract any global bindings from the class body.
-                if let Some(globals) = Globals::from_body(body) {
-                    self.semantic.set_globals(globals);
-                }
-
-                self.visit_body(body);
-            }
-            Stmt::Try(ast::StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                range: _,
-            })
-            | Stmt::TryStar(ast::StmtTryStar {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                range: _,
-            }) => {
-                let mut handled_exceptions = Exceptions::empty();
-                for type_ in extract_handled_exceptions(handlers) {
-                    if let Some(call_path) = self.semantic.resolve_call_path(type_) {
-                        match call_path.as_slice() {
-                            ["", "NameError"] => {
-                                handled_exceptions |= Exceptions::NAME_ERROR;
-                            }
-                            ["", "ModuleNotFoundError"] => {
-                                handled_exceptions |= Exceptions::MODULE_NOT_FOUND_ERROR;
-                            }
-                            ["", "ImportError"] => {
-                                handled_exceptions |= Exceptions::IMPORT_ERROR;
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-
-                self.semantic.handled_exceptions.push(handled_exceptions);
-                self.visit_body(body);
-                self.semantic.handled_exceptions.pop();
-
-                for except_handler in handlers {
-                    self.visit_except_handler(except_handler);
-                }
-
-                self.visit_body(orelse);
-                self.visit_body(finalbody);
-            }
-            Stmt::AnnAssign(ast::StmtAnnAssign {
-                target,
-                annotation,
-                value,
-                ..
-            }) => {
-                // If we're in a class or module scope, then the annotation needs to be
-                // available at runtime.
-                // See: https://docs.python.org/3/reference/simple_stmts.html#annotated-assignment-statements
-                let runtime_annotation = if self.semantic.future_annotations() {
-                    if self.semantic.scope().kind.is_class() {
-                        let baseclasses = &self
-                            .settings
-                            .flake8_type_checking
-                            .runtime_evaluated_base_classes;
-                        let decorators = &self
-                            .settings
-                            .flake8_type_checking
-                            .runtime_evaluated_decorators;
-                        flake8_type_checking::helpers::runtime_evaluated(
-                            baseclasses,
-                            decorators,
-                            &self.semantic,
-                        )
-                    } else {
-                        false
-                    }
-                } else {
-                    matches!(
-                        self.semantic.scope().kind,
-                        ScopeKind::Class(_) | ScopeKind::Module
-                    )
-                };
-
-                if runtime_annotation {
-                    self.visit_runtime_annotation(annotation);
-                } else {
-                    self.visit_annotation(annotation);
-                }
-                if let Some(expr) = value {
-                    if self.semantic.match_typing_expr(annotation, "TypeAlias") {
-                        self.visit_type_definition(expr);
-                    } else {
-                        self.visit_expr(expr);
-                    }
-                }
-                self.visit_expr(target);
-            }
-            Stmt::Assert(ast::StmtAssert {
-                test,
-                msg,
-                range: _,
-            }) => {
-                self.visit_boolean_test(test);
-                if let Some(expr) = msg {
-                    self.visit_expr(expr);
-                }
-            }
-            Stmt::While(ast::StmtWhile {
-                test,
-                body,
-                orelse,
-                range: _,
-            }) => {
-                self.visit_boolean_test(test);
-                self.visit_body(body);
-                self.visit_body(orelse);
-            }
-            Stmt::If(
-                stmt_if @ ast::StmtIf {
-                    test,
-                    body,
-                    elif_else_clauses,
-                    range: _,
-                },
-            ) => {
-                self.visit_boolean_test(test);
-
-                if typing::is_type_checking_block(stmt_if, &self.semantic) {
-                    if self.semantic.at_top_level() {
-                        self.importer.visit_type_checking_block(stmt);
-                    }
-                    self.visit_type_checking_block(body);
-                } else {
-                    self.visit_body(body);
-                }
-
-                for clause in elif_else_clauses {
-                    self.visit_elif_else_clause(clause);
-                }
-            }
-            _ => visitor::walk_stmt(self, stmt),
-        };
-
-        // Step 4: Clean-up
-        match stmt {
-            Stmt::FunctionDef(ast::StmtFunctionDef { name, .. })
-            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { name, .. }) => {
-                let scope_id = self.semantic.scope_id;
-                self.deferred.scopes.push(scope_id);
-                self.semantic.pop_scope();
-                self.semantic.pop_definition();
-                self.add_binding(
-                    name,
-                    stmt.identifier(),
-                    BindingKind::FunctionDefinition(scope_id),
-                    BindingFlags::empty(),
-                );
-            }
-            Stmt::ClassDef(ast::StmtClassDef { name, .. }) => {
-                let scope_id = self.semantic.scope_id;
-                self.deferred.scopes.push(scope_id);
-                self.semantic.pop_scope();
-                self.semantic.pop_definition();
-                self.add_binding(
-                    name,
-                    stmt.identifier(),
-                    BindingKind::ClassDefinition(scope_id),
-                    BindingFlags::empty(),
-                );
-            }
-            _ => {}
-        }
-
         self.semantic.flags = flags_snapshot;
         self.semantic.pop_stmt();
     }
@@ -2178,7 +2178,403 @@ where
             self.semantic.flags -= SemanticModelFlags::BOOLEAN_TEST;
         }
 
-        // Step 1: Analysis
+        // Step 1: Binding
+        match expr {
+            Expr::Call(ast::ExprCall {
+                func,
+                args: _,
+                keywords: _,
+                range: _,
+            }) => {
+                if let Expr::Name(ast::ExprName { id, ctx, range: _ }) = func.as_ref() {
+                    if id == "locals" && ctx.is_load() {
+                        let scope = self.semantic.scope_mut();
+                        scope.set_uses_locals();
+                    }
+                }
+            }
+            Expr::Name(ast::ExprName { id, ctx, range: _ }) => match ctx {
+                ExprContext::Load => self.handle_node_load(expr),
+                ExprContext::Store => self.handle_node_store(id, expr),
+                ExprContext::Del => self.handle_node_delete(expr),
+            },
+            _ => {}
+        }
+
+        // Step 2: Traversal
+        match expr {
+            Expr::ListComp(ast::ExprListComp {
+                elt,
+                generators,
+                range: _,
+            })
+            | Expr::SetComp(ast::ExprSetComp {
+                elt,
+                generators,
+                range: _,
+            })
+            | Expr::GeneratorExp(ast::ExprGeneratorExp {
+                elt,
+                generators,
+                range: _,
+            }) => {
+                self.visit_generators(generators);
+                self.visit_expr(elt);
+            }
+            Expr::DictComp(ast::ExprDictComp {
+                key,
+                value,
+                generators,
+                range: _,
+            }) => {
+                self.visit_generators(generators);
+                self.visit_expr(key);
+                self.visit_expr(value);
+            }
+            Expr::Lambda(
+                lambda @ ast::ExprLambda {
+                    args,
+                    body: _,
+                    range: _,
+                },
+            ) => {
+                // Visit the default arguments, but avoid the body, which will be deferred.
+                for ArgWithDefault {
+                    default,
+                    def: _,
+                    range: _,
+                } in args
+                    .posonlyargs
+                    .iter()
+                    .chain(&args.args)
+                    .chain(&args.kwonlyargs)
+                {
+                    if let Some(expr) = &default {
+                        self.visit_expr(expr);
+                    }
+                }
+
+                self.semantic.push_scope(ScopeKind::Lambda(lambda));
+                self.deferred.lambdas.push((expr, self.semantic.snapshot()));
+            }
+            Expr::IfExp(ast::ExprIfExp {
+                test,
+                body,
+                orelse,
+                range: _,
+            }) => {
+                self.visit_boolean_test(test);
+                self.visit_expr(body);
+                self.visit_expr(orelse);
+            }
+            Expr::Call(ast::ExprCall {
+                func,
+                args,
+                keywords,
+                range: _,
+            }) => {
+                self.visit_expr(func);
+
+                let callable = self.semantic.resolve_call_path(func).and_then(|call_path| {
+                    if self.semantic.match_typing_call_path(&call_path, "cast") {
+                        Some(typing::Callable::Cast)
+                    } else if self.semantic.match_typing_call_path(&call_path, "NewType") {
+                        Some(typing::Callable::NewType)
+                    } else if self.semantic.match_typing_call_path(&call_path, "TypeVar") {
+                        Some(typing::Callable::TypeVar)
+                    } else if self
+                        .semantic
+                        .match_typing_call_path(&call_path, "NamedTuple")
+                    {
+                        Some(typing::Callable::NamedTuple)
+                    } else if self
+                        .semantic
+                        .match_typing_call_path(&call_path, "TypedDict")
+                    {
+                        Some(typing::Callable::TypedDict)
+                    } else if matches!(
+                        call_path.as_slice(),
+                        [
+                            "mypy_extensions",
+                            "Arg"
+                                | "DefaultArg"
+                                | "NamedArg"
+                                | "DefaultNamedArg"
+                                | "VarArg"
+                                | "KwArg"
+                        ]
+                    ) {
+                        Some(typing::Callable::MypyExtension)
+                    } else if matches!(call_path.as_slice(), ["", "bool"]) {
+                        Some(typing::Callable::Bool)
+                    } else {
+                        None
+                    }
+                });
+                match callable {
+                    Some(typing::Callable::Bool) => {
+                        let mut args = args.iter();
+                        if let Some(arg) = args.next() {
+                            self.visit_boolean_test(arg);
+                        }
+                        for arg in args {
+                            self.visit_expr(arg);
+                        }
+                    }
+                    Some(typing::Callable::Cast) => {
+                        let mut args = args.iter();
+                        if let Some(arg) = args.next() {
+                            self.visit_type_definition(arg);
+                        }
+                        for arg in args {
+                            self.visit_expr(arg);
+                        }
+                    }
+                    Some(typing::Callable::NewType) => {
+                        let mut args = args.iter();
+                        if let Some(arg) = args.next() {
+                            self.visit_non_type_definition(arg);
+                        }
+                        for arg in args {
+                            self.visit_type_definition(arg);
+                        }
+                    }
+                    Some(typing::Callable::TypeVar) => {
+                        let mut args = args.iter();
+                        if let Some(arg) = args.next() {
+                            self.visit_non_type_definition(arg);
+                        }
+                        for arg in args {
+                            self.visit_type_definition(arg);
+                        }
+                        for keyword in keywords {
+                            let Keyword {
+                                arg,
+                                value,
+                                range: _,
+                            } = keyword;
+                            if let Some(id) = arg {
+                                if id == "bound" {
+                                    self.visit_type_definition(value);
+                                } else {
+                                    self.visit_non_type_definition(value);
+                                }
+                            }
+                        }
+                    }
+                    Some(typing::Callable::NamedTuple) => {
+                        // Ex) NamedTuple("a", [("a", int)])
+                        let mut args = args.iter();
+                        if let Some(arg) = args.next() {
+                            self.visit_non_type_definition(arg);
+                        }
+                        for arg in args {
+                            if let Expr::List(ast::ExprList { elts, .. })
+                            | Expr::Tuple(ast::ExprTuple { elts, .. }) = arg
+                            {
+                                for elt in elts {
+                                    match elt {
+                                        Expr::List(ast::ExprList { elts, .. })
+                                        | Expr::Tuple(ast::ExprTuple { elts, .. })
+                                            if elts.len() == 2 =>
+                                        {
+                                            self.visit_non_type_definition(&elts[0]);
+                                            self.visit_type_definition(&elts[1]);
+                                        }
+                                        _ => {
+                                            self.visit_non_type_definition(elt);
+                                        }
+                                    }
+                                }
+                            } else {
+                                self.visit_non_type_definition(arg);
+                            }
+                        }
+
+                        // Ex) NamedTuple("a", a=int)
+                        for keyword in keywords {
+                            let Keyword { value, .. } = keyword;
+                            self.visit_type_definition(value);
+                        }
+                    }
+                    Some(typing::Callable::TypedDict) => {
+                        // Ex) TypedDict("a", {"a": int})
+                        let mut args = args.iter();
+                        if let Some(arg) = args.next() {
+                            self.visit_non_type_definition(arg);
+                        }
+                        for arg in args {
+                            if let Expr::Dict(ast::ExprDict {
+                                keys,
+                                values,
+                                range: _,
+                            }) = arg
+                            {
+                                for key in keys.iter().flatten() {
+                                    self.visit_non_type_definition(key);
+                                }
+                                for value in values {
+                                    self.visit_type_definition(value);
+                                }
+                            } else {
+                                self.visit_non_type_definition(arg);
+                            }
+                        }
+
+                        // Ex) TypedDict("a", a=int)
+                        for keyword in keywords {
+                            let Keyword { value, .. } = keyword;
+                            self.visit_type_definition(value);
+                        }
+                    }
+                    Some(typing::Callable::MypyExtension) => {
+                        let mut args = args.iter();
+                        if let Some(arg) = args.next() {
+                            // Ex) DefaultNamedArg(bool | None, name="some_prop_name")
+                            self.visit_type_definition(arg);
+
+                            for arg in args {
+                                self.visit_non_type_definition(arg);
+                            }
+                            for keyword in keywords {
+                                let Keyword { value, .. } = keyword;
+                                self.visit_non_type_definition(value);
+                            }
+                        } else {
+                            // Ex) DefaultNamedArg(type="bool", name="some_prop_name")
+                            for keyword in keywords {
+                                let Keyword {
+                                    value,
+                                    arg,
+                                    range: _,
+                                } = keyword;
+                                if arg.as_ref().map_or(false, |arg| arg == "type") {
+                                    self.visit_type_definition(value);
+                                } else {
+                                    self.visit_non_type_definition(value);
+                                }
+                            }
+                        }
+                    }
+                    None => {
+                        // If we're in a type definition, we need to treat the arguments to any
+                        // other callables as non-type definitions (i.e., we don't want to treat
+                        // any strings as deferred type definitions).
+                        for arg in args {
+                            self.visit_non_type_definition(arg);
+                        }
+                        for keyword in keywords {
+                            let Keyword { value, .. } = keyword;
+                            self.visit_non_type_definition(value);
+                        }
+                    }
+                }
+            }
+            Expr::Subscript(ast::ExprSubscript {
+                value,
+                slice,
+                ctx,
+                range: _,
+            }) => {
+                // Only allow annotations in `ExprContext::Load`. If we have, e.g.,
+                // `obj["foo"]["bar"]`, we need to avoid treating the `obj["foo"]`
+                // portion as an annotation, despite having `ExprContext::Load`. Thus, we track
+                // the `ExprContext` at the top-level.
+                if self.semantic.in_subscript() {
+                    visitor::walk_expr(self, expr);
+                } else if matches!(ctx, ExprContext::Store | ExprContext::Del) {
+                    self.semantic.flags |= SemanticModelFlags::SUBSCRIPT;
+                    visitor::walk_expr(self, expr);
+                } else {
+                    self.visit_expr(value);
+
+                    match typing::match_annotated_subscript(
+                        value,
+                        &self.semantic,
+                        self.settings.typing_modules.iter().map(String::as_str),
+                        &self.settings.pyflakes.extend_generics,
+                    ) {
+                        // Ex) Literal["Class"]
+                        Some(typing::SubscriptKind::Literal) => {
+                            self.semantic.flags |= SemanticModelFlags::LITERAL;
+
+                            self.visit_type_definition(slice);
+                            self.visit_expr_context(ctx);
+                        }
+                        // Ex) Optional[int]
+                        Some(typing::SubscriptKind::Generic) => {
+                            self.visit_type_definition(slice);
+                            self.visit_expr_context(ctx);
+                        }
+                        // Ex) Annotated[int, "Hello, world!"]
+                        Some(typing::SubscriptKind::PEP593Annotation) => {
+                            // First argument is a type (including forward references); the
+                            // rest are arbitrary Python objects.
+                            if let Expr::Tuple(ast::ExprTuple {
+                                elts,
+                                ctx,
+                                range: _,
+                            }) = slice.as_ref()
+                            {
+                                if let Some(expr) = elts.first() {
+                                    self.visit_expr(expr);
+                                    for expr in elts.iter().skip(1) {
+                                        self.visit_non_type_definition(expr);
+                                    }
+                                    self.visit_expr_context(ctx);
+                                }
+                            } else {
+                                error!("Found non-Expr::Tuple argument to PEP 593 Annotation.");
+                            }
+                        }
+                        None => {
+                            self.visit_expr(slice);
+                            self.visit_expr_context(ctx);
+                        }
+                    }
+                }
+            }
+            Expr::Constant(ast::ExprConstant {
+                value: Constant::Str(value),
+                kind: _,
+                range: _,
+            }) => {
+                if self.semantic.in_type_definition()
+                    && !self.semantic.in_literal()
+                    && !self.semantic.in_f_string()
+                {
+                    self.deferred.string_type_definitions.push((
+                        expr.range(),
+                        value,
+                        self.semantic.snapshot(),
+                    ));
+                }
+            }
+            Expr::JoinedStr(_) => {
+                self.semantic.flags |= if self.semantic.in_f_string() {
+                    SemanticModelFlags::NESTED_F_STRING
+                } else {
+                    SemanticModelFlags::F_STRING
+                };
+                visitor::walk_expr(self, expr);
+            }
+            _ => visitor::walk_expr(self, expr),
+        }
+
+        // Step 3: Clean-up
+        match expr {
+            Expr::Lambda(_)
+            | Expr::GeneratorExp(_)
+            | Expr::ListComp(_)
+            | Expr::DictComp(_)
+            | Expr::SetComp(_) => {
+                self.deferred.scopes.push(self.semantic.scope_id);
+                self.semantic.pop_scope();
+            }
+            _ => {}
+        };
+
+        // Step 4: Analysis
         match expr {
             Expr::Subscript(subscript @ ast::ExprSubscript { value, slice, .. }) => {
                 // Ex) Optional[...], Union[...]
@@ -3555,402 +3951,6 @@ where
             _ => {}
         };
 
-        // Step 2: Binding
-        match expr {
-            Expr::Call(ast::ExprCall {
-                func,
-                args: _,
-                keywords: _,
-                range: _,
-            }) => {
-                if let Expr::Name(ast::ExprName { id, ctx, range: _ }) = func.as_ref() {
-                    if id == "locals" && ctx.is_load() {
-                        let scope = self.semantic.scope_mut();
-                        scope.set_uses_locals();
-                    }
-                }
-            }
-            Expr::Name(ast::ExprName { id, ctx, range: _ }) => match ctx {
-                ExprContext::Load => self.handle_node_load(expr),
-                ExprContext::Store => self.handle_node_store(id, expr),
-                ExprContext::Del => self.handle_node_delete(expr),
-            },
-            _ => {}
-        }
-
-        // Step 3: Traversal
-        match expr {
-            Expr::ListComp(ast::ExprListComp {
-                elt,
-                generators,
-                range: _,
-            })
-            | Expr::SetComp(ast::ExprSetComp {
-                elt,
-                generators,
-                range: _,
-            })
-            | Expr::GeneratorExp(ast::ExprGeneratorExp {
-                elt,
-                generators,
-                range: _,
-            }) => {
-                self.visit_generators(generators);
-                self.visit_expr(elt);
-            }
-            Expr::DictComp(ast::ExprDictComp {
-                key,
-                value,
-                generators,
-                range: _,
-            }) => {
-                self.visit_generators(generators);
-                self.visit_expr(key);
-                self.visit_expr(value);
-            }
-            Expr::Lambda(
-                lambda @ ast::ExprLambda {
-                    args,
-                    body: _,
-                    range: _,
-                },
-            ) => {
-                // Visit the default arguments, but avoid the body, which will be deferred.
-                for ArgWithDefault {
-                    default,
-                    def: _,
-                    range: _,
-                } in args
-                    .posonlyargs
-                    .iter()
-                    .chain(&args.args)
-                    .chain(&args.kwonlyargs)
-                {
-                    if let Some(expr) = &default {
-                        self.visit_expr(expr);
-                    }
-                }
-
-                self.semantic.push_scope(ScopeKind::Lambda(lambda));
-                self.deferred.lambdas.push((expr, self.semantic.snapshot()));
-            }
-            Expr::IfExp(ast::ExprIfExp {
-                test,
-                body,
-                orelse,
-                range: _,
-            }) => {
-                self.visit_boolean_test(test);
-                self.visit_expr(body);
-                self.visit_expr(orelse);
-            }
-            Expr::Call(ast::ExprCall {
-                func,
-                args,
-                keywords,
-                range: _,
-            }) => {
-                self.visit_expr(func);
-
-                let callable = self.semantic.resolve_call_path(func).and_then(|call_path| {
-                    if self.semantic.match_typing_call_path(&call_path, "cast") {
-                        Some(typing::Callable::Cast)
-                    } else if self.semantic.match_typing_call_path(&call_path, "NewType") {
-                        Some(typing::Callable::NewType)
-                    } else if self.semantic.match_typing_call_path(&call_path, "TypeVar") {
-                        Some(typing::Callable::TypeVar)
-                    } else if self
-                        .semantic
-                        .match_typing_call_path(&call_path, "NamedTuple")
-                    {
-                        Some(typing::Callable::NamedTuple)
-                    } else if self
-                        .semantic
-                        .match_typing_call_path(&call_path, "TypedDict")
-                    {
-                        Some(typing::Callable::TypedDict)
-                    } else if matches!(
-                        call_path.as_slice(),
-                        [
-                            "mypy_extensions",
-                            "Arg"
-                                | "DefaultArg"
-                                | "NamedArg"
-                                | "DefaultNamedArg"
-                                | "VarArg"
-                                | "KwArg"
-                        ]
-                    ) {
-                        Some(typing::Callable::MypyExtension)
-                    } else if matches!(call_path.as_slice(), ["", "bool"]) {
-                        Some(typing::Callable::Bool)
-                    } else {
-                        None
-                    }
-                });
-                match callable {
-                    Some(typing::Callable::Bool) => {
-                        let mut args = args.iter();
-                        if let Some(arg) = args.next() {
-                            self.visit_boolean_test(arg);
-                        }
-                        for arg in args {
-                            self.visit_expr(arg);
-                        }
-                    }
-                    Some(typing::Callable::Cast) => {
-                        let mut args = args.iter();
-                        if let Some(arg) = args.next() {
-                            self.visit_type_definition(arg);
-                        }
-                        for arg in args {
-                            self.visit_expr(arg);
-                        }
-                    }
-                    Some(typing::Callable::NewType) => {
-                        let mut args = args.iter();
-                        if let Some(arg) = args.next() {
-                            self.visit_non_type_definition(arg);
-                        }
-                        for arg in args {
-                            self.visit_type_definition(arg);
-                        }
-                    }
-                    Some(typing::Callable::TypeVar) => {
-                        let mut args = args.iter();
-                        if let Some(arg) = args.next() {
-                            self.visit_non_type_definition(arg);
-                        }
-                        for arg in args {
-                            self.visit_type_definition(arg);
-                        }
-                        for keyword in keywords {
-                            let Keyword {
-                                arg,
-                                value,
-                                range: _,
-                            } = keyword;
-                            if let Some(id) = arg {
-                                if id == "bound" {
-                                    self.visit_type_definition(value);
-                                } else {
-                                    self.visit_non_type_definition(value);
-                                }
-                            }
-                        }
-                    }
-                    Some(typing::Callable::NamedTuple) => {
-                        // Ex) NamedTuple("a", [("a", int)])
-                        let mut args = args.iter();
-                        if let Some(arg) = args.next() {
-                            self.visit_non_type_definition(arg);
-                        }
-                        for arg in args {
-                            if let Expr::List(ast::ExprList { elts, .. })
-                            | Expr::Tuple(ast::ExprTuple { elts, .. }) = arg
-                            {
-                                for elt in elts {
-                                    match elt {
-                                        Expr::List(ast::ExprList { elts, .. })
-                                        | Expr::Tuple(ast::ExprTuple { elts, .. })
-                                            if elts.len() == 2 =>
-                                        {
-                                            self.visit_non_type_definition(&elts[0]);
-                                            self.visit_type_definition(&elts[1]);
-                                        }
-                                        _ => {
-                                            self.visit_non_type_definition(elt);
-                                        }
-                                    }
-                                }
-                            } else {
-                                self.visit_non_type_definition(arg);
-                            }
-                        }
-
-                        // Ex) NamedTuple("a", a=int)
-                        for keyword in keywords {
-                            let Keyword { value, .. } = keyword;
-                            self.visit_type_definition(value);
-                        }
-                    }
-                    Some(typing::Callable::TypedDict) => {
-                        // Ex) TypedDict("a", {"a": int})
-                        let mut args = args.iter();
-                        if let Some(arg) = args.next() {
-                            self.visit_non_type_definition(arg);
-                        }
-                        for arg in args {
-                            if let Expr::Dict(ast::ExprDict {
-                                keys,
-                                values,
-                                range: _,
-                            }) = arg
-                            {
-                                for key in keys.iter().flatten() {
-                                    self.visit_non_type_definition(key);
-                                }
-                                for value in values {
-                                    self.visit_type_definition(value);
-                                }
-                            } else {
-                                self.visit_non_type_definition(arg);
-                            }
-                        }
-
-                        // Ex) TypedDict("a", a=int)
-                        for keyword in keywords {
-                            let Keyword { value, .. } = keyword;
-                            self.visit_type_definition(value);
-                        }
-                    }
-                    Some(typing::Callable::MypyExtension) => {
-                        let mut args = args.iter();
-                        if let Some(arg) = args.next() {
-                            // Ex) DefaultNamedArg(bool | None, name="some_prop_name")
-                            self.visit_type_definition(arg);
-
-                            for arg in args {
-                                self.visit_non_type_definition(arg);
-                            }
-                            for keyword in keywords {
-                                let Keyword { value, .. } = keyword;
-                                self.visit_non_type_definition(value);
-                            }
-                        } else {
-                            // Ex) DefaultNamedArg(type="bool", name="some_prop_name")
-                            for keyword in keywords {
-                                let Keyword {
-                                    value,
-                                    arg,
-                                    range: _,
-                                } = keyword;
-                                if arg.as_ref().map_or(false, |arg| arg == "type") {
-                                    self.visit_type_definition(value);
-                                } else {
-                                    self.visit_non_type_definition(value);
-                                }
-                            }
-                        }
-                    }
-                    None => {
-                        // If we're in a type definition, we need to treat the arguments to any
-                        // other callables as non-type definitions (i.e., we don't want to treat
-                        // any strings as deferred type definitions).
-                        for arg in args {
-                            self.visit_non_type_definition(arg);
-                        }
-                        for keyword in keywords {
-                            let Keyword { value, .. } = keyword;
-                            self.visit_non_type_definition(value);
-                        }
-                    }
-                }
-            }
-            Expr::Subscript(ast::ExprSubscript {
-                value,
-                slice,
-                ctx,
-                range: _,
-            }) => {
-                // Only allow annotations in `ExprContext::Load`. If we have, e.g.,
-                // `obj["foo"]["bar"]`, we need to avoid treating the `obj["foo"]`
-                // portion as an annotation, despite having `ExprContext::Load`. Thus, we track
-                // the `ExprContext` at the top-level.
-                if self.semantic.in_subscript() {
-                    visitor::walk_expr(self, expr);
-                } else if matches!(ctx, ExprContext::Store | ExprContext::Del) {
-                    self.semantic.flags |= SemanticModelFlags::SUBSCRIPT;
-                    visitor::walk_expr(self, expr);
-                } else {
-                    self.visit_expr(value);
-
-                    match typing::match_annotated_subscript(
-                        value,
-                        &self.semantic,
-                        self.settings.typing_modules.iter().map(String::as_str),
-                        &self.settings.pyflakes.extend_generics,
-                    ) {
-                        // Ex) Literal["Class"]
-                        Some(typing::SubscriptKind::Literal) => {
-                            self.semantic.flags |= SemanticModelFlags::LITERAL;
-
-                            self.visit_type_definition(slice);
-                            self.visit_expr_context(ctx);
-                        }
-                        // Ex) Optional[int]
-                        Some(typing::SubscriptKind::Generic) => {
-                            self.visit_type_definition(slice);
-                            self.visit_expr_context(ctx);
-                        }
-                        // Ex) Annotated[int, "Hello, world!"]
-                        Some(typing::SubscriptKind::PEP593Annotation) => {
-                            // First argument is a type (including forward references); the
-                            // rest are arbitrary Python objects.
-                            if let Expr::Tuple(ast::ExprTuple {
-                                elts,
-                                ctx,
-                                range: _,
-                            }) = slice.as_ref()
-                            {
-                                if let Some(expr) = elts.first() {
-                                    self.visit_expr(expr);
-                                    for expr in elts.iter().skip(1) {
-                                        self.visit_non_type_definition(expr);
-                                    }
-                                    self.visit_expr_context(ctx);
-                                }
-                            } else {
-                                error!("Found non-Expr::Tuple argument to PEP 593 Annotation.");
-                            }
-                        }
-                        None => {
-                            self.visit_expr(slice);
-                            self.visit_expr_context(ctx);
-                        }
-                    }
-                }
-            }
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(value),
-                kind: _,
-                range: _,
-            }) => {
-                if self.semantic.in_type_definition()
-                    && !self.semantic.in_literal()
-                    && !self.semantic.in_f_string()
-                {
-                    self.deferred.string_type_definitions.push((
-                        expr.range(),
-                        value,
-                        self.semantic.snapshot(),
-                    ));
-                }
-            }
-            Expr::JoinedStr(_) => {
-                self.semantic.flags |= if self.semantic.in_f_string() {
-                    SemanticModelFlags::NESTED_F_STRING
-                } else {
-                    SemanticModelFlags::F_STRING
-                };
-                visitor::walk_expr(self, expr);
-            }
-            _ => visitor::walk_expr(self, expr),
-        }
-
-        // Step 4: Clean-up
-        match expr {
-            Expr::Lambda(_)
-            | Expr::GeneratorExp(_)
-            | Expr::ListComp(_)
-            | Expr::DictComp(_)
-            | Expr::SetComp(_) => {
-                self.deferred.scopes.push(self.semantic.scope_id);
-                self.semantic.pop_scope();
-            }
-            _ => {}
-        };
-
         self.semantic.flags = flags_snapshot;
         self.semantic.pop_expr();
     }
@@ -3959,7 +3959,47 @@ where
         let flags_snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::EXCEPTION_HANDLER;
 
-        // Step 1: Analysis
+        // Step 1: Binding
+        let binding = match except_handler {
+            ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+                type_: _,
+                name,
+                body: _,
+                range: _,
+            }) => {
+                if let Some(name) = name {
+                    // Store the existing binding, if any.
+                    let binding_id = self.semantic.lookup_symbol(name.as_str());
+
+                    // Add the bound exception name to the scope.
+                    self.add_binding(
+                        name.as_str(),
+                        name.range(),
+                        BindingKind::BoundException,
+                        BindingFlags::empty(),
+                    );
+
+                    Some((name, binding_id))
+                } else {
+                    None
+                }
+            }
+        };
+
+        // Step 2: Traversal
+        walk_except_handler(self, except_handler);
+
+        // Step 3: Clean-up
+        if let Some((name, binding_id)) = binding {
+            self.add_binding(
+                name.as_str(),
+                name.range(),
+                BindingKind::UnboundException(binding_id),
+                BindingFlags::empty(),
+            );
+        }
+
+        // Step 4: Analysis
         match except_handler {
             ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                 type_,
@@ -4041,46 +4081,6 @@ where
             }
         }
 
-        // Step 2: Binding
-        let binding = match except_handler {
-            ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
-                type_: _,
-                name,
-                body: _,
-                range: _,
-            }) => {
-                if let Some(name) = name {
-                    // Store the existing binding, if any.
-                    let binding_id = self.semantic.lookup_symbol(name.as_str());
-
-                    // Add the bound exception name to the scope.
-                    self.add_binding(
-                        name.as_str(),
-                        name.range(),
-                        BindingKind::BoundException,
-                        BindingFlags::empty(),
-                    );
-
-                    Some((name, binding_id))
-                } else {
-                    None
-                }
-            }
-        };
-
-        // Step 3: Traversal
-        walk_except_handler(self, except_handler);
-
-        // Step 4: Clean-up
-        if let Some((name, binding_id)) = binding {
-            self.add_binding(
-                name.as_str(),
-                name.range(),
-                BindingKind::UnboundException(binding_id),
-                BindingFlags::empty(),
-            );
-        }
-
         self.semantic.flags = flags_snapshot;
     }
 
@@ -4096,26 +4096,7 @@ where
     }
 
     fn visit_arguments(&mut self, arguments: &'b Arguments) {
-        // Step 1: Analysis
-        if self.enabled(Rule::MutableArgumentDefault) {
-            flake8_bugbear::rules::mutable_argument_default(self, arguments);
-        }
-        if self.enabled(Rule::FunctionCallInDefaultArgument) {
-            flake8_bugbear::rules::function_call_in_argument_default(self, arguments);
-        }
-        if self.settings.rules.enabled(Rule::ImplicitOptional) {
-            ruff::rules::implicit_optional(self, arguments);
-        }
-        if self.is_stub {
-            if self.enabled(Rule::TypedArgumentDefaultInStub) {
-                flake8_pyi::rules::typed_argument_simple_defaults(self, arguments);
-            }
-            if self.enabled(Rule::ArgumentDefaultInStub) {
-                flake8_pyi::rules::argument_simple_defaults(self, arguments);
-            }
-        }
-
-        // Step 2: Binding.
+        // Step 1: Binding.
         // Bind, but intentionally avoid walking default expressions, as we handle them
         // upstream.
         for arg_with_default in &arguments.posonlyargs {
@@ -4133,10 +4114,39 @@ where
         if let Some(arg) = &arguments.kwarg {
             self.visit_arg(arg);
         }
+
+        // Step 4: Analysis
+        if self.enabled(Rule::MutableArgumentDefault) {
+            flake8_bugbear::rules::mutable_argument_default(self, arguments);
+        }
+        if self.enabled(Rule::FunctionCallInDefaultArgument) {
+            flake8_bugbear::rules::function_call_in_argument_default(self, arguments);
+        }
+        if self.settings.rules.enabled(Rule::ImplicitOptional) {
+            ruff::rules::implicit_optional(self, arguments);
+        }
+        if self.is_stub {
+            if self.enabled(Rule::TypedArgumentDefaultInStub) {
+                flake8_pyi::rules::typed_argument_simple_defaults(self, arguments);
+            }
+            if self.enabled(Rule::ArgumentDefaultInStub) {
+                flake8_pyi::rules::argument_simple_defaults(self, arguments);
+            }
+        }
     }
 
     fn visit_arg(&mut self, arg: &'b Arg) {
-        // Step 1: Analysis
+        // Step 1: Binding.
+        // Bind, but intentionally avoid walking the annotation, as we handle it
+        // upstream.
+        self.add_binding(
+            &arg.arg,
+            arg.identifier(),
+            BindingKind::Argument,
+            BindingFlags::empty(),
+        );
+
+        // Step 4: Analysis
         if self.enabled(Rule::AmbiguousVariableName) {
             if let Some(diagnostic) =
                 pycodestyle::rules::ambiguous_variable_name(&arg.arg, arg.range())
@@ -4156,20 +4166,10 @@ where
         if self.enabled(Rule::BuiltinArgumentShadowing) {
             flake8_builtins::rules::builtin_argument_shadowing(self, arg);
         }
-
-        // Step 2: Binding.
-        // Bind, but intentionally avoid walking the annotation, as we handle it
-        // upstream.
-        self.add_binding(
-            &arg.arg,
-            arg.identifier(),
-            BindingKind::Argument,
-            BindingFlags::empty(),
-        );
     }
 
     fn visit_pattern(&mut self, pattern: &'b Pattern) {
-        // Step 2: Binding
+        // Step 1: Binding
         if let Pattern::MatchAs(ast::PatternMatchAs {
             name: Some(name), ..
         })
@@ -4189,19 +4189,19 @@ where
             );
         }
 
-        // Step 3: Traversal
+        // Step 2: Traversal
         walk_pattern(self, pattern);
     }
 
     fn visit_body(&mut self, body: &'b [Stmt]) {
-        // Step 1: Analysis
-        if self.enabled(Rule::UnnecessaryPass) {
-            flake8_pie::rules::no_unnecessary_pass(self, body);
-        }
-
-        // Step 3: Traversal
+        // Step 2: Traversal
         for stmt in body {
             self.visit_stmt(stmt);
+        }
+
+        // Step 4: Analysis
+        if self.enabled(Rule::UnnecessaryPass) {
+            flake8_pie::rules::no_unnecessary_pass(self, body);
         }
     }
 }
