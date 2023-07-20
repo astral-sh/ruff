@@ -99,32 +99,39 @@ impl Violation for UnassignedSpecialVariableInStub {
 }
 
 /// ## What it does
-/// Checks for `typehint.TypeAlias` annotation in type aliases.
+/// Checks for type alias definitions that are not annotated with
+/// `typing.TypeAlias`.
 ///
 /// ## Why is this bad?
-/// It makes it harder for someone reading the code to differentiate
-/// between a value assignment and a type alias.
+/// In Python, a type alias is defined by assigning a type to a variable (e.g.,
+/// `Vector = list[float]`).
+///
+/// It's best to annotate type aliases with the `typing.TypeAlias` type to
+/// make it clear that the statement is a type alias declaration, as opposed
+/// to a normal variable assignment.
 ///
 /// ## Example
 /// ```python
-/// IntOrStr = int | str
+/// Vector = list[float]
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// IntOrStr: TypeAlias = int | str
+/// from typing import TypeAlias
+///
+/// Vector: TypeAlias = list[float]
 /// ```
 #[violation]
-pub struct TypeAliasCheck {
+pub struct TypeAliasWithoutAnnotation {
     name: String,
     value: String,
 }
 
-impl AlwaysAutofixableViolation for TypeAliasCheck {
+impl AlwaysAutofixableViolation for TypeAliasWithoutAnnotation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TypeAliasCheck { name, value } = self;
-        format!("Use `typing.TypeAlias` for type alias `{name}`, e.g. \"{name}: typing.TypeAlias = {value}\"")
+        let TypeAliasWithoutAnnotation { name, value } = self;
+        format!("Use `typing.TypeAlias` for type alias, e.g., `{name}: typing.TypeAlias = {value}`")
     }
 
     fn autofix_title(&self) -> String {
@@ -368,18 +375,21 @@ fn is_enum(bases: &[Expr], semantic: &SemanticModel) -> bool {
     });
 }
 
-/// Returns `true` if an [`Expr`] is valid for a type alias check.
-fn validate_type_alias_value(value: &Expr, semantic: &SemanticModel) -> bool {
-    is_valid_pep_604_union(value)
+/// Returns `true` if an [`Expr`] is a value that should be annotated with `typing.TypeAlias`.
+///
+/// This is relatively conservative, as it's hard to reliably detect whether a right-hand side is a
+/// valid type alias. In particular, this function checks for uses of `typing.Any`, `None`,
+/// parameterized generics, and PEP 604-style unions.
+fn is_annotatable_type_alias(value: &Expr, semantic: &SemanticModel) -> bool {
+    matches!(
+        value,
+        Expr::Subscript(_)
+            | Expr::Constant(ast::ExprConstant {
+                value: Constant::None,
+                ..
+            }),
+    ) || is_valid_pep_604_union(value)
         || semantic.match_typing_expr(value, "Any")
-        || matches!(
-            value,
-            Expr::Subscript(_)
-                | Expr::Constant(ast::ExprConstant {
-                    value: Constant::None,
-                    ..
-                }),
-        )
 }
 
 /// PYI011
@@ -584,20 +594,21 @@ pub(crate) fn unassigned_special_variable_in_stub(
 }
 
 /// PIY026
-pub(crate) fn type_alias_check(checker: &mut Checker, value: &Expr, targets: &[Expr]) {
+pub(crate) fn type_alias_without_annotation(checker: &mut Checker, value: &Expr, targets: &[Expr]) {
     let [target] = targets else {
         return;
     };
-    if !validate_type_alias_value(value, checker.semantic()) {
-        return;
-    }
 
     let Expr::Name(ast::ExprName { id, .. }) = target else {
         return;
     };
 
+    if !is_annotatable_type_alias(value, checker.semantic()) {
+        return;
+    }
+
     let mut diagnostic = Diagnostic::new(
-        TypeAliasCheck {
+        TypeAliasWithoutAnnotation {
             name: id.to_string(),
             value: checker.generator().expr(value),
         },

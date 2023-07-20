@@ -1557,7 +1557,7 @@ where
                         Rule::UnprefixedTypeParam,
                         Rule::AssignmentDefaultInStub,
                         Rule::UnannotatedAssignmentInStub,
-                        Rule::TypeAliasCheck,
+                        Rule::TypeAliasWithoutAnnotation,
                     ]) {
                         // Ignore assignments in function bodies; those are covered by other rules.
                         if !self
@@ -1576,8 +1576,10 @@ where
                                     self, targets, value,
                                 );
                             }
-                            if self.enabled(Rule::TypeAliasCheck) {
-                                flake8_pyi::rules::type_alias_check(self, value, targets);
+                            if self.enabled(Rule::TypeAliasWithoutAnnotation) {
+                                flake8_pyi::rules::type_alias_without_annotation(
+                                    self, value, targets,
+                                );
                             }
                         }
                     }
