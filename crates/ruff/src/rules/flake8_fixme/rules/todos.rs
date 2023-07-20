@@ -88,7 +88,7 @@ impl Violation for LineContainsXxx {
 ///
 /// Consider resolving the issue before deploying the code.
 ///
-/// Note that if you use "TODO" comments as a form of documentation, this
+/// Note that if you use "HACK" comments as a form of documentation, this
 /// rule may not be appropriate for your project.
 ///
 /// ## Example
