@@ -950,7 +950,7 @@ class A:
                 visitor.visit_body(body);
             }
             ast::Mod::Interactive(ast::ModInteractive { body, range: _ }) => {
-                visitor.visit_body(body)
+                visitor.visit_body(body);
             }
             ast::Mod::Expression(ast::ModExpression { body, range: _ }) => visitor.visit_expr(body),
             ast::Mod::FunctionType(ast::ModFunctionType {
