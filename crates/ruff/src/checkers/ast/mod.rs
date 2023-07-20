@@ -2355,9 +2355,6 @@ where
                         }
                     }
                     ExprContext::Store => {
-                        if self.enabled(Rule::UndefinedLocal) {
-                            pyflakes::rules::undefined_local(self, id);
-                        }
                         if self.enabled(Rule::NonLowercaseVariableInFunction) {
                             if self.semantic.scope().kind.is_any_function() {
                                 // Ignore globals.
@@ -4379,16 +4376,13 @@ impl<'a> Checker<'a> {
             .scopes
             .ancestors(scope_id)
             .skip(1)
+            .filter(|scope| scope.kind.is_function() || scope.kind.is_module())
             .find_map(|scope| scope.get(name))
         {
             // Otherwise, if there's an existing binding in a parent scope, mark it as shadowed.
-            let binding = self.semantic.binding(binding_id);
-            let shadowed = self.semantic.binding(shadowed_id);
-            if binding.redefines(shadowed) {
-                self.semantic
-                    .shadowed_bindings
-                    .insert(binding_id, shadowed_id);
-            }
+            self.semantic
+                .shadowed_bindings
+                .insert(binding_id, shadowed_id);
         }
 
         // Add the binding to the scope.
@@ -4874,6 +4868,7 @@ impl<'a> Checker<'a> {
             Rule::TypingOnlyStandardLibraryImport,
             Rule::TypingOnlyThirdPartyImport,
             Rule::UnusedImport,
+            Rule::UndefinedLocal,
         ]) {
             return;
         }
@@ -4919,6 +4914,11 @@ impl<'a> Checker<'a> {
         let mut diagnostics: Vec<Diagnostic> = vec![];
         for scope_id in self.deferred.scopes.iter().rev().copied() {
             let scope = &self.semantic.scopes[scope_id];
+
+            // F823
+            if self.enabled(Rule::UndefinedLocal) {
+                pyflakes::rules::undefined_local(self, scope_id, scope, &mut diagnostics);
+            }
 
             // PLW0602
             if self.enabled(Rule::GlobalVariableNotAssigned) {

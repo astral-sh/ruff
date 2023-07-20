@@ -25,3 +25,17 @@ def dec(x):
 def f():
     dec = 1
     return dec
+
+
+class Class:
+    def f(self):
+        print(my_var)
+        my_var = 1
+
+
+class Class:
+    my_var = 0
+
+    def f(self):
+        print(my_var)
+        my_var = 1
