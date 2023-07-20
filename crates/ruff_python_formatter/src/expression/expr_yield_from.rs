@@ -8,17 +8,7 @@ use ruff_formatter::prelude::{space, text};
 use crate::expression::maybe_parenthesize_expression;
 
 #[derive(Default)]
-pub struct FormatExprYieldFrom{
-    parentheses: Option<Parentheses>,
-}
-impl FormatRuleWithOptions<ExprYieldFrom, PyFormatContext<'_>> for FormatExprYieldFrom {
-    type Options = Option<Parentheses>;
-
-    fn with_options(mut self, options: Self::Options) -> Self {
-        self.parentheses = options;
-        self
-    }
-}
+pub struct FormatExprYieldFrom;
 
 impl FormatNodeRule<ExprYieldFrom> for FormatExprYieldFrom {
     fn fmt_fields(&self, item: &ExprYieldFrom, f: &mut PyFormatter) -> FormatResult<()> {

@@ -10,17 +10,7 @@ use ruff_python_whitespace::{SimpleTokenizer, TokenKind};
 use crate::expression::maybe_parenthesize_expression;
 
 #[derive(Default)]
-pub struct FormatExprYield{
-    parentheses: Option<Parentheses>,
-}
-impl FormatRuleWithOptions<ExprYield, PyFormatContext<'_>> for FormatExprYield {
-    type Options = Option<Parentheses>;
-
-    fn with_options(mut self, options: Self::Options) -> Self {
-        self.parentheses = options;
-        self
-    }
-}
+pub struct FormatExprYield;
 
 impl FormatNodeRule<ExprYield> for FormatExprYield {
     fn fmt_fields(&self, item: &ExprYield, f: &mut PyFormatter) -> FormatResult<()> {
