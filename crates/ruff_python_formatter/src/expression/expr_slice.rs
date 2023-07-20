@@ -1,6 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::ExprSlice;
-use rustpython_parser::ast::{Expr, Ranged};
+use rustpython_parser::ast::{Expr, ExprSlice, Ranged, UnaryOp};
 
 use ruff_formatter::prelude::{hard_line_break, line_suffix_boundary, space, text};
 use ruff_formatter::{write, Buffer, Format, FormatError, FormatResult};
@@ -196,7 +195,13 @@ pub(crate) fn find_colons(
 /// Determines whether this expression needs a space around the colon
 /// <https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#slices>
 fn is_simple_expr(expr: &Expr) -> bool {
-    matches!(expr, Expr::Constant(_) | Expr::Name(_))
+    // Unary op expressions except `not` can be simple.
+    if let Some(u) = expr.as_unary_op_expr() {
+        matches!(u.op, UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert)
+            && is_simple_expr(&u.operand)
+    } else {
+        matches!(expr, Expr::Constant(_) | Expr::Name(_))
+    }
 }
 
 pub(crate) enum ExprSliceCommentSection {

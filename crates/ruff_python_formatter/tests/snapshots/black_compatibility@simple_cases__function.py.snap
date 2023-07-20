@@ -117,21 +117,6 @@ def __await__(): return (yield)
  
  
  def func_no_args():
-@@ -41,12 +40,12 @@
-     debug: bool = False,
-     **kwargs,
- ) -> str:
--    return text[number:-1]
-+    return text[number : -1]
- 
- 
- def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r""):
-     offset = attr.ib(default=attr.Factory(lambda: _r.uniform(10000, 200000)))
--    assert task._cancel_stack[: len(old_stack)] == old_stack
-+    assert task._cancel_stack[ : len(old_stack)] == old_stack
- 
- 
- def spaces_types(
 @@ -65,18 +64,14 @@
  
  def spaces2(result=_core.Value(None)):
@@ -220,12 +205,12 @@ def function_signature_stress_test(
     debug: bool = False,
     **kwargs,
 ) -> str:
-    return text[number : -1]
+    return text[number:-1]
 
 
 def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r""):
     offset = attr.ib(default=attr.Factory(lambda: _r.uniform(10000, 200000)))
-    assert task._cancel_stack[ : len(old_stack)] == old_stack
+    assert task._cancel_stack[: len(old_stack)] == old_stack
 
 
 def spaces_types(
