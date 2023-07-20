@@ -1,6 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::ExprSlice;
-use rustpython_parser::ast::{Expr, Ranged};
+use rustpython_parser::ast::{Expr, ExprSlice, ExprUnaryOp, Ranged, UnaryOp};
 
 use ruff_formatter::prelude::{hard_line_break, line_suffix_boundary, space, text};
 use ruff_formatter::{write, Buffer, Format, FormatError, FormatResult};
@@ -87,7 +86,7 @@ impl FormatNodeRule<ExprSlice> for FormatExprSlice {
         // e201 = "e"[a() :: 1]
         // e202 = "e"[a() :: a()]
         // ```
-        if !all_simple {
+        if !all_simple && lower.is_some() {
             space().fmt(f)?;
         }
         text(":").fmt(f)?;
@@ -196,7 +195,17 @@ pub(crate) fn find_colons(
 /// Determines whether this expression needs a space around the colon
 /// <https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#slices>
 fn is_simple_expr(expr: &Expr) -> bool {
-    matches!(expr, Expr::Constant(_) | Expr::Name(_))
+    // Unary op expressions except `not` can be simple.
+    if let Some(ExprUnaryOp {
+        op: UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert,
+        operand,
+        ..
+    }) = expr.as_unary_op_expr()
+    {
+        is_simple_expr(operand)
+    } else {
+        matches!(expr, Expr::Constant(_) | Expr::Name(_))
+    }
 }
 
 pub(crate) enum ExprSliceCommentSection {

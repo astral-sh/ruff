@@ -4939,11 +4939,6 @@ impl<'a> Checker<'a> {
                 }
             }
 
-            // Imports in classes are public members.
-            if scope.kind.is_class() {
-                continue;
-            }
-
             // F402
             if self.enabled(Rule::ImportShadowedByLoopVar) {
                 for (name, binding_id) in scope.bindings() {
@@ -5074,6 +5069,11 @@ impl<'a> Checker<'a> {
                         diagnostics.push(diagnostic);
                     }
                 }
+            }
+
+            // Imports in classes are public members.
+            if scope.kind.is_class() {
+                continue;
             }
 
             if enforce_typing_imports {

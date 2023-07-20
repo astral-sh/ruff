@@ -211,7 +211,7 @@ d={'a':1,
  # Comment 1
  
  # Comment 2
-@@ -17,30 +16,44 @@
+@@ -17,26 +16,40 @@
  
  # fmt: off
  def func_no_args():
@@ -264,17 +264,12 @@ d={'a':1,
 +    debug: bool = False,
 +    **kwargs,
 +) -> str:
-+    return text[number : -1]
++    return text[number:-1]
 +
 +
  # fmt: on
  def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r""):
      offset = attr.ib(default=attr.Factory(lambda: _r.uniform(1, 2)))
--    assert task._cancel_stack[: len(old_stack)] == old_stack
-+    assert task._cancel_stack[ : len(old_stack)] == old_stack
- 
- 
- def spaces_types(
 @@ -63,15 +76,15 @@
  
  something = {
@@ -445,13 +440,13 @@ def function_signature_stress_test(
     debug: bool = False,
     **kwargs,
 ) -> str:
-    return text[number : -1]
+    return text[number:-1]
 
 
 # fmt: on
 def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r""):
     offset = attr.ib(default=attr.Factory(lambda: _r.uniform(1, 2)))
-    assert task._cancel_stack[ : len(old_stack)] == old_stack
+    assert task._cancel_stack[: len(old_stack)] == old_stack
 
 
 def spaces_types(
