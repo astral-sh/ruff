@@ -274,34 +274,41 @@ fn is_valid_default_value_with_annotation(
     false
 }
 
-/// Returns `true` if an [`Expr`] appears to be a valid PEP 604 union member.
-fn is_valid_pep_604_union_member(value: &Expr) -> bool {
-    matches!(
-        value,
-        Expr::Name(_)
+/// Returns `true` if an [`Expr`] appears to be a valid PEP 604 union. (e.g. `int | None`)
+fn is_valid_pep_604_union(annotation: &Expr) -> bool {
+    /// Returns `true` if an [`Expr`] appears to be a valid PEP 604 union member.
+    fn is_valid_pep_604_union_member(value: &Expr) -> bool {
+        match value {
+            Expr::BinOp(ast::ExprBinOp {
+                left,
+                op: Operator::BitOr,
+                right,
+                range: _,
+            }) => is_valid_pep_604_union_member(left) && is_valid_pep_604_union_member(right),
+            Expr::Name(_)
             | Expr::Subscript(_)
             | Expr::Attribute(_)
             | Expr::Constant(ast::ExprConstant {
                 value: Constant::None,
                 ..
-            })
-    )
-}
-
-/// Returns `true` if an [`Expr`] appears to be a valid PEP 604 union. (e.g. `int | None`)
-fn is_valid_pep_604_union(annotation: &Expr) -> bool {
-    match annotation {
-        Expr::BinOp(ast::ExprBinOp {
-            left,
-            op: Operator::BitOr,
-            right,
-            range: _,
-        }) => {
-            (is_valid_pep_604_union_member(left) || is_valid_pep_604_union(left))
-                && is_valid_pep_604_union_member(right)
+            }) => true,
+            _ => false,
         }
-        _ => false,
     }
+
+    // The top-level expression must be a bit-or operation.
+    let Expr::BinOp(ast::ExprBinOp {
+        left,
+        op: Operator::BitOr,
+        right,
+        range: _,
+    }) = annotation
+    else {
+        return false;
+    };
+
+    // The left and right operands must be valid union members.
+    is_valid_pep_604_union_member(left) && is_valid_pep_604_union_member(right)
 }
 
 /// Returns `true` if an [`Expr`] appears to be a valid default value without an annotation.
