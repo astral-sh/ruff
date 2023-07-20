@@ -16,7 +16,7 @@ pub enum TupleParentheses {
     #[default]
     Default,
 
-    /// Handle special cases where parentheses are not introduced if they are not already present.
+    /// Handle special cases where parentheses are to be preserved.
     ///
     /// Black omits parentheses for tuples inside subscripts except if the tuple is already
     /// parenthesized in the source code.
@@ -57,7 +57,7 @@ pub enum TupleParentheses {
     /// Black still does use parentheses in these positions if the group breaks or magic trailing
     /// comma is used.
     ///
-    /// Here are some more examples:
+    /// Additional examples:
     /// ```python
     /// for (a,) in []:
     /// pass
@@ -70,6 +70,7 @@ pub enum TupleParentheses {
     ///     b,
     /// ) in []:
     ///     pass
+    /// ```
     NeverPreserve,
 }
 
