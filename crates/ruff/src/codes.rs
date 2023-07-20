@@ -748,6 +748,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8UsePathlib, "122") => (RuleGroup::Unspecified, rules::flake8_use_pathlib::violations::OsPathSplitext),
         (Flake8UsePathlib, "123") => (RuleGroup::Unspecified, rules::flake8_use_pathlib::violations::BuiltinOpen),
         (Flake8UsePathlib, "124") => (RuleGroup::Unspecified, rules::flake8_use_pathlib::violations::PyPath),
+        (Flake8UsePathlib, "201") => (RuleGroup::Unspecified, rules::flake8_use_pathlib::rules::PathConstructorCurrentDirectory),
 
         // flake8-logging-format
         (Flake8LoggingFormat, "001") => (RuleGroup::Unspecified, rules::flake8_logging_format::violations::LoggingStringFormat),

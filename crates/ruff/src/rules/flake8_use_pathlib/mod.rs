@@ -56,6 +56,8 @@ mod tests {
 
     #[test_case(Rule::PyPath, Path::new("py_path_1.py"))]
     #[test_case(Rule::PyPath, Path::new("py_path_2.py"))]
+    #[test_case(Rule::PathConstructorCurrentDirectory, Path::new("PTH201.py"))]
+
     fn rules_pypath(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
