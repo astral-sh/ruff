@@ -33,10 +33,10 @@ impl NeedsParentheses for ExprYieldFrom {
         parent: AnyNodeRef,
         _context: &PyFormatContext,
     ) -> OptionalParentheses {
-        if parent.is_stmt_return() || parent.is_expr_await() {
-            OptionalParentheses::Always
-        } else {
+        if parent.is_stmt_assign() {
             OptionalParentheses::Multiline
+        } else {
+            OptionalParentheses::Always
         }
     }
 }
