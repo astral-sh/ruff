@@ -204,6 +204,9 @@ pub enum SimpleTokenKind {
     /// `async`
     Async,
 
+    /// `yield`
+    Yield,
+
     /// Any other non trivia token.
     Other,
 

@@ -1,0 +1,35 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+assertion_line: 161
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/yield_from.py
+---
+## Input
+```py
+l = [1,2,3,4]
+
+
+def foo():
+    yield from l # some comment
+
+    # weird indents
+    yield\
+                    from\
+                        l
+                    # indented trailing comment
+```
+
+## Output
+```py
+l = [1, 2, 3, 4]
+
+
+def foo():
+    yield from l  # some comment
+
+    # weird indents
+    yield from l
+    # indented trailing comment
+```
+
+
+

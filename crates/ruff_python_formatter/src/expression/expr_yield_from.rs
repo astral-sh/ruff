@@ -1,16 +1,39 @@
 use crate::context::PyFormatContext;
-use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parentheses, Parenthesize};
 use crate::{not_yet_implemented, FormatNodeRule, PyFormatter};
-use ruff_formatter::{write, Buffer, FormatResult};
+use ruff_formatter::{write, Buffer, FormatResult, Format, FormatRuleWithOptions};
 use ruff_python_ast::node::AnyNodeRef;
-use rustpython_parser::ast::ExprYieldFrom;
+use rustpython_parser::ast::{ExprYield, ExprYieldFrom};
+use ruff_formatter::prelude::{space, text};
+use crate::expression::maybe_parenthesize_expression;
 
 #[derive(Default)]
-pub struct FormatExprYieldFrom;
+pub struct FormatExprYieldFrom{
+    parentheses: Option<Parentheses>,
+}
+impl FormatRuleWithOptions<ExprYieldFrom, PyFormatContext<'_>> for FormatExprYieldFrom {
+    type Options = Option<Parentheses>;
+
+    fn with_options(mut self, options: Self::Options) -> Self {
+        self.parentheses = options;
+        self
+    }
+}
 
 impl FormatNodeRule<ExprYieldFrom> for FormatExprYieldFrom {
     fn fmt_fields(&self, item: &ExprYieldFrom, f: &mut PyFormatter) -> FormatResult<()> {
-        write!(f, [not_yet_implemented(item)])
+        let ExprYieldFrom {
+            range: _,
+            value
+        } = item;
+
+        write!(
+            f,
+            [&text("yield from"), space(), maybe_parenthesize_expression(value, item, Parenthesize::IfRequired)]
+        )?;
+
+        Ok(())
+
     }
 }
 
