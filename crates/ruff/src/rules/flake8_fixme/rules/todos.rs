@@ -12,6 +12,10 @@ use crate::directives::{TodoComment, TodoDirectiveKind};
 ///
 /// Consider resolving the issue before deploying the code.
 ///
+/// Note that if you use "TODO" comments as a form of documentation (e.g.,
+/// to [provide context for future work](https://gist.github.com/dmnd/ed5d8ef8de2e4cfea174bd5dafcda382)),
+/// this rule may not be appropriate for your project.
+///
 /// ## Example
 /// ```python
 /// def greet(name):
@@ -35,6 +39,9 @@ impl Violation for LineContainsTodo {
 ///
 /// Consider resolving the issue before deploying the code.
 ///
+/// Note that if you use "FIXME" comments as a form of documentation, this
+/// rule may not be appropriate for your project.
+///
 /// ## Example
 /// ```python
 /// def speed(distance, time):
@@ -55,9 +62,8 @@ impl Violation for LineContainsFixme {
 /// ## Why is this bad?
 /// "XXX" comments are used to describe an issue that should be resolved.
 ///
-/// Consider resolving the issue before deploying the code. Additionally,
-/// consider using a more descriptive comment tag (such as "TODO", "FIXME", or
-/// "HACK").
+/// Consider resolving the issue before deploying the code, or, at minimum,
+/// using a more descriptive comment tag (e.g, "TODO").
 ///
 /// ## Example
 /// ```python
@@ -81,6 +87,9 @@ impl Violation for LineContainsXxx {
 /// (usually, a suboptimal solution or temporary workaround).
 ///
 /// Consider resolving the issue before deploying the code.
+///
+/// Note that if you use "TODO" comments as a form of documentation, this
+/// rule may not be appropriate for your project.
 ///
 /// ## Example
 /// ```python
