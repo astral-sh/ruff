@@ -216,6 +216,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "C2403") => (RuleGroup::Preview, rules::pylint::rules::NonAsciiImportName),
         #[allow(deprecated)]
         (Pylint, "C1901") => (RuleGroup::Nursery, rules::pylint::rules::CompareToEmptyString),
+        (Pylint, "C2701") => (RuleGroup::Preview, rules::pylint::rules::ImportPrivateName),
         (Pylint, "C3002") => (RuleGroup::Stable, rules::pylint::rules::UnnecessaryDirectLambdaCall),
         (Pylint, "E0100") => (RuleGroup::Stable, rules::pylint::rules::YieldInInit),
         (Pylint, "E0101") => (RuleGroup::Stable, rules::pylint::rules::ReturnInInit),
