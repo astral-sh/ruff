@@ -12,7 +12,7 @@ license = { workspace = true }
 
 [dependencies]
 ruff_formatter = { path = "../ruff_formatter" }
-ruff_python_whitespace = { path = "../ruff_python_whitespace" }
+ruff_python_trivia = { path = "../ruff_python_trivia" }
 ruff_python_ast = { path = "../ruff_python_ast" }
 ruff_text_size = { workspace = true }
 
@@ -28,7 +28,6 @@ rustpython-parser = { workspace = true }
 serde = { workspace = true, optional = true }
 smallvec = { workspace = true }
 thiserror = { workspace = true }
-unic-ucd-ident = "0.9.0"
 
 [dev-dependencies]
 ruff_formatter = { path = "../ruff_formatter", features = ["serde"]}

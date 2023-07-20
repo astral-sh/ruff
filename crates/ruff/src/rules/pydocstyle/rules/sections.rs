@@ -13,7 +13,7 @@ use ruff_python_ast::docstrings::{clean_space, leading_space};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::is_staticmethod;
 use ruff_python_semantic::{Definition, Member, MemberKind};
-use ruff_python_whitespace::{NewlineWithTrailingNewline, PythonWhitespace};
+use ruff_python_trivia::{NewlineWithTrailingNewline, PythonWhitespace};
 use ruff_textwrap::dedent;
 
 use crate::checkers::ast::Checker;
@@ -1187,19 +1187,22 @@ impl AlwaysAutofixableViolation for SectionNameEndsInColon {
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[violation]
 pub struct UndocumentedParam {
-    pub names: Vec<String>,
+    /// The name of the function being documented.
+    definition: String,
+    /// The names of the undocumented parameters.
+    names: Vec<String>,
 }
 
 impl Violation for UndocumentedParam {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UndocumentedParam { names } = self;
+        let UndocumentedParam { definition, names } = self;
         if names.len() == 1 {
             let name = &names[0];
-            format!("Missing argument description in the docstring: `{name}`")
+            format!("Missing argument description in the docstring for `{definition}`: `{name}`")
         } else {
             let names = names.iter().map(|name| format!("`{name}`")).join(", ");
-            format!("Missing argument descriptions in the docstring: {names}")
+            format!("Missing argument descriptions in the docstring for `{definition}`: {names}")
         }
     }
 }
@@ -1779,11 +1782,16 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
     }
 
     if !missing_arg_names.is_empty() {
-        let names = missing_arg_names.into_iter().sorted().collect();
-        checker.diagnostics.push(Diagnostic::new(
-            UndocumentedParam { names },
-            stmt.identifier(),
-        ));
+        if let Some(definition) = docstring.definition.name() {
+            let names = missing_arg_names.into_iter().sorted().collect();
+            checker.diagnostics.push(Diagnostic::new(
+                UndocumentedParam {
+                    definition: definition.to_string(),
+                    names,
+                },
+                stmt.identifier(),
+            ));
+        }
     }
 }
 

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, Ranged, Stmt};
+use rustpython_parser::ast::{Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -50,12 +50,7 @@ impl Violation for NonLowercaseVariableInFunction {
 }
 
 /// N806
-pub(crate) fn non_lowercase_variable_in_function(
-    checker: &mut Checker,
-    expr: &Expr,
-    stmt: &Stmt,
-    name: &str,
-) {
+pub(crate) fn non_lowercase_variable_in_function(checker: &mut Checker, expr: &Expr, name: &str) {
     if checker
         .settings
         .pep8_naming
@@ -66,16 +61,22 @@ pub(crate) fn non_lowercase_variable_in_function(
         return;
     }
 
-    if !str::is_lowercase(name)
-        && !helpers::is_named_tuple_assignment(stmt, checker.semantic())
-        && !helpers::is_typed_dict_assignment(stmt, checker.semantic())
-        && !helpers::is_type_var_assignment(stmt, checker.semantic())
-    {
-        checker.diagnostics.push(Diagnostic::new(
-            NonLowercaseVariableInFunction {
-                name: name.to_string(),
-            },
-            expr.range(),
-        ));
+    if str::is_lowercase(name) {
+        return;
     }
+
+    let parent = checker.semantic().stmt();
+    if helpers::is_named_tuple_assignment(parent, checker.semantic())
+        || helpers::is_typed_dict_assignment(parent, checker.semantic())
+        || helpers::is_type_var_assignment(parent, checker.semantic())
+    {
+        return;
+    }
+
+    checker.diagnostics.push(Diagnostic::new(
+        NonLowercaseVariableInFunction {
+            name: name.to_string(),
+        },
+        expr.range(),
+    ));
 }

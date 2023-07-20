@@ -5,21 +5,6 @@ expression: comments.debug(test_case.source_code)
 {
     Node {
         kind: StmtIf,
-        range: 21..128,
-        source: `elif x < y:⏎`,
-    }: {
-        "leading": [],
-        "dangling": [
-            SourceComment {
-                text: "# Leading else comment",
-                position: OwnLine,
-                formatted: false,
-            },
-        ],
-        "trailing": [],
-    },
-    Node {
-        kind: StmtIf,
         range: 37..60,
         source: `if x < 10:⏎`,
     }: {
@@ -32,5 +17,20 @@ expression: comments.debug(test_case.source_code)
                 formatted: false,
             },
         ],
+    },
+    Node {
+        kind: ElifElseClause,
+        range: 114..128,
+        source: `else:⏎`,
+    }: {
+        "leading": [
+            SourceComment {
+                text: "# Leading else comment",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+        "dangling": [],
+        "trailing": [],
     },
 }

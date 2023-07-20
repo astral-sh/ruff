@@ -1,10 +1,12 @@
-use crate::context::NodeLevel;
-use crate::prelude::*;
-use crate::trivia::lines_before;
+use rustpython_parser::ast::{Ranged, Stmt, Suite};
+
 use ruff_formatter::{
     format_args, write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions,
 };
-use rustpython_parser::ast::{Ranged, Stmt, Suite};
+use ruff_python_trivia::lines_before;
+
+use crate::context::NodeLevel;
+use crate::prelude::*;
 
 /// Level at which the [`Suite`] appears in the source code.
 #[derive(Copy, Clone, Debug)]
@@ -185,13 +187,15 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Suite {
 
 #[cfg(test)]
 mod tests {
+    use rustpython_parser::ast::Suite;
+    use rustpython_parser::Parse;
+
+    use ruff_formatter::format;
+
     use crate::comments::Comments;
     use crate::prelude::*;
     use crate::statement::suite::SuiteLevel;
     use crate::PyFormatOptions;
-    use ruff_formatter::format;
-    use rustpython_parser::ast::Suite;
-    use rustpython_parser::Parse;
 
     fn format_suite(level: SuiteLevel) -> String {
         let source = r#"

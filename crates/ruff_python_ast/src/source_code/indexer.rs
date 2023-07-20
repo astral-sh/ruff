@@ -97,6 +97,18 @@ impl Indexer {
         &self.comment_ranges
     }
 
+    /// Returns the comments in the given range as source code slices
+    pub fn comments_in_range<'a>(
+        &'a self,
+        range: TextRange,
+        locator: &'a Locator,
+    ) -> impl Iterator<Item = &'a str> {
+        self.comment_ranges
+            .comments_in_range(range)
+            .iter()
+            .map(move |comment_range| locator.slice(*comment_range))
+    }
+
     /// Returns the line start positions of continuations (backslash).
     pub fn continuation_line_starts(&self) -> &[TextSize] {
         &self.continuation_lines

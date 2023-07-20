@@ -1,7 +1,8 @@
-use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
+use rustpython_parser::ast::{self, Expr, Ranged, StmtIf};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::stmt_if::if_elif_branches;
 
 use crate::checkers::ast::Checker;
 
@@ -37,12 +38,16 @@ impl Violation for IfTuple {
 }
 
 /// F634
-pub(crate) fn if_tuple(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
-    if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &test {
-        if !elts.is_empty() {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(IfTuple, stmt.range()));
+pub(crate) fn if_tuple(checker: &mut Checker, stmt_if: &StmtIf) {
+    for branch in if_elif_branches(stmt_if) {
+        let Expr::Tuple(ast::ExprTuple { elts, .. }) = &branch.test else {
+            continue;
+        };
+        if elts.is_empty() {
+            continue;
         }
+        checker
+            .diagnostics
+            .push(Diagnostic::new(IfTuple, branch.test.range()));
     }
 }

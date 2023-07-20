@@ -8,7 +8,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{has_leading_content, has_trailing_content};
 use ruff_python_ast::source_code::Generator;
 use ruff_python_semantic::SemanticModel;
-use ruff_python_whitespace::{leading_indentation, UniversalNewlines};
+use ruff_python_trivia::{leading_indentation, UniversalNewlines};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -224,6 +224,7 @@ fn function(
                 body: vec![body],
                 decorator_list: vec![],
                 returns: Some(Box::new(return_type)),
+                type_params: vec![],
                 type_comment: None,
                 range: TextRange::default(),
             });
@@ -236,6 +237,7 @@ fn function(
         body: vec![body],
         decorator_list: vec![],
         returns: None,
+        type_params: vec![],
         type_comment: None,
         range: TextRange::default(),
     });

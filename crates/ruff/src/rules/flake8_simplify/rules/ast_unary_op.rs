@@ -127,13 +127,7 @@ fn is_dunder_method(name: &str) -> bool {
 }
 
 fn is_exception_check(stmt: &Stmt) -> bool {
-    let Stmt::If(ast::StmtIf {
-        test: _,
-        body,
-        orelse: _,
-        range: _,
-    }) = stmt
-    else {
+    let Stmt::If(ast::StmtIf { body, .. }) = stmt else {
         return false;
     };
     matches!(body.as_slice(), [Stmt::Raise(_)])

@@ -49,6 +49,7 @@ FIXTURE_SETS = [
     "py_39",
     "py_310",
     "py_311",
+    "py_312",
     "simple_cases",
     "miscellaneous",
     ".",

@@ -133,8 +133,8 @@ At time of writing, the repository includes the following crates:
     refer to?"
 - `crates/ruff_python_stdlib`: library crate containing Python-specific standard library data, e.g.
     the names of all built-in exceptions and which standard library types are immutable.
-- `crates/ruff_python_whitespace`: library crate containing Python-specific whitespace analysis
-    logic (indentation and newlines).
+- `crates/ruff_python_trivia`: library crate containing Python-specific trivia utilities (e.g.,
+    for analyzing indentation, newlines, etc.).
 - `crates/ruff_rustpython`: library crate containing `RustPython`-specific utilities.
 - `crates/ruff_textwrap`: library crate to indent and dedent Python source code.
 - `crates/ruff_wasm`: library crate for exposing Ruff as a WebAssembly module. Powers the
@@ -417,6 +417,13 @@ Summary
    41.66 ± 1.18 times faster than 'flake8 crates/ruff/resources/test/cpython'
    53.64 ± 0.77 times faster than 'pyflakes crates/ruff/resources/test/cpython'
   159.43 ± 2.48 times faster than 'pycodestyle crates/ruff/resources/test/cpython'
+```
+
+To benchmark a subset of rules, e.g. `LineTooLong` and `DocLineTooLong`:
+
+```shell
+cargo build --release && hyperfine --warmup 10 \
+  "./target/release/ruff ./crates/ruff/resources/test/cpython/ --no-cache -e --select W505,E501"
 ```
 
 You can run `poetry install` from `./scripts/benchmarks` to create a working environment for the

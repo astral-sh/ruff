@@ -1,15 +1,18 @@
-use anyhow::{bail, Context};
+use anyhow::{bail, format_err, Context};
 use clap::{CommandFactory, FromArgMatches};
 use ignore::DirEntry;
 use indicatif::ProgressBar;
-
+use log::debug;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use ruff::resolver::python_files_in_path;
 use ruff::settings::types::{FilePattern, FilePatternSet};
 use ruff_cli::args::CheckArgs;
 use ruff_cli::resolve::resolve;
-use ruff_formatter::{FormatError, PrintError};
-use ruff_python_formatter::{format_module, FormatModuleError, PyFormatOptions};
+use ruff_formatter::{FormatError, LineWidth, PrintError};
+use ruff_python_formatter::{
+    format_module, FormatModuleError, MagicTrailingComma, PyFormatOptions,
+};
+use serde::Deserialize;
 use similar::{ChangeTag, TextDiff};
 use std::fmt::{Display, Formatter};
 use std::fs::File;
@@ -18,7 +21,6 @@ use std::ops::{Add, AddAssign};
 use std::panic::catch_unwind;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
-use std::sync::mpsc::channel;
 use std::time::{Duration, Instant};
 use std::{fmt, fs, io};
 use tempfile::NamedTempFile;
@@ -180,7 +182,7 @@ pub(crate) struct Args {
 
 pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
     let all_success = if args.multi_project {
-        format_dev_multi_project(args)
+        format_dev_multi_project(args)?
     } else {
         let result = format_dev_project(&args.files, args.stability_check, args.write, true)?;
         let error_count = result.error_count();
@@ -206,92 +208,74 @@ pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
     }
 }
 
-/// Each `path` is one of the `files` in `Args`
-enum Message {
-    Start {
-        path: PathBuf,
-    },
-    Failed {
-        path: PathBuf,
-        error: anyhow::Error,
-    },
-    Finished {
-        path: PathBuf,
-        result: CheckRepoResult,
-    },
-}
-
 /// Checks a directory of projects
-fn format_dev_multi_project(args: &Args) -> bool {
+fn format_dev_multi_project(args: &Args) -> anyhow::Result<bool> {
     let mut total_errors = 0;
     let mut total_files = 0;
     let start = Instant::now();
 
-    rayon::scope(|scope| {
-        let (sender, receiver) = channel();
+    let mut project_paths = Vec::new();
 
-        // Workers, to check is subdirectory in parallel
-        for base_dir in &args.files {
-            for dir in base_dir.read_dir().unwrap() {
-                let path = dir.unwrap().path().clone();
+    for directory in &args.files {
+        for project_directory in directory
+            .read_dir()
+            .with_context(|| "Failed to read projects directory '{directory}'")?
+        {
+            project_paths.push(
+                project_directory
+                    .with_context(|| "Failed to read project directory '{project_directory}'")?
+                    .path(),
+            );
+        }
+    }
 
-                let sender = sender.clone();
+    let num_projects = project_paths.len();
+    let bar = ProgressBar::new(num_projects as u64);
 
-                scope.spawn(move |_| {
-                    sender.send(Message::Start { path: path.clone() }).unwrap();
+    let mut error_file = match &args.error_file {
+        Some(error_file) => Some(BufWriter::new(
+            File::create(error_file).context("Couldn't open error file")?,
+        )),
+        None => None,
+    };
 
-                    match format_dev_project(
-                        &[path.clone()],
-                        args.stability_check,
-                        args.write,
-                        false,
-                    ) {
-                        Ok(result) => sender.send(Message::Finished { result, path }),
-                        Err(error) => sender.send(Message::Failed { error, path }),
-                    }
-                    .unwrap();
+    #[allow(clippy::print_stdout)]
+    for project_path in project_paths {
+        bar.suspend(|| println!("Starting {}", project_path.display()));
+
+        match format_dev_project(
+            &[project_path.clone()],
+            args.stability_check,
+            args.write,
+            false,
+        ) {
+            Ok(result) => {
+                total_errors += result.error_count();
+                total_files += result.file_count;
+
+                bar.suspend(|| {
+                    println!(
+                        "Finished {} with {} files (similarity index {:.3}) in {:.2}s",
+                        project_path.display(),
+                        result.file_count,
+                        result.statistics.similarity_index(),
+                        result.duration.as_secs_f32(),
+                    );
+                    println!("{}", result.display(args.format).to_string().trim_end());
                 });
+                if let Some(error_file) = &mut error_file {
+                    write!(error_file, "{}", result.display(args.format)).unwrap();
+                    error_file.flush().unwrap();
+                }
+
+                bar.inc(1);
+            }
+            Err(error) => {
+                bar.suspend(|| println!("Failed {}: {}", project_path.display(), error));
+                bar.inc(1);
             }
         }
-
-        // Main thread, writing to stdout
-        scope.spawn(|_| {
-            let mut error_file = args.error_file.as_ref().map(|error_file| {
-                BufWriter::new(File::create(error_file).expect("Couldn't open error file"))
-            });
-
-            let bar = ProgressBar::new(args.files.len() as u64);
-            for message in receiver {
-                match message {
-                    Message::Start { path } => {
-                        bar.println(path.display().to_string());
-                    }
-                    Message::Finished { path, result } => {
-                        total_errors += result.error_count();
-                        total_files += result.file_count;
-
-                        bar.println(format!(
-                            "Finished {} with {} files (similarity index {:.3}) in {:.2}s",
-                            path.display(),
-                            result.file_count,
-                            result.statistics.similarity_index(),
-                            result.duration.as_secs_f32(),
-                        ));
-                        bar.println(result.display(args.format).to_string().trim_end());
-                        if let Some(error_file) = &mut error_file {
-                            write!(error_file, "{}", result.display(args.format)).unwrap();
-                        }
-                        bar.inc(1);
-                    }
-                    Message::Failed { path, error } => {
-                        bar.println(format!("Failed {}: {}", path.display(), error));
-                        bar.inc(1);
-                    }
-                }
-            }
-            bar.finish();
-        });
-    });
+    }
 
     let duration = start.elapsed();
 
@@ -303,7 +287,7 @@ fn format_dev_multi_project(args: &Args) -> bool {
         );
     }
 
-    total_errors == 0
+    Ok(total_errors == 0)
 }
 
 fn format_dev_project(
@@ -313,6 +297,13 @@ fn format_dev_project(
     progress_bar: bool,
 ) -> anyhow::Result<CheckRepoResult> {
     let start = Instant::now();
+
+    // TODO(konstin): The assumptions between this script (one repo) and ruff (pass in a bunch of
+    // files) mismatch.
+    let options = BlackOptions::from_file(&files[0])?.to_py_format_options();
+    debug!("Options for {}: {options:?}", files[0].display());
+
+    // TODO(konstin): black excludes
 
     // Find files to check (or in this case, format twice). Adapted from ruff_cli
     // First argument is ignored
@@ -335,7 +326,9 @@ fn format_dev_project(
 
             let file = dir_entry.path().to_path_buf();
             // Handle panics (mostly in `debug_assert!`)
-            let result = match catch_unwind(|| format_dev_file(&file, stability_check, write)) {
+            let result = match catch_unwind(|| {
+                format_dev_file(&file, stability_check, write, options.clone())
+            }) {
                 Ok(result) => result,
                 Err(panic) => {
                     if let Some(message) = panic.downcast_ref::<String>() {
@@ -600,11 +593,12 @@ fn format_dev_file(
     input_path: &Path,
     stability_check: bool,
     write: bool,
+    options: PyFormatOptions,
 ) -> Result<Statistics, CheckFileError> {
     let content = fs::read_to_string(input_path)?;
     #[cfg(not(debug_assertions))]
     let start = Instant::now();
-    let printed = match format_module(&content, PyFormatOptions::default()) {
+    let printed = match format_module(&content, options.clone()) {
         Ok(printed) => printed,
         Err(err @ (FormatModuleError::LexError(_) | FormatModuleError::ParseError(_))) => {
             return Err(CheckFileError::SyntaxErrorInInput(err));
@@ -631,7 +625,7 @@ fn format_dev_file(
     }
 
     if stability_check {
-        let reformatted = match format_module(formatted, PyFormatOptions::default()) {
+        let reformatted = match format_module(formatted, options) {
             Ok(reformatted) => reformatted,
             Err(err @ (FormatModuleError::LexError(_) | FormatModuleError::ParseError(_))) => {
                 return Err(CheckFileError::SyntaxErrorInOutput {
@@ -661,4 +655,132 @@ fn format_dev_file(
     }
 
     Ok(Statistics::from_versions(&content, formatted))
+}
+
+#[derive(Deserialize, Default)]
+struct PyprojectToml {
+    tool: Option<PyprojectTomlTool>,
+}
+
+#[derive(Deserialize, Default)]
+struct PyprojectTomlTool {
+    black: Option<BlackOptions>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(default)]
+struct BlackOptions {
+    // Black actually allows both snake case and kebab case
+    #[serde(alias = "line-length")]
+    line_length: u16,
+    #[serde(alias = "skip-magic-trailing-comma")]
+    skip_magic_trailing_comma: bool,
+    #[allow(unused)]
+    #[serde(alias = "force-exclude")]
+    force_exclude: Option<String>,
+}
+
+impl Default for BlackOptions {
+    fn default() -> Self {
+        Self {
+            line_length: 88,
+            skip_magic_trailing_comma: false,
+            force_exclude: None,
+        }
+    }
+}
+
+impl BlackOptions {
+    /// TODO(konstin): For the real version, fix printing of error chains and remove the path
+    /// argument
+    fn from_toml(toml: &str, path: &Path) -> anyhow::Result<Self> {
+        let pyproject_toml: PyprojectToml = toml::from_str(toml).map_err(|e| {
+            format_err!(
+                "Not a valid pyproject.toml toml file at {}: {e}",
+                path.display()
+            )
+        })?;
+        let black_options = pyproject_toml
+            .tool
+            .unwrap_or_default()
+            .black
+            .unwrap_or_default();
+        debug!(
+            "Found {}, setting black options: {:?}",
+            path.display(),
+            &black_options
+        );
+        Ok(black_options)
+    }
+
+    fn from_file(repo: &Path) -> anyhow::Result<Self> {
+        let path = repo.join("pyproject.toml");
+        if !path.is_file() {
+            debug!(
+                "No pyproject.toml at {}, using black option defaults",
+                path.display()
+            );
+            return Ok(Self::default());
+        }
+        Self::from_toml(&fs::read_to_string(&path)?, repo)
+    }
+
+    fn to_py_format_options(&self) -> PyFormatOptions {
+        let mut options = PyFormatOptions::default();
+        options
+            .with_line_width(
+                LineWidth::try_from(self.line_length).expect("Invalid line length limit"),
+            )
+            .with_magic_trailing_comma(if self.skip_magic_trailing_comma {
+                MagicTrailingComma::Ignore
+            } else {
+                MagicTrailingComma::Respect
+            });
+        options
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::format_dev::BlackOptions;
+    use indoc::indoc;
+    use ruff_formatter::{FormatOptions, LineWidth};
+    use ruff_python_formatter::MagicTrailingComma;
+    use std::path::Path;
+
+    #[test]
+    fn test_transformers() {
+        let toml = indoc! {"
+            [tool.black]
+            line-length = 119
+            target-version = ['py37']
+        "};
+        let options = BlackOptions::from_toml(toml, Path::new("pyproject.toml"))
+            .unwrap()
+            .to_py_format_options();
+        assert_eq!(options.line_width(), LineWidth::try_from(119).unwrap());
+        assert!(matches!(
+            options.magic_trailing_comma(),
+            MagicTrailingComma::Respect
+        ));
+    }
+
+    #[test]
+    fn test_typeshed() {
+        let toml = indoc! {r#"
+            [tool.black]
+            line_length = 130
+            target_version = ["py310"]
+            skip_magic_trailing_comma = true
+            force-exclude = ".*_pb2.pyi"
+        "#};
+        let options = BlackOptions::from_toml(toml, Path::new("pyproject.toml"))
+            .unwrap()
+            .to_py_format_options();
+        assert_eq!(options.line_width(), LineWidth::try_from(130).unwrap());
+        assert!(matches!(
+            options.magic_trailing_comma(),
+            MagicTrailingComma::Ignore
+        ));
+    }
 }

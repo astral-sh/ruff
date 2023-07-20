@@ -54,15 +54,16 @@ pub fn format_and_debug_print(input: &str, cli: &Cli) -> Result<String> {
     let comment_ranges = comment_ranges.finish();
 
     // Parse the AST.
-    let python_ast = parse_tokens(tokens, Mode::Module, "<filename>")
-        .with_context(|| "Syntax error in input")?;
+    let python_ast =
+        parse_tokens(tokens, Mode::Module, "<filename>").context("Syntax error in input")?;
 
     let formatted = format_node(
         &python_ast,
         &comment_ranges,
         input,
         PyFormatOptions::default(),
-    )?;
+    )
+    .context("Failed to format node")?;
     if cli.print_ir {
         println!("{}", formatted.document().display(SourceCode::new(input)));
     }
@@ -74,7 +75,7 @@ pub fn format_and_debug_print(input: &str, cli: &Cli) -> Result<String> {
     }
     Ok(formatted
         .print()
-        .with_context(|| "Failed to print the formatter IR")?
+        .context("Failed to print the formatter IR")?
         .as_code()
         .to_string())
 }

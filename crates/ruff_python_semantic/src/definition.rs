@@ -47,6 +47,14 @@ impl<'a> Module<'a> {
             None
         }
     }
+
+    /// Return the name of the module.
+    pub fn name(&self) -> Option<&'a str> {
+        match self.source {
+            ModuleSource::Path(path) => path.last().map(Deref::deref),
+            ModuleSource::File(file) => file.file_stem().and_then(std::ffi::OsStr::to_str),
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -72,12 +80,13 @@ pub struct Member<'a> {
 }
 
 impl<'a> Member<'a> {
-    fn name(&self) -> &'a str {
+    /// Return the name of the member.
+    pub fn name(&self) -> Option<&'a str> {
         match &self.stmt {
-            Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) => name,
-            Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { name, .. }) => name,
-            Stmt::ClassDef(ast::StmtClassDef { name, .. }) => name,
-            _ => unreachable!("Unexpected member kind: {:?}", self.kind),
+            Stmt::FunctionDef(ast::StmtFunctionDef { name, .. })
+            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { name, .. })
+            | Stmt::ClassDef(ast::StmtClassDef { name, .. }) => Some(name),
+            _ => None,
         }
     }
 }
@@ -99,6 +108,13 @@ impl Definition<'_> {
                 ..
             })
         )
+    }
+
+    pub fn name(&self) -> Option<&str> {
+        match self {
+            Definition::Module(module) => module.name(),
+            Definition::Member(member) => member.name(),
+        }
     }
 }
 
@@ -134,8 +150,9 @@ impl<'a> Definitions<'a> {
                         MemberKind::Class => {
                             let parent = &definitions[member.parent];
                             if parent.visibility.is_private()
-                                || exports
-                                    .map_or(false, |exports| !exports.contains(&member.name()))
+                                || exports.map_or(false, |exports| {
+                                    member.name().map_or(false, |name| !exports.contains(&name))
+                                })
                             {
                                 Visibility::Private
                             } else {
@@ -163,8 +180,9 @@ impl<'a> Definitions<'a> {
                         MemberKind::Function => {
                             let parent = &definitions[member.parent];
                             if parent.visibility.is_private()
-                                || exports
-                                    .map_or(false, |exports| !exports.contains(&member.name()))
+                                || exports.map_or(false, |exports| {
+                                    member.name().map_or(false, |name| !exports.contains(&name))
+                                })
                             {
                                 Visibility::Private
                             } else {

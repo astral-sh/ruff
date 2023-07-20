@@ -2,12 +2,12 @@ use rustpython_parser::ast::{Ranged, StmtFunctionDef};
 
 use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule};
 use ruff_python_ast::function::AnyFunctionDefinition;
+use ruff_python_trivia::{lines_after, skip_trailing_trivia};
 
 use crate::comments::{leading_comments, trailing_comments};
 use crate::context::NodeLevel;
 use crate::expression::parentheses::{optional_parentheses, Parentheses};
 use crate::prelude::*;
-use crate::trivia::{lines_after, skip_trailing_trivia};
 use crate::FormatNodeRule;
 
 #[derive(Default)]

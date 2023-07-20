@@ -208,12 +208,7 @@ fn check_positional_args(
         (ErrorKind::ThirdArgBadAnnotation, is_traceback_type),
     ];
 
-    for (arg, (error_info, predicate)) in positional_args
-        .iter()
-        .skip(1)
-        .take(3)
-        .zip(validations.into_iter())
-    {
+    for (arg, (error_info, predicate)) in positional_args.iter().skip(1).take(3).zip(validations) {
         let Some(annotation) = arg.def.annotation.as_ref() else {
             continue;
         };

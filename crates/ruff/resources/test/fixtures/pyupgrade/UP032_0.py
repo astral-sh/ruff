@@ -62,6 +62,16 @@ print("foo {} ".format(x))
     1111111111111111111111111111111111111111111111111111111111111111111111111,
 )
 
+"""
+{}
+""".format(1)
+
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = """
+{}
+""".format(
+    111111
+)
+
 ###
 # Non-errors
 ###
@@ -97,6 +107,21 @@ r'"\N{snowman} {}".format(a)'
 
 "123456789 {}".format(
     11111111111111111111111111111111111111111111111111111111111111111111111111,
+)
+
+"""
+{}
+{}
+{}
+""".format(
+1,
+2,
+111111111111111111111111111111111111111111111111111111111111111111111111111111111111111,
+)
+
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = """{}
+""".format(
+    111111
 )
 
 async def c():

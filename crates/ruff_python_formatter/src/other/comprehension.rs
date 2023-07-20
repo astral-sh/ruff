@@ -1,4 +1,5 @@
 use crate::comments::{leading_comments, trailing_comments};
+use crate::expression::expr_tuple::TupleParentheses;
 use crate::prelude::*;
 use crate::AsFormat;
 use crate::{FormatNodeRule, PyFormatter};
@@ -58,7 +59,7 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
                 trailing_comments(before_target_comments),
                 group(&format_args!(
                     Spacer(target),
-                    target.format(),
+                    ExprTupleWithoutParentheses(target),
                     in_spacer,
                     leading_comments(before_in_comments),
                     text("in"),
@@ -102,5 +103,19 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
     ) -> FormatResult<()> {
         // dangling comments are formatted as part of fmt_fields
         Ok(())
+    }
+}
+
+struct ExprTupleWithoutParentheses<'a>(&'a Expr);
+
+impl Format<PyFormatContext<'_>> for ExprTupleWithoutParentheses<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+        match self.0 {
+            Expr::Tuple(expr_tuple) => expr_tuple
+                .format()
+                .with_options(TupleParentheses::Comprehension)
+                .fmt(f),
+            other => other.format().fmt(f),
+        }
     }
 }

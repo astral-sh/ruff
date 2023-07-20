@@ -317,7 +317,7 @@ impl From<&Configuration> for RuleTable {
         // The fixable set keeps track of which rules are fixable.
         let mut fixable_set: RuleSet = RuleSelector::All
             .into_iter()
-            .chain(RuleSelector::Nursery.into_iter())
+            .chain(&RuleSelector::Nursery)
             .collect();
 
         // Ignores normally only subtract from the current set of selected

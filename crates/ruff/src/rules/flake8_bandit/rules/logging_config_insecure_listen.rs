@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::SimpleCallArgs;
 
 use crate::checkers::ast::Checker;
 
@@ -20,7 +19,6 @@ impl Violation for LoggingConfigInsecureListen {
 pub(crate) fn logging_config_insecure_listen(
     checker: &mut Checker,
     func: &Expr,
-    args: &[Expr],
     keywords: &[Keyword],
 ) {
     if checker
@@ -30,12 +28,17 @@ pub(crate) fn logging_config_insecure_listen(
             matches!(call_path.as_slice(), ["logging", "config", "listen"])
         })
     {
-        let call_args = SimpleCallArgs::new(args, keywords);
-
-        if call_args.keyword_argument("verify").is_none() {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(LoggingConfigInsecureListen, func.range()));
+        if keywords.iter().any(|keyword| {
+            keyword
+                .arg
+                .as_ref()
+                .map_or(false, |arg| arg.as_str() == "verify")
+        }) {
+            return;
         }
+
+        checker
+            .diagnostics
+            .push(Diagnostic::new(LoggingConfigInsecureListen, func.range()));
     }
 }

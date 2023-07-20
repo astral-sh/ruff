@@ -325,8 +325,8 @@ pub(crate) fn f_strings(
         return;
     }
 
-    // Avoid refactoring multi-line strings.
-    if checker.locator.contains_line_break(template.range()) {
+    // Avoid refactoring strings that are implicitly concatenated.
+    if is_implicit_concatenation(checker.locator.slice(template.range())) {
         return;
     }
 
@@ -338,7 +338,17 @@ pub(crate) fn f_strings(
 
     // Avoid refactors that exceed the line length limit.
     let col_offset = template.start() - checker.locator.line_start(template.start());
-    if col_offset.to_usize() + contents.len() > line_length.get() {
+    if contents.lines().enumerate().any(|(idx, line)| {
+        // If `template` is a multiline string, `col_offset` should only be applied to the first
+        // line:
+        // ```
+        // a = """{}        -> offset = col_offset (= 4)
+        // {}               -> offset = 0
+        // """.format(0, 1) -> offset = 0
+        // ```
+        let offset = if idx == 0 { col_offset.to_usize() } else { 0 };
+        offset + line.chars().count() > line_length.get()
+    }) {
         return;
     }
 

@@ -12,6 +12,9 @@ use crate::prelude::*;
 
 #[derive(Eq, PartialEq, Debug, Default)]
 pub enum TupleParentheses {
+    /// Black omits parentheses for tuples inside of comprehensions.
+    Comprehension,
+
     /// Effectively `None` in `Option<Parentheses>`
     #[default]
     Default,
@@ -119,6 +122,13 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                 parenthesized("(", &ExprSequence::new(item), ")").fmt(f)
             }
             _ => match self.parentheses {
+                TupleParentheses::Comprehension => {
+                    let separator =
+                        format_with(|f| group(&format_args![text(","), space()]).fmt(f));
+                    f.join_with(separator)
+                        .entries(elts.iter().formatted())
+                        .finish()
+                }
                 TupleParentheses::Preserve => group(&ExprSequence::new(item)).fmt(f),
                 _ => parenthesize_if_expands(&ExprSequence::new(item)).fmt(f),
             },

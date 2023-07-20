@@ -66,16 +66,16 @@ fn num_statements(stmts: &[Stmt]) -> usize {
     let mut count = 0;
     for stmt in stmts {
         match stmt {
-            Stmt::If(ast::StmtIf { body, orelse, .. }) => {
+            Stmt::If(ast::StmtIf {
+                body,
+                elif_else_clauses,
+                ..
+            }) => {
                 count += 1;
                 count += num_statements(body);
-                if let Some(stmt) = orelse.first() {
-                    // `elif:` and `else: if:` have the same AST representation.
-                    // Avoid treating `elif:` as two statements.
-                    if !stmt.is_if_stmt() {
-                        count += 1;
-                    }
-                    count += num_statements(orelse);
+                for clause in elif_else_clauses {
+                    count += 1;
+                    count += num_statements(&clause.body);
                 }
             }
             Stmt::For(ast::StmtFor { body, orelse, .. })
@@ -207,7 +207,7 @@ def f():
             print()
 "#;
         let stmts = Suite::parse(source, "<filename>")?;
-        assert_eq!(num_statements(&stmts), 5);
+        assert_eq!(num_statements(&stmts), 6);
         Ok(())
     }
 
