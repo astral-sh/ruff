@@ -1084,6 +1084,34 @@ class A:
         assert_snapshot!(trace);
     }
 
+
+    #[test]
+    fn type_aliases() {
+        let source = r#"type X[T: str, U, *Ts, **P] = list[T]"#;
+
+        let trace = trace_preorder_visitation(source);
+
+        assert_snapshot!(trace);
+    }
+
+    #[test]
+    fn class_type_parameters() {
+        let source = r#"class X[T: str, U, *Ts, **P]: ..."#;
+
+        let trace = trace_preorder_visitation(source);
+
+        assert_snapshot!(trace);
+    }
+
+    #[test]
+    fn function_type_parameters() {
+        let source = r#"def X[T: str, U, *Ts, **P](): ..."#;
+
+        let trace = trace_preorder_visitation(source);
+
+        assert_snapshot!(trace);
+    }
+
     fn trace_preorder_visitation(source: &str) -> String {
         let tokens = lex(source, Mode::Module);
         let parsed = parse_tokens(tokens, Mode::Module, "test.py").unwrap();
