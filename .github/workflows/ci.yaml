@@ -23,35 +23,33 @@ jobs:
     name: "Determine changes"
     runs-on: ubuntu-latest
     outputs:
-      linter: ${{ steps.linter.outputs.any_changed }}
-      formatter: ${{ steps.formatter.outputs.any_changed }}
+      linter: ${{ steps.changed.outputs.linter_any_changed }}
+      formatter: ${{ steps.changed.outputs.formatter_any_changed }}
     steps:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
       - uses: tj-actions/changed-files@v37
-        id: linter
+        id: changed
         with:
-          files: |
-            Cargo.toml
-            Cargo.lock
-            crates/**
-            !crates/ruff_python_formatter/**
-            !crates/ruff_formatter/**
-            !crates/ruff_dev/**
-            !crates/ruff_shrinking/**
+          files_yaml: |
+            linter:
+              - Cargo.toml
+              - Cargo.lock
+              - crates/**
+              - "!crates/ruff_python_formatter/**"
+              - "!crates/ruff_formatter/**"
+              - "!crates/ruff_dev/**"
+              - "!crates/ruff_shrinking/**"
 
-      - uses: tj-actions/changed-files@v37
-        id: formatter
-        with:
-          files: |
-            Cargo.toml
-            Cargo.lock
-            crates/ruff_python_formatter/**
-            crates/ruff_formatter/**
-            crates/ruff_python_trivia/**
-            crates/ruff_python_ast/**
+            formatter:
+              - Cargo.toml
+              - Cargo.lock
+              - crates/ruff_python_formatter/**
+              - crates/ruff_formatter/**
+              - crates/ruff_python_trivia/**
+              - crates/ruff_python_ast/**
 
 
   cargo-fmt:
