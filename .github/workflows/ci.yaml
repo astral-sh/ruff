@@ -19,6 +19,41 @@ env:
   PYTHON_VERSION: "3.11" # to build abi3 wheels
 
 jobs:
+  determine_changes:
+    name: "Determine changes"
+    runs-on: ubuntu-latest
+    outputs:
+      linter: ${{ steps.linter.outputs.any_changed }}
+      formatter: ${{ steps.formatter.outputs.any_changed }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - uses: tj-actions/changed-files@v37
+        id: linter
+        with:
+          files: |
+            Cargo.toml
+            Cargo.lock
+            crates/**
+            !crates/ruff_python_formatter/**
+            !crates/ruff_formatter/**
+            !crates/ruff_dev/**
+            !crates/ruff_shrinking/**
+
+      - uses: tj-actions/changed-files@v37
+        id: formatter
+        with:
+          files: |
+            Cargo.toml
+            Cargo.lock
+            crates/ruff_python_formatter/**
+            crates/ruff_formatter/**
+            crates/ruff_python_trivia/**
+            crates/ruff_python_ast/**
+
+
   cargo-fmt:
     name: "cargo fmt"
     runs-on: ubuntu-latest
@@ -137,9 +172,11 @@ jobs:
   ecosystem:
     name: "ecosystem"
     runs-on: ubuntu-latest
-    needs: cargo-test
+    needs:
+      - cargo-test
+      - determine_changes
     # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && needs.determine_changes.outputs.linter == 'true'
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
@@ -287,6 +324,8 @@ jobs:
   check-formatter-stability:
     name: "Check formatter stability"
     runs-on: ubuntu-latest
+    needs: determine_changes
+    if: needs.determine_changes.outputs.formatter == 'true'
     steps:
       - uses: actions/checkout@v3
       - name: "Install Rust toolchain"
