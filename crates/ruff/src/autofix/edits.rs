@@ -7,7 +7,7 @@ use rustpython_parser::{lexer, Mode};
 use ruff_diagnostics::Edit;
 use ruff_python_ast::helpers;
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
-use ruff_python_whitespace::{is_python_whitespace, NewlineWithTrailingNewline, PythonWhitespace};
+use ruff_python_trivia::{is_python_whitespace, NewlineWithTrailingNewline, PythonWhitespace};
 
 use crate::autofix::codemods;
 

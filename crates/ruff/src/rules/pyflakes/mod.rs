@@ -1026,8 +1026,8 @@ mod tests {
             &[
                 Rule::UndefinedName,
                 Rule::UndefinedName,
-                Rule::UndefinedName,
                 Rule::UnusedVariable,
+                Rule::UndefinedName,
                 Rule::UndefinedName,
             ],
         );

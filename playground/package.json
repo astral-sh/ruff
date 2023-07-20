@@ -8,6 +8,7 @@
     "build": "tsc && vite build",
     "check": "npm run lint && npm run tsc",
     "dev": "vite",
+    "dev:wasm": "wasm-pack build ../crates/ruff_wasm --dev --target web --out-dir ../../playground/src/pkg",
     "fmt": "prettier --cache -w .",
     "lint": "eslint --cache --ext .ts,.tsx src",
     "preview": "vite preview",
@@ -19,7 +20,8 @@
     "lz-string": "^1.4.4",
     "monaco-editor": "^0.40.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "react-resizable-panels": "^0.0.54"
   },
   "devDependencies": {
     "@types/react": "^18.0.26",

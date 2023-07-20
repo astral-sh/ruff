@@ -38,7 +38,7 @@ use rustpython_parser::ast::{
 };
 
 use ruff_diagnostics::{Diagnostic, Fix, IsolationLevel};
-use ruff_python_ast::all::{extract_all_names, AllNamesFlags};
+use ruff_python_ast::all::{extract_all_names, DunderAllFlags};
 use ruff_python_ast::helpers::{extract_handled_exceptions, to_module_path};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::source_code::{Generator, Indexer, Locator, Quote, Stylist};
@@ -50,8 +50,8 @@ use ruff_python_ast::{cast, helpers, str, visitor};
 use ruff_python_semantic::analyze::{branch_detection, typing, visibility};
 use ruff_python_semantic::{
     Binding, BindingFlags, BindingId, BindingKind, ContextualizedDefinition, Exceptions,
-    ExecutionContext, Export, FromImport, Globals, Import, Module, ModuleKind, ResolvedRead, Scope,
-    ScopeId, ScopeKind, SemanticModel, SemanticModelFlags, StarImport, SubmoduleImport,
+    ExecutionContext, Export, FromImport, Globals, Import, Module, ModuleKind, ScopeId, ScopeKind,
+    SemanticModel, SemanticModelFlags, StarImport, SubmoduleImport,
 };
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
 use ruff_python_stdlib::path::is_python_stub_file;
@@ -411,7 +411,7 @@ where
                             stmt,
                             name,
                             decorator_list,
-                            returns.as_ref().map(|expr| &**expr),
+                            returns.as_ref().map(AsRef::as_ref),
                             args,
                             stmt.is_async_function_def_stmt(),
                         );
@@ -470,18 +470,14 @@ where
                     Rule::SuperfluousElseContinue,
                     Rule::SuperfluousElseBreak,
                 ]) {
-                    flake8_return::rules::function(
-                        self,
-                        body,
-                        returns.as_ref().map(|expr| &**expr),
-                    );
+                    flake8_return::rules::function(self, body, returns.as_ref().map(AsRef::as_ref));
                 }
                 if self.enabled(Rule::UselessReturn) {
                     pylint::rules::useless_return(
                         self,
                         stmt,
                         body,
-                        returns.as_ref().map(|expr| &**expr),
+                        returns.as_ref().map(AsRef::as_ref),
                     );
                 }
                 if self.enabled(Rule::ComplexStructure) {
@@ -1404,11 +1400,7 @@ where
                 }
                 if stmt.is_for_stmt() {
                     if self.enabled(Rule::ReimplementedBuiltin) {
-                        flake8_simplify::rules::convert_for_loop_to_any_all(
-                            self,
-                            stmt,
-                            self.semantic.sibling_stmt(),
-                        );
+                        flake8_simplify::rules::convert_for_loop_to_any_all(self, stmt);
                     }
                     if self.enabled(Rule::InDictKeys) {
                         flake8_simplify::rules::key_in_dict_for(self, target, iter);
@@ -1565,6 +1557,7 @@ where
                         Rule::UnprefixedTypeParam,
                         Rule::AssignmentDefaultInStub,
                         Rule::UnannotatedAssignmentInStub,
+                        Rule::TypeAliasWithoutAnnotation,
                     ]) {
                         // Ignore assignments in function bodies; those are covered by other rules.
                         if !self
@@ -1581,6 +1574,11 @@ where
                             if self.enabled(Rule::UnannotatedAssignmentInStub) {
                                 flake8_pyi::rules::unannotated_assignment_in_stub(
                                     self, targets, value,
+                                );
+                            }
+                            if self.enabled(Rule::TypeAliasWithoutAnnotation) {
+                                flake8_pyi::rules::type_alias_without_annotation(
+                                    self, value, targets,
                                 );
                             }
                         }
@@ -3026,8 +3024,15 @@ where
                     Rule::OsPathSplitext,
                     Rule::BuiltinOpen,
                     Rule::PyPath,
+                    Rule::OsPathGetsize,
+                    Rule::OsPathGetatime,
+                    Rule::OsPathGetmtime,
+                    Rule::OsPathGetctime,
                 ]) {
                     flake8_use_pathlib::rules::replaceable_by_pathlib(self, func);
+                }
+                if self.enabled(Rule::PathConstructorCurrentDirectory) {
+                    flake8_use_pathlib::rules::path_constructor_current_directory(self, expr, func);
                 }
                 if self.enabled(Rule::NumpyLegacyRandom) {
                     numpy::rules::legacy_random(self, func);
@@ -4061,7 +4066,7 @@ where
         }
 
         // Step 2: Binding
-        let bindings = match except_handler {
+        let binding = match except_handler {
             ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                 type_: _,
                 name,
@@ -4070,17 +4075,17 @@ where
             }) => {
                 if let Some(name) = name {
                     // Store the existing binding, if any.
-                    let existing_id = self.semantic.lookup_symbol(name.as_str());
+                    let binding_id = self.semantic.lookup_symbol(name.as_str());
 
                     // Add the bound exception name to the scope.
-                    let binding_id = self.add_binding(
+                    self.add_binding(
                         name.as_str(),
                         name.range(),
-                        BindingKind::Assignment,
+                        BindingKind::BoundException,
                         BindingFlags::empty(),
                     );
 
-                    Some((name, existing_id, binding_id))
+                    Some((name, binding_id))
                 } else {
                     None
                 }
@@ -4091,33 +4096,11 @@ where
         walk_except_handler(self, except_handler);
 
         // Step 4: Clean-up
-        if let Some((name, existing_id, binding_id)) = bindings {
-            // If the exception name wasn't used in the scope, emit a diagnostic.
-            if !self.semantic.is_used(binding_id) {
-                if self.enabled(Rule::UnusedVariable) {
-                    let mut diagnostic = Diagnostic::new(
-                        pyflakes::rules::UnusedVariable {
-                            name: name.to_string(),
-                        },
-                        name.range(),
-                    );
-                    if self.patch(Rule::UnusedVariable) {
-                        diagnostic.try_set_fix(|| {
-                            pyflakes::fixes::remove_exception_handler_assignment(
-                                except_handler,
-                                self.locator,
-                            )
-                            .map(Fix::automatic)
-                        });
-                    }
-                    self.diagnostics.push(diagnostic);
-                }
-            }
-
+        if let Some((name, binding_id)) = binding {
             self.add_binding(
                 name.as_str(),
                 name.range(),
-                BindingKind::UnboundException(existing_id),
+                BindingKind::UnboundException(binding_id),
                 BindingFlags::empty(),
             );
         }
@@ -4142,7 +4125,7 @@ where
             flake8_bugbear::rules::mutable_argument_default(self, arguments);
         }
         if self.enabled(Rule::FunctionCallInDefaultArgument) {
-            flake8_bugbear::rules::function_call_argument_default(self, arguments);
+            flake8_bugbear::rules::function_call_in_argument_default(self, arguments);
         }
         if self.settings.rules.enabled(Rule::ImplicitOptional) {
             ruff::rules::implicit_optional(self, arguments);
@@ -4240,21 +4223,10 @@ where
             flake8_pie::rules::no_unnecessary_pass(self, body);
         }
 
-        // Step 2: Binding
-        let prev_body = self.semantic.body;
-        let prev_body_index = self.semantic.body_index;
-        self.semantic.body = body;
-        self.semantic.body_index = 0;
-
         // Step 3: Traversal
         for stmt in body {
             self.visit_stmt(stmt);
-            self.semantic.body_index += 1;
         }
-
-        // Step 4: Clean-up
-        self.semantic.body = prev_body;
-        self.semantic.body_index = prev_body_index;
     }
 }
 
@@ -4469,55 +4441,7 @@ impl<'a> Checker<'a> {
         let Expr::Name(ast::ExprName { id, .. }) = expr else {
             return;
         };
-        match self.semantic.resolve_read(id, expr.range()) {
-            ResolvedRead::Resolved(_) | ResolvedRead::ImplicitGlobal => {
-                // Nothing to do.
-            }
-            ResolvedRead::WildcardImport => {
-                // F405
-                if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
-                    let sources: Vec<String> = self
-                        .semantic
-                        .scopes
-                        .iter()
-                        .flat_map(Scope::star_imports)
-                        .map(|StarImport { level, module }| {
-                            helpers::format_import_from(*level, *module)
-                        })
-                        .sorted()
-                        .dedup()
-                        .collect();
-                    self.diagnostics.push(Diagnostic::new(
-                        pyflakes::rules::UndefinedLocalWithImportStarUsage {
-                            name: id.to_string(),
-                            sources,
-                        },
-                        expr.range(),
-                    ));
-                }
-            }
-            ResolvedRead::NotFound | ResolvedRead::UnboundLocal(_) => {
-                // F821
-                if self.enabled(Rule::UndefinedName) {
-                    // Allow __path__.
-                    if self.path.ends_with("__init__.py") && id == "__path__" {
-                        return;
-                    }
-
-                    // Avoid flagging if `NameError` is handled.
-                    if self.semantic.exceptions().contains(Exceptions::NAME_ERROR) {
-                        return;
-                    }
-
-                    self.diagnostics.push(Diagnostic::new(
-                        pyflakes::rules::UndefinedName {
-                            name: id.to_string(),
-                        },
-                        expr.range(),
-                    ));
-                }
-            }
-        }
+        self.semantic.resolve_read(id, expr.range());
     }
 
     fn handle_node_store(&mut self, id: &'a str, expr: &Expr) {
@@ -4584,27 +4508,24 @@ impl<'a> Checker<'a> {
                 _ => false,
             }
         {
-            let (names, flags) = extract_all_names(parent, |name| self.semantic.is_builtin(name));
+            let (all_names, all_flags) =
+                extract_all_names(parent, |name| self.semantic.is_builtin(name));
 
-            if self.enabled(Rule::InvalidAllFormat) {
-                if matches!(flags, AllNamesFlags::INVALID_FORMAT) {
-                    self.diagnostics
-                        .push(pylint::rules::invalid_all_format(expr));
-                }
+            let mut flags = BindingFlags::empty();
+            if all_flags.contains(DunderAllFlags::INVALID_OBJECT) {
+                flags |= BindingFlags::INVALID_ALL_OBJECT;
             }
-
-            if self.enabled(Rule::InvalidAllObject) {
-                if matches!(flags, AllNamesFlags::INVALID_OBJECT) {
-                    self.diagnostics
-                        .push(pylint::rules::invalid_all_object(expr));
-                }
+            if all_flags.contains(DunderAllFlags::INVALID_FORMAT) {
+                flags |= BindingFlags::INVALID_ALL_FORMAT;
             }
 
             self.add_binding(
                 id,
                 expr.range(),
-                BindingKind::Export(Export { names }),
-                BindingFlags::empty(),
+                BindingKind::Export(Export {
+                    names: all_names.into_boxed_slice(),
+                }),
+                flags,
             );
             return;
         }
@@ -4612,7 +4533,7 @@ impl<'a> Checker<'a> {
         if self
             .semantic
             .expr_ancestors()
-            .any(|expr| matches!(expr, Expr::NamedExpr(_)))
+            .any(|expr| expr.is_named_expr_expr())
         {
             self.add_binding(
                 id,
@@ -4815,6 +4736,163 @@ impl<'a> Checker<'a> {
         }
     }
 
+    /// Run any lint rules that operate over a single [`UnresolvedReference`].
+    fn check_unresolved_references(&mut self) {
+        if !self.any_enabled(&[Rule::UndefinedLocalWithImportStarUsage, Rule::UndefinedName]) {
+            return;
+        }
+
+        for reference in self.semantic.unresolved_references() {
+            if reference.wildcard_import() {
+                if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
+                    self.diagnostics.push(Diagnostic::new(
+                        pyflakes::rules::UndefinedLocalWithImportStarUsage {
+                            name: reference.name(self.locator).to_string(),
+                        },
+                        reference.range(),
+                    ));
+                }
+            } else {
+                if self.enabled(Rule::UndefinedName) {
+                    // Avoid flagging if `NameError` is handled.
+                    if reference.exceptions().contains(Exceptions::NAME_ERROR) {
+                        continue;
+                    }
+
+                    // Allow __path__.
+                    if self.path.ends_with("__init__.py") {
+                        if reference.name(self.locator) == "__path__" {
+                            continue;
+                        }
+                    }
+
+                    self.diagnostics.push(Diagnostic::new(
+                        pyflakes::rules::UndefinedName {
+                            name: reference.name(self.locator).to_string(),
+                        },
+                        reference.range(),
+                    ));
+                }
+            }
+        }
+    }
+
+    /// Run any lint rules that operate over a single [`Binding`].
+    fn check_bindings(&mut self) {
+        if !self.any_enabled(&[
+            Rule::InvalidAllFormat,
+            Rule::InvalidAllObject,
+            Rule::UnaliasedCollectionsAbcSetImport,
+            Rule::UnconventionalImportAlias,
+            Rule::UnusedVariable,
+        ]) {
+            return;
+        }
+
+        for binding in self.semantic.bindings.iter() {
+            // F841
+            if self.enabled(Rule::UnusedVariable) {
+                if binding.kind.is_bound_exception() && !binding.is_used() {
+                    let mut diagnostic = Diagnostic::new(
+                        pyflakes::rules::UnusedVariable {
+                            name: binding.name(self.locator).to_string(),
+                        },
+                        binding.range,
+                    );
+                    if self.patch(Rule::UnusedVariable) {
+                        diagnostic.try_set_fix(|| {
+                            pyflakes::fixes::remove_exception_handler_assignment(
+                                binding,
+                                self.locator,
+                            )
+                            .map(Fix::automatic)
+                        });
+                    }
+                    self.diagnostics.push(diagnostic);
+                }
+            }
+            if self.enabled(Rule::InvalidAllFormat) {
+                if let Some(diagnostic) = pylint::rules::invalid_all_format(binding) {
+                    self.diagnostics.push(diagnostic);
+                }
+            }
+            if self.enabled(Rule::InvalidAllObject) {
+                if let Some(diagnostic) = pylint::rules::invalid_all_object(binding) {
+                    self.diagnostics.push(diagnostic);
+                }
+            }
+            if self.enabled(Rule::UnconventionalImportAlias) {
+                if let Some(diagnostic) =
+                    flake8_import_conventions::rules::unconventional_import_alias(
+                        self,
+                        binding,
+                        &self.settings.flake8_import_conventions.aliases,
+                    )
+                {
+                    self.diagnostics.push(diagnostic);
+                }
+            }
+            if self.is_stub {
+                if self.enabled(Rule::UnaliasedCollectionsAbcSetImport) {
+                    if let Some(diagnostic) =
+                        flake8_pyi::rules::unaliased_collections_abc_set_import(self, binding)
+                    {
+                        self.diagnostics.push(diagnostic);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Run any lint rules that operate over the module exports (i.e., members of `__all__`).
+    fn check_exports(&mut self) {
+        let exports: Vec<(&str, TextRange)> = self
+            .semantic
+            .global_scope()
+            .get_all("__all__")
+            .map(|binding_id| &self.semantic.bindings[binding_id])
+            .filter_map(|binding| match &binding.kind {
+                BindingKind::Export(Export { names }) => {
+                    Some(names.iter().map(|name| (*name, binding.range)))
+                }
+                _ => None,
+            })
+            .flatten()
+            .collect();
+
+        for (name, range) in exports {
+            if let Some(binding_id) = self.semantic.global_scope().get(name) {
+                // Mark anything referenced in `__all__` as used.
+                self.semantic
+                    .add_global_reference(binding_id, range, ExecutionContext::Runtime);
+            } else {
+                if self.semantic.global_scope().uses_star_imports() {
+                    // F405
+                    if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
+                        self.diagnostics.push(Diagnostic::new(
+                            pyflakes::rules::UndefinedLocalWithImportStarUsage {
+                                name: (*name).to_string(),
+                            },
+                            range,
+                        ));
+                    }
+                } else {
+                    // F822
+                    if self.enabled(Rule::UndefinedExport) {
+                        if !self.path.ends_with("__init__.py") {
+                            self.diagnostics.push(Diagnostic::new(
+                                pyflakes::rules::UndefinedExport {
+                                    name: (*name).to_string(),
+                                },
+                                range,
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     fn check_deferred_scopes(&mut self) {
         if !self.any_enabled(&[
             Rule::GlobalVariableNotAssigned,
@@ -4824,37 +4902,9 @@ impl<'a> Checker<'a> {
             Rule::TypingOnlyFirstPartyImport,
             Rule::TypingOnlyStandardLibraryImport,
             Rule::TypingOnlyThirdPartyImport,
-            Rule::UnaliasedCollectionsAbcSetImport,
-            Rule::UnconventionalImportAlias,
-            Rule::UndefinedExport,
-            Rule::UndefinedLocalWithImportStarUsage,
-            Rule::UndefinedLocalWithImportStarUsage,
             Rule::UnusedImport,
         ]) {
             return;
-        }
-
-        // Mark anything referenced in `__all__` as used.
-        let exports: Vec<(&str, TextRange)> = {
-            self.semantic
-                .global_scope()
-                .get_all("__all__")
-                .map(|binding_id| &self.semantic.bindings[binding_id])
-                .filter_map(|binding| match &binding.kind {
-                    BindingKind::Export(Export { names }) => {
-                        Some(names.iter().map(|name| (*name, binding.range)))
-                    }
-                    _ => None,
-                })
-                .flatten()
-                .collect()
-        };
-
-        for (name, range) in &exports {
-            if let Some(binding_id) = self.semantic.global_scope().get(name) {
-                self.semantic
-                    .add_global_reference(binding_id, *range, ExecutionContext::Runtime);
-            }
         }
 
         // Identify any valid runtime imports. If a module is imported at runtime, and
@@ -4898,43 +4948,6 @@ impl<'a> Checker<'a> {
         let mut diagnostics: Vec<Diagnostic> = vec![];
         for scope_id in self.deferred.scopes.iter().rev().copied() {
             let scope = &self.semantic.scopes[scope_id];
-
-            if scope.kind.is_module() {
-                // F822
-                if self.enabled(Rule::UndefinedExport) {
-                    if !self.path.ends_with("__init__.py") {
-                        for (name, range) in &exports {
-                            diagnostics
-                                .extend(pyflakes::rules::undefined_export(name, *range, scope));
-                        }
-                    }
-                }
-
-                // F405
-                if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
-                    let sources: Vec<String> = scope
-                        .star_imports()
-                        .map(|StarImport { level, module }| {
-                            helpers::format_import_from(*level, *module)
-                        })
-                        .sorted()
-                        .dedup()
-                        .collect();
-                    if !sources.is_empty() {
-                        for (name, range) in &exports {
-                            if !scope.has(name) {
-                                diagnostics.push(Diagnostic::new(
-                                    pyflakes::rules::UndefinedLocalWithImportStarUsage {
-                                        name: (*name).to_string(),
-                                        sources: sources.clone(),
-                                    },
-                                    *range,
-                                ));
-                            }
-                        }
-                    }
-                }
-            }
 
             // PLW0602
             if self.enabled(Rule::GlobalVariableNotAssigned) {
@@ -5125,23 +5138,6 @@ impl<'a> Checker<'a> {
             if self.enabled(Rule::UnusedImport) {
                 pyflakes::rules::unused_import(self, scope, &mut diagnostics);
             }
-            if self.enabled(Rule::UnconventionalImportAlias) {
-                flake8_import_conventions::rules::unconventional_import_alias(
-                    self,
-                    scope,
-                    &mut diagnostics,
-                    &self.settings.flake8_import_conventions.aliases,
-                );
-            }
-            if self.is_stub {
-                if self.enabled(Rule::UnaliasedCollectionsAbcSetImport) {
-                    flake8_pyi::rules::unaliased_collections_abc_set_import(
-                        self,
-                        scope,
-                        &mut diagnostics,
-                    );
-                }
-            }
         }
         self.diagnostics.extend(diagnostics);
     }
@@ -5222,8 +5218,8 @@ impl<'a> Checker<'a> {
 
         // Compute visibility of all definitions.
         let exports: Option<Vec<&str>> = {
-            let global_scope = self.semantic.global_scope();
-            global_scope
+            self.semantic
+                .global_scope()
                 .get_all("__all__")
                 .map(|binding_id| &self.semantic.bindings[binding_id])
                 .filter_map(|binding| match &binding.kind {
@@ -5486,8 +5482,11 @@ pub(crate) fn check_ast(
     checker.check_deferred_assignments();
     checker.check_deferred_for_loops();
 
-    // Check docstrings.
+    // Check docstrings, exports, bindings, and unresolved references.
     checker.check_definitions();
+    checker.check_exports();
+    checker.check_bindings();
+    checker.check_unresolved_references();
 
     // Reset the scope to module-level, and check all consumed scopes.
     checker.semantic.scope_id = ScopeId::global();

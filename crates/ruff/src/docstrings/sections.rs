@@ -5,7 +5,7 @@ use ruff_python_ast::docstrings::{leading_space, leading_words};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use strum_macros::EnumIter;
 
-use ruff_python_whitespace::{Line, UniversalNewlineIterator, UniversalNewlines};
+use ruff_python_trivia::{Line, UniversalNewlineIterator, UniversalNewlines};
 
 use crate::docstrings::styles::SectionStyle;
 use crate::docstrings::{Docstring, DocstringBody};

@@ -8,7 +8,7 @@ use std::error::Error;
 pub enum FormatError {
     /// In case a node can't be formatted because it either misses a require child element or
     /// a child is present that should not (e.g. a trailing comma after a rest element).
-    SyntaxError,
+    SyntaxError { message: &'static str },
     /// In case range formatting failed because the provided range was larger
     /// than the formatted syntax tree
     RangeError { input: TextRange, tree: TextRange },
@@ -28,7 +28,9 @@ pub enum FormatError {
 impl std::fmt::Display for FormatError {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            FormatError::SyntaxError => fmt.write_str("syntax error"),
+            FormatError::SyntaxError {message} => {
+                std::write!(fmt, "syntax error: {message}")
+            },
             FormatError::RangeError { input, tree } => std::write!(
                 fmt,
                 "formatting range {input:?} is larger than syntax tree {tree:?}"
@@ -54,6 +56,12 @@ impl From<&PrintError> for FormatError {
         match error {
             PrintError::InvalidDocument(reason) => FormatError::InvalidDocument(*reason),
         }
+    }
+}
+
+impl FormatError {
+    pub fn syntax_error(message: &'static str) -> Self {
+        Self::SyntaxError { message }
     }
 }
 

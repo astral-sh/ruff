@@ -4,6 +4,9 @@ use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
+use crate::rules::flake8_use_pathlib::rules::{
+    OsPathGetatime, OsPathGetctime, OsPathGetmtime, OsPathGetsize,
+};
 use crate::rules::flake8_use_pathlib::violations::{
     BuiltinOpen, OsChmod, OsGetcwd, OsMakedirs, OsMkdir, OsPathAbspath, OsPathBasename,
     OsPathDirname, OsPathExists, OsPathExpanduser, OsPathIsabs, OsPathIsdir, OsPathIsfile,
@@ -41,6 +44,14 @@ pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, expr: &Expr) {
                 ["os", "path", "dirname"] => Some(OsPathDirname.into()),
                 ["os", "path", "samefile"] => Some(OsPathSamefile.into()),
                 ["os", "path", "splitext"] => Some(OsPathSplitext.into()),
+                // PTH202
+                ["os", "path", "getsize"] => Some(OsPathGetsize.into()),
+                // PTH203
+                ["os", "path", "getatime"] => Some(OsPathGetatime.into()),
+                // PTH204
+                ["os", "path", "getmtime"] => Some(OsPathGetmtime.into()),
+                // PTH205
+                ["os", "path", "getctime"] => Some(OsPathGetctime.into()),
                 ["", "open"] => Some(BuiltinOpen.into()),
                 ["py", "path", "local"] => Some(PyPath.into()),
                 // Python 3.9+

@@ -1,0 +1,50 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/py_312/type_aliases.py
+---
+## Input
+
+```py
+type A=int
+type Gen[T]=list[T]
+
+type = aliased
+print(type(42))
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -1,5 +1,5 @@
+-type A = int
+-type Gen[T] = list[T]
++type NOT_YET_IMPLEMENTED_type_alias = int
++type NOT_YET_IMPLEMENTED_type_alias = int
+ 
+ type = aliased
+ print(type(42))
+```
+
+## Ruff Output
+
+```py
+type NOT_YET_IMPLEMENTED_type_alias = int
+type NOT_YET_IMPLEMENTED_type_alias = int
+
+type = aliased
+print(type(42))
+```
+
+## Black Output
+
+```py
+type A = int
+type Gen[T] = list[T]
+
+type = aliased
+print(type(42))
+```
+
+

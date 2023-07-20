@@ -4,7 +4,7 @@
 use std::borrow::Cow;
 use std::cmp;
 
-use ruff_python_whitespace::{PythonWhitespace, UniversalNewlines};
+use ruff_python_trivia::{PythonWhitespace, UniversalNewlines};
 
 /// Indent each line by the given prefix.
 ///

@@ -68,27 +68,9 @@ while x := f(x):
      pass
  [y := f(x), y**2, y**3]
  filtered_data = [y for x in data if (y := f(x)) is None]
-@@ -19,10 +19,10 @@
-     pass
- 
- 
--lambda: (x := 1)
--(x := lambda: 1)
--(x := lambda: (y := 1))
--lambda line: (m := re.match(pattern, line)) and m.group(1)
-+lambda NOT_YET_IMPLEMENTED_lambda: True
-+(x := lambda NOT_YET_IMPLEMENTED_lambda: True)
-+(x := lambda NOT_YET_IMPLEMENTED_lambda: True)
-+lambda NOT_YET_IMPLEMENTED_lambda: True
- x = (y := 0)
- (z := (y := (x := 0)))
- (info := (name, phone, *rest))
-@@ -31,9 +31,9 @@
- len(lines := f.readlines())
- foo(x := 3, cat="vector")
+@@ -33,7 +33,7 @@
  foo(cat=(category := "vector"))
--if any(len(longline := l) >= 100 for l in lines):
-+if any((NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])):
+ if any(len(longline := l) >= 100 for l in lines):
      print(longline)
 -if env_base := os.environ.get("PYTHONUSERBASE", None):
 +if (env_base := os.environ.get("PYTHONUSERBASE", None)):
@@ -131,10 +113,10 @@ def foo(answer: (p := 42) = 5):
     pass
 
 
-lambda NOT_YET_IMPLEMENTED_lambda: True
-(x := lambda NOT_YET_IMPLEMENTED_lambda: True)
-(x := lambda NOT_YET_IMPLEMENTED_lambda: True)
-lambda NOT_YET_IMPLEMENTED_lambda: True
+lambda: (x := 1)
+(x := lambda: 1)
+(x := lambda: (y := 1))
+lambda line: (m := re.match(pattern, line)) and m.group(1)
 x = (y := 0)
 (z := (y := (x := 0)))
 (info := (name, phone, *rest))
@@ -143,7 +125,7 @@ x = (y := 0)
 len(lines := f.readlines())
 foo(x := 3, cat="vector")
 foo(cat=(category := "vector"))
-if any((NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])):
+if any(len(longline := l) >= 100 for l in lines):
     print(longline)
 if (env_base := os.environ.get("PYTHONUSERBASE", None)):
     return env_base
