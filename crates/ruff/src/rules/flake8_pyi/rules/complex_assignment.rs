@@ -22,9 +22,10 @@ use crate::checkers::ast::Checker;
 ///
 /// Use instead:
 /// ```python
-/// a = int
-/// b = int
+/// a: TypeAlias = int
+/// b: TypeAlias = int
 ///
+/// 
 /// class a:
 ///     b: int
 /// ```
