@@ -429,7 +429,7 @@ fn main() -> ExitCode {
     if let Err(e) = run() {
         eprintln!("💥 Minimizer failed");
         for cause in e.chain() {
-            eprintln!("  Caused by: {cause}");
+            eprintln!("  Cause: {cause}");
         }
         ExitCode::FAILURE
     } else {

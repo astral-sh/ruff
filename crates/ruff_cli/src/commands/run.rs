@@ -125,7 +125,7 @@ pub(crate) fn run(
                         (Some(path.to_owned()), {
                             let mut error = e.to_string();
                             for cause in e.chain() {
-                                write!(&mut error, "\n  Caused by: {cause}").unwrap();
+                                write!(&mut error, "\n  Cause: {cause}").unwrap();
                             }
                             error
                         })
@@ -143,30 +143,30 @@ pub(crate) fn run(
             }
             .unwrap_or_else(|(path, message)| {
                 if let Some(path) = &path {
-                    error!(
-                        "{}{}{} {message}",
-                        "Failed to lint ".bold(),
-                        fs::relativize_path(path).bold(),
-                        ":".bold()
-                    );
                     let settings = resolver.resolve(path, pyproject_config);
                     if settings.rules.enabled(Rule::IOError) {
-                        let file =
+                        let dummy =
                             SourceFileBuilder::new(path.to_string_lossy().as_ref(), "").finish();
 
                         Diagnostics::new(
                             vec![Message::from_diagnostic(
                                 Diagnostic::new(IOError { message }, TextRange::default()),
-                                file,
+                                dummy,
                                 TextSize::default(),
                             )],
                             ImportMap::default(),
                         )
                     } else {
+                        warn!(
+                            "{}{}{} {message}",
+                            "Failed to lint ".bold(),
+                            fs::relativize_path(path).bold(),
+                            ":".bold()
+                        );
                         Diagnostics::default()
                     }
                 } else {
-                    error!("{} {message}", "Encountered error:".bold());
+                    warn!("{} {message}", "Encountered error:".bold());
                     Diagnostics::default()
                 }
             })
@@ -224,5 +224,87 @@ with the relevant file contents, the `pyproject.toml` settings, and the followin
 
             Ok(Diagnostics::default())
         }
+    }
+}
+
+#[cfg(test)]
+#[cfg(unix)]
+mod test {
+    use super::run;
+    use crate::args::Overrides;
+    use anyhow::Result;
+    use ruff::message::{Emitter, EmitterContext, TextEmitter};
+    use ruff::registry::Rule;
+    use ruff::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
+    use ruff::settings::{flags, AllSettings, CliSettings, Settings};
+    use rustc_hash::FxHashMap;
+    use std::fs;
+    use std::os::unix::fs::OpenOptionsExt;
+    use tempfile::TempDir;
+
+    /// We check that regular python files, pyproject.toml and jupyter notebooks all handle io
+    /// errors gracefully
+    #[test]
+    fn unreadable_files() -> Result<()> {
+        let path = "E902.py";
+        let rule_code = Rule::IOError;
+
+        // Create inaccessible files
+        let tempdir = TempDir::new()?;
+        let pyproject_toml = tempdir.path().join("pyproject.toml");
+        let python_file = tempdir.path().join("code.py");
+        let notebook = tempdir.path().join("notebook.ipynb");
+        for file in [&pyproject_toml, &python_file, &notebook] {
+            fs::OpenOptions::new()
+                .create(true)
+                .write(true)
+                .mode(0o000)
+                .open(file)?;
+        }
+
+        // Configure
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path);
+        let settings = AllSettings {
+            cli: CliSettings::default(),
+            // invalid pyproject.toml is not active by default
+            lib: Settings::for_rules(vec![rule_code, Rule::InvalidPyprojectToml]),
+        };
+        let pyproject_config =
+            PyprojectConfig::new(PyprojectDiscoveryStrategy::Fixed, settings, None);
+
+        // Run
+        let diagnostics = run(
+            // Notebooks are not included by default
+            &[tempdir.path().to_path_buf(), notebook],
+            &pyproject_config,
+            &Overrides::default(),
+            flags::Cache::Disabled,
+            flags::Noqa::Disabled,
+            flags::FixMode::Generate,
+        )
+        .unwrap();
+        let mut output = Vec::new();
+
+        TextEmitter::default()
+            .with_show_fix_status(true)
+            .emit(
+                &mut output,
+                &diagnostics.messages,
+                &EmitterContext::new(&FxHashMap::default()),
+            )
+            .unwrap();
+
+        let messages = String::from_utf8(output).unwrap();
+
+        insta::with_settings!({
+            omit_expression => true,
+            filters => vec![
+                // The tempdir is always different (and platform dependent)
+                (tempdir.path().to_str().unwrap(), "/home/ferris/project"),
+            ]
+        }, {
+            insta::assert_snapshot!(snapshot, messages);
+        });
+        Ok(())
     }
 }

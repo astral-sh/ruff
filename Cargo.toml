@@ -21,7 +21,7 @@ filetime = { version = "0.2.20" }
 glob = { version = "0.3.1" }
 globset = { version = "0.4.10" }
 ignore = { version = "0.4.20" }
-insta = { version = "1.31.0" }
+insta = { version = "1.31.0", feature = ["filters", "glob"] }
 is-macro = { version = "0.2.2" }
 itertools = { version = "0.10.5" }
 log = { version = "0.4.17" }

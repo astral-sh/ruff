@@ -293,7 +293,6 @@ impl Settings {
         })
     }
 
-    #[cfg(test)]
     pub fn for_rule(rule_code: Rule) -> Self {
         Self {
             rules: RuleTable::from_iter([rule_code]),
@@ -301,7 +300,6 @@ impl Settings {
         }
     }
 
-    #[cfg(test)]
     pub fn for_rules(rules: impl IntoIterator<Item = Rule>) -> Self {
         Self {
             rules: RuleTable::from_iter(rules),
