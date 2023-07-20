@@ -1,10 +1,8 @@
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 
-/// PTH202
-
 /// ## What it does
-/// Detects the use of `os.path.getsize`.
+/// Checks for uses of `os.path.getsize`.
 ///
 /// ## Why is this bad?
 /// `pathlib` offers high-level path manipulations of paths, `os` offers low-level manipulation of paths.

@@ -1,10 +1,8 @@
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 
-/// PTH205
-
 /// ## What it does
-/// Detects the use of `os.path.getatime`.
+/// Checks for uses of `os.path.getatime`.
 ///
 /// ## Why is this bad?
 /// `pathlib` offers high-level path manipulations of paths, `os` offers low-level manipulation of paths.
