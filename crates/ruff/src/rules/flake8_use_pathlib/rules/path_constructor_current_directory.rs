@@ -67,7 +67,7 @@ pub(crate) fn path_constructor_current_directory(checker: &mut Checker, expr: &E
     let [Expr::Constant(ExprConstant {
         value: Constant::Str(value),
         kind: _,
-        range
+        range,
     })] = args.as_slice()
     else {
         return;

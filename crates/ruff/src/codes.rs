@@ -749,6 +749,11 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8UsePathlib, "123") => (RuleGroup::Unspecified, rules::flake8_use_pathlib::violations::BuiltinOpen),
         (Flake8UsePathlib, "124") => (RuleGroup::Unspecified, rules::flake8_use_pathlib::violations::PyPath),
         (Flake8UsePathlib, "201") => (RuleGroup::Unspecified, rules::flake8_use_pathlib::rules::PathConstructorCurrentDirectory),
+        (Flake8UsePathlib, "202") => (RuleGroup::Unspecified, rules::flake8_use_pathlib::rules::OsPathGetsize),
+        (Flake8UsePathlib, "202") => (RuleGroup::Unspecified, rules::flake8_use_pathlib::rules::OsPathGetsize),
+        (Flake8UsePathlib, "203") => (RuleGroup::Unspecified, rules::flake8_use_pathlib::rules::OsPathGetatime),
+        (Flake8UsePathlib, "204") => (RuleGroup::Unspecified, rules::flake8_use_pathlib::rules::OsPathGetmtime),
+        (Flake8UsePathlib, "205") => (RuleGroup::Unspecified, rules::flake8_use_pathlib::rules::OsPathGetctime),
 
         // flake8-logging-format
         (Flake8LoggingFormat, "001") => (RuleGroup::Unspecified, rules::flake8_logging_format::violations::LoggingStringFormat),
