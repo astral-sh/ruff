@@ -9,7 +9,7 @@ PTH201.py:5:10: PTH201 [*] Do not pass the current directory explicitly to `Path
 6 | _ = pth(".")
 7 | _ = PurePath(".")
   |
-  = help: Removes the uncessary current directory constructor argument
+  = help: Remove the current directory argument
 
 ℹ Fix
 2 2 | from pathlib import Path as pth
@@ -29,7 +29,7 @@ PTH201.py:6:9: PTH201 [*] Do not pass the current directory explicitly to `Path`
   |         ^^^ PTH201
 7 | _ = PurePath(".")
   |
-  = help: Removes the uncessary current directory constructor argument
+  = help: Remove the current directory argument
 
 ℹ Fix
 3 3 | 
@@ -50,7 +50,7 @@ PTH201.py:7:14: PTH201 [*] Do not pass the current directory explicitly to `Path
 8 | 
 9 | # no match
   |
-  = help: Removes the uncessary current directory constructor argument
+  = help: Remove the current directory argument
 
 ℹ Fix
 4 4 | # match
