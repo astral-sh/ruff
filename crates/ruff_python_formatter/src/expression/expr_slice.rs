@@ -87,7 +87,7 @@ impl FormatNodeRule<ExprSlice> for FormatExprSlice {
         // e201 = "e"[a() :: 1]
         // e202 = "e"[a() :: a()]
         // ```
-        if !all_simple {
+        if !all_simple && lower.is_some() {
             space().fmt(f)?;
         }
         text(":").fmt(f)?;
