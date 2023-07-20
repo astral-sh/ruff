@@ -31,14 +31,14 @@ impl FormatNodeRule<ExprDictComp> for FormatExprDictComp {
             f,
             [parenthesized(
                 "{",
-                &format_args!(
+                &group(&format_args!(
                     group(&key.format()),
                     text(":"),
                     space(),
                     value.format(),
                     soft_line_break_or_space(),
                     group(&joined)
-                ),
+                )),
                 "}"
             )]
         )
