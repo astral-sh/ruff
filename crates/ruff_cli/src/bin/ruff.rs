@@ -57,7 +57,7 @@ pub fn main() -> ExitCode {
                 // the configuration it is help to chain errors ("resolving configuration failed" ->
                 // "failed to read file: subdir/pyproject.toml")
                 for cause in err.chain() {
-                    eprintln!("  {} {cause}", "Caused by:".bold());
+                    eprintln!("  {} {cause}", "Cause:".bold());
                 }
             }
             ExitStatus::Error.into()

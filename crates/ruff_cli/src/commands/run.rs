@@ -125,7 +125,7 @@ pub(crate) fn run(
                         (Some(path.to_owned()), {
                             let mut error = e.to_string();
                             for cause in e.chain() {
-                                write!(&mut error, "\n  Caused by: {cause}").unwrap();
+                                write!(&mut error, "\n  Cause: {cause}").unwrap();
                             }
                             error
                         })
@@ -228,7 +228,7 @@ with the relevant file contents, the `pyproject.toml` settings, and the followin
 }
 
 #[cfg(test)]
-#[cfg(unix)] // If you need to add a second test, move this cfg
+#[cfg(unix)]
 mod test {
     use super::run;
     use crate::args::Overrides;
