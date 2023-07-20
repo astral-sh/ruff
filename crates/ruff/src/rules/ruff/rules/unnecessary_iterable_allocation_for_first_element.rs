@@ -4,6 +4,7 @@ use num_bigint::BigInt;
 use num_traits::{One, Zero};
 use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::{self, Comprehension, Constant, Expr, Ranged};
+use unicode_width::UnicodeWidthStr;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -85,7 +86,7 @@ impl AlwaysAutofixableViolation for UnnecessaryIterableAllocationForFirstElement
 impl UnnecessaryIterableAllocationForFirstElement {
     /// If the iterable is too long, or spans multiple lines, truncate it.
     fn truncate(iterable: &str) -> &str {
-        if iterable.len() > 40 || iterable.contains(['\r', '\n']) {
+        if iterable.width() > 40 || iterable.contains(['\r', '\n']) {
             "..."
         } else {
             iterable
@@ -151,11 +152,11 @@ enum HeadSubscriptKind {
 /// first `bool` checks that the element is in fact first, the second checks if it's a slice or an
 /// index.
 fn classify_subscript(expr: &Expr) -> Option<HeadSubscriptKind> {
-    match expr {
+    let result = match expr {
         Expr::Constant(ast::ExprConstant {
             value: Constant::Int(value),
             ..
-        }) if value.is_zero() => Some(HeadSubscriptKind::Index),
+        }) if value.is_zero() => HeadSubscriptKind::Index,
         Expr::Slice(ast::ExprSlice {
             step, lower, upper, ..
         }) => {
@@ -182,10 +183,12 @@ fn classify_subscript(expr: &Expr) -> Option<HeadSubscriptKind> {
                 }
             }
 
-            Some(HeadSubscriptKind::Slice)
+            HeadSubscriptKind::Slice
         }
-        _ => None,
-    }
+        _ => return None,
+    };
+
+    Some(result)
 }
 
 #[derive(Debug)]
@@ -206,7 +209,7 @@ struct IterationTarget {
 /// As a special-case, given `[x for x in y]`, returns the range of `y` (rather than the
 /// redundant comprehension).
 fn match_iteration_target(expr: &Expr, model: &SemanticModel) -> Option<IterationTarget> {
-    match expr {
+    let result = match expr {
         Expr::Call(ast::ExprCall { func, args, .. }) => {
             let ast::ExprName { id, .. } = func.as_name_expr()?;
 
@@ -225,73 +228,73 @@ fn match_iteration_target(expr: &Expr, model: &SemanticModel) -> Option<Iteratio
             match arg {
                 Expr::GeneratorExp(ast::ExprGeneratorExp {
                     elt, generators, ..
-                }) => match_simple_comprehension(elt, generators)
-                    .map(|range| IterationTarget {
+                }) => match match_simple_comprehension(elt, generators) {
+                    Some(range) => IterationTarget {
                         range,
                         iterable: false,
-                    })
-                    .or_else(|| {
-                        Some(IterationTarget {
-                            range: arg.range(),
-                            iterable: true,
-                        })
-                    }),
+                    },
+                    None => IterationTarget {
+                        range: arg.range(),
+                        iterable: true,
+                    },
+                },
                 Expr::ListComp(ast::ExprListComp {
                     elt, generators, ..
-                }) => match_simple_comprehension(elt, generators)
-                    .map(|range| IterationTarget {
+                }) => match match_simple_comprehension(elt, generators) {
+                    Some(range) => IterationTarget {
                         range,
                         iterable: false,
-                    })
-                    .or_else(|| {
-                        Some(IterationTarget {
-                            range: arg
-                                .range()
-                                // Remove the `[`
-                                .add_start(TextSize::from(1))
-                                // Remove the `]`
-                                .sub_end(TextSize::from(1)),
-                            iterable: true,
-                        })
-                    }),
-                _ => Some(IterationTarget {
+                    },
+                    None => IterationTarget {
+                        range: arg
+                            .range()
+                            // Remove the `[`
+                            .add_start(TextSize::from(1))
+                            // Remove the `]`
+                            .sub_end(TextSize::from(1)),
+                        iterable: true,
+                    },
+                },
+                _ => IterationTarget {
                     range: arg.range(),
                     iterable: false,
-                }),
+                },
             }
         }
+
         Expr::ListComp(ast::ExprListComp {
             elt, generators, ..
-        }) => match_simple_comprehension(elt, generators)
-            .map(|range| IterationTarget {
+        }) => match match_simple_comprehension(elt, generators) {
+            Some(range) => IterationTarget {
                 range,
                 iterable: false,
-            })
-            .or_else(|| {
-                Some(IterationTarget {
-                    range: expr
-                        .range()
-                        // Remove the `[`
-                        .add_start(TextSize::from(1))
-                        // Remove the `]`
-                        .sub_end(TextSize::from(1)),
-                    iterable: true,
-                })
-            }),
-        _ => None,
-    }
+            },
+            None => IterationTarget {
+                range: expr
+                    .range()
+                    // Remove the `[`
+                    .add_start(TextSize::from(1))
+                    // Remove the `]`
+                    .sub_end(TextSize::from(1)),
+                iterable: true,
+            },
+        },
+
+        _ => return None,
+    };
+
+    Some(result)
 }
 
 /// Returns the [`Expr`] target for a comprehension, if the comprehension is "simple"
 /// (e.g., `x` for `[i for i in x]`).
 fn match_simple_comprehension(elt: &Expr, generators: &[Comprehension]) -> Option<TextRange> {
-    let [generator] = generators else {
+    let [generator @ Comprehension {
+        is_async: false, ..
+    }] = generators
+    else {
         return None;
     };
-
-    if generator.is_async {
-        return None;
-    }
 
     // Ignore if there's an `if` statement in the comprehension, since it filters the list.
     if !generator.ifs.is_empty() {
