@@ -78,19 +78,23 @@ pub struct UnresolvedReference {
 }
 
 impl UnresolvedReference {
+    /// The range of the reference in the source code.
     pub const fn range(&self) -> TextRange {
         self.range
     }
 
+    /// The set of exceptions that were handled when resolution was attempted.
     pub const fn exceptions(&self) -> Exceptions {
         self.exceptions
     }
 
-    pub const fn wildcard_import(&self) -> bool {
+    /// Returns `true` if the unresolved reference may be resolved by a wildcard import.
+    pub const fn is_wildcard_import(&self) -> bool {
         self.flags
             .contains(UnresolvedReferenceFlags::WILDCARD_IMPORT)
     }
 
+    /// Returns the name of the reference.
     pub fn name<'a>(&self, locator: &Locator<'a>) -> &'a str {
         locator.slice(self.range)
     }
@@ -99,7 +103,15 @@ impl UnresolvedReference {
 bitflags! {
     #[derive(Copy, Clone, Debug)]
     pub struct UnresolvedReferenceFlags: u8 {
-        /// The unresolved reference appeared in a context that includes a wildcard import.
+        /// The unresolved reference may be resolved by a wildcard import.
+        ///
+        /// For example, the reference `x` in the following code may be resolved by the wildcard
+        /// import of `module`:
+        /// ```python
+        /// from module import *
+        ///
+        /// print(x)
+        /// ```
         const WILDCARD_IMPORT = 1 << 0;
     }
 }

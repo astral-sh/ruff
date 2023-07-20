@@ -251,8 +251,28 @@ impl<'a> SemanticModel<'a> {
             .map_or(true, |binding| binding.kind.is_builtin())
     }
 
-    /// Resolve a read reference to `symbol` at `range`.
-    pub fn resolve_read(&mut self, symbol: &str, range: TextRange) -> ReadResult {
+    /// Resolve a `del` reference to `symbol` at `range`.
+    pub fn resolve_del(&mut self, symbol: &str, range: TextRange) {
+        let is_unbound = self.scopes[self.scope_id]
+            .get(symbol)
+            .map_or(true, |binding_id| {
+                // Treat the deletion of a name as a reference to that name.
+                self.add_local_reference(binding_id, range, ExecutionContext::Runtime);
+                self.bindings[binding_id].is_unbound()
+            });
+
+        // If the binding is unbound, we need to add an unresolved reference.
+        if is_unbound {
+            self.unresolved_references.push(
+                range,
+                self.exceptions(),
+                UnresolvedReferenceFlags::empty(),
+            );
+        }
+    }
+
+    /// Resolve a `load` reference to `symbol` at `range`.
+    pub fn resolve_load(&mut self, symbol: &str, range: TextRange) -> ReadResult {
         // PEP 563 indicates that if a forward reference can be resolved in the module scope, we
         // should prefer it over local resolutions.
         if self.in_forward_reference() {
@@ -436,7 +456,7 @@ impl<'a> SemanticModel<'a> {
         }
     }
 
-    /// Lookup a symbol in the current scope. This is a carbon copy of [`Self::resolve_read`], but
+    /// Lookup a symbol in the current scope. This is a carbon copy of [`Self::resolve_load`], but
     /// doesn't add any read references to the resolved symbol.
     pub fn lookup_symbol(&self, symbol: &str) -> Option<BindingId> {
         if self.in_forward_reference() {

@@ -2407,32 +2407,7 @@ where
                             }
                         }
                     }
-                    ExprContext::Del => {
-                        if let Some(binding_id) = self.semantic.scope().get(id) {
-                            // If the name is unbound, then it's an error.
-                            if self.enabled(Rule::UndefinedName) {
-                                let binding = self.semantic.binding(binding_id);
-                                if binding.is_unbound() {
-                                    self.diagnostics.push(Diagnostic::new(
-                                        pyflakes::rules::UndefinedName {
-                                            name: id.to_string(),
-                                        },
-                                        expr.range(),
-                                    ));
-                                }
-                            }
-                        } else {
-                            // If the name isn't bound at all, then it's an error.
-                            if self.enabled(Rule::UndefinedName) {
-                                self.diagnostics.push(Diagnostic::new(
-                                    pyflakes::rules::UndefinedName {
-                                        name: id.to_string(),
-                                    },
-                                    expr.range(),
-                                ));
-                            }
-                        }
-                    }
+                    ExprContext::Del => {}
                 }
                 if self.enabled(Rule::SixPY3) {
                     flake8_2020::rules::name_or_attribute(self, expr);
@@ -4441,7 +4416,7 @@ impl<'a> Checker<'a> {
         let Expr::Name(ast::ExprName { id, .. }) = expr else {
             return;
         };
-        self.semantic.resolve_read(id, expr.range());
+        self.semantic.resolve_load(id, expr.range());
     }
 
     fn handle_node_store(&mut self, id: &'a str, expr: &Expr) {
@@ -4557,11 +4532,7 @@ impl<'a> Checker<'a> {
             return;
         };
 
-        // Treat the deletion of a name as a reference to that name.
-        if let Some(binding_id) = self.semantic.scope().get(id) {
-            self.semantic
-                .add_local_reference(binding_id, expr.range(), ExecutionContext::Runtime);
-        }
+        self.semantic.resolve_del(id, expr.range());
 
         if helpers::on_conditional_branch(&mut self.semantic.parents()) {
             return;
@@ -4743,7 +4714,7 @@ impl<'a> Checker<'a> {
         }
 
         for reference in self.semantic.unresolved_references() {
-            if reference.wildcard_import() {
+            if reference.is_wildcard_import() {
                 if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
                     self.diagnostics.push(Diagnostic::new(
                         pyflakes::rules::UndefinedLocalWithImportStarUsage {
