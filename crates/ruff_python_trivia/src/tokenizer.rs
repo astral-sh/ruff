@@ -577,15 +577,15 @@ fn find_unterminated_string_kind(input: &str) -> Option<StringKind> {
     let mut rest = input;
 
     while let Some(comment_or_string_start) = memchr3(b'#', b'\'', b'\"', rest.as_bytes()) {
-        let c = rest.as_bytes()[comment_or_string_start];
+        let c = rest.as_bytes()[comment_or_string_start] as char;
         let after = &rest[comment_or_string_start + 1..];
 
-        if c == b'#' {
+        if c == '#' {
             let comment_end = memchr2(b'\n', b'\r', after.as_bytes()).unwrap_or(after.len());
             rest = &after[comment_end..];
         } else {
             let mut cursor = Cursor::new(after);
-            let quote_kind = if c == b'\'' {
+            let quote_kind = if c == '\'' {
                 QuoteKind::Single
             } else {
                 QuoteKind::Double
@@ -598,6 +598,7 @@ fn find_unterminated_string_kind(input: &str) -> Option<StringKind> {
                     StringKind::Triple(quote_kind)
                 } else {
                     // empty string literal, nothing more to lex
+                    rest = cursor.chars().as_str();
                     continue;
                 }
             } else {
@@ -937,6 +938,13 @@ mod tests {
     #[test]
     fn string_with_double_escaped_backslash() {
         let test_case = tokenize(r#"'a string \\' # a comment '"#);
+
+        assert_debug_snapshot!(test_case.tokenize_reverse());
+    }
+
+    #[test]
+    fn empty_string_literal() {
+        let test_case = tokenize(r#"'' # a comment '"#);
 
         assert_debug_snapshot!(test_case.tokenize_reverse());
     }
