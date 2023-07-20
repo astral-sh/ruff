@@ -9,7 +9,8 @@ use crate::registry::AsRule;
 /// Detects pathlib `Path` objects that are initialized with the default current directory argument.
 ///
 /// ## Why is this bad?
-/// The `Path()` constructor defaults to the current directory. There is no need to pass the current directory (`"."`) explicitly.
+/// The `Path()` constructor defaults to the current directory. There is no
+/// need to pass the current directory (`"."`) explicitly.
 ///
 /// ## Example
 /// ```python
