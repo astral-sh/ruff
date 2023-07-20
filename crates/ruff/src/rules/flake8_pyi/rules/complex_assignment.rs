@@ -9,7 +9,10 @@ use crate::checkers::ast::Checker;
 /// Checks for assignments with multiple or non-name targets
 ///
 /// ## Why is this bad?
-/// TODO
+/// Stub files are not intended to ever be executed. As such, it's useful to enforce that only a
+/// subset of Python syntax is allowed in a stub file, to ensure that everything in the stub is
+/// 100% unambiguous when it comes to how the type checker is supposed to interpret it. Only
+/// allowing simple assignments is one such restriction.
 ///
 /// ## Example
 /// ```python
@@ -22,7 +25,8 @@ use crate::checkers::ast::Checker;
 /// a = int
 /// b = int
 ///
-/// TODO
+/// class a:
+///     b: int
 /// ```
 #[violation]
 pub struct ComplexAssignment;
