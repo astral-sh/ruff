@@ -5,7 +5,7 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_whitespace::Line;
+use ruff_python_trivia::Line;
 
 /// ## What it does
 /// Check for `type: ignore` annotations that suppress all type warnings, as

@@ -3,11 +3,11 @@ use rustpython_parser::ast::Ranged;
 
 use ruff_formatter::{format_args, write, FormatError, SourceCode};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
+use ruff_python_trivia::{lines_after, lines_before, skip_trailing_trivia};
 
 use crate::comments::SourceComment;
 use crate::context::NodeLevel;
 use crate::prelude::*;
-use crate::trivia::{lines_after, lines_before, skip_trailing_trivia};
 
 /// Formats the leading comments of a node.
 pub(crate) fn leading_node_comments<T>(node: &T) -> FormatLeadingComments
@@ -251,7 +251,9 @@ impl Format<PyFormatContext<'_>> for FormatComment<'_> {
         let trailing_whitespace_len = comment_text.text_len() - trimmed.text_len();
 
         let Some(content) = trimmed.strip_prefix('#') else {
-            return Err(FormatError::SyntaxError);
+            return Err(FormatError::syntax_error(
+                "Didn't find expected comment token `#`",
+            ));
         };
 
         // Fast path for correctly formatted comments:

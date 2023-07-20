@@ -21,7 +21,6 @@ use std::ops::{Add, AddAssign};
 use std::panic::catch_unwind;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
-use std::sync::mpsc::channel;
 use std::time::{Duration, Instant};
 use std::{fmt, fs, io};
 use tempfile::NamedTempFile;
@@ -183,7 +182,7 @@ pub(crate) struct Args {
 
 pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
     let all_success = if args.multi_project {
-        format_dev_multi_project(args)
+        format_dev_multi_project(args)?
     } else {
         let result = format_dev_project(&args.files, args.stability_check, args.write, true)?;
         let error_count = result.error_count();
@@ -209,97 +208,74 @@ pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
     }
 }
 
-/// Each `path` is one of the `files` in `Args`
-enum Message {
-    Start {
-        path: PathBuf,
-    },
-    Failed {
-        path: PathBuf,
-        error: anyhow::Error,
-    },
-    Finished {
-        path: PathBuf,
-        result: CheckRepoResult,
-    },
-}
-
 /// Checks a directory of projects
-fn format_dev_multi_project(args: &Args) -> bool {
+fn format_dev_multi_project(args: &Args) -> anyhow::Result<bool> {
     let mut total_errors = 0;
     let mut total_files = 0;
-    let mut num_projects: usize = 0;
     let start = Instant::now();
 
-    rayon::scope(|scope| {
-        let (sender, receiver) = channel();
+    let mut project_paths = Vec::new();
 
-        // Workers, to check is subdirectory in parallel
-        for base_dir in &args.files {
-            for dir in base_dir.read_dir().unwrap() {
-                num_projects += 1;
-                let path = dir.unwrap().path().clone();
+    for directory in &args.files {
+        for project_directory in directory
+            .read_dir()
+            .with_context(|| "Failed to read projects directory '{directory}'")?
+        {
+            project_paths.push(
+                project_directory
+                    .with_context(|| "Failed to read project directory '{project_directory}'")?
+                    .path(),
+            );
+        }
+    }
 
-                let sender = sender.clone();
+    let num_projects = project_paths.len();
+    let bar = ProgressBar::new(num_projects as u64);
 
-                scope.spawn(move |_| {
-                    sender.send(Message::Start { path: path.clone() }).unwrap();
+    let mut error_file = match &args.error_file {
+        Some(error_file) => Some(BufWriter::new(
+            File::create(error_file).context("Couldn't open error file")?,
+        )),
+        None => None,
+    };
 
-                    match format_dev_project(
-                        &[path.clone()],
-                        args.stability_check,
-                        args.write,
-                        false,
-                    ) {
-                        Ok(result) => sender.send(Message::Finished { result, path }),
-                        Err(error) => sender.send(Message::Failed { error, path }),
-                    }
-                    .unwrap();
+    #[allow(clippy::print_stdout)]
+    for project_path in project_paths {
+        bar.suspend(|| println!("Starting {}", project_path.display()));
+
+        match format_dev_project(
+            &[project_path.clone()],
+            args.stability_check,
+            args.write,
+            false,
+        ) {
+            Ok(result) => {
+                total_errors += result.error_count();
+                total_files += result.file_count;
+
+                bar.suspend(|| {
+                    println!(
+                        "Finished {} with {} files (similarity index {:.3}) in {:.2}s",
+                        project_path.display(),
+                        result.file_count,
+                        result.statistics.similarity_index(),
+                        result.duration.as_secs_f32(),
+                    );
+                    println!("{}", result.display(args.format).to_string().trim_end());
                 });
+                if let Some(error_file) = &mut error_file {
+                    write!(error_file, "{}", result.display(args.format)).unwrap();
+                    error_file.flush().unwrap();
+                }
+
+                bar.inc(1);
+            }
+            Err(error) => {
+                bar.suspend(|| println!("Failed {}: {}", project_path.display(), error));
+                bar.inc(1);
             }
         }
-
-        // Main thread, writing to stdout
-        #[allow(clippy::print_stdout)]
-        scope.spawn(|_| {
-            let mut error_file = args.error_file.as_ref().map(|error_file| {
-                BufWriter::new(File::create(error_file).expect("Couldn't open error file"))
-            });
-
-            let bar = ProgressBar::new(num_projects as u64);
-            for message in receiver {
-                match message {
-                    Message::Start { path } => {
-                        bar.suspend(|| println!("Starting {}", path.display()));
-                    }
-                    Message::Finished { path, result } => {
-                        total_errors += result.error_count();
-                        total_files += result.file_count;
-
-                        bar.suspend(|| {
-                            println!(
-                                "Finished {} with {} files (similarity index {:.3}) in {:.2}s",
-                                path.display(),
-                                result.file_count,
-                                result.statistics.similarity_index(),
-                                result.duration.as_secs_f32(),
-                            );
-                        });
-                        bar.suspend(|| print!("{}", result.display(args.format)));
-                        if let Some(error_file) = &mut error_file {
-                            write!(error_file, "{}", result.display(args.format)).unwrap();
-                        }
-                        bar.inc(1);
-                    }
-                    Message::Failed { path, error } => {
-                        bar.suspend(|| println!("Failed {}: {}", path.display(), error));
-                        bar.inc(1);
-                    }
-                }
-            }
-            bar.finish();
-        });
-    });
+    }
 
     let duration = start.elapsed();
 
@@ -311,7 +287,7 @@ fn format_dev_multi_project(args: &Args) -> bool {
         );
     }
 
-    total_errors == 0
+    Ok(total_errors == 0)
 }
 
 fn format_dev_project(

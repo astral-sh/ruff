@@ -15,22 +15,30 @@ use crate::checkers::ast::Checker;
 /// the value can be something else Python considers falsy, such as `None` or
 /// `0` or another empty container, then the code is not equivalent.
 ///
+/// ## Known problems
+/// High false positive rate, as the check is context-insensitive and does not
+/// consider the type of the variable being compared ([#4282]).
+///
 /// ## Example
 /// ```python
-/// def foo(x):
-///     if x == "":
-///         print("x is empty")
+/// x: str = ...
+///
+/// if x == "":
+///     print("x is empty")
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// def foo(x):
-///     if not x:
-///         print("x is empty")
+/// x: str = ...
+///
+/// if not x:
+///     print("x is empty")
 /// ```
 ///
 /// ## References
 /// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
+///
+/// [#4282]: https://github.com/astral-sh/ruff/issues/4282
 #[violation]
 pub struct CompareToEmptyString {
     existing: String,

@@ -1,8 +1,5 @@
-use ruff_text_size::TextRange;
-
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::Scope;
 
 /// ## What it does
 /// Checks for undefined names in `__all__`.
@@ -36,7 +33,7 @@ use ruff_python_semantic::Scope;
 /// - [Python documentation: `__all__`](https://docs.python.org/3/tutorial/modules.html#importing-from-a-package)
 #[violation]
 pub struct UndefinedExport {
-    name: String,
+    pub name: String,
 }
 
 impl Violation for UndefinedExport {
@@ -45,20 +42,4 @@ impl Violation for UndefinedExport {
         let UndefinedExport { name } = self;
         format!("Undefined name `{name}` in `__all__`")
     }
-}
-
-/// F822
-pub(crate) fn undefined_export(name: &str, range: TextRange, scope: &Scope) -> Vec<Diagnostic> {
-    let mut diagnostics = Vec::new();
-    if !scope.uses_star_imports() {
-        if !scope.has(name) {
-            diagnostics.push(Diagnostic::new(
-                UndefinedExport {
-                    name: (*name).to_string(),
-                },
-                range,
-            ));
-        }
-    }
-    diagnostics
 }

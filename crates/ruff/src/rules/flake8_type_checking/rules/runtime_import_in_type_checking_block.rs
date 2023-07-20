@@ -4,7 +4,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::{NodeId, ReferenceId, Scope};
+use ruff_python_semantic::{NodeId, ResolvedReferenceId, Scope};
 
 use crate::autofix;
 use crate::checkers::ast::Checker;
@@ -180,7 +180,7 @@ struct Import<'a> {
     /// The qualified name of the import (e.g., `typing.List` for `from typing import List`).
     qualified_name: &'a str,
     /// The first reference to the imported symbol.
-    reference_id: ReferenceId,
+    reference_id: ResolvedReferenceId,
     /// The trimmed range of the import (e.g., `List` in `from typing import List`).
     range: TextRange,
     /// The range of the import's parent statement.

@@ -397,7 +397,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [PyTorch](https://github.com/pytorch/pytorch)
 - [Pydantic](https://github.com/pydantic/pydantic)
 - [Pylint](https://github.com/PyCQA/pylint)
-- [Pynecone](https://github.com/pynecone-io/pynecone)
+- [Reflex](https://github.com/reflex-dev/reflex)
 - [Robyn](https://github.com/sansyrox/robyn)
 - Scale AI ([Launch SDK](https://github.com/scaleapi/launch-python-client))
 - Snowflake ([SnowCLI](https://github.com/Snowflake-Labs/snowcli))

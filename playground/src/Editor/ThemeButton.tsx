@@ -2,6 +2,7 @@
  * Button to toggle between light and dark mode themes.
  */
 import { Theme } from "./theme";
+import AstralButton from "./AstralButton";
 
 export default function ThemeButton({
   theme,
@@ -11,9 +12,9 @@ export default function ThemeButton({
   onChange: (theme: Theme) => void;
 }) {
   return (
-    <button
+    <AstralButton
       type="button"
-      className="ml-4 sm:ml-0 ring-1 ring-gray-900/5 shadow-sm hover:bg-gray-50 dark:ring-0 dark:bg-gray-800 dark:hover:bg-gray-700 dark:shadow-highlight/4 group focus:outline-none focus-visible:ring-2 rounded-md focus-visible:ring-ayu-accent dark:focus-visible:ring-2 dark:focus-visible:ring-gray-400"
+      className="ml-4 sm:ml-0 shadow-sm"
       onClick={() => onChange(theme === "light" ? "dark" : "light")}
     >
       <span className="sr-only">
@@ -27,7 +28,7 @@ export default function ThemeButton({
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
-        className="stroke-ayu-accent fill-ayu-accent/10 group-hover:stroke-ayu-accent/80 dark:stroke-gray-400 dark:fill-gray-400/20 dark:group-hover:stroke-gray-300"
+        className="stroke-black hover:stroke-radiate hover:fill-black fill-radiate"
       >
         <g className="dark:opacity-0">
           <path d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"></path>
@@ -44,6 +45,6 @@ export default function ThemeButton({
           />
         </g>
       </svg>
-    </button>
+    </AstralButton>
   );
 }

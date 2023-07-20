@@ -100,6 +100,14 @@ if node.module0123456789:
     ):
         print("Bad module!")
 
+# SIM102
+# Regression test for https://github.com/apache/airflow/blob/145b16caaa43f0c42bffd97344df916c602cddde/airflow/configuration.py#L1161
+if a:
+    if b:
+        if c:
+            print("if")
+elif d:
+    print("elif")
 
 # OK
 if a:

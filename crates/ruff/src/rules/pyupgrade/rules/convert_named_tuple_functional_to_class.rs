@@ -170,6 +170,7 @@ fn create_class_def_stmt(typename: &str, body: Vec<Stmt>, base_class: &Expr) -> 
         bases: vec![base_class.clone()],
         keywords: vec![],
         body,
+        type_params: vec![],
         decorator_list: vec![],
         range: TextRange::default(),
     }

@@ -283,7 +283,7 @@ aaaaaaaaaaaaaa + [
 ]
 (
     aaaaaaaaaaaaaa
-    + (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
+    + (a for x in bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)
 )
 aaaaaaaaaaaaaa + {
     a

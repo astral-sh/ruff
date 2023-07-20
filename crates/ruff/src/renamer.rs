@@ -245,6 +245,7 @@ impl Renamer {
             | BindingKind::NamedExprAssignment
             | BindingKind::UnpackedAssignment
             | BindingKind::Assignment
+            | BindingKind::BoundException
             | BindingKind::LoopVar
             | BindingKind::Global
             | BindingKind::Nonlocal(_)

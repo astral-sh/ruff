@@ -2,8 +2,8 @@ use std::iter::Peekable;
 
 use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::{
-    Alias, Arg, ArgWithDefault, Arguments, Comprehension, Decorator, ExceptHandler, Expr, Keyword,
-    MatchCase, Mod, Pattern, Ranged, Stmt, WithItem,
+    Alias, Arg, ArgWithDefault, Arguments, Comprehension, Decorator, ElifElseClause, ExceptHandler,
+    Expr, Keyword, MatchCase, Mod, Pattern, Ranged, Stmt, WithItem,
 };
 
 use ruff_formatter::{SourceCode, SourceCodeSlice};
@@ -13,7 +13,7 @@ use ruff_python_ast::source_code::{CommentRanges, Locator};
 // pre-order.
 #[allow(clippy::wildcard_imports)]
 use ruff_python_ast::visitor::preorder::*;
-use ruff_python_whitespace::is_python_whitespace;
+use ruff_python_trivia::is_python_whitespace;
 
 use crate::comments::node_key::NodeRefEqualityKey;
 use crate::comments::placement::place_comment;
@@ -283,6 +283,13 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast> {
             walk_pattern(self, pattern);
         }
         self.finish_node(pattern);
+    }
+
+    fn visit_elif_else_clause(&mut self, elif_else_clause: &'ast ElifElseClause) {
+        if self.start_node(elif_else_clause).is_traverse() {
+            walk_elif_else_clause(self, elif_else_clause);
+        }
+        self.finish_node(elif_else_clause);
     }
 }
 

@@ -2,7 +2,7 @@ use ruff_text_size::{TextLen, TextRange};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_whitespace::NewlineWithTrailingNewline;
+use ruff_python_trivia::NewlineWithTrailingNewline;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;

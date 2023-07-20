@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::iter;
 
 use rustpython_parser::ast::{self, ExceptHandler, Stmt};
 
@@ -42,7 +43,17 @@ fn common_ancestor(
 /// Return the alternative branches for a given node.
 fn alternatives(stmt: &Stmt) -> Vec<Vec<&Stmt>> {
     match stmt {
-        Stmt::If(ast::StmtIf { body, .. }) => vec![body.iter().collect()],
+        Stmt::If(ast::StmtIf {
+            body,
+            elif_else_clauses,
+            ..
+        }) => iter::once(body.iter().collect())
+            .chain(
+                elif_else_clauses
+                    .iter()
+                    .map(|clause| clause.body.iter().collect()),
+            )
+            .collect(),
         Stmt::Try(ast::StmtTry {
             body,
             handlers,

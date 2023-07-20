@@ -1,16 +1,20 @@
-if x == y: # trailing if condition
-    pass # trailing `pass` comment
-    # Root `if` trailing comment
+# 1 leading if comment
+if x == y:  # 2 trailing if condition
+    # 3 leading pass
+    pass  # 4 end-of-line trailing `pass` comment
+    # 5 Root `if` trailing comment
 
-# Leading elif comment
-elif x < y: # trailing elif condition
-    pass
-    # `elif` trailing comment
+# 6 Leading elif comment
+elif x < y:  # 7 trailing elif condition
+    # 8 leading pass
+    pass # 9 end-of-line trailing `pass` comment
+    # 10 `elif` trailing comment
 
-# Leading else comment
-else: # trailing else condition
-    pass
-    # `else` trailing comment
+# 11 Leading else comment
+else:  # 12 trailing else condition
+    # 13 leading pass
+    pass # 14 end-of-line trailing `pass` comment
+    # 15 `else` trailing comment
 
 
 if x == y:
@@ -71,3 +75,14 @@ else:  # Comment
     if False:
         pass
     pass
+
+
+# Regression test for `last_child_in_body` special casing of `StmtIf`
+# https://github.com/python/cpython/blob/aecf6aca515a203a823a87c711f15cbb82097c8b/Lib/test/test_pty.py#L260-L275
+def f():
+    if True:
+        pass
+    else:
+        pass
+
+        # comment

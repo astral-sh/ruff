@@ -361,6 +361,46 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtDelete {
     }
 }
 
+impl FormatRule<ast::StmtTypeAlias, PyFormatContext<'_>>
+    for crate::statement::stmt_type_alias::FormatStmtTypeAlias
+{
+    #[inline]
+    fn fmt(
+        &self,
+        node: &ast::StmtTypeAlias,
+        f: &mut Formatter<PyFormatContext<'_>>,
+    ) -> FormatResult<()> {
+        FormatNodeRule::<ast::StmtTypeAlias>::fmt(self, node, f)
+    }
+}
+impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StmtTypeAlias {
+    type Format<'a> = FormatRefWithRule<
+        'a,
+        ast::StmtTypeAlias,
+        crate::statement::stmt_type_alias::FormatStmtTypeAlias,
+        PyFormatContext<'ast>,
+    >;
+    fn format(&self) -> Self::Format<'_> {
+        FormatRefWithRule::new(
+            self,
+            crate::statement::stmt_type_alias::FormatStmtTypeAlias::default(),
+        )
+    }
+}
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtTypeAlias {
+    type Format = FormatOwnedWithRule<
+        ast::StmtTypeAlias,
+        crate::statement::stmt_type_alias::FormatStmtTypeAlias,
+        PyFormatContext<'ast>,
+    >;
+    fn into_format(self) -> Self::Format {
+        FormatOwnedWithRule::new(
+            self,
+            crate::statement::stmt_type_alias::FormatStmtTypeAlias::default(),
+        )
+    }
+}
+
 impl FormatRule<ast::StmtAssign, PyFormatContext<'_>>
     for crate::statement::stmt_assign::FormatStmtAssign
 {
@@ -2932,5 +2972,45 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::Decorator {
     >;
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, crate::other::decorator::FormatDecorator::default())
+    }
+}
+
+impl FormatRule<ast::ElifElseClause, PyFormatContext<'_>>
+    for crate::other::elif_else_clause::FormatElifElseClause
+{
+    #[inline]
+    fn fmt(
+        &self,
+        node: &ast::ElifElseClause,
+        f: &mut Formatter<PyFormatContext<'_>>,
+    ) -> FormatResult<()> {
+        FormatNodeRule::<ast::ElifElseClause>::fmt(self, node, f)
+    }
+}
+impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ElifElseClause {
+    type Format<'a> = FormatRefWithRule<
+        'a,
+        ast::ElifElseClause,
+        crate::other::elif_else_clause::FormatElifElseClause,
+        PyFormatContext<'ast>,
+    >;
+    fn format(&self) -> Self::Format<'_> {
+        FormatRefWithRule::new(
+            self,
+            crate::other::elif_else_clause::FormatElifElseClause::default(),
+        )
+    }
+}
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ElifElseClause {
+    type Format = FormatOwnedWithRule<
+        ast::ElifElseClause,
+        crate::other::elif_else_clause::FormatElifElseClause,
+        PyFormatContext<'ast>,
+    >;
+    fn into_format(self) -> Self::Format {
+        FormatOwnedWithRule::new(
+            self,
+            crate::other::elif_else_clause::FormatElifElseClause::default(),
+        )
     }
 }

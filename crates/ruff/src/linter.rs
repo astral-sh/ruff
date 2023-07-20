@@ -214,6 +214,7 @@ pub fn check_path(
     {
         let ignored = check_noqa(
             &mut diagnostics,
+            path,
             locator,
             indexer.comment_ranges(),
             &directives.noqa_line_for,
@@ -320,6 +321,7 @@ pub fn lint_only(
     package: Option<&Path>,
     settings: &Settings,
     noqa: flags::Noqa,
+    source_kind: Option<&SourceKind>,
 ) -> LinterResult<(Vec<Message>, Option<ImportMap>)> {
     // Tokenize once.
     let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents);
@@ -352,7 +354,7 @@ pub fn lint_only(
         &directives,
         settings,
         noqa,
-        None,
+        source_kind,
     );
 
     result.map(|(diagnostics, imports)| {

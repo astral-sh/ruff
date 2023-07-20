@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use std::fmt::{Debug, Formatter};
 use std::ops::Deref;
 
@@ -24,6 +25,21 @@ impl CommentRanges {
                 }
             })
             .is_ok()
+    }
+
+    /// Returns the comments who are within the range
+    pub fn comments_in_range(&self, range: TextRange) -> &[TextRange] {
+        let start = self
+            .raw
+            .partition_point(|comment| comment.start() < range.start());
+        // We expect there are few comments, so switching to find should be faster
+        match self.raw[start..]
+            .iter()
+            .find_position(|comment| comment.end() > range.end())
+        {
+            Some((in_range, _element)) => &self.raw[start..start + in_range],
+            None => &self.raw[start..],
+        }
     }
 }
 

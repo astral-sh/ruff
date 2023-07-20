@@ -68,10 +68,19 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
     let mut complexity = 0;
     for stmt in stmts {
         match stmt {
-            Stmt::If(ast::StmtIf { body, orelse, .. }) => {
+            Stmt::If(ast::StmtIf {
+                body,
+                elif_else_clauses,
+                ..
+            }) => {
                 complexity += 1;
                 complexity += get_complexity_number(body);
-                complexity += get_complexity_number(orelse);
+                for clause in elif_else_clauses {
+                    if clause.test.is_some() {
+                        complexity += 1;
+                    }
+                    complexity += get_complexity_number(&clause.body);
+                }
             }
             Stmt::For(ast::StmtFor { body, orelse, .. })
             | Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. }) => {

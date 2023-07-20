@@ -13,7 +13,7 @@ use ruff_python_ast::docstrings::{clean_space, leading_space};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::is_staticmethod;
 use ruff_python_semantic::{Definition, Member, MemberKind};
-use ruff_python_whitespace::{NewlineWithTrailingNewline, PythonWhitespace};
+use ruff_python_trivia::{NewlineWithTrailingNewline, PythonWhitespace};
 use ruff_textwrap::dedent;
 
 use crate::checkers::ast::Checker;

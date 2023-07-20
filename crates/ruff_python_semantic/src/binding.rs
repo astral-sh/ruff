@@ -5,23 +5,26 @@ use ruff_text_size::TextRange;
 use rustpython_parser::ast::Ranged;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
+use ruff_python_ast::source_code::Locator;
 
 use crate::context::ExecutionContext;
 use crate::model::SemanticModel;
 use crate::node::NodeId;
-use crate::reference::ReferenceId;
+use crate::reference::ResolvedReferenceId;
 use crate::ScopeId;
 
 #[derive(Debug, Clone)]
 pub struct Binding<'a> {
     pub kind: BindingKind<'a>,
     pub range: TextRange,
+    /// The [`ScopeId`] of the scope in which the [`Binding`] was defined.
+    pub scope: ScopeId,
     /// The context in which the [`Binding`] was created.
     pub context: ExecutionContext,
     /// The statement in which the [`Binding`] was defined.
     pub source: Option<NodeId>,
     /// The references to the [`Binding`].
-    pub references: Vec<ReferenceId>,
+    pub references: Vec<ResolvedReferenceId>,
     /// The exceptions that were handled when the [`Binding`] was defined.
     pub exceptions: Exceptions,
     /// Flags for the [`Binding`].
@@ -35,7 +38,7 @@ impl<'a> Binding<'a> {
     }
 
     /// Returns an iterator over all references for the current [`Binding`].
-    pub fn references(&self) -> impl Iterator<Item = ReferenceId> + '_ {
+    pub fn references(&self) -> impl Iterator<Item = ResolvedReferenceId> + '_ {
         self.references.iter().copied()
     }
 
@@ -68,6 +71,18 @@ impl<'a> Binding<'a> {
     /// declared by a `global` statement, or shadows a [`Binding`] declared by a `global` statement.
     pub const fn is_global(&self) -> bool {
         self.flags.contains(BindingFlags::GLOBAL)
+    }
+
+    /// Return `true` if this [`Binding`] represents an assignment to `__all__` with an invalid
+    /// value (e.g., `__all__ = "Foo"`).
+    pub const fn is_invalid_all_format(&self) -> bool {
+        self.flags.contains(BindingFlags::INVALID_ALL_FORMAT)
+    }
+
+    /// Return `true` if this [`Binding`] represents an assignment to `__all__` that includes an
+    /// invalid member (e.g., `__all__ = ["Foo", 1]`).
+    pub const fn is_invalid_all_object(&self) -> bool {
+        self.flags.contains(BindingFlags::INVALID_ALL_OBJECT)
     }
 
     /// Return `true` if this [`Binding`] represents an unbound variable
@@ -163,6 +178,11 @@ impl<'a> Binding<'a> {
         }
     }
 
+    /// Returns the name of the binding (e.g., `x` in `x = 1`).
+    pub fn name<'b>(&self, locator: &'b Locator) -> &'b str {
+        locator.slice(self.range)
+    }
+
     /// Returns the range of the binding's parent.
     pub fn parent_range(&self, semantic: &SemanticModel) -> Option<TextRange> {
         self.source
@@ -226,6 +246,24 @@ bitflags! {
         ///     x = 1
         /// ```
         const GLOBAL = 1 << 4;
+
+        /// The binding represents an export via `__all__`, but the assigned value uses an invalid
+        /// expression (i.e., a non-container type).
+        ///
+        /// For example:
+        /// ```python
+        /// __all__ = 1
+        /// ```
+        const INVALID_ALL_FORMAT = 1 << 5;
+
+        /// The binding represents an export via `__all__`, but the assigned value contains an
+        /// invalid member (i.e., a non-string).
+        ///
+        /// For example:
+        /// ```python
+        /// __all__ = [1]
+        /// ```
+        const INVALID_ALL_OBJECT = 1 << 6;
     }
 }
 
@@ -275,7 +313,7 @@ impl<'a> FromIterator<Binding<'a>> for Bindings<'a> {
 #[derive(Debug, Clone)]
 pub struct Export<'a> {
     /// The names of the bindings exported via `__all__`.
-    pub names: Vec<&'a str>,
+    pub names: Box<[&'a str]>,
 }
 
 /// A binding for an `import`, keyed on the name to which the import is bound.
@@ -417,7 +455,16 @@ pub enum BindingKind<'a> {
     /// ```
     Deletion,
 
-    /// A binding to unbind the local variable, like `x` in:
+    /// A binding to bind an exception to a local variable, like `x` in:
+    /// ```python
+    /// try:
+    ///    ...
+    /// except Exception as x:
+    ///   ...
+    /// ```
+    BoundException,
+
+    /// A binding to unbind a bound local exception, like `x` in:
     /// ```python
     /// try:
     ///    ...
@@ -427,7 +474,6 @@ pub enum BindingKind<'a> {
     ///
     /// After the `except` block, `x` is unbound, despite the lack
     /// of an explicit `del` statement.
-    ///
     ///
     /// Stores the ID of the binding that was shadowed in the enclosing
     /// scope, if any.

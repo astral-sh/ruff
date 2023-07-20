@@ -134,7 +134,7 @@ with match() as match:
  
  
  def get_grammars(target_versions: Set[TargetVersion]) -> List[Grammar]:
-@@ -23,13 +23,11 @@
+@@ -23,11 +23,7 @@
              pygram.python_grammar,
          ]
  
@@ -145,14 +145,9 @@ with match() as match:
 -                    pass
 +    NOT_YET_IMPLEMENTED_StmtMatch
  
--    if all(version.is_python2() for version in target_versions):
-+    if all(
-+        (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
-+    ):
+     if all(version.is_python2() for version in target_versions):
          # Python 2-only code, so try Python 2 grammars.
-         return [
-             # Python 2.7 with future print_function import
-@@ -41,13 +39,11 @@
+@@ -41,13 +37,11 @@
      re.match()
      match = a
      with match() as match:
@@ -168,7 +163,7 @@ with match() as match:
          self.assertIs(x, False)
          self.assertEqual(y, 0)
          self.assertIs(z, x)
-@@ -72,16 +68,12 @@
+@@ -72,16 +66,12 @@
      def test_patma_155(self):
          x = 0
          y = None
@@ -187,7 +182,7 @@ with match() as match:
  
      # At least one of the above branches must have been taken, because every Python
      # version has exactly one of the two 'ASYNC_*' flags
-@@ -99,9 +91,9 @@
+@@ -99,9 +89,9 @@
  re.match()
  match = a
  with match() as match:
@@ -231,9 +226,7 @@ def get_grammars(target_versions: Set[TargetVersion]) -> List[Grammar]:
 
     NOT_YET_IMPLEMENTED_StmtMatch
 
-    if all(
-        (NOT_YET_IMPLEMENTED_generator_key for NOT_YET_IMPLEMENTED_generator_key in [])
-    ):
+    if all(version.is_python2() for version in target_versions):
         # Python 2-only code, so try Python 2 grammars.
         return [
             # Python 2.7 with future print_function import

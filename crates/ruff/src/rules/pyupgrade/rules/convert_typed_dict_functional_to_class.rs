@@ -127,6 +127,7 @@ fn create_class_def_stmt(
         bases: vec![base_class.clone()],
         keywords,
         body,
+        type_params: vec![],
         decorator_list: vec![],
         range: TextRange::default(),
     }

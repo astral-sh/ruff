@@ -1,145 +1,232 @@
-import { useCallback, useEffect, useState } from "react";
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { DEFAULT_PYTHON_SOURCE } from "../constants";
-import init, {
-  check,
-  Diagnostic,
-  currentVersion,
-  defaultSettings,
-} from "../pkg";
+import init, { Diagnostic, Workspace } from "../pkg";
 import { ErrorMessage } from "./ErrorMessage";
 import Header from "./Header";
 import { useTheme } from "./theme";
 import { persist, restore, stringify } from "./settings";
 import SettingsEditor from "./SettingsEditor";
 import SourceEditor from "./SourceEditor";
-import MonacoThemes from "./MonacoThemes";
+import { Panel, PanelGroup } from "react-resizable-panels";
+import PrimarySideBar from "./PrimarySideBar";
+import SecondarySideBar from "./SecondarySideBar";
+import { HorizontalResizeHandle } from "./ResizeHandle";
+import SecondaryPanel, {
+  SecondaryPanelResult,
+  SecondaryTool,
+} from "./SecondaryPanel";
 
 type Tab = "Source" | "Settings";
 
+interface Source {
+  pythonSource: string;
+  settingsSource: string;
+  revision: number;
+}
+
+interface CheckResult {
+  diagnostics: Diagnostic[];
+  error: string | null;
+  secondary: SecondaryPanelResult;
+}
+
 export default function Editor() {
-  const [initialized, setInitialized] = useState<boolean>(false);
-  const [version, setVersion] = useState<string | null>(null);
+  const [ruffVersion, setRuffVersion] = useState<string | null>(null);
+  const [checkResult, setCheckResult] = useState<CheckResult>({
+    diagnostics: [],
+    error: null,
+    secondary: null,
+  });
+  const [source, setSource] = useState<Source>({
+    pythonSource: "",
+    settingsSource: "",
+    revision: 0,
+  });
+
   const [tab, setTab] = useState<Tab>("Source");
-  const [edit, setEdit] = useState<number>(0);
-  const [settingsSource, setSettingsSource] = useState<string | null>(null);
-  const [pythonSource, setPythonSource] = useState<string | null>(null);
-  const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
-  const [error, setError] = useState<string | null>(null);
   const [theme, setTheme] = useTheme();
+  const [secondaryTool, setSecondaryTool] = useState<SecondaryTool | null>(
+    null,
+  );
+
+  const initialized = ruffVersion != null;
 
   useEffect(() => {
-    init().then(() => setInitialized(true));
+    init().then(() => {
+      setRuffVersion(Workspace.version());
+
+      const [settingsSource, pythonSource] = restore() ?? [
+        stringify(Workspace.defaultSettings()),
+        DEFAULT_PYTHON_SOURCE,
+      ];
+
+      setSource({
+        pythonSource,
+        revision: 0,
+        settingsSource,
+      });
+    });
   }, []);
 
-  useEffect(() => {
-    if (!initialized || settingsSource == null || pythonSource == null) {
-      return;
-    }
-
-    let config: any;
-    let diagnostics: Diagnostic[];
-
-    try {
-      config = JSON.parse(settingsSource);
-    } catch (e) {
-      setDiagnostics([]);
-      setError((e as Error).message);
-      return;
-    }
-
-    try {
-      diagnostics = check(pythonSource, config);
-    } catch (e) {
-      setError(e as string);
-      return;
-    }
-
-    setError(null);
-    setDiagnostics(diagnostics);
-  }, [initialized, settingsSource, pythonSource]);
+  const deferredSource = useDeferredValue(source);
 
   useEffect(() => {
     if (!initialized) {
       return;
     }
 
-    if (settingsSource == null || pythonSource == null) {
-      const payload = restore();
-      if (payload) {
-        const [settingsSource, pythonSource] = payload;
-        setSettingsSource(settingsSource);
-        setPythonSource(pythonSource);
-      } else {
-        setSettingsSource(stringify(defaultSettings()));
-        setPythonSource(DEFAULT_PYTHON_SOURCE);
+    const { settingsSource, pythonSource } = deferredSource;
+
+    try {
+      const config = JSON.parse(settingsSource);
+      const workspace = new Workspace(config);
+      const diagnostics = workspace.check(pythonSource);
+
+      let secondary: SecondaryPanelResult = null;
+
+      try {
+        switch (secondaryTool) {
+          case "AST":
+            secondary = {
+              status: "ok",
+              content: workspace.parse(pythonSource),
+            };
+            break;
+
+          case "Format":
+            secondary = {
+              status: "ok",
+              content: workspace.format(pythonSource),
+            };
+            break;
+
+          case "FIR":
+            secondary = {
+              status: "ok",
+              content: workspace.format_ir(pythonSource),
+            };
+            break;
+
+          case "Tokens":
+            secondary = {
+              status: "ok",
+              content: workspace.tokens(pythonSource),
+            };
+            break;
+        }
+      } catch (error: unknown) {
+        secondary = {
+          status: "error",
+          error: error instanceof Error ? error.message : error + "",
+        };
       }
-    }
-  }, [initialized, settingsSource, pythonSource]);
 
-  useEffect(() => {
+      setCheckResult({
+        diagnostics,
+        error: null,
+        secondary,
+      });
+    } catch (e) {
+      setCheckResult({
+        diagnostics: [],
+        error: (e as Error).message,
+        secondary: null,
+      });
+    }
+  }, [initialized, deferredSource, secondaryTool]);
+
+  const handleShare = useMemo(() => {
     if (!initialized) {
-      return;
+      return undefined;
     }
 
-    setVersion(currentVersion());
-  }, [initialized]);
-
-  const handleShare = useCallback(() => {
-    if (!initialized || settingsSource == null || pythonSource == null) {
-      return;
-    }
-
-    persist(settingsSource, pythonSource);
-  }, [initialized, settingsSource, pythonSource]);
+    return () => {
+      persist(source.settingsSource, source.pythonSource);
+    };
+  }, [source, initialized]);
 
   const handlePythonSourceChange = useCallback((pythonSource: string) => {
-    setEdit((edit) => edit + 1);
-    setPythonSource(pythonSource);
+    setSource((state) => ({
+      ...state,
+      pythonSource,
+      revision: state.revision + 1,
+    }));
   }, []);
 
   const handleSettingsSourceChange = useCallback((settingsSource: string) => {
-    setEdit((edit) => edit + 1);
-    setSettingsSource(settingsSource);
+    setSource((state) => ({
+      ...state,
+      settingsSource,
+      revision: state.revision + 1,
+    }));
   }, []);
 
+  // useMonacoTheme();
+
   return (
-    <main
-      className={
-        "h-full w-full flex flex-auto bg-ayu-background dark:bg-ayu-background-dark"
-      }
-    >
+    <main className="flex flex-col h-full bg-ayu-background dark:bg-ayu-background-dark">
       <Header
-        edit={edit}
-        tab={tab}
+        edit={source.revision}
         theme={theme}
-        version={version}
-        onChangeTab={setTab}
+        version={ruffVersion}
         onChangeTheme={setTheme}
-        onShare={initialized ? handleShare : undefined}
+        onShare={handleShare}
       />
 
-      <MonacoThemes />
-
-      <div className={"mt-12 relative flex-auto"}>
-        {initialized && settingsSource != null && pythonSource != null ? (
-          <>
-            <SourceEditor
-              visible={tab === "Source"}
-              source={pythonSource}
-              theme={theme}
-              diagnostics={diagnostics}
-              onChange={handlePythonSourceChange}
+      <div className="flex flex-grow">
+        {initialized ? (
+          <PanelGroup direction="horizontal" autoSaveId="main">
+            <PrimarySideBar
+              onSelectTool={(tool) => setTab(tool)}
+              selected={tab}
             />
-            <SettingsEditor
-              visible={tab === "Settings"}
-              source={settingsSource}
-              theme={theme}
-              onChange={handleSettingsSourceChange}
+            <Panel id="main" order={0} className="my-2">
+              <SourceEditor
+                visible={tab === "Source"}
+                source={source.pythonSource}
+                theme={theme}
+                diagnostics={checkResult.diagnostics}
+                onChange={handlePythonSourceChange}
+              />
+              <SettingsEditor
+                visible={tab === "Settings"}
+                source={source.settingsSource}
+                theme={theme}
+                onChange={handleSettingsSourceChange}
+              />
+            </Panel>
+            {secondaryTool != null && (
+              <>
+                <HorizontalResizeHandle />
+                <Panel id="secondary-panel" order={1} className={"my-2"}>
+                  <SecondaryPanel
+                    theme={theme}
+                    tool={secondaryTool}
+                    result={checkResult.secondary}
+                  />
+                </Panel>
+              </>
+            )}
+            <SecondarySideBar
+              selected={secondaryTool}
+              onSelected={(tool) => {
+                if (secondaryTool === tool) {
+                  setSecondaryTool(null);
+                } else {
+                  setSecondaryTool(tool);
+                }
+              }}
             />
-          </>
+          </PanelGroup>
         ) : null}
       </div>
-      {error && tab === "Source" ? (
+      {checkResult.error && tab === "Source" ? (
         <div
           style={{
             position: "fixed",
@@ -148,7 +235,7 @@ export default function Editor() {
             bottom: "10%",
           }}
         >
-          <ErrorMessage>{error}</ErrorMessage>
+          <ErrorMessage>{checkResult.error}</ErrorMessage>
         </div>
       ) : null}
     </main>

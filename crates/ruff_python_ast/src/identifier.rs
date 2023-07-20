@@ -14,7 +14,7 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustpython_ast::{Alias, Arg, ArgWithDefault};
 use rustpython_parser::ast::{self, ExceptHandler, Ranged, Stmt};
 
-use ruff_python_whitespace::{is_python_whitespace, Cursor};
+use ruff_python_trivia::{is_python_whitespace, Cursor};
 
 use crate::source_code::Locator;
 
