@@ -56,6 +56,20 @@ pub enum TupleParentheses {
     /// ```
     /// Black still does use parentheses in these positions if the group breaks or magic trailing
     /// comma is used.
+    ///
+    /// Here are some more examples:
+    /// ```python
+    /// for (a,) in []:
+    /// pass
+    /// for a, b in []:
+    ///     pass
+    /// for a, b in []:  # Strips parentheses
+    ///     pass
+    /// for (
+    ///     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+    ///     b,
+    /// ) in []:
+    ///     pass
     NeverPreserve,
 }
 
