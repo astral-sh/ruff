@@ -5,7 +5,11 @@ expression: trace
 - ModModule
   - StmtTypeAlias
     - ExprName
-    - ExprName
+    - TypeParamTypeVar
+      - ExprName
+    - TypeParamTypeVar
+    - TypeParamTypeVarTuple
+    - TypeParamParamSpec
     - ExprSubscript
       - ExprName
       - ExprName

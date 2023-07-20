@@ -948,12 +948,9 @@ class A:
             ast::Mod::Module(ast::ModModule {
                 body,
                 range: _,
-                type_ignores,
+                type_ignores: _,
             }) => {
                 visitor.visit_body(body);
-                for ignore in type_ignores {
-                    visitor.visit_type_ignore(ignore);
-                }
             }
             ast::Mod::Interactive(ast::ModInteractive { body, range: _ }) => visitor.visit_body(body),
             ast::Mod::Expression(ast::ModExpression { body, range: _ }) => visitor.visit_expr(body),

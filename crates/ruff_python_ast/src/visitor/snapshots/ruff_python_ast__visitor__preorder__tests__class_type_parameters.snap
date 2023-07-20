@@ -4,7 +4,11 @@ expression: trace
 ---
 - ModModule
   - StmtClassDef
-    - ExprName
+    - TypeParamTypeVar
+      - ExprName
+    - TypeParamTypeVar
+    - TypeParamTypeVarTuple
+    - TypeParamParamSpec
     - StmtExpr
       - ExprConstant
         - Ellipsis
