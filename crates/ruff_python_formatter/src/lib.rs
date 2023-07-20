@@ -285,7 +285,7 @@ with (
         "bbbbbbbbbb",
         "cccccccccccccccccccccccccccccccccccccccccc",
         dddddddddddddddddddddddddddddddd,
-    ] as example1,
+    ] as example,
     aaaaaaaaaaaaaaaaaaaaaaaaaa
     + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
     + cccccccccccccccccccccccccccc
