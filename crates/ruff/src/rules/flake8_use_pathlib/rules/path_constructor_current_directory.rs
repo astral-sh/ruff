@@ -54,7 +54,9 @@ pub(crate) fn path_constructor_current_directory(checker: &mut Checker, expr: &E
         return;
     }
 
-    if let Expr::Call(ExprCall { args, keywords, .. }) = expr {
+    let Expr::Call(ExprCall { args, keywords, .. }) = expr else {
+        return;
+    }
         if !keywords.is_empty() || args.len() != 1 {
             return;
         }
