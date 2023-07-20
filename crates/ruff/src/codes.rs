@@ -15,7 +15,7 @@ use crate::rules;
 pub struct NoqaCode(&'static str, &'static str);
 
 impl NoqaCode {
-    /// Return the prefix for the [`NoqaCode`], e.g., `SIM` for `SIM101`.
+    /// Return the prefix for the [`NoqaCode`], e.g., `SIM` for `SIM101`. comment change
     pub fn prefix(&self) -> &str {
         self.0
     }
