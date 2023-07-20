@@ -36,7 +36,7 @@ impl NeedsParentheses for ExprYield {
         parent: AnyNodeRef,
         _context: &PyFormatContext,
     ) -> OptionalParentheses {
-        if parent.is_stmt_assign() {
+        if parent.is_stmt_assign() || parent.is_stmt_ann_assign() || parent.is_stmt_aug_assign() {
             OptionalParentheses::Multiline
         } else {
             OptionalParentheses::Always

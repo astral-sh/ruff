@@ -50,6 +50,7 @@ def foo():
         yield x + (2 * 4) # trailing comment
 
     while (
+
         yield l
     ):
         pass
