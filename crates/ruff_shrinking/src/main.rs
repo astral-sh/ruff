@@ -37,6 +37,7 @@ use ruff_python_ast::statement_visitor::{walk_body, walk_stmt, StatementVisitor}
 use ruff_python_ast::visitor::{walk_expr, Visitor};
 use rustpython_ast::text_size::TextRange;
 use rustpython_ast::{Expr, Ranged, Stmt, Suite};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 use std::str;
@@ -47,7 +48,6 @@ const STRATEGIES: &[&dyn Strategy] = &[
     (&StrategyRemoveModuleMember),
     (&StrategyRemoveStatement),
     (&StrategyRemoveExpression),
-    (&StrategyReplaceStatementWithPass),
     (&StrategyRemoveLine),
     (&StrategyRemoveNewline),
     (&StrategyRemoveToken),
@@ -159,22 +159,6 @@ impl Strategy for StrategyRemoveStatement {
         ast: &'a Suite,
     ) -> Result<Box<dyn ExactSizeStringIter + 'a>> {
         Ok(strategy_statement(input, ast, false))
-    }
-}
-
-/// A body is invalid without any statements, but maybe replacing it with a pass works.
-struct StrategyReplaceStatementWithPass;
-
-impl Strategy for StrategyReplaceStatementWithPass {
-    fn name(&self) -> &'static str {
-        "replace statement with pass"
-    }
-    fn candidates<'a>(
-        &self,
-        input: &'a str,
-        ast: &'a Suite,
-    ) -> Result<Box<dyn ExactSizeStringIter + 'a>> {
-        Ok(strategy_statement(input, ast, true))
     }
 }
 
@@ -293,7 +277,8 @@ impl Strategy for StrategyRemoveToken {
     ) -> Result<Box<dyn ExactSizeStringIter + 'a>> {
         let token_ranges: Vec<_> = ruff_rustpython::tokenize(input)
             .into_iter()
-            .map(|token| token.unwrap())
+            // At this point we know we have valid python code
+            .map(Result::unwrap)
             .filter(|token| token.1.len().to_usize() > 0)
             .map(|token| token.1)
             .collect();
@@ -435,6 +420,7 @@ fn run() -> Result<()> {
     let command_args = shlex::split(&args.command).context("Couldn't split command input")?;
 
     let loop_start = Instant::now();
+    let mut stats = HashMap::new();
 
     let mut num_iterations = 0;
     // normalize line endings for the remove newline dependent rules
@@ -453,22 +439,29 @@ fn run() -> Result<()> {
         let duration = start.elapsed();
         if let Some((strategy, idx, smaller_failure)) = smaller_failure {
             println!(
-                "Match found with {} {idx} in {:.1}s, {} bytes remaining",
+                "Match found with {} {idx} in {:.2}s, {} bytes remaining",
                 strategy.name(),
                 duration.as_secs_f32(),
                 smaller_failure.len()
             );
+            *stats.entry(strategy.name()).or_insert(0) += 1;
             input = smaller_failure;
             last_strategy_and_idx = Some((strategy, idx));
         } else {
             // The last minimization failed, write back the original content
             fs::write(&args.output_file, input.as_bytes())?;
+            println!(
+                "Last iteration in {:.2}s, {} bytes remaining",
+                duration.as_secs_f32(),
+                input.as_bytes().len()
+            );
             break;
         }
     }
 
+    println!("Strategies taken: {stats:?}");
     println!(
-        "Done with {num_iterations} iterations in {:.1}s. Find your minimized example in {}",
+        "Done with {num_iterations} iterations in {:.2}s. Find your minimized example in {}",
         loop_start.elapsed().as_secs_f32(),
         args.output_file.display()
     );
