@@ -1,7 +1,7 @@
 use rustpython_ast::{ArgWithDefault, ElifElseClause, Mod, TypeIgnore};
 use rustpython_parser::ast::{
     self, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Constant, Decorator, ExceptHandler,
-    Expr, Keyword, MatchCase, Operator, Pattern, Stmt, UnaryOp, WithItem,
+    Expr, Keyword, MatchCase, Operator, Pattern, Stmt, UnaryOp, WithItem, TypeParam, TypeParamTypeVar
 };
 
 /// Visitor that traverses all nodes recursively in pre-order.
@@ -80,6 +80,10 @@ pub trait PreorderVisitor<'a> {
         walk_with_item(self, with_item);
     }
 
+    fn visit_type_param(&mut self, type_param: &'a TypeParam) {
+        walk_type_param(self, type_param);
+    }
+    
     fn visit_match_case(&mut self, match_case: &'a MatchCase) {
         walk_match_case(self, match_case);
     }
@@ -216,6 +220,15 @@ where
             for expr in targets {
                 visitor.visit_expr(expr);
             }
+        }
+
+        Stmt::TypeAlias(ast::StmtTypeAlias { range: _range, name, type_params, value } ) => {
+            visitor.visit_expr(name);
+            for type_param in type_params {
+                visitor.visit_type_param(type_param);
+            }
+
+            visitor.visit_expr(value);
         }
 
         Stmt::Assign(ast::StmtAssign {
@@ -805,6 +818,18 @@ where
     }
 }
 
+pub fn walk_type_param<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, type_param: &'a TypeParam) {
+    match type_param {
+        TypeParam::TypeVar(TypeParamTypeVar {bound, name: _, range: _}) => {
+            if let Some(expr) = bound {
+                visitor.visit_expr(expr);
+            }
+        }
+        TypeParam::TypeVarTuple(_) => {}
+        TypeParam::ParamSpec(_) => {}
+    }
+}
+
 pub fn walk_match_case<'a, V>(visitor: &mut V, match_case: &'a MatchCase)
 where
     V: PreorderVisitor<'a> + ?Sized,
@@ -815,6 +840,8 @@ where
     }
     visitor.visit_body(&match_case.body);
 }
+
+
 
 pub fn walk_pattern<'a, V>(visitor: &mut V, pattern: &'a Pattern)
 where
