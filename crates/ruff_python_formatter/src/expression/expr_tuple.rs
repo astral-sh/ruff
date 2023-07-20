@@ -29,15 +29,21 @@ pub enum TupleParentheses {
 
     /// Handle the special cases where we don't include parentheses at all.
     ///
+    ///
     /// Black never formats tuple targets of for loops with parentheses if inside a comprehension.
+    /// For example, tuple targets will always be formatted on the same line, except when an element supports
+    /// line-breaking in an un-parenthesized context.
     /// ```python
-    /// {k: v for k, v in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension}
-    /// ```
-    /// Becomes
-    /// ```python
+    /// # Input
+    /// {k: v for x, (k, v) in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension}
+    ///
+    /// # Black
     /// {
     ///     k: v
-    ///     for k, v in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
+    ///     for x, (
+    ///         k,
+    ///         v,
+    ///     ) in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
     /// }
     /// ```
     Never,
