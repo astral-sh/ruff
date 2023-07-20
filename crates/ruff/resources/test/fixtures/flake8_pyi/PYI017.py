@@ -1,20 +1,14 @@
 var: int
-a = var # Ok
-
+a = var  # OK
 
 b = c = int  # OK
 
-
 a.b = int  # OK
 
+d, e = int, str  # OK
 
-d, e = int, str # OK
+f, g, h = int, str, TypeVar("T")  # OK
 
+i: TypeAlias = int | str  # OK
 
-f, g, h = int, str, TypeVar("T") # OK
-
-
-i: TypeAlias = int | str # Ok
-
-
-j: TypeAlias = int # Ok
+j: TypeAlias = int  # OK

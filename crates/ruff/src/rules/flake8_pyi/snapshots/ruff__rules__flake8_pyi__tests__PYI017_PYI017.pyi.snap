@@ -1,28 +1,44 @@
 ---
 source: crates/ruff/src/rules/flake8_pyi/mod.rs
 ---
-PYI017.pyi:5:1: PYI017 Stubs should not contain assignments to attributes or multiple targets.
+PYI017.pyi:4:1: PYI017 Stubs should not contain assignments to attributes or multiple targets
   |
-5 | b = c = int  # PYI017
+2 | a = var  # OK
+3 | 
+4 | b = c = int  # PYI017
   | ^^^^^^^^^^^ PYI017
+5 | 
+6 | a.b = int  # PYI017
   |
 
-PYI017.pyi:8:1: PYI017 Stubs should not contain assignments to attributes or multiple targets.
+PYI017.pyi:6:1: PYI017 Stubs should not contain assignments to attributes or multiple targets
   |
-8 | a.b = int  # PYI017
+4 | b = c = int  # PYI017
+5 | 
+6 | a.b = int  # PYI017
   | ^^^^^^^^^ PYI017
+7 | 
+8 | d, e = int, str  # PYI017
   |
 
-PYI017.pyi:11:1: PYI017 Stubs should not contain assignments to attributes or multiple targets.
+PYI017.pyi:8:1: PYI017 Stubs should not contain assignments to attributes or multiple targets
    |
-11 | d, e = int, str # PYI017
+ 6 | a.b = int  # PYI017
+ 7 | 
+ 8 | d, e = int, str  # PYI017
    | ^^^^^^^^^^^^^^^ PYI017
+ 9 | 
+10 | f, g, h = int, str, TypeVar("T")  # PYI017
    |
 
-PYI017.pyi:14:1: PYI017 Stubs should not contain assignments to attributes or multiple targets.
+PYI017.pyi:10:1: PYI017 Stubs should not contain assignments to attributes or multiple targets
    |
-14 | f, g, h = int, str, TypeVar("T") # PYI017
+ 8 | d, e = int, str  # PYI017
+ 9 | 
+10 | f, g, h = int, str, TypeVar("T")  # PYI017
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI017
+11 | 
+12 | i: TypeAlias = int | str  # OK
    |
 
 

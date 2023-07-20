@@ -1557,7 +1557,7 @@ where
                         Rule::UnprefixedTypeParam,
                         Rule::AssignmentDefaultInStub,
                         Rule::UnannotatedAssignmentInStub,
-                        Rule::ComplexAssignment,
+                        Rule::ComplexAssignmentInStub,
                         Rule::TypeAliasWithoutAnnotation,
                     ]) {
                         // Ignore assignments in function bodies; those are covered by other rules.
@@ -1577,8 +1577,8 @@ where
                                     self, targets, value,
                                 );
                             }
-                            if self.enabled(Rule::ComplexAssignment) {
-                                flake8_pyi::rules::complex_assignment(self, stmt_assign);
+                            if self.enabled(Rule::ComplexAssignmentInStub) {
+                                flake8_pyi::rules::complex_assignment_in_stub(self, stmt_assign);
                             }
                             if self.enabled(Rule::TypeAliasWithoutAnnotation) {
                                 flake8_pyi::rules::type_alias_without_annotation(

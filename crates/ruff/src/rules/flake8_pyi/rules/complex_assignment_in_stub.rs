@@ -30,21 +30,21 @@ use crate::checkers::ast::Checker;
 ///     b: int
 /// ```
 #[violation]
-pub struct ComplexAssignment;
+pub struct ComplexAssignmentInStub;
 
-impl Violation for ComplexAssignment {
+impl Violation for ComplexAssignmentInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Stubs should not contain assignments to attributes or multiple targets.")
+        format!("Stubs should not contain assignments to attributes or multiple targets")
     }
 }
 
 /// PYI017
-pub(crate) fn complex_assignment(checker: &mut Checker, stmt: &StmtAssign) {
-    if let [Expr::Name(_)] = stmt.targets[..] {
+pub(crate) fn complex_assignment_in_stub(checker: &mut Checker, stmt: &StmtAssign) {
+    if matches!(stmt.targets.as_slice(), [Expr::Name(_)]) {
         return;
     }
     checker
         .diagnostics
-        .push(Diagnostic::new(ComplexAssignment, stmt.range));
+        .push(Diagnostic::new(ComplexAssignmentInStub, stmt.range));
 }
