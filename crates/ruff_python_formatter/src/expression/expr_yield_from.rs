@@ -1,8 +1,6 @@
 use crate::context::PyFormatContext;
 use crate::expression::maybe_parenthesize_expression;
-use crate::expression::parentheses::{
-    NeedsParentheses, OptionalParentheses, Parenthesize,
-};
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parenthesize};
 use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::prelude::{space, text};
 use ruff_formatter::{write, Buffer, FormatResult};
