@@ -255,11 +255,35 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
 
                     in_text = true;
 
+                    fn write_escaped(
+                        element: &FormatElement,
+                        f: &mut Formatter<IrFormatContext>,
+                    ) -> FormatResult<()> {
+                        let text = match element {
+                            FormatElement::StaticText { text } => text,
+                            FormatElement::DynamicText { text } => text.as_ref(),
+                            FormatElement::SourceCodeSlice { slice, .. } => {
+                                slice.text(f.context().source_code())
+                            }
+                            _ => unreachable!(),
+                        };
+
+                        if text.contains('"') {
+                            f.write_element(FormatElement::DynamicText {
+                                text: text.replace('"', "\\\"").into(),
+                            })
+                        } else {
+                            f.write_element(element.clone())
+                        }
+                    }
+
                     match element {
                         FormatElement::Space => {
                             write!(f, [text(" ")])?;
                         }
-                        element if element.is_text() => f.write_element(element.clone())?,
+                        element if element.is_text() => {
+                            write_escaped(element, f)?;
+                        }
                         _ => unreachable!(),
                     }
 
@@ -784,6 +808,22 @@ mod tests {
     soft_line_break
   ])
 ]"#
+        );
+    }
+
+    #[test]
+    fn escapes_quotes() {
+        let formatted = format!(
+            SimpleFormatContext::default(),
+            [text(r#""""Python docstring""""#)]
+        )
+        .unwrap();
+
+        let document = formatted.into_document();
+
+        assert_eq!(
+            &std::format!("{}", document.display(SourceCode::default())),
+            r#"["\"\"\"Python docstring\"\"\""]"#
         );
     }
 
