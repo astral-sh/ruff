@@ -1,0 +1,66 @@
+---
+source: crates/ruff_python_trivia/src/tokenizer.rs
+expression: test_case.tokenize_reverse()
+---
+[
+    SimpleToken {
+        kind: Comment,
+        range: 14..27,
+    },
+    SimpleToken {
+        kind: Whitespace,
+        range: 13..14,
+    },
+    SimpleToken {
+        kind: Other,
+        range: 12..13,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 11..12,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 10..11,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 9..10,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 8..9,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 7..8,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 6..7,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 5..6,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 4..5,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 3..4,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 2..3,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 1..2,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 0..1,
+    },
+]
