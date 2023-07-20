@@ -12,9 +12,6 @@ use crate::prelude::*;
 
 #[derive(Eq, PartialEq, Debug, Default)]
 pub enum TupleParentheses {
-    /// Black omits parentheses for tuples inside of comprehensions.
-    Comprehension,
-
     /// Effectively `None` in `Option<Parentheses>`
     #[default]
     Default,
@@ -29,6 +26,21 @@ pub enum TupleParentheses {
     /// x[(a, b):]
     /// ```
     Preserve,
+
+    /// Handle the special cases where we don't include parentheses at all.
+    ///
+    /// Black never formats tuple targets of for loops with parentheses if inside a comprehension.
+    /// ```python
+    /// {k: v for k, v in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension}
+    /// ```
+    /// Becomes
+    /// ```python
+    /// {
+    ///     k: v
+    ///     for k, v in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
+    /// }
+    /// ```
+    Never,
 
     /// Handle the special cases where we don't include parentheses if they are not required.
     ///
@@ -122,7 +134,7 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                 parenthesized("(", &ExprSequence::new(item), ")").fmt(f)
             }
             _ => match self.parentheses {
-                TupleParentheses::Comprehension => {
+                TupleParentheses::Never => {
                     let separator =
                         format_with(|f| group(&format_args![text(","), space()]).fmt(f));
                     f.join_with(separator)
