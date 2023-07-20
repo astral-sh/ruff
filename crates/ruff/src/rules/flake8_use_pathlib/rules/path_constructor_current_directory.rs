@@ -6,7 +6,7 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Detects pathlib `Path` objects that are initialized with the default current directory argument.
+/// Checks for pathlib `Path` objects that are initialized with the current directory. 
 ///
 /// ## Why is this bad?
 /// The `Path()` constructor defaults to the current directory. There is no
