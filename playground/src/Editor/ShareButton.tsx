@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import AstralButton from "./AstralButton";
 
 export default function ShareButton({ onShare }: { onShare?: () => void }) {
   const [copied, setCopied] = useState(false);
@@ -11,9 +12,9 @@ export default function ShareButton({ onShare }: { onShare?: () => void }) {
   }, [copied]);
 
   return copied ? (
-    <button
+    <AstralButton
       type="button"
-      className="relative flex-none rounded-md text-sm font-semibold leading-6 py-1.5 px-3 cursor-auto text-ayu-accent shadow-copied dark:bg-ayu-accent/10"
+      className="relative flex-none leading-6 py-1.5 px-3 cursor-auto shadow-copied"
     >
       <span
         className="absolute inset-0 flex items-center justify-center invisible"
@@ -24,11 +25,11 @@ export default function ShareButton({ onShare }: { onShare?: () => void }) {
       <span className="" aria-hidden="false">
         Copied!
       </span>
-    </button>
+    </AstralButton>
   ) : (
-    <button
+    <AstralButton
       type="button"
-      className="relative flex-none rounded-md text-sm font-semibold leading-6 py-1.5 px-3 enabled:hover:bg-ayu-accent/70 bg-ayu-accent text-white shadow-sm dark:shadow-highlight/20 disabled:opacity-50"
+      className="relative flex-none leading-6 py-1.5 px-3 shadow-sm disabled:opacity-50"
       disabled={!onShare || copied}
       onClick={
         onShare
@@ -48,6 +49,6 @@ export default function ShareButton({ onShare }: { onShare?: () => void }) {
       <span className="invisible" aria-hidden="true">
         Copied!
       </span>
-    </button>
+    </AstralButton>
   );
 }

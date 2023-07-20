@@ -2,7 +2,7 @@ use rustpython_parser::ast::{Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::is_const_false;
+use ruff_python_ast::helpers::{find_keyword, is_const_false};
 
 use crate::checkers::ast::Checker;
 
@@ -63,12 +63,7 @@ pub(crate) fn request_with_no_cert_validation(
             _ => None,
         })
     {
-        if let Some(keyword) = keywords.iter().find(|keyword| {
-            keyword
-                .arg
-                .as_ref()
-                .map_or(false, |arg| arg.as_str() == "verify")
-        }) {
+        if let Some(keyword) = find_keyword(keywords, "verify") {
             if is_const_false(&keyword.value) {
                 checker.diagnostics.push(Diagnostic::new(
                     RequestWithNoCertValidation {

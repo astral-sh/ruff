@@ -18,7 +18,7 @@ use rustpython_parser::lexer::LexResult;
 
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::token_kind::TokenKind;
-use ruff_python_whitespace::is_python_whitespace;
+use ruff_python_trivia::is_python_whitespace;
 
 mod extraneous_whitespace;
 mod indentation;

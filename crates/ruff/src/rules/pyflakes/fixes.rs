@@ -1,10 +1,11 @@
-use anyhow::{bail, Ok, Result};
+use anyhow::{Context, Ok, Result};
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{ExceptHandler, Expr, Ranged};
-use rustpython_parser::{lexer, Mode};
+use rustpython_parser::ast::{Expr, Ranged};
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python_semantic::Binding;
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 
 use crate::autofix::codemods::CodegenStylist;
 use crate::cst::matchers::{match_call_mut, match_dict, match_expression};
@@ -90,31 +91,29 @@ pub(crate) fn remove_unused_positional_arguments_from_format_call(
 
 /// Generate a [`Edit`] to remove the binding from an exception handler.
 pub(crate) fn remove_exception_handler_assignment(
-    except_handler: &ExceptHandler,
+    bound_exception: &Binding,
     locator: &Locator,
 ) -> Result<Edit> {
-    let contents = locator.slice(except_handler.range());
-    let mut fix_start = None;
-    let mut fix_end = None;
+    // Lex backwards, to the token just before the `as`.
+    let mut tokenizer =
+        SimpleTokenizer::up_to(bound_exception.range.start(), locator.contents()).skip_trivia();
 
-    // End of the token just before the `as` to the semicolon.
-    let mut prev = None;
-    for (tok, range) in
-        lexer::lex_starts_at(contents, Mode::Module, except_handler.start()).flatten()
-    {
-        if tok.is_as() {
-            fix_start = prev;
-        }
-        if tok.is_colon() {
-            fix_end = Some(range.start());
-            break;
-        }
-        prev = Some(range.end());
-    }
+    // Eat the `as` token.
+    let preceding = tokenizer
+        .next_back()
+        .context("expected the exception name to be preceded by `as`")?;
+    debug_assert!(matches!(preceding.kind, SimpleTokenKind::As));
 
-    if let (Some(start), Some(end)) = (fix_start, fix_end) {
-        Ok(Edit::deletion(start, end))
-    } else {
-        bail!("Could not find span of exception handler")
-    }
+    // Lex to the end of the preceding token, which should be the exception value.
+    let preceding = tokenizer
+        .next_back()
+        .context("expected the exception name to be preceded by a token")?;
+
+    // Lex forwards, to the `:` token.
+    let following = SimpleTokenizer::starts_at(bound_exception.range.end(), locator.contents())
+        .next()
+        .context("expected the exception name to be followed by a colon")?;
+    debug_assert!(matches!(following.kind, SimpleTokenKind::Colon));
+
+    Ok(Edit::deletion(preceding.end(), following.start()))
 }

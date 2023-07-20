@@ -80,15 +80,15 @@ If it doesn't, we get something like
 ```
 
 For a list of expression, you don't need to format it manually but can use the `JoinBuilder` util,
-accessible through `.join_with`. Finish will write to the formatter internally.
+accessible through `.join_comma_separated`. Finish will write to the formatter internally.
 
 ```rust
-f.join_with(&format_args!(text(","), soft_line_break_or_space()))
-    .entries(self.elts.iter().formatted())
-    .finish()?;
-// Here we need a trailing comma on the last entry of an expanded group since we have more
-// than one element
-write!(f, [if_group_breaks(&text(","))])
+f.join_comma_separated(item.end())
+    .nodes(elts.iter())
+    .finish()
+// Here we have a builder that separates each element by a `,` and a [`soft_line_break_or_space`].
+// It emits a trailing `,` that is only shown if the enclosing group expands. It forces the enclosing
+// group to expand if the last item has a trailing `comma` and the magical comma option is enabled.
 ```
 
 If you need avoid second mutable borrows with a builder, you can use `format_with(|f| { ... })` as
@@ -271,7 +271,7 @@ It is also possible large number of repositories using ruff. This dataset is lar
 only do this occasionally:
 
 ```shell
-curl https://raw.githubusercontent.com/akx/ruff-usage-aggregate/master/data/known-github-tomls.jsonl > github_search.jsonl
+curl https://raw.githubusercontent.com/akx/ruff-usage-aggregate/master/data/known-github-tomls-clean.jsonl> github_search.jsonl
 python scripts/check_ecosystem.py --checkouts target/checkouts --projects github_search.jsonl -v $(which true) $(which true)
 cargo run --bin ruff_dev -- format-dev --stability-check --multi-project target/checkouts
 ```

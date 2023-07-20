@@ -13,7 +13,7 @@ license = { workspace = true }
 [lib]
 
 [dependencies]
-ruff_python_whitespace = { path = "../ruff_python_whitespace" }
+ruff_python_trivia = { path = "../ruff_python_trivia" }
 ruff_text_size = { workspace = true }
 
 anyhow = { workspace = true }

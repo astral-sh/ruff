@@ -83,3 +83,8 @@ e210 = "e"[a() : 1 :]
 
 # Regression test for https://github.com/astral-sh/ruff/issues/5605
 f = "f"[:,]
+
+# Regression test for https://github.com/astral-sh/ruff/issues/5733
+g1 = "g"[(1):(2)]
+g2 = "g"[(1):(2):(3)]
+

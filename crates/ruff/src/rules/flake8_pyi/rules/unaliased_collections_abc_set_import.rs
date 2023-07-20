@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::{BindingKind, FromImport, Scope};
+use ruff_python_semantic::{Binding, BindingKind, FromImport};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -48,31 +48,29 @@ impl Violation for UnaliasedCollectionsAbcSetImport {
 /// PYI025
 pub(crate) fn unaliased_collections_abc_set_import(
     checker: &Checker,
-    scope: &Scope,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
-    for (name, binding_id) in scope.all_bindings() {
-        let binding = checker.semantic().binding(binding_id);
-        let BindingKind::FromImport(FromImport { qualified_name }) = &binding.kind else {
-            continue;
-        };
-        if qualified_name.as_str() != "collections.abc.Set" {
-            continue;
-        }
-        if name == "AbstractSet" {
-            continue;
-        }
-
-        let mut diagnostic = Diagnostic::new(UnaliasedCollectionsAbcSetImport, binding.range);
-        if checker.patch(diagnostic.kind.rule()) {
-            if checker.semantic().is_available("AbstractSet") {
-                diagnostic.try_set_fix(|| {
-                    let (edit, rest) =
-                        Renamer::rename(name, "AbstractSet", scope, checker.semantic())?;
-                    Ok(Fix::suggested_edits(edit, rest))
-                });
-            }
-        }
-        diagnostics.push(diagnostic);
+    binding: &Binding,
+) -> Option<Diagnostic> {
+    let BindingKind::FromImport(FromImport { qualified_name }) = &binding.kind else {
+        return None;
+    };
+    if qualified_name.as_str() != "collections.abc.Set" {
+        return None;
     }
+
+    let name = binding.name(checker.locator);
+    if name == "AbstractSet" {
+        return None;
+    }
+
+    let mut diagnostic = Diagnostic::new(UnaliasedCollectionsAbcSetImport, binding.range);
+    if checker.patch(diagnostic.kind.rule()) {
+        if checker.semantic().is_available("AbstractSet") {
+            diagnostic.try_set_fix(|| {
+                let scope = &checker.semantic().scopes[binding.scope];
+                let (edit, rest) = Renamer::rename(name, "AbstractSet", scope, checker.semantic())?;
+                Ok(Fix::suggested_edits(edit, rest))
+            });
+        }
+    }
+    Some(diagnostic)
 }

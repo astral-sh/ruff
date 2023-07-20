@@ -7,7 +7,7 @@ use rustpython_parser::{lexer, Mode};
 use ruff_diagnostics::Edit;
 use ruff_python_ast::helpers;
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
-use ruff_python_whitespace::{is_python_whitespace, NewlineWithTrailingNewline, PythonWhitespace};
+use ruff_python_trivia::{is_python_whitespace, NewlineWithTrailingNewline, PythonWhitespace};
 
 use crate::autofix::codemods;
 
@@ -190,9 +190,21 @@ fn is_lone_child(child: &Stmt, parent: &Stmt) -> bool {
         }
         Stmt::For(ast::StmtFor { body, orelse, .. })
         | Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. })
-        | Stmt::While(ast::StmtWhile { body, orelse, .. })
-        | Stmt::If(ast::StmtIf { body, orelse, .. }) => {
+        | Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
             if is_only(body, child) || is_only(orelse, child) {
+                return true;
+            }
+        }
+        Stmt::If(ast::StmtIf {
+            body,
+            elif_else_clauses,
+            ..
+        }) => {
+            if is_only(body, child)
+                || elif_else_clauses
+                    .iter()
+                    .any(|ast::ElifElseClause { body, .. }| is_only(body, child))
+            {
                 return true;
             }
         }

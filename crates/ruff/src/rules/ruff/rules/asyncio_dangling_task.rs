@@ -4,7 +4,8 @@ use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::CallPath;
+
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for `asyncio.create_task` and `asyncio.ensure_future` calls
@@ -62,8 +63,32 @@ impl Violation for AsyncioDanglingTask {
     }
 }
 
+/// RUF006
+pub(crate) fn asyncio_dangling_task(checker: &mut Checker, expr: &Expr) {
+    let Expr::Call(ast::ExprCall { func, .. }) = expr else {
+        return;
+    };
+
+    let Some(method) = checker
+        .semantic()
+        .resolve_call_path(func)
+        .and_then(|call_path| match call_path.as_slice() {
+            ["asyncio", "create_task"] => Some(Method::CreateTask),
+            ["asyncio", "ensure_future"] => Some(Method::EnsureFuture),
+            _ => None,
+        })
+    else {
+        return;
+    };
+
+    checker.diagnostics.push(Diagnostic::new(
+        AsyncioDanglingTask { method },
+        expr.range(),
+    ));
+}
+
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub(crate) enum Method {
+enum Method {
     CreateTask,
     EnsureFuture,
 }
@@ -74,34 +99,5 @@ impl fmt::Display for Method {
             Method::CreateTask => fmt.write_str("create_task"),
             Method::EnsureFuture => fmt.write_str("ensure_future"),
         }
-    }
-}
-
-/// RUF006
-pub(crate) fn asyncio_dangling_task<'a, F>(
-    expr: &'a Expr,
-    resolve_call_path: F,
-) -> Option<Diagnostic>
-where
-    F: FnOnce(&'a Expr) -> Option<CallPath<'a>>,
-{
-    if let Expr::Call(ast::ExprCall { func, .. }) = expr {
-        match resolve_call_path(func).as_deref() {
-            Some(["asyncio", "create_task"]) => Some(Diagnostic::new(
-                AsyncioDanglingTask {
-                    method: Method::CreateTask,
-                },
-                expr.range(),
-            )),
-            Some(["asyncio", "ensure_future"]) => Some(Diagnostic::new(
-                AsyncioDanglingTask {
-                    method: Method::EnsureFuture,
-                },
-                expr.range(),
-            )),
-            _ => None,
-        }
-    } else {
-        None
     }
 }

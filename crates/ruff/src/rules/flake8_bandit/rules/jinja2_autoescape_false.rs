@@ -1,3 +1,4 @@
+use ruff_python_ast::helpers::find_keyword;
 use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -37,12 +38,7 @@ pub(crate) fn jinja2_autoescape_false(checker: &mut Checker, func: &Expr, keywor
             matches!(call_path.as_slice(), ["jinja2", "Environment"])
         })
     {
-        if let Some(keyword) = keywords.iter().find(|keyword| {
-            keyword
-                .arg
-                .as_ref()
-                .map_or(false, |arg| arg.as_str() == "autoescape")
-        }) {
+        if let Some(keyword) = find_keyword(keywords, "autoescape") {
             match &keyword.value {
                 Expr::Constant(ast::ExprConstant {
                     value: Constant::Bool(true),

@@ -2,9 +2,10 @@
 
 pub mod preorder;
 
+use rustpython_ast::ElifElseClause;
 use rustpython_parser::ast::{
-    self, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Constant, Decorator, ExceptHandler,
-    Expr, ExprContext, Keyword, MatchCase, Operator, Pattern, Stmt, UnaryOp, WithItem,
+    self, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Decorator, ExceptHandler, Expr,
+    ExprContext, Keyword, MatchCase, Operator, Pattern, Stmt, UnaryOp, WithItem,
 };
 
 /// A trait for AST visitors. Visits all nodes in the AST recursively in evaluation-order.
@@ -26,9 +27,6 @@ pub trait Visitor<'a> {
     }
     fn visit_expr(&mut self, expr: &'a Expr) {
         walk_expr(self, expr);
-    }
-    fn visit_constant(&mut self, constant: &'a Constant) {
-        walk_constant(self, constant);
     }
     fn visit_expr_context(&mut self, expr_context: &'a ExprContext) {
         walk_expr_context(self, expr_context);
@@ -78,12 +76,25 @@ pub trait Visitor<'a> {
     fn visit_body(&mut self, body: &'a [Stmt]) {
         walk_body(self, body);
     }
+    fn visit_elif_else_clause(&mut self, elif_else_clause: &'a ElifElseClause) {
+        walk_elif_else_clause(self, elif_else_clause);
+    }
 }
 
 pub fn walk_body<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, body: &'a [Stmt]) {
     for stmt in body {
         visitor.visit_stmt(stmt);
     }
+}
+
+pub fn walk_elif_else_clause<'a, V: Visitor<'a> + ?Sized>(
+    visitor: &mut V,
+    elif_else_clause: &'a ElifElseClause,
+) {
+    if let Some(test) = &elif_else_clause.test {
+        visitor.visit_expr(test);
+    }
+    visitor.visit_body(&elif_else_clause.body);
 }
 
 pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
@@ -219,12 +230,17 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
         Stmt::If(ast::StmtIf {
             test,
             body,
-            orelse,
+            elif_else_clauses,
             range: _range,
         }) => {
             visitor.visit_expr(test);
             visitor.visit_body(body);
-            visitor.visit_body(orelse);
+            for clause in elif_else_clauses {
+                if let Some(test) = &clause.test {
+                    visitor.visit_expr(test);
+                }
+                walk_elif_else_clause(visitor, clause);
+            }
         }
         Stmt::With(ast::StmtWith { items, body, .. }) => {
             for with_item in items {
@@ -318,6 +334,7 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             range: _range,
         }) => visitor.visit_expr(value),
         Stmt::Pass(_) | Stmt::Break(_) | Stmt::Continue(_) => {}
+        Stmt::TypeAlias(_) => todo!(),
     }
 }
 
@@ -507,7 +524,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
                 visitor.visit_expr(expr);
             }
         }
-        Expr::Constant(ast::ExprConstant { value, .. }) => visitor.visit_constant(value),
+        Expr::Constant(_) => {}
         Expr::Attribute(ast::ExprAttribute { value, ctx, .. }) => {
             visitor.visit_expr(value);
             visitor.visit_expr_context(ctx);
@@ -568,14 +585,6 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
             if let Some(expr) = step {
                 visitor.visit_expr(expr);
             }
-        }
-    }
-}
-
-pub fn walk_constant<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, constant: &'a Constant) {
-    if let Constant::Tuple(constants) = constant {
-        for constant in constants {
-            visitor.visit_constant(constant);
         }
     }
 }
@@ -675,12 +684,7 @@ pub fn walk_pattern<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, pattern: &'a P
             value,
             range: _range,
         }) => visitor.visit_expr(value),
-        Pattern::MatchSingleton(ast::PatternMatchSingleton {
-            value,
-            range: _range,
-        }) => {
-            visitor.visit_constant(value);
-        }
+        Pattern::MatchSingleton(_) => {}
         Pattern::MatchSequence(ast::PatternMatchSequence {
             patterns,
             range: _range,

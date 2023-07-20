@@ -4,6 +4,7 @@ pub(crate) mod arg_with_default;
 pub(crate) mod arguments;
 pub(crate) mod comprehension;
 pub(crate) mod decorator;
+pub(crate) mod elif_else_clause;
 pub(crate) mod except_handler_except_handler;
 pub(crate) mod identifier;
 pub(crate) mod keyword;

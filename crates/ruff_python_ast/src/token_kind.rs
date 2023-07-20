@@ -156,6 +156,7 @@ pub enum TokenKind {
     Try,
     While,
     Match,
+    Type,
     Case,
     With,
     Yield,
@@ -426,11 +427,13 @@ impl TokenKind {
             Tok::While => TokenKind::While,
             Tok::Match => TokenKind::Match,
             Tok::Case => TokenKind::Case,
+            Tok::Type => TokenKind::Type,
             Tok::With => TokenKind::With,
             Tok::Yield => TokenKind::Yield,
             Tok::StartModule => TokenKind::StartModule,
             Tok::StartInteractive => TokenKind::StartInteractive,
             Tok::StartExpression => TokenKind::StartExpression,
+            Tok::MagicCommand { .. } => todo!(),
         }
     }
 }

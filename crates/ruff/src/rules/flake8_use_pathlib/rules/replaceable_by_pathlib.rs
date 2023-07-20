@@ -44,13 +44,13 @@ pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, expr: &Expr) {
                 ["os", "path", "dirname"] => Some(OsPathDirname.into()),
                 ["os", "path", "samefile"] => Some(OsPathSamefile.into()),
                 ["os", "path", "splitext"] => Some(OsPathSplitext.into()),
-                /// PTH202
+                // PTH202
                 ["os", "path", "getsize"] => Some(OsPathGetsize.into()),
-                /// PTH203
+                // PTH203
                 ["os", "path", "getatime"] => Some(OsPathGetatime.into()),
-                /// PTH204
+                // PTH204
                 ["os", "path", "getmtime"] => Some(OsPathGetmtime.into()),
-                /// PTH205
+                // PTH205
                 ["os", "path", "getctime"] => Some(OsPathGetctime.into()),
                 ["", "open"] => Some(BuiltinOpen.into()),
                 ["py", "path", "local"] => Some(PyPath.into()),

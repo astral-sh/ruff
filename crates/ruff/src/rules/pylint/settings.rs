@@ -28,7 +28,6 @@ impl TryFrom<&Constant> for ConstantType {
             Constant::Float(..) => Ok(Self::Float),
             Constant::Int(..) => Ok(Self::Int),
             Constant::Str(..) => Ok(Self::Str),
-            Constant::Tuple(..) => Ok(Self::Tuple),
             Constant::Bool(..) | Constant::Ellipsis | Constant::None => {
                 Err(anyhow!("Singleton constants are unsupported"))
             }

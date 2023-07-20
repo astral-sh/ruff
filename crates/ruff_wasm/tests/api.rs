@@ -4,12 +4,12 @@ use wasm_bindgen_test::wasm_bindgen_test;
 
 use ruff::registry::Rule;
 use ruff_python_ast::source_code::{OneIndexed, SourceLocation};
-use ruff_wasm::{check, ExpandedMessage};
+use ruff_wasm::{ExpandedMessage, Workspace};
 
 macro_rules! check {
     ($source:expr, $config:expr, $expected:expr) => {{
-        let foo = js_sys::JSON::parse($config).unwrap();
-        match check($source, foo) {
+        let config = js_sys::JSON::parse($config).unwrap();
+        match Workspace::new(config).unwrap().check($source) {
             Ok(output) => {
                 let result: Vec<ExpandedMessage> = serde_wasm_bindgen::from_value(output).unwrap();
                 assert_eq!(result, $expected);
@@ -29,11 +29,11 @@ fn empty_config() {
             message: "If test is a tuple, which is always `True`".to_string(),
             location: SourceLocation {
                 row: OneIndexed::from_zero_indexed(0),
-                column: OneIndexed::from_zero_indexed(0)
+                column: OneIndexed::from_zero_indexed(3)
             },
             end_location: SourceLocation {
-                row: OneIndexed::from_zero_indexed(1),
-                column: OneIndexed::from_zero_indexed(8)
+                row: OneIndexed::from_zero_indexed(0),
+                column: OneIndexed::from_zero_indexed(9)
             },
             fix: None,
         }]
