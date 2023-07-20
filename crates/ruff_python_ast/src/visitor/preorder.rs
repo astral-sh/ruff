@@ -1,7 +1,8 @@
 use rustpython_ast::{ArgWithDefault, ElifElseClause, Mod, TypeIgnore};
 use rustpython_parser::ast::{
     self, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Constant, Decorator, ExceptHandler,
-    Expr, Keyword, MatchCase, Operator, Pattern, Stmt, UnaryOp, WithItem, TypeParam, TypeParamTypeVar
+    Expr, Keyword, MatchCase, Operator, Pattern, Stmt, TypeParam, TypeParamTypeVar, UnaryOp,
+    WithItem,
 };
 
 /// Visitor that traverses all nodes recursively in pre-order.
@@ -83,7 +84,7 @@ pub trait PreorderVisitor<'a> {
     fn visit_type_param(&mut self, type_param: &'a TypeParam) {
         walk_type_param(self, type_param);
     }
-    
+
     fn visit_match_case(&mut self, match_case: &'a MatchCase) {
         walk_match_case(self, match_case);
     }
@@ -160,6 +161,7 @@ where
             body,
             decorator_list,
             returns,
+            type_params,
             ..
         })
         | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
@@ -167,10 +169,15 @@ where
             body,
             decorator_list,
             returns,
+            type_params,
             ..
         }) => {
             for decorator in decorator_list {
                 visitor.visit_decorator(decorator);
+            }
+
+            for type_param in type_params {
+                visitor.visit_type_param(type_param);
             }
 
             visitor.visit_arguments(args);
@@ -187,10 +194,15 @@ where
             keywords,
             body,
             decorator_list,
+            type_params,
             ..
         }) => {
             for decorator in decorator_list {
                 visitor.visit_decorator(decorator);
+            }
+
+            for type_param in type_params {
+                visitor.visit_type_param(type_param);
             }
 
             for expr in bases {
@@ -222,12 +234,16 @@ where
             }
         }
 
-        Stmt::TypeAlias(ast::StmtTypeAlias { range: _range, name, type_params, value } ) => {
+        Stmt::TypeAlias(ast::StmtTypeAlias {
+            range: _range,
+            name,
+            type_params,
+            value,
+        }) => {
             visitor.visit_expr(name);
             for type_param in type_params {
                 visitor.visit_type_param(type_param);
             }
-
             visitor.visit_expr(value);
         }
 
@@ -413,7 +429,6 @@ where
         | Stmt::Continue(_)
         | Stmt::Global(_)
         | Stmt::Nonlocal(_) => {}
-        Stmt::TypeAlias(_) => todo!(),
     }
 }
 
@@ -818,9 +833,15 @@ where
     }
 }
 
-pub fn walk_type_param<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, type_param: &'a TypeParam) {
+pub fn walk_type_param<'a, V>(visitor: &mut V, type_param: &'a TypeParam) where
+V: PreorderVisitor<'a> + ?Sized,
+{
     match type_param {
-        TypeParam::TypeVar(TypeParamTypeVar {bound, name: _, range: _}) => {
+        TypeParam::TypeVar(TypeParamTypeVar {
+            bound,
+            name: _,
+            range: _,
+        }) => {
             if let Some(expr) = bound {
                 visitor.visit_expr(expr);
             }
@@ -840,8 +861,6 @@ where
     }
     visitor.visit_body(&match_case.body);
 }
-
-
 
 pub fn walk_pattern<'a, V>(visitor: &mut V, pattern: &'a Pattern)
 where
