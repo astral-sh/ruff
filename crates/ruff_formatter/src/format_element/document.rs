@@ -270,7 +270,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
 
                         if text.contains('"') {
                             f.write_element(FormatElement::DynamicText {
-                                text: text.replace('"', "\\\"").into(),
+                                text: text.replace('"', r#"\""#).into(),
                             })
                         } else {
                             f.write_element(element.clone())
