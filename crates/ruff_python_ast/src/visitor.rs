@@ -798,22 +798,20 @@ pub fn walk_cmp_op<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, cmp_op: &'a Cmp
 #[allow(unused_variables)]
 pub fn walk_alias<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, alias: &'a Alias) {}
 
-
 #[cfg(test)]
 mod tests {
     use std::fmt::{Debug, Write};
 
     use insta::assert_snapshot;
     use rustpython_parser::lexer::lex;
-    use rustpython_parser::{parse_tokens, Mode, ast};
+    use rustpython_parser::{ast, parse_tokens, Mode};
 
     use crate::node::AnyNodeRef;
     use crate::visitor::{
         walk_alias, walk_arg, walk_arguments, walk_comprehension, walk_except_handler, walk_expr,
-        walk_keyword, walk_match_case, walk_pattern, walk_stmt, walk_type_param,
-        walk_with_item, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension,
-        ExceptHandler, Expr, Keyword, MatchCase, Operator, Pattern, Visitor, Stmt,
-        UnaryOp, WithItem, TypeParam
+        walk_keyword, walk_match_case, walk_pattern, walk_stmt, walk_type_param, walk_with_item,
+        Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, ExceptHandler, Expr, Keyword,
+        MatchCase, Operator, Pattern, Stmt, TypeParam, UnaryOp, Visitor, WithItem,
     };
 
     #[test]
@@ -902,7 +900,6 @@ class A:
         assert_snapshot!(trace);
     }
 
-
     #[test]
     fn type_aliases() {
         let source = r#"type X[T: str, U, *Ts, **P] = list[T]"#;
@@ -952,7 +949,9 @@ class A:
             }) => {
                 visitor.visit_body(body);
             }
-            ast::Mod::Interactive(ast::ModInteractive { body, range: _ }) => visitor.visit_body(body),
+            ast::Mod::Interactive(ast::ModInteractive { body, range: _ }) => {
+                visitor.visit_body(body)
+            }
             ast::Mod::Expression(ast::ModExpression { body, range: _ }) => visitor.visit_expr(body),
             ast::Mod::FunctionType(ast::ModFunctionType {
                 range: _,
@@ -967,7 +966,6 @@ class A:
             }
         }
     }
-
 
     /// Emits a `tree` with a node for every visited AST node (labelled by the AST node's kind)
     /// and leafs for attributes.
@@ -1099,6 +1097,5 @@ class A:
             walk_type_param(self, type_param);
             self.exit_node();
         }
-        
     }
 }

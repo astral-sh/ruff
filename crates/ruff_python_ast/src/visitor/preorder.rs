@@ -833,8 +833,9 @@ where
     }
 }
 
-pub fn walk_type_param<'a, V>(visitor: &mut V, type_param: &'a TypeParam) where
-V: PreorderVisitor<'a> + ?Sized,
+pub fn walk_type_param<'a, V>(visitor: &mut V, type_param: &'a TypeParam)
+where
+    V: PreorderVisitor<'a> + ?Sized,
 {
     match type_param {
         TypeParam::TypeVar(TypeParamTypeVar {
@@ -993,9 +994,9 @@ mod tests {
     use crate::visitor::preorder::{
         walk_alias, walk_arg, walk_arguments, walk_comprehension, walk_except_handler, walk_expr,
         walk_keyword, walk_match_case, walk_module, walk_pattern, walk_stmt, walk_type_ignore,
-        walk_with_item, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Constant,
-        ExceptHandler, Expr, Keyword, MatchCase, Mod, Operator, Pattern, PreorderVisitor, Stmt,
-        TypeIgnore, UnaryOp, WithItem,walk_type_param, TypeParam
+        walk_type_param, walk_with_item, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension,
+        Constant, ExceptHandler, Expr, Keyword, MatchCase, Mod, Operator, Pattern, PreorderVisitor,
+        Stmt, TypeIgnore, TypeParam, UnaryOp, WithItem,
     };
 
     #[test]
@@ -1083,7 +1084,6 @@ class A:
 
         assert_snapshot!(trace);
     }
-
 
     #[test]
     fn type_aliases() {
@@ -1268,6 +1268,5 @@ class A:
             walk_type_param(self, type_param);
             self.exit_node();
         }
-        
     }
 }

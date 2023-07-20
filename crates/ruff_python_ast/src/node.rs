@@ -1,4 +1,4 @@
-use ast::{TypeParamTypeVar, TypeParamParamSpec, TypeParamTypeVarTuple, TypeParam};
+use ast::{TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple};
 use ruff_text_size::TextRange;
 use rustpython_ast::{
     Alias, Arg, ArgWithDefault, Arguments, Comprehension, Decorator, ExceptHandler, Keyword,
@@ -3904,7 +3904,6 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::TypeParamTypeVarTuple(node) => NonNull::from(*node).cast(),
             AnyNodeRef::TypeParamParamSpec(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ElifElseClause(node) => NonNull::from(*node).cast(),
-
         }
     }
 
@@ -5097,7 +5096,6 @@ impl<'a> From<&'a Pattern> for AnyNodeRef<'a> {
     }
 }
 
-
 impl<'a> From<&'a TypeParam> for AnyNodeRef<'a> {
     fn from(type_param: &'a TypeParam) -> Self {
         match type_param {
@@ -5107,7 +5105,6 @@ impl<'a> From<&'a TypeParam> for AnyNodeRef<'a> {
         }
     }
 }
-
 
 impl<'a> From<&'a ExceptHandler> for AnyNodeRef<'a> {
     fn from(handler: &'a ExceptHandler) -> Self {
