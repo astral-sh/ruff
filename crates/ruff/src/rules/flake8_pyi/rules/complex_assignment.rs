@@ -25,7 +25,7 @@ use crate::checkers::ast::Checker;
 /// a: TypeAlias = int
 /// b: TypeAlias = int
 ///
-/// 
+///
 /// class a:
 ///     b: int
 /// ```
