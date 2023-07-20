@@ -38,7 +38,7 @@ impl AlwaysAutofixableViolation for PathConstructorCurrentDirectory {
     }
 
     fn autofix_title(&self) -> String {
-        "Removes the uncessary current directory constructor argument".to_string()
+        "Remove the current directory constructor argument".to_string()
     }
 }
 
