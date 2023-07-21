@@ -172,10 +172,10 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "C0131") => (RuleGroup::Unspecified, rules::pylint::rules::TypeBivariance),
         (Pylint, "C0132") => (RuleGroup::Unspecified, rules::pylint::rules::TypeParamNameMismatch),
         (Pylint, "C0205") => (RuleGroup::Unspecified, rules::pylint::rules::SingleStringSlots),
+        (Pylint, "C0208") => (RuleGroup::Unspecified, rules::pylint::rules::IterationOverSet),
         (Pylint, "C0414") => (RuleGroup::Unspecified, rules::pylint::rules::UselessImportAlias),
         (Pylint, "C1901") => (RuleGroup::Nursery, rules::pylint::rules::CompareToEmptyString),
         (Pylint, "C3002") => (RuleGroup::Unspecified, rules::pylint::rules::UnnecessaryDirectLambdaCall),
-        (Pylint, "C0208") => (RuleGroup::Unspecified, rules::pylint::rules::IterationOverSet),
         (Pylint, "E0100") => (RuleGroup::Unspecified, rules::pylint::rules::YieldInInit),
         (Pylint, "E0101") => (RuleGroup::Unspecified, rules::pylint::rules::ReturnInInit),
         (Pylint, "E0116") => (RuleGroup::Unspecified, rules::pylint::rules::ContinueInFinally),
@@ -650,8 +650,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "048") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::StubBodyMultipleStatements),
         (Flake8Pyi, "050") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::NoReturnArgumentAnnotationInStub),
         (Flake8Pyi, "052") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::UnannotatedAssignmentInStub),
-        (Flake8Pyi, "054") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::NumericLiteralTooLong),
         (Flake8Pyi, "053") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::StringOrBytesTooLong),
+        (Flake8Pyi, "054") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::NumericLiteralTooLong),
 
         // flake8-pytest-style
         (Flake8PytestStyle, "001") => (RuleGroup::Unspecified, rules::flake8_pytest_style::rules::PytestFixtureIncorrectParenthesesStyle),

@@ -15,6 +15,7 @@ mod tests {
     use crate::test::{test_path, test_snippet};
     use crate::{assert_messages, settings};
 
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("strict.py"))]
     #[test_case(Rule::TypingOnlyFirstPartyImport, Path::new("TCH001.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("TCH002.py"))]
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("TCH003.py"))]
@@ -33,7 +34,6 @@ mod tests {
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_13.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_14.pyi"))]
     #[test_case(Rule::EmptyTypeCheckingBlock, Path::new("TCH005.py"))]
-    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("strict.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(

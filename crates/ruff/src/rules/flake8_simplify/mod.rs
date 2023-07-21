@@ -25,7 +25,9 @@ mod tests {
     #[test_case(Rule::ReimplementedBuiltin, Path::new("SIM110.py"))]
     #[test_case(Rule::ReimplementedBuiltin, Path::new("SIM111.py"))]
     #[test_case(Rule::UncapitalizedEnvironmentVariables, Path::new("SIM112.py"))]
+    #[test_case(Rule::IfWithSameArms, Path::new("SIM114.py"))]
     #[test_case(Rule::OpenFileWithContextHandler, Path::new("SIM115.py"))]
+    #[test_case(Rule::IfElseBlockInsteadOfDictLookup, Path::new("SIM116.py"))]
     #[test_case(Rule::MultipleWithStatements, Path::new("SIM117.py"))]
     #[test_case(Rule::InDictKeys, Path::new("SIM118.py"))]
     #[test_case(Rule::NegateEqualOp, Path::new("SIM201.py"))]
@@ -41,8 +43,6 @@ mod tests {
     #[test_case(Rule::YodaConditions, Path::new("SIM300.py"))]
     #[test_case(Rule::IfElseBlockInsteadOfDictGet, Path::new("SIM401.py"))]
     #[test_case(Rule::DictGetWithNoneDefault, Path::new("SIM910.py"))]
-    #[test_case(Rule::IfElseBlockInsteadOfDictLookup, Path::new("SIM116.py"))]
-    #[test_case(Rule::IfWithSameArms, Path::new("SIM114.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
