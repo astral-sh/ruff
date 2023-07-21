@@ -262,6 +262,7 @@ pub fn python_files_in_path(
         builder.add(path);
     }
     builder.standard_filters(pyproject_config.settings.lib.respect_gitignore);
+    builder.require_git(false);
     builder.hidden(false);
     let walker = builder.build_parallel();
 
