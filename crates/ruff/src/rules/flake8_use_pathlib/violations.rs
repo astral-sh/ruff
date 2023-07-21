@@ -1,20 +1,17 @@
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 
-// PTH100
-
 /// ## What it does
-/// Detects the use of `os.path.abspath`.
+/// Checks for uses of `os.path.abspath`.
 ///
 /// ## Why is this bad?
-/// `pathlib` offers high-level path manipulations, `os` offers low-level
-/// manipulation of paths. The use of the `Path` object where possible, e.g.
-/// `Path.resolve()` improves readability over their `os` counterparts such as
-/// `os.path.abspath()`.
+/// `pathlib` offers a high-level API for path manipulation, as compared to
+/// the lower-level API offered by `os`. When possible, using `Path` object
+/// methods such as `Path.resolve()` can improve readability over the `os`
+/// module's counterparts (e.g., `os.path.abspath()`).
 ///
-/// There are situations where creating many `Path` object causes overhead.
-/// `os` functions therefore remain preferable in heavy loops and data
-/// structures storing paths (e.g. pandas).
+/// Note that `os` functions may be preferable if performance is a concern,
+/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
@@ -43,20 +40,17 @@ impl Violation for OsPathAbspath {
     }
 }
 
-// PTH101
-
 /// ## What it does
-/// Detects the use of `os.chmod`.
+/// Checks for uses of `os.chmod`.
 ///
 /// ## Why is this bad?
-/// `pathlib` offers high-level path manipulations, `os` offers low-level
-/// manipulation of paths. The use of the `Path` object where possible, e.g.
-/// `Path.chmod()` improves readability over their `os` counterparts such as
-/// `os.chmod()`.
+/// `pathlib` offers a high-level API for path manipulation, as compared to
+/// the lower-level API offered by `os`. When possible, using `Path` object
+/// methods such as `Path.chmod()` can improve readability over the `os`
+/// module's counterparts (e.g., `os.chmod()`).
 ///
-/// There are situations where creating many `Path` object causes overhead.
-/// `os` functions therefore remain preferable in heavy loops and data
-/// structures storing paths (e.g. pandas).
+/// Note that `os` functions may be preferable if performance is a concern,
+/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
@@ -85,20 +79,17 @@ impl Violation for OsChmod {
     }
 }
 
-// PTH102
-
 /// ## What it does
-/// Detects the use of `os.makedirs`.
+/// Checks for uses of `os.makedirs`.
 ///
 /// ## Why is this bad?
-/// `pathlib` offers high-level path manipulations, `os` offers low-level
-/// manipulation of paths. The use of the `Path` object where possible, e.g.
-/// `Path.mkdir(parents=True)` improves readability over their `os`
-/// counterparts such as `os.makedirs()`.
+/// `pathlib` offers a high-level API for path manipulation, as compared to
+/// the lower-level API offered by `os`. When possible, using `Path` object
+/// methods such as `Path.mkdir(parents=True)` can improve readability over the
+/// `os` module's counterparts (e.g., `os.makedirs()`.
 ///
-/// There are situations where creating many `Path` object causes overhead.
-/// `os` functions therefore remain preferable in heavy loops and data
-/// structures storing paths (e.g. pandas).
+/// Note that `os` functions may be preferable if performance is a concern,
+/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
@@ -127,20 +118,17 @@ impl Violation for OsMakedirs {
     }
 }
 
-// PTH103
-
 /// ## What it does
-/// Detects the use of `os.mkdir`.
+/// Checks for uses of `os.mkdir`.
 ///
 /// ## Why is this bad?
-/// `pathlib` offers high-level path manipulations, `os` offers low-level
-/// manipulation of paths. The use of the `Path` object where possible, e.g.
-/// `Path.mkdir()` improves readability over their `os` counterparts such as
-/// `os.mkdir()`.
+/// `pathlib` offers a high-level API for path manipulation, as compared to
+/// the lower-level API offered by `os`. When possible, using `Path` object
+/// methods such as `Path.mkdir()` can improve readability over the `os`
+/// module's counterparts (e.g., `os.mkdir()`).
 ///
-/// There are situations where creating many `Path` object causes overhead.
-/// `os` functions therefore remain preferable in heavy loops and data
-/// structures storing paths (e.g. pandas).
+/// Note that `os` functions may be preferable if performance is a concern,
+/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
@@ -169,20 +157,17 @@ impl Violation for OsMkdir {
     }
 }
 
-// PTH104
-
 /// ## What it does
-/// Detects the use of `os.rename`.
+/// Checks for uses of `os.rename`.
 ///
 /// ## Why is this bad?
-/// `pathlib` offers high-level path manipulations, `os` offers low-level
-/// manipulation of paths. The use of the `Path` object where possible, e.g.
-/// `Path.rename()` improves readability over their `os` counterparts such as
-/// `os.rename()`.
+/// `pathlib` offers a high-level API for path manipulation, as compared to
+/// the lower-level API offered by `os`. When possible, using `Path` object
+/// methods such as `Path.rename()` can improve readability over the `os`
+/// module's counterparts (e.g., `os.rename()`).
 ///
-/// There are situations where creating many `Path` object causes overhead.
-/// `os` functions therefore remain preferable in heavy loops and data
-/// structures storing paths (e.g. pandas).
+/// Note that `os` functions may be preferable if performance is a concern,
+/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
@@ -211,20 +196,17 @@ impl Violation for OsRename {
     }
 }
 
-// PTH105
-
 /// ## What it does
-/// Detects the use of `os.replace`.
+/// Checks for uses of `os.replace`.
 ///
 /// ## Why is this bad?
-/// `pathlib` offers high-level path manipulations, `os` offers low-level
-/// manipulation of paths. The use of the `Path` object where possible, e.g.
-/// `Path.replace()` improves readability over their `os` counterparts such as
-/// `os.replace()`.
+/// `pathlib` offers a high-level API for path manipulation, as compared to
+/// the lower-level API offered by `os`. When possible, using `Path` object
+/// methods such as `Path.replace()` can improve readability over the `os`
+/// module's counterparts (e.g., `os.replace()`).
 ///
-/// There are situations where creating many `Path` object causes overhead.
-/// `os` functions therefore remain preferable in heavy loops and data
-/// structures storing paths (e.g. pandas).
+/// Note that `os` functions may be preferable if performance is a concern,
+/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
@@ -253,20 +235,17 @@ impl Violation for OsReplace {
     }
 }
 
-// PTH106
-
 /// ## What it does
-/// Detects the use of `os.rmdir`.
+/// Checks for uses of `os.rmdir`.
 ///
 /// ## Why is this bad?
-/// `pathlib` offers high-level path manipulations, `os` offers low-level
-/// manipulation of paths. The use of the `Path` object where possible, e.g.
-/// `Path.rmdir()` improves readability over their `os` counterparts such as
-/// `os.rmdir()`.
+/// `pathlib` offers a high-level API for path manipulation, as compared to
+/// the lower-level API offered by `os`. When possible, using `Path` object
+/// methods such as `Path.rmdir()` can improve readability over the `os`
+/// module's counterparts (e.g., `os.rmdir()`).
 ///
-/// There are situations where creating many `Path` object causes overhead.
-/// `os` functions therefore remain preferable in heavy loops and data
-/// structures storing paths (e.g. pandas).
+/// Note that `os` functions may be preferable if performance is a concern,
+/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
@@ -295,20 +274,17 @@ impl Violation for OsRmdir {
     }
 }
 
-// PTH107
-
 /// ## What it does
-/// Detects the use of `os.remove`.
+/// Checks for uses of `os.remove`.
 ///
 /// ## Why is this bad?
-/// `pathlib` offers high-level path manipulations, `os` offers low-level
-/// manipulation of paths. The use of the `Path` object where possible, e.g.
-/// `Path.unlink()` improves readability over their `os` counterparts such as
-/// `os.remove()`.
+/// `pathlib` offers a high-level API for path manipulation, as compared to
+/// the lower-level API offered by `os`. When possible, using `Path` object
+/// methods such as `Path.unlink()` can improve readability over the `os`
+/// module's counterparts (e.g., `os.remove()`).
 ///
-/// There are situations where creating many `Path` object causes overhead.
-/// `os` functions therefore remain preferable in heavy loops and data
-/// structures storing paths (e.g. pandas).
+/// Note that `os` functions may be preferable if performance is a concern,
+/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
@@ -337,20 +313,17 @@ impl Violation for OsRemove {
     }
 }
 
-// PTH108
-
 /// ## What it does
-/// Detects the use of `os.unlink`.
+/// Checks for uses of `os.unlink`.
 ///
 /// ## Why is this bad?
-/// `pathlib` offers high-level path manipulations, `os` offers low-level
-/// manipulation of paths. The use of the `Path` object where possible, e.g.
-/// `Path.unlink()` improves readability over their `os` counterparts such as
-/// `os.unlink()`.
+/// `pathlib` offers a high-level API for path manipulation, as compared to
+/// the lower-level API offered by `os`. When possible, using `Path` object
+/// methods such as `Path.unlink()` can improve readability over the `os`
+/// module's counterparts (e.g., `os.unlink()`).
 ///
-/// There are situations where creating many `Path` object causes overhead.
-/// `os` functions therefore remain preferable in heavy loops and data
-/// structures storing paths (e.g. pandas).
+/// Note that `os` functions may be preferable if performance is a concern,
+/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
@@ -379,20 +352,17 @@ impl Violation for OsUnlink {
     }
 }
 
-// PTH109
-
 /// ## What it does
-/// Detects the use of `os.getcwd` and `os.getcwdb`.
+/// Checks for uses of `os.getcwd` and `os.getcwdb`.
 ///
 /// ## Why is this bad?
-/// `pathlib` offers high-level path manipulations, `os` offers low-level
-/// manipulation of paths. The use of the `Path` object where possible, e.g.
-/// `Path.cwd()` improves readability over their `os` counterparts such as
-/// `os.getcwd()`.
+/// `pathlib` offers a high-level API for path manipulation, as compared to
+/// the lower-level API offered by `os`. When possible, using `Path` object
+/// methods such as `Path.cwd()` can improve readability over the `os`
+/// module's counterparts (e.g., `os.getcwd()`).
 ///
-/// There are situations where creating many `Path` object causes overhead.
-/// `os` functions therefore remain preferable in heavy loops and data
-/// structures storing paths (e.g. pandas).
+/// Note that `os` functions may be preferable if performance is a concern,
+/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
@@ -422,20 +392,17 @@ impl Violation for OsGetcwd {
     }
 }
 
-// PTH110
-
 /// ## What it does
-/// Detects the use of `os.path.exists`.
+/// Checks for uses of `os.path.exists`.
 ///
 /// ## Why is this bad?
-/// `pathlib` offers high-level path manipulations, `os` offers low-level
-/// manipulation of paths. The use of the `Path` object where possible, e.g.
-/// `Path.exists()` improves readability over their `os` counterparts such as
-/// `os.path.exists()`.
+/// `pathlib` offers a high-level API for path manipulation, as compared to
+/// the lower-level API offered by `os`. When possible, using `Path` object
+/// methods such as `Path.exists()` can improve readability over the `os`
+/// module's counterparts (e.g., `os.path.exists()`).
 ///
-/// There are situations where creating many `Path` object causes overhead.
-/// `os` functions therefore remain preferable in heavy loops and data
-/// structures storing paths (e.g. pandas).
+/// Note that `os` functions may be preferable if performance is a concern,
+/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
@@ -464,20 +431,17 @@ impl Violation for OsPathExists {
     }
 }
 
-// PTH111
-
 /// ## What it does
-/// Detects the use of `os.path.expanduser`.
+/// Checks for uses of `os.path.expanduser`.
 ///
 /// ## Why is this bad?
-/// `pathlib` offers high-level path manipulations, `os` offers low-level
-/// manipulation of paths. The use of the `Path` object where possible, e.g.
-/// `Path.expanduser()` improves readability over their `os` counterparts such
-/// as `os.path.expanduser()`.
+/// `pathlib` offers a high-level API for path manipulation, as compared to
+/// the lower-level API offered by `os`. When possible, using `Path` object
+/// methods such as `Path.expanduser()` can improve readability over the `os`
+/// module's counterparts (e.g., as `os.path.expanduser()`).
 ///
-/// There are situations where creating many `Path` object causes overhead.
-/// `os` functions therefore remain preferable in heavy loops and data
-/// structures storing paths (e.g. pandas).
+/// Note that `os` functions may be preferable if performance is a concern,
+/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
@@ -506,20 +470,17 @@ impl Violation for OsPathExpanduser {
     }
 }
 
-// PTH112
-
 /// ## What it does
-/// Detects the use of `os.path.isdir`.
+/// Checks for uses of `os.path.isdir`.
 ///
 /// ## Why is this bad?
-/// `pathlib` offers high-level path manipulations, `os` offers low-level
-/// manipulation of paths. The use of the `Path` object where possible, e.g.
-/// `Path.is_dir()` improves readability over their `os` counterparts such as
-/// `os.path.isdir()`.
+/// `pathlib` offers a high-level API for path manipulation, as compared to
+/// the lower-level API offered by `os`. When possible, using `Path` object
+/// methods such as `Path.is_dir()` can improve readability over the `os`
+/// module's counterparts (e.g., `os.path.isdir()`).
 ///
-/// There are situations where creating many `Path` object causes overhead.
-/// `os` functions therefore remain preferable in heavy loops and data
-/// structures storing paths (e.g. pandas).
+/// Note that `os` functions may be preferable if performance is a concern,
+/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
@@ -548,20 +509,17 @@ impl Violation for OsPathIsdir {
     }
 }
 
-// PTH113
-
 /// ## What it does
-/// Detects the use of `os.path.isfile`.
+/// Checks for uses of `os.path.isfile`.
 ///
 /// ## Why is this bad?
-/// `pathlib` offers high-level path manipulations, `os` offers low-level
-/// manipulation of paths. The use of the `Path` object where possible, e.g.
-/// `Path.is_file()` improves readability over their `os` counterparts such as
-/// `os.path.isfile()`.
+/// `pathlib` offers a high-level API for path manipulation, as compared to
+/// the lower-level API offered by `os`. When possible, using `Path` object
+/// methods such as `Path.is_file()` can improve readability over the `os`
+/// module's counterparts (e.g., `os.path.isfile()`).
 ///
-/// There are situations where creating many `Path` object causes overhead.
-/// `os` functions therefore remain preferable in heavy loops and data
-/// structures storing paths (e.g. pandas).
+/// Note that `os` functions may be preferable if performance is a concern,
+/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
@@ -590,20 +548,17 @@ impl Violation for OsPathIsfile {
     }
 }
 
-// PTH114
-
 /// ## What it does
-/// Detects the use of `os.path.islink`.
+/// Checks for uses of `os.path.islink`.
 ///
 /// ## Why is this bad?
-/// `pathlib` offers high-level path manipulations, `os` offers low-level
-/// manipulation of paths. The use of the `Path` object where possible, e.g.
-/// `Path.is_link()` improves readability over their `os` counterparts such as
-/// `os.path.islink()`.
+/// `pathlib` offers a high-level API for path manipulation, as compared to
+/// the lower-level API offered by `os`. When possible, using `Path` object
+/// methods such as `Path.is_link()` can improve readability over the `os`
+/// module's counterparts (e.g., `os.path.islink()`).
 ///
-/// There are situations where creating many `Path` object causes overhead.
-/// `os` functions therefore remain preferable in heavy loops and data
-/// structures storing paths (e.g. pandas).
+/// Note that `os` functions may be preferable if performance is a concern,
+/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
@@ -632,20 +587,17 @@ impl Violation for OsPathIslink {
     }
 }
 
-// PTH115
-
 /// ## What it does
-/// Detects the use of `os.readlink`.
+/// Checks for uses of `os.readlink`.
 ///
 /// ## Why is this bad?
-/// `pathlib` offers high-level path manipulations, `os` offers low-level
-/// manipulation of paths. The use of the `Path` object where possible, e.g.
-/// `Path.readlink()` improves readability over their `os` counterparts such as
-/// `os.readlink()`.
+/// `pathlib` offers a high-level API for path manipulation, as compared to
+/// the lower-level API offered by `os`. When possible, using `Path` object
+/// methods such as `Path.readlink()` can improve readability over the `os`
+/// module's counterparts (e.g., `os.readlink()`).
 ///
-/// There are situations where creating many `Path` object causes overhead.
-/// `os` functions therefore remain preferable in heavy loops and data
-/// structures storing paths (e.g. pandas).
+/// Note that `os` functions may be preferable if performance is a concern,
+/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
@@ -674,20 +626,17 @@ impl Violation for OsReadlink {
     }
 }
 
-// PTH116
-
 /// ## What it does
-/// Detects the use of `os.stat`.
+/// Checks for uses of `os.stat`.
 ///
 /// ## Why is this bad?
-/// `pathlib` offers high-level path manipulations, `os` offers low-level
-/// manipulation of paths. The use of the `Path` object where possible, e.g.
-/// `Path.stat()` improves readability over their `os` counterparts such as
-/// `os.path.stat()`.
+/// `pathlib` offers a high-level API for path manipulation, as compared to
+/// the lower-level API offered by `os`. When possible, using `Path` object
+/// methods such as `Path.stat()` can improve readability over the `os`
+/// module's counterparts (e.g., `os.path.stat()`).
 ///
-/// There are situations where creating many `Path` object causes overhead.
-/// `os` functions therefore remain preferable in heavy loops and data
-/// structures storing paths (e.g. pandas).
+/// Note that `os` functions may be preferable if performance is a concern,
+/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
@@ -731,20 +680,17 @@ impl Violation for OsStat {
     }
 }
 
-// PTH117
-
 /// ## What it does
-/// Detects the use of `os.path.isabs`.
+/// Checks for uses of `os.path.isabs`.
 ///
 /// ## Why is this bad?
-/// `pathlib` offers high-level path manipulations, `os` offers low-level
-/// manipulation of paths. The use of the `Path` object where possible, e.g.
-/// `Path.is_absolute()` improves readability over their `os` counterparts such
-///  as `os.path.isabs()`.
+/// `pathlib` offers a high-level API for path manipulation, as compared to
+/// the lower-level API offered by `os`. When possible, using `Path` object
+/// methods such as `Path.is_absolute()` can improve readability over the `os`
+/// module's counterparts (e.g.,  as `os.path.isabs()`).
 ///
-/// There are situations where creating many `Path` object causes overhead.
-/// `os` functions therefore remain preferable in heavy loops and data
-/// structures storing paths (e.g. pandas).
+/// Note that `os` functions may be preferable if performance is a concern,
+/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
@@ -775,20 +721,17 @@ impl Violation for OsPathIsabs {
     }
 }
 
-// PTH118
-
 /// ## What it does
-/// Detects the use of `os.path.join`.
+/// Checks for uses of `os.path.join`.
 ///
 /// ## Why is this bad?
-/// `pathlib` offers high-level path manipulations, `os` offers low-level
-/// manipulation of paths. The use of the `Path` object where possible, e.g.
-/// `Path.joinpath()` improves readability over their `os` counterparts such as
-/// `os.path.join()`.
+/// `pathlib` offers a high-level API for path manipulation, as compared to
+/// the lower-level API offered by `os`. When possible, using `Path` object
+/// methods such as `Path.joinpath()` can improve readability over the `os`
+/// module's counterparts (e.g., `os.path.join()`).
 ///
-/// There are situations where creating many `Path` object causes overhead.
-/// `os` functions therefore remain preferable in heavy loops and data
-/// structures storing paths (e.g. pandas).
+/// Note that `os` functions may be preferable if performance is a concern,
+/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
@@ -817,20 +760,17 @@ impl Violation for OsPathJoin {
     }
 }
 
-// PTH119
-
 /// ## What it does
-/// Detects the use of `os.path.basename`.
+/// Checks for uses of `os.path.basename`.
 ///
 /// ## Why is this bad?
-/// `pathlib` offers high-level path manipulations, `os` offers low-level
-/// manipulation of paths. The use of the `Path` object where possible, e.g.
-/// `Path.name` improves readability over their `os` counterparts such as
-/// `os.path.basename()`.
+/// `pathlib` offers a high-level API for path manipulation, as compared to
+/// the lower-level API offered by `os`. When possible, using `Path` object
+/// methods such as `Path.name` can improve readability over the `os`
+/// module's counterparts (e.g., `os.path.basename()`).
 ///
-/// There are situations where creating many `Path` object causes overhead.
-/// `os` functions therefore remain preferable in heavy loops and data
-/// structures storing paths (e.g. pandas).
+/// Note that `os` functions may be preferable if performance is a concern,
+/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
@@ -859,20 +799,17 @@ impl Violation for OsPathBasename {
     }
 }
 
-// PTH120
-
 /// ## What it does
-/// Detects the use of `os.path.dirname`.
+/// Checks for uses of `os.path.dirname`.
 ///
 /// ## Why is this bad?
-/// `pathlib` offers high-level path manipulations, `os` offers low-level
-/// manipulation of paths. The use of the `Path` object where possible, e.g.
-/// `Path.parent` improves readability over their `os` counterparts such as
-/// `os.path.dirname()`.
+/// `pathlib` offers a high-level API for path manipulation, as compared to
+/// the lower-level API offered by `os`. When possible, using `Path` object
+/// methods such as `Path.parent` can improve readability over the `os`
+/// module's counterparts (e.g., `os.path.dirname()`).
 ///
-/// There are situations where creating many `Path` object causes overhead.
-/// `os` functions therefore remain preferable in heavy loops and data
-/// structures storing paths (e.g. pandas).
+/// Note that `os` functions may be preferable if performance is a concern,
+/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
@@ -901,20 +838,17 @@ impl Violation for OsPathDirname {
     }
 }
 
-// PTH121
-
 /// ## What it does
-/// Detects the use of `os.path.samefile`.
+/// Checks for uses of `os.path.samefile`.
 ///
 /// ## Why is this bad?
-/// `pathlib` offers high-level path manipulations, `os` offers low-level
-/// manipulation of paths. The use of the `Path` object where possible, e.g.
-/// `Path.samefile()` improves readability over their `os` counterparts such as
-/// `os.path.samefile()`.
+/// `pathlib` offers a high-level API for path manipulation, as compared to
+/// the lower-level API offered by `os`. When possible, using `Path` object
+/// methods such as `Path.samefile()` can improve readability over the `os`
+/// module's counterparts (e.g., `os.path.samefile()`).
 ///
-/// There are situations where creating many `Path` object causes overhead.
-/// `os` functions therefore remain preferable in heavy loops and data
-/// structures storing paths (e.g. pandas).
+/// Note that `os` functions may be preferable if performance is a concern,
+/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
@@ -943,20 +877,17 @@ impl Violation for OsPathSamefile {
     }
 }
 
-// PTH122
-
 /// ## What it does
-/// Detects the use of `os.path.splitext`.
+/// Checks for uses of `os.path.splitext`.
 ///
 /// ## Why is this bad?
-/// `pathlib` offers high-level path manipulations, `os` offers low-level
-/// manipulation of paths. The use of the `Path` object where possible, e.g.
-/// `Path.suffix` improves readability over their `os` counterparts such as
-/// `os.path.splitext()`.
+/// `pathlib` offers a high-level API for path manipulation, as compared to
+/// the lower-level API offered by `os`. When possible, using `Path` object
+/// methods such as `Path.suffix` can improve readability over the `os`
+/// module's counterparts (e.g., `os.path.splitext()`).
 ///
-/// There are situations where creating many `Path` object causes overhead.
-/// `os` functions therefore remain preferable in heavy loops and data
-/// structures storing paths (e.g. pandas).
+/// Note that `os` functions may be preferable if performance is a concern,
+/// e.g., in hot loops.
 ///
 /// ## Examples
 /// ```python
@@ -986,17 +917,13 @@ impl Violation for OsPathSplitext {
     }
 }
 
-// PTH123
-
 /// ## What it does
-/// Detects the use of `open`.
+/// Checks for uses of the `open` builtin.
 ///
 /// ## Why is this bad?
-/// `pathlib` offers high-level path manipulations, `os` offers low-level
-/// manipulation of paths. The use of the `Path` object where possible, e.g.
-/// `Path.open()` improves readability over their `os` counterparts that are
-/// often used to manipulate the input argument to `open()`.
-///
+/// `pathlib` offers a high-level API for path manipulation. When possible,
+/// using `Path` object methods such as `Path.open()` can improve readability
+/// over the `open` builtin.
 ///
 /// ## Examples
 /// ```python
@@ -1027,14 +954,12 @@ impl Violation for BuiltinOpen {
     }
 }
 
-// PTH124
-
 /// ## What it does
-/// Detects the use of the `py.path` lirbary.
+/// Checks for uses of the `py.path` library.
 ///
 /// ## Why is this bad?
-/// `py.path` is in maintenance mode, use the `pathlib` module from the
-/// standard library, or third-party modules such as `path` (formerly
+/// The `py.path` library is in maintenance mode. Instead, prefer the standard
+/// library's `pathlib` module, or third-party modules like `path` (formerly
 /// `py.path`).
 ///
 /// ## Examples
