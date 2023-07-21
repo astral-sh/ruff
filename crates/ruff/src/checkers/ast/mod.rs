@@ -3004,6 +3004,7 @@ where
                     Rule::OsPathGetatime,
                     Rule::OsPathGetmtime,
                     Rule::OsPathGetctime,
+                    Rule::Glob,
                 ]) {
                     flake8_use_pathlib::rules::replaceable_by_pathlib(self, func);
                 }
