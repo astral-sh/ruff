@@ -3010,6 +3010,9 @@ where
                 if self.enabled(Rule::PathConstructorCurrentDirectory) {
                     flake8_use_pathlib::rules::path_constructor_current_directory(self, expr, func);
                 }
+                if self.enabled(Rule::OsSepSplit) {
+                    flake8_use_pathlib::rules::os_sep_split(self, func, args, keywords);
+                }
                 if self.enabled(Rule::NumpyLegacyRandom) {
                     numpy::rules::legacy_random(self, func);
                 }
