@@ -17,11 +17,15 @@ use ruff_macros::{derive_message_formats, violation};
 ///
 /// ## Examples
 /// ```python
+/// import os
+///
 /// os.path.getsize(__file__)
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from pathlib import Path
+///
 /// Path(__file__).stat().st_size
 /// ```
 ///
