@@ -1,4 +1,5 @@
-use crate::comments::{dangling_node_comments, leading_comments};
+use crate::builders::empty_with_dangling_comments;
+use crate::comments::leading_comments;
 use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 use crate::FormatNodeRule;
@@ -64,14 +65,13 @@ impl FormatNodeRule<ExprDict> for FormatExprDict {
         debug_assert_eq!(keys.len(), values.len());
 
         if values.is_empty() {
-            return write!(
-                f,
-                [
-                    &text("{"),
-                    block_indent(&dangling_node_comments(item)),
-                    &text("}"),
-                ]
-            );
+            let comments = f.context().comments().clone();
+            return empty_with_dangling_comments(
+                text("{"),
+                comments.dangling_comments(item),
+                text("}"),
+            )
+            .fmt(f);
         }
 
         let format_pairs = format_with(|f| {

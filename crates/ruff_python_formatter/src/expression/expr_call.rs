@@ -1,11 +1,11 @@
 use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::{Expr, ExprCall, Ranged};
 
+use crate::builders::empty_with_dangling_comments;
 use ruff_formatter::write;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 
-use crate::comments::dangling_comments;
 use crate::expression::expr_generator_exp::GeneratorExpParentheses;
 use crate::expression::parentheses::{
     parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
@@ -34,14 +34,15 @@ impl FormatNodeRule<ExprCall> for FormatExprCall {
         // ```
         if args.is_empty() && keywords.is_empty() {
             let comments = f.context().comments().clone();
-            let comments = comments.dangling_comments(item);
             return write!(
                 f,
                 [
                     func.format(),
-                    text("("),
-                    dangling_comments(comments),
-                    text(")")
+                    empty_with_dangling_comments(
+                        text("("),
+                        comments.dangling_comments(item),
+                        text(")"),
+                    )
                 ]
             );
         }

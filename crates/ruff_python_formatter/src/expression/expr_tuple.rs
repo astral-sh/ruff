@@ -5,8 +5,7 @@ use rustpython_parser::ast::{Expr, Ranged};
 use ruff_formatter::{format_args, write, FormatRuleWithOptions};
 use ruff_python_ast::node::AnyNodeRef;
 
-use crate::builders::parenthesize_if_expands;
-use crate::comments::{dangling_comments, CommentLinePosition};
+use crate::builders::{empty_with_dangling_comments, parenthesize_if_expands};
 use crate::expression::parentheses::{
     parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
 };
@@ -79,22 +78,12 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
         match elts.as_slice() {
             [] => {
                 let comments = f.context().comments().clone();
-                let dangling = comments.dangling_comments(item);
-                let end_of_line_split = dangling.partition_point(|comment| {
-                    comment.line_position() == CommentLinePosition::EndOfLine
-                });
-                debug_assert!(dangling[end_of_line_split..]
-                    .iter()
-                    .all(|comment| comment.line_position() == CommentLinePosition::OwnLine));
-                write!(
-                    f,
-                    [group(&format_args![
-                        text("("),
-                        dangling_comments(&dangling[..end_of_line_split]),
-                        soft_block_indent(&dangling_comments(&dangling[end_of_line_split..])),
-                        text(")")
-                    ])]
+                return empty_with_dangling_comments(
+                    text("("),
+                    comments.dangling_comments(item),
+                    text(")"),
                 )
+                .fmt(f);
             }
             [single] => match self.parentheses {
                 TupleParentheses::Subscript
