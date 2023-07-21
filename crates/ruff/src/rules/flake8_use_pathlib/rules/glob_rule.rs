@@ -25,6 +25,7 @@ use ruff_macros::{derive_message_formats, violation};
 /// from pathlib import Path
 ///
 /// Path(path).glob("requirements*.txt")
+/// ```
 ///
 /// ## References
 /// - [Python documentation: `Path.glob`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.glob)
