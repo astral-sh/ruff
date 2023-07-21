@@ -149,7 +149,11 @@ impl FormatNodeRule<Arguments> for FormatArguments {
 
             joiner.finish()?;
 
-            write!(f, [if_group_breaks(&text(","))])?;
+            // lambdas have no parentheses, so they also don't get magic trailing comma behaviour
+            // (but we do preserve a trailing comma below)
+            if self.parentheses != ArgumentsParentheses::SkipInsideLambda {
+                write!(f, [if_group_breaks(&text(","))])?;
+            }
 
             // Expand the group if the source has a trailing *magic* comma.
             if let Some(last_node) = last_node {
@@ -177,7 +181,14 @@ impl FormatNodeRule<Arguments> for FormatArguments {
                 };
 
                 if maybe_comma_token.map_or(false, |token| token.kind() == SimpleTokenKind::Comma) {
-                    write!(f, [hard_line_break()])?;
+                    if self.parentheses == ArgumentsParentheses::SkipInsideLambda {
+                        // For lambdas (no parentheses), preserve the trailing comma. It doesn't
+                        // behave like a magic trailing comma, it's just preserved
+                        write!(f, [text(",")])?;
+                    } else {
+                        // Make the magic trailing comma expand the group
+                        write!(f, [hard_line_break()])?;
+                    }
                 }
             }
 
