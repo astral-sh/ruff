@@ -637,6 +637,13 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_lambda_no_args() {
+        let source = "lambda: 1";
+        let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
+        insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
     fn test_parse_tuples() {
         let source = "a, b = 4, 5";
 

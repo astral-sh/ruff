@@ -11,7 +11,7 @@ Ok(
                     ExprLambda {
                         range: 0..9,
                         args: Arguments {
-                            range: 0..9,
+                            range: 6..6,
                             posonlyargs: [],
                             args: [],
                             vararg: None,

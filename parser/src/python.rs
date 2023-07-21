@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: 97fa7c01dee20861a5e5be31c0e0e1bccbc4396352b92ca6e5688d8f08b58cfe
+// sha3: e7613070cb5214ab021650015eb34d0a63631e3e1e61e1b26445cf55a4919727
 use crate::{
     ast::{self as ast, Ranged, bigint::BigInt},
     lexer::{LexicalError, LexicalErrorType},
@@ -32635,7 +32635,9 @@ fn __action178<
 >(
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
+    (_, location_args, _): (TextSize, TextSize, TextSize),
     (_, p, _): (TextSize, core::option::Option<ast::Arguments>, TextSize),
+    (_, end_location_args, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, body, _): (TextSize, ast::Expr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
@@ -32644,7 +32646,7 @@ fn __action178<
     {
         p.as_ref().map(validate_arguments).transpose()?;
         let p = p
-            .unwrap_or_else(|| ast::Arguments::empty((location..end_location).into()));
+            .unwrap_or_else(|| ast::Arguments::empty((location_args..end_location_args).into()));
 
         Ok(ast::Expr::Lambda(
             ast::ExprLambda {
@@ -43474,25 +43476,35 @@ fn __action820<
 >(
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, core::option::Option<ast::Arguments>, TextSize),
-    __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Expr, TextSize),
-    __4: (TextSize, TextSize, TextSize),
+    __2: (TextSize, TextSize, TextSize),
+    __3: (TextSize, token::Tok, TextSize),
+    __4: (TextSize, ast::Expr, TextSize),
+    __5: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
+    let __start1 = __0.2;
+    let __end1 = __1.0;
     let __temp0 = __action387(
         &__start0,
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
+    let __temp1 = __action387(
+        &__start1,
+        &__end1,
+    );
+    let __temp1 = (__start1, __temp1, __end1);
     __action178(
         __temp0,
         __0,
+        __temp1,
         __1,
         __2,
         __3,
         __4,
+        __5,
     )
 }
 
@@ -55169,19 +55181,27 @@ fn __action1303<
     __3: (TextSize, ast::Expr, TextSize),
 ) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
-    let __start0 = __3.2;
-    let __end0 = __3.2;
+    let __start0 = __1.2;
+    let __end0 = __2.0;
+    let __start1 = __3.2;
+    let __end1 = __3.2;
     let __temp0 = __action386(
         &__start0,
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
+    let __temp1 = __action386(
+        &__start1,
+        &__end1,
+    );
+    let __temp1 = (__start1, __temp1, __end1);
     __action820(
         __0,
         __1,
+        __temp0,
         __2,
         __3,
-        __temp0,
+        __temp1,
     )
 }
 

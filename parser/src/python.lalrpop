@@ -1245,10 +1245,10 @@ NamedExpression: ast::Expr = {
 };
 
 LambdaDef: ast::Expr = {
-    <location:@L> "lambda" <p:ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter>?> ":" <body:Test<"all">> <end_location:@R> =>? {
+    <location:@L> "lambda" <location_args:@L> <p:ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter>?> <end_location_args:@R> ":" <body:Test<"all">> <end_location:@R> =>? {
         p.as_ref().map(validate_arguments).transpose()?;
         let p = p
-            .unwrap_or_else(|| ast::Arguments::empty((location..end_location).into()));
+            .unwrap_or_else(|| ast::Arguments::empty((location_args..end_location_args).into()));
 
         Ok(ast::Expr::Lambda(
             ast::ExprLambda {
