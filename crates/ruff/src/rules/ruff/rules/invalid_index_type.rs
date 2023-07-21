@@ -49,7 +49,7 @@ impl Violation for InvalidIndexType {
     }
 }
 
-/// RUF015
+/// RUF016
 pub(crate) fn invalid_index_type(checker: &mut Checker, expr: &ExprSubscript) {
     let ExprSubscript {
         value,
