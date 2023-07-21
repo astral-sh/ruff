@@ -327,7 +327,7 @@ last_call()
  )
  what_is_up_with_those_new_coord_names = (coord_names | set(vars_to_create)) - set(
      vars_to_remove
- )
+-)
 -result = (
 -    session.query(models.Customer.id)
 -    .filter(
@@ -335,7 +335,7 @@ last_call()
 -    )
 -    .order_by(models.Customer.id.asc())
 -    .all()
--)
+ )
 -result = (
 -    session.query(models.Customer.id)
 -    .filter(
