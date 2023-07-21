@@ -81,7 +81,7 @@ impl Document {
                             interned_expands
                         }
                     }
-                    FormatElement::BestFitting { variants } => {
+                    FormatElement::BestFitting { variants, mode: _ } => {
                         enclosing.push(Enclosing::BestFitting);
 
                         for variant in variants {
@@ -326,7 +326,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                     write!(f, [text("line_suffix_boundary")])?;
                 }
 
-                FormatElement::BestFitting { variants } => {
+                FormatElement::BestFitting { variants, mode } => {
                     write!(f, [text("best_fitting([")])?;
                     f.write_elements([
                         FormatElement::Tag(StartIndent),
@@ -341,6 +341,16 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                         FormatElement::Tag(EndIndent),
                         FormatElement::Line(LineMode::Hard),
                     ]);
+
+                    if *mode != BestFittingMode::FirstLine {
+                        write!(
+                            f,
+                            [
+                                dynamic_text(&std::format!("mode: {mode:?},"), None),
+                                space()
+                            ]
+                        )?;
+                    }
 
                     write!(f, [text("])")])?;
                 }
