@@ -1,0 +1,32 @@
+---
+source: crates/ruff/src/rules/flake8_pyi/mod.rs
+---
+PYI056.pyi:3:1: PYI056 Calling ".append()" on "__all__" may not be supported by all type checkers (use += instead)
+  |
+1 | __all__ = ["A", "B", "C"]
+2 | 
+3 | __all__.append("D")
+  | ^^^^^^^^^^^^^^ PYI056
+4 | __all__.extend(["E", "Foo"])
+5 | __all__.remove("A")
+  |
+
+PYI056.pyi:4:1: PYI056 Calling ".extend()" on "__all__" may not be supported by all type checkers (use += instead)
+  |
+3 | __all__.append("D")
+4 | __all__.extend(["E", "Foo"])
+  | ^^^^^^^^^^^^^^ PYI056
+5 | __all__.remove("A")
+  |
+
+PYI056.pyi:5:1: PYI056 Calling ".remove()" on "__all__" may not be supported by all type checkers (use += instead)
+  |
+3 | __all__.append("D")
+4 | __all__.extend(["E", "Foo"])
+5 | __all__.remove("A")
+  | ^^^^^^^^^^^^^^ PYI056
+6 | 
+7 | # these are ok
+  |
+
+
