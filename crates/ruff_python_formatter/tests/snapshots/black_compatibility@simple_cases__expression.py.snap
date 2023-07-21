@@ -357,21 +357,6 @@ last_call()
  Ø = set()
  authors.łukasz.say_thanks()
  mapping = {
-@@ -237,10 +234,10 @@
- 
- 
- def gen():
--    yield from outside_of_generator
--    a = yield
--    b = yield
--    c = yield
-+    NOT_YET_IMPLEMENTED_ExprYieldFrom
-+    a = NOT_YET_IMPLEMENTED_ExprYield
-+    b = NOT_YET_IMPLEMENTED_ExprYield
-+    c = NOT_YET_IMPLEMENTED_ExprYield
- 
- 
- async def f():
 @@ -328,13 +325,18 @@
  ):
      return True
@@ -645,10 +630,10 @@ mapping = {
 
 
 def gen():
-    NOT_YET_IMPLEMENTED_ExprYieldFrom
-    a = NOT_YET_IMPLEMENTED_ExprYield
-    b = NOT_YET_IMPLEMENTED_ExprYield
-    c = NOT_YET_IMPLEMENTED_ExprYield
+    yield from outside_of_generator
+    a = yield
+    b = yield
+    c = yield
 
 
 async def f():
