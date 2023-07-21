@@ -694,6 +694,9 @@ where
                 if self.enabled(Rule::DjangoUnorderedBodyContentInModel) {
                     flake8_django::rules::unordered_body_content_in_model(self, bases, body);
                 }
+                if self.enabled(Rule::EqWithoutHash) {
+                    pylint::rules::object_without_hash_method(self, class_def);
+                }
                 if !self.is_stub {
                     if self.enabled(Rule::DjangoModelWithoutDunderStr) {
                         flake8_django::rules::model_without_dunder_str(self, class_def);
