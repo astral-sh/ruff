@@ -39,7 +39,18 @@ pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, expr: &Expr) {
                 ["os", "path", "islink"] => Some(OsPathIslink.into()),
                 ["os", "stat"] => Some(OsStat.into()),
                 ["os", "path", "isabs"] => Some(OsPathIsabs.into()),
-                ["os", "path", "join"] => Some(OsPathJoin.into()),
+                ["os", "path", "join"] => Some(
+                    OsPathJoin {
+                        module: "path".to_string(),
+                    }
+                    .into(),
+                ),
+                ["os", "sep", "join"] => Some(
+                    OsPathJoin {
+                        module: "sep".to_string(),
+                    }
+                    .into(),
+                ),
                 ["os", "path", "basename"] => Some(OsPathBasename.into()),
                 ["os", "path", "dirname"] => Some(OsPathDirname.into()),
                 ["os", "path", "samefile"] => Some(OsPathSamefile.into()),

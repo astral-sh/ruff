@@ -203,12 +203,15 @@ impl Violation for OsPathIsabs {
 
 // PTH118
 #[violation]
-pub struct OsPathJoin;
+pub struct OsPathJoin {
+    pub module: String,
+}
 
 impl Violation for OsPathJoin {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`os.path.join()` should be replaced by `Path` with `/` operator")
+        let OsPathJoin { module } = self;
+        format!("`os.{module}.join()` should be replaced by `Path` with `/` operator")
     }
 }
 
