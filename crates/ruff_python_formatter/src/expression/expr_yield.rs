@@ -18,7 +18,7 @@ impl FormatNodeRule<ExprYield> for FormatExprYield {
             write!(
                 f,
                 [
-                    &text("yield"),
+                    text("yield"),
                     space(),
                     maybe_parenthesize_expression(val, item, Parenthesize::IfRequired)
                 ]
