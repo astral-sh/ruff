@@ -20,9 +20,6 @@ use super::super::settings::Quote;
 /// Consistency is good. Use either single or double quotes for inline
 /// strings, but be consistent.
 ///
-/// ## Options
-/// - `flake8-quotes.inline-quotes`
-///
 /// ## Example
 /// ```python
 /// foo = 'bar'
@@ -32,6 +29,9 @@ use super::super::settings::Quote;
 /// ```python
 /// foo = "bar"
 /// ```
+///
+/// ## Options
+/// - `flake8-quotes.inline-quotes`
 #[violation]
 pub struct BadQuotesInlineString {
     quote: Quote,
@@ -42,16 +42,16 @@ impl AlwaysAutofixableViolation for BadQuotesInlineString {
     fn message(&self) -> String {
         let BadQuotesInlineString { quote } = self;
         match quote {
-            Quote::Single => format!("Double quotes found but single quotes preferred"),
             Quote::Double => format!("Single quotes found but double quotes preferred"),
+            Quote::Single => format!("Double quotes found but single quotes preferred"),
         }
     }
 
     fn autofix_title(&self) -> String {
         let BadQuotesInlineString { quote } = self;
         match quote {
-            Quote::Single => "Replace double quotes with single quotes".to_string(),
             Quote::Double => "Replace single quotes with double quotes".to_string(),
+            Quote::Single => "Replace double quotes with single quotes".to_string(),
         }
     }
 }
@@ -64,9 +64,6 @@ impl AlwaysAutofixableViolation for BadQuotesInlineString {
 /// ## Why is this bad?
 /// Consistency is good. Use either single or double quotes for multiline
 /// strings, but be consistent.
-///
-/// ## Options
-/// - `flake8-quotes.multiline-quotes`
 ///
 /// ## Example
 /// ```python
@@ -81,6 +78,9 @@ impl AlwaysAutofixableViolation for BadQuotesInlineString {
 /// bar
 /// """
 /// ```
+///
+/// ## Options
+/// - `flake8-quotes.multiline-quotes`
 #[violation]
 pub struct BadQuotesMultilineString {
     quote: Quote,
@@ -91,16 +91,16 @@ impl AlwaysAutofixableViolation for BadQuotesMultilineString {
     fn message(&self) -> String {
         let BadQuotesMultilineString { quote } = self;
         match quote {
-            Quote::Single => format!("Double quote multiline found but single quotes preferred"),
             Quote::Double => format!("Single quote multiline found but double quotes preferred"),
+            Quote::Single => format!("Double quote multiline found but single quotes preferred"),
         }
     }
 
     fn autofix_title(&self) -> String {
         let BadQuotesMultilineString { quote } = self;
         match quote {
-            Quote::Single => "Replace double multiline quotes with single quotes".to_string(),
             Quote::Double => "Replace single multiline quotes with double quotes".to_string(),
+            Quote::Single => "Replace double multiline quotes with single quotes".to_string(),
         }
     }
 }
@@ -112,9 +112,6 @@ impl AlwaysAutofixableViolation for BadQuotesMultilineString {
 /// ## Why is this bad?
 /// Consistency is good. Use either single or double quotes for docstring
 /// strings, but be consistent.
-///
-/// ## Options
-/// - `flake8-quotes.docstring-quotes`
 ///
 /// ## Example
 /// ```python
@@ -129,6 +126,9 @@ impl AlwaysAutofixableViolation for BadQuotesMultilineString {
 /// bar
 /// """
 /// ```
+///
+/// ## Options
+/// - `flake8-quotes.docstring-quotes`
 #[violation]
 pub struct BadQuotesDocstring {
     quote: Quote,
@@ -139,16 +139,16 @@ impl AlwaysAutofixableViolation for BadQuotesDocstring {
     fn message(&self) -> String {
         let BadQuotesDocstring { quote } = self;
         match quote {
-            Quote::Single => format!("Double quote docstring found but single quotes preferred"),
             Quote::Double => format!("Single quote docstring found but double quotes preferred"),
+            Quote::Single => format!("Double quote docstring found but single quotes preferred"),
         }
     }
 
     fn autofix_title(&self) -> String {
         let BadQuotesDocstring { quote } = self;
         match quote {
-            Quote::Single => "Replace double quotes docstring with single quotes".to_string(),
             Quote::Double => "Replace single quotes docstring with double quotes".to_string(),
+            Quote::Single => "Replace double quotes docstring with single quotes".to_string(),
         }
     }
 }
@@ -186,8 +186,8 @@ impl AlwaysAutofixableViolation for AvoidableEscapedQuote {
 
 const fn good_single(quote: Quote) -> char {
     match quote {
-        Quote::Single => '\'',
         Quote::Double => '"',
+        Quote::Single => '\'',
     }
 }
 
@@ -200,22 +200,22 @@ const fn bad_single(quote: Quote) -> char {
 
 const fn good_multiline(quote: Quote) -> &'static str {
     match quote {
-        Quote::Single => "'''",
         Quote::Double => "\"\"\"",
+        Quote::Single => "'''",
     }
 }
 
 const fn good_multiline_ending(quote: Quote) -> &'static str {
     match quote {
-        Quote::Single => "'\"\"\"",
         Quote::Double => "\"'''",
+        Quote::Single => "'\"\"\"",
     }
 }
 
 const fn good_docstring(quote: Quote) -> &'static str {
     match quote {
-        Quote::Single => "'",
         Quote::Double => "\"",
+        Quote::Single => "'",
     }
 }
 
@@ -284,8 +284,7 @@ fn docstring(locator: &Locator, range: TextRange, settings: &Settings) -> Option
         fixed_contents.push_str(&quote);
         fixed_contents.push_str(string_contents);
         fixed_contents.push_str(&quote);
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
             fixed_contents,
             range,
         )));
@@ -323,7 +322,7 @@ fn strings(locator: &Locator, sequence: &[TextRange], settings: &Settings) -> Ve
         string_contents.contains(good_single(quotes_settings.inline_quotes))
     });
 
-    for (range, trivia) in sequence.iter().zip(trivia.into_iter()) {
+    for (range, trivia) in sequence.iter().zip(trivia) {
         if trivia.is_multiline {
             // If our string is or contains a known good string, ignore it.
             if trivia
@@ -358,8 +357,7 @@ fn strings(locator: &Locator, sequence: &[TextRange], settings: &Settings) -> Ve
                 fixed_contents.push_str(quote);
                 fixed_contents.push_str(string_contents);
                 fixed_contents.push_str(quote);
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                     fixed_contents,
                     *range,
                 )));
@@ -425,8 +423,7 @@ fn strings(locator: &Locator, sequence: &[TextRange], settings: &Settings) -> Ve
 
                         fixed_contents.push(quote);
 
-                        #[allow(deprecated)]
-                        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                             fixed_contents,
                             *range,
                         )));
@@ -452,8 +449,7 @@ fn strings(locator: &Locator, sequence: &[TextRange], settings: &Settings) -> Ve
                     fixed_contents.push(quote);
                     fixed_contents.push_str(string_contents);
                     fixed_contents.push(quote);
-                    #[allow(deprecated)]
-                    diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                    diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                         fixed_contents,
                         *range,
                     )));
@@ -468,12 +464,11 @@ fn strings(locator: &Locator, sequence: &[TextRange], settings: &Settings) -> Ve
 
 /// Generate `flake8-quote` diagnostics from a token stream.
 pub(crate) fn from_tokens(
+    diagnostics: &mut Vec<Diagnostic>,
     lxr: &[LexResult],
     locator: &Locator,
     settings: &Settings,
-) -> Vec<Diagnostic> {
-    let mut diagnostics = vec![];
-
+) {
     // Keep track of sequences of strings, which represent implicit string
     // concatenation, and should thus be handled as a single unit.
     let mut sequence = vec![];
@@ -492,7 +487,7 @@ pub(crate) fn from_tokens(
                 diagnostics.push(diagnostic);
             }
         } else {
-            if matches!(tok, Tok::String { .. }) {
+            if tok.is_string() {
                 // If this is a string, add it to the sequence.
                 sequence.push(range);
             } else if !matches!(tok, Tok::Comment(..) | Tok::NonLogicalNewline) {
@@ -510,6 +505,4 @@ pub(crate) fn from_tokens(
         diagnostics.extend(strings(locator, &sequence, settings));
         sequence.clear();
     }
-
-    diagnostics
 }

@@ -1,10 +1,42 @@
-use rustpython_parser::ast::{Arg, Arguments, Expr, Ranged};
+use rustpython_parser::ast::{Arg, ArgWithDefault, Arguments, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
+use crate::checkers::ast::Checker;
+
 use super::super::helpers::{matches_password_name, string_literal};
 
+/// ## What it does
+/// Checks for potential uses of hardcoded passwords in function argument
+/// defaults.
+///
+/// ## Why is this bad?
+/// Including a hardcoded password in source code is a security risk, as an
+/// attacker could discover the password and use it to gain unauthorized
+/// access.
+///
+/// Instead, store passwords and other secrets in configuration files,
+/// environment variables, or other sources that are excluded from version
+/// control.
+///
+/// ## Example
+/// ```python
+/// def connect_to_server(password="hunter2"):
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import os
+///
+///
+/// def connect_to_server(password=os.environ["PASSWORD"]):
+///     ...
+/// ```
+///
+/// ## References
+/// - [Common Weakness Enumeration: CWE-259](https://cwe.mitre.org/data/definitions/259.html)
 #[violation]
 pub struct HardcodedPasswordDefault {
     name: String,
@@ -36,34 +68,22 @@ fn check_password_kwarg(arg: &Arg, default: &Expr) -> Option<Diagnostic> {
 }
 
 /// S107
-pub(crate) fn hardcoded_password_default(arguments: &Arguments) -> Vec<Diagnostic> {
-    let mut diagnostics: Vec<Diagnostic> = Vec::new();
-
-    let defaults_start =
-        arguments.posonlyargs.len() + arguments.args.len() - arguments.defaults.len();
-    for (i, arg) in arguments
+pub(crate) fn hardcoded_password_default(checker: &mut Checker, arguments: &Arguments) {
+    for ArgWithDefault {
+        def,
+        default,
+        range: _,
+    } in arguments
         .posonlyargs
         .iter()
         .chain(&arguments.args)
-        .enumerate()
+        .chain(&arguments.kwonlyargs)
     {
-        if let Some(i) = i.checked_sub(defaults_start) {
-            let default = &arguments.defaults[i];
-            if let Some(diagnostic) = check_password_kwarg(arg, default) {
-                diagnostics.push(diagnostic);
-            }
+        let Some(default) = default else {
+            continue;
+        };
+        if let Some(diagnostic) = check_password_kwarg(def, default) {
+            checker.diagnostics.push(diagnostic);
         }
     }
-
-    let defaults_start = arguments.kwonlyargs.len() - arguments.kw_defaults.len();
-    for (i, kwarg) in arguments.kwonlyargs.iter().enumerate() {
-        if let Some(i) = i.checked_sub(defaults_start) {
-            let default = &arguments.kw_defaults[i];
-            if let Some(diagnostic) = check_password_kwarg(kwarg, default) {
-                diagnostics.push(diagnostic);
-            }
-        }
-    }
-
-    diagnostics
 }

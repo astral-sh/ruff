@@ -55,8 +55,6 @@ struct GroupNameFinder<'a> {
     /// A flag indicating that the `group_name` variable has been overridden
     /// during the visit.
     overridden: bool,
-    /// A stack of `if` statements.
-    parent_ifs: Vec<&'a Stmt>,
     /// A stack of counters where each counter is itself a list of usage count.
     /// This is used specifically for mutually exclusive statements such as an
     /// `if` or `match`.
@@ -77,7 +75,6 @@ impl<'a> GroupNameFinder<'a> {
             usage_count: 0,
             nested: false,
             overridden: false,
-            parent_ifs: Vec::new(),
             counter_stack: Vec::new(),
             exprs: Vec::new(),
         }
@@ -146,56 +143,28 @@ where
             Stmt::If(ast::StmtIf {
                 test,
                 body,
-                orelse,
+                elif_else_clauses,
                 range: _,
             }) => {
-                // Determine whether we're on an `if` arm (as opposed to an `elif`).
-                let is_if_arm = !self.parent_ifs.iter().any(|parent| {
-                    if let Stmt::If(ast::StmtIf { orelse, .. }) = parent {
-                        orelse.len() == 1 && &orelse[0] == stmt
-                    } else {
-                        false
-                    }
-                });
+                // base if plus branches
+                let mut if_stack = Vec::with_capacity(1 + elif_else_clauses.len());
+                // Initialize the vector with the count for the if branch.
+                if_stack.push(0);
+                self.counter_stack.push(if_stack);
 
-                if is_if_arm {
-                    // Initialize the vector with the count for current branch.
-                    self.counter_stack.push(vec![0]);
-                } else {
-                    // SAFETY: `unwrap` is safe because we're either in `elif` or
-                    // `else` branch which can come only after an `if` branch.
-                    // When inside an `if` branch, a new vector will be pushed
-                    // onto the stack.
+                self.visit_expr(test);
+                self.visit_body(body);
+
+                for clause in elif_else_clauses {
                     self.counter_stack.last_mut().unwrap().push(0);
+                    self.visit_elif_else_clause(clause);
                 }
 
-                let has_else = orelse
-                    .first()
-                    .map_or(false, |expr| !matches!(expr, Stmt::If(_)));
-
-                self.parent_ifs.push(stmt);
-                if has_else {
-                    // There's no `Stmt::Else`; instead, the `else` contents are directly on
-                    // the `orelse` of the `Stmt::If` node. We want to add a new counter for
-                    // the `orelse` branch, but first, we need to visit the `if` body manually.
-                    self.visit_expr(test);
-                    self.visit_body(body);
-
-                    // Now, we're in an `else` block.
-                    self.counter_stack.last_mut().unwrap().push(0);
-                    self.visit_body(orelse);
-                } else {
-                    visitor::walk_stmt(self, stmt);
-                }
-                self.parent_ifs.pop();
-
-                if is_if_arm {
-                    if let Some(last) = self.counter_stack.pop() {
-                        // This is the max number of group usage from all the
-                        // branches of this `if` statement.
-                        let max_count = last.into_iter().max().unwrap_or(0);
-                        self.increment_usage_count(max_count);
-                    }
+                if let Some(last) = self.counter_stack.pop() {
+                    // This is the max number of group usage from all the
+                    // branches of this `if` statement.
+                    let max_count = last.into_iter().max().unwrap_or(0);
+                    self.increment_usage_count(max_count);
                 }
             }
             Stmt::Match(ast::StmtMatch {
@@ -342,16 +311,16 @@ pub(crate) fn reuse_of_groupby_generator(
     };
     // Check if the function call is `itertools.groupby`
     if !checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(func)
         .map_or(false, |call_path| {
-            call_path.as_slice() == ["itertools", "groupby"]
+            matches!(call_path.as_slice(), ["itertools", "groupby"])
         })
     {
         return;
     }
     let mut finder = GroupNameFinder::new(group_name);
-    for stmt in body.iter() {
+    for stmt in body {
         finder.visit_stmt(stmt);
     }
     for expr in finder.exprs {

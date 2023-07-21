@@ -1,13 +1,28 @@
 #![cfg(not(target_family = "wasm"))]
 
 #[cfg(unix)]
+use std::fs;
+#[cfg(unix)]
+use std::fs::Permissions;
+#[cfg(unix)]
+use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+#[cfg(unix)]
 use std::path::Path;
 use std::str;
 
+#[cfg(unix)]
+use anyhow::Context;
 use anyhow::Result;
 use assert_cmd::Command;
 #[cfg(unix)]
+use clap::Parser;
+#[cfg(unix)]
 use path_absolutize::path_dedot;
+#[cfg(unix)]
+use tempfile::TempDir;
+
+use ruff_cli::args::Args;
+use ruff_cli::run;
 
 const BIN_NAME: &str = "ruff";
 
@@ -91,34 +106,35 @@ fn stdin_json() -> Result<()> {
             r#"[
   {{
     "code": "F401",
-    "message": "`os` imported but unused",
+    "end_location": {{
+      "column": 10,
+      "row": 1
+    }},
+    "filename": "{file_path}",
     "fix": {{
       "applicability": "Automatic",
-      "message": "Remove unused import: `os`",
       "edits": [
         {{
           "content": "",
-          "location": {{
-            "row": 1,
-            "column": 1
-          }},
           "end_location": {{
-            "row": 2,
-            "column": 1
+            "column": 1,
+            "row": 2
+          }},
+          "location": {{
+            "column": 1,
+            "row": 1
           }}
         }}
-      ]
+      ],
+      "message": "Remove unused import: `os`"
     }},
     "location": {{
-      "row": 1,
-      "column": 8
+      "column": 8,
+      "row": 1
     }},
-    "end_location": {{
-      "row": 1,
-      "column": 10
-    }},
-    "filename": "{file_path}",
-    "noqa_row": 1
+    "message": "`os` imported but unused",
+    "noqa_row": 1,
+    "url": "https://beta.ruff.rs/docs/rules/unused-import"
   }}
 ]"#
         )
@@ -275,5 +291,57 @@ Found 1 error.
 "#
     );
 
+    Ok(())
+}
+
+/// An unreadable pyproject.toml in non-isolated mode causes ruff to hard-error trying to build up
+/// configuration globs
+#[cfg(unix)]
+#[test]
+fn unreadable_pyproject_toml() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let pyproject_toml = tempdir.path().join("pyproject.toml");
+    // Create an empty file with 000 permissions
+    fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .mode(0o000)
+        .open(pyproject_toml)?;
+
+    // Don't `--isolated` since the configuration discovery is where the error happens
+    let args = Args::parse_from(["", "check", "--no-cache", tempdir.path().to_str().unwrap()]);
+    let err = run(args).err().context("Unexpected success")?;
+    assert_eq!(
+        err.chain()
+            .map(std::string::ToString::to_string)
+            .collect::<Vec<_>>(),
+        vec!["Permission denied (os error 13)".to_string()],
+    );
+    Ok(())
+}
+
+/// Check the output with an unreadable directory
+#[cfg(unix)]
+#[test]
+fn unreadable_dir() -> Result<()> {
+    // Create a directory with 000 (not iterable/readable) permissions
+    let tempdir = TempDir::new()?;
+    let unreadable_dir = tempdir.path().join("unreadable_dir");
+    fs::create_dir(&unreadable_dir)?;
+    fs::set_permissions(&unreadable_dir, Permissions::from_mode(0o000))?;
+
+    // We (currently?) have to use a subcommand to check exit status (currently wrong) and logging
+    // output
+    let mut cmd = Command::cargo_bin(BIN_NAME)?;
+    let output = cmd
+        .args(["--no-cache", "--isolated"])
+        .arg(&unreadable_dir)
+        .assert()
+        // TODO(konstin): This should be a failure, but we currently can't track that
+        .success();
+    assert_eq!(
+        str::from_utf8(&output.get_output().stderr)?,
+        "warning: Encountered error: Permission denied (os error 13)\n"
+    );
     Ok(())
 }

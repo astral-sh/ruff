@@ -1,10 +1,8 @@
-use crate::comments::Comments;
-use crate::expression::parentheses::{
-    default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
-};
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 use crate::FormatNodeRule;
 use ruff_formatter::{write, FormatContext};
+use ruff_python_ast::node::AnyNodeRef;
 use rustpython_parser::ast::ExprName;
 
 #[derive(Default)]
@@ -29,11 +27,10 @@ impl FormatNodeRule<ExprName> for FormatExprName {
 impl NeedsParentheses for ExprName {
     fn needs_parentheses(
         &self,
-        parenthesize: Parenthesize,
-        source: &str,
-        comments: &Comments,
-    ) -> Parentheses {
-        default_expression_needs_parentheses(self.into(), parenthesize, source, comments)
+        _parent: AnyNodeRef,
+        _context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        OptionalParentheses::Never
     }
 }
 

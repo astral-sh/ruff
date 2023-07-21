@@ -8,6 +8,36 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for uses of deprecated methods from the `unittest` module.
+///
+/// ## Why is this bad?
+/// The `unittest` module has deprecated aliases for some of its methods.
+/// The aliases may be removed in future versions of Python. Instead,
+/// use their non-deprecated counterparts.
+///
+/// ## Example
+/// ```python
+/// from unittest import TestCase
+///
+///
+/// class SomeTest(TestCase):
+///     def test_something(self):
+///         self.assertEquals(1, 1)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from unittest import TestCase
+///
+///
+/// class SomeTest(TestCase):
+///     def test_something(self):
+///         self.assertEqual(1, 1)
+/// ```
+///
+/// ## References
+/// - [Python documentation: Deprecated aliases](https://docs.python.org/3/library/unittest.html#deprecated-aliases)
 #[violation]
 pub struct DeprecatedUnittestAlias {
     alias: String,
@@ -69,8 +99,7 @@ pub(crate) fn deprecated_unittest_alias(checker: &mut Checker, expr: &Expr) {
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
             format!("self.{target}"),
             expr.range(),
         )));

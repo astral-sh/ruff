@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, Ranged, Stmt};
+use rustpython_parser::ast::{Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -20,7 +20,7 @@ use crate::rules::pep8_naming::helpers;
 /// > Modules that are designed for use via from M import * should use the
 /// __all__ mechanism to prevent exporting globals, or use the older
 /// convention of prefixing such globals with an underscore (which you might
-///want to do to indicate these globals are “module non-public”).
+/// want to do to indicate these globals are “module non-public”).
 /// >
 /// > ### Function and Variable Names
 /// > Function names should be lowercase, with words separated by underscores
@@ -60,29 +60,30 @@ impl Violation for MixedCaseVariableInGlobalScope {
 }
 
 /// N816
-pub(crate) fn mixed_case_variable_in_global_scope(
-    checker: &mut Checker,
-    expr: &Expr,
-    stmt: &Stmt,
-    name: &str,
-) {
+pub(crate) fn mixed_case_variable_in_global_scope(checker: &mut Checker, expr: &Expr, name: &str) {
     if checker
         .settings
         .pep8_naming
         .ignore_names
         .iter()
-        .any(|ignore_name| ignore_name == name)
+        .any(|ignore_name| ignore_name.matches(name))
     {
         return;
     }
-    if helpers::is_mixed_case(name)
-        && !helpers::is_named_tuple_assignment(checker.semantic_model(), stmt)
-    {
-        checker.diagnostics.push(Diagnostic::new(
-            MixedCaseVariableInGlobalScope {
-                name: name.to_string(),
-            },
-            expr.range(),
-        ));
+
+    if !helpers::is_mixed_case(name) {
+        return;
     }
+
+    let parent = checker.semantic().stmt();
+    if helpers::is_named_tuple_assignment(parent, checker.semantic()) {
+        return;
+    }
+
+    checker.diagnostics.push(Diagnostic::new(
+        MixedCaseVariableInGlobalScope {
+            name: name.to_string(),
+        },
+        expr.range(),
+    ));
 }

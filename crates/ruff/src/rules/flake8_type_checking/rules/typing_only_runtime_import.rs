@@ -4,10 +4,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, DiagnosticKind, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::binding::Binding;
-use ruff_python_semantic::node::NodeId;
-use ruff_python_semantic::reference::ReferenceId;
-use ruff_python_semantic::scope::Scope;
+use ruff_python_semantic::{Binding, NodeId, ResolvedReferenceId, Scope};
 
 use crate::autofix;
 use crate::checkers::ast::Checker;
@@ -197,7 +194,7 @@ pub(crate) fn typing_only_runtime_import(
         FxHashMap::default();
 
     for binding_id in scope.binding_ids() {
-        let binding = &checker.semantic_model().bindings[binding_id];
+        let binding = checker.semantic().binding(binding_id);
 
         // If we're in un-strict mode, don't flag typing-only imports that are
         // implicitly loaded by way of a valid runtime import.
@@ -233,9 +230,8 @@ pub(crate) fn typing_only_runtime_import(
         if binding.context.is_runtime()
             && binding.references().all(|reference_id| {
                 checker
-                    .semantic_model()
-                    .references
-                    .resolve(reference_id)
+                    .semantic()
+                    .reference(reference_id)
                     .context()
                     .is_typing()
             })
@@ -282,11 +278,11 @@ pub(crate) fn typing_only_runtime_import(
             let import = Import {
                 qualified_name,
                 reference_id,
-                trimmed_range: binding.trimmed_range(checker.semantic_model(), checker.locator),
-                parent_range: binding.parent_range(checker.semantic_model()),
+                range: binding.range,
+                parent_range: binding.parent_range(checker.semantic()),
             };
 
-            if checker.rule_is_ignored(rule_for(import_type), import.trimmed_range.start())
+            if checker.rule_is_ignored(rule_for(import_type), import.range.start())
                 || import.parent_range.map_or(false, |parent_range| {
                     checker.rule_is_ignored(rule_for(import_type), parent_range.start())
                 })
@@ -315,14 +311,14 @@ pub(crate) fn typing_only_runtime_import(
 
         for Import {
             qualified_name,
-            trimmed_range,
+            range,
             parent_range,
             ..
         } in imports
         {
             let mut diagnostic = Diagnostic::new(
                 diagnostic_for(import_type, qualified_name.to_string()),
-                trimmed_range,
+                range,
             );
             if let Some(range) = parent_range {
                 diagnostic.set_parent(range.start());
@@ -339,14 +335,14 @@ pub(crate) fn typing_only_runtime_import(
     for ((_, import_type), imports) in ignores_by_statement {
         for Import {
             qualified_name,
-            trimmed_range,
+            range,
             parent_range,
             ..
         } in imports
         {
             let mut diagnostic = Diagnostic::new(
                 diagnostic_for(import_type, qualified_name.to_string()),
-                trimmed_range,
+                range,
             );
             if let Some(range) = parent_range {
                 diagnostic.set_parent(range.start());
@@ -361,9 +357,9 @@ struct Import<'a> {
     /// The qualified name of the import (e.g., `typing.List` for `from typing import List`).
     qualified_name: &'a str,
     /// The first reference to the imported symbol.
-    reference_id: ReferenceId,
+    reference_id: ResolvedReferenceId,
     /// The trimmed range of the import (e.g., `List` in `from typing import List`).
-    trimmed_range: TextRange,
+    range: TextRange,
     /// The range of the import's parent statement.
     parent_range: Option<TextRange>,
 }
@@ -417,8 +413,8 @@ fn is_exempt(name: &str, exempt_modules: &[&str]) -> bool {
 
 /// Generate a [`Fix`] to remove typing-only imports from a runtime context.
 fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[Import]) -> Result<Fix> {
-    let stmt = checker.semantic_model().stmts[stmt_id];
-    let parent = checker.semantic_model().stmts.parent(stmt);
+    let stmt = checker.semantic().stmts[stmt_id];
+    let parent = checker.semantic().stmts.parent(stmt);
     let qualified_names: Vec<&str> = imports
         .iter()
         .map(|Import { qualified_name, .. }| *qualified_name)
@@ -428,12 +424,7 @@ fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[Import]) -> Result
     let at = imports
         .iter()
         .map(|Import { reference_id, .. }| {
-            checker
-                .semantic_model()
-                .references
-                .resolve(*reference_id)
-                .range()
-                .start()
+            checker.semantic().reference(*reference_id).range().start()
         })
         .min()
         .expect("Expected at least one import");
@@ -444,8 +435,8 @@ fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[Import]) -> Result
         stmt,
         parent,
         checker.locator,
-        checker.indexer,
         checker.stylist,
+        checker.indexer,
     )?;
 
     // Step 2) Add the import to a `TYPE_CHECKING` block.
@@ -455,7 +446,7 @@ fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[Import]) -> Result
             qualified_names,
         },
         at,
-        checker.semantic_model(),
+        checker.semantic(),
     )?;
 
     Ok(

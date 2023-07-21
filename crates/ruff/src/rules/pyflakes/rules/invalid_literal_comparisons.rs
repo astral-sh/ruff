@@ -1,8 +1,7 @@
 use itertools::izip;
 use log::error;
 use once_cell::unsync::Lazy;
-use ruff_text_size::TextRange;
-use rustpython_parser::ast::{Cmpop, Expr};
+use rustpython_parser::ast::{CmpOp, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -10,22 +9,6 @@ use ruff_python_ast::helpers;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
-
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub(crate) enum IsCmpop {
-    Is,
-    IsNot,
-}
-
-impl From<&Cmpop> for IsCmpop {
-    fn from(cmpop: &Cmpop) -> Self {
-        match cmpop {
-            Cmpop::Is => IsCmpop::Is,
-            Cmpop::IsNot => IsCmpop::IsNot,
-            _ => panic!("Expected Cmpop::Is | Cmpop::IsNot"),
-        }
-    }
-}
 
 /// ## What it does
 /// Checks for `is` and `is not` comparisons against constant literals, like
@@ -59,29 +42,29 @@ impl From<&Cmpop> for IsCmpop {
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/reference/expressions.html#is-not)
-/// - [Python documentation](https://docs.python.org/3/reference/expressions.html#value-comparisons)
+/// - [Python documentation: Identity comparisons](https://docs.python.org/3/reference/expressions.html#is-not)
+/// - [Python documentation: Value comparisons](https://docs.python.org/3/reference/expressions.html#value-comparisons)
 /// - [_Why does Python log a SyntaxWarning for ‘is’ with literals?_ by Adam Johnson](https://adamj.eu/tech/2020/01/21/why-does-python-3-8-syntaxwarning-for-is-literal/)
 #[violation]
 pub struct IsLiteral {
-    cmpop: IsCmpop,
+    cmp_op: IsCmpOp,
 }
 
 impl AlwaysAutofixableViolation for IsLiteral {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let IsLiteral { cmpop } = self;
-        match cmpop {
-            IsCmpop::Is => format!("Use `==` to compare constant literals"),
-            IsCmpop::IsNot => format!("Use `!=` to compare constant literals"),
+        let IsLiteral { cmp_op } = self;
+        match cmp_op {
+            IsCmpOp::Is => format!("Use `==` to compare constant literals"),
+            IsCmpOp::IsNot => format!("Use `!=` to compare constant literals"),
         }
     }
 
     fn autofix_title(&self) -> String {
-        let IsLiteral { cmpop } = self;
-        match cmpop {
-            IsCmpop::Is => "Replace `is` with `==`".to_string(),
-            IsCmpop::IsNot => "Replace `is not` with `!=`".to_string(),
+        let IsLiteral { cmp_op } = self;
+        match cmp_op {
+            IsCmpOp::Is => "Replace `is` with `==`".to_string(),
+            IsCmpOp::IsNot => "Replace `is not` with `!=`".to_string(),
         }
     }
 }
@@ -90,33 +73,32 @@ impl AlwaysAutofixableViolation for IsLiteral {
 pub(crate) fn invalid_literal_comparison(
     checker: &mut Checker,
     left: &Expr,
-    ops: &[Cmpop],
+    ops: &[CmpOp],
     comparators: &[Expr],
-    location: TextRange,
+    expr: &Expr,
 ) {
-    let located = Lazy::new(|| helpers::locate_cmpops(checker.locator.slice(location)));
+    let located = Lazy::new(|| helpers::locate_cmp_ops(expr, checker.locator));
     let mut left = left;
     for (index, (op, right)) in izip!(ops, comparators).enumerate() {
-        if matches!(op, Cmpop::Is | Cmpop::IsNot)
+        if matches!(op, CmpOp::Is | CmpOp::IsNot)
             && (helpers::is_constant_non_singleton(left)
                 || helpers::is_constant_non_singleton(right))
         {
-            let mut diagnostic = Diagnostic::new(IsLiteral { cmpop: op.into() }, location);
+            let mut diagnostic = Diagnostic::new(IsLiteral { cmp_op: op.into() }, expr.range());
             if checker.patch(diagnostic.kind.rule()) {
                 if let Some(located_op) = &located.get(index) {
                     assert_eq!(located_op.op, *op);
                     if let Some(content) = match located_op.op {
-                        Cmpop::Is => Some("==".to_string()),
-                        Cmpop::IsNot => Some("!=".to_string()),
+                        CmpOp::Is => Some("==".to_string()),
+                        CmpOp::IsNot => Some("!=".to_string()),
                         node => {
                             error!("Failed to fix invalid comparison: {node:?}");
                             None
                         }
                     } {
-                        #[allow(deprecated)]
-                        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                             content,
-                            located_op.range + location.start(),
+                            located_op.range + expr.start(),
                         )));
                     }
                 } else {
@@ -126,5 +108,21 @@ pub(crate) fn invalid_literal_comparison(
             checker.diagnostics.push(diagnostic);
         }
         left = right;
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+enum IsCmpOp {
+    Is,
+    IsNot,
+}
+
+impl From<&CmpOp> for IsCmpOp {
+    fn from(cmp_op: &CmpOp) -> Self {
+        match cmp_op {
+            CmpOp::Is => IsCmpOp::Is,
+            CmpOp::IsNot => IsCmpOp::IsNot,
+            _ => panic!("Expected CmpOp::Is | CmpOp::IsNot"),
+        }
     }
 }

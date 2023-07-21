@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
+use std::iter;
 
-use rustpython_parser::ast::{self, Excepthandler, Stmt};
+use rustpython_parser::ast::{self, ExceptHandler, Stmt};
 
 use crate::node::{NodeId, Nodes};
 
@@ -42,7 +43,17 @@ fn common_ancestor(
 /// Return the alternative branches for a given node.
 fn alternatives(stmt: &Stmt) -> Vec<Vec<&Stmt>> {
     match stmt {
-        Stmt::If(ast::StmtIf { body, .. }) => vec![body.iter().collect()],
+        Stmt::If(ast::StmtIf {
+            body,
+            elif_else_clauses,
+            ..
+        }) => iter::once(body.iter().collect())
+            .chain(
+                elif_else_clauses
+                    .iter()
+                    .map(|clause| clause.body.iter().collect()),
+            )
+            .collect(),
         Stmt::Try(ast::StmtTry {
             body,
             handlers,
@@ -57,7 +68,7 @@ fn alternatives(stmt: &Stmt) -> Vec<Vec<&Stmt>> {
         }) => vec![body.iter().chain(orelse.iter()).collect()]
             .into_iter()
             .chain(handlers.iter().map(|handler| {
-                let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) =
+                let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, .. }) =
                     handler;
                 body.iter().collect()
             }))

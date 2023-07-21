@@ -38,7 +38,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/enum.html#enum.Enum)
+/// - [Python documentation: `enum.Enum`](https://docs.python.org/3/library/enum.html#enum.Enum)
 #[violation]
 pub struct NonUniqueEnums {
     value: String,
@@ -53,22 +53,18 @@ impl Violation for NonUniqueEnums {
 }
 
 /// PIE796
-pub(crate) fn non_unique_enums<'a, 'b>(
-    checker: &mut Checker<'a>,
-    parent: &'b Stmt,
-    body: &'b [Stmt],
-) where
-    'b: 'a,
-{
+pub(crate) fn non_unique_enums(checker: &mut Checker, parent: &Stmt, body: &[Stmt]) {
     let Stmt::ClassDef(ast::StmtClassDef { bases, .. }) = parent else {
         return;
     };
 
     if !bases.iter().any(|expr| {
         checker
-            .semantic_model()
+            .semantic()
             .resolve_call_path(expr)
-            .map_or(false, |call_path| call_path.as_slice() == ["enum", "Enum"])
+            .map_or(false, |call_path| {
+                matches!(call_path.as_slice(), ["enum", "Enum"])
+            })
     }) {
         return;
     }
@@ -81,9 +77,11 @@ pub(crate) fn non_unique_enums<'a, 'b>(
 
         if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
             if checker
-                .semantic_model()
+                .semantic()
                 .resolve_call_path(func)
-                .map_or(false, |call_path| call_path.as_slice() == ["enum", "auto"])
+                .map_or(false, |call_path| {
+                    matches!(call_path.as_slice(), ["enum", "auto"])
+                })
             {
                 continue;
             }

@@ -2,13 +2,18 @@
 name = "ruff_python_ast"
 version = "0.0.0"
 publish = false
+authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 
 [lib]
 
 [dependencies]
-ruff_newlines = { path = "../ruff_newlines" }
+ruff_python_trivia = { path = "../ruff_python_trivia" }
 ruff_text_size = { workspace = true }
 
 anyhow = { workspace = true }

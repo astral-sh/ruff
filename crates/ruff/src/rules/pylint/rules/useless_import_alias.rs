@@ -43,14 +43,13 @@ pub(crate) fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
     if alias.name.contains('.') {
         return;
     }
-    if &alias.name != asname {
+    if alias.name.as_str() != asname.as_str() {
         return;
     }
 
     let mut diagnostic = Diagnostic::new(UselessImportAlias, alias.range());
     if checker.patch(diagnostic.kind.rule()) {
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
             asname.to_string(),
             alias.range(),
         )));

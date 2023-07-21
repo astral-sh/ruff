@@ -1,29 +1,49 @@
 use ruff_text_size::{TextLen, TextRange};
-use rustpython_parser::ast::{self, Cmpop, Expr};
+use rustpython_parser::ast::{CmpOp, Expr, Ranged};
 use unicode_width::UnicodeWidthStr;
 
-use ruff_newlines::Line;
-use ruff_python_ast::source_code::Generator;
+use ruff_python_ast::source_code::Locator;
+use ruff_python_trivia::Line;
 
 use crate::line_width::{LineLength, LineWidth, TabSize};
 
-pub(crate) fn is_ambiguous_name(name: &str) -> bool {
+pub(super) fn is_ambiguous_name(name: &str) -> bool {
     name == "l" || name == "I" || name == "O"
 }
 
-pub(crate) fn compare(
+pub(super) fn compare(
     left: &Expr,
-    ops: &[Cmpop],
+    ops: &[CmpOp],
     comparators: &[Expr],
-    generator: Generator,
+    locator: &Locator,
 ) -> String {
-    let node = ast::ExprCompare {
-        left: Box::new(left.clone()),
-        ops: ops.to_vec(),
-        comparators: comparators.to_vec(),
-        range: TextRange::default(),
-    };
-    generator.expr(&node.into())
+    let start = left.start();
+    let end = comparators.last().map_or_else(|| left.end(), Ranged::end);
+    let mut contents = String::with_capacity(usize::from(end - start));
+
+    // Add the left side of the comparison.
+    contents.push_str(locator.slice(left.range()));
+
+    for (op, comparator) in ops.iter().zip(comparators) {
+        // Add the operator.
+        contents.push_str(match op {
+            CmpOp::Eq => " == ",
+            CmpOp::NotEq => " != ",
+            CmpOp::Lt => " < ",
+            CmpOp::LtE => " <= ",
+            CmpOp::Gt => " > ",
+            CmpOp::GtE => " >= ",
+            CmpOp::In => " in ",
+            CmpOp::NotIn => " not in ",
+            CmpOp::Is => " is ",
+            CmpOp::IsNot => " is not ",
+        });
+
+        // Add the right side of the comparison.
+        contents.push_str(locator.slice(comparator.range()));
+    }
+
+    contents
 }
 
 pub(super) fn is_overlong(
@@ -33,16 +53,13 @@ pub(super) fn is_overlong(
     task_tags: &[String],
     tab_size: TabSize,
 ) -> Option<Overlong> {
-    let mut start_offset = line.start();
-    let mut width = LineWidth::new(tab_size);
-
-    for c in line.chars() {
-        if width < limit {
-            start_offset += c.text_len();
-        }
-        width = width.add_char(c);
+    // Each character is between 1-4 bytes. If the number of bytes is smaller than the limit, it cannot be overlong.
+    if line.len() < limit.get() {
+        return None;
     }
 
+    let mut width = LineWidth::new(tab_size);
+    width = width.add_str(line.as_str());
     if width <= limit {
         return None;
     }
@@ -71,6 +88,17 @@ pub(super) fn is_overlong(
         }
     }
 
+    // Obtain the start offset of the part of the line that exceeds the limit
+    let mut start_offset = line.start();
+    let mut start_width = LineWidth::new(tab_size);
+    for c in line.chars() {
+        if start_width < limit {
+            start_offset += c.text_len();
+            start_width = start_width.add_char(c);
+        } else {
+            break;
+        }
+    }
     Some(Overlong {
         range: TextRange::new(start_offset, line.end()),
         width: width.get(),

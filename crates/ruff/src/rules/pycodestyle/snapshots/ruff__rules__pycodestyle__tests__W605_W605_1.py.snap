@@ -11,10 +11,10 @@ W605_1.py:2:10: W605 [*] Invalid escape sequence: `\.`
   |
   = help: Add backslash to escape sequence
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | #: W605:1:10
 2   |-regex = '\.png$'
-  2 |+regex = '\\.png$'
+  2 |+regex = r'\.png$'
 3 3 | 
 4 4 | #: W605:2:1
 5 5 | regex = '''
@@ -29,15 +29,15 @@ W605_1.py:6:1: W605 [*] Invalid escape sequence: `\.`
   |
   = help: Add backslash to escape sequence
 
-ℹ Suggested fix
+ℹ Fix
+2 2 | regex = '\.png$'
 3 3 | 
 4 4 | #: W605:2:1
-5 5 | regex = '''
-6   |-\.png$
-  6 |+\\.png$
+5   |-regex = '''
+  5 |+regex = r'''
+6 6 | \.png$
 7 7 | '''
 8 8 | 
-9 9 | #: W605:2:6
 
 W605_1.py:11:6: W605 [*] Invalid escape sequence: `\_`
    |
@@ -49,12 +49,12 @@ W605_1.py:11:6: W605 [*] Invalid escape sequence: `\_`
    |
    = help: Add backslash to escape sequence
 
-ℹ Suggested fix
+ℹ Fix
 8  8  | 
 9  9  | #: W605:2:6
 10 10 | f(
 11    |-    '\_'
-   11 |+    '\\_'
+   11 |+    r'\_'
 12 12 | )
 13 13 | 
 14 14 | #: W605:4:6
@@ -70,14 +70,35 @@ W605_1.py:18:6: W605 [*] Invalid escape sequence: `\_`
    |
    = help: Add backslash to escape sequence
 
-ℹ Suggested fix
-15 15 | """
+ℹ Fix
+12 12 | )
+13 13 | 
+14 14 | #: W605:4:6
+15    |-"""
+   15 |+r"""
 16 16 | multi-line
 17 17 | literal
-18    |-with \_ somewhere
-   18 |+with \\_ somewhere
-19 19 | in the middle
-20 20 | """
-21 21 | 
+18 18 | with \_ somewhere
+
+W605_1.py:25:12: W605 [*] Invalid escape sequence: `\.`
+   |
+23 | def f():
+24 |     #: W605:1:11
+25 |     return'\.png$'
+   |            ^^ W605
+26 | 
+27 | #: Okay
+   |
+   = help: Add backslash to escape sequence
+
+ℹ Fix
+22 22 | 
+23 23 | def f():
+24 24 |     #: W605:1:11
+25    |-    return'\.png$'
+   25 |+    return r'\.png$'
+26 26 | 
+27 27 | #: Okay
+28 28 | regex = r'\.png$'
 
 

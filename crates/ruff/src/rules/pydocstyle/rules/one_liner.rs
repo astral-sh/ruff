@@ -1,12 +1,37 @@
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_newlines::NewlineWithTrailingNewline;
 use ruff_python_ast::str::{leading_quote, trailing_quote};
+use ruff_python_trivia::NewlineWithTrailingNewline;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for single-line docstrings that are broken across multiple lines.
+///
+/// ## Why is this bad?
+/// [PEP 257] recommends that docstrings that _can_ fit on one line should be
+/// formatted on a single line, for consistency and readability.
+///
+/// ## Example
+/// ```python
+/// def average(values: list[float]) -> float:
+///     """
+///     Return the mean of the given values.
+///     """
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def average(values: list[float]) -> float:
+///     """Return the mean of the given values."""
+/// ```
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+///
+/// [PEP 257]: https://peps.python.org/pep-0257/
 #[violation]
 pub struct FitsOnOneLine;
 
@@ -51,8 +76,7 @@ pub(crate) fn one_liner(checker: &mut Checker, docstring: &Docstring) {
                 if !trimmed.ends_with(trailing.chars().last().unwrap())
                     && !trimmed.starts_with(leading.chars().last().unwrap())
                 {
-                    #[allow(deprecated)]
-                    diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                    diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                         format!("{leading}{trimmed}{trailing}"),
                         docstring.range(),
                     )));

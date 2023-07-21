@@ -26,7 +26,7 @@ use ruff_macros::{derive_message_formats, violation};
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/reference/simple_stmts.html#nonlocal)
+/// - [Python documentation: The `nonlocal` statement](https://docs.python.org/3/reference/simple_stmts.html#nonlocal)
 /// - [PEP 3104](https://peps.python.org/pep-3104/)
 #[violation]
 pub struct NonlocalWithoutBinding {

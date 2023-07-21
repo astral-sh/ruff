@@ -11,7 +11,7 @@ docstring_singles_function.py:2:5: Q002 [*] Single quote docstring found but dou
   |
   = help: Replace single quotes docstring with double quotes
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | def foo():
 2   |-    '''function without params, single line docstring'''
   2 |+    """function without params, single line docstring"""
@@ -32,7 +32,7 @@ docstring_singles_function.py:8:5: Q002 [*] Single quote docstring found but dou
    |
    = help: Replace single quotes docstring with double quotes
 
-ℹ Suggested fix
+ℹ Fix
 5  5  | 
 6  6  | 
 7  7  | def foo2():
@@ -53,7 +53,7 @@ docstring_singles_function.py:27:5: Q002 [*] Single quote docstring found but do
    |
    = help: Replace single quotes docstring with double quotes
 
-ℹ Suggested fix
+ℹ Fix
 24 24 | 
 25 25 | 
 26 26 | def function_with_single_docstring(a):

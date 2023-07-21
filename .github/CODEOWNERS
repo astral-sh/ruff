@@ -1,0 +1,9 @@
+# GitHub code owners file. For more info: https://help.github.com/articles/about-codeowners/
+#
+# - Comment lines begin with `#` character.
+# - Each line is a file pattern followed by one or more owners.
+# - The '*' pattern is global owners.
+# - Order is important. The last matching pattern has the most precedence.
+
+# Jupyter
+/crates/ruff/src/jupyter/ @dhruvmanila

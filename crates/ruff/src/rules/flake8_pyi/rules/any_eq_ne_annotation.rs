@@ -33,7 +33,7 @@ use crate::registry::AsRule;
 ///         ...
 /// ```
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/typing.html#the-any-type)
+/// - [Python documentation: The `Any` type](https://docs.python.org/3/library/typing.html#the-any-type)
 /// - [Mypy documentation](https://mypy.readthedocs.io/en/latest/dynamic_typing.html#any-vs-object)
 #[violation]
 pub struct AnyEqNeAnnotation {
@@ -62,18 +62,15 @@ pub(crate) fn any_eq_ne_annotation(checker: &mut Checker, name: &str, args: &Arg
         return;
     }
 
-    let Some(annotation) = &args.args[1].annotation else {
+    let Some(annotation) = &args.args[1].def.annotation else {
         return;
     };
 
-    if !checker.semantic_model().scope().kind.is_class() {
+    if !checker.semantic().scope().kind.is_class() {
         return;
     }
 
-    if checker
-        .semantic_model()
-        .match_typing_expr(annotation, "Any")
-    {
+    if checker.semantic().match_typing_expr(annotation, "Any") {
         let mut diagnostic = Diagnostic::new(
             AnyEqNeAnnotation {
                 method_name: name.to_string(),
@@ -82,7 +79,7 @@ pub(crate) fn any_eq_ne_annotation(checker: &mut Checker, name: &str, args: &Arg
         );
         if checker.patch(diagnostic.kind.rule()) {
             // Ex) `def __eq__(self, obj: Any): ...`
-            if checker.semantic_model().is_builtin("object") {
+            if checker.semantic().is_builtin("object") {
                 diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                     "object".to_string(),
                     annotation.range(),

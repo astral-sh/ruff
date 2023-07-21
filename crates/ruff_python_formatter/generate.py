@@ -1,3 +1,5 @@
+#! /usr/bin/python
+
 """See Docs.md"""
 
 # %%
@@ -28,7 +30,10 @@ nodes_file = (
 node_lines = (
     nodes_file.split("pub enum AnyNode {")[1].split("}")[0].strip().splitlines()
 )
-nodes = [node_line.split("(")[1].split("<")[0] for node_line in node_lines]
+nodes = [
+    node_line.split("(")[1].split(")")[0].split("::")[-1].split("<")[0]
+    for node_line in node_lines
+]
 print(nodes)
 
 # %%
@@ -102,12 +107,15 @@ for group, group_nodes in nodes_grouped.items():
 # %%
 # Generate `FormatRule`, `AsFormat` and `IntoFormat`
 
-generated = """//! This is a generated file. Don't modify it by hand! Run `scripts/generate.py` to re-generate the file.
+generated = """//! This is a generated file. Don't modify it by hand! Run `crates/ruff_python_formatter/generate.py` to re-generate the file.
+#![allow(unknown_lints, clippy::default_constructed_unit_structs)]
+
 use crate::context::PyFormatContext;
 use crate::{AsFormat, FormatNodeRule, IntoFormat};
 use ruff_formatter::formatter::Formatter;
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule, FormatResult, FormatRule};
 use rustpython_parser::ast;
+
 """  # noqa: E501
 for node in nodes:
     text = f"""

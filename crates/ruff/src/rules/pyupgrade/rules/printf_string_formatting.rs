@@ -18,6 +18,28 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 use crate::rules::pyupgrade::helpers::curly_escape;
 
+/// ## What it does
+/// Checks for `printf`-style string formatting.
+///
+/// ## Why is this bad?
+/// `printf`-style string formatting has a number of quirks, and leads to less
+/// readable code than using `str.format` calls or f-strings. In general, prefer
+/// the newer `str.format` and f-strings constructs over `printf`-style string
+/// formatting.
+///
+/// ## Example
+/// ```python
+/// "%s, %s" % ("Hello", "World")  # "Hello, World"
+/// ```
+///
+/// Use instead:
+/// ```python
+/// "{}, {}".format("Hello", "World")  # "Hello, World"
+/// ```
+///
+/// ## References
+/// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#old-string-formatting)
+/// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[violation]
 pub struct PrintfStringFormatting;
 
@@ -322,7 +344,7 @@ pub(crate) fn printf_string_formatting(
     )
     .flatten()
     {
-        if matches!(tok, Tok::String { .. }) {
+        if tok.is_string() {
             strings.push(range);
         } else if matches!(tok, Tok::Rpar) {
             // If we hit a right paren, we have to preserve it.
@@ -446,8 +468,7 @@ pub(crate) fn printf_string_formatting(
 
     let mut diagnostic = Diagnostic::new(PrintfStringFormatting, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
             contents,
             expr.range(),
         )));
@@ -456,7 +477,7 @@ pub(crate) fn printf_string_formatting(
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use test_case::test_case;
 
     use super::*;

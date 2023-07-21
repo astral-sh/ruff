@@ -41,6 +41,7 @@ natively, including:
 - [flake8-builtins](https://pypi.org/project/flake8-builtins/)
 - [flake8-commas](https://pypi.org/project/flake8-commas/)
 - [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/)
+- [flake8-copyright](https://pypi.org/project/flake8-copyright/)
 - [flake8-datetimez](https://pypi.org/project/flake8-datetimez/)
 - [flake8-debugger](https://pypi.org/project/flake8-debugger/)
 - [flake8-django](https://pypi.org/project/flake8-django/)
@@ -73,6 +74,7 @@ natively, including:
 - [mccabe](https://pypi.org/project/mccabe/)
 - [pandas-vet](https://pypi.org/project/pandas-vet/)
 - [pep8-naming](https://pypi.org/project/pep8-naming/)
+- [perflint](https://pypi.org/project/perflint/) ([#4789](https://github.com/astral-sh/ruff/issues/4789))
 - [pydocstyle](https://pypi.org/project/pydocstyle/)
 - [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks)
 - [pyupgrade](https://pypi.org/project/pyupgrade/)
@@ -92,8 +94,8 @@ There are a few other minor incompatibilities between Ruff and the originating F
 
 - Ruff doesn't implement all the "opinionated" lint rules from flake8-bugbear.
 - Depending on your project structure, Ruff and isort can differ in their detection of first-party
-  code. (This is often solved by modifying the `src` property, e.g., to `src = ["src"]`, if your
-  code is nested in a `src` directory.)
+    code. (This is often solved by modifying the `src` property, e.g., to `src = ["src"]`, if your
+    code is nested in a `src` directory.)
 
 ## How does Ruff compare to Pylint?
 
@@ -143,6 +145,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [flake8-builtins](https://pypi.org/project/flake8-builtins/)
 - [flake8-commas](https://pypi.org/project/flake8-commas/)
 - [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/)
+- [flake8-copyright](https://pypi.org/project/flake8-comprehensions/)
 - [flake8-datetimez](https://pypi.org/project/flake8-datetimez/)
 - [flake8-debugger](https://pypi.org/project/flake8-debugger/)
 - [flake8-django](https://pypi.org/project/flake8-django/)
@@ -173,6 +176,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [mccabe](https://pypi.org/project/mccabe/)
 - [pandas-vet](https://pypi.org/project/pandas-vet/)
 - [pep8-naming](https://pypi.org/project/pep8-naming/)
+- [perflint](https://pypi.org/project/perflint/) ([#4789](https://github.com/astral-sh/ruff/issues/4789))
 - [pydocstyle](https://pypi.org/project/pydocstyle/)
 - [tryceratops](https://pypi.org/project/tryceratops/)
 
@@ -305,7 +309,23 @@ src = ["../src", "../test"]
 
 ## Does Ruff support Jupyter Notebooks?
 
-Ruff is integrated into [nbQA](https://github.com/nbQA-dev/nbQA), a tool for running linters and
+Ruff has built-in experimental support for linting [Jupyter Notebooks](https://jupyter.org/).
+
+To opt in to linting Jupyter Notebook (`.ipynb`) files, add the `*.ipynb` pattern to your
+[`include`](settings.md#include) setting, like so:
+
+```toml
+[tool.ruff]
+include = ["*.py", "*.pyi", "**/pyproject.toml", "*.ipynb"]
+```
+
+This will prompt Ruff to discover Jupyter Notebook (`.ipynb`) files in any specified
+directories, and lint them accordingly.
+
+Alternatively, pass the notebook file(s) to `ruff` on the command-line directly. For example,
+`ruff check /path/to/notebook.ipynb` will always lint `notebook.ipynb`.
+
+Ruff also integrates with [nbQA](https://github.com/nbQA-dev/nbQA), a tool for running linters and
 code formatters over Jupyter Notebooks.
 
 After installing `ruff` and `nbqa`, you can run Ruff over a notebook like so:
@@ -349,6 +369,38 @@ Setting a `convention` force-disables any rules that are incompatible with that 
 matter how they're provided, which avoids accidental incompatibilities and simplifies configuration.
 By default, no `convention` is set, and so the enabled rules are determined by the `select` setting
 alone.
+
+## What is the "nursery"?
+
+The "nursery" is a collection of newer rules that are considered experimental or unstable.
+
+If a rule is marked as part of the "nursery", it can only be enabled via direct selection. For
+example, consider a hypothetical rule, `HYP001`. If `HYP001` were included in the "nursery", it
+could be enabled by adding the following to your `pyproject.toml`:
+
+```toml
+[tool.ruff]
+extend-select = ["HYP001"]
+```
+
+However, it would _not_ be enabled by selecting the `HYP` category, like so:
+
+```toml
+[tool.ruff]
+extend-select = ["HYP"]
+```
+
+Similarly, it would _not_ be enabled via the `ALL` selector:
+
+```toml
+[tool.ruff]
+select = ["ALL"]
+```
+
+(The "nursery" terminology comes from [Clippy](https://doc.rust-lang.org/nightly/clippy/), a similar
+tool for linting Rust code.)
+
+To see which rules are currently in the "nursery", visit the [rules reference](https://beta.ruff.rs/docs/rules/).
 
 ## How can I tell what settings Ruff is using to check my code?
 

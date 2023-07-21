@@ -6,18 +6,18 @@ use std::ops::Deref;
 use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::FxHashMap;
 
+use crate::source_kind::SourceKind;
 pub use azure::AzureEmitter;
 pub use github::GithubEmitter;
 pub use gitlab::GitlabEmitter;
 pub use grouped::GroupedEmitter;
 pub use json::JsonEmitter;
+pub use json_lines::JsonLinesEmitter;
 pub use junit::JunitEmitter;
 pub use pylint::PylintEmitter;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
 use ruff_python_ast::source_code::{SourceFile, SourceLocation};
 pub use text::TextEmitter;
-
-use crate::jupyter::JupyterIndex;
 
 mod azure;
 mod diff;
@@ -25,6 +25,7 @@ mod github;
 mod gitlab;
 mod grouped;
 mod json;
+mod json_lines;
 mod junit;
 mod pylint;
 mod text;
@@ -93,6 +94,7 @@ struct MessageWithLocation<'a> {
 
 impl Deref for MessageWithLocation<'_> {
     type Target = Message;
+
     fn deref(&self) -> &Self::Target {
         self.message
     }
@@ -127,22 +129,23 @@ pub trait Emitter {
 
 /// Context passed to [`Emitter`].
 pub struct EmitterContext<'a> {
-    jupyter_indices: &'a FxHashMap<String, JupyterIndex>,
+    source_kind: &'a FxHashMap<String, SourceKind>,
 }
 
 impl<'a> EmitterContext<'a> {
-    pub fn new(jupyter_indices: &'a FxHashMap<String, JupyterIndex>) -> Self {
-        Self { jupyter_indices }
+    pub fn new(source_kind: &'a FxHashMap<String, SourceKind>) -> Self {
+        Self { source_kind }
     }
 
     /// Tests if the file with `name` is a jupyter notebook.
     pub fn is_jupyter_notebook(&self, name: &str) -> bool {
-        self.jupyter_indices.contains_key(name)
+        self.source_kind
+            .get(name)
+            .map_or(false, SourceKind::is_jupyter)
     }
 
-    /// Returns the file's [`JupyterIndex`] if the file `name` is a jupyter notebook.
-    pub fn jupyter_index(&self, name: &str) -> Option<&JupyterIndex> {
-        self.jupyter_indices.get(name)
+    pub fn source_kind(&self, name: &str) -> Option<&SourceKind> {
+        self.source_kind.get(name)
     }
 }
 
@@ -226,8 +229,8 @@ def fibonacci(n):
         emitter: &mut dyn Emitter,
         messages: &[Message],
     ) -> String {
-        let indices = FxHashMap::default();
-        let context = EmitterContext::new(&indices);
+        let source_kinds = FxHashMap::default();
+        let context = EmitterContext::new(&source_kinds);
         let mut output: Vec<u8> = Vec::new();
         emitter.emit(&mut output, messages, &context).unwrap();
 

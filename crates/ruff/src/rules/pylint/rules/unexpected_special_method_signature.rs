@@ -4,8 +4,7 @@ use rustpython_parser::ast::{Arguments, Decorator, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::identifier_range;
-use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::is_staticmethod;
 
 use crate::checkers::ast::Checker;
@@ -110,7 +109,7 @@ impl ExpectedParams {
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/reference/datamodel.html)
+/// - [Python documentation: Data model](https://docs.python.org/3/reference/datamodel.html)
 #[violation]
 pub struct UnexpectedSpecialMethodSignature {
     method_name: String,
@@ -143,9 +142,8 @@ pub(crate) fn unexpected_special_method_signature(
     name: &str,
     decorator_list: &[Decorator],
     args: &Arguments,
-    locator: &Locator,
 ) {
-    if !checker.semantic_model().scope().kind.is_class() {
+    if !checker.semantic().scope().kind.is_class() {
         return;
     }
 
@@ -160,10 +158,11 @@ pub(crate) fn unexpected_special_method_signature(
     }
 
     let actual_params = args.args.len();
-    let optional_params = args.defaults.len();
-    let mandatory_params = actual_params - optional_params;
+    let mandatory_params = args.args.iter().filter(|arg| arg.default.is_none()).count();
 
-    let Some(expected_params) = ExpectedParams::from_method(name, is_staticmethod(checker.semantic_model(), decorator_list)) else {
+    let Some(expected_params) =
+        ExpectedParams::from_method(name, is_staticmethod(decorator_list, checker.semantic()))
+    else {
         return;
     };
 
@@ -189,7 +188,7 @@ pub(crate) fn unexpected_special_method_signature(
                 expected_params,
                 actual_params,
             },
-            identifier_range(stmt, locator),
+            stmt.identifier(),
         ));
     }
 }

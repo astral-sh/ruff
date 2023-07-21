@@ -1,3 +1,4 @@
+...
 "some_string"
 b"\\xa3"
 Name
@@ -114,7 +115,7 @@ call(
     arg,
     another,
     kwarg="hey",
-    **kwargs,
+    **kwargs
 )  # note: no trailing comma pre-3.6
 call(*gidgets[:2])
 call(a, *gidgets[:2])

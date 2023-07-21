@@ -3,7 +3,7 @@ use rustpython_parser::ast::{Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::prelude::Constant;
+use rustpython_parser::ast::Constant;
 
 use crate::checkers::ast::Checker;
 
@@ -51,11 +51,9 @@ pub(crate) fn variable_name_task_id(
     value: &Expr,
 ) -> Option<Diagnostic> {
     // If we have more than one target, we can't do anything.
-    if targets.len() != 1 {
+    let [target] = targets else {
         return None;
-    }
-
-    let target = &targets[0];
+    };
     let Expr::Name(ast::ExprName { id, .. }) = target else {
         return None;
     };
@@ -67,7 +65,7 @@ pub(crate) fn variable_name_task_id(
 
     // If the function doesn't come from Airflow, we can't do anything.
     if !checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(func)
         .map_or(false, |call_path| matches!(call_path[0], "airflow"))
     {

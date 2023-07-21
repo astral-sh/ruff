@@ -1,10 +1,11 @@
+use ruff_text_size::TextRange;
+
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
-
-use super::super::helpers::{shadows_builtin, AnyShadowing};
+use crate::rules::flake8_builtins::helpers::shadows_builtin;
 
 /// ## What it does
 /// Checks for variable (and function) assignments that use the same name
@@ -18,10 +19,6 @@ use super::super::helpers::{shadows_builtin, AnyShadowing};
 ///
 /// Builtins can be marked as exceptions to this rule via the
 /// [`flake8-builtins.builtins-ignorelist`] configuration option.
-///
-/// ## Options
-///
-/// - `flake8-builtins.builtins-ignorelist`
 ///
 /// ## Example
 /// ```python
@@ -43,6 +40,10 @@ use super::super::helpers::{shadows_builtin, AnyShadowing};
 ///     return result
 /// ```
 ///
+/// ## Options
+/// - `flake8-builtins.builtins-ignorelist`
+///
+/// ## References
 /// - [_Why is it a bad idea to name a variable `id` in Python?_](https://stackoverflow.com/questions/77552/id-is-a-bad-variable-name-in-python)
 #[violation]
 pub struct BuiltinVariableShadowing {
@@ -58,17 +59,13 @@ impl Violation for BuiltinVariableShadowing {
 }
 
 /// A001
-pub(crate) fn builtin_variable_shadowing(
-    checker: &mut Checker,
-    name: &str,
-    shadowing: AnyShadowing,
-) {
+pub(crate) fn builtin_variable_shadowing(checker: &mut Checker, name: &str, range: TextRange) {
     if shadows_builtin(name, &checker.settings.flake8_builtins.builtins_ignorelist) {
         checker.diagnostics.push(Diagnostic::new(
             BuiltinVariableShadowing {
                 name: name.to_string(),
             },
-            shadowing.range(checker.locator),
+            range,
         ));
     }
 }

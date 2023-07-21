@@ -2,13 +2,35 @@ use ruff_text_size::{TextLen, TextRange};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_newlines::NewlineWithTrailingNewline;
+use ruff_python_trivia::NewlineWithTrailingNewline;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 use crate::registry::AsRule;
 use crate::rules::pydocstyle::helpers::ends_with_backslash;
 
+/// ## What it does
+/// Checks for surrounding whitespace in docstrings.
+///
+/// ## Why is this bad?
+/// Remove surrounding whitespace from the docstring, for consistency.
+///
+/// ## Example
+/// ```python
+/// def factorial(n: int) -> int:
+///     """ Return the factorial of n. """
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def factorial(n: int) -> int:
+///     """Return the factorial of n."""
+/// ```
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[violation]
 pub struct SurroundingWhitespace;
 
@@ -47,8 +69,7 @@ pub(crate) fn no_surrounding_whitespace(checker: &mut Checker, docstring: &Docst
         // characters, avoid applying the fix.
         if !trimmed.ends_with(quote) && !trimmed.starts_with(quote) && !ends_with_backslash(trimmed)
         {
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                 trimmed.to_string(),
                 TextRange::at(body.start(), line.text_len()),
             )));

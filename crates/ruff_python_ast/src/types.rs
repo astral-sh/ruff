@@ -28,7 +28,7 @@ impl<'a, T> AsRef<T> for RefEquality<'a, T> {
 
 impl<'a, T> Clone for RefEquality<'a, T> {
     fn clone(&self) -> Self {
-        Self(self.0)
+        *self
     }
 }
 

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::Stmt;
+use rustpython_parser::ast::{Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -35,7 +35,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/exceptions.html#exception-context)
+/// - [Python documentation: Exception context](https://docs.python.org/3/library/exceptions.html#exception-context)
 #[violation]
 pub struct ReraiseNoCause;
 
@@ -55,10 +55,12 @@ pub(crate) fn reraise_no_cause(checker: &mut Checker, body: &[Stmt]) {
     };
 
     for (range, exc, cause) in raises {
-        if exc.map_or(false, |expr| expr.is_call_expr() && cause.is_none()) {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(ReraiseNoCause, range));
+        if cause.is_none() {
+            if exc.map_or(false, Expr::is_call_expr) {
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(ReraiseNoCause, range));
+            }
         }
     }
 }

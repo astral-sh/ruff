@@ -19,7 +19,9 @@ pub(crate) fn derive_message_formats(func: &ItemFn) -> TokenStream {
 }
 
 fn parse_block(block: &Block, strings: &mut TokenStream) -> Result<(), TokenStream> {
-    let Some(Stmt::Expr(last, _)) = block.stmts.last() else {panic!("expected last statement in block to be an expression")};
+    let Some(Stmt::Expr(last, _)) = block.stmts.last() else {
+        panic!("expected last statement in block to be an expression")
+    };
     parse_expr(last, strings)?;
     Ok(())
 }
@@ -28,7 +30,9 @@ fn parse_expr(expr: &Expr, strings: &mut TokenStream) -> Result<(), TokenStream>
     match expr {
         Expr::Macro(mac) if mac.mac.path.is_ident("format") => {
             let Some(first_token) = mac.mac.tokens.to_token_stream().into_iter().next() else {
-                return Err(quote_spanned!(expr.span() => compile_error!("expected format! to have an argument")))
+                return Err(
+                    quote_spanned!(expr.span() => compile_error!("expected format! to have an argument")),
+                );
             };
             strings.extend(quote! {#first_token,});
             Ok(())

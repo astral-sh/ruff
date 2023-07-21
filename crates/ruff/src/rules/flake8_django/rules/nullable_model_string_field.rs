@@ -1,8 +1,8 @@
-use rustpython_parser::ast::Constant::Bool;
 use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::is_const_true;
 
 use crate::checkers::ast::Checker;
 
@@ -51,24 +51,14 @@ impl Violation for DjangoNullableModelStringField {
     }
 }
 
-const NOT_NULL_TRUE_FIELDS: [&str; 6] = [
-    "CharField",
-    "TextField",
-    "SlugField",
-    "EmailField",
-    "FilePathField",
-    "URLField",
-];
-
 /// DJ001
-pub(crate) fn nullable_model_string_field(checker: &Checker, body: &[Stmt]) -> Vec<Diagnostic> {
-    let mut errors = Vec::new();
-    for statement in body.iter() {
-        let Stmt::Assign(ast::StmtAssign {value, ..}) = statement else {
-            continue
+pub(crate) fn nullable_model_string_field(checker: &mut Checker, body: &[Stmt]) {
+    for statement in body {
+        let Stmt::Assign(ast::StmtAssign { value, .. }) = statement else {
+            continue;
         };
         if let Some(field_name) = is_nullable_field(checker, value) {
-            errors.push(Diagnostic::new(
+            checker.diagnostics.push(Diagnostic::new(
                 DjangoNullableModelStringField {
                     field_name: field_name.to_string(),
                 },
@@ -76,32 +66,34 @@ pub(crate) fn nullable_model_string_field(checker: &Checker, body: &[Stmt]) -> V
             ));
         }
     }
-    errors
 }
 
 fn is_nullable_field<'a>(checker: &'a Checker, value: &'a Expr) -> Option<&'a str> {
-    let Expr::Call(ast::ExprCall {func, keywords, ..}) = value else {
+    let Expr::Call(ast::ExprCall { func, keywords, .. }) = value else {
         return None;
     };
 
-    let Some(valid_field_name) = helpers::get_model_field_name(checker.semantic_model(), func) else {
+    let Some(valid_field_name) = helpers::get_model_field_name(func, checker.semantic()) else {
         return None;
     };
 
-    if !NOT_NULL_TRUE_FIELDS.contains(&valid_field_name) {
+    if !matches!(
+        valid_field_name,
+        "CharField" | "TextField" | "SlugField" | "EmailField" | "FilePathField" | "URLField"
+    ) {
         return None;
     }
 
     let mut null_key = false;
     let mut blank_key = false;
     let mut unique_key = false;
-    for keyword in keywords.iter() {
-        let Expr::Constant(ast::ExprConstant {value: Bool(true), ..}) = &keyword.value else {
-            continue
-        };
+    for keyword in keywords {
         let Some(argument) = &keyword.arg else {
-            continue
+            continue;
         };
+        if !is_const_true(&keyword.value) {
+            continue;
+        }
         match argument.as_str() {
             "blank" => blank_key = true,
             "null" => null_key = true,

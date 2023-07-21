@@ -1,3 +1,4 @@
+use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
 use crate::FormatNodeRule;
@@ -18,7 +19,7 @@ impl FormatNodeRule<Decorator> for FormatDecorator {
             f,
             [
                 text("@"),
-                expression.format().with_options(Parenthesize::Optional)
+                maybe_parenthesize_expression(expression, item, Parenthesize::Optional)
             ]
         )
     }

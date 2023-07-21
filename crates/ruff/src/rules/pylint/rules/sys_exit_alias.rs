@@ -35,7 +35,7 @@ use crate::registry::AsRule;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/constants.html#constants-added-by-the-site-module)
+/// - [Python documentation: Constants added by the `site` module](https://docs.python.org/3/library/constants.html#constants-added-by-the-site-module)
 #[violation]
 pub struct SysExitAlias {
     name: String,
@@ -61,31 +61,31 @@ pub(crate) fn sys_exit_alias(checker: &mut Checker, func: &Expr) {
     let Expr::Name(ast::ExprName { id, .. }) = func else {
         return;
     };
-    for name in ["exit", "quit"] {
-        if id != name {
-            continue;
-        }
-        if !checker.semantic_model().is_builtin(name) {
-            continue;
-        }
-        let mut diagnostic = Diagnostic::new(
-            SysExitAlias {
-                name: name.to_string(),
-            },
-            func.range(),
-        );
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.try_set_fix(|| {
-                let (import_edit, binding) = checker.importer.get_or_import_symbol(
-                    &ImportRequest::import("sys", "exit"),
-                    func.start(),
-                    checker.semantic_model(),
-                )?;
-                let reference_edit = Edit::range_replacement(binding, func.range());
-                #[allow(deprecated)]
-                Ok(Fix::unspecified_edits(import_edit, [reference_edit]))
-            });
-        }
-        checker.diagnostics.push(diagnostic);
+
+    if !matches!(id.as_str(), "exit" | "quit") {
+        return;
     }
+
+    if !checker.semantic().is_builtin(id.as_str()) {
+        return;
+    }
+
+    let mut diagnostic = Diagnostic::new(
+        SysExitAlias {
+            name: id.to_string(),
+        },
+        func.range(),
+    );
+    if checker.patch(diagnostic.kind.rule()) {
+        diagnostic.try_set_fix(|| {
+            let (import_edit, binding) = checker.importer.get_or_import_symbol(
+                &ImportRequest::import("sys", "exit"),
+                func.start(),
+                checker.semantic(),
+            )?;
+            let reference_edit = Edit::range_replacement(binding, func.range());
+            Ok(Fix::suggested_edits(import_edit, [reference_edit]))
+        });
+    }
+    checker.diagnostics.push(diagnostic);
 }

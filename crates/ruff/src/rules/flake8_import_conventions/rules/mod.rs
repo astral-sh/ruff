@@ -1,7 +1,7 @@
-pub(crate) use banned_import_alias::{banned_import_alias, BannedImportAlias};
-pub(crate) use banned_import_from::{banned_import_from, BannedImportFrom};
-pub(crate) use conventional_import_alias::{conventional_import_alias, UnconventionalImportAlias};
+pub(crate) use banned_import_alias::*;
+pub(crate) use banned_import_from::*;
+pub(crate) use unconventional_import_alias::*;
 
 mod banned_import_alias;
 mod banned_import_from;
-mod conventional_import_alias;
+mod unconventional_import_alias;

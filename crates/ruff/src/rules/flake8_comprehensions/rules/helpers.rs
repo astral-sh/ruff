@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{self, Expr, Keyword};
 
-pub(crate) fn expr_name(func: &Expr) -> Option<&str> {
+pub(super) fn expr_name(func: &Expr) -> Option<&str> {
     if let Expr::Name(ast::ExprName { id, .. }) = func {
         Some(id)
     } else {
@@ -8,25 +8,25 @@ pub(crate) fn expr_name(func: &Expr) -> Option<&str> {
     }
 }
 
-pub(crate) fn exactly_one_argument_with_matching_function<'a>(
+pub(super) fn exactly_one_argument_with_matching_function<'a>(
     name: &str,
     func: &Expr,
     args: &'a [Expr],
     keywords: &[Keyword],
 ) -> Option<&'a Expr> {
-    if !keywords.is_empty() {
+    let [arg] = args else {
         return None;
-    }
-    if args.len() != 1 {
+    };
+    if !keywords.is_empty() {
         return None;
     }
     if expr_name(func)? != name {
         return None;
     }
-    Some(&args[0])
+    Some(arg)
 }
 
-pub(crate) fn first_argument_with_matching_function<'a>(
+pub(super) fn first_argument_with_matching_function<'a>(
     name: &str,
     func: &Expr,
     args: &'a [Expr],

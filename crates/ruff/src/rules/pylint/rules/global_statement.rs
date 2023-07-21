@@ -1,5 +1,3 @@
-use rustpython_parser::ast::Ranged;
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
@@ -55,22 +53,14 @@ impl Violation for GlobalStatement {
 
 /// PLW0603
 pub(crate) fn global_statement(checker: &mut Checker, name: &str) {
-    let scope = checker.semantic_model().scope();
-    if let Some(binding_id) = scope.get(name) {
-        let binding = &checker.semantic_model().bindings[binding_id];
-        if binding.kind.is_global() {
-            let source = checker.semantic_model().stmts[binding
-                .source
-                .expect("`global` bindings should always have a `source`")];
-            let diagnostic = Diagnostic::new(
-                GlobalStatement {
-                    name: name.to_string(),
-                },
-                // Match Pylint's behavior by reporting on the `global` statement`, rather
-                // than the variable usage.
-                source.range(),
-            );
-            checker.diagnostics.push(diagnostic);
-        }
+    if let Some(range) = checker.semantic().global(name) {
+        checker.diagnostics.push(Diagnostic::new(
+            GlobalStatement {
+                name: name.to_string(),
+            },
+            // Match Pylint's behavior by reporting on the `global` statement`, rather
+            // than the variable usage.
+            range,
+        ));
     }
 }

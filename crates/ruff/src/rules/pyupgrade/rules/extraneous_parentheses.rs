@@ -9,6 +9,22 @@ use ruff_python_ast::source_code::Locator;
 use crate::registry::Rule;
 use crate::settings::Settings;
 
+/// ## What it does
+/// Checks for extraneous parentheses.
+///
+/// ## Why is this bad?
+/// Extraneous parentheses are redundant, and can be removed to improve
+/// readability while retaining identical semantics.
+///
+/// ## Example
+/// ```python
+/// print(("Hello, world"))
+/// ```
+///
+/// Use instead:
+/// ```python
+/// print("Hello, world")
+/// ```
 #[violation]
 pub struct ExtraneousParentheses;
 
@@ -90,7 +106,7 @@ fn match_extraneous_parentheses(tokens: &[LexResult], mut i: usize) -> Option<(u
         if i >= tokens.len() {
             return None;
         }
-        let Ok(( tok, _)) = &tokens[i] else {
+        let Ok((tok, _)) = &tokens[i] else {
             return None;
         };
         match tok {
@@ -106,7 +122,7 @@ fn match_extraneous_parentheses(tokens: &[LexResult], mut i: usize) -> Option<(u
     if i >= tokens.len() {
         return None;
     }
-    let Ok(( tok, _)) = &tokens[i] else {
+    let Ok((tok, _)) = &tokens[i] else {
         return None;
     };
     if matches!(tok, Tok::Rpar) {
@@ -118,21 +134,21 @@ fn match_extraneous_parentheses(tokens: &[LexResult], mut i: usize) -> Option<(u
 
 /// UP034
 pub(crate) fn extraneous_parentheses(
+    diagnostics: &mut Vec<Diagnostic>,
     tokens: &[LexResult],
     locator: &Locator,
     settings: &Settings,
-) -> Vec<Diagnostic> {
-    let mut diagnostics = vec![];
+) {
     let mut i = 0;
     while i < tokens.len() {
         if matches!(tokens[i], Ok((Tok::Lpar, _))) {
             if let Some((start, end)) = match_extraneous_parentheses(tokens, i) {
                 i = end + 1;
                 let Ok((_, start_range)) = &tokens[start] else {
-                    return diagnostics;
+                    return;
                 };
                 let Ok((.., end_range)) = &tokens[end] else {
-                    return diagnostics;
+                    return;
                 };
                 let mut diagnostic = Diagnostic::new(
                     ExtraneousParentheses,
@@ -141,8 +157,7 @@ pub(crate) fn extraneous_parentheses(
                 if settings.rules.should_fix(Rule::ExtraneousParentheses) {
                     let contents =
                         locator.slice(TextRange::new(start_range.start(), end_range.end()));
-                    #[allow(deprecated)]
-                    diagnostic.set_fix(Fix::unspecified(Edit::replacement(
+                    diagnostic.set_fix(Fix::automatic(Edit::replacement(
                         contents[1..contents.len() - 1].to_string(),
                         start_range.start(),
                         end_range.end(),
@@ -156,5 +171,4 @@ pub(crate) fn extraneous_parentheses(
             i += 1;
         }
     }
-    diagnostics
 }

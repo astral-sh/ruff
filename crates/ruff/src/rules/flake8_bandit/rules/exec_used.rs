@@ -1,8 +1,25 @@
-use rustpython_parser::ast::{self, Expr, Ranged};
+use rustpython_parser::ast::{Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
+use crate::checkers::ast::Checker;
+
+/// ## What it does
+/// Checks for uses of the builtin `exec` function.
+///
+/// ## Why is this bad?
+/// The `exec()` function is insecure as it allows for arbitrary code
+/// execution.
+///
+/// ## Example
+/// ```python
+/// exec("print('Hello World')")
+/// ```
+///
+/// ## References
+/// - [Python documentation: `exec`](https://docs.python.org/3/library/functions.html#exec)
+/// - [Common Weakness Enumeration: CWE-78](https://cwe.mitre.org/data/definitions/78.html)
 #[violation]
 pub struct ExecBuiltin;
 
@@ -14,12 +31,16 @@ impl Violation for ExecBuiltin {
 }
 
 /// S102
-pub(crate) fn exec_used(expr: &Expr, func: &Expr) -> Option<Diagnostic> {
-    let Expr::Name(ast::ExprName { id, .. }) = func else {
-        return None;
-    };
-    if id != "exec" {
-        return None;
+pub(crate) fn exec_used(checker: &mut Checker, func: &Expr) {
+    if checker
+        .semantic()
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            matches!(call_path.as_slice(), ["" | "builtin", "exec"])
+        })
+    {
+        checker
+            .diagnostics
+            .push(Diagnostic::new(ExecBuiltin, func.range()));
     }
-    Some(Diagnostic::new(ExecBuiltin, expr.range()))
 }

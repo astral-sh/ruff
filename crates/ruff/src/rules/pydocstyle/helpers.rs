@@ -1,15 +1,14 @@
 use std::collections::BTreeSet;
 
-use ruff_newlines::StrExt;
 use ruff_python_ast::call_path::from_qualified_name;
 use ruff_python_ast::cast;
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::str::is_implicit_concatenation;
-use ruff_python_semantic::definition::{Definition, Member, MemberKind};
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::{Definition, Member, MemberKind, SemanticModel};
+use ruff_python_trivia::UniversalNewlines;
 
 /// Return the index of the first logical line in a string.
-pub(crate) fn logical_line(content: &str) -> Option<usize> {
+pub(super) fn logical_line(content: &str) -> Option<usize> {
     // Find the first logical line.
     let mut logical_line = None;
     for (i, line) in content.universal_newlines().enumerate() {
@@ -28,17 +27,22 @@ pub(crate) fn logical_line(content: &str) -> Option<usize> {
 
 /// Normalize a word by removing all non-alphanumeric characters
 /// and converting it to lowercase.
-pub(crate) fn normalize_word(first_word: &str) -> String {
+pub(super) fn normalize_word(first_word: &str) -> String {
     first_word
         .replace(|c: char| !c.is_alphanumeric(), "")
         .to_lowercase()
 }
 
+/// Return true if a line ends with an odd number of backslashes (i.e., ends with an escape).
+pub(super) fn ends_with_backslash(line: &str) -> bool {
+    line.chars().rev().take_while(|c| *c == '\\').count() % 2 == 1
+}
+
 /// Check decorator list to see if function should be ignored.
 pub(crate) fn should_ignore_definition(
-    model: &SemanticModel,
     definition: &Definition,
     ignore_decorators: &BTreeSet<String>,
+    semantic: &SemanticModel,
 ) -> bool {
     if ignore_decorators.is_empty() {
         return false;
@@ -51,7 +55,8 @@ pub(crate) fn should_ignore_definition(
     }) = definition
     {
         for decorator in cast::decorator_list(stmt) {
-            if let Some(call_path) = model.resolve_call_path(map_callable(&decorator.expression)) {
+            if let Some(call_path) = semantic.resolve_call_path(map_callable(&decorator.expression))
+            {
                 if ignore_decorators
                     .iter()
                     .any(|decorator| from_qualified_name(decorator) == call_path)
@@ -62,11 +67,6 @@ pub(crate) fn should_ignore_definition(
         }
     }
     false
-}
-
-/// Return true if a line ends with an odd number of backslashes (i.e., ends with an escape).
-pub(crate) fn ends_with_backslash(line: &str) -> bool {
-    line.chars().rev().take_while(|c| *c == '\\').count() % 2 == 1
 }
 
 /// Check if a docstring should be ignored.

@@ -1,19 +1,19 @@
 ---
 source: crates/ruff/src/rules/flake8_builtins/mod.rs
 ---
-A001.py:1:1: A001 Variable `sum` is shadowing a Python builtin
+A001.py:1:16: A001 Variable `sum` is shadowing a Python builtin
   |
 1 | import some as sum
-  | ^^^^^^^^^^^^^^^^^^ A001
+  |                ^^^ A001
 2 | from some import other as int
 3 | from directory import new as dir
   |
 
-A001.py:2:1: A001 Variable `int` is shadowing a Python builtin
+A001.py:2:27: A001 Variable `int` is shadowing a Python builtin
   |
 1 | import some as sum
 2 | from some import other as int
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ A001
+  |                           ^^^ A001
 3 | from directory import new as dir
   |
 
@@ -102,15 +102,13 @@ A001.py:16:7: A001 Variable `slice` is shadowing a Python builtin
 17 |     pass
    |
 
-A001.py:21:1: A001 Variable `ValueError` is shadowing a Python builtin
+A001.py:21:23: A001 Variable `ValueError` is shadowing a Python builtin
    |
-19 |   try:
-20 |       ...
-21 | / except ImportError as ValueError:
-22 | |     ...
-   | |_______^ A001
-23 |   
-24 |   for memoryview, *bytearray in []:
+19 | try:
+20 |     ...
+21 | except ImportError as ValueError:
+   |                       ^^^^^^^^^^ A001
+22 |     ...
    |
 
 A001.py:24:5: A001 Variable `memoryview` is shadowing a Python builtin

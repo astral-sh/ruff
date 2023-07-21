@@ -1,0 +1,38 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/named_expr.py
+---
+## Input
+```py
+y = 1
+
+if (
+    # 1
+    x # 2
+    := # 3
+    y # 4
+):
+    pass
+
+y0 = (y1 := f(x))
+
+f(x:=y, z=True)
+```
+
+## Output
+```py
+y = 1
+
+if (
+    # 1
+    x := y  # 2  # 3  # 4
+):
+    pass
+
+y0 = (y1 := f(x))
+
+f(x := y, z=True)
+```
+
+
+

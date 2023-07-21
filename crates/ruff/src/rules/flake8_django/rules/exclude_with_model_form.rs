@@ -52,22 +52,22 @@ pub(crate) fn exclude_with_model_form(
 ) -> Option<Diagnostic> {
     if !bases
         .iter()
-        .any(|base| is_model_form(checker.semantic_model(), base))
+        .any(|base| is_model_form(base, checker.semantic()))
     {
         return None;
     }
-    for element in body.iter() {
+    for element in body {
         let Stmt::ClassDef(ast::StmtClassDef { name, body, .. }) = element else {
             continue;
         };
         if name != "Meta" {
             continue;
         }
-        for element in body.iter() {
+        for element in body {
             let Stmt::Assign(ast::StmtAssign { targets, .. }) = element else {
                 continue;
             };
-            for target in targets.iter() {
+            for target in targets {
                 let Expr::Name(ast::ExprName { id, .. }) = target else {
                     continue;
                 };

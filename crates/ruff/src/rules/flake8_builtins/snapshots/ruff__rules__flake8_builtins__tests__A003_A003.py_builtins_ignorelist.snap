@@ -6,7 +6,7 @@ A003.py:2:5: A003 Class attribute `ImportError` is shadowing a Python builtin
 1 | class MyClass:
 2 |     ImportError = 4
   |     ^^^^^^^^^^^ A003
-3 |     id = 5
+3 |     id: int
 4 |     dir = "/"
   |
 

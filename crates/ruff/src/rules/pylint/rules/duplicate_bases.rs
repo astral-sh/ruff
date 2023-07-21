@@ -1,7 +1,7 @@
 use std::hash::BuildHasherDefault;
 
 use rustc_hash::FxHashSet;
-use rustpython_parser::ast::{self, Expr, Identifier, Ranged};
+use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -35,7 +35,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/reference/compound_stmts.html#class-definitions)
+/// - [Python documentation: Class definitions](https://docs.python.org/3/reference/compound_stmts.html#class-definitions)
 #[violation]
 pub struct DuplicateBases {
     base: String,
@@ -52,7 +52,7 @@ impl Violation for DuplicateBases {
 
 /// PLE0241
 pub(crate) fn duplicate_bases(checker: &mut Checker, name: &str, bases: &[Expr]) {
-    let mut seen: FxHashSet<&Identifier> =
+    let mut seen: FxHashSet<&str> =
         FxHashSet::with_capacity_and_hasher(bases.len(), BuildHasherDefault::default());
     for base in bases {
         if let Expr::Name(ast::ExprName { id, .. }) = base {

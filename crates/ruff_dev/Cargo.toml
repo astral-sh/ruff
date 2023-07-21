@@ -2,25 +2,44 @@
 name = "ruff_dev"
 version = "0.0.0"
 publish = false
+authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 
 [dependencies]
 ruff = { path = "../ruff", features = ["schemars"] }
 ruff_cli = { path = "../ruff_cli" }
 ruff_diagnostics = { path = "../ruff_diagnostics" }
+ruff_formatter = { path = "../ruff_formatter" }
+ruff_python_formatter = { path = "../ruff_python_formatter" }
+ruff_python_stdlib = { path = "../ruff_python_stdlib" }
 ruff_textwrap = { path = "../ruff_textwrap" }
 
 anyhow = { workspace = true }
 clap = { workspace = true }
+ignore = { workspace = true }
+indicatif = "0.17.5"
 itertools = { workspace = true }
 libcst = { workspace = true }
+log = { workspace = true }
 once_cell = { workspace = true }
 pretty_assertions = { version = "1.3.0" }
+rayon = "1.7.0"
 regex = { workspace = true }
 rustpython-format = { workspace = true }
 rustpython-parser = { workspace = true }
 schemars = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+similar = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
+tempfile = "3.6.0"
+toml = { workspace = true, features = ["parse"] }
+
+[dev-dependencies]
+indoc = "2.0.3"

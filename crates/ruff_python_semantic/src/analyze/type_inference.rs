@@ -44,8 +44,8 @@ pub enum PythonType {
 impl From<&Expr> for PythonType {
     fn from(expr: &Expr) -> Self {
         match expr {
-            Expr::NamedExpr(ast::ExprNamedExpr { value, .. }) => (&**value).into(),
-            Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => (&**operand).into(),
+            Expr::NamedExpr(ast::ExprNamedExpr { value, .. }) => (value.as_ref()).into(),
+            Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => (operand.as_ref()).into(),
             Expr::Dict(_) => PythonType::Dict,
             Expr::DictComp(_) => PythonType::Dict,
             Expr::Set(_) => PythonType::Set,
@@ -88,7 +88,6 @@ impl From<&Expr> for PythonType {
                 Constant::None => PythonType::None,
                 Constant::Ellipsis => PythonType::Ellipsis,
                 Constant::Bytes(_) => PythonType::Bytes,
-                Constant::Tuple(_) => PythonType::Tuple,
             },
             _ => PythonType::Unknown,
         }

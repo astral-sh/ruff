@@ -1,4 +1,4 @@
-from abc import ABCMeta
+import abc
 
 import pydantic
 
@@ -17,6 +17,10 @@ class Class:
 
     @classmethod
     def class_method(cls):
+        pass
+
+    @abc.abstractclassmethod
+    def abstract_class_method(cls):
         pass
 
     @staticmethod
@@ -41,7 +45,7 @@ class Class:
         ...
 
 
-class MetaClass(ABCMeta):
+class MetaClass(abc.ABCMeta):
     def bad_method(self):
         pass
 

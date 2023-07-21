@@ -1,0 +1,33 @@
+---
+source: crates/ruff_python_resolver/src/lib.rs
+expression: result
+---
+ImportResult {
+    is_relative: false,
+    is_import_found: true,
+    is_partly_resolved: false,
+    is_namespace_package: false,
+    is_init_file_present: false,
+    is_stub_package: false,
+    import_type: ThirdParty,
+    resolved_paths: [
+        "./resources/test/airflow/venv/lib/python3.11/site-packages/_watchdog_fsevents.cpython-311-darwin.so",
+    ],
+    search_path: Some(
+        "./resources/test/airflow/venv/lib/python3.11/site-packages",
+    ),
+    is_stub_file: false,
+    is_native_lib: true,
+    is_stdlib_typeshed_file: false,
+    is_third_party_typeshed_file: false,
+    is_local_typings_file: false,
+    implicit_imports: ImplicitImports(
+        {},
+    ),
+    filtered_implicit_imports: ImplicitImports(
+        {},
+    ),
+    non_stub_import_result: None,
+    py_typed_info: None,
+    package_directory: None,
+}

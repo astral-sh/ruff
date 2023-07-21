@@ -9,6 +9,37 @@ use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for the use of generics that can be replaced with standard library
+/// variants based on [PEP 585].
+///
+/// ## Why is this bad?
+/// [PEP 585] enabled collections in the Python standard library (like `list`)
+/// to be used as generics directly, instead of importing analogous members
+/// from the `typing` module (like `typing.List`).
+///
+/// When available, the [PEP 585] syntax should be used instead of importing
+/// members from the `typing` module, as it's more concise and readable.
+/// Importing those members from `typing` is considered deprecated as of PEP
+/// 585.
+///
+/// ## Example
+/// ```python
+/// from typing import List
+///
+/// foo: List[int] = [1, 2, 3]
+/// ```
+///
+/// Use instead:
+/// ```python
+/// foo: list[int] = [1, 2, 3]
+/// ```
+///
+/// ## Options
+/// - `target-version`
+/// - `pyupgrade.keep-runtime-typing`
+///
+/// [PEP 585]: https://peps.python.org/pep-0585/
 #[violation]
 pub struct NonPEP585Annotation {
     from: String,
@@ -47,11 +78,11 @@ pub(crate) fn use_pep585_annotation(
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        if !checker.semantic_model().in_complex_string_type_definition() {
+        if !checker.semantic().in_complex_string_type_definition() {
             match replacement {
                 ModuleMember::BuiltIn(name) => {
                     // Built-in type, like `list`.
-                    if checker.semantic_model().is_builtin(name) {
+                    if checker.semantic().is_builtin(name) {
                         diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                             (*name).to_string(),
                             expr.range(),
@@ -64,7 +95,7 @@ pub(crate) fn use_pep585_annotation(
                         let (import_edit, binding) = checker.importer.get_or_import_symbol(
                             &ImportRequest::import_from(module, member),
                             expr.start(),
-                            checker.semantic_model(),
+                            checker.semantic(),
                         )?;
                         let reference_edit = Edit::range_replacement(binding, expr.range());
                         Ok(Fix::suggested_edits(import_edit, [reference_edit]))

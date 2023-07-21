@@ -25,7 +25,9 @@ pub(crate) fn check_file_path(
 
     // pep8-naming
     if settings.rules.enabled(Rule::InvalidModuleName) {
-        if let Some(diagnostic) = invalid_module_name(path, package) {
+        if let Some(diagnostic) =
+            invalid_module_name(path, package, &settings.pep8_naming.ignore_names)
+        {
             diagnostics.push(diagnostic);
         }
     }

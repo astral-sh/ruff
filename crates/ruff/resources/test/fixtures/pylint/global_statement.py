@@ -73,3 +73,15 @@ def override_class():
         pass
 
     CLASS()
+
+
+def multiple_assignment():
+    """Should warn on every assignment."""
+    global CONSTANT  # [global-statement]
+    CONSTANT = 1
+    CONSTANT = 2
+
+
+def no_assignment():
+    """Shouldn't warn"""
+    global CONSTANT

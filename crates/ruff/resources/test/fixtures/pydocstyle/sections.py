@@ -513,3 +513,19 @@ def implicit_string_concatenation():
     A value of some sort.
 
     """"Extra content"
+
+
+def replace_equals_with_dash():
+    """Equal length equals should be replaced with dashes.
+
+    Parameters
+    ==========
+    """
+
+
+def replace_equals_with_dash2():
+    """Here, the length of equals is not the same.
+
+    Parameters
+    ===========
+    """

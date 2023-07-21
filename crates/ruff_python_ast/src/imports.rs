@@ -85,6 +85,9 @@ impl std::fmt::Display for ImportFrom<'_> {
             write!(f, "{module}")?;
         }
         write!(f, " import {}", self.name.name)?;
+        if let Some(as_name) = self.name.as_name {
+            write!(f, " as {as_name}")?;
+        }
         Ok(())
     }
 }
@@ -160,8 +163,8 @@ impl ImportMap {
 }
 
 impl<'a> IntoIterator for &'a ImportMap {
-    type Item = (&'a String, &'a Vec<ModuleImport>);
     type IntoIter = std::collections::hash_map::Iter<'a, String, Vec<ModuleImport>>;
+    type Item = (&'a String, &'a Vec<ModuleImport>);
 
     fn into_iter(self) -> Self::IntoIter {
         self.module_to_imports.iter()

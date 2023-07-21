@@ -11,6 +11,22 @@ use crate::rules::ruff::rules::confusables::CONFUSABLES;
 use crate::rules::ruff::rules::Context;
 use crate::settings::Settings;
 
+/// ## What it does
+/// Checks for ambiguous unicode characters in strings.
+///
+/// ## Why is this bad?
+/// The use of ambiguous unicode characters can confuse readers and cause
+/// subtle bugs.
+///
+/// ## Example
+/// ```python
+/// print("Ηello, world!")  # "Η" is the Greek eta (`U+0397`).
+/// ```
+///
+/// Use instead:
+/// ```python
+/// print("Hello, world!")  # "H" is the Latin capital H (`U+0048`).
+/// ```
 #[violation]
 pub struct AmbiguousUnicodeCharacterString {
     confusable: char,
@@ -44,6 +60,22 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterString {
     }
 }
 
+/// ## What it does
+/// Checks for ambiguous unicode characters in docstrings.
+///
+/// ## Why is this bad?
+/// The use of ambiguous unicode characters can confuse readers and cause
+/// subtle bugs.
+///
+/// ## Example
+/// ```python
+/// """A lovely docstring (with a `U+FF09` parenthesis）."""
+/// ```
+///
+/// Use instead:
+/// ```python
+/// """A lovely docstring (with no strange parentheses)."""
+/// ```
 #[violation]
 pub struct AmbiguousUnicodeCharacterDocstring {
     confusable: char,
@@ -77,6 +109,22 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterDocstring {
     }
 }
 
+/// ## What it does
+/// Checks for ambiguous unicode characters in comments.
+///
+/// ## Why is this bad?
+/// The use of ambiguous unicode characters can confuse readers and cause
+/// subtle bugs.
+///
+/// ## Example
+/// ```python
+/// foo()  # nоqa  # "о" is Cyrillic (`U+043E`)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// foo()  # noqa  # "o" is Latin (`U+006F`)
+/// ```
 #[violation]
 pub struct AmbiguousUnicodeCharacterComment {
     confusable: char,
@@ -111,18 +159,17 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterComment {
 }
 
 pub(crate) fn ambiguous_unicode_character(
+    diagnostics: &mut Vec<Diagnostic>,
     locator: &Locator,
     range: TextRange,
     context: Context,
     settings: &Settings,
-) -> Vec<Diagnostic> {
-    let mut diagnostics = vec![];
-
+) {
     let text = locator.slice(range);
 
     // Most of the time, we don't need to check for ambiguous unicode characters at all.
     if text.is_ascii() {
-        return diagnostics;
+        return;
     }
 
     // Iterate over the "words" in the text.
@@ -184,8 +231,6 @@ pub(crate) fn ambiguous_unicode_character(
         }
         word_candidates.clear();
     }
-
-    diagnostics
 }
 
 bitflags! {
@@ -256,8 +301,7 @@ impl Candidate {
             );
             if settings.rules.enabled(diagnostic.kind.rule()) {
                 if settings.rules.should_fix(diagnostic.kind.rule()) {
-                    #[allow(deprecated)]
-                    diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                    diagnostic.set_fix(Fix::manual(Edit::range_replacement(
                         self.representant.to_string(),
                         char_range,
                     )));

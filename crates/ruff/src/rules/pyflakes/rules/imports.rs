@@ -1,5 +1,3 @@
-use itertools::Itertools;
-
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::OneIndexed;
@@ -51,7 +49,7 @@ impl Violation for ImportShadowedByLoopVar {
 /// ## Why is this bad?
 /// Wildcard imports (e.g., `from module import *`) make it hard to determine
 /// which symbols are available in the current namespace, and from which module
-/// they were imported.
+/// they were imported. They're also discouraged by [PEP 8].
 ///
 /// ## Example
 /// ```python
@@ -71,8 +69,7 @@ impl Violation for ImportShadowedByLoopVar {
 ///     return pi * radius**2
 /// ```
 ///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#imports)
+/// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[violation]
 pub struct UndefinedLocalWithImportStar {
     pub(crate) name: String,
@@ -110,7 +107,7 @@ impl Violation for UndefinedLocalWithImportStar {
 /// ```
 ///
 /// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#module-level-dunder-names)
+/// - [Python documentation: Future statements](https://docs.python.org/3/reference/simple_stmts.html#future)
 #[violation]
 pub struct LateFutureImport;
 
@@ -155,24 +152,16 @@ impl Violation for LateFutureImport {
 /// def area(radius):
 ///     return pi * radius**2
 /// ```
-///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#imports)
 #[violation]
 pub struct UndefinedLocalWithImportStarUsage {
     pub(crate) name: String,
-    pub(crate) sources: Vec<String>,
 }
 
 impl Violation for UndefinedLocalWithImportStarUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UndefinedLocalWithImportStarUsage { name, sources } = self;
-        let sources = sources
-            .iter()
-            .map(|source| format!("`{source}`"))
-            .join(", ");
-        format!("`{name}` may be undefined, or defined from star imports: {sources}")
+        let UndefinedLocalWithImportStarUsage { name } = self;
+        format!("`{name}` may be undefined, or defined from star imports")
     }
 }
 
@@ -183,8 +172,9 @@ impl Violation for UndefinedLocalWithImportStarUsage {
 /// The use of wildcard imports outside of the module namespace (e.g., within
 /// functions) can lead to confusion, as the import can shadow local variables.
 ///
-/// Though wildcard imports are discouraged, when necessary, they should be placed
-/// in the module namespace (i.e., at the top-level of a module).
+/// Though wildcard imports are discouraged by [PEP 8], when necessary, they
+/// should be placed in the module namespace (i.e., at the top-level of a
+/// module).
 ///
 /// ## Example
 /// ```python
@@ -201,8 +191,7 @@ impl Violation for UndefinedLocalWithImportStarUsage {
 ///     ...
 /// ```
 ///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#imports)
+/// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[violation]
 pub struct UndefinedLocalWithNestedImportStarUsage {
     pub(crate) name: String,

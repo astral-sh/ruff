@@ -1,58 +1,15 @@
 use std::{fmt, iter};
 
 use regex::Regex;
-use rustpython_parser::ast::{self, Expr, ExprContext, Ranged, Stmt, Withitem};
+use rustpython_parser::ast::{self, Expr, ExprContext, Ranged, Stmt, WithItem};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
-use ruff_python_ast::types::Node;
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub(crate) enum OuterBindingKind {
-    For,
-    With,
-}
-
-impl fmt::Display for OuterBindingKind {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            OuterBindingKind::For => fmt.write_str("`for` loop"),
-            OuterBindingKind::With => fmt.write_str("`with` statement"),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub(crate) enum InnerBindingKind {
-    For,
-    With,
-    Assignment,
-}
-
-impl fmt::Display for InnerBindingKind {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            InnerBindingKind::For => fmt.write_str("`for` loop"),
-            InnerBindingKind::With => fmt.write_str("`with` statement"),
-            InnerBindingKind::Assignment => fmt.write_str("assignment"),
-        }
-    }
-}
-
-impl PartialEq<InnerBindingKind> for OuterBindingKind {
-    fn eq(&self, other: &InnerBindingKind) -> bool {
-        matches!(
-            (self, other),
-            (OuterBindingKind::For, InnerBindingKind::For)
-                | (OuterBindingKind::With, InnerBindingKind::With)
-        )
-    }
-}
 
 /// ## What it does
 /// Checks for variables defined in `for` loops and `with` statements that
@@ -128,6 +85,48 @@ impl Violation for RedefinedLoopName {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+enum OuterBindingKind {
+    For,
+    With,
+}
+
+impl fmt::Display for OuterBindingKind {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            OuterBindingKind::For => fmt.write_str("`for` loop"),
+            OuterBindingKind::With => fmt.write_str("`with` statement"),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+enum InnerBindingKind {
+    For,
+    With,
+    Assignment,
+}
+
+impl fmt::Display for InnerBindingKind {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            InnerBindingKind::For => fmt.write_str("`for` loop"),
+            InnerBindingKind::With => fmt.write_str("`with` statement"),
+            InnerBindingKind::Assignment => fmt.write_str("assignment"),
+        }
+    }
+}
+
+impl PartialEq<InnerBindingKind> for OuterBindingKind {
+    fn eq(&self, other: &InnerBindingKind) -> bool {
+        matches!(
+            (self, other),
+            (OuterBindingKind::For, InnerBindingKind::For)
+                | (OuterBindingKind::With, InnerBindingKind::With)
+        )
+    }
+}
+
 struct ExprWithOuterBindingKind<'a> {
     expr: &'a Expr,
     binding_kind: OuterBindingKind,
@@ -176,7 +175,7 @@ impl<'a, 'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'a, 'b> {
                 // Check for single-target assignments which are of the
                 // form `x = cast(..., x)`.
                 if targets.first().map_or(false, |target| {
-                    assignment_is_cast_expr(self.context, value, target)
+                    assignment_is_cast_expr(value, target, self.context)
                 }) {
                     return;
                 }
@@ -236,7 +235,7 @@ impl<'a, 'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'a, 'b> {
 ///
 /// x = cast(int, x)
 /// ```
-fn assignment_is_cast_expr(model: &SemanticModel, value: &Expr, target: &Expr) -> bool {
+fn assignment_is_cast_expr(value: &Expr, target: &Expr, semantic: &SemanticModel) -> bool {
     let Expr::Call(ast::ExprCall { func, args, .. }) = value else {
         return false;
     };
@@ -252,13 +251,13 @@ fn assignment_is_cast_expr(model: &SemanticModel, value: &Expr, target: &Expr) -
     if arg_id != target_id {
         return false;
     }
-    model.match_typing_expr(func, "cast")
+    semantic.match_typing_expr(func, "cast")
 }
 
-fn assignment_targets_from_expr<'a, U>(
-    expr: &'a Expr<U>,
+fn assignment_targets_from_expr<'a>(
+    expr: &'a Expr,
     dummy_variable_rgx: &'a Regex,
-) -> Box<dyn Iterator<Item = &'a Expr<U>> + 'a> {
+) -> Box<dyn Iterator<Item = &'a Expr> + 'a> {
     // The Box is necessary to ensure the match arms have the same return type - we can't use
     // a cast to "impl Iterator", since at the time of writing that is only allowed for
     // return types and argument types.
@@ -275,7 +274,7 @@ fn assignment_targets_from_expr<'a, U>(
             ctx: ExprContext::Store,
             value,
             range: _,
-        }) => Box::new(iter::once(&**value)),
+        }) => Box::new(iter::once(value.as_ref())),
         Expr::Name(ast::ExprName {
             ctx: ExprContext::Store,
             id,
@@ -308,77 +307,73 @@ fn assignment_targets_from_expr<'a, U>(
     }
 }
 
-fn assignment_targets_from_with_items<'a, U>(
-    items: &'a [Withitem<U>],
+fn assignment_targets_from_with_items<'a>(
+    items: &'a [WithItem],
     dummy_variable_rgx: &'a Regex,
-) -> impl Iterator<Item = &'a Expr<U>> + 'a {
+) -> impl Iterator<Item = &'a Expr> + 'a {
     items
         .iter()
         .filter_map(|item| {
             item.optional_vars
                 .as_ref()
-                .map(|expr| assignment_targets_from_expr(&**expr, dummy_variable_rgx))
+                .map(|expr| assignment_targets_from_expr(expr, dummy_variable_rgx))
         })
         .flatten()
 }
 
-fn assignment_targets_from_assign_targets<'a, U>(
-    targets: &'a [Expr<U>],
+fn assignment_targets_from_assign_targets<'a>(
+    targets: &'a [Expr],
     dummy_variable_rgx: &'a Regex,
-) -> impl Iterator<Item = &'a Expr<U>> + 'a {
+) -> impl Iterator<Item = &'a Expr> + 'a {
     targets
         .iter()
         .flat_map(|target| assignment_targets_from_expr(target, dummy_variable_rgx))
 }
 
 /// PLW2901
-pub(crate) fn redefined_loop_name<'a, 'b>(checker: &'a mut Checker<'b>, node: &Node<'b>) {
-    let (outer_assignment_targets, inner_assignment_targets) = match node {
-        Node::Stmt(stmt) => match stmt {
-            // With.
-            Stmt::With(ast::StmtWith { items, body, .. }) => {
-                let outer_assignment_targets: Vec<ExprWithOuterBindingKind<'a>> =
-                    assignment_targets_from_with_items(items, &checker.settings.dummy_variable_rgx)
-                        .map(|expr| ExprWithOuterBindingKind {
-                            expr,
-                            binding_kind: OuterBindingKind::With,
-                        })
-                        .collect();
-                let mut visitor = InnerForWithAssignTargetsVisitor {
-                    context: checker.semantic_model(),
-                    dummy_variable_rgx: &checker.settings.dummy_variable_rgx,
-                    assignment_targets: vec![],
-                };
-                for stmt in body {
-                    visitor.visit_stmt(stmt);
-                }
-                (outer_assignment_targets, visitor.assignment_targets)
+pub(crate) fn redefined_loop_name(checker: &mut Checker, stmt: &Stmt) {
+    let (outer_assignment_targets, inner_assignment_targets) = match stmt {
+        Stmt::With(ast::StmtWith { items, body, .. })
+        | Stmt::AsyncWith(ast::StmtAsyncWith { items, body, .. }) => {
+            let outer_assignment_targets: Vec<ExprWithOuterBindingKind> =
+                assignment_targets_from_with_items(items, &checker.settings.dummy_variable_rgx)
+                    .map(|expr| ExprWithOuterBindingKind {
+                        expr,
+                        binding_kind: OuterBindingKind::With,
+                    })
+                    .collect();
+            let mut visitor = InnerForWithAssignTargetsVisitor {
+                context: checker.semantic(),
+                dummy_variable_rgx: &checker.settings.dummy_variable_rgx,
+                assignment_targets: vec![],
+            };
+            for stmt in body {
+                visitor.visit_stmt(stmt);
             }
-            // For and async for.
-            Stmt::For(ast::StmtFor { target, body, .. })
-            | Stmt::AsyncFor(ast::StmtAsyncFor { target, body, .. }) => {
-                let outer_assignment_targets: Vec<ExprWithOuterBindingKind<'a>> =
-                    assignment_targets_from_expr(target, &checker.settings.dummy_variable_rgx)
-                        .map(|expr| ExprWithOuterBindingKind {
-                            expr,
-                            binding_kind: OuterBindingKind::For,
-                        })
-                        .collect();
-                let mut visitor = InnerForWithAssignTargetsVisitor {
-                    context: checker.semantic_model(),
-                    dummy_variable_rgx: &checker.settings.dummy_variable_rgx,
-                    assignment_targets: vec![],
-                };
-                for stmt in body {
-                    visitor.visit_stmt(stmt);
-                }
-                (outer_assignment_targets, visitor.assignment_targets)
+            (outer_assignment_targets, visitor.assignment_targets)
+        }
+        Stmt::For(ast::StmtFor { target, body, .. })
+        | Stmt::AsyncFor(ast::StmtAsyncFor { target, body, .. }) => {
+            let outer_assignment_targets: Vec<ExprWithOuterBindingKind> =
+                assignment_targets_from_expr(target, &checker.settings.dummy_variable_rgx)
+                    .map(|expr| ExprWithOuterBindingKind {
+                        expr,
+                        binding_kind: OuterBindingKind::For,
+                    })
+                    .collect();
+            let mut visitor = InnerForWithAssignTargetsVisitor {
+                context: checker.semantic(),
+                dummy_variable_rgx: &checker.settings.dummy_variable_rgx,
+                assignment_targets: vec![],
+            };
+            for stmt in body {
+                visitor.visit_stmt(stmt);
             }
-            _ => panic!(
-                "redefined_loop_name called on Statement that is not a With, For, or AsyncFor"
-            ),
-        },
-        Node::Expr(_) => panic!("redefined_loop_name called on Node that is not a Statement"),
+            (outer_assignment_targets, visitor.assignment_targets)
+        }
+        _ => panic!(
+            "redefined_loop_name called on Statement that is not a With, For, AsyncWith, or AsyncFor"
+        )
     };
 
     let mut diagnostics = Vec::new();

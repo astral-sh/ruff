@@ -2,7 +2,7 @@ use rustpython_parser::ast::{self, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
 
@@ -51,17 +51,17 @@ pub(crate) fn locals_in_render_function(
     keywords: &[Keyword],
 ) {
     if !checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(func)
         .map_or(false, |call_path| {
-            call_path.as_slice() == ["django", "shortcuts", "render"]
+            matches!(call_path.as_slice(), ["django", "shortcuts", "render"])
         })
     {
         return;
     }
 
     let locals = if args.len() >= 3 {
-        if !is_locals_call(checker.semantic_model(), &args[2]) {
+        if !is_locals_call(&args[2], checker.semantic()) {
             return;
         }
         &args[2]
@@ -69,7 +69,7 @@ pub(crate) fn locals_in_render_function(
         .iter()
         .find(|keyword| keyword.arg.as_ref().map_or(false, |arg| arg == "context"))
     {
-        if !is_locals_call(checker.semantic_model(), &keyword.value) {
+        if !is_locals_call(&keyword.value, checker.semantic()) {
             return;
         }
         &keyword.value
@@ -83,11 +83,11 @@ pub(crate) fn locals_in_render_function(
     ));
 }
 
-fn is_locals_call(model: &SemanticModel, expr: &Expr) -> bool {
+fn is_locals_call(expr: &Expr, semantic: &SemanticModel) -> bool {
     let Expr::Call(ast::ExprCall { func, .. }) = expr else {
-        return false
+        return false;
     };
-    model
-        .resolve_call_path(func)
-        .map_or(false, |call_path| call_path.as_slice() == ["", "locals"])
+    semantic.resolve_call_path(func).map_or(false, |call_path| {
+        matches!(call_path.as_slice(), ["", "locals"])
+    })
 }

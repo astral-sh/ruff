@@ -1,14 +1,16 @@
 //! Generate Python source code from an abstract syntax tree (AST).
 
+use rustpython_ast::ArgWithDefault;
 use std::ops::Deref;
 
 use rustpython_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
 use rustpython_parser::ast::{
-    self, Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, ConversionFlag,
-    Excepthandler, Expr, Identifier, MatchCase, Operator, Pattern, Stmt, Suite, Withitem,
+    self, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Constant, ConversionFlag,
+    ExceptHandler, Expr, Identifier, MatchCase, Operator, Pattern, Stmt, Suite, TypeParam,
+    TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
 };
 
-use ruff_newlines::LineEnding;
+use ruff_python_trivia::LineEnding;
 
 use crate::source_code::stylist::{Indentation, Quote, Stylist};
 
@@ -131,7 +133,7 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn body<U>(&mut self, stmts: &[Stmt<U>]) {
+    fn body(&mut self, stmts: &[Stmt]) {
         self.indent_depth = self.indent_depth.saturating_add(1);
         for stmt in stmts {
             self.unparse_stmt(stmt);
@@ -183,13 +185,13 @@ impl<'a> Generator<'a> {
         self.buffer
     }
 
-    pub(crate) fn unparse_suite<U>(&mut self, suite: &Suite<U>) {
+    pub fn unparse_suite(&mut self, suite: &Suite) {
         for stmt in suite {
             self.unparse_stmt(stmt);
         }
     }
 
-    pub(crate) fn unparse_stmt<U>(&mut self, ast: &Stmt<U>) {
+    pub(crate) fn unparse_stmt(&mut self, ast: &Stmt) {
         macro_rules! statement {
             ($body:block) => {{
                 self.newline();
@@ -206,6 +208,7 @@ impl<'a> Generator<'a> {
                 body,
                 returns,
                 decorator_list,
+                type_params,
                 ..
             }) => {
                 self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
@@ -218,6 +221,7 @@ impl<'a> Generator<'a> {
                 statement!({
                     self.p("def ");
                     self.p_id(name);
+                    self.unparse_type_params(type_params);
                     self.p("(");
                     self.unparse_args(args);
                     self.p(")");
@@ -238,6 +242,7 @@ impl<'a> Generator<'a> {
                 body,
                 returns,
                 decorator_list,
+                type_params,
                 ..
             }) => {
                 self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
@@ -250,6 +255,7 @@ impl<'a> Generator<'a> {
                 statement!({
                     self.p("async def ");
                     self.p_id(name);
+                    self.unparse_type_params(type_params);
                     self.p("(");
                     self.unparse_args(args);
                     self.p(")");
@@ -270,7 +276,8 @@ impl<'a> Generator<'a> {
                 keywords,
                 body,
                 decorator_list,
-                range: _range,
+                type_params,
+                range: _,
             }) => {
                 self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
                 for decorator in decorator_list {
@@ -282,6 +289,7 @@ impl<'a> Generator<'a> {
                 statement!({
                     self.p("class ");
                     self.p_id(name);
+                    self.unparse_type_params(type_params);
                     let mut first = true;
                     for base in bases {
                         self.p_if(first, "(");
@@ -456,7 +464,7 @@ impl<'a> Generator<'a> {
             Stmt::If(ast::StmtIf {
                 test,
                 body,
-                orelse,
+                elif_else_clauses,
                 range: _range,
             }) => {
                 statement!({
@@ -466,33 +474,19 @@ impl<'a> Generator<'a> {
                 });
                 self.body(body);
 
-                let mut orelse_: &[Stmt<U>] = orelse;
-                loop {
-                    if orelse_.len() == 1 && matches!(orelse_[0], Stmt::If(_)) {
-                        if let Stmt::If(ast::StmtIf {
-                            body,
-                            test,
-                            orelse,
-                            range: _range,
-                        }) = &orelse_[0]
-                        {
-                            statement!({
-                                self.p("elif ");
-                                self.unparse_expr(test, precedence::IF);
-                                self.p(":");
-                            });
-                            self.body(body);
-                            orelse_ = orelse;
-                        }
+                for clause in elif_else_clauses {
+                    if let Some(test) = &clause.test {
+                        statement!({
+                            self.p("elif ");
+                            self.unparse_expr(test, precedence::IF);
+                            self.p(":");
+                        });
                     } else {
-                        if !orelse_.is_empty() {
-                            statement!({
-                                self.p("else:");
-                            });
-                            self.body(orelse_);
-                        }
-                        break;
+                        statement!({
+                            self.p("else:");
+                        });
                     }
+                    self.body(&clause.body);
                 }
             }
             Stmt::With(ast::StmtWith { items, body, .. }) => {
@@ -501,7 +495,7 @@ impl<'a> Generator<'a> {
                     let mut first = true;
                     for item in items {
                         self.p_delim(&mut first, ", ");
-                        self.unparse_withitem(item);
+                        self.unparse_with_item(item);
                     }
                     self.p(":");
                 });
@@ -513,7 +507,7 @@ impl<'a> Generator<'a> {
                     let mut first = true;
                     for item in items {
                         self.p_delim(&mut first, ", ");
-                        self.unparse_withitem(item);
+                        self.unparse_with_item(item);
                     }
                     self.p(":");
                 });
@@ -536,6 +530,18 @@ impl<'a> Generator<'a> {
                     });
                     self.indent_depth = self.indent_depth.saturating_sub(1);
                 }
+            }
+            Stmt::TypeAlias(ast::StmtTypeAlias {
+                name,
+                range: _range,
+                type_params,
+                value,
+            }) => {
+                self.p("type ");
+                self.unparse_expr(name, precedence::MAX);
+                self.unparse_type_params(type_params);
+                self.p(" = ");
+                self.unparse_expr(value, precedence::ASSIGN);
             }
             Stmt::Raise(ast::StmtRaise {
                 exc,
@@ -568,7 +574,7 @@ impl<'a> Generator<'a> {
 
                 for handler in handlers {
                     statement!({
-                        self.unparse_excepthandler(handler, false);
+                        self.unparse_except_handler(handler, false);
                     });
                 }
 
@@ -599,7 +605,7 @@ impl<'a> Generator<'a> {
 
                 for handler in handlers {
                     statement!({
-                        self.unparse_excepthandler(handler, true);
+                        self.unparse_except_handler(handler, true);
                     });
                 }
 
@@ -717,9 +723,9 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_excepthandler<U>(&mut self, ast: &Excepthandler<U>, star: bool) {
+    fn unparse_except_handler(&mut self, ast: &ExceptHandler, star: bool) {
         match ast {
-            Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
+            ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                 type_,
                 name,
                 body,
@@ -743,7 +749,7 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_pattern<U>(&mut self, ast: &Pattern<U>) {
+    fn unparse_pattern(&mut self, ast: &Pattern) {
         match ast {
             Pattern::MatchValue(ast::PatternMatchValue {
                 value,
@@ -830,7 +836,7 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_match_case<U>(&mut self, ast: &MatchCase<U>) {
+    fn unparse_match_case(&mut self, ast: &MatchCase) {
         self.p("case ");
         self.unparse_pattern(&ast.pattern);
         if let Some(guard) = &ast.guard {
@@ -841,7 +847,39 @@ impl<'a> Generator<'a> {
         self.body(&ast.body);
     }
 
-    pub(crate) fn unparse_expr<U>(&mut self, ast: &Expr<U>, level: u8) {
+    fn unparse_type_params(&mut self, type_params: &Vec<TypeParam>) {
+        if !type_params.is_empty() {
+            self.p("[");
+            let mut first = true;
+            for type_param in type_params {
+                self.p_delim(&mut first, ", ");
+                self.unparse_type_param(type_param);
+            }
+            self.p("]");
+        }
+    }
+
+    pub(crate) fn unparse_type_param(&mut self, ast: &TypeParam) {
+        match ast {
+            TypeParam::TypeVar(TypeParamTypeVar { name, bound, .. }) => {
+                self.p_id(name);
+                if let Some(expr) = bound {
+                    self.p(": ");
+                    self.unparse_expr(expr, precedence::MAX);
+                }
+            }
+            TypeParam::TypeVarTuple(TypeParamTypeVarTuple { name, .. }) => {
+                self.p("*");
+                self.p_id(name);
+            }
+            TypeParam::ParamSpec(TypeParamParamSpec { name, .. }) => {
+                self.p("**");
+                self.p_id(name);
+            }
+        }
+    }
+
+    pub(crate) fn unparse_expr(&mut self, ast: &Expr, level: u8) {
         macro_rules! opprec {
             ($opty:ident, $x:expr, $enu:path, $($var:ident($op:literal, $prec:ident)),*$(,)?) => {
                 match $x {
@@ -870,7 +908,7 @@ impl<'a> Generator<'a> {
                 values,
                 range: _range,
             }) => {
-                let (op, prec) = opprec!(bin, op, Boolop, And("and", AND), Or("or", OR));
+                let (op, prec) = opprec!(bin, op, BoolOp, And("and", AND), Or("or", OR));
                 group_if!(prec, {
                     let mut first = true;
                     for val in values {
@@ -929,7 +967,7 @@ impl<'a> Generator<'a> {
                 let (op, prec) = opprec!(
                     un,
                     op,
-                    rustpython_parser::ast::Unaryop,
+                    rustpython_parser::ast::UnaryOp,
                     Invert("~", INVERT),
                     Not("not ", NOT),
                     UAdd("+", UADD),
@@ -1087,16 +1125,16 @@ impl<'a> Generator<'a> {
                     self.unparse_expr(left, new_lvl);
                     for (op, cmp) in ops.iter().zip(comparators) {
                         let op = match op {
-                            Cmpop::Eq => " == ",
-                            Cmpop::NotEq => " != ",
-                            Cmpop::Lt => " < ",
-                            Cmpop::LtE => " <= ",
-                            Cmpop::Gt => " > ",
-                            Cmpop::GtE => " >= ",
-                            Cmpop::Is => " is ",
-                            Cmpop::IsNot => " is not ",
-                            Cmpop::In => " in ",
-                            Cmpop::NotIn => " not in ",
+                            CmpOp::Eq => " == ",
+                            CmpOp::NotEq => " != ",
+                            CmpOp::Lt => " < ",
+                            CmpOp::LtE => " <= ",
+                            CmpOp::Gt => " > ",
+                            CmpOp::GtE => " >= ",
+                            CmpOp::Is => " is ",
+                            CmpOp::IsNot => " is not ",
+                            CmpOp::In => " in ",
+                            CmpOp::NotIn => " not in ",
                         };
                         self.p(op);
                         self.unparse_expr(cmp, new_lvl);
@@ -1118,7 +1156,7 @@ impl<'a> Generator<'a> {
                         range: _range,
                     })],
                     [],
-                ) = (&**args, &**keywords)
+                ) = (args.as_slice(), keywords.as_slice())
                 {
                     // Ensure that a single generator doesn't get double-parenthesized.
                     self.unparse_expr(elt, precedence::COMMA);
@@ -1190,7 +1228,7 @@ impl<'a> Generator<'a> {
                 self.p("*");
                 self.unparse_expr(value, precedence::MAX);
             }
-            Expr::Name(ast::ExprName { id, .. }) => self.p_id(id),
+            Expr::Name(ast::ExprName { id, .. }) => self.p(id.as_str()),
             Expr::List(ast::ExprList { elts, .. }) => {
                 self.p("[");
                 let mut first = true;
@@ -1248,23 +1286,6 @@ impl<'a> Generator<'a> {
             Constant::None => self.p("None"),
             Constant::Bool(b) => self.p(if *b { "True" } else { "False" }),
             Constant::Int(i) => self.p(&format!("{i}")),
-            Constant::Tuple(tup) => {
-                if let [elt] = &**tup {
-                    self.p("(");
-                    self.unparse_constant(elt);
-                    self.p(",");
-                    self.p(")");
-                } else {
-                    self.p("(");
-                    for (i, elt) in tup.iter().enumerate() {
-                        if i != 0 {
-                            self.p(", ");
-                        }
-                        self.unparse_constant(elt);
-                    }
-                    self.p(")");
-                }
-            }
             Constant::Float(fp) => {
                 if fp.is_infinite() {
                     self.p(inf_str);
@@ -1288,16 +1309,11 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_args<U>(&mut self, args: &Arguments<U>) {
+    fn unparse_args(&mut self, args: &Arguments) {
         let mut first = true;
-        let defaults_start = args.posonlyargs.len() + args.args.len() - args.defaults.len();
-        for (i, arg) in args.posonlyargs.iter().chain(&args.args).enumerate() {
+        for (i, arg_with_default) in args.posonlyargs.iter().chain(&args.args).enumerate() {
             self.p_delim(&mut first, ", ");
-            self.unparse_arg(arg);
-            if let Some(i) = i.checked_sub(defaults_start) {
-                self.p("=");
-                self.unparse_expr(&args.defaults[i], precedence::COMMA);
-            }
+            self.unparse_arg_with_default(arg_with_default);
             self.p_if(i + 1 == args.posonlyargs.len(), ", /");
         }
         if args.vararg.is_some() || !args.kwonlyargs.is_empty() {
@@ -1307,17 +1323,9 @@ impl<'a> Generator<'a> {
         if let Some(vararg) = &args.vararg {
             self.unparse_arg(vararg);
         }
-        let defaults_start = args.kwonlyargs.len() - args.kw_defaults.len();
-        for (i, kwarg) in args.kwonlyargs.iter().enumerate() {
+        for kwarg in &args.kwonlyargs {
             self.p_delim(&mut first, ", ");
-            self.unparse_arg(kwarg);
-            if let Some(default) = i
-                .checked_sub(defaults_start)
-                .and_then(|i| args.kw_defaults.get(i))
-            {
-                self.p("=");
-                self.unparse_expr(default, precedence::COMMA);
-            }
+            self.unparse_arg_with_default(kwarg);
         }
         if let Some(kwarg) = &args.kwarg {
             self.p_delim(&mut first, ", ");
@@ -1326,7 +1334,7 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_arg<U>(&mut self, arg: &Arg<U>) {
+    fn unparse_arg(&mut self, arg: &Arg) {
         self.p_id(&arg.arg);
         if let Some(ann) = &arg.annotation {
             self.p(": ");
@@ -1334,7 +1342,15 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_comp<U>(&mut self, generators: &[Comprehension<U>]) {
+    fn unparse_arg_with_default(&mut self, arg_with_default: &ArgWithDefault) {
+        self.unparse_arg(&arg_with_default.def);
+        if let Some(default) = &arg_with_default.default {
+            self.p("=");
+            self.unparse_expr(default, precedence::COMMA);
+        }
+    }
+
+    fn unparse_comp(&mut self, generators: &[Comprehension]) {
         for comp in generators {
             self.p(if comp.is_async {
                 " async for "
@@ -1351,18 +1367,13 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_fstring_body<U>(&mut self, values: &[Expr<U>], is_spec: bool) {
+    fn unparse_fstring_body(&mut self, values: &[Expr], is_spec: bool) {
         for value in values {
             self.unparse_fstring_elem(value, is_spec);
         }
     }
 
-    fn unparse_formatted<U>(
-        &mut self,
-        val: &Expr<U>,
-        conversion: ConversionFlag,
-        spec: Option<&Expr<U>>,
-    ) {
+    fn unparse_formatted(&mut self, val: &Expr, conversion: ConversionFlag, spec: Option<&Expr>) {
         let mut generator = Generator::new(self.indent, self.quote, self.line_ending);
         generator.unparse_expr(val, precedence::FORMATTED_VALUE);
         let brace = if generator.buffer.starts_with('{') {
@@ -1388,7 +1399,7 @@ impl<'a> Generator<'a> {
         self.p("}");
     }
 
-    fn unparse_fstring_elem<U>(&mut self, expr: &Expr<U>, is_spec: bool) {
+    fn unparse_fstring_elem(&mut self, expr: &Expr, is_spec: bool) {
         match expr {
             Expr::Constant(ast::ExprConstant { value, .. }) => {
                 if let Constant::Str(s) = value {
@@ -1418,7 +1429,7 @@ impl<'a> Generator<'a> {
         self.p(&s);
     }
 
-    fn unparse_joinedstr<U>(&mut self, values: &[Expr<U>], is_spec: bool) {
+    fn unparse_joinedstr(&mut self, values: &[Expr], is_spec: bool) {
         if is_spec {
             self.unparse_fstring_body(values, is_spec);
         } else {
@@ -1437,7 +1448,7 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_alias<U>(&mut self, alias: &Alias<U>) {
+    fn unparse_alias(&mut self, alias: &Alias) {
         self.p_id(&alias.name);
         if let Some(asname) = &alias.asname {
             self.p(" as ");
@@ -1445,9 +1456,9 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_withitem<U>(&mut self, withitem: &Withitem<U>) {
-        self.unparse_expr(&withitem.context_expr, precedence::MAX);
-        if let Some(optional_vars) = &withitem.optional_vars {
+    fn unparse_with_item(&mut self, with_item: &WithItem) {
+        self.unparse_expr(&with_item.context_expr, precedence::MAX);
+        if let Some(optional_vars) = &with_item.optional_vars {
             self.p(" as ");
             self.unparse_expr(optional_vars, precedence::MAX);
         }
@@ -1456,10 +1467,10 @@ impl<'a> Generator<'a> {
 
 #[cfg(test)]
 mod tests {
-    use rustpython_ast::Suite;
+    use rustpython_ast::Stmt;
     use rustpython_parser::Parse;
 
-    use ruff_newlines::LineEnding;
+    use ruff_python_trivia::LineEnding;
 
     use crate::source_code::stylist::{Indentation, Quote};
     use crate::source_code::Generator;
@@ -1468,10 +1479,9 @@ mod tests {
         let indentation = Indentation::default();
         let quote = Quote::default();
         let line_ending = LineEnding::default();
-        let program = Suite::parse(contents, "<filename>").unwrap();
-        let stmt = program.first().unwrap();
+        let stmt = Stmt::parse(contents, "<filename>").unwrap();
         let mut generator = Generator::new(&indentation, quote, line_ending);
-        generator.unparse_stmt(stmt);
+        generator.unparse_stmt(&stmt);
         generator.generate()
     }
 
@@ -1481,10 +1491,9 @@ mod tests {
         line_ending: LineEnding,
         contents: &str,
     ) -> String {
-        let program = Suite::parse(contents, "<filename>").unwrap();
-        let stmt = program.first().unwrap();
+        let stmt = Stmt::parse(contents, "<filename>").unwrap();
         let mut generator = Generator::new(indentation, quote, line_ending);
-        generator.unparse_stmt(stmt);
+        generator.unparse_stmt(&stmt);
         generator.generate()
     }
 
@@ -1553,6 +1562,26 @@ mod tests {
     pass"#
         );
         assert_round_trip!(
+            r#"class Foo[T]:
+    pass"#
+        );
+        assert_round_trip!(
+            r#"class Foo[T](Bar):
+    pass"#
+        );
+        assert_round_trip!(
+            r#"class Foo[*Ts]:
+    pass"#
+        );
+        assert_round_trip!(
+            r#"class Foo[**P]:
+    pass"#
+        );
+        assert_round_trip!(
+            r#"class Foo[T, U, *Ts, **P]:
+    pass"#
+        );
+        assert_round_trip!(
             r#"def f() -> (int, str):
     pass"#
         );
@@ -1581,6 +1610,22 @@ mod tests {
         );
         assert_round_trip!(
             r#"def test(a, b=4, /, c=8, d=9):
+    pass"#
+        );
+        assert_round_trip!(
+            r#"def test[T]():
+    pass"#
+        );
+        assert_round_trip!(
+            r#"def test[*Ts]():
+    pass"#
+        );
+        assert_round_trip!(
+            r#"def test[**P]():
+    pass"#
+        );
+        assert_round_trip!(
+            r#"def test[T, U, *Ts, **P]():
     pass"#
         );
         assert_round_trip!(
@@ -1636,6 +1681,13 @@ class Foo:
     def f():
         pass"#
         );
+
+        // Type aliases
+        assert_round_trip!(r#"type Foo = int | str"#);
+        assert_round_trip!(r#"type Foo[T] = list[T]"#);
+        assert_round_trip!(r#"type Foo[*Ts] = ..."#);
+        assert_round_trip!(r#"type Foo[**P] = ..."#);
+        assert_round_trip!(r#"type Foo[T, U, *Ts, **P] = ..."#);
     }
 
     #[test]

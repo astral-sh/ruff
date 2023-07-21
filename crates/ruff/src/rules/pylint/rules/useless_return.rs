@@ -44,11 +44,11 @@ impl AlwaysAutofixableViolation for UselessReturn {
 }
 
 /// PLR1711
-pub(crate) fn useless_return<'a>(
-    checker: &mut Checker<'a>,
-    stmt: &'a Stmt,
-    body: &'a [Stmt],
-    returns: Option<&'a Expr>,
+pub(crate) fn useless_return(
+    checker: &mut Checker,
+    stmt: &Stmt,
+    body: &[Stmt],
+    returns: Option<&Expr>,
 ) {
     // Skip functions that have a return annotation that is not `None`.
     if !returns.map_or(true, is_const_none) {
@@ -85,7 +85,7 @@ pub(crate) fn useless_return<'a>(
     }
 
     // Verify that the last statement is a return statement.
-    let Stmt::Return(ast::StmtReturn { value, range: _}) = &last_stmt else {
+    let Stmt::Return(ast::StmtReturn { value, range: _ }) = &last_stmt else {
         return;
     };
 
@@ -103,13 +103,8 @@ pub(crate) fn useless_return<'a>(
 
     let mut diagnostic = Diagnostic::new(UselessReturn, last_stmt.range());
     if checker.patch(diagnostic.kind.rule()) {
-        let edit = autofix::edits::delete_stmt(
-            last_stmt,
-            Some(stmt),
-            checker.locator,
-            checker.indexer,
-            checker.stylist,
-        );
+        let edit =
+            autofix::edits::delete_stmt(last_stmt, Some(stmt), checker.locator, checker.indexer);
         diagnostic.set_fix(Fix::automatic(edit).isolate(checker.isolation(Some(stmt))));
     }
     checker.diagnostics.push(diagnostic);

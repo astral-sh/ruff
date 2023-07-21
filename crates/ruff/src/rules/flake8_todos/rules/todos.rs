@@ -67,7 +67,7 @@ pub struct MissingTodoAuthor;
 impl Violation for MissingTodoAuthor {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing author in TODO; try: `# TODO(<author_name>): ...`")
+        format!("Missing author in TODO; try: `# TODO(<author_name>): ...` or `# TODO @<author_name>: ...`")
     }
 }
 
@@ -227,21 +227,20 @@ impl Violation for MissingSpaceAfterTodoColon {
 
 static ISSUE_LINK_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
     RegexSet::new([
-        r#"^#\s*(http|https)://.*"#, // issue link
-        r#"^#\s*\d+$"#,              // issue code - like "003"
-        r#"^#\s*[A-Z]{1,6}\-?\d+$"#, // issue code - like "TD003" or "TD-003"
+        r"^#\s*(http|https)://.*", // issue link
+        r"^#\s*\d+$",              // issue code - like "003"
+        r"^#\s*[A-Z]{1,6}\-?\d+$", // issue code - like "TD003"
     ])
     .unwrap()
 });
 
 pub(crate) fn todos(
+    diagnostics: &mut Vec<Diagnostic>,
     todo_comments: &[TodoComment],
-    indexer: &Indexer,
     locator: &Locator,
+    indexer: &Indexer,
     settings: &Settings,
-) -> Vec<Diagnostic> {
-    let mut diagnostics: Vec<Diagnostic> = vec![];
-
+) {
     for todo_comment in todo_comments {
         let TodoComment {
             directive,
@@ -256,8 +255,8 @@ pub(crate) fn todos(
             continue;
         }
 
-        directive_errors(directive, &mut diagnostics, settings);
-        static_errors(&mut diagnostics, content, range, directive);
+        directive_errors(diagnostics, directive, settings);
+        static_errors(diagnostics, content, range, directive);
 
         let mut has_issue_link = false;
         let mut curr_range = range;
@@ -297,14 +296,12 @@ pub(crate) fn todos(
             diagnostics.push(Diagnostic::new(MissingTodoLink, directive.range));
         }
     }
-
-    diagnostics
 }
 
 /// Check that the directive itself is valid. This function modifies `diagnostics` in-place.
 fn directive_errors(
-    directive: &TodoDirective,
     diagnostics: &mut Vec<Diagnostic>,
+    directive: &TodoDirective,
     settings: &Settings,
 ) {
     if directive.content == "TODO" {
@@ -339,8 +336,7 @@ fn directive_errors(
     }
 }
 
-/// Checks for "static" errors in the comment: missing colon, missing author, etc. This function
-/// modifies `diagnostics` in-place.
+/// Checks for "static" errors in the comment: missing colon, missing author, etc.
 fn static_errors(
     diagnostics: &mut Vec<Diagnostic>,
     comment: &str,
@@ -357,6 +353,15 @@ fn static_errors(
                 TextSize::try_from(end_index + 1).unwrap()
             } else {
                 trimmed.text_len()
+            }
+        } else if trimmed.starts_with('@') {
+            if let Some(end_index) = trimmed.find(|c: char| c.is_whitespace() || c == ':') {
+                TextSize::try_from(end_index).unwrap()
+            } else {
+                // TD002
+                diagnostics.push(Diagnostic::new(MissingTodoAuthor, directive.range));
+
+                TextSize::new(0)
             }
         } else {
             // TD002

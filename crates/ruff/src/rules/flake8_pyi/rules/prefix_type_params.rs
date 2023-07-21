@@ -60,27 +60,40 @@ impl Violation for UnprefixedTypeParam {
 
 /// PYI001
 pub(crate) fn prefix_type_params(checker: &mut Checker, value: &Expr, targets: &[Expr]) {
-    if targets.len() != 1 {
+    let [target] = targets else {
         return;
-    }
-    if let Expr::Name(ast::ExprName { id, .. }) = &targets[0] {
+    };
+    if let Expr::Name(ast::ExprName { id, .. }) = target {
         if id.starts_with('_') {
             return;
         }
     };
 
     if let Expr::Call(ast::ExprCall { func, .. }) = value {
-        let Some(kind) = checker.semantic_model().resolve_call_path(func).and_then(|call_path| {
-            if checker.semantic_model().match_typing_call_path(&call_path, "ParamSpec") {
-                Some(VarKind::ParamSpec)
-            } else if checker.semantic_model().match_typing_call_path(&call_path, "TypeVar") {
-                Some(VarKind::TypeVar)
-            } else if checker.semantic_model().match_typing_call_path(&call_path, "TypeVarTuple") {
-                Some(VarKind::TypeVarTuple)
-            } else {
-                None
-            }
-        }) else {
+        let Some(kind) = checker
+            .semantic()
+            .resolve_call_path(func)
+            .and_then(|call_path| {
+                if checker
+                    .semantic()
+                    .match_typing_call_path(&call_path, "ParamSpec")
+                {
+                    Some(VarKind::ParamSpec)
+                } else if checker
+                    .semantic()
+                    .match_typing_call_path(&call_path, "TypeVar")
+                {
+                    Some(VarKind::TypeVar)
+                } else if checker
+                    .semantic()
+                    .match_typing_call_path(&call_path, "TypeVarTuple")
+                {
+                    Some(VarKind::TypeVarTuple)
+                } else {
+                    None
+                }
+            })
+        else {
             return;
         };
         checker

@@ -1,10 +1,12 @@
-use crate::context::NodeLevel;
-use crate::prelude::*;
-use crate::trivia::lines_before;
+use rustpython_parser::ast::{Ranged, Stmt, Suite};
+
 use ruff_formatter::{
     format_args, write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions,
 };
-use rustpython_parser::ast::{Ranged, Stmt, Suite};
+use ruff_python_trivia::lines_before;
+
+use crate::context::NodeLevel;
+use crate::prelude::*;
 
 /// Level at which the [`Suite`] appears in the source code.
 #[derive(Copy, Clone, Debug)]
@@ -43,7 +45,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
         };
 
         let comments = f.context().comments().clone();
-        let source = f.context().contents();
+        let source = f.context().source();
 
         let saved_level = f.context().node_level();
         f.context_mut().set_node_level(node_level);
@@ -52,7 +54,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
 
         let mut iter = statements.iter();
         let Some(first) = iter.next() else {
-            return Ok(())
+            return Ok(());
         };
 
         // First entry has never any separator, doesn't matter which one we take;
@@ -96,13 +98,12 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 // the leading comment. This is why the suite handling counts the lines before the
                 // start of the next statement or before the first leading comments for compound statements.
                 let separator = format_with(|f| {
-                    let start = if let Some(first_leading) =
-                        comments.leading_comments(statement.into()).first()
-                    {
-                        first_leading.slice().start()
-                    } else {
-                        statement.start()
-                    };
+                    let start =
+                        if let Some(first_leading) = comments.leading_comments(statement).first() {
+                            first_leading.slice().start()
+                        } else {
+                            statement.start()
+                        };
 
                     match lines_before(start, source) {
                         0 | 1 => hard_line_break().fmt(f),
@@ -178,6 +179,7 @@ impl<'ast> AsFormat<PyFormatContext<'ast>> for Suite {
 
 impl<'ast> IntoFormat<PyFormatContext<'ast>> for Suite {
     type Format = FormatOwnedWithRule<Suite, FormatSuite, PyFormatContext<'ast>>;
+
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, FormatSuite::default())
     }
@@ -185,12 +187,15 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Suite {
 
 #[cfg(test)]
 mod tests {
+    use rustpython_parser::ast::Suite;
+    use rustpython_parser::Parse;
+
+    use ruff_formatter::format;
+
     use crate::comments::Comments;
     use crate::prelude::*;
     use crate::statement::suite::SuiteLevel;
-    use ruff_formatter::{format, IndentStyle, SimpleFormatOptions};
-    use rustpython_parser::ast::Suite;
-    use rustpython_parser::Parse;
+    use crate::PyFormatOptions;
 
     fn format_suite(level: SuiteLevel) -> String {
         let source = r#"
@@ -216,14 +221,7 @@ def trailing_func():
 
         let statements = Suite::parse(source, "test.py").unwrap();
 
-        let context = PyFormatContext::new(
-            SimpleFormatOptions {
-                indent_style: IndentStyle::Space(4),
-                ..SimpleFormatOptions::default()
-            },
-            source,
-            Comments::default(),
-        );
+        let context = PyFormatContext::new(PyFormatOptions::default(), source, Comments::default());
 
         let test_formatter =
             format_with(|f: &mut PyFormatter| statements.format().with_options(level).fmt(f));
@@ -252,7 +250,8 @@ one_leading_newline = 10
 no_leading_newline = 30
 
 
-NOT_YET_IMPLEMENTED_StmtClassDef
+class InTheMiddle:
+    pass
 
 
 trailing_statement = 1
@@ -283,7 +282,8 @@ two_leading_newlines = 20
 one_leading_newline = 10
 no_leading_newline = 30
 
-NOT_YET_IMPLEMENTED_StmtClassDef
+class InTheMiddle:
+    pass
 
 trailing_statement = 1
 

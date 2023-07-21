@@ -56,10 +56,7 @@ impl AlwaysAutofixableViolation for MissingRequiredImport {
 fn includes_import(stmt: &Stmt, target: &AnyImport) -> bool {
     match target {
         AnyImport::Import(target) => {
-            let Stmt::Import(ast::StmtImport {
-                names,
-                 range: _,
-            }) = &stmt else {
+            let Stmt::Import(ast::StmtImport { names, range: _ }) = &stmt else {
                 return false;
             };
             names.iter().any(|alias| {
@@ -71,8 +68,9 @@ fn includes_import(stmt: &Stmt, target: &AnyImport) -> bool {
                 module,
                 names,
                 level,
-                 range: _,
-            }) = &stmt else {
+                range: _,
+            }) = &stmt
+            else {
                 return false;
             };
             module.as_deref() == target.module
@@ -118,8 +116,7 @@ fn add_required_import(
         TextRange::default(),
     );
     if settings.rules.should_fix(Rule::MissingRequiredImport) {
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(
+        diagnostic.set_fix(Fix::automatic(
             Importer::new(python_ast, locator, stylist)
                 .add_import(required_import, TextSize::default()),
         ));

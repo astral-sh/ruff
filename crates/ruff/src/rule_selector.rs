@@ -145,8 +145,8 @@ impl From<RuleCodePrefix> for RuleSelector {
 }
 
 impl IntoIterator for &RuleSelector {
-    type Item = Rule;
     type IntoIter = RuleSelectorIter;
+    type Item = Rule;
 
     fn into_iter(self) -> Self::IntoIter {
         match self {
@@ -158,16 +158,16 @@ impl IntoIterator for &RuleSelector {
             }
             RuleSelector::C => RuleSelectorIter::Chain(
                 Linter::Flake8Comprehensions
-                    .into_iter()
-                    .chain(Linter::McCabe.into_iter()),
+                    .rules()
+                    .chain(Linter::McCabe.rules()),
             ),
             RuleSelector::T => RuleSelectorIter::Chain(
                 Linter::Flake8Debugger
-                    .into_iter()
-                    .chain(Linter::Flake8Print.into_iter()),
+                    .rules()
+                    .chain(Linter::Flake8Print.rules()),
             ),
-            RuleSelector::Linter(linter) => RuleSelectorIter::Vec(linter.into_iter()),
-            RuleSelector::Prefix { prefix, .. } => RuleSelectorIter::Vec(prefix.into_iter()),
+            RuleSelector::Linter(linter) => RuleSelectorIter::Vec(linter.rules()),
+            RuleSelector::Prefix { prefix, .. } => RuleSelectorIter::Vec(prefix.clone().rules()),
         }
     }
 }
@@ -249,6 +249,9 @@ mod schema {
                                 (!prefix.is_empty()).then(|| prefix.to_string())
                             })),
                     )
+                    // Filter out rule gated behind `#[cfg(feature = "unreachable-code")]`, which is
+                    // off-by-default
+                    .filter(|prefix| prefix != "RUF014")
                     .sorted()
                     .map(Value::String)
                     .collect(),
@@ -342,24 +345,33 @@ mod clap_completion {
                             let prefix = l.common_prefix();
                             (!prefix.is_empty()).then(|| PossibleValue::new(prefix).help(l.name()))
                         })
-                        .chain(RuleCodePrefix::iter().map(|p| {
-                            let prefix = p.linter().common_prefix();
-                            let code = p.short_code();
+                        .chain(
+                            RuleCodePrefix::iter()
+                                // Filter out rule gated behind `#[cfg(feature = "unreachable-code")]`, which is
+                                // off-by-default
+                                .filter(|p| {
+                                    format!("{}{}", p.linter().common_prefix(), p.short_code())
+                                        != "RUF014"
+                                })
+                                .map(|p| {
+                                    let prefix = p.linter().common_prefix();
+                                    let code = p.short_code();
 
-                            let mut rules_iter = p.into_iter();
-                            let rule1 = rules_iter.next();
-                            let rule2 = rules_iter.next();
+                                    let mut rules_iter = p.rules();
+                                    let rule1 = rules_iter.next();
+                                    let rule2 = rules_iter.next();
 
-                            let value = PossibleValue::new(format!("{prefix}{code}"));
+                                    let value = PossibleValue::new(format!("{prefix}{code}"));
 
-                            if rule2.is_none() {
-                                let rule1 = rule1.unwrap();
-                                let name: &'static str = rule1.into();
-                                value.help(name)
-                            } else {
-                                value
-                            }
-                        })),
+                                    if rule2.is_none() {
+                                        let rule1 = rule1.unwrap();
+                                        let name: &'static str = rule1.into();
+                                        value.help(name)
+                                    } else {
+                                        value
+                                    }
+                                }),
+                        ),
                 ),
             ))
         }

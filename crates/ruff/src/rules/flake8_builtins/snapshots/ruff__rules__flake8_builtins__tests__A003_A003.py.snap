@@ -6,7 +6,7 @@ A003.py:2:5: A003 Class attribute `ImportError` is shadowing a Python builtin
 1 | class MyClass:
 2 |     ImportError = 4
   |     ^^^^^^^^^^^ A003
-3 |     id = 5
+3 |     id: int
 4 |     dir = "/"
   |
 
@@ -14,7 +14,7 @@ A003.py:3:5: A003 Class attribute `id` is shadowing a Python builtin
   |
 1 | class MyClass:
 2 |     ImportError = 4
-3 |     id = 5
+3 |     id: int
   |     ^^ A003
 4 |     dir = "/"
   |
@@ -22,7 +22,7 @@ A003.py:3:5: A003 Class attribute `id` is shadowing a Python builtin
 A003.py:4:5: A003 Class attribute `dir` is shadowing a Python builtin
   |
 2 |     ImportError = 4
-3 |     id = 5
+3 |     id: int
 4 |     dir = "/"
   |     ^^^ A003
 5 | 

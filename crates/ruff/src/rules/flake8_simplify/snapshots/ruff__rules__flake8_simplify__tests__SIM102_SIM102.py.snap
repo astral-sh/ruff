@@ -48,6 +48,31 @@ SIM102.py:7:1: SIM102 [*] Use a single `if` statement instead of nested `if` sta
 12 11 | # SIM102
 13 12 | if a:
 
+SIM102.py:8:5: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+   |
+ 6 |   # SIM102
+ 7 |   if a:
+ 8 |       if b:
+   |  _____^
+ 9 | |         if c:
+   | |_____________^ SIM102
+10 |               d
+   |
+   = help: Combine `if` statements using `and`
+
+ℹ Suggested fix
+5  5  | 
+6  6  | # SIM102
+7  7  | if a:
+8     |-    if b:
+9     |-        if c:
+10    |-            d
+   8  |+    if b and c:
+   9  |+        d
+11 10 | 
+12 11 | # SIM102
+13 12 | if a:
+
 SIM102.py:15:1: SIM102 [*] Use a single `if` statement instead of nested `if` statements
    |
 13 |   if a:
@@ -255,30 +280,56 @@ SIM102.py:97:1: SIM102 Use a single `if` statement instead of nested `if` statem
     |
     = help: Combine `if` statements using `and`
 
-SIM102.py:124:5: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+SIM102.py:106:5: SIM102 [*] Use a single `if` statement instead of nested `if` statements
     |
-122 |   if a:
-123 |       # SIM 102
-124 |       if b:
+104 |   # Regression test for https://github.com/apache/airflow/blob/145b16caaa43f0c42bffd97344df916c602cddde/airflow/configuration.py#L1161
+105 |   if a:
+106 |       if b:
     |  _____^
-125 | |         if c:
+107 | |         if c:
     | |_____________^ SIM102
-126 |               print("foo")
-127 |   else:
+108 |               print("if")
+109 |   elif d:
     |
     = help: Combine `if` statements using `and`
 
 ℹ Suggested fix
-121 121 | # OK
-122 122 | if a:
-123 123 |     # SIM 102
-124     |-    if b:
-125     |-        if c:
-126     |-            print("foo")
-    124 |+    if b and c:
-    125 |+        print("foo")
-127 126 | else:
-128 127 |     print("bar")
-129 128 | 
+103 103 | # SIM102
+104 104 | # Regression test for https://github.com/apache/airflow/blob/145b16caaa43f0c42bffd97344df916c602cddde/airflow/configuration.py#L1161
+105 105 | if a:
+106     |-    if b:
+107     |-        if c:
+108     |-            print("if")
+    106 |+    if b and c:
+    107 |+        print("if")
+109 108 | elif d:
+110 109 |     print("elif")
+111 110 | 
+
+SIM102.py:132:5: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+    |
+130 |   if a:
+131 |       # SIM 102
+132 |       if b:
+    |  _____^
+133 | |         if c:
+    | |_____________^ SIM102
+134 |               print("foo")
+135 |   else:
+    |
+    = help: Combine `if` statements using `and`
+
+ℹ Suggested fix
+129 129 | # OK
+130 130 | if a:
+131 131 |     # SIM 102
+132     |-    if b:
+133     |-        if c:
+134     |-            print("foo")
+    132 |+    if b and c:
+    133 |+        print("foo")
+135 134 | else:
+136 135 |     print("bar")
+137 136 | 
 
 

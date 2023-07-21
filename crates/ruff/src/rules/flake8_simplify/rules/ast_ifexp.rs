@@ -1,8 +1,9 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Ranged, Unaryop};
+use rustpython_parser::ast::{self, Expr, ExprContext, Ranged, UnaryOp};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{is_const_false, is_const_true};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -141,16 +142,7 @@ pub(crate) fn explicit_true_false_in_ifexpr(
     body: &Expr,
     orelse: &Expr,
 ) {
-    let Expr::Constant(ast::ExprConstant { value, .. } )= &body else {
-        return;
-    };
-    if !matches!(value, Constant::Bool(true)) {
-        return;
-    }
-    let Expr::Constant(ast::ExprConstant { value, .. } )= &orelse else {
-        return;
-    };
-    if !matches!(value, Constant::Bool(false)) {
+    if !is_const_true(body) || !is_const_false(orelse) {
         return;
     }
 
@@ -161,13 +153,12 @@ pub(crate) fn explicit_true_false_in_ifexpr(
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        if matches!(test, Expr::Compare(_)) {
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                checker.generator().expr(&test.clone()),
+        if test.is_compare_expr() {
+            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                checker.locator.slice(test.range()).to_string(),
                 expr.range(),
             )));
-        } else if checker.semantic_model().is_builtin("bool") {
+        } else if checker.semantic().is_builtin("bool") {
             let node = ast::ExprName {
                 id: "bool".into(),
                 ctx: ExprContext::Load,
@@ -179,8 +170,7 @@ pub(crate) fn explicit_true_false_in_ifexpr(
                 keywords: vec![],
                 range: TextRange::default(),
             };
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                 checker.generator().expr(&node1.into()),
                 expr.range(),
             )));
@@ -197,16 +187,7 @@ pub(crate) fn explicit_false_true_in_ifexpr(
     body: &Expr,
     orelse: &Expr,
 ) {
-    let Expr::Constant(ast::ExprConstant { value, .. }) = &body else {
-        return;
-    };
-    if !matches!(value, Constant::Bool(false)) {
-        return;
-    }
-    let Expr::Constant(ast::ExprConstant { value, .. }) = &orelse else {
-        return;
-    };
-    if !matches!(value, Constant::Bool(true)) {
+    if !is_const_false(body) || !is_const_true(orelse) {
         return;
     }
 
@@ -219,12 +200,11 @@ pub(crate) fn explicit_false_true_in_ifexpr(
     if checker.patch(diagnostic.kind.rule()) {
         let node = test.clone();
         let node1 = ast::ExprUnaryOp {
-            op: Unaryop::Not,
+            op: UnaryOp::Not,
             operand: Box::new(node),
             range: TextRange::default(),
         };
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
             checker.generator().expr(&node1.into()),
             expr.range(),
         )));
@@ -240,7 +220,12 @@ pub(crate) fn twisted_arms_in_ifexpr(
     body: &Expr,
     orelse: &Expr,
 ) {
-    let Expr::UnaryOp(ast::ExprUnaryOp { op, operand: test_operand, range: _ } )= &test else {
+    let Expr::UnaryOp(ast::ExprUnaryOp {
+        op,
+        operand,
+        range: _,
+    }) = &test
+    else {
         return;
     };
     if !op.is_not() {
@@ -248,10 +233,10 @@ pub(crate) fn twisted_arms_in_ifexpr(
     }
 
     // Check if the test operand and else branch use the same variable.
-    let Expr::Name(ast::ExprName { id: test_id, .. } )= test_operand.as_ref() else {
+    let Expr::Name(ast::ExprName { id: test_id, .. }) = operand.as_ref() else {
         return;
     };
-    let Expr::Name(ast::ExprName {id: orelse_id, ..}) = orelse else {
+    let Expr::Name(ast::ExprName { id: orelse_id, .. }) = orelse else {
         return;
     };
     if !test_id.eq(orelse_id) {
@@ -275,8 +260,7 @@ pub(crate) fn twisted_arms_in_ifexpr(
             orelse: Box::new(node),
             range: TextRange::default(),
         };
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
             checker.generator().expr(&node3.into()),
             expr.range(),
         )));

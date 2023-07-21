@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+use std::fmt::Write;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
@@ -5,6 +7,7 @@ use std::time::Instant;
 use anyhow::Result;
 use colored::Colorize;
 use ignore::Error;
+use itertools::Itertools;
 use log::{debug, error, warn};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
@@ -20,7 +23,7 @@ use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::source_code::SourceFileBuilder;
 
 use crate::args::Overrides;
-use crate::cache;
+use crate::cache::{self, Cache};
 use crate::diagnostics::Diagnostics;
 use crate::panic::catch_unwind;
 
@@ -75,6 +78,25 @@ pub(crate) fn run(
         pyproject_config,
     );
 
+    // Load the caches.
+    let caches = bool::from(cache).then(|| {
+        package_roots
+            .iter()
+            .map(|(package, package_root)| package_root.unwrap_or(package))
+            .unique()
+            .par_bridge()
+            .map(|cache_root| {
+                let settings = resolver.resolve_all(cache_root, pyproject_config);
+                let cache = Cache::open(
+                    &settings.cli.cache_dir,
+                    cache_root.to_path_buf(),
+                    &settings.lib,
+                );
+                (cache_root, cache)
+            })
+            .collect::<HashMap<&Path, Cache>>()
+    });
+
     let start = Instant::now();
     let mut diagnostics: Diagnostics = paths
         .par_iter()
@@ -86,13 +108,24 @@ pub(crate) fn run(
                         .parent()
                         .and_then(|parent| package_roots.get(parent))
                         .and_then(|package| *package);
+
                     let settings = resolver.resolve_all(path, pyproject_config);
+
+                    let cache_root = package.unwrap_or_else(|| path.parent().unwrap_or(path));
+                    let cache = caches.as_ref().and_then(|caches| {
+                        if let Some(cache) = caches.get(&cache_root) {
+                            Some(cache)
+                        } else {
+                            debug!("No cache found for {}", cache_root.display());
+                            None
+                        }
+                    });
 
                     lint_path(path, package, settings, cache, noqa, autofix).map_err(|e| {
                         (Some(path.to_owned()), {
                             let mut error = e.to_string();
                             for cause in e.chain() {
-                                error += &format!("\n  Caused by: {cause}");
+                                write!(&mut error, "\n  Cause: {cause}").unwrap();
                             }
                             error
                         })
@@ -110,30 +143,30 @@ pub(crate) fn run(
             }
             .unwrap_or_else(|(path, message)| {
                 if let Some(path) = &path {
-                    error!(
-                        "{}{}{} {message}",
-                        "Failed to lint ".bold(),
-                        fs::relativize_path(path).bold(),
-                        ":".bold()
-                    );
                     let settings = resolver.resolve(path, pyproject_config);
                     if settings.rules.enabled(Rule::IOError) {
-                        let file =
+                        let dummy =
                             SourceFileBuilder::new(path.to_string_lossy().as_ref(), "").finish();
 
                         Diagnostics::new(
                             vec![Message::from_diagnostic(
                                 Diagnostic::new(IOError { message }, TextRange::default()),
-                                file,
+                                dummy,
                                 TextSize::default(),
                             )],
                             ImportMap::default(),
                         )
                     } else {
+                        warn!(
+                            "{}{}{} {message}",
+                            "Failed to lint ".bold(),
+                            fs::relativize_path(path).bold(),
+                            ":".bold()
+                        );
                         Diagnostics::default()
                     }
                 } else {
-                    error!("{} {message}", "Encountered error:".bold());
+                    warn!("{} {message}", "Encountered error:".bold());
                     Diagnostics::default()
                 }
             })
@@ -144,6 +177,13 @@ pub(crate) fn run(
         });
 
     diagnostics.messages.sort();
+
+    // Store the caches.
+    if let Some(caches) = caches {
+        caches
+            .into_par_iter()
+            .try_for_each(|(_, cache)| cache.store())?;
+    }
 
     let duration = start.elapsed();
     debug!("Checked {:?} files in: {:?}", paths.len(), duration);
@@ -157,7 +197,7 @@ fn lint_path(
     path: &Path,
     package: Option<&Path>,
     settings: &AllSettings,
-    cache: flags::Cache,
+    cache: Option<&Cache>,
     noqa: flags::Noqa,
     autofix: flags::FixMode,
 ) -> Result<Diagnostics> {
@@ -188,91 +228,83 @@ with the relevant file contents, the `pyproject.toml` settings, and the followin
 }
 
 #[cfg(test)]
-#[cfg(feature = "jupyter_notebook")]
+#[cfg(unix)]
 mod test {
-    use std::path::PathBuf;
-    use std::str::FromStr;
-
-    use anyhow::Result;
-    use path_absolutize::Absolutize;
-
-    use ruff::logging::LogLevel;
-    use ruff::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
-    use ruff::settings::configuration::{Configuration, RuleSelection};
-    use ruff::settings::flags::FixMode;
-    use ruff::settings::flags::{Cache, Noqa};
-    use ruff::settings::types::SerializationFormat;
-    use ruff::settings::AllSettings;
-    use ruff::RuleSelector;
-
-    use crate::args::Overrides;
-    use crate::printer::{Flags, Printer};
-
     use super::run;
+    use crate::args::Overrides;
+    use anyhow::Result;
+    use ruff::message::{Emitter, EmitterContext, TextEmitter};
+    use ruff::registry::Rule;
+    use ruff::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
+    use ruff::settings::{flags, AllSettings, CliSettings, Settings};
+    use rustc_hash::FxHashMap;
+    use std::fs;
+    use std::os::unix::fs::OpenOptionsExt;
+    use tempfile::TempDir;
 
+    /// We check that regular python files, pyproject.toml and jupyter notebooks all handle io
+    /// errors gracefully
     #[test]
-    fn test_jupyter_notebook_integration() -> Result<()> {
-        let overrides: Overrides = Overrides {
-            select: Some(vec![
-                RuleSelector::from_str("B")?,
-                RuleSelector::from_str("F")?,
-            ]),
-            ..Default::default()
+    fn unreadable_files() -> Result<()> {
+        let path = "E902.py";
+        let rule_code = Rule::IOError;
+
+        // Create inaccessible files
+        let tempdir = TempDir::new()?;
+        let pyproject_toml = tempdir.path().join("pyproject.toml");
+        let python_file = tempdir.path().join("code.py");
+        let notebook = tempdir.path().join("notebook.ipynb");
+        for file in [&pyproject_toml, &python_file, &notebook] {
+            fs::OpenOptions::new()
+                .create(true)
+                .write(true)
+                .mode(0o000)
+                .open(file)?;
+        }
+
+        // Configure
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path);
+        let settings = AllSettings {
+            cli: CliSettings::default(),
+            // invalid pyproject.toml is not active by default
+            lib: Settings::for_rules(vec![rule_code, Rule::InvalidPyprojectToml]),
         };
+        let pyproject_config =
+            PyprojectConfig::new(PyprojectDiscoveryStrategy::Fixed, settings, None);
 
-        let mut configuration = Configuration::default();
-        configuration.rule_selections.push(RuleSelection {
-            select: Some(vec![
-                RuleSelector::from_str("B")?,
-                RuleSelector::from_str("F")?,
-            ]),
-            ..Default::default()
-        });
-
-        let root_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("..")
-            .join("ruff")
-            .join("resources")
-            .join("test")
-            .join("fixtures")
-            .join("jupyter");
-
+        // Run
         let diagnostics = run(
-            &[root_path.join("valid.ipynb")],
-            &PyprojectConfig::new(
-                PyprojectDiscoveryStrategy::Fixed,
-                AllSettings::from_configuration(configuration, &root_path)?,
-                None,
-            ),
-            &overrides,
-            Cache::Disabled,
-            Noqa::Enabled,
-            FixMode::None,
-        )?;
+            // Notebooks are not included by default
+            &[tempdir.path().to_path_buf(), notebook],
+            &pyproject_config,
+            &Overrides::default(),
+            flags::Cache::Disabled,
+            flags::Noqa::Disabled,
+            flags::FixMode::Generate,
+        )
+        .unwrap();
+        let mut output = Vec::new();
 
-        let printer = Printer::new(
-            SerializationFormat::Text,
-            LogLevel::Default,
-            FixMode::None,
-            Flags::SHOW_VIOLATIONS,
-        );
-        let mut writer: Vec<u8> = Vec::new();
-        // Mute the terminal color codes
-        colored::control::set_override(false);
-        printer.write_once(&diagnostics, &mut writer)?;
-        // TODO(konstin): Set jupyter notebooks as none-fixable for now
-        // TODO(konstin) 2: Make jupyter notebooks fixable
-        let expected = format!(
-            "{valid_ipynb}:cell 1:2:5: F841 [*] Local variable `x` is assigned to but never used
-{valid_ipynb}:cell 3:1:24: B006 Do not use mutable data structures for argument defaults
-Found 2 errors.
-[*] 1 potentially fixable with the --fix option.
-",
-            valid_ipynb = root_path.join("valid.ipynb").absolutize()?.display()
-        );
+        TextEmitter::default()
+            .with_show_fix_status(true)
+            .emit(
+                &mut output,
+                &diagnostics.messages,
+                &EmitterContext::new(&FxHashMap::default()),
+            )
+            .unwrap();
 
-        assert_eq!(expected, String::from_utf8(writer)?);
+        let messages = String::from_utf8(output).unwrap();
 
+        insta::with_settings!({
+            omit_expression => true,
+            filters => vec![
+                // The tempdir is always different (and platform dependent)
+                (tempdir.path().to_str().unwrap(), "/home/ferris/project"),
+            ]
+        }, {
+            insta::assert_snapshot!(snapshot, messages);
+        });
         Ok(())
     }
 }

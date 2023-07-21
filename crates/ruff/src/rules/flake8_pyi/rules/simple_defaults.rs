@@ -1,12 +1,15 @@
-use rustpython_parser::ast::{self, Arguments, Constant, Expr, Operator, Ranged, Stmt, Unaryop};
+use rustpython_parser::ast::{
+    self, ArgWithDefault, Arguments, Constant, Expr, Operator, Ranged, Stmt, UnaryOp,
+};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::call_path::CallPath;
 use ruff_python_ast::source_code::Locator;
-use ruff_python_semantic::model::SemanticModel;
-use ruff_python_semantic::scope::ScopeKind;
+use ruff_python_semantic::{ScopeKind, SemanticModel};
 
 use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
 use crate::registry::AsRule;
 
 #[violation]
@@ -95,36 +98,80 @@ impl Violation for UnassignedSpecialVariableInStub {
     }
 }
 
-const ALLOWED_MATH_ATTRIBUTES_IN_DEFAULTS: &[&[&str]] = &[
-    &["math", "inf"],
-    &["math", "nan"],
-    &["math", "e"],
-    &["math", "pi"],
-    &["math", "tau"],
-];
+/// ## What it does
+/// Checks for type alias definitions that are not annotated with
+/// `typing.TypeAlias`.
+///
+/// ## Why is this bad?
+/// In Python, a type alias is defined by assigning a type to a variable (e.g.,
+/// `Vector = list[float]`).
+///
+/// It's best to annotate type aliases with the `typing.TypeAlias` type to
+/// make it clear that the statement is a type alias declaration, as opposed
+/// to a normal variable assignment.
+///
+/// ## Example
+/// ```python
+/// Vector = list[float]
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from typing import TypeAlias
+///
+/// Vector: TypeAlias = list[float]
+/// ```
+#[violation]
+pub struct TypeAliasWithoutAnnotation {
+    name: String,
+    value: String,
+}
 
-const ALLOWED_ATTRIBUTES_IN_DEFAULTS: &[&[&str]] = &[
-    &["sys", "stdin"],
-    &["sys", "stdout"],
-    &["sys", "stderr"],
-    &["sys", "version"],
-    &["sys", "version_info"],
-    &["sys", "platform"],
-    &["sys", "executable"],
-    &["sys", "prefix"],
-    &["sys", "exec_prefix"],
-    &["sys", "base_prefix"],
-    &["sys", "byteorder"],
-    &["sys", "maxsize"],
-    &["sys", "hexversion"],
-    &["sys", "winver"],
-];
+impl AlwaysAutofixableViolation for TypeAliasWithoutAnnotation {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let TypeAliasWithoutAnnotation { name, value } = self;
+        format!("Use `typing.TypeAlias` for type alias, e.g., `{name}: typing.TypeAlias = {value}`")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Add `typing.TypeAlias` annotation".to_string()
+    }
+}
+
+fn is_allowed_negated_math_attribute(call_path: &CallPath) -> bool {
+    matches!(call_path.as_slice(), ["math", "inf" | "e" | "pi" | "tau"])
+}
+
+fn is_allowed_math_attribute(call_path: &CallPath) -> bool {
+    matches!(
+        call_path.as_slice(),
+        ["math", "inf" | "nan" | "e" | "pi" | "tau"]
+            | [
+                "sys",
+                "stdin"
+                    | "stdout"
+                    | "stderr"
+                    | "version"
+                    | "version_info"
+                    | "platform"
+                    | "executable"
+                    | "prefix"
+                    | "exec_prefix"
+                    | "base_prefix"
+                    | "byteorder"
+                    | "maxsize"
+                    | "hexversion"
+                    | "winver"
+            ]
+    )
+}
 
 fn is_valid_default_value_with_annotation(
     default: &Expr,
     allow_container: bool,
     locator: &Locator,
-    model: &SemanticModel,
+    semantic: &SemanticModel,
 ) -> bool {
     match default {
         Expr::Constant(_) => {
@@ -137,7 +184,7 @@ fn is_valid_default_value_with_annotation(
                 && elts.len() <= 10
                 && elts
                     .iter()
-                    .all(|e| is_valid_default_value_with_annotation(e, false, locator, model));
+                    .all(|e| is_valid_default_value_with_annotation(e, false, locator, semantic));
         }
         Expr::Dict(ast::ExprDict {
             keys,
@@ -148,12 +195,12 @@ fn is_valid_default_value_with_annotation(
                 && keys.len() <= 10
                 && keys.iter().zip(values).all(|(k, v)| {
                     k.as_ref().map_or(false, |k| {
-                        is_valid_default_value_with_annotation(k, false, locator, model)
-                    }) && is_valid_default_value_with_annotation(v, false, locator, model)
+                        is_valid_default_value_with_annotation(k, false, locator, semantic)
+                    }) && is_valid_default_value_with_annotation(v, false, locator, semantic)
                 });
         }
         Expr::UnaryOp(ast::ExprUnaryOp {
-            op: Unaryop::USub,
+            op: UnaryOp::USub,
             operand,
             range: _,
         }) => {
@@ -165,12 +212,11 @@ fn is_valid_default_value_with_annotation(
                 }) => return true,
                 // Ex) `-math.inf`, `-math.pi`, etc.
                 Expr::Attribute(_) => {
-                    if model.resolve_call_path(operand).map_or(false, |call_path| {
-                        ALLOWED_MATH_ATTRIBUTES_IN_DEFAULTS.iter().any(|target| {
-                            // reject `-math.nan`
-                            call_path.as_slice() == *target && *target != ["math", "nan"]
-                        })
-                    }) {
+                    if semantic
+                        .resolve_call_path(operand)
+                        .as_ref()
+                        .map_or(false, is_allowed_negated_math_attribute)
+                    {
                         return true;
                     }
                 }
@@ -197,7 +243,7 @@ fn is_valid_default_value_with_annotation(
                 {
                     return locator.slice(left.range()).len() <= 10;
                 } else if let Expr::UnaryOp(ast::ExprUnaryOp {
-                    op: Unaryop::USub,
+                    op: UnaryOp::USub,
                     operand,
                     range: _,
                 }) = left.as_ref()
@@ -215,12 +261,11 @@ fn is_valid_default_value_with_annotation(
         }
         // Ex) `math.inf`, `sys.stdin`, etc.
         Expr::Attribute(_) => {
-            if model.resolve_call_path(default).map_or(false, |call_path| {
-                ALLOWED_MATH_ATTRIBUTES_IN_DEFAULTS
-                    .iter()
-                    .chain(ALLOWED_ATTRIBUTES_IN_DEFAULTS.iter())
-                    .any(|target| call_path.as_slice() == *target)
-            }) {
+            if semantic
+                .resolve_call_path(default)
+                .as_ref()
+                .map_or(false, is_allowed_math_attribute)
+            {
                 return true;
             }
         }
@@ -231,22 +276,39 @@ fn is_valid_default_value_with_annotation(
 
 /// Returns `true` if an [`Expr`] appears to be a valid PEP 604 union. (e.g. `int | None`)
 fn is_valid_pep_604_union(annotation: &Expr) -> bool {
-    match annotation {
-        Expr::BinOp(ast::ExprBinOp {
-            left,
-            op: Operator::BitOr,
-            right,
-            range: _,
-        }) => is_valid_pep_604_union(left) && is_valid_pep_604_union(right),
-        Expr::Name(_)
-        | Expr::Subscript(_)
-        | Expr::Attribute(_)
-        | Expr::Constant(ast::ExprConstant {
-            value: Constant::None,
-            ..
-        }) => true,
-        _ => false,
+    /// Returns `true` if an [`Expr`] appears to be a valid PEP 604 union member.
+    fn is_valid_pep_604_union_member(value: &Expr) -> bool {
+        match value {
+            Expr::BinOp(ast::ExprBinOp {
+                left,
+                op: Operator::BitOr,
+                right,
+                range: _,
+            }) => is_valid_pep_604_union_member(left) && is_valid_pep_604_union_member(right),
+            Expr::Name(_)
+            | Expr::Subscript(_)
+            | Expr::Attribute(_)
+            | Expr::Constant(ast::ExprConstant {
+                value: Constant::None,
+                ..
+            }) => true,
+            _ => false,
+        }
     }
+
+    // The top-level expression must be a bit-or operation.
+    let Expr::BinOp(ast::ExprBinOp {
+        left,
+        op: Operator::BitOr,
+        right,
+        range: _,
+    }) = annotation
+    else {
+        return false;
+    };
+
+    // The left and right operands must be valid union members.
+    is_valid_pep_604_union_member(left) && is_valid_pep_604_union_member(right)
 }
 
 /// Returns `true` if an [`Expr`] appears to be a valid default value without an annotation.
@@ -266,11 +328,11 @@ fn is_valid_default_value_without_annotation(default: &Expr) -> bool {
 
 /// Returns `true` if an [`Expr`] appears to be `TypeVar`, `TypeVarTuple`, `NewType`, or `ParamSpec`
 /// call.
-fn is_type_var_like_call(model: &SemanticModel, expr: &Expr) -> bool {
-    let Expr::Call(ast::ExprCall { func, .. } )= expr else {
+fn is_type_var_like_call(expr: &Expr, semantic: &SemanticModel) -> bool {
+    let Expr::Call(ast::ExprCall { func, .. }) = expr else {
         return false;
     };
-    model.resolve_call_path(func).map_or(false, |call_path| {
+    semantic.resolve_call_path(func).map_or(false, |call_path| {
         matches!(
             call_path.as_slice(),
             [
@@ -283,11 +345,11 @@ fn is_type_var_like_call(model: &SemanticModel, expr: &Expr) -> bool {
 
 /// Returns `true` if this is a "special" assignment which must have a value (e.g., an assignment to
 /// `__all__`).
-fn is_special_assignment(model: &SemanticModel, target: &Expr) -> bool {
+fn is_special_assignment(target: &Expr, semantic: &SemanticModel) -> bool {
     if let Expr::Name(ast::ExprName { id, .. }) = target {
         match id.as_str() {
-            "__all__" => model.scope().kind.is_module(),
-            "__match_args__" | "__slots__" => model.scope().kind.is_class(),
+            "__all__" => semantic.scope().kind.is_module(),
+            "__match_args__" | "__slots__" => semantic.scope().kind.is_class(),
             _ => false,
         }
     } else {
@@ -295,10 +357,20 @@ fn is_special_assignment(model: &SemanticModel, target: &Expr) -> bool {
     }
 }
 
+/// Returns `true` if this is an assignment to a simple `Final`-annotated variable.
+fn is_final_assignment(annotation: &Expr, value: &Expr, semantic: &SemanticModel) -> bool {
+    if matches!(value, Expr::Name(_) | Expr::Attribute(_)) {
+        if semantic.match_typing_expr(annotation, "Final") {
+            return true;
+        }
+    }
+    false
+}
+
 /// Returns `true` if the a class is an enum, based on its base classes.
-fn is_enum(model: &SemanticModel, bases: &[Expr]) -> bool {
+fn is_enum(bases: &[Expr], semantic: &SemanticModel) -> bool {
     return bases.iter().any(|expr| {
-        model.resolve_call_path(expr).map_or(false, |call_path| {
+        semantic.resolve_call_path(expr).map_or(false, |call_path| {
             matches!(
                 call_path.as_slice(),
                 [
@@ -310,131 +382,92 @@ fn is_enum(model: &SemanticModel, bases: &[Expr]) -> bool {
     });
 }
 
+/// Returns `true` if an [`Expr`] is a value that should be annotated with `typing.TypeAlias`.
+///
+/// This is relatively conservative, as it's hard to reliably detect whether a right-hand side is a
+/// valid type alias. In particular, this function checks for uses of `typing.Any`, `None`,
+/// parameterized generics, and PEP 604-style unions.
+fn is_annotatable_type_alias(value: &Expr, semantic: &SemanticModel) -> bool {
+    matches!(
+        value,
+        Expr::Subscript(_)
+            | Expr::Constant(ast::ExprConstant {
+                value: Constant::None,
+                ..
+            }),
+    ) || is_valid_pep_604_union(value)
+        || semantic.match_typing_expr(value, "Any")
+}
+
 /// PYI011
-pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
-    if !args.defaults.is_empty() {
-        let defaults_start = args.posonlyargs.len() + args.args.len() - args.defaults.len();
-        for (i, arg) in args.posonlyargs.iter().chain(&args.args).enumerate() {
-            if let Some(default) = i
-                .checked_sub(defaults_start)
-                .and_then(|i| args.defaults.get(i))
-            {
-                if arg.annotation.is_some() {
-                    if !is_valid_default_value_with_annotation(
-                        default,
-                        true,
-                        checker.locator,
-                        checker.semantic_model(),
-                    ) {
-                        let mut diagnostic =
-                            Diagnostic::new(TypedArgumentDefaultInStub, default.range());
+pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, arguments: &Arguments) {
+    for ArgWithDefault {
+        def,
+        default,
+        range: _,
+    } in arguments
+        .posonlyargs
+        .iter()
+        .chain(&arguments.args)
+        .chain(&arguments.kwonlyargs)
+    {
+        let Some(default) = default else {
+            continue;
+        };
+        if def.annotation.is_some() {
+            if !is_valid_default_value_with_annotation(
+                default,
+                true,
+                checker.locator,
+                checker.semantic(),
+            ) {
+                let mut diagnostic = Diagnostic::new(TypedArgumentDefaultInStub, default.range());
 
-                        if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                                "...".to_string(),
-                                default.range(),
-                            )));
-                        }
-
-                        checker.diagnostics.push(diagnostic);
-                    }
+                if checker.patch(diagnostic.kind.rule()) {
+                    diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                        "...".to_string(),
+                        default.range(),
+                    )));
                 }
-            }
-        }
-    }
 
-    if !args.kw_defaults.is_empty() {
-        let defaults_start = args.kwonlyargs.len() - args.kw_defaults.len();
-        for (i, kwarg) in args.kwonlyargs.iter().enumerate() {
-            if let Some(default) = i
-                .checked_sub(defaults_start)
-                .and_then(|i| args.kw_defaults.get(i))
-            {
-                if kwarg.annotation.is_some() {
-                    if !is_valid_default_value_with_annotation(
-                        default,
-                        true,
-                        checker.locator,
-                        checker.semantic_model(),
-                    ) {
-                        let mut diagnostic =
-                            Diagnostic::new(TypedArgumentDefaultInStub, default.range());
-
-                        if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                                "...".to_string(),
-                                default.range(),
-                            )));
-                        }
-
-                        checker.diagnostics.push(diagnostic);
-                    }
-                }
+                checker.diagnostics.push(diagnostic);
             }
         }
     }
 }
 
 /// PYI014
-pub(crate) fn argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
-    if !args.defaults.is_empty() {
-        let defaults_start = args.posonlyargs.len() + args.args.len() - args.defaults.len();
-        for (i, arg) in args.posonlyargs.iter().chain(&args.args).enumerate() {
-            if let Some(default) = i
-                .checked_sub(defaults_start)
-                .and_then(|i| args.defaults.get(i))
-            {
-                if arg.annotation.is_none() {
-                    if !is_valid_default_value_with_annotation(
-                        default,
-                        true,
-                        checker.locator,
-                        checker.semantic_model(),
-                    ) {
-                        let mut diagnostic =
-                            Diagnostic::new(ArgumentDefaultInStub, default.range());
+pub(crate) fn argument_simple_defaults(checker: &mut Checker, arguments: &Arguments) {
+    for ArgWithDefault {
+        def,
+        default,
+        range: _,
+    } in arguments
+        .posonlyargs
+        .iter()
+        .chain(&arguments.args)
+        .chain(&arguments.kwonlyargs)
+    {
+        let Some(default) = default else {
+            continue;
+        };
+        if def.annotation.is_none() {
+            if !is_valid_default_value_with_annotation(
+                default,
+                true,
+                checker.locator,
+                checker.semantic(),
+            ) {
+                let mut diagnostic = Diagnostic::new(ArgumentDefaultInStub, default.range());
 
-                        if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                                "...".to_string(),
-                                default.range(),
-                            )));
-                        }
-
-                        checker.diagnostics.push(diagnostic);
-                    }
+                if checker.patch(diagnostic.kind.rule()) {
+                    diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                        "...".to_string(),
+                        default.range(),
+                    )));
                 }
-            }
-        }
-    }
 
-    if !args.kw_defaults.is_empty() {
-        let defaults_start = args.kwonlyargs.len() - args.kw_defaults.len();
-        for (i, kwarg) in args.kwonlyargs.iter().enumerate() {
-            if let Some(default) = i
-                .checked_sub(defaults_start)
-                .and_then(|i| args.kw_defaults.get(i))
-            {
-                if kwarg.annotation.is_none() {
-                    if !is_valid_default_value_with_annotation(
-                        default,
-                        true,
-                        checker.locator,
-                        checker.semantic_model(),
-                    ) {
-                        let mut diagnostic =
-                            Diagnostic::new(ArgumentDefaultInStub, default.range());
-
-                        if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                                "...".to_string(),
-                                default.range(),
-                            )));
-                        }
-
-                        checker.diagnostics.push(diagnostic);
-                    }
-                }
+                checker.diagnostics.push(diagnostic);
             }
         }
     }
@@ -442,28 +475,22 @@ pub(crate) fn argument_simple_defaults(checker: &mut Checker, args: &Arguments) 
 
 /// PYI015
 pub(crate) fn assignment_default_in_stub(checker: &mut Checker, targets: &[Expr], value: &Expr) {
-    if targets.len() != 1 {
+    let [target] = targets else {
         return;
-    }
-    let target = &targets[0];
+    };
     if !target.is_name_expr() {
         return;
     }
-    if is_special_assignment(checker.semantic_model(), target) {
+    if is_special_assignment(target, checker.semantic()) {
         return;
     }
-    if is_type_var_like_call(checker.semantic_model(), value) {
+    if is_type_var_like_call(value, checker.semantic()) {
         return;
     }
     if is_valid_default_value_without_annotation(value) {
         return;
     }
-    if is_valid_default_value_with_annotation(
-        value,
-        true,
-        checker.locator,
-        checker.semantic_model(),
-    ) {
+    if is_valid_default_value_with_annotation(value, true, checker.locator, checker.semantic()) {
         return;
     }
 
@@ -485,23 +512,21 @@ pub(crate) fn annotated_assignment_default_in_stub(
     annotation: &Expr,
 ) {
     if checker
-        .semantic_model()
+        .semantic()
         .match_typing_expr(annotation, "TypeAlias")
     {
         return;
     }
-    if is_special_assignment(checker.semantic_model(), target) {
+    if is_special_assignment(target, checker.semantic()) {
         return;
     }
-    if is_type_var_like_call(checker.semantic_model(), value) {
+    if is_type_var_like_call(value, checker.semantic()) {
         return;
     }
-    if is_valid_default_value_with_annotation(
-        value,
-        true,
-        checker.locator,
-        checker.semantic_model(),
-    ) {
+    if is_final_assignment(annotation, value, checker.semantic()) {
+        return;
+    }
+    if is_valid_default_value_with_annotation(value, true, checker.locator, checker.semantic()) {
         return;
     }
 
@@ -521,34 +546,27 @@ pub(crate) fn unannotated_assignment_in_stub(
     targets: &[Expr],
     value: &Expr,
 ) {
-    if targets.len() != 1 {
+    let [target] = targets else {
         return;
-    }
-    let target = &targets[0];
+    };
     let Expr::Name(ast::ExprName { id, .. }) = target else {
         return;
     };
-    if is_special_assignment(checker.semantic_model(), target) {
+    if is_special_assignment(target, checker.semantic()) {
         return;
     }
-    if is_type_var_like_call(checker.semantic_model(), value) {
+    if is_type_var_like_call(value, checker.semantic()) {
         return;
     }
     if is_valid_default_value_without_annotation(value) {
         return;
     }
-    if !is_valid_default_value_with_annotation(
-        value,
-        true,
-        checker.locator,
-        checker.semantic_model(),
-    ) {
+    if !is_valid_default_value_with_annotation(value, true, checker.locator, checker.semantic()) {
         return;
     }
 
-    if let ScopeKind::Class(ast::StmtClassDef { bases, .. }) = checker.semantic_model().scope().kind
-    {
-        if is_enum(checker.semantic_model(), bases) {
+    if let ScopeKind::Class(ast::StmtClassDef { bases, .. }) = checker.semantic().scope().kind {
+        if is_enum(bases, checker.semantic()) {
             return;
         }
     }
@@ -570,7 +588,7 @@ pub(crate) fn unassigned_special_variable_in_stub(
         return;
     };
 
-    if !is_special_assignment(checker.semantic_model(), target) {
+    if !is_special_assignment(target, checker.semantic()) {
         return;
     }
 
@@ -580,4 +598,41 @@ pub(crate) fn unassigned_special_variable_in_stub(
         },
         stmt.range(),
     ));
+}
+
+/// PIY026
+pub(crate) fn type_alias_without_annotation(checker: &mut Checker, value: &Expr, targets: &[Expr]) {
+    let [target] = targets else {
+        return;
+    };
+
+    let Expr::Name(ast::ExprName { id, .. }) = target else {
+        return;
+    };
+
+    if !is_annotatable_type_alias(value, checker.semantic()) {
+        return;
+    }
+
+    let mut diagnostic = Diagnostic::new(
+        TypeAliasWithoutAnnotation {
+            name: id.to_string(),
+            value: checker.generator().expr(value),
+        },
+        target.range(),
+    );
+    if checker.patch(diagnostic.kind.rule()) {
+        diagnostic.try_set_fix(|| {
+            let (import_edit, binding) = checker.importer.get_or_import_symbol(
+                &ImportRequest::import("typing", "TypeAlias"),
+                target.start(),
+                checker.semantic(),
+            )?;
+            Ok(Fix::suggested_edits(
+                Edit::range_replacement(format!("{id}: {binding}"), target.range()),
+                [import_edit],
+            ))
+        });
+    }
+    checker.diagnostics.push(diagnostic);
 }

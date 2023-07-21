@@ -1,23 +1,140 @@
 use ruff_text_size::{TextLen, TextRange};
 
+/// Includes all permutations of `r`, `u`, `f`, and `fr` (`ur` is invalid, as is `uf`). This
+/// includes all possible orders, and all possible casings, for both single and triple quotes.
+///
 /// See: <https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals>
+#[rustfmt::skip]
 const TRIPLE_QUOTE_STR_PREFIXES: &[&str] = &[
-    "u\"\"\"", "u'''", "r\"\"\"", "r'''", "U\"\"\"", "U'''", "R\"\"\"", "R'''", "\"\"\"", "'''",
+    "FR\"\"\"",
+    "Fr\"\"\"",
+    "fR\"\"\"",
+    "fr\"\"\"",
+    "RF\"\"\"",
+    "Rf\"\"\"",
+    "rF\"\"\"",
+    "rf\"\"\"",
+    "FR'''",
+    "Fr'''",
+    "fR'''",
+    "fr'''",
+    "RF'''",
+    "Rf'''",
+    "rF'''",
+    "rf'''",
+    "R\"\"\"",
+    "r\"\"\"",
+    "R'''",
+    "r'''",
+    "F\"\"\"",
+    "f\"\"\"",
+    "F'''",
+    "f'''",
+    "U\"\"\"",
+    "u\"\"\"",
+    "U'''",
+    "u'''",
+    "\"\"\"",
+    "'''",
 ];
+
+#[rustfmt::skip]
 const SINGLE_QUOTE_STR_PREFIXES: &[&str] = &[
-    "u\"", "u'", "r\"", "r'", "U\"", "U'", "R\"", "R'", "\"", "'",
+    "FR\"",
+    "Fr\"",
+    "fR\"",
+    "fr\"",
+    "RF\"",
+    "Rf\"",
+    "rF\"",
+    "rf\"",
+    "FR'",
+    "Fr'",
+    "fR'",
+    "fr'",
+    "RF'",
+    "Rf'",
+    "rF'",
+    "rf'",
+    "R\"",
+    "r\"",
+    "R'",
+    "r'",
+    "F\"",
+    "f\"",
+    "F'",
+    "f'",
+    "U\"",
+    "u\"",
+    "U'",
+    "u'",
+    "\"",
+    "'",
 ];
+
+/// Includes all permutations of `b` and `rb`. This includes all possible orders, and all possible
+/// casings, for both single and triple quotes.
+///
+/// See: <https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals>
+#[rustfmt::skip]
 pub const TRIPLE_QUOTE_BYTE_PREFIXES: &[&str] = &[
-    "br'''", "rb'''", "bR'''", "Rb'''", "Br'''", "rB'''", "RB'''", "BR'''", "b'''", "br\"\"\"",
-    "rb\"\"\"", "bR\"\"\"", "Rb\"\"\"", "Br\"\"\"", "rB\"\"\"", "RB\"\"\"", "BR\"\"\"", "b\"\"\"",
+    "BR\"\"\"",
+    "Br\"\"\"",
+    "bR\"\"\"",
+    "br\"\"\"",
+    "RB\"\"\"",
+    "Rb\"\"\"",
+    "rB\"\"\"",
+    "rb\"\"\"",
+    "BR'''",
+    "Br'''",
+    "bR'''",
+    "br'''",
+    "RB'''",
+    "Rb'''",
+    "rB'''",
+    "rb'''",
     "B\"\"\"",
+    "b\"\"\"",
+    "B'''",
+    "b'''",
 ];
+
+#[rustfmt::skip]
 pub const SINGLE_QUOTE_BYTE_PREFIXES: &[&str] = &[
-    "br'", "rb'", "bR'", "Rb'", "Br'", "rB'", "RB'", "BR'", "b'", "br\"", "rb\"", "bR\"", "Rb\"",
-    "Br\"", "rB\"", "RB\"", "BR\"", "b\"", "B\"",
+    "BR\"",
+    "Br\"",
+    "bR\"",
+    "br\"",
+    "RB\"",
+    "Rb\"",
+    "rB\"",
+    "rb\"",
+    "BR'",
+    "Br'",
+    "bR'",
+    "br'",
+    "RB'",
+    "Rb'",
+    "rB'",
+    "rb'",
+    "B\"",
+    "b\"",
+    "B'",
+    "b'",
 ];
-const TRIPLE_QUOTE_SUFFIXES: &[&str] = &["\"\"\"", "'''"];
-const SINGLE_QUOTE_SUFFIXES: &[&str] = &["\"", "'"];
+
+#[rustfmt::skip]
+const TRIPLE_QUOTE_SUFFIXES: &[&str] = &[
+    "\"\"\"",
+    "'''",
+];
+
+#[rustfmt::skip]
+const SINGLE_QUOTE_SUFFIXES: &[&str] = &[
+    "\"",
+    "'",
+];
 
 /// Strip the leading and trailing quotes from a string.
 /// Assumes that the string is a valid string literal, but does not verify that the string
@@ -103,11 +220,15 @@ pub fn is_implicit_concatenation(content: &str) -> bool {
     let mut rest = &content[leading_quote_str.len()..content.len() - trailing_quote_str.len()];
     while let Some(index) = rest.find(trailing_quote_str) {
         let mut chars = rest[..index].chars().rev();
+
         if let Some('\\') = chars.next() {
-            // If the quote is double-escaped, then it's _not_ escaped, so the string is
-            // implicitly concatenated.
-            if let Some('\\') = chars.next() {
-                return true;
+            if chars.next() == Some('\\') {
+                // Either `\\'` or `\\\'` need to test one more character
+
+                // If the quote is preceded by `//` then it is not escaped, instead the backslash is escaped.
+                if chars.next() != Some('\\') {
+                    return true;
+                }
             }
         } else {
             // If the quote is _not_ escaped, then it's implicitly concatenated.
@@ -182,5 +303,6 @@ mod tests {
 
         // Negative cases with escaped quotes.
         assert!(!is_implicit_concatenation(r#""abc\"def""#));
+        assert!(!is_implicit_concatenation(r#"'\\\' ""'"#));
     }
 }

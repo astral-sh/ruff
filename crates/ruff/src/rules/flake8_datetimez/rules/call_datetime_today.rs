@@ -6,6 +6,8 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+use super::helpers;
+
 #[violation]
 pub struct CallDatetimeToday;
 
@@ -26,15 +28,21 @@ impl Violation for CallDatetimeToday {
 /// It uses the system local timezone.
 /// Use `datetime.datetime.now(tz=)` instead.
 pub(crate) fn call_datetime_today(checker: &mut Checker, func: &Expr, location: TextRange) {
-    if checker
-        .semantic_model()
+    if !checker
+        .semantic()
         .resolve_call_path(func)
         .map_or(false, |call_path| {
-            call_path.as_slice() == ["datetime", "datetime", "today"]
+            matches!(call_path.as_slice(), ["datetime", "datetime", "today"])
         })
     {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(CallDatetimeToday, location));
+        return;
     }
+
+    if helpers::parent_expr_is_astimezone(checker) {
+        return;
+    }
+
+    checker
+        .diagnostics
+        .push(Diagnostic::new(CallDatetimeToday, location));
 }

@@ -56,7 +56,7 @@ fn add_diagnostic(checker: &mut Checker, expr: &Expr) {
         Expr::DictComp(_) => "dict",
         _ => return,
     };
-    if !checker.semantic_model().is_builtin(id) {
+    if !checker.semantic().is_builtin(id) {
         return;
     }
     let mut diagnostic = Diagnostic::new(
@@ -82,10 +82,9 @@ pub(crate) fn unnecessary_dict_comprehension(
     value: &Expr,
     generators: &[Comprehension],
 ) {
-    if generators.len() != 1 {
+    let [generator] = generators else {
         return;
-    }
-    let generator = &generators[0];
+    };
     if !generator.ifs.is_empty() || generator.is_async {
         return;
     }
@@ -123,10 +122,9 @@ pub(crate) fn unnecessary_list_set_comprehension(
     elt: &Expr,
     generators: &[Comprehension],
 ) {
-    if generators.len() != 1 {
+    let [generator] = generators else {
         return;
-    }
-    let generator = &generators[0];
+    };
     if !generator.ifs.is_empty() || generator.is_async {
         return;
     }

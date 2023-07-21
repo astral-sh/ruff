@@ -34,9 +34,11 @@ impl Violation for TypeCommentInStub {
 }
 
 /// PYI033
-pub(crate) fn type_comment_in_stub(indexer: &Indexer, locator: &Locator) -> Vec<Diagnostic> {
-    let mut diagnostics = vec![];
-
+pub(crate) fn type_comment_in_stub(
+    diagnostics: &mut Vec<Diagnostic>,
+    locator: &Locator,
+    indexer: &Indexer,
+) {
     for range in indexer.comment_ranges() {
         let comment = locator.slice(*range);
 
@@ -44,8 +46,6 @@ pub(crate) fn type_comment_in_stub(indexer: &Indexer, locator: &Locator) -> Vec<
             diagnostics.push(Diagnostic::new(TypeCommentInStub, *range));
         }
     }
-
-    diagnostics
 }
 
 static TYPE_COMMENT_REGEX: Lazy<Regex> =

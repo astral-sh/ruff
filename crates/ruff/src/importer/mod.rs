@@ -1,4 +1,7 @@
-//! Add and modify import statements to make module members available during fix execution.
+//! Code modification struct to add and modify import statements.
+//!
+//! Enables rules to make module members available (that may be not yet be imported) during fix
+//! execution.
 
 use std::error::Error;
 
@@ -10,7 +13,7 @@ use rustpython_parser::ast::{self, Ranged, Stmt, Suite};
 use ruff_diagnostics::Edit;
 use ruff_python_ast::imports::{AnyImport, Import, ImportFrom};
 use ruff_python_ast::source_code::{Locator, Stylist};
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::SemanticModel;
 use ruff_textwrap::indent;
 
 use crate::autofix;
@@ -116,7 +119,7 @@ impl<'a> Importer<'a> {
         &self,
         import: &StmtImports,
         at: TextSize,
-        semantic_model: &SemanticModel,
+        semantic: &SemanticModel,
     ) -> Result<TypingImportEdit> {
         // Generate the modified import statement.
         let content = autofix::codemods::retain_imports(
@@ -130,7 +133,7 @@ impl<'a> Importer<'a> {
         let (type_checking_edit, type_checking) = self.get_or_import_symbol(
             &ImportRequest::import_from("typing", "TYPE_CHECKING"),
             at,
-            semantic_model,
+            semantic,
         )?;
 
         // Add the import to a `TYPE_CHECKING` block.
@@ -164,11 +167,11 @@ impl<'a> Importer<'a> {
         &self,
         symbol: &ImportRequest,
         at: TextSize,
-        semantic_model: &SemanticModel,
+        semantic: &SemanticModel,
     ) -> Result<(Edit, String), ResolutionError> {
-        match self.get_symbol(symbol, at, semantic_model) {
+        match self.get_symbol(symbol, at, semantic) {
             Some(result) => result,
-            None => self.import_symbol(symbol, at, semantic_model),
+            None => self.import_symbol(symbol, at, semantic),
         }
     }
 
@@ -177,11 +180,10 @@ impl<'a> Importer<'a> {
         &self,
         symbol: &ImportRequest,
         at: TextSize,
-        semantic_model: &SemanticModel,
+        semantic: &SemanticModel,
     ) -> Option<Result<(Edit, String), ResolutionError>> {
         // If the symbol is already available in the current scope, use it.
-        let imported_name =
-            semantic_model.resolve_qualified_import_name(symbol.module, symbol.member)?;
+        let imported_name = semantic.resolve_qualified_import_name(symbol.module, symbol.member)?;
 
         // If the symbol source (i.e., the import statement) comes after the current location,
         // abort. For example, we could be generating an edit within a function, and the import
@@ -196,7 +198,7 @@ impl<'a> Importer<'a> {
 
         // If the symbol source (i.e., the import statement) is in a typing-only context, but we're
         // in a runtime context, abort.
-        if imported_name.context().is_typing() && semantic_model.execution_context().is_runtime() {
+        if imported_name.context().is_typing() && semantic.execution_context().is_runtime() {
             return Some(Err(ResolutionError::IncompatibleContext));
         }
 
@@ -233,13 +235,13 @@ impl<'a> Importer<'a> {
         &self,
         symbol: &ImportRequest,
         at: TextSize,
-        semantic_model: &SemanticModel,
+        semantic: &SemanticModel,
     ) -> Result<(Edit, String), ResolutionError> {
         if let Some(stmt) = self.find_import_from(symbol.module, at) {
             // Case 1: `from functools import lru_cache` is in scope, and we're trying to reference
             // `functools.cache`; thus, we add `cache` to the import, and return `"cache"` as the
             // bound name.
-            if semantic_model.is_unbound(symbol.member) {
+            if semantic.is_available(symbol.member) {
                 let Ok(import_edit) = self.add_member(stmt, symbol.member) else {
                     return Err(ResolutionError::InvalidEdit);
                 };
@@ -252,7 +254,7 @@ impl<'a> Importer<'a> {
                 ImportStyle::Import => {
                     // Case 2a: No `functools` import is in scope; thus, we add `import functools`,
                     // and return `"functools.cache"` as the bound name.
-                    if semantic_model.is_unbound(symbol.module) {
+                    if semantic.is_available(symbol.module) {
                         let import_edit =
                             self.add_import(&AnyImport::Import(Import::module(symbol.module)), at);
                         Ok((
@@ -270,7 +272,7 @@ impl<'a> Importer<'a> {
                 ImportStyle::ImportFrom => {
                     // Case 2b: No `functools` import is in scope; thus, we add
                     // `from functools import cache`, and return `"cache"` as the bound name.
-                    if semantic_model.is_unbound(symbol.member) {
+                    if semantic.is_available(symbol.member) {
                         let import_edit = self.add_import(
                             &AnyImport::ImportFrom(ImportFrom::member(
                                 symbol.module,

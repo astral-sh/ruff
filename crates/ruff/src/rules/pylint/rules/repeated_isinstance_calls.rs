@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_parser::ast::{self, Boolop, Expr, Ranged};
+use rustpython_parser::ast::{self, BoolOp, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -36,6 +36,9 @@ use crate::settings::types::PythonVersion;
 ///     return isinstance(x, int | float | complex)
 /// ```
 ///
+/// ## Options
+/// - `target-version`
+///
 /// ## References
 /// - [Python documentation: `isinstance`](https://docs.python.org/3/library/functions.html#isinstance)
 #[violation]
@@ -60,7 +63,7 @@ impl AlwaysAutofixableViolation for RepeatedIsinstanceCalls {
 pub(crate) fn repeated_isinstance_calls(
     checker: &mut Checker,
     expr: &Expr,
-    op: Boolop,
+    op: BoolOp,
     values: &[Expr],
 ) {
     if !op.is_or() {
@@ -79,7 +82,7 @@ pub(crate) fn repeated_isinstance_calls(
         let [obj, types] = &args[..] else {
             continue;
         };
-        if !checker.semantic_model().is_builtin("isinstance") {
+        if !checker.semantic().is_builtin("isinstance") {
             return;
         }
         let (num_calls, matches) = obj_to_types

@@ -1,14 +1,15 @@
 [package]
 name = "ruff"
-version = "0.0.272"
-authors.workspace = true
-edition.workspace = true
-rust-version.workspace = true
-documentation.workspace = true
-homepage.workspace = true
-repository.workspace = true
+version = "0.0.278"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 readme = "README.md"
-license = "MIT"
 
 [lib]
 name = "ruff"
@@ -16,8 +17,9 @@ name = "ruff"
 [dependencies]
 ruff_cache = { path = "../ruff_cache" }
 ruff_diagnostics = { path = "../ruff_diagnostics", features = ["serde"] }
+ruff_index = { path = "../ruff_index" }
 ruff_macros = { path = "../ruff_macros" }
-ruff_newlines = { path = "../ruff_newlines" }
+ruff_python_trivia = { path = "../ruff_python_trivia" }
 ruff_python_ast = { path = "../ruff_python_ast", features = ["serde"] }
 ruff_python_semantic = { path = "../ruff_python_semantic" }
 ruff_python_stdlib = { path = "../ruff_python_stdlib" }
@@ -41,6 +43,7 @@ is-macro = { workspace = true }
 itertools = { workspace = true }
 libcst = { workspace = true }
 log = { workspace = true }
+memchr = { workspace = true }
 natord = { version = "1.0.9" }
 nohash-hasher = { workspace = true }
 num-bigint = { workspace = true }
@@ -64,16 +67,18 @@ schemars = { workspace = true, optional = true }
 semver = { version = "1.0.16" }
 serde = { workspace = true }
 serde_json = { workspace = true }
-similar = { workspace = true, features = ["inline"] }
+serde_with = { version = "3.0.0" }
+similar = { workspace = true }
 shellexpand = { workspace = true }
 smallvec = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
-thiserror = { version = "1.0.38" }
+thiserror = { version = "1.0.43" }
 toml = { workspace = true }
 typed-arena = { version = "2.0.2" }
 unicode-width = { version = "0.1.10" }
 unicode_names2 = { version = "0.6.0", git = "https://github.com/youknowone/unicode_names2.git", rev = "4ce16aa85cbcdd9cc830410f1a72ef9a235f2fde" }
+wsl = { version = "0.1.0" }
 
 [dev-dependencies]
 insta = { workspace = true }
@@ -81,8 +86,10 @@ pretty_assertions = "1.3.0"
 test-case = { workspace = true }
 # Disable colored output in tests
 colored = { workspace = true, features = ["no-color"] }
+tempfile = "3.6.0"
 
 [features]
 default = []
 schemars = ["dep:schemars"]
-jupyter_notebook = []
+# Enables the UnreachableCode rule
+unreachable-code = []

@@ -7,7 +7,7 @@ use ruff_python_ast::source_code::OneIndexed;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for usages of names that are declared as `global` prior to the
+/// Checks for uses of names that are declared as `global` prior to the
 /// relevant `global` declaration.
 ///
 /// ## Why is this bad?
@@ -38,7 +38,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/reference/simple_stmts.html#the-global-statement)
+/// - [Python documentation: The `global` statement](https://docs.python.org/3/reference/simple_stmts.html#the-global-statement)
 #[violation]
 pub struct LoadBeforeGlobalDeclaration {
     name: String,
@@ -52,9 +52,10 @@ impl Violation for LoadBeforeGlobalDeclaration {
         format!("Name `{name}` is used prior to global declaration on line {line}")
     }
 }
+
 /// PLE0118
 pub(crate) fn load_before_global_declaration(checker: &mut Checker, name: &str, expr: &Expr) {
-    if let Some(stmt) = checker.semantic_model().global(name) {
+    if let Some(stmt) = checker.semantic().global(name) {
         if expr.start() < stmt.start() {
             #[allow(deprecated)]
             let location = checker.locator.compute_source_location(stmt.start());

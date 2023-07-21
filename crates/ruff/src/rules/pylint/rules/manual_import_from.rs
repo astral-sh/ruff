@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Alias, Int, Ranged, Stmt};
+use rustpython_parser::ast::{self, Alias, Identifier, Int, Ranged, Stmt};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -25,7 +25,7 @@ use crate::registry::AsRule;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/reference/import.html#submodules)
+/// - [Python documentation: Submodules](https://docs.python.org/3/reference/import.html#submodules)
 #[violation]
 pub struct ManualFromImport {
     module: String,
@@ -74,7 +74,7 @@ pub(crate) fn manual_from_import(
     if checker.patch(diagnostic.kind.rule()) {
         if names.len() == 1 {
             let node = ast::StmtImportFrom {
-                module: Some(module.into()),
+                module: Some(Identifier::new(module.to_string(), TextRange::default())),
                 names: vec![Alias {
                     name: asname.clone(),
                     asname: None,
@@ -83,8 +83,7 @@ pub(crate) fn manual_from_import(
                 level: Some(Int::new(0)),
                 range: TextRange::default(),
             };
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                 checker.generator().stmt(&node.into()),
                 stmt.range(),
             )));

@@ -12,7 +12,7 @@ invalid_characters.py:21:12: PLE2512 [*] Invalid unescaped character SUB, use "\
    |
    = help: Replace with escape sequence
 
-ℹ Suggested fix
+ℹ Fix
 18 18 | 
 19 19 | cr_ok = '\\r'
 20 20 | 

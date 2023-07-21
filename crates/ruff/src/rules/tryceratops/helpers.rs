@@ -3,18 +3,18 @@ use rustpython_parser::ast::{self, Expr};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_semantic::analyze::logging;
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::SemanticModel;
 
 /// Collect `logging`-like calls from an AST.
-pub(crate) struct LoggerCandidateVisitor<'a, 'b> {
-    semantic_model: &'a SemanticModel<'b>,
-    pub(crate) calls: Vec<&'b ast::ExprCall>,
+pub(super) struct LoggerCandidateVisitor<'a, 'b> {
+    semantic: &'a SemanticModel<'b>,
+    pub(super) calls: Vec<&'b ast::ExprCall>,
 }
 
 impl<'a, 'b> LoggerCandidateVisitor<'a, 'b> {
-    pub(crate) fn new(semantic_model: &'a SemanticModel<'b>) -> Self {
+    pub(super) fn new(semantic: &'a SemanticModel<'b>) -> Self {
         LoggerCandidateVisitor {
-            semantic_model,
+            semantic,
             calls: Vec::new(),
         }
     }
@@ -23,7 +23,7 @@ impl<'a, 'b> LoggerCandidateVisitor<'a, 'b> {
 impl<'a, 'b> Visitor<'b> for LoggerCandidateVisitor<'a, 'b> {
     fn visit_expr(&mut self, expr: &'b Expr) {
         if let Expr::Call(call) = expr {
-            if logging::is_logger_candidate(&call.func, self.semantic_model) {
+            if logging::is_logger_candidate(&call.func, self.semantic) {
                 self.calls.push(call);
             }
         }

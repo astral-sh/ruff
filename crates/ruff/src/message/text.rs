@@ -11,10 +11,12 @@ use ruff_text_size::{TextRange, TextSize};
 use ruff_python_ast::source_code::{OneIndexed, SourceLocation};
 
 use crate::fs::relativize_path;
+use crate::jupyter::{JupyterIndex, Notebook};
 use crate::line_width::{LineWidth, TabSize};
 use crate::message::diff::Diff;
 use crate::message::{Emitter, EmitterContext, Message};
 use crate::registry::AsRule;
+use crate::source_kind::SourceKind;
 
 bitflags! {
     #[derive(Default)]
@@ -70,27 +72,34 @@ impl Emitter for TextEmitter {
             )?;
 
             let start_location = message.compute_start_location();
+            let jupyter_index = context
+                .source_kind(message.filename())
+                .and_then(SourceKind::notebook)
+                .map(Notebook::index);
 
             // Check if we're working on a jupyter notebook and translate positions with cell accordingly
-            let diagnostic_location =
-                if let Some(jupyter_index) = context.jupyter_index(message.filename()) {
-                    write!(
-                        writer,
-                        "cell {cell}{sep}",
-                        cell = jupyter_index.row_to_cell[start_location.row.get()],
-                        sep = ":".cyan(),
-                    )?;
+            let diagnostic_location = if let Some(jupyter_index) = jupyter_index {
+                write!(
+                    writer,
+                    "cell {cell}{sep}",
+                    cell = jupyter_index
+                        .cell(start_location.row.get())
+                        .unwrap_or_default(),
+                    sep = ":".cyan(),
+                )?;
 
-                    SourceLocation {
-                        row: OneIndexed::new(
-                            jupyter_index.row_to_row_in_cell[start_location.row.get()] as usize,
-                        )
-                        .unwrap(),
-                        column: start_location.column,
-                    }
-                } else {
-                    start_location
-                };
+                SourceLocation {
+                    row: OneIndexed::new(
+                        jupyter_index
+                            .cell_row(start_location.row.get())
+                            .unwrap_or(1) as usize,
+                    )
+                    .unwrap(),
+                    column: start_location.column,
+                }
+            } else {
+                start_location
+            };
 
             writeln!(
                 writer,
@@ -105,7 +114,14 @@ impl Emitter for TextEmitter {
             )?;
 
             if self.flags.contains(EmitterFlags::SHOW_SOURCE) {
-                writeln!(writer, "{}", MessageCodeFrame { message })?;
+                writeln!(
+                    writer,
+                    "{}",
+                    MessageCodeFrame {
+                        message,
+                        jupyter_index
+                    }
+                )?;
             }
 
             if self.flags.contains(EmitterFlags::SHOW_FIX_DIFF) {
@@ -149,6 +165,7 @@ impl Display for RuleCodeAndBody<'_> {
 
 pub(super) struct MessageCodeFrame<'a> {
     pub(crate) message: &'a Message,
+    pub(crate) jupyter_index: Option<&'a JupyterIndex>,
 }
 
 impl Display for MessageCodeFrame<'_> {
@@ -173,6 +190,20 @@ impl Display for MessageCodeFrame<'_> {
         let content_start_index = source_code.line_index(range.start());
         let mut start_index = content_start_index.saturating_sub(2);
 
+        // If we're working on a jupyter notebook, skip the lines which are
+        // outside of the cell containing the diagnostic.
+        if let Some(jupyter_index) = self.jupyter_index {
+            let content_start_cell = jupyter_index
+                .cell(content_start_index.get())
+                .unwrap_or_default();
+            while start_index < content_start_index {
+                if jupyter_index.cell(start_index.get()).unwrap_or_default() == content_start_cell {
+                    break;
+                }
+                start_index = start_index.saturating_add(1);
+            }
+        }
+
         // Trim leading empty lines.
         while start_index < content_start_index {
             if !source_code.line_text(start_index).trim().is_empty() {
@@ -186,7 +217,21 @@ impl Display for MessageCodeFrame<'_> {
             .saturating_add(2)
             .min(OneIndexed::from_zero_indexed(source_code.line_count()));
 
-        // Trim trailing empty lines
+        // If we're working on a jupyter notebook, skip the lines which are
+        // outside of the cell containing the diagnostic.
+        if let Some(jupyter_index) = self.jupyter_index {
+            let content_end_cell = jupyter_index
+                .cell(content_end_index.get())
+                .unwrap_or_default();
+            while end_index > content_end_index {
+                if jupyter_index.cell(end_index.get()).unwrap_or_default() == content_end_cell {
+                    break;
+                }
+                end_index = end_index.saturating_sub(1);
+            }
+        }
+
+        // Trim trailing empty lines.
         while end_index > content_end_index {
             if !source_code.line_text(end_index).trim().is_empty() {
                 break;
@@ -215,7 +260,14 @@ impl Display for MessageCodeFrame<'_> {
             title: None,
             slices: vec![Slice {
                 source: &source.text,
-                line_start: start_index.get(),
+                line_start: self.jupyter_index.map_or_else(
+                    || start_index.get(),
+                    |jupyter_index| {
+                        jupyter_index
+                            .cell_row(start_index.get())
+                            .unwrap_or_default() as usize
+                    },
+                ),
                 annotations: vec![SourceAnnotation {
                     label: &label,
                     annotation_type: AnnotationType::Error,

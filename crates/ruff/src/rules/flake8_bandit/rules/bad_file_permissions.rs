@@ -1,15 +1,39 @@
 use num_traits::ToPrimitive;
-use once_cell::sync::Lazy;
-use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{self, Constant, Expr, Keyword, Operator, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::compose_call_path;
+use ruff_python_ast::call_path::CallPath;
 use ruff_python_ast::helpers::SimpleCallArgs;
+use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for files with overly permissive permissions.
+///
+/// ## Why is this bad?
+/// Overly permissive file permissions may allow unintended access and
+/// arbitrary code execution.
+///
+/// ## Example
+/// ```python
+/// import os
+///
+/// os.chmod("/etc/secrets.txt", 0o666)  # rw-rw-rw-
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import os
+///
+/// os.chmod("/etc/secrets.txt", 0o600)  # rw-------
+/// ```
+///
+/// ## References
+/// - [Python documentation: `os.chmod`](https://docs.python.org/3/library/os.html#os.chmod)
+/// - [Python documentation: `stat`](https://docs.python.org/3/library/stat.html)
+/// - [Common Weakness Enumeration: CWE-732](https://cwe.mitre.org/data/definitions/732.html)
 #[violation]
 pub struct BadFilePermissions {
     mask: u16,
@@ -19,84 +43,7 @@ impl Violation for BadFilePermissions {
     #[derive_message_formats]
     fn message(&self) -> String {
         let BadFilePermissions { mask } = self;
-        format!("`os.chmod` setting a permissive mask `{mask:#o}` on file or directory",)
-    }
-}
-
-const WRITE_WORLD: u16 = 0o2;
-const EXECUTE_GROUP: u16 = 0o10;
-
-static PYSTAT_MAPPING: Lazy<FxHashMap<&'static str, u16>> = Lazy::new(|| {
-    FxHashMap::from_iter([
-        ("stat.ST_MODE", 0o0),
-        ("stat.S_IFDOOR", 0o0),
-        ("stat.S_IFPORT", 0o0),
-        ("stat.ST_INO", 0o1),
-        ("stat.S_IXOTH", 0o1),
-        ("stat.UF_NODUMP", 0o1),
-        ("stat.ST_DEV", 0o2),
-        ("stat.S_IWOTH", 0o2),
-        ("stat.UF_IMMUTABLE", 0o2),
-        ("stat.ST_NLINK", 0o3),
-        ("stat.ST_UID", 0o4),
-        ("stat.S_IROTH", 0o4),
-        ("stat.UF_APPEND", 0o4),
-        ("stat.ST_GID", 0o5),
-        ("stat.ST_SIZE", 0o6),
-        ("stat.ST_ATIME", 0o7),
-        ("stat.S_IRWXO", 0o7),
-        ("stat.ST_MTIME", 0o10),
-        ("stat.S_IXGRP", 0o10),
-        ("stat.UF_OPAQUE", 0o10),
-        ("stat.ST_CTIME", 0o11),
-        ("stat.S_IWGRP", 0o20),
-        ("stat.UF_NOUNLINK", 0o20),
-        ("stat.S_IRGRP", 0o40),
-        ("stat.UF_COMPRESSED", 0o40),
-        ("stat.S_IRWXG", 0o70),
-        ("stat.S_IEXEC", 0o100),
-        ("stat.S_IXUSR", 0o100),
-        ("stat.S_IWRITE", 0o200),
-        ("stat.S_IWUSR", 0o200),
-        ("stat.S_IREAD", 0o400),
-        ("stat.S_IRUSR", 0o400),
-        ("stat.S_IRWXU", 0o700),
-        ("stat.S_ISVTX", 0o1000),
-        ("stat.S_ISGID", 0o2000),
-        ("stat.S_ENFMT", 0o2000),
-        ("stat.S_ISUID", 0o4000),
-    ])
-});
-
-fn get_int_value(expr: &Expr) -> Option<u16> {
-    match expr {
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Int(value),
-            ..
-        }) => value.to_u16(),
-        Expr::Attribute(_) => {
-            compose_call_path(expr).and_then(|path| PYSTAT_MAPPING.get(path.as_str()).copied())
-        }
-        Expr::BinOp(ast::ExprBinOp {
-            left,
-            op,
-            right,
-            range: _,
-        }) => {
-            if let (Some(left_value), Some(right_value)) =
-                (get_int_value(left), get_int_value(right))
-            {
-                match op {
-                    Operator::BitAnd => Some(left_value & right_value),
-                    Operator::BitOr => Some(left_value | right_value),
-                    Operator::BitXor => Some(left_value ^ right_value),
-                    _ => None,
-                }
-            } else {
-                None
-            }
-        }
-        _ => None,
+        format!("`os.chmod` setting a permissive mask `{mask:#o}` on file or directory")
     }
 }
 
@@ -108,13 +55,15 @@ pub(crate) fn bad_file_permissions(
     keywords: &[Keyword],
 ) {
     if checker
-        .semantic_model()
+        .semantic()
         .resolve_call_path(func)
-        .map_or(false, |call_path| call_path.as_slice() == ["os", "chmod"])
+        .map_or(false, |call_path| {
+            matches!(call_path.as_slice(), ["os", "chmod"])
+        })
     {
         let call_args = SimpleCallArgs::new(args, keywords);
         if let Some(mode_arg) = call_args.argument("mode", 1) {
-            if let Some(int_value) = get_int_value(mode_arg) {
+            if let Some(int_value) = int_value(mode_arg, checker.semantic()) {
                 if (int_value & WRITE_WORLD > 0) || (int_value & EXECUTE_GROUP > 0) {
                     checker.diagnostics.push(Diagnostic::new(
                         BadFilePermissions { mask: int_value },
@@ -123,5 +72,77 @@ pub(crate) fn bad_file_permissions(
                 }
             }
         }
+    }
+}
+
+const WRITE_WORLD: u16 = 0o2;
+const EXECUTE_GROUP: u16 = 0o10;
+
+fn py_stat(call_path: &CallPath) -> Option<u16> {
+    match call_path.as_slice() {
+        ["stat", "ST_MODE"] => Some(0o0),
+        ["stat", "S_IFDOOR"] => Some(0o0),
+        ["stat", "S_IFPORT"] => Some(0o0),
+        ["stat", "ST_INO"] => Some(0o1),
+        ["stat", "S_IXOTH"] => Some(0o1),
+        ["stat", "UF_NODUMP"] => Some(0o1),
+        ["stat", "ST_DEV"] => Some(0o2),
+        ["stat", "S_IWOTH"] => Some(0o2),
+        ["stat", "UF_IMMUTABLE"] => Some(0o2),
+        ["stat", "ST_NLINK"] => Some(0o3),
+        ["stat", "ST_UID"] => Some(0o4),
+        ["stat", "S_IROTH"] => Some(0o4),
+        ["stat", "UF_APPEND"] => Some(0o4),
+        ["stat", "ST_GID"] => Some(0o5),
+        ["stat", "ST_SIZE"] => Some(0o6),
+        ["stat", "ST_ATIME"] => Some(0o7),
+        ["stat", "S_IRWXO"] => Some(0o7),
+        ["stat", "ST_MTIME"] => Some(0o10),
+        ["stat", "S_IXGRP"] => Some(0o10),
+        ["stat", "UF_OPAQUE"] => Some(0o10),
+        ["stat", "ST_CTIME"] => Some(0o11),
+        ["stat", "S_IWGRP"] => Some(0o20),
+        ["stat", "UF_NOUNLINK"] => Some(0o20),
+        ["stat", "S_IRGRP"] => Some(0o40),
+        ["stat", "UF_COMPRESSED"] => Some(0o40),
+        ["stat", "S_IRWXG"] => Some(0o70),
+        ["stat", "S_IEXEC"] => Some(0o100),
+        ["stat", "S_IXUSR"] => Some(0o100),
+        ["stat", "S_IWRITE"] => Some(0o200),
+        ["stat", "S_IWUSR"] => Some(0o200),
+        ["stat", "S_IREAD"] => Some(0o400),
+        ["stat", "S_IRUSR"] => Some(0o400),
+        ["stat", "S_IRWXU"] => Some(0o700),
+        ["stat", "S_ISVTX"] => Some(0o1000),
+        ["stat", "S_ISGID"] => Some(0o2000),
+        ["stat", "S_ENFMT"] => Some(0o2000),
+        ["stat", "S_ISUID"] => Some(0o4000),
+        _ => None,
+    }
+}
+
+fn int_value(expr: &Expr, model: &SemanticModel) -> Option<u16> {
+    match expr {
+        Expr::Constant(ast::ExprConstant {
+            value: Constant::Int(value),
+            ..
+        }) => value.to_u16(),
+        Expr::Attribute(_) => model.resolve_call_path(expr).as_ref().and_then(py_stat),
+        Expr::BinOp(ast::ExprBinOp {
+            left,
+            op,
+            right,
+            range: _,
+        }) => {
+            let left_value = int_value(left, model)?;
+            let right_value = int_value(right, model)?;
+            match op {
+                Operator::BitAnd => Some(left_value & right_value),
+                Operator::BitOr => Some(left_value | right_value),
+                Operator::BitXor => Some(left_value ^ right_value),
+                _ => None,
+            }
+        }
+        _ => None,
     }
 }

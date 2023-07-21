@@ -3,8 +3,12 @@ fail_fast: true
 exclude: |
   (?x)^(
     crates/ruff/resources/.*|
+    crates/ruff/src/rules/.*/snapshots/.*|
+    crates/ruff_cli/resources/.*|
     crates/ruff_python_formatter/resources/.*|
-    crates/ruff_python_formatter/src/snapshots/.*
+    crates/ruff_python_formatter/tests/snapshots/.*|
+    crates/ruff_python_resolver/resources/.*|
+    crates/ruff_python_resolver/tests/snapshots/.*
   )$
 
 repos:
@@ -18,6 +22,7 @@ repos:
     hooks:
       - id: mdformat
         additional_dependencies:
+          - mdformat-mkdocs
           - mdformat-black
           - black==23.1.0 # Must be the latest version of Black
 
@@ -37,29 +42,19 @@ repos:
         name: cargo fmt
         entry: cargo fmt --
         language: system
-        types: [rust]
-      - id: clippy
-        name: clippy
-        entry: cargo clippy --workspace --all-targets --all-features -- -D warnings
-        language: system
-        pass_filenames: false
+        types: [ rust ]
+        pass_filenames: false # This makes it a lot faster
       - id: ruff
         name: ruff
-        entry: cargo run -p ruff_cli -- check --no-cache --force-exclude --fix --exit-non-zero-on-fix
+        entry: cargo run --bin ruff -- check --no-cache --force-exclude --fix --exit-non-zero-on-fix
         language: system
-        types_or: [python, pyi]
+        types_or: [ python, pyi ]
         require_serial: true
         exclude: |
           (?x)^(
             crates/ruff/resources/.*|
             crates/ruff_python_formatter/resources/.*
           )$
-      - id: dev-generate-all
-        name: dev-generate-all
-        entry: cargo dev generate-all
-        language: system
-        pass_filenames: false
-        exclude: target
 
   # Black
   - repo: https://github.com/psf/black
@@ -68,4 +63,4 @@ repos:
       - id: black
 
 ci:
-  skip: [cargo-fmt, clippy, dev-generate-all]
+  skip: [ cargo-fmt, dev-generate-all ]

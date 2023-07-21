@@ -11,12 +11,4 @@ F404.py:6:1: F404 `from __future__` imports must occur at the beginning of the f
 8 | import __future__
   |
 
-F404.py:8:1: F404 `from __future__` imports must occur at the beginning of the file
-  |
-6 | from __future__ import print_function
-7 | 
-8 | import __future__
-  | ^^^^^^^^^^^^^^^^^ F404
-  |
-
 

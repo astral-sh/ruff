@@ -1,5 +1,5 @@
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{self, Expr, Ranged};
+use rustpython_parser::ast::{self, ArgWithDefault, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -8,6 +8,33 @@ use ruff_python_ast::visitor::Visitor;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for loop control variables that override the loop iterable.
+///
+/// ## Why is this bad?
+/// Loop control variables should not override the loop iterable, as this can
+/// lead to confusing behavior.
+///
+/// Instead, use a distinct variable name for any loop control variables.
+///
+/// ## Example
+/// ```python
+/// items = [1, 2, 3]
+///
+/// for items in items:
+///     print(items)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// items = [1, 2, 3]
+///
+/// for item in items:
+///     print(item)
+/// ```
+///
+/// ## References
+/// - [Python documentation: The `for` statement](https://docs.python.org/3/reference/compound_stmts.html#the-for-statement)
 #[violation]
 pub struct LoopVariableOverridesIterator {
     name: String,
@@ -49,8 +76,17 @@ where
                 range: _,
             }) => {
                 visitor::walk_expr(self, body);
-                for arg in &args.args {
-                    self.names.remove(arg.arg.as_str());
+                for ArgWithDefault {
+                    def,
+                    default: _,
+                    range: _,
+                } in args
+                    .posonlyargs
+                    .iter()
+                    .chain(&args.args)
+                    .chain(&args.kwonlyargs)
+                {
+                    self.names.remove(def.arg.as_str());
                 }
             }
             _ => visitor::walk_expr(self, expr),

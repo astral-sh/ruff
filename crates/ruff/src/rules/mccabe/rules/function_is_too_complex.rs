@@ -1,24 +1,20 @@
-use rustpython_parser::ast::{self, Excepthandler, Stmt};
+use rustpython_parser::ast::{self, ExceptHandler, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::identifier_range;
-use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::identifier::Identifier;
 
 /// ## What it does
 /// Checks for functions with a high `McCabe` complexity.
 ///
+/// ## Why is this bad?
 /// The `McCabe` complexity of a function is a measure of the complexity of
 /// the control flow graph of the function. It is calculated by adding
 /// one to the number of decision points in the function. A decision
 /// point is a place in the code where the program has a choice of two
 /// or more paths to follow.
 ///
-/// ## Why is this bad?
 /// Functions with a high complexity are hard to understand and maintain.
-///
-/// ## Options
-/// - `mccabe.max-complexity`
 ///
 /// ## Example
 /// ```python
@@ -46,6 +42,9 @@ use ruff_python_ast::source_code::Locator;
 ///         return 2
 ///     return 1
 /// ```
+///
+/// ## Options
+/// - `mccabe.max-complexity`
 #[violation]
 pub struct ComplexStructure {
     name: String,
@@ -69,10 +68,19 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
     let mut complexity = 0;
     for stmt in stmts {
         match stmt {
-            Stmt::If(ast::StmtIf { body, orelse, .. }) => {
+            Stmt::If(ast::StmtIf {
+                body,
+                elif_else_clauses,
+                ..
+            }) => {
                 complexity += 1;
                 complexity += get_complexity_number(body);
-                complexity += get_complexity_number(orelse);
+                for clause in elif_else_clauses {
+                    if clause.test.is_some() {
+                        complexity += 1;
+                    }
+                    complexity += get_complexity_number(&clause.body);
+                }
             }
             Stmt::For(ast::StmtFor { body, orelse, .. })
             | Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. }) => {
@@ -117,7 +125,7 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
                 complexity += get_complexity_number(finalbody);
                 for handler in handlers {
                     complexity += 1;
-                    let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
+                    let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                         body, ..
                     }) = handler;
                     complexity += get_complexity_number(body);
@@ -142,7 +150,6 @@ pub(crate) fn function_is_too_complex(
     name: &str,
     body: &[Stmt],
     max_complexity: usize,
-    locator: &Locator,
 ) -> Option<Diagnostic> {
     let complexity = get_complexity_number(body) + 1;
     if complexity > max_complexity {
@@ -152,7 +159,7 @@ pub(crate) fn function_is_too_complex(
                 complexity,
                 max_complexity,
             },
-            identifier_range(stmt, locator),
+            stmt.identifier(),
         ))
     } else {
         None

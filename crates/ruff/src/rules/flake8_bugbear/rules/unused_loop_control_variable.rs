@@ -1,26 +1,5 @@
-//! Checks for unused loop variables.
-//!
-//! ## Why is this bad?
-//!
-//! Unused variables may signal a mistake or unfinished code.
-//!
-//! ## Example
-//!
-//! ```python
-//! for x in range(10):
-//!     method()
-//! ```
-//!
-//! Prefix the variable with an underscore:
-//!
-//! ```python
-//! for _x in range(10):
-//!     method()
-//! ```
-
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
-use serde::{Deserialize, Serialize};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -30,12 +9,37 @@ use ruff_python_ast::{helpers, visitor};
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, result_like::BoolLike)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, result_like::BoolLike)]
 enum Certainty {
     Certain,
     Uncertain,
 }
 
+/// ## What it does
+/// Checks for unused variables in loops (e.g., `for` and `while` statements).
+///
+/// ## Why is this bad?
+/// Defining a variable in a loop statement that is never used can confuse
+/// readers.
+///
+/// If the variable is intended to be unused (e.g., to facilitate
+/// destructuring of a tuple or other object), prefix it with an underscore
+/// to indicate the intent. Otherwise, remove the variable entirely.
+///
+/// ## Example
+/// ```python
+/// for i, j in foo:
+///     bar(i)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// for i, _j in foo:
+///     bar(i)
+/// ```
+///
+/// ## References
+/// - [PEP 8: Naming Conventions](https://peps.python.org/pep-0008/#naming-conventions)
 #[violation]
 pub struct UnusedLoopControlVariable {
     /// The name of the loop control variable.
@@ -129,7 +133,7 @@ pub(crate) fn unused_loop_control_variable(checker: &mut Checker, target: &Expr,
 
         // Avoid fixing any variables that _may_ be used, but undetectably so.
         let certainty = Certainty::from(!helpers::uses_magic_variable_access(body, |id| {
-            checker.semantic_model().is_builtin(id)
+            checker.semantic().is_builtin(id)
         }));
 
         // Attempt to rename the variable by prepending an underscore, but avoid
@@ -150,20 +154,23 @@ pub(crate) fn unused_loop_control_variable(checker: &mut Checker, target: &Expr,
             },
             expr.range(),
         );
-        if let Some(rename) = rename {
-            if certainty.into() && checker.patch(diagnostic.kind.rule()) {
-                // Avoid fixing if the variable, or any future bindings to the variable, are
-                // used _after_ the loop.
-                let scope = checker.semantic_model().scope();
-                if scope
-                    .bindings_for_name(name)
-                    .map(|binding_id| &checker.semantic_model().bindings[binding_id])
-                    .all(|binding| !binding.is_used())
-                {
-                    diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                        rename,
-                        expr.range(),
-                    )));
+        if checker.patch(diagnostic.kind.rule()) {
+            if let Some(rename) = rename {
+                if certainty.into() {
+                    // Avoid fixing if the variable, or any future bindings to the variable, are
+                    // used _after_ the loop.
+                    let scope = checker.semantic().scope();
+                    if scope
+                        .get_all(name)
+                        .map(|binding_id| checker.semantic().binding(binding_id))
+                        .filter(|binding| binding.range.start() >= expr.range().start())
+                        .all(|binding| !binding.is_used())
+                    {
+                        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                            rename,
+                            expr.range(),
+                        )));
+                    }
                 }
             }
         }

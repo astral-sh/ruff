@@ -1,6 +1,3 @@
-pub(crate) use function::{
-    function, ImplicitReturn, ImplicitReturnValue, SuperfluousElseBreak, SuperfluousElseContinue,
-    SuperfluousElseRaise, SuperfluousElseReturn, UnnecessaryAssign, UnnecessaryReturnNone,
-};
+pub(crate) use function::*;
 
 mod function;

@@ -1,0 +1,506 @@
+---
+source: crates/ruff/src/rules/ruff/mod.rs
+---
+RUF015.py:4:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
+  |
+3 | # RUF015
+4 | list(x)[0]
+  | ^^^^^^^^^^ RUF015
+5 | list(x)[:1]
+6 | list(x)[:1:1]
+  |
+  = help: Replace with `next(iter(x))`
+
+ℹ Suggested fix
+1 1 | x = range(10)
+2 2 | 
+3 3 | # RUF015
+4   |-list(x)[0]
+  4 |+next(iter(x))
+5 5 | list(x)[:1]
+6 6 | list(x)[:1:1]
+7 7 | list(x)[:1:2]
+
+RUF015.py:5:1: RUF015 [*] Prefer `[next(iter(x))]` over single element slice
+  |
+3 | # RUF015
+4 | list(x)[0]
+5 | list(x)[:1]
+  | ^^^^^^^^^^^ RUF015
+6 | list(x)[:1:1]
+7 | list(x)[:1:2]
+  |
+  = help: Replace with `[next(iter(x))]
+
+ℹ Suggested fix
+2 2 | 
+3 3 | # RUF015
+4 4 | list(x)[0]
+5   |-list(x)[:1]
+  5 |+[next(iter(x))]
+6 6 | list(x)[:1:1]
+7 7 | list(x)[:1:2]
+8 8 | tuple(x)[0]
+
+RUF015.py:6:1: RUF015 [*] Prefer `[next(iter(x))]` over single element slice
+  |
+4 | list(x)[0]
+5 | list(x)[:1]
+6 | list(x)[:1:1]
+  | ^^^^^^^^^^^^^ RUF015
+7 | list(x)[:1:2]
+8 | tuple(x)[0]
+  |
+  = help: Replace with `[next(iter(x))]
+
+ℹ Suggested fix
+3 3 | # RUF015
+4 4 | list(x)[0]
+5 5 | list(x)[:1]
+6   |-list(x)[:1:1]
+  6 |+[next(iter(x))]
+7 7 | list(x)[:1:2]
+8 8 | tuple(x)[0]
+9 9 | tuple(x)[:1]
+
+RUF015.py:7:1: RUF015 [*] Prefer `[next(iter(x))]` over single element slice
+  |
+5 | list(x)[:1]
+6 | list(x)[:1:1]
+7 | list(x)[:1:2]
+  | ^^^^^^^^^^^^^ RUF015
+8 | tuple(x)[0]
+9 | tuple(x)[:1]
+  |
+  = help: Replace with `[next(iter(x))]
+
+ℹ Suggested fix
+4 4 | list(x)[0]
+5 5 | list(x)[:1]
+6 6 | list(x)[:1:1]
+7   |-list(x)[:1:2]
+  7 |+[next(iter(x))]
+8 8 | tuple(x)[0]
+9 9 | tuple(x)[:1]
+10 10 | tuple(x)[:1:1]
+
+RUF015.py:8:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
+   |
+ 6 | list(x)[:1:1]
+ 7 | list(x)[:1:2]
+ 8 | tuple(x)[0]
+   | ^^^^^^^^^^^ RUF015
+ 9 | tuple(x)[:1]
+10 | tuple(x)[:1:1]
+   |
+   = help: Replace with `next(iter(x))`
+
+ℹ Suggested fix
+5 5 | list(x)[:1]
+6 6 | list(x)[:1:1]
+7 7 | list(x)[:1:2]
+8   |-tuple(x)[0]
+  8 |+next(iter(x))
+9 9 | tuple(x)[:1]
+10 10 | tuple(x)[:1:1]
+11 11 | tuple(x)[:1:2]
+
+RUF015.py:9:1: RUF015 [*] Prefer `[next(iter(x))]` over single element slice
+   |
+ 7 | list(x)[:1:2]
+ 8 | tuple(x)[0]
+ 9 | tuple(x)[:1]
+   | ^^^^^^^^^^^^ RUF015
+10 | tuple(x)[:1:1]
+11 | tuple(x)[:1:2]
+   |
+   = help: Replace with `[next(iter(x))]
+
+ℹ Suggested fix
+6  6  | list(x)[:1:1]
+7  7  | list(x)[:1:2]
+8  8  | tuple(x)[0]
+9     |-tuple(x)[:1]
+   9  |+[next(iter(x))]
+10 10 | tuple(x)[:1:1]
+11 11 | tuple(x)[:1:2]
+12 12 | list(i for i in x)[0]
+
+RUF015.py:10:1: RUF015 [*] Prefer `[next(iter(x))]` over single element slice
+   |
+ 8 | tuple(x)[0]
+ 9 | tuple(x)[:1]
+10 | tuple(x)[:1:1]
+   | ^^^^^^^^^^^^^^ RUF015
+11 | tuple(x)[:1:2]
+12 | list(i for i in x)[0]
+   |
+   = help: Replace with `[next(iter(x))]
+
+ℹ Suggested fix
+7  7  | list(x)[:1:2]
+8  8  | tuple(x)[0]
+9  9  | tuple(x)[:1]
+10    |-tuple(x)[:1:1]
+   10 |+[next(iter(x))]
+11 11 | tuple(x)[:1:2]
+12 12 | list(i for i in x)[0]
+13 13 | list(i for i in x)[:1]
+
+RUF015.py:11:1: RUF015 [*] Prefer `[next(iter(x))]` over single element slice
+   |
+ 9 | tuple(x)[:1]
+10 | tuple(x)[:1:1]
+11 | tuple(x)[:1:2]
+   | ^^^^^^^^^^^^^^ RUF015
+12 | list(i for i in x)[0]
+13 | list(i for i in x)[:1]
+   |
+   = help: Replace with `[next(iter(x))]
+
+ℹ Suggested fix
+8  8  | tuple(x)[0]
+9  9  | tuple(x)[:1]
+10 10 | tuple(x)[:1:1]
+11    |-tuple(x)[:1:2]
+   11 |+[next(iter(x))]
+12 12 | list(i for i in x)[0]
+13 13 | list(i for i in x)[:1]
+14 14 | list(i for i in x)[:1:1]
+
+RUF015.py:12:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
+   |
+10 | tuple(x)[:1:1]
+11 | tuple(x)[:1:2]
+12 | list(i for i in x)[0]
+   | ^^^^^^^^^^^^^^^^^^^^^ RUF015
+13 | list(i for i in x)[:1]
+14 | list(i for i in x)[:1:1]
+   |
+   = help: Replace with `next(iter(x))`
+
+ℹ Suggested fix
+9  9  | tuple(x)[:1]
+10 10 | tuple(x)[:1:1]
+11 11 | tuple(x)[:1:2]
+12    |-list(i for i in x)[0]
+   12 |+next(iter(x))
+13 13 | list(i for i in x)[:1]
+14 14 | list(i for i in x)[:1:1]
+15 15 | list(i for i in x)[:1:2]
+
+RUF015.py:13:1: RUF015 [*] Prefer `[next(iter(x))]` over single element slice
+   |
+11 | tuple(x)[:1:2]
+12 | list(i for i in x)[0]
+13 | list(i for i in x)[:1]
+   | ^^^^^^^^^^^^^^^^^^^^^^ RUF015
+14 | list(i for i in x)[:1:1]
+15 | list(i for i in x)[:1:2]
+   |
+   = help: Replace with `[next(iter(x))]
+
+ℹ Suggested fix
+10 10 | tuple(x)[:1:1]
+11 11 | tuple(x)[:1:2]
+12 12 | list(i for i in x)[0]
+13    |-list(i for i in x)[:1]
+   13 |+[next(iter(x))]
+14 14 | list(i for i in x)[:1:1]
+15 15 | list(i for i in x)[:1:2]
+16 16 | [i for i in x][0]
+
+RUF015.py:14:1: RUF015 [*] Prefer `[next(iter(x))]` over single element slice
+   |
+12 | list(i for i in x)[0]
+13 | list(i for i in x)[:1]
+14 | list(i for i in x)[:1:1]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ RUF015
+15 | list(i for i in x)[:1:2]
+16 | [i for i in x][0]
+   |
+   = help: Replace with `[next(iter(x))]
+
+ℹ Suggested fix
+11 11 | tuple(x)[:1:2]
+12 12 | list(i for i in x)[0]
+13 13 | list(i for i in x)[:1]
+14    |-list(i for i in x)[:1:1]
+   14 |+[next(iter(x))]
+15 15 | list(i for i in x)[:1:2]
+16 16 | [i for i in x][0]
+17 17 | [i for i in x][:1]
+
+RUF015.py:15:1: RUF015 [*] Prefer `[next(iter(x))]` over single element slice
+   |
+13 | list(i for i in x)[:1]
+14 | list(i for i in x)[:1:1]
+15 | list(i for i in x)[:1:2]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ RUF015
+16 | [i for i in x][0]
+17 | [i for i in x][:1]
+   |
+   = help: Replace with `[next(iter(x))]
+
+ℹ Suggested fix
+12 12 | list(i for i in x)[0]
+13 13 | list(i for i in x)[:1]
+14 14 | list(i for i in x)[:1:1]
+15    |-list(i for i in x)[:1:2]
+   15 |+[next(iter(x))]
+16 16 | [i for i in x][0]
+17 17 | [i for i in x][:1]
+18 18 | [i for i in x][:1:1]
+
+RUF015.py:16:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
+   |
+14 | list(i for i in x)[:1:1]
+15 | list(i for i in x)[:1:2]
+16 | [i for i in x][0]
+   | ^^^^^^^^^^^^^^^^^ RUF015
+17 | [i for i in x][:1]
+18 | [i for i in x][:1:1]
+   |
+   = help: Replace with `next(iter(x))`
+
+ℹ Suggested fix
+13 13 | list(i for i in x)[:1]
+14 14 | list(i for i in x)[:1:1]
+15 15 | list(i for i in x)[:1:2]
+16    |-[i for i in x][0]
+   16 |+next(iter(x))
+17 17 | [i for i in x][:1]
+18 18 | [i for i in x][:1:1]
+19 19 | [i for i in x][:1:2]
+
+RUF015.py:17:1: RUF015 [*] Prefer `[next(iter(x))]` over single element slice
+   |
+15 | list(i for i in x)[:1:2]
+16 | [i for i in x][0]
+17 | [i for i in x][:1]
+   | ^^^^^^^^^^^^^^^^^^ RUF015
+18 | [i for i in x][:1:1]
+19 | [i for i in x][:1:2]
+   |
+   = help: Replace with `[next(iter(x))]
+
+ℹ Suggested fix
+14 14 | list(i for i in x)[:1:1]
+15 15 | list(i for i in x)[:1:2]
+16 16 | [i for i in x][0]
+17    |-[i for i in x][:1]
+   17 |+[next(iter(x))]
+18 18 | [i for i in x][:1:1]
+19 19 | [i for i in x][:1:2]
+20 20 | 
+
+RUF015.py:18:1: RUF015 [*] Prefer `[next(iter(x))]` over single element slice
+   |
+16 | [i for i in x][0]
+17 | [i for i in x][:1]
+18 | [i for i in x][:1:1]
+   | ^^^^^^^^^^^^^^^^^^^^ RUF015
+19 | [i for i in x][:1:2]
+   |
+   = help: Replace with `[next(iter(x))]
+
+ℹ Suggested fix
+15 15 | list(i for i in x)[:1:2]
+16 16 | [i for i in x][0]
+17 17 | [i for i in x][:1]
+18    |-[i for i in x][:1:1]
+   18 |+[next(iter(x))]
+19 19 | [i for i in x][:1:2]
+20 20 | 
+21 21 | # OK (not indexing (solely) the first element)
+
+RUF015.py:19:1: RUF015 [*] Prefer `[next(iter(x))]` over single element slice
+   |
+17 | [i for i in x][:1]
+18 | [i for i in x][:1:1]
+19 | [i for i in x][:1:2]
+   | ^^^^^^^^^^^^^^^^^^^^ RUF015
+20 | 
+21 | # OK (not indexing (solely) the first element)
+   |
+   = help: Replace with `[next(iter(x))]
+
+ℹ Suggested fix
+16 16 | [i for i in x][0]
+17 17 | [i for i in x][:1]
+18 18 | [i for i in x][:1:1]
+19    |-[i for i in x][:1:2]
+   19 |+[next(iter(x))]
+20 20 | 
+21 21 | # OK (not indexing (solely) the first element)
+22 22 | list(x)
+
+RUF015.py:38:1: RUF015 [*] Prefer `next(i + 1 for i in x)` over single element slice
+   |
+37 | # RUF015 (doesn't mirror the underlying list)
+38 | [i + 1 for i in x][0]
+   | ^^^^^^^^^^^^^^^^^^^^^ RUF015
+39 | [i for i in x if i > 5][0]
+40 | [(i, i + 1) for i in x][0]
+   |
+   = help: Replace with `next(i + 1 for i in x)`
+
+ℹ Suggested fix
+35 35 | [i for i in x][::]
+36 36 | 
+37 37 | # RUF015 (doesn't mirror the underlying list)
+38    |-[i + 1 for i in x][0]
+   38 |+next(i + 1 for i in x)
+39 39 | [i for i in x if i > 5][0]
+40 40 | [(i, i + 1) for i in x][0]
+41 41 | 
+
+RUF015.py:39:1: RUF015 [*] Prefer `next(i for i in x if i > 5)` over single element slice
+   |
+37 | # RUF015 (doesn't mirror the underlying list)
+38 | [i + 1 for i in x][0]
+39 | [i for i in x if i > 5][0]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF015
+40 | [(i, i + 1) for i in x][0]
+   |
+   = help: Replace with `next(i for i in x if i > 5)`
+
+ℹ Suggested fix
+36 36 | 
+37 37 | # RUF015 (doesn't mirror the underlying list)
+38 38 | [i + 1 for i in x][0]
+39    |-[i for i in x if i > 5][0]
+   39 |+next(i for i in x if i > 5)
+40 40 | [(i, i + 1) for i in x][0]
+41 41 | 
+42 42 | # RUF015 (multiple generators)
+
+RUF015.py:40:1: RUF015 [*] Prefer `next((i, i + 1) for i in x)` over single element slice
+   |
+38 | [i + 1 for i in x][0]
+39 | [i for i in x if i > 5][0]
+40 | [(i, i + 1) for i in x][0]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF015
+41 | 
+42 | # RUF015 (multiple generators)
+   |
+   = help: Replace with `next((i, i + 1) for i in x)`
+
+ℹ Suggested fix
+37 37 | # RUF015 (doesn't mirror the underlying list)
+38 38 | [i + 1 for i in x][0]
+39 39 | [i for i in x if i > 5][0]
+40    |-[(i, i + 1) for i in x][0]
+   40 |+next((i, i + 1) for i in x)
+41 41 | 
+42 42 | # RUF015 (multiple generators)
+43 43 | y = range(10)
+
+RUF015.py:44:1: RUF015 [*] Prefer `next(i + j for i in x for j in y)` over single element slice
+   |
+42 | # RUF015 (multiple generators)
+43 | y = range(10)
+44 | [i + j for i in x for j in y][0]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF015
+45 | 
+46 | # RUF015
+   |
+   = help: Replace with `next(i + j for i in x for j in y)`
+
+ℹ Suggested fix
+41 41 | 
+42 42 | # RUF015 (multiple generators)
+43 43 | y = range(10)
+44    |-[i + j for i in x for j in y][0]
+   44 |+next(i + j for i in x for j in y)
+45 45 | 
+46 46 | # RUF015
+47 47 | list(range(10))[0]
+
+RUF015.py:47:1: RUF015 [*] Prefer `next(iter(range(10)))` over single element slice
+   |
+46 | # RUF015
+47 | list(range(10))[0]
+   | ^^^^^^^^^^^^^^^^^^ RUF015
+48 | list(x.y)[0]
+49 | list(x["y"])[0]
+   |
+   = help: Replace with `next(iter(range(10)))`
+
+ℹ Suggested fix
+44 44 | [i + j for i in x for j in y][0]
+45 45 | 
+46 46 | # RUF015
+47    |-list(range(10))[0]
+   47 |+next(iter(range(10)))
+48 48 | list(x.y)[0]
+49 49 | list(x["y"])[0]
+50 50 | 
+
+RUF015.py:48:1: RUF015 [*] Prefer `next(iter(x.y))` over single element slice
+   |
+46 | # RUF015
+47 | list(range(10))[0]
+48 | list(x.y)[0]
+   | ^^^^^^^^^^^^ RUF015
+49 | list(x["y"])[0]
+   |
+   = help: Replace with `next(iter(x.y))`
+
+ℹ Suggested fix
+45 45 | 
+46 46 | # RUF015
+47 47 | list(range(10))[0]
+48    |-list(x.y)[0]
+   48 |+next(iter(x.y))
+49 49 | list(x["y"])[0]
+50 50 | 
+51 51 | # RUF015 (multi-line)
+
+RUF015.py:49:1: RUF015 [*] Prefer `next(iter(x["y"]))` over single element slice
+   |
+47 | list(range(10))[0]
+48 | list(x.y)[0]
+49 | list(x["y"])[0]
+   | ^^^^^^^^^^^^^^^ RUF015
+50 | 
+51 | # RUF015 (multi-line)
+   |
+   = help: Replace with `next(iter(x["y"]))`
+
+ℹ Suggested fix
+46 46 | # RUF015
+47 47 | list(range(10))[0]
+48 48 | list(x.y)[0]
+49    |-list(x["y"])[0]
+   49 |+next(iter(x["y"]))
+50 50 | 
+51 51 | # RUF015 (multi-line)
+52 52 | revision_heads_map_ast = [
+
+RUF015.py:52:26: RUF015 [*] Prefer `next(...)` over single element slice
+   |
+51 |   # RUF015 (multi-line)
+52 |   revision_heads_map_ast = [
+   |  __________________________^
+53 | |     a
+54 | |     for a in revision_heads_map_ast_obj.body
+55 | |     if isinstance(a, ast.Assign) and a.targets[0].id == "REVISION_HEADS_MAP"
+56 | | ][0]
+   | |____^ RUF015
+   |
+   = help: Replace with `next(...)`
+
+ℹ Suggested fix
+49 49 | list(x["y"])[0]
+50 50 | 
+51 51 | # RUF015 (multi-line)
+52    |-revision_heads_map_ast = [
+   52 |+revision_heads_map_ast = next(
+53 53 |     a
+54 54 |     for a in revision_heads_map_ast_obj.body
+55 55 |     if isinstance(a, ast.Assign) and a.targets[0].id == "REVISION_HEADS_MAP"
+56    |-][0]
+   56 |+)
+
+

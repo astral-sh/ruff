@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use rustpython_parser::ast::{self, Constant, Expr, Ranged, Unaryop};
+use rustpython_parser::ast::{self, Constant, Expr, Ranged, UnaryOp};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -12,8 +12,9 @@ use crate::rules::pylint::settings::ConstantType;
 /// comparisons.
 ///
 /// ## Why is this bad?
-/// The use of "magic" can make code harder to read and maintain, as readers
-/// will have to infer the meaning of the value from the context.
+/// The use of "magic" values can make code harder to read and maintain, as
+/// readers will have to infer the meaning of the value from the context.
+/// Such values are discouraged by [PEP 8].
 ///
 /// For convenience, this rule excludes a variety of common values from the
 /// "magic" value definition, such as `0`, `1`, `""`, and `"__main__"`.
@@ -33,9 +34,7 @@ use crate::rules::pylint::settings::ConstantType;
 ///     return price * (1 - DISCOUNT_RATE)
 /// ```
 ///
-/// ## References
-/// - [Wikipedia](https://en.wikipedia.org/wiki/Magic_number_(programming)#Unnamed_numerical_constants)
-/// - [PEP 8](https://peps.python.org/pep-0008/#constants)
+/// [PEP 8]: https://peps.python.org/pep-0008/#constants
 #[violation]
 pub struct MagicValueComparison {
     value: String,
@@ -56,7 +55,7 @@ fn as_constant(expr: &Expr) -> Option<&Constant> {
     match expr {
         Expr::Constant(ast::ExprConstant { value, .. }) => Some(value),
         Expr::UnaryOp(ast::ExprUnaryOp {
-            op: Unaryop::UAdd | Unaryop::USub | Unaryop::Invert,
+            op: UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert,
             operand,
             range: _,
         }) => match operand.as_ref() {
@@ -83,7 +82,6 @@ fn is_magic_value(constant: &Constant, allowed_types: &[ConstantType]) -> bool {
         Constant::Str(value) => !matches!(value.as_str(), "" | "__main__"),
         Constant::Int(value) => !matches!(value.try_into(), Ok(0 | 1)),
         Constant::Bytes(_) => true,
-        Constant::Tuple(_) => true,
         Constant::Float(_) => true,
         Constant::Complex { .. } => true,
     }

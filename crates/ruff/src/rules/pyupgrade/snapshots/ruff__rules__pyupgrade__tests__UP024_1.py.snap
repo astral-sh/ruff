@@ -12,7 +12,7 @@ UP024_1.py:5:8: UP024 [*] Replace aliased errors with `OSError`
   |
   = help: Replace with builtin `OSError`
 
-ℹ Suggested fix
+ℹ Fix
 2 2 | 
 3 3 | try:
 4 4 |     pass
@@ -32,7 +32,7 @@ UP024_1.py:7:8: UP024 [*] Replace aliased errors with `OSError`
   |
   = help: Replace with builtin `OSError`
 
-ℹ Suggested fix
+ℹ Fix
 4 4 |     pass
 5 5 | except (OSError, mmap.error, IOError):
 6 6 |     pass
@@ -57,7 +57,7 @@ UP024_1.py:12:8: UP024 [*] Replace aliased errors with `OSError`
    |
    = help: Replace with builtin `OSError`
 
-ℹ Suggested fix
+ℹ Fix
 9  9  | 
 10 10 | try:
 11 11 |     pass

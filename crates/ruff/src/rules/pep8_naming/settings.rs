@@ -1,8 +1,13 @@
 //! Settings for the `pep8-naming` plugin.
 
+use std::error::Error;
+use std::fmt;
+
 use serde::{Deserialize, Serialize};
 
 use ruff_macros::{CacheKey, CombineOptions, ConfigurationOptions};
+
+use crate::settings::types::IdentifierPattern;
 
 const IGNORE_NAMES: [&str; 12] = [
     "setUp",
@@ -36,7 +41,7 @@ pub struct Options {
             ignore-names = ["callMethod"]
         "#
     )]
-    /// A list of names to ignore when considering `pep8-naming` violations.
+    /// A list of names (or patterns) to ignore when considering `pep8-naming` violations.
     pub ignore_names: Option<Vec<String>>,
     #[option(
         default = r#"[]"#,
@@ -72,7 +77,7 @@ pub struct Options {
 
 #[derive(Debug, CacheKey)]
 pub struct Settings {
-    pub ignore_names: Vec<String>,
+    pub ignore_names: Vec<IdentifierPattern>,
     pub classmethod_decorators: Vec<String>,
     pub staticmethod_decorators: Vec<String>,
 }
@@ -80,21 +85,59 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            ignore_names: IGNORE_NAMES.map(String::from).to_vec(),
+            ignore_names: IGNORE_NAMES
+                .iter()
+                .map(|name| IdentifierPattern::new(name).unwrap())
+                .collect(),
             classmethod_decorators: Vec::new(),
             staticmethod_decorators: Vec::new(),
         }
     }
 }
 
-impl From<Options> for Settings {
-    fn from(options: Options) -> Self {
-        Self {
-            ignore_names: options
-                .ignore_names
-                .unwrap_or_else(|| IGNORE_NAMES.map(String::from).to_vec()),
+impl TryFrom<Options> for Settings {
+    type Error = SettingsError;
+
+    fn try_from(options: Options) -> Result<Self, Self::Error> {
+        Ok(Self {
+            ignore_names: match options.ignore_names {
+                Some(names) => names
+                    .into_iter()
+                    .map(|name| {
+                        IdentifierPattern::new(&name).map_err(SettingsError::InvalidIgnoreName)
+                    })
+                    .collect::<Result<Vec<_>, Self::Error>>()?,
+                None => IGNORE_NAMES
+                    .into_iter()
+                    .map(|name| IdentifierPattern::new(name).unwrap())
+                    .collect(),
+            },
             classmethod_decorators: options.classmethod_decorators.unwrap_or_default(),
             staticmethod_decorators: options.staticmethod_decorators.unwrap_or_default(),
+        })
+    }
+}
+
+/// Error returned by the [`TryFrom`] implementation of [`Settings`].
+#[derive(Debug)]
+pub enum SettingsError {
+    InvalidIgnoreName(glob::PatternError),
+}
+
+impl fmt::Display for SettingsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SettingsError::InvalidIgnoreName(err) => {
+                write!(f, "Invalid pattern in ignore-names: {err}")
+            }
+        }
+    }
+}
+
+impl Error for SettingsError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            SettingsError::InvalidIgnoreName(err) => Some(err),
         }
     }
 }
@@ -102,7 +145,13 @@ impl From<Options> for Settings {
 impl From<Settings> for Options {
     fn from(settings: Settings) -> Self {
         Self {
-            ignore_names: Some(settings.ignore_names),
+            ignore_names: Some(
+                settings
+                    .ignore_names
+                    .into_iter()
+                    .map(|pattern| pattern.as_str().to_owned())
+                    .collect(),
+            ),
             classmethod_decorators: Some(settings.classmethod_decorators),
             staticmethod_decorators: Some(settings.staticmethod_decorators),
         }

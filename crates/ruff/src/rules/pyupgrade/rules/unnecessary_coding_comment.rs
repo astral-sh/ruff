@@ -3,9 +3,27 @@ use regex::Regex;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_newlines::Line;
+use ruff_python_trivia::Line;
 
-// TODO: document referencing [PEP 3120]: https://peps.python.org/pep-3120/
+/// ## What it does
+/// Checks for unnecessary UTF-8 encoding declarations.
+///
+/// ## Why is this bad?
+/// [PEP 3120] makes UTF-8 the default encoding, so a UTF-8 encoding
+/// declaration is unnecessary.
+///
+/// ## Example
+/// ```python
+/// # -*- coding: utf-8 -*-
+/// print("Hello, world!")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// print("Hello, world!")
+/// ```
+///
+/// [PEP 3120]: https://peps.python.org/pep-3120/
 #[violation]
 pub struct UTF8EncodingDeclaration;
 
@@ -30,8 +48,7 @@ pub(crate) fn unnecessary_coding_comment(line: &Line, autofix: bool) -> Option<D
     if CODING_COMMENT_REGEX.is_match(line.as_str()) {
         let mut diagnostic = Diagnostic::new(UTF8EncodingDeclaration, line.full_range());
         if autofix {
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::deletion(
+            diagnostic.set_fix(Fix::automatic(Edit::deletion(
                 line.start(),
                 line.full_end(),
             )));

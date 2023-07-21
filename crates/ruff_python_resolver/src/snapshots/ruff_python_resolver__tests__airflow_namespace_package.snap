@@ -1,0 +1,40 @@
+---
+source: crates/ruff_python_resolver/src/lib.rs
+expression: result
+---
+ImportResult {
+    is_relative: false,
+    is_import_found: true,
+    is_partly_resolved: false,
+    is_namespace_package: true,
+    is_init_file_present: true,
+    is_stub_package: false,
+    import_type: Local,
+    resolved_paths: [
+        "./resources/test/airflow/airflow/__init__.py",
+        "",
+        "./resources/test/airflow/airflow/providers/google/__init__.py",
+        "./resources/test/airflow/airflow/providers/google/cloud/__init__.py",
+        "./resources/test/airflow/airflow/providers/google/cloud/hooks/__init__.py",
+        "./resources/test/airflow/airflow/providers/google/cloud/hooks/gcs.py",
+    ],
+    search_path: Some(
+        "./resources/test/airflow",
+    ),
+    is_stub_file: false,
+    is_native_lib: false,
+    is_stdlib_typeshed_file: false,
+    is_third_party_typeshed_file: false,
+    is_local_typings_file: false,
+    implicit_imports: ImplicitImports(
+        {},
+    ),
+    filtered_implicit_imports: ImplicitImports(
+        {},
+    ),
+    non_stub_import_result: None,
+    py_typed_info: None,
+    package_directory: Some(
+        "./resources/test/airflow/airflow",
+    ),
+}

@@ -1,7 +1,6 @@
-use rustpython_parser::ast::{Expr, Ranged};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_semantic::Binding;
 
 /// ## What it does
 /// Checks for invalid assignments to `__all__`.
@@ -24,7 +23,7 @@ use ruff_macros::{derive_message_formats, violation};
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
+/// - [Python documentation: The `import` statement](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
 #[violation]
 pub struct InvalidAllFormat;
 
@@ -36,6 +35,10 @@ impl Violation for InvalidAllFormat {
 }
 
 /// PLE0605
-pub(crate) fn invalid_all_format(expr: &Expr) -> Diagnostic {
-    Diagnostic::new(InvalidAllFormat, expr.range())
+pub(crate) fn invalid_all_format(binding: &Binding) -> Option<Diagnostic> {
+    if binding.is_invalid_all_format() {
+        Some(Diagnostic::new(InvalidAllFormat, binding.range))
+    } else {
+        None
+    }
 }

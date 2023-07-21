@@ -8,6 +8,33 @@ use crate::autofix;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for unnecessary `__future__` imports.
+///
+/// ## Why is this bad?
+/// The `__future__` module is used to enable features that are not yet
+/// available in the current Python version. If a feature is already
+/// available in the minimum supported Python version, importing it
+/// from `__future__` is unnecessary and should be removed to avoid
+/// confusion.
+///
+/// ## Example
+/// ```python
+/// from __future__ import print_function
+///
+/// print("Hello, world!")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// print("Hello, world!")
+/// ```
+///
+/// ## Options
+/// - `target-version`
+///
+/// ## References
+/// - [Python documentation: `__future__` — Future statement definitions](https://docs.python.org/3/library/__future__.html)
 #[violation]
 pub struct UnnecessaryFutureImport {
     pub names: Vec<String>,
@@ -88,15 +115,15 @@ pub(crate) fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, name
                 .iter()
                 .map(|alias| format!("__future__.{}", alias.name))
                 .collect();
-            let stmt = checker.semantic_model().stmt();
-            let parent = checker.semantic_model().stmt_parent();
+            let stmt = checker.semantic().stmt();
+            let parent = checker.semantic().stmt_parent();
             let edit = autofix::edits::remove_unused_imports(
                 unused_imports.iter().map(String::as_str),
                 stmt,
                 parent,
                 checker.locator,
-                checker.indexer,
                 checker.stylist,
+                checker.indexer,
             )?;
             Ok(Fix::suggested(edit).isolate(checker.isolation(parent)))
         });

@@ -29,7 +29,6 @@ pub trait Buffer {
     ///
     /// assert_eq!(buffer.into_vec(), vec![FormatElement::StaticText { text: "test" }]);
     /// ```
-    ///
     fn write_element(&mut self, element: FormatElement) -> FormatResult<()>;
 
     /// Returns a slice containing all elements written into this buffer.

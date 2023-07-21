@@ -49,10 +49,7 @@ impl Indexer {
                 }
 
                 // Newlines after a newline never form a continuation.
-                if !matches!(
-                    prev_token,
-                    Some(Tok::Newline | Tok::NonLogicalNewline) | None
-                ) {
+                if !matches!(prev_token, Some(Tok::Newline | Tok::NonLogicalNewline)) {
                     continuation_lines.push(line_start);
                 }
 
@@ -96,8 +93,20 @@ impl Indexer {
     }
 
     /// Returns the byte offset ranges of comments
-    pub fn comment_ranges(&self) -> &CommentRanges {
+    pub const fn comment_ranges(&self) -> &CommentRanges {
         &self.comment_ranges
+    }
+
+    /// Returns the comments in the given range as source code slices
+    pub fn comments_in_range<'a>(
+        &'a self,
+        range: TextRange,
+        locator: &'a Locator,
+    ) -> impl Iterator<Item = &'a str> {
+        self.comment_ranges
+            .comments_in_range(range)
+            .iter()
+            .map(move |comment_range| locator.slice(*comment_range))
     }
 
     /// Returns the line start positions of continuations (backslash).
@@ -204,7 +213,7 @@ if True:
             ]
         );
 
-        let contents = r#"
+        let contents = r"
 x = 1; import sys
 import os
 
@@ -218,7 +227,7 @@ if True:
 
 x = 1; \
 import os
-"#
+"
         .trim();
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));

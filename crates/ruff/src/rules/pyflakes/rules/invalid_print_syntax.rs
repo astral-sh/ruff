@@ -44,7 +44,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/functions.html#print)
+/// - [Python documentation: `print`](https://docs.python.org/3/library/functions.html#print)
 #[violation]
 pub struct InvalidPrintSyntax;
 
@@ -63,7 +63,7 @@ pub(crate) fn invalid_print_syntax(checker: &mut Checker, left: &Expr) {
     if id != "print" {
         return;
     }
-    if !checker.semantic_model().is_builtin("print") {
+    if !checker.semantic().is_builtin("print") {
         return;
     };
     checker

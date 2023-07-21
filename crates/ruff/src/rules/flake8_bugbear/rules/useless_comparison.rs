@@ -5,6 +5,26 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for useless comparisons.
+///
+/// ## Why is this bad?
+/// Useless comparisons have no effect on the program, and are often included
+/// by mistake. If the comparison is intended to enforce an invariant, prepend
+/// the comparison with an `assert`. Otherwise, remove it entirely.
+///
+/// ## Example
+/// ```python
+/// foo == bar
+/// ```
+///
+/// Use instead:
+/// ```python
+/// assert foo == bar, "`foo` and `bar` should be equal."
+/// ```
+///
+/// ## References
+/// - [Python documentation: `assert` statement](https://docs.python.org/3/reference/simple_stmts.html#the-assert-statement)
 #[violation]
 pub struct UselessComparison;
 

@@ -8,6 +8,27 @@ use crate::autofix;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for unnecessary imports of builtins.
+///
+/// ## Why is this bad?
+/// Builtins are always available. Importing them is unnecessary and should be
+/// removed to avoid confusion.
+///
+/// ## Example
+/// ```python
+/// from builtins import str
+///
+/// str(1)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// str(1)
+/// ```
+///
+/// ## References
+/// - [Python documentation: The Python Standard Library](https://docs.python.org/3/library/index.html)
 #[violation]
 pub struct UnnecessaryBuiltinImport {
     pub names: Vec<String>,
@@ -31,37 +52,6 @@ impl AlwaysAutofixableViolation for UnnecessaryBuiltinImport {
     }
 }
 
-const BUILTINS: &[&str] = &[
-    "*",
-    "ascii",
-    "bytes",
-    "chr",
-    "dict",
-    "filter",
-    "hex",
-    "input",
-    "int",
-    "isinstance",
-    "list",
-    "map",
-    "max",
-    "min",
-    "next",
-    "object",
-    "oct",
-    "open",
-    "pow",
-    "range",
-    "round",
-    "str",
-    "super",
-    "zip",
-];
-const IO: &[&str] = &["open"];
-const SIX_MOVES_BUILTINS: &[&str] = BUILTINS;
-const SIX: &[&str] = &["callable", "next"];
-const SIX_MOVES: &[&str] = &["filter", "input", "map", "range", "zip"];
-
 /// UP029
 pub(crate) fn unnecessary_builtin_import(
     checker: &mut Checker,
@@ -69,25 +59,52 @@ pub(crate) fn unnecessary_builtin_import(
     module: &str,
     names: &[Alias],
 ) {
-    let deprecated_names = match module {
-        "builtins" => BUILTINS,
-        "io" => IO,
-        "six" => SIX,
-        "six.moves" => SIX_MOVES,
-        "six.moves.builtins" => SIX_MOVES_BUILTINS,
-        _ => return,
-    };
-
-    // Do this with a filter?
-    let mut unused_imports: Vec<&Alias> = vec![];
-    for alias in names {
-        if alias.asname.is_some() {
-            continue;
-        }
-        if deprecated_names.contains(&alias.name.as_str()) {
-            unused_imports.push(alias);
-        }
+    // Ignore irrelevant modules.
+    if !matches!(
+        module,
+        "builtins" | "io" | "six" | "six.moves" | "six.moves.builtins"
+    ) {
+        return;
     }
+
+    // Identify unaliased, builtin imports.
+    let unused_imports: Vec<&Alias> = names
+        .iter()
+        .filter(|alias| alias.asname.is_none())
+        .filter(|alias| {
+            matches!(
+                (module, alias.name.as_str()),
+                (
+                    "builtins" | "six.moves.builtins",
+                    "*" | "ascii"
+                        | "bytes"
+                        | "chr"
+                        | "dict"
+                        | "filter"
+                        | "hex"
+                        | "input"
+                        | "int"
+                        | "isinstance"
+                        | "list"
+                        | "map"
+                        | "max"
+                        | "min"
+                        | "next"
+                        | "object"
+                        | "oct"
+                        | "open"
+                        | "pow"
+                        | "range"
+                        | "round"
+                        | "str"
+                        | "super"
+                        | "zip"
+                ) | ("io", "open")
+                    | ("six", "callable" | "next")
+                    | ("six.moves", "filter" | "input" | "map" | "range" | "zip")
+            )
+        })
+        .collect();
 
     if unused_imports.is_empty() {
         return;
@@ -105,8 +122,8 @@ pub(crate) fn unnecessary_builtin_import(
     );
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {
-            let stmt = checker.semantic_model().stmt();
-            let parent = checker.semantic_model().stmt_parent();
+            let stmt = checker.semantic().stmt();
+            let parent = checker.semantic().stmt_parent();
             let unused_imports: Vec<String> = unused_imports
                 .iter()
                 .map(|alias| format!("{module}.{}", alias.name))
@@ -116,8 +133,8 @@ pub(crate) fn unnecessary_builtin_import(
                 stmt,
                 parent,
                 checker.locator,
-                checker.indexer,
                 checker.stylist,
+                checker.indexer,
             )?;
             Ok(Fix::suggested(edit).isolate(checker.isolation(parent)))
         });

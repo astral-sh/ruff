@@ -1,9 +1,8 @@
-use crate::comments::Comments;
-use crate::expression::parentheses::{
-    default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
-};
+use crate::context::PyFormatContext;
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::{not_yet_implemented, FormatNodeRule, PyFormatter};
 use ruff_formatter::{write, Buffer, FormatResult};
+use ruff_python_ast::node::AnyNodeRef;
 use rustpython_parser::ast::ExprYield;
 
 #[derive(Default)]
@@ -18,10 +17,9 @@ impl FormatNodeRule<ExprYield> for FormatExprYield {
 impl NeedsParentheses for ExprYield {
     fn needs_parentheses(
         &self,
-        parenthesize: Parenthesize,
-        source: &str,
-        comments: &Comments,
-    ) -> Parentheses {
-        default_expression_needs_parentheses(self.into(), parenthesize, source, comments)
+        _parent: AnyNodeRef,
+        _context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        OptionalParentheses::Multiline
     }
 }

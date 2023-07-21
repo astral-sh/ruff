@@ -1,0 +1,14 @@
+---
+source: crates/ruff/src/noqa.rs
+expression: "ParsedFileExemption::try_extract(source)"
+---
+Ok(
+    Some(
+        Codes(
+            [
+                "F401",
+                "F841",
+            ],
+        ),
+    ),
+)

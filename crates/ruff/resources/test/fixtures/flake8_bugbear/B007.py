@@ -97,3 +97,10 @@ def f():
 # variable name).
 for line_ in range(self.header_lines):
     fp.readline()
+
+# Regression test: visitor didn't walk the elif test
+for key, value in current_crawler_tags.items():
+    if key:
+        pass
+    elif wanted_tag_value != value:
+        pass

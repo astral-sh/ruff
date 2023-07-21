@@ -4,7 +4,7 @@
 use std::borrow::Cow;
 use std::cmp;
 
-use ruff_newlines::StrExt;
+use ruff_python_trivia::{PythonWhitespace, UniversalNewlines};
 
 /// Indent each line by the given prefix.
 ///
@@ -57,9 +57,9 @@ pub fn indent<'a>(text: &'a str, prefix: &str) -> Cow<'a, str> {
     }
 
     let mut result = String::with_capacity(text.len() + prefix.len());
-    let trimmed_prefix = prefix.trim_end();
+    let trimmed_prefix = prefix.trim_whitespace_end();
     for line in text.universal_newlines() {
-        if line.trim().is_empty() {
+        if line.trim_whitespace().is_empty() {
             result.push_str(trimmed_prefix);
         } else {
             result.push_str(prefix);
@@ -92,7 +92,7 @@ pub fn dedent(text: &str) -> Cow<'_, str> {
     let prefix_len = text
         .universal_newlines()
         .fold(usize::MAX, |prefix_len, line| {
-            let leading_whitespace_len = line.len() - line.trim_start().len();
+            let leading_whitespace_len = line.len() - line.trim_whitespace_start().len();
             if leading_whitespace_len == line.len() {
                 // Skip empty lines.
                 prefix_len
@@ -109,7 +109,7 @@ pub fn dedent(text: &str) -> Cow<'_, str> {
     // Remove the common prefix from each line.
     let mut result = String::with_capacity(text.len());
     for line in text.universal_newlines() {
-        if line.trim().is_empty() {
+        if line.trim_whitespace().is_empty() {
             if let Some(line_ending) = line.line_ending() {
                 result.push_str(&line_ending);
             }
@@ -332,5 +332,14 @@ mod tests {
             "  baz\r"
         ].join("");
         assert_eq!(dedent(&x), y);
+    }
+
+    #[test]
+    fn dedent_non_python_whitespace() {
+        let text = r#"        C = int(f.rea1,0],[-1,0,1]],
+              [[-1,-1,1],[1,1,-1],[0,-1,0]],
+              [[-1,-1,-1],[1,1,0],[1,0,1]]
+             ]"#;
+        assert_eq!(dedent(text), text);
     }
 }

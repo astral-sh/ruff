@@ -1,4 +1,5 @@
-use anyhow::Result;
+use colored::Colorize;
+use log::warn;
 use pyproject_toml::{BuildSystem, Project};
 use ruff_text_size::{TextRange, TextSize};
 use serde::{Deserialize, Serialize};
@@ -7,7 +8,9 @@ use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::source_code::SourceFile;
 
 use crate::message::Message;
+use crate::registry::Rule;
 use crate::rules::ruff::rules::InvalidPyprojectToml;
+use crate::settings::Settings;
 use crate::IOError;
 
 /// Unlike [`pyproject_toml::PyProjectToml`], in our case `build_system` is also optional
@@ -20,29 +23,38 @@ struct PyProjectToml {
     project: Option<Project>,
 }
 
-pub fn lint_pyproject_toml(source_file: SourceFile) -> Result<Vec<Message>> {
-    let err = match toml::from_str::<PyProjectToml>(source_file.source_text()) {
-        Ok(_) => return Ok(Vec::default()),
-        Err(err) => err,
+pub fn lint_pyproject_toml(source_file: SourceFile, settings: &Settings) -> Vec<Message> {
+    let Some(err) = toml::from_str::<PyProjectToml>(source_file.source_text()).err() else {
+        return Vec::default();
     };
 
+    let mut messages = Vec::new();
     let range = match err.span() {
         // This is bad but sometimes toml and/or serde just don't give us spans
         // TODO(konstin,micha): https://github.com/astral-sh/ruff/issues/4571
         None => TextRange::default(),
         Some(range) => {
             let Ok(end) = TextSize::try_from(range.end) else {
-                let diagnostic = Diagnostic::new(
-                    IOError {
-                        message: "pyproject.toml is larger than 4GB".to_string(),
-                    },
-                    TextRange::default(),
+                let message = format!(
+                    "{} is larger than 4GB, but ruff assumes all files to be smaller",
+                    source_file.name(),
                 );
-                return Ok(vec![Message::from_diagnostic(
-                    diagnostic,
-                    source_file,
-                    TextSize::default(),
-                )]);
+                if settings.rules.enabled(Rule::IOError) {
+                    let diagnostic = Diagnostic::new(IOError { message }, TextRange::default());
+                    messages.push(Message::from_diagnostic(
+                        diagnostic,
+                        source_file,
+                        TextSize::default(),
+                    ));
+                } else {
+                    warn!(
+                        "{}{}{} {message}",
+                        "Failed to lint ".bold(),
+                        source_file.name().bold(),
+                        ":".bold()
+                    );
+                }
+                return messages;
             };
             TextRange::new(
                 // start <= end, so if end < 4GB follows start < 4GB
@@ -52,11 +64,15 @@ pub fn lint_pyproject_toml(source_file: SourceFile) -> Result<Vec<Message>> {
         }
     };
 
-    let toml_err = err.message().to_string();
-    let diagnostic = Diagnostic::new(InvalidPyprojectToml { message: toml_err }, range);
-    Ok(vec![Message::from_diagnostic(
-        diagnostic,
-        source_file,
-        TextSize::default(),
-    )])
+    if settings.rules.enabled(Rule::InvalidPyprojectToml) {
+        let toml_err = err.message().to_string();
+        let diagnostic = Diagnostic::new(InvalidPyprojectToml { message: toml_err }, range);
+        messages.push(Message::from_diagnostic(
+            diagnostic,
+            source_file,
+            TextSize::default(),
+        ));
+    }
+
+    messages
 }

@@ -12,6 +12,8 @@ To use the fuzzers provided in this directory, start by invoking:
 
 This will install [`cargo-fuzz`](https://github.com/rust-fuzz/cargo-fuzz) and optionally download a
 [dataset](https://zenodo.org/record/3628784) which improves the efficacy of the testing.
+**This step is necessary for initialising the corpus directory, as all fuzzers share a common
+corpus.**
 The dataset may take several hours to download and clean, so if you're just looking to try out the
 fuzzers, skip the dataset download, though be warned that some features simply cannot be tested
 without it (very unlikely for the fuzzer to generate valid python code from "thin air").
@@ -22,6 +24,8 @@ Once you have initialised the fuzzers, you can then execute any fuzzer with:
 cargo fuzz run -s none name_of_fuzzer -- -timeout=1
 ```
 
+**Users using Apple M1 devices must use a nightly compiler and omit the `-s none` portion of this
+command, as this architecture does not support fuzzing without a sanitizer.**
 You can view the names of the available fuzzers with `cargo fuzz list`.
 For specific details about how each fuzzer works, please read this document in its entirety.
 
@@ -74,6 +78,8 @@ itself, each harness is briefly described below.
 
 This fuzz harness does not perform any "smart" testing of Ruff; it merely checks that the parsing
 and unparsing of a particular input (what would normally be a source code file) does not crash.
+It also attempts to verify that the locations of tokens and errors identified do not fall in the
+middle of a UTF-8 code point, which may cause downstream panics.
 While this is unlikely to find any issues on its own, it executes very quickly and covers a large
 and diverse code region that may speed up the generation of inputs and therefore make a more
 valuable corpus quickly.
@@ -95,11 +101,3 @@ This fuzz harness checks that fixes applied by Ruff do not introduce new errors 
 [`ruff::test::test_snippet`](../crates/ruff/src/test.rs) testing utility.
 It currently is only configured to use default settings, but may be extended in future versions to
 test non-default linter settings.
-
-## Experimental settings
-
-You can optionally use `--no-default-features --features libafl` to use the libafl fuzzer instead of
-libfuzzer.
-This fuzzer has experimental support, but can vastly improve fuzzer performance.
-If you are not already familiar with [LibAFL](https://github.com/AFLplusplus/LibAFL), this mode is
-not currently recommended.

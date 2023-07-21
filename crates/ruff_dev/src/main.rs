@@ -4,7 +4,11 @@
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use ruff::logging::{set_up_logging, LogLevel};
+use ruff_cli::check;
+use std::process::ExitCode;
 
+mod format_dev;
 mod generate_all;
 mod generate_cli_help;
 mod generate_docs;
@@ -27,6 +31,7 @@ struct Args {
 }
 
 #[derive(Subcommand)]
+#[allow(clippy::large_enum_variant)]
 enum Command {
     /// Run all code and documentation generation steps.
     GenerateAll(generate_all::Args),
@@ -48,22 +53,56 @@ enum Command {
     PrintTokens(print_tokens::Args),
     /// Run round-trip source code generation on a given Python file.
     RoundTrip(round_trip::Args),
+    /// Run a ruff command n times for profiling/benchmarking
+    Repeat {
+        #[clap(flatten)]
+        args: ruff_cli::args::CheckArgs,
+        #[clap(flatten)]
+        log_level_args: ruff_cli::args::LogLevelArgs,
+        /// Run this many times
+        #[clap(long)]
+        repeat: usize,
+    },
+    /// Several utils related to the formatter which can be run on one or more repositories. The
+    /// selected set of files in a repository is the same as for `ruff check`.
+    ///
+    /// * Check formatter stability: Format a repository twice and ensure that it looks that the
+    ///   first and second formatting look the same.
+    /// * Format: Format the files in a repository to be able to check them with `git diff`
+    /// * Statistics: The subcommand the Jaccard index between the (assumed to be black formatted)
+    ///   input and the ruff formatted output
+    FormatDev(format_dev::Args),
 }
 
-fn main() -> Result<()> {
+fn main() -> Result<ExitCode> {
     let args = Args::parse();
     #[allow(clippy::print_stdout)]
-    match &args.command {
-        Command::GenerateAll(args) => generate_all::main(args)?,
-        Command::GenerateJSONSchema(args) => generate_json_schema::main(args)?,
+    match args.command {
+        Command::GenerateAll(args) => generate_all::main(&args)?,
+        Command::GenerateJSONSchema(args) => generate_json_schema::main(&args)?,
         Command::GenerateRulesTable => println!("{}", generate_rules_table::generate()),
         Command::GenerateOptions => println!("{}", generate_options::generate()),
-        Command::GenerateCliHelp(args) => generate_cli_help::main(args)?,
-        Command::GenerateDocs(args) => generate_docs::main(args)?,
-        Command::PrintAST(args) => print_ast::main(args)?,
-        Command::PrintCST(args) => print_cst::main(args)?,
-        Command::PrintTokens(args) => print_tokens::main(args)?,
-        Command::RoundTrip(args) => round_trip::main(args)?,
+        Command::GenerateCliHelp(args) => generate_cli_help::main(&args)?,
+        Command::GenerateDocs(args) => generate_docs::main(&args)?,
+        Command::PrintAST(args) => print_ast::main(&args)?,
+        Command::PrintCST(args) => print_cst::main(&args)?,
+        Command::PrintTokens(args) => print_tokens::main(&args)?,
+        Command::RoundTrip(args) => round_trip::main(&args)?,
+        Command::Repeat {
+            args,
+            repeat,
+            log_level_args,
+        } => {
+            let log_level = LogLevel::from(&log_level_args);
+            set_up_logging(&log_level)?;
+            for _ in 0..repeat {
+                check(args.clone(), log_level)?;
+            }
+        }
+        Command::FormatDev(args) => {
+            let exit_code = format_dev::main(&args)?;
+            return Ok(exit_code);
+        }
     }
-    Ok(())
+    Ok(ExitCode::SUCCESS)
 }

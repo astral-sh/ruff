@@ -1,5 +1,4 @@
 //! Rules from [pandas-vet](https://pypi.org/project/pandas-vet/).
-pub(crate) mod fixes;
 pub(crate) mod helpers;
 pub(crate) mod rules;
 
@@ -13,17 +12,6 @@ mod tests {
     use crate::registry::{Linter, Rule};
     use crate::test::{test_path, test_snippet};
     use crate::{assert_messages, settings};
-
-    #[test_case(Rule::PandasUseOfInplaceArgument, Path::new("PD002.py"))]
-    fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
-        let diagnostics = test_path(
-            Path::new("pandas_vet").join(path).as_path(),
-            &settings::Settings::for_rule(rule_code),
-        )?;
-        assert_messages!(snapshot, diagnostics);
-        Ok(())
-    }
 
     #[test_case(
         r#"
@@ -252,27 +240,6 @@ mod tests {
     #[test_case(
         r#"
         import pandas as pd
-        employees = pd.read_csv(input_file)
-    "#,
-        "PD012_pass_read_csv"
-    )]
-    #[test_case(
-        r#"
-        import pandas as pd
-        employees = pd.read_table(input_file)
-    "#,
-        "PD012_fail_read_table"
-    )]
-    #[test_case(
-        r#"
-        import pandas as pd
-        employees = read_table
-    "#,
-        "PD012_node_Name_pass"
-    )]
-    #[test_case(
-        r#"
-        import pandas as pd
         x = pd.DataFrame()
         y = x.melt(
             id_vars="airline",
@@ -365,8 +332,26 @@ mod tests {
         "PD901_fail_df_var"
     )]
     fn contents(contents: &str, snapshot: &str) {
-        let diagnostics =
-            test_snippet(contents, &settings::Settings::for_rules(&Linter::PandasVet));
+        let diagnostics = test_snippet(
+            contents,
+            &settings::Settings::for_rules(Linter::PandasVet.rules()),
+        );
         assert_messages!(snapshot, diagnostics);
+    }
+
+    #[test_case(
+        Rule::PandasUseOfDotReadTable,
+        Path::new("pandas_use_of_dot_read_table.py")
+    )]
+    #[test_case(Rule::PandasUseOfInplaceArgument, Path::new("PD002.py"))]
+    #[test_case(Rule::PandasNuniqueConstantSeriesCheck, Path::new("PD101.py"))]
+    fn paths(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("pandas_vet").join(path).as_path(),
+            &settings::Settings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
     }
 }

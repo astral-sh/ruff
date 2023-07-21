@@ -13,10 +13,30 @@ use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::str::{is_implicit_concatenation, leading_quote, trailing_quote};
 
 use crate::checkers::ast::Checker;
+use crate::line_width::LineLength;
 use crate::registry::AsRule;
 use crate::rules::pyflakes::format::FormatSummary;
 use crate::rules::pyupgrade::helpers::curly_escape;
 
+/// ## What it does
+/// Checks for `str#format` calls that can be replaced with f-strings.
+///
+/// ## Why is this bad?
+/// f-strings are more readable and generally preferred over `str#format`
+/// calls.
+///
+/// ## Example
+/// ```python
+/// "{}".format(foo)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// f"{foo}"
+/// ```
+///
+/// ## References
+/// - [Python documentation: f-strings](https://docs.python.org/3/reference/lexical_analysis.html#f-strings)
 #[violation]
 pub struct FString;
 
@@ -178,7 +198,7 @@ fn try_convert_to_f_string(expr: &Expr, locator: &Locator) -> Option<String> {
         return None;
     };
 
-    let Some(mut summary) = FormatSummaryValues::try_from_expr( expr, locator) else {
+    let Some(mut summary) = FormatSummaryValues::try_from_expr(expr, locator) else {
         return None;
     };
 
@@ -294,25 +314,41 @@ fn try_convert_to_f_string(expr: &Expr, locator: &Locator) -> Option<String> {
 }
 
 /// UP032
-pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &Expr) {
+pub(crate) fn f_strings(
+    checker: &mut Checker,
+    summary: &FormatSummary,
+    expr: &Expr,
+    template: &Expr,
+    line_length: LineLength,
+) {
     if summary.has_nested_parts {
         return;
     }
 
-    // Avoid refactoring multi-line strings.
-    if checker.locator.contains_line_break(expr.range()) {
+    // Avoid refactoring strings that are implicitly concatenated.
+    if is_implicit_concatenation(checker.locator.slice(template.range())) {
         return;
     }
 
     // Currently, the only issue we know of is in LibCST:
     // https://github.com/Instagram/LibCST/issues/846
-    let Some(mut contents) = try_convert_to_f_string( expr, checker.locator) else {
+    let Some(mut contents) = try_convert_to_f_string(expr, checker.locator) else {
         return;
     };
 
-    // Avoid refactors that increase the resulting string length.
-    let existing = checker.locator.slice(expr.range());
-    if contents.len() > existing.len() {
+    // Avoid refactors that exceed the line length limit.
+    let col_offset = template.start() - checker.locator.line_start(template.start());
+    if contents.lines().enumerate().any(|(idx, line)| {
+        // If `template` is a multiline string, `col_offset` should only be applied to the first
+        // line:
+        // ```
+        // a = """{}        -> offset = col_offset (= 4)
+        // {}               -> offset = 0
+        // """.format(0, 1) -> offset = 0
+        // ```
+        let offset = if idx == 0 { col_offset.to_usize() } else { 0 };
+        offset + line.chars().count() > line_length.get()
+    }) {
         return;
     }
 
@@ -329,8 +365,7 @@ pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &E
 
     let mut diagnostic = Diagnostic::new(FString, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
             contents,
             expr.range(),
         )));

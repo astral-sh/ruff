@@ -11,7 +11,7 @@ E713.py:2:8: E713 [*] Test for membership should be `not in`
   |
   = help: Convert to `not in`
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | #: E713
 2   |-if not X in Y:
   2 |+if X not in Y:
@@ -30,7 +30,7 @@ E713.py:5:8: E713 [*] Test for membership should be `not in`
   |
   = help: Convert to `not in`
 
-ℹ Suggested fix
+ℹ Fix
 2 2 | if not X in Y:
 3 3 |     pass
 4 4 | #: E713
@@ -51,7 +51,7 @@ E713.py:8:8: E713 [*] Test for membership should be `not in`
    |
    = help: Convert to `not in`
 
-ℹ Suggested fix
+ℹ Fix
 5 5 | if not X.B in Y:
 6 6 |     pass
 7 7 | #: E713
@@ -72,7 +72,7 @@ E713.py:11:23: E713 [*] Test for membership should be `not in`
    |
    = help: Convert to `not in`
 
-ℹ Suggested fix
+ℹ Fix
 8  8  | if not X in Y and Z == "zero":
 9  9  |     pass
 10 10 | #: E713
@@ -92,7 +92,7 @@ E713.py:14:9: E713 [*] Test for membership should be `not in`
    |
    = help: Convert to `not in`
 
-ℹ Suggested fix
+ℹ Fix
 11 11 | if X == "zero" or not Y in Z:
 12 12 |     pass
 13 13 | #: E713

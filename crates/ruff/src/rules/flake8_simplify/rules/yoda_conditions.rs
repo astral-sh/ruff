@@ -1,6 +1,6 @@
 use anyhow::Result;
 use libcst_native::CompOp;
-use rustpython_parser::ast::{self, Cmpop, Expr, Ranged, Unaryop};
+use rustpython_parser::ast::{self, CmpOp, Expr, Ranged, UnaryOp};
 
 use crate::autofix::codemods::CodegenStylist;
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -71,12 +71,12 @@ impl Violation for YodaConditions {
 /// Return `true` if an [`Expr`] is a constant or a constant-like name.
 fn is_constant_like(expr: &Expr) -> bool {
     match expr {
-        Expr::Attribute(ast::ExprAttribute { attr, .. }) => str::is_upper(attr),
+        Expr::Attribute(ast::ExprAttribute { attr, .. }) => str::is_cased_uppercase(attr),
         Expr::Constant(_) => true,
         Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().all(is_constant_like),
-        Expr::Name(ast::ExprName { id, .. }) => str::is_upper(id),
+        Expr::Name(ast::ExprName { id, .. }) => str::is_cased_uppercase(id),
         Expr::UnaryOp(ast::ExprUnaryOp {
-            op: Unaryop::UAdd | Unaryop::USub | Unaryop::Invert,
+            op: UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert,
             operand,
             range: _,
         }) => operand.is_constant_expr(),
@@ -156,7 +156,7 @@ pub(crate) fn yoda_conditions(
     checker: &mut Checker,
     expr: &Expr,
     left: &Expr,
-    ops: &[Cmpop],
+    ops: &[CmpOp],
     comparators: &[Expr],
 ) {
     let ([op], [right]) = (ops, comparators) else {
@@ -165,7 +165,7 @@ pub(crate) fn yoda_conditions(
 
     if !matches!(
         op,
-        Cmpop::Eq | Cmpop::NotEq | Cmpop::Lt | Cmpop::LtE | Cmpop::Gt | Cmpop::GtE,
+        CmpOp::Eq | CmpOp::NotEq | CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE,
     ) {
         return;
     }
@@ -182,8 +182,7 @@ pub(crate) fn yoda_conditions(
             expr.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                 suggestion,
                 expr.range(),
             )));

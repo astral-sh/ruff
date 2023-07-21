@@ -24,6 +24,8 @@ ruff_python_ast = { path = "../crates/ruff_python_ast" }
 ruff_python_formatter = { path = "../crates/ruff_python_formatter" }
 similar = { version = "2.2.1" }
 
+rustpython-parser = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "db04fd415774032e1e2ceb03bcbf5305e0d22c8c" , default-features = false, features = ["full-lexer", "num-bigint"] }
+
 # Prevent this from interfering with workspaces
 [workspace]
 members = ["."]

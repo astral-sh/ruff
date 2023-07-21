@@ -4,7 +4,7 @@ use rustpython_parser::ast::{self, Expr, Keyword, Ranged};
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::has_comments;
-use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::SemanticModel;
 
 use crate::{checkers::ast::Checker, registry::AsRule};
 
@@ -59,16 +59,20 @@ impl Violation for NestedMinMax {
 
 impl MinMax {
     /// Converts a function call [`Expr`] into a [`MinMax`] if it is a call to `min` or `max`.
-    fn try_from_call(func: &Expr, keywords: &[Keyword], model: &SemanticModel) -> Option<MinMax> {
+    fn try_from_call(
+        func: &Expr,
+        keywords: &[Keyword],
+        semantic: &SemanticModel,
+    ) -> Option<MinMax> {
         if !keywords.is_empty() {
             return None;
         }
         let Expr::Name(ast::ExprName { id, .. }) = func else {
             return None;
         };
-        if id.as_str() == "min" && model.is_builtin("min") {
+        if id.as_str() == "min" && semantic.is_builtin("min") {
             Some(MinMax::Min)
-        } else if id.as_str() == "max" && model.is_builtin("max") {
+        } else if id.as_str() == "max" && semantic.is_builtin("max") {
             Some(MinMax::Max)
         } else {
             None
@@ -87,8 +91,8 @@ impl std::fmt::Display for MinMax {
 
 /// Collect a new set of arguments to by either accepting existing args as-is or
 /// collecting child arguments, if it's a call to the same function.
-fn collect_nested_args(model: &SemanticModel, min_max: MinMax, args: &[Expr]) -> Vec<Expr> {
-    fn inner(model: &SemanticModel, min_max: MinMax, args: &[Expr], new_args: &mut Vec<Expr>) {
+fn collect_nested_args(min_max: MinMax, args: &[Expr], semantic: &SemanticModel) -> Vec<Expr> {
+    fn inner(min_max: MinMax, args: &[Expr], semantic: &SemanticModel, new_args: &mut Vec<Expr>) {
         for arg in args {
             if let Expr::Call(ast::ExprCall {
                 func,
@@ -106,8 +110,8 @@ fn collect_nested_args(model: &SemanticModel, min_max: MinMax, args: &[Expr]) ->
                     new_args.push(new_arg);
                     continue;
                 }
-                if MinMax::try_from_call(func, keywords, model) == Some(min_max) {
-                    inner(model, min_max, args, new_args);
+                if MinMax::try_from_call(func, keywords, semantic) == Some(min_max) {
+                    inner(min_max, args, semantic, new_args);
                     continue;
                 }
             }
@@ -116,7 +120,7 @@ fn collect_nested_args(model: &SemanticModel, min_max: MinMax, args: &[Expr]) ->
     }
 
     let mut new_args = Vec::with_capacity(args.len());
-    inner(model, min_max, args, &mut new_args);
+    inner(min_max, args, semantic, &mut new_args);
     new_args
 }
 
@@ -128,7 +132,7 @@ pub(crate) fn nested_min_max(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    let Some(min_max) = MinMax::try_from_call(func, keywords, checker.semantic_model()) else {
+    let Some(min_max) = MinMax::try_from_call(func, keywords, checker.semantic()) else {
         return;
     };
 
@@ -139,23 +143,21 @@ pub(crate) fn nested_min_max(
     }
 
     if args.iter().any(|arg| {
-        let Expr::Call(ast::ExprCall { func, keywords, ..} )= arg else {
+        let Expr::Call(ast::ExprCall { func, keywords, .. }) = arg else {
             return false;
         };
-        MinMax::try_from_call(func.as_ref(), keywords.as_ref(), checker.semantic_model())
-            == Some(min_max)
+        MinMax::try_from_call(func.as_ref(), keywords.as_ref(), checker.semantic()) == Some(min_max)
     }) {
         let mut diagnostic = Diagnostic::new(NestedMinMax { func: min_max }, expr.range());
         if checker.patch(diagnostic.kind.rule()) {
-            if !has_comments(expr, checker.locator) {
+            if !has_comments(expr, checker.locator, checker.indexer) {
                 let flattened_expr = Expr::Call(ast::ExprCall {
                     func: Box::new(func.clone()),
-                    args: collect_nested_args(checker.semantic_model(), min_max, args),
+                    args: collect_nested_args(min_max, args, checker.semantic()),
                     keywords: keywords.to_owned(),
                     range: TextRange::default(),
                 });
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                     checker.generator().expr(&flattened_expr),
                     expr.range(),
                 )));

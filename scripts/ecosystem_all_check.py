@@ -3,13 +3,14 @@ panics, autofix errors and similar problems.
 
 It's a less elaborate, more hacky version of check_ecosystem.py
 """
+from __future__ import annotations
 
 import json
 import subprocess
 import sys
 from pathlib import Path
 from subprocess import CalledProcessError
-from typing import NamedTuple, Optional
+from typing import NamedTuple
 
 from tqdm import tqdm
 
@@ -19,7 +20,7 @@ class Repository(NamedTuple):
 
     org: str
     repo: str
-    ref: Optional[str]
+    ref: str | None
 
 
 def main() -> None:
@@ -49,7 +50,7 @@ def main() -> None:
     successes = 0
     errors = 0
     for repository in tqdm(repositories):
-        project_dir = checkouts.joinpath(repository.org).joinpath(repository.repo)
+        project_dir = checkouts.joinpath(f"{repository.org}:{repository.repo}")
         if not project_dir.is_dir():
             tqdm.write(f"Missing {project_dir}")
             errors += 1

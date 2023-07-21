@@ -6,6 +6,8 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+use super::helpers;
+
 #[violation]
 pub struct CallDatetimeUtcnow;
 
@@ -28,15 +30,21 @@ impl Violation for CallDatetimeUtcnow {
 /// UTC. As such, the recommended way to create an object representing the
 /// current time in UTC is by calling `datetime.now(timezone.utc)`.
 pub(crate) fn call_datetime_utcnow(checker: &mut Checker, func: &Expr, location: TextRange) {
-    if checker
-        .semantic_model()
+    if !checker
+        .semantic()
         .resolve_call_path(func)
         .map_or(false, |call_path| {
-            call_path.as_slice() == ["datetime", "datetime", "utcnow"]
+            matches!(call_path.as_slice(), ["datetime", "datetime", "utcnow"])
         })
     {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(CallDatetimeUtcnow, location));
+        return;
     }
+
+    if helpers::parent_expr_is_astimezone(checker) {
+        return;
+    }
+
+    checker
+        .diagnostics
+        .push(Diagnostic::new(CallDatetimeUtcnow, location));
 }

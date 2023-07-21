@@ -2,7 +2,9 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_newlines::Line;
+use ruff_python_ast::helpers;
+use ruff_python_ast::source_code::{Indexer, Locator};
+use ruff_python_trivia::Line;
 
 use crate::registry::Rule;
 use crate::settings::Settings;
@@ -11,7 +13,7 @@ use crate::settings::Settings;
 /// Checks for superfluous trailing whitespace.
 ///
 /// ## Why is this bad?
-/// Per PEP 8, "avoid trailing whitespace anywhere. Because it’s usually
+/// According to [PEP 8], "avoid trailing whitespace anywhere. Because it’s usually
 /// invisible, it can be confusing"
 ///
 /// ## Example
@@ -24,8 +26,7 @@ use crate::settings::Settings;
 /// spam(1)\n#
 /// ```
 ///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#other-recommendations)
+/// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 #[violation]
 pub struct TrailingWhitespace;
 
@@ -44,13 +45,12 @@ impl AlwaysAutofixableViolation for TrailingWhitespace {
 /// Checks for superfluous whitespace in blank lines.
 ///
 /// ## Why is this bad?
-/// Per PEP 8, "avoid trailing whitespace anywhere. Because it’s usually
+/// According to [PEP 8], "avoid trailing whitespace anywhere. Because it’s usually
 /// invisible, it can be confusing"
 ///
 /// ## Example
 /// ```python
 /// class Foo(object):\n    \n    bang = 12
-///
 /// ```
 ///
 /// Use instead:
@@ -58,8 +58,7 @@ impl AlwaysAutofixableViolation for TrailingWhitespace {
 /// class Foo(object):\n\n    bang = 12
 /// ```
 ///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#other-recommendations)
+/// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 #[violation]
 pub struct BlankLineWithWhitespace;
 
@@ -75,7 +74,12 @@ impl AlwaysAutofixableViolation for BlankLineWithWhitespace {
 }
 
 /// W291, W293
-pub(crate) fn trailing_whitespace(line: &Line, settings: &Settings) -> Option<Diagnostic> {
+pub(crate) fn trailing_whitespace(
+    line: &Line,
+    locator: &Locator,
+    indexer: &Indexer,
+    settings: &Settings,
+) -> Option<Diagnostic> {
     let whitespace_len: TextSize = line
         .chars()
         .rev()
@@ -89,16 +93,20 @@ pub(crate) fn trailing_whitespace(line: &Line, settings: &Settings) -> Option<Di
             if settings.rules.enabled(Rule::BlankLineWithWhitespace) {
                 let mut diagnostic = Diagnostic::new(BlankLineWithWhitespace, range);
                 if settings.rules.should_fix(Rule::BlankLineWithWhitespace) {
-                    #[allow(deprecated)]
-                    diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(range)));
+                    // Remove any preceding continuations, to avoid introducing a potential
+                    // syntax error.
+                    diagnostic.set_fix(Fix::automatic(Edit::range_deletion(TextRange::new(
+                        helpers::preceded_by_continuations(line.start(), locator, indexer)
+                            .unwrap_or(range.start()),
+                        range.end(),
+                    ))));
                 }
                 return Some(diagnostic);
             }
         } else if settings.rules.enabled(Rule::TrailingWhitespace) {
             let mut diagnostic = Diagnostic::new(TrailingWhitespace, range);
             if settings.rules.should_fix(Rule::TrailingWhitespace) {
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(range)));
+                diagnostic.set_fix(Fix::automatic(Edit::range_deletion(range)));
             }
             return Some(diagnostic);
         }

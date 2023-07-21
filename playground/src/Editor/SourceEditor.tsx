@@ -2,9 +2,9 @@
  * Editor for the Python source code.
  */
 
-import Editor, { useMonaco } from "@monaco-editor/react";
+import Editor, { BeforeMount, Monaco } from "@monaco-editor/react";
 import { MarkerSeverity, MarkerTag } from "monaco-editor";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Diagnostic } from "../pkg";
 import { Theme } from "./theme";
 
@@ -21,7 +21,8 @@ export default function SourceEditor({
   theme: Theme;
   onChange: (pythonSource: string) => void;
 }) {
-  const monaco = useMonaco();
+  const monacoRef = useRef<Monaco | null>(null);
+  const monaco = monacoRef.current;
 
   useEffect(() => {
     const editor = monaco?.editor;
@@ -54,7 +55,7 @@ export default function SourceEditor({
         provideCodeActions: function (model, position) {
           const actions = diagnostics
             .filter((check) => position.startLineNumber === check.location.row)
-            .filter((check) => check.fix)
+            .filter(({ fix }) => fix)
             .map((check) => ({
               title: check.fix
                 ? check.fix.message
@@ -71,11 +72,11 @@ export default function SourceEditor({
                       edit: {
                         range: {
                           startLineNumber: edit.location.row,
-                          startColumn: edit.location.column + 1,
+                          startColumn: edit.location.column,
                           endLineNumber: edit.end_location.row,
-                          endColumn: edit.end_location.column + 1,
+                          endColumn: edit.end_location.column,
                         },
-                        text: edit.content,
+                        text: edit.content || "",
                       },
                     })),
                   }
@@ -98,14 +99,21 @@ export default function SourceEditor({
     [onChange],
   );
 
+  const handleMount: BeforeMount = useCallback(
+    (instance) => (monacoRef.current = instance),
+    [],
+  );
+
   return (
     <Editor
+      beforeMount={handleMount}
       options={{
         readOnly: false,
         minimap: { enabled: false },
         fontSize: 14,
         roundedSelection: false,
         scrollBeyondLastLine: false,
+        contextmenu: false,
       }}
       language={"python"}
       wrapperProps={visible ? {} : { style: { display: "none" } }}

@@ -44,10 +44,10 @@ impl Violation for EllipsisInNonEmptyClassBody {
 }
 
 /// PYI013
-pub(crate) fn ellipsis_in_non_empty_class_body<'a>(
-    checker: &mut Checker<'a>,
-    parent: &'a Stmt,
-    body: &'a [Stmt],
+pub(crate) fn ellipsis_in_non_empty_class_body(
+    checker: &mut Checker,
+    parent: &Stmt,
+    body: &[Stmt],
 ) {
     // If the class body contains a single statement, then it's fine for it to be an ellipsis.
     if body.len() == 1 {
@@ -69,13 +69,8 @@ pub(crate) fn ellipsis_in_non_empty_class_body<'a>(
 
         let mut diagnostic = Diagnostic::new(EllipsisInNonEmptyClassBody, stmt.range());
         if checker.patch(diagnostic.kind.rule()) {
-            let edit = autofix::edits::delete_stmt(
-                stmt,
-                Some(parent),
-                checker.locator,
-                checker.indexer,
-                checker.stylist,
-            );
+            let edit =
+                autofix::edits::delete_stmt(stmt, Some(parent), checker.locator, checker.indexer);
             diagnostic.set_fix(Fix::automatic(edit).isolate(checker.isolation(Some(parent))));
         }
         checker.diagnostics.push(diagnostic);

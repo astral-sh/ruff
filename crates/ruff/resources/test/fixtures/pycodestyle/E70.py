@@ -60,3 +60,9 @@ match *0, 1, *2:
 #:
 class Foo:
     match: Optional[Match] = None
+#: E702:2:4
+while 1:
+  1;...
+#: E703:2:1
+0\
+;

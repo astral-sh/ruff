@@ -262,6 +262,7 @@ pub fn python_files_in_path(
         builder.add(path);
     }
     builder.standard_filters(pyproject_config.settings.lib.respect_gitignore);
+    builder.require_git(false);
     builder.hidden(false);
     let walker = builder.build_parallel();
 
@@ -330,9 +331,12 @@ pub fn python_files_in_path(
             }
 
             if result.as_ref().map_or(true, |entry| {
-                if entry.depth() == 0 {
+                // Ignore directories
+                if entry.file_type().map_or(true, |ft| ft.is_dir()) {
+                    false
+                } else if entry.depth() == 0 {
                     // Accept all files that are passed-in directly.
-                    entry.file_type().map_or(false, |ft| ft.is_file())
+                    true
                 } else {
                     // Otherwise, check if the file is included.
                     let path = entry.path();

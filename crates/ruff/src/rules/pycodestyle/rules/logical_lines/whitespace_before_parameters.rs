@@ -65,8 +65,7 @@ pub(crate) fn whitespace_before_parameters(
             let mut diagnostic = Diagnostic::new(kind, TextRange::new(start, end));
 
             if autofix {
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::deletion(start, end)));
+                diagnostic.set_fix(Fix::automatic(Edit::deletion(start, end)));
             }
             context.push_diagnostic(diagnostic);
         }

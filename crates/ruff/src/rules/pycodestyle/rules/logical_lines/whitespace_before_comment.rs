@@ -4,6 +4,7 @@ use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::token_kind::TokenKind;
+use ruff_python_trivia::PythonWhitespace;
 
 use crate::checkers::logical_lines::LogicalLinesContext;
 use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
@@ -58,8 +59,7 @@ impl Violation for TooFewSpacesBeforeInlineComment {
 /// x = x + 1    # Increment x
 /// ```
 ///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#comments)
+/// [PEP 8]: https://peps.python.org/pep-0008/#comments
 #[violation]
 pub struct NoSpaceAfterInlineComment;
 
@@ -91,8 +91,7 @@ impl Violation for NoSpaceAfterInlineComment {
 /// # \xa0- Block comment list
 /// ```
 ///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#comments)
+/// [PEP 8]: https://peps.python.org/pep-0008/#comments
 #[violation]
 pub struct NoSpaceAfterBlockComment;
 
@@ -115,7 +114,6 @@ impl Violation for NoSpaceAfterBlockComment {
 /// ## Example
 /// ```python
 /// ### Block comment
-///
 /// ```
 ///
 /// Use instead:
@@ -125,8 +123,7 @@ impl Violation for NoSpaceAfterBlockComment {
 /// # \xa0- Block comment list
 /// ```
 ///
-/// ## References
-/// - [PEP 8](https://peps.python.org/pep-0008/#comments)
+/// [PEP 8]: https://peps.python.org/pep-0008/#comments
 #[violation]
 pub struct MultipleLeadingHashesForBlockComment;
 
@@ -156,7 +153,7 @@ pub(crate) fn whitespace_before_comment(
             ));
             let token_text = locator.slice(range);
 
-            let is_inline_comment = !line_text.trim().is_empty();
+            let is_inline_comment = !line_text.trim_whitespace().is_empty();
             if is_inline_comment {
                 if range.start() - prev_end < "  ".text_len() {
                     context.push(

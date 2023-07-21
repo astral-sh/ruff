@@ -93,7 +93,7 @@ pub(crate) fn logging_call(
     keywords: &[Keyword],
 ) {
     // If there are any starred arguments, abort.
-    if args.iter().any(|arg| matches!(arg, Expr::Starred(_))) {
+    if args.iter().any(Expr::is_starred_expr) {
         return;
     }
 
@@ -102,7 +102,7 @@ pub(crate) fn logging_call(
         return;
     }
 
-    if !logging::is_logger_candidate(func, checker.semantic_model()) {
+    if !logging::is_logger_candidate(func, checker.semantic()) {
         return;
     }
 
@@ -122,7 +122,7 @@ pub(crate) fn logging_call(
                         return;
                     }
 
-                    let message_args = call_args.args.len() - 1;
+                    let message_args = call_args.num_args() - 1;
 
                     if checker.enabled(Rule::LoggingTooManyArgs) {
                         if summary.num_positional < message_args {
@@ -134,7 +134,7 @@ pub(crate) fn logging_call(
 
                     if checker.enabled(Rule::LoggingTooFewArgs) {
                         if message_args > 0
-                            && call_args.kwargs.is_empty()
+                            && call_args.num_kwargs() == 0
                             && summary.num_positional > message_args
                         {
                             checker

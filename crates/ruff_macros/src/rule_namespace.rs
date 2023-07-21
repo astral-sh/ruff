@@ -6,10 +6,16 @@ use syn::spanned::Spanned;
 use syn::{Attribute, Data, DataEnum, DeriveInput, Error, ExprLit, Lit, Meta, MetaNameValue};
 
 pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
-    let DeriveInput { ident, data: Data::Enum(DataEnum {
-        variants, ..
-    }), .. } = input else {
-        return Err(Error::new(input.ident.span(), "only named fields are supported"));
+    let DeriveInput {
+        ident,
+        data: Data::Enum(DataEnum { variants, .. }),
+        ..
+    } = input
+    else {
+        return Err(Error::new(
+            input.ident.span(),
+            "only named fields are supported",
+        ));
     };
 
     let mut parsed = Vec::new();
@@ -53,8 +59,12 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenS
             ));
         }
 
-        let Some(doc_attr) = variant.attrs.iter().find(|attr| attr.path().is_ident("doc")) else {
-            return Err(Error::new(variant.span(), r#"expected a doc comment"#))
+        let Some(doc_attr) = variant
+            .attrs
+            .iter()
+            .find(|attr| attr.path().is_ident("doc"))
+        else {
+            return Err(Error::new(variant.span(), r#"expected a doc comment"#));
         };
 
         let variant_ident = variant.ident;
@@ -125,8 +135,19 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenS
 /// Parses an attribute in the form of `#[doc = " [name](https://example.com/)"]`
 /// into a tuple of link label and URL.
 fn parse_doc_attr(doc_attr: &Attribute) -> syn::Result<(String, String)> {
-    let Meta::NameValue(MetaNameValue{value: syn::Expr::Lit(ExprLit { lit: Lit::Str(doc_lit), ..}), ..}) = &doc_attr.meta else {
-        return Err(Error::new(doc_attr.span(), r#"expected doc attribute to be in the form of #[doc = "..."]"#))
+    let Meta::NameValue(MetaNameValue {
+        value:
+            syn::Expr::Lit(ExprLit {
+                lit: Lit::Str(doc_lit),
+                ..
+            }),
+        ..
+    }) = &doc_attr.meta
+    else {
+        return Err(Error::new(
+            doc_attr.span(),
+            r#"expected doc attribute to be in the form of #[doc = "..."]"#,
+        ));
     };
     parse_markdown_link(doc_lit.value().trim())
         .map(|(name, url)| (name.to_string(), url.to_string()))

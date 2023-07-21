@@ -1,7 +1,8 @@
-use rustpython_parser::ast::{Expr, Ranged, Stmt};
+use rustpython_parser::ast::{Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_stdlib::str;
 
 use crate::checkers::ast::Checker;
 use crate::rules::pep8_naming::helpers;
@@ -17,9 +18,6 @@ use crate::rules::pep8_naming::helpers;
 /// > is allowed only in contexts where that's already the prevailing style (e.g. threading.py),
 /// > to retain backwards compatibility.
 ///
-/// ## Options
-/// - `pep8-naming.ignore-names`
-///
 /// ## Example
 /// ```python
 /// def my_function(a):
@@ -33,6 +31,9 @@ use crate::rules::pep8_naming::helpers;
 ///     b = a + 3
 ///     return b
 /// ```
+///
+/// ## Options
+/// - `pep8-naming.ignore-names`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-variable-names
 #[violation]
@@ -49,32 +50,33 @@ impl Violation for NonLowercaseVariableInFunction {
 }
 
 /// N806
-pub(crate) fn non_lowercase_variable_in_function(
-    checker: &mut Checker,
-    expr: &Expr,
-    stmt: &Stmt,
-    name: &str,
-) {
+pub(crate) fn non_lowercase_variable_in_function(checker: &mut Checker, expr: &Expr, name: &str) {
     if checker
         .settings
         .pep8_naming
         .ignore_names
         .iter()
-        .any(|ignore_name| ignore_name == name)
+        .any(|ignore_name| ignore_name.matches(name))
     {
         return;
     }
 
-    if name.to_lowercase() != name
-        && !helpers::is_named_tuple_assignment(checker.semantic_model(), stmt)
-        && !helpers::is_typed_dict_assignment(checker.semantic_model(), stmt)
-        && !helpers::is_type_var_assignment(checker.semantic_model(), stmt)
-    {
-        checker.diagnostics.push(Diagnostic::new(
-            NonLowercaseVariableInFunction {
-                name: name.to_string(),
-            },
-            expr.range(),
-        ));
+    if str::is_lowercase(name) {
+        return;
     }
+
+    let parent = checker.semantic().stmt();
+    if helpers::is_named_tuple_assignment(parent, checker.semantic())
+        || helpers::is_typed_dict_assignment(parent, checker.semantic())
+        || helpers::is_type_var_assignment(parent, checker.semantic())
+    {
+        return;
+    }
+
+    checker.diagnostics.push(Diagnostic::new(
+        NonLowercaseVariableInFunction {
+            name: name.to_string(),
+        },
+        expr.range(),
+    ));
 }

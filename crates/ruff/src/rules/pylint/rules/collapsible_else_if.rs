@@ -1,8 +1,8 @@
-use rustpython_parser::ast::{Ranged, Stmt};
+use ruff_text_size::TextRange;
+use rustpython_parser::ast::{ElifElseClause, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::Locator;
 
 /// ## What it does
 /// Checks for `else` blocks that consist of a single `if` statement.
@@ -35,7 +35,7 @@ use ruff_python_ast::source_code::Locator;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/tutorial/controlflow.html#if-statements)
+/// - [Python documentation: `if` Statements](https://docs.python.org/3/tutorial/controlflow.html#if-statements)
 #[violation]
 pub struct CollapsibleElseIf;
 
@@ -47,15 +47,20 @@ impl Violation for CollapsibleElseIf {
 }
 
 /// PLR5501
-pub(crate) fn collapsible_else_if(orelse: &[Stmt], locator: &Locator) -> Option<Diagnostic> {
-    if orelse.len() == 1 {
-        let first = &orelse[0];
-        if matches!(first, Stmt::If(_)) {
-            // Determine whether this is an `elif`, or an `if` in an `else` block.
-            if locator.slice(first.range()).starts_with("if") {
-                return Some(Diagnostic::new(CollapsibleElseIf, first.range()));
-            }
-        }
+pub(crate) fn collapsible_else_if(elif_else_clauses: &[ElifElseClause]) -> Option<Diagnostic> {
+    let Some(ElifElseClause {
+        body,
+        test: None,
+        range,
+    }) = elif_else_clauses.last()
+    else {
+        return None;
+    };
+    if let [first @ Stmt::If(_)] = body.as_slice() {
+        return Some(Diagnostic::new(
+            CollapsibleElseIf,
+            TextRange::new(range.start(), first.start()),
+        ));
     }
     None
 }

@@ -47,6 +47,14 @@ impl<'a> Module<'a> {
             None
         }
     }
+
+    /// Return the name of the module.
+    pub fn name(&self) -> Option<&'a str> {
+        match self.source {
+            ModuleSource::Path(path) => path.last().map(Deref::deref),
+            ModuleSource::File(file) => file.file_stem().and_then(std::ffi::OsStr::to_str),
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -72,12 +80,13 @@ pub struct Member<'a> {
 }
 
 impl<'a> Member<'a> {
-    fn name(&self) -> &'a str {
+    /// Return the name of the member.
+    pub fn name(&self) -> Option<&'a str> {
         match &self.stmt {
-            Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) => name,
-            Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { name, .. }) => name,
-            Stmt::ClassDef(ast::StmtClassDef { name, .. }) => name,
-            _ => unreachable!("Unexpected member kind: {:?}", self.kind),
+            Stmt::FunctionDef(ast::StmtFunctionDef { name, .. })
+            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { name, .. })
+            | Stmt::ClassDef(ast::StmtClassDef { name, .. }) => Some(name),
+            _ => None,
         }
     }
 }
@@ -100,6 +109,13 @@ impl Definition<'_> {
             })
         )
     }
+
+    pub fn name(&self) -> Option<&str> {
+        match self {
+            Definition::Module(module) => module.name(),
+            Definition::Member(member) => member.name(),
+        }
+    }
 }
 
 /// The definitions within a Python program indexed by [`DefinitionId`].
@@ -115,7 +131,7 @@ impl<'a> Definitions<'a> {
     ///
     /// Members are assumed to be pushed in traversal order, such that parents are pushed before
     /// their children.
-    pub fn push_member(&mut self, member: Member<'a>) -> DefinitionId {
+    pub(crate) fn push_member(&mut self, member: Member<'a>) -> DefinitionId {
         self.0.push(Definition::Member(member))
     }
 
@@ -134,8 +150,9 @@ impl<'a> Definitions<'a> {
                         MemberKind::Class => {
                             let parent = &definitions[member.parent];
                             if parent.visibility.is_private()
-                                || exports
-                                    .map_or(false, |exports| !exports.contains(&member.name()))
+                                || exports.map_or(false, |exports| {
+                                    member.name().map_or(false, |name| !exports.contains(&name))
+                                })
                             {
                                 Visibility::Private
                             } else {
@@ -163,8 +180,9 @@ impl<'a> Definitions<'a> {
                         MemberKind::Function => {
                             let parent = &definitions[member.parent];
                             if parent.visibility.is_private()
-                                || exports
-                                    .map_or(false, |exports| !exports.contains(&member.name()))
+                                || exports.map_or(false, |exports| {
+                                    member.name().map_or(false, |name| !exports.contains(&name))
+                                })
                             {
                                 Visibility::Private
                             } else {
@@ -202,8 +220,8 @@ impl<'a> Deref for Definitions<'a> {
 }
 
 impl<'a> IntoIterator for Definitions<'a> {
-    type Item = Definition<'a>;
     type IntoIter = std::vec::IntoIter<Self::Item>;
+    type Item = Definition<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()

@@ -1,0 +1,29 @@
+##
+
+@decorator()()
+def f():
+    ...
+
+##
+
+@(decorator)
+def f():
+    ...
+
+##
+
+@sequence["decorator"]
+def f():
+    ...
+
+##
+
+@decorator[List[str]]
+def f():
+    ...
+
+##
+
+@var := decorator
+def f():
+    ...
