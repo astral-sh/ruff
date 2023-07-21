@@ -827,12 +827,15 @@ impl Violation for OsPathIsabs {
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
 #[violation]
-pub struct OsPathJoin;
+pub struct OsPathJoin {
+    pub module: String,
+}
 
 impl Violation for OsPathJoin {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`os.path.join()` should be replaced by `Path` with `/` operator")
+        let OsPathJoin { module } = self;
+        format!("`os.{module}.join()` should be replaced by `Path` with `/` operator")
     }
 }
 
