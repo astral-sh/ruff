@@ -526,7 +526,30 @@ impl Ranged for crate::TypeIgnore {
         }
     }
 }
-
+impl Ranged for crate::generic::TypeParamTypeVar {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+impl Ranged for crate::generic::TypeParamTypeVarTuple {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+impl Ranged for crate::generic::TypeParamParamSpec {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+impl Ranged for crate::TypeParam {
+    fn range(&self) -> TextRange {
+        match self {
+            Self::TypeVar(node) => node.range(),
+            Self::TypeVarTuple(node) => node.range(),
+            Self::ParamSpec(node) => node.range(),
+        }
+    }
+}
 impl Ranged for crate::generic::Decorator {
     fn range(&self) -> TextRange {
         self.range
