@@ -156,10 +156,13 @@ At a high level, the steps involved in adding a new lint rule are as follows:
     (e.g., `pub(crate) fn assert_false`) based on whatever inputs are required for the rule (e.g.,
     an `ast::StmtAssert` node).
 
-1. Define the logic for triggering the violation in `crates/ruff/src/checkers/ast/mod.rs` (for
-    AST-based checks), `crates/ruff/src/checkers/tokens.rs` (for token-based checks),
-    `crates/ruff/src/checkers/lines.rs` (for text-based checks), or
-    `crates/ruff/src/checkers/filesystem.rs` (for filesystem-based checks).
+1. Define the logic for invoking the diagnostic in `crates/ruff/src/checkers/ast/analyze` (for
+    AST-based rules), `crates/ruff/src/checkers/tokens.rs` (for token-based rules),
+    `crates/ruff/src/checkers/physical_lines.rs` (for text-based rules),
+    `crates/ruff/src/checkers/filesystem.rs` (for filesystem-based rules), etc. For AST-based rules,
+    you'll likely want to modify `analyze/statement.rs` (if your rule is based on analyzing
+    statements, like imports) or `analyze/expression.rs` (if your rule is based on analyzing
+    expressions, like function calls).
 
 1. Map the violation struct to a rule code in `crates/ruff/src/codes.rs` (e.g., `B011`).
 
