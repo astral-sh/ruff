@@ -15,11 +15,15 @@ use ruff_macros::{derive_message_formats, violation};
 ///
 /// ## Examples
 /// ```python
+/// import os
+///
 /// file_path = os.path.abspath("../path/to/file")
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from pathlib import Path
+///
 /// file_path = Path("../path/to/file").resolve()
 /// ```
 ///
@@ -54,11 +58,15 @@ impl Violation for OsPathAbspath {
 ///
 /// ## Examples
 /// ```python
+/// import os
+///
 /// os.chmod("file.py", 0o444)
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from pathlib import Path
+///
 /// Path("file.py").chmod(0o444)
 /// ```
 ///
@@ -93,11 +101,15 @@ impl Violation for OsChmod {
 ///
 /// ## Examples
 /// ```python
+/// import os
+///
 /// os.makedirs("./nested/directory/")
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from pathlib import Path
+///
 /// Path("./nested/directory/").mkdir(parents=True)
 /// ```
 ///
@@ -132,11 +144,15 @@ impl Violation for OsMakedirs {
 ///
 /// ## Examples
 /// ```python
+/// import os
+///
 /// os.mkdir("./directory/")
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from pathlib import Path
+///
 /// Path("./directory/").mkdir()
 /// ```
 ///
@@ -171,11 +187,15 @@ impl Violation for OsMkdir {
 ///
 /// ## Examples
 /// ```python
+/// import os
+///
 /// os.rename("old.py", "new.py")
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from pathlib import Path
+///
 /// Path("old.py").rename("new.py")
 /// ```
 ///
@@ -210,11 +230,15 @@ impl Violation for OsRename {
 ///
 /// ## Examples
 /// ```python
+/// import os
+///
 /// os.replace("old.py", "new.py")
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from pathlib import Path
+///
 /// Path("old.py").replace("new.py")
 /// ```
 ///
@@ -249,11 +273,15 @@ impl Violation for OsReplace {
 ///
 /// ## Examples
 /// ```python
+/// import os
+///
 /// os.rmdir("folder/")
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from pathlib import Path
+///
 /// Path("folder/").rmdir()
 /// ```
 ///
@@ -288,11 +316,15 @@ impl Violation for OsRmdir {
 ///
 /// ## Examples
 /// ```python
+/// import os
+///
 /// os.remove("file.py")
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from pathlib import Path
+///
 /// Path("file.py").unlink()
 /// ```
 ///
@@ -327,11 +359,15 @@ impl Violation for OsRemove {
 ///
 /// ## Examples
 /// ```python
+/// import os
+///
 /// os.unlink("file.py")
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from pathlib import Path
+///
 /// Path("file.py").unlink()
 /// ```
 ///
@@ -366,11 +402,15 @@ impl Violation for OsUnlink {
 ///
 /// ## Examples
 /// ```python
+/// import os
+///
 /// cwd = os.getcwd()
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from pathlib import Path
+///
 /// cwd = Path.cwd()
 /// ```
 ///
@@ -406,11 +446,15 @@ impl Violation for OsGetcwd {
 ///
 /// ## Examples
 /// ```python
+/// import os
+///
 /// os.path.exists("file.py")
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from pathlib import Path
+///
 /// Path("file.py").exists()
 /// ```
 ///
@@ -445,11 +489,15 @@ impl Violation for OsPathExists {
 ///
 /// ## Examples
 /// ```python
+/// import os
+///
 /// os.path.expanduser("~/films/Monty Python")
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from pathlib import Path
+///
 /// Path("~/films/Monty Python").expanduser()
 /// ```
 ///
@@ -484,11 +532,15 @@ impl Violation for OsPathExpanduser {
 ///
 /// ## Examples
 /// ```python
+/// import os
+///
 /// os.path.isdir("docs")
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from pathlib import Path
+///
 /// Path("docs").is_dir()
 /// ```
 ///
@@ -523,11 +575,15 @@ impl Violation for OsPathIsdir {
 ///
 /// ## Examples
 /// ```python
+/// import os
+///
 /// os.path.isfile("docs")
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from pathlib import Path
+///
 /// Path("docs").is_file()
 /// ```
 ///
@@ -562,11 +618,15 @@ impl Violation for OsPathIsfile {
 ///
 /// ## Examples
 /// ```python
+/// import os
+///
 /// os.path.islink("docs")
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from pathlib import Path
+///
 /// Path("docs").is_link()
 /// ```
 ///
@@ -601,11 +661,15 @@ impl Violation for OsPathIslink {
 ///
 /// ## Examples
 /// ```python
+/// import os
+///
 /// os.readlink(file_name)
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from pathlib import Path
+///
 /// Path(file_name).readlink()
 /// ```
 ///
@@ -641,6 +705,8 @@ impl Violation for OsReadlink {
 /// ## Examples
 /// ```python
 /// import os
+///
+/// import os
 /// from pwd import getpwuid
 /// from grp import getgrgid
 ///
@@ -651,6 +717,8 @@ impl Violation for OsReadlink {
 ///
 /// Use instead:
 /// ```python
+/// from pathlib import Path
+///
 /// from pathlib import Path
 ///
 /// file_path = Path(file_name)
@@ -694,12 +762,16 @@ impl Violation for OsStat {
 ///
 /// ## Examples
 /// ```python
+/// import os
+///
 /// if os.path.isabs(file_name):
 ///     print("Absolute path!")
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from pathlib import Path
+///
 /// if Path(file_name).is_absolute():
 ///     print("Absolute path!")
 /// ```
@@ -735,11 +807,15 @@ impl Violation for OsPathIsabs {
 ///
 /// ## Examples
 /// ```python
+/// import os
+///
 /// os.path.join(os.path.join(ROOT_PATH, "folder"), "file.py")
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from pathlib import Path
+///
 /// Path(ROOT_PATH) / "folder" / "file.py"
 /// ```
 ///
@@ -774,11 +850,15 @@ impl Violation for OsPathJoin {
 ///
 /// ## Examples
 /// ```python
+/// import os
+///
 /// os.path.basename(__file__)
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from pathlib import Path
+///
 /// Path(__file__).name
 /// ```
 ///
@@ -813,11 +893,15 @@ impl Violation for OsPathBasename {
 ///
 /// ## Examples
 /// ```python
+/// import os
+///
 /// os.path.dirname(__file__)
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from pathlib import Path
+///
 /// Path(__file__).parent
 /// ```
 ///
@@ -852,11 +936,15 @@ impl Violation for OsPathDirname {
 ///
 /// ## Examples
 /// ```python
+/// import os
+///
 /// os.path.samefile("f1.py", "f2.py")
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from pathlib import Path
+///
 /// Path("f1.py").samefile("f2.py")
 /// ```
 ///
@@ -891,11 +979,15 @@ impl Violation for OsPathSamefile {
 ///
 /// ## Examples
 /// ```python
+/// import os
+///
 /// os.path.splitext("f1.py")
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from pathlib import Path
+///
 /// Path("f1.py").suffix
 /// ```
 ///
@@ -933,6 +1025,8 @@ impl Violation for OsPathSplitext {
 ///
 /// Use instead:
 /// ```python
+/// from pathlib import Path
+///
 /// with Path("f1.py").open("wb") as fp:
 ///     ...
 /// ```
@@ -964,11 +1058,15 @@ impl Violation for BuiltinOpen {
 ///
 /// ## Examples
 /// ```python
+/// import py.path
+///
 /// p = py.path.local("/foo/bar").join("baz/qux")
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from pathlib import Path
+///
 /// p = Path("/foo/bar") / "bar" / "qux"
 /// ```
 ///
