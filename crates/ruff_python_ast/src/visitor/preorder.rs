@@ -995,7 +995,7 @@ mod tests {
         walk_keyword, walk_match_case, walk_module, walk_pattern, walk_stmt, walk_type_ignore,
         walk_with_item, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Constant,
         ExceptHandler, Expr, Keyword, MatchCase, Mod, Operator, Pattern, PreorderVisitor, Stmt,
-        TypeIgnore, UnaryOp, WithItem,
+        TypeIgnore, UnaryOp, WithItem,walk_type_param, TypeParam
     };
 
     #[test]
@@ -1262,5 +1262,12 @@ class A:
             walk_type_ignore(self, type_ignore);
             self.exit_node();
         }
+
+        fn visit_type_param(&mut self, type_param: &TypeParam) {
+            self.enter_node(type_param);
+            walk_type_param(self, type_param);
+            self.exit_node();
+        }
+        
     }
 }

@@ -51,11 +51,11 @@ wsl = { version = "0.1.0" }
 # v1.0.1
 libcst = { git = "https://github.com/Instagram/LibCST.git", rev = "3cacca1a1029f05707e50703b49fe3dd860aa839", default-features = false }
 
-ruff_text_size = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "4d03b9b5b212fc869e4cfda151414438186a7779" }
-rustpython-ast = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "4d03b9b5b212fc869e4cfda151414438186a7779" , default-features = false, features = ["num-bigint"]}
-rustpython-format = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "4d03b9b5b212fc869e4cfda151414438186a7779", default-features = false, features = ["num-bigint"] }
-rustpython-literal = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "4d03b9b5b212fc869e4cfda151414438186a7779", default-features = false }
-rustpython-parser = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "4d03b9b5b212fc869e4cfda151414438186a7779" , default-features = false, features = ["full-lexer", "num-bigint"] }
+ruff_text_size = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "7822404abb472ec15ae74f1cb84fabcae57f4657" }
+rustpython-ast = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "7822404abb472ec15ae74f1cb84fabcae57f4657" , default-features = false, features = ["num-bigint"]}
+rustpython-format = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "7822404abb472ec15ae74f1cb84fabcae57f4657", default-features = false, features = ["num-bigint"] }
+rustpython-literal = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "7822404abb472ec15ae74f1cb84fabcae57f4657", default-features = false }
+rustpython-parser = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "7822404abb472ec15ae74f1cb84fabcae57f4657" , default-features = false, features = ["full-lexer", "num-bigint"] }
 
 [profile.release]
 lto = "fat"
