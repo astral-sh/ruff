@@ -44,11 +44,11 @@ impl AlwaysAutofixableViolation for UselessReturn {
 }
 
 /// PLR1711
-pub(crate) fn useless_return<'a>(
-    checker: &mut Checker<'a>,
-    stmt: &'a Stmt,
-    body: &'a [Stmt],
-    returns: Option<&'a Expr>,
+pub(crate) fn useless_return(
+    checker: &mut Checker,
+    stmt: &Stmt,
+    body: &[Stmt],
+    returns: Option<&Expr>,
 ) {
     // Skip functions that have a return annotation that is not `None`.
     if !returns.map_or(true, is_const_none) {

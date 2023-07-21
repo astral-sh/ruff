@@ -49,13 +49,11 @@ impl AlwaysAutofixableViolation for DuplicateClassFieldDefinition {
 }
 
 /// PIE794
-pub(crate) fn duplicate_class_field_definition<'a, 'b>(
-    checker: &mut Checker<'a>,
-    parent: &'b Stmt,
-    body: &'b [Stmt],
-) where
-    'b: 'a,
-{
+pub(crate) fn duplicate_class_field_definition(
+    checker: &mut Checker,
+    parent: &Stmt,
+    body: &[Stmt],
+) {
     let mut seen_targets: FxHashSet<&str> = FxHashSet::default();
     for stmt in body {
         // Extract the property name from the assignment statement.
