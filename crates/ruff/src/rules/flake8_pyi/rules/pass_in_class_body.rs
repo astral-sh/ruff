@@ -22,11 +22,7 @@ impl AlwaysAutofixableViolation for PassInClassBody {
 }
 
 /// PYI012
-pub(crate) fn pass_in_class_body<'a>(
-    checker: &mut Checker<'a>,
-    parent: &'a Stmt,
-    body: &'a [Stmt],
-) {
+pub(crate) fn pass_in_class_body(checker: &mut Checker, parent: &Stmt, body: &[Stmt]) {
     // `pass` is required in these situations (or handled by `pass_statement_stub_body`).
     if body.len() < 2 {
         return;
