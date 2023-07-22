@@ -73,6 +73,7 @@ pub(crate) fn os_sep_split(
         };
         arg
     } else if !keywords.is_empty() {
+        // `.split(sep=os.sep)`
         let Some(keyword) = find_keyword(keywords, "sep") else {
             return;
         };
