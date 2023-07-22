@@ -70,6 +70,9 @@ impl<'a> FormatSummaryValues<'a> {
                 if contains_invalids(locator.slice(arg.range())) {
                     return None;
                 }
+                if locator.contains_line_break(arg.range()) {
+                    return None;
+                }
                 extracted_args.push(arg);
             }
             for keyword in keywords {
