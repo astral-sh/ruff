@@ -91,13 +91,13 @@ pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, expr: &Expr) {
                 ["py", "path", "local"] => Some(PyPath.into()),
                 // PTH207
                 ["glob", "glob"] => Some(
-                    Glob{
+                    Glob {
                         function: "glob".to_string(),
                     }
                     .into(),
                 ),
                 ["glob", "iglob"] => Some(
-                    Glob{
+                    Glob {
                         function: "iglob".to_string(),
                     }
                     .into(),
