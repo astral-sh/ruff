@@ -58,7 +58,7 @@ pub(crate) fn unnecessary_list_call(
     if checker.patch(diagnostic.kind.rule()) {
         #[allow(deprecated)]
         diagnostic.try_set_fix_from_edit(|| {
-            fixes::fix_unnecessary_list_call(checker.locator, checker.stylist, expr)
+            fixes::fix_unnecessary_list_call(checker.locator(), checker.stylist(), expr)
         });
     }
     checker.diagnostics.push(diagnostic);

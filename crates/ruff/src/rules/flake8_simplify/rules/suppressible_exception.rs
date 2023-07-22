@@ -117,9 +117,9 @@ pub(crate) fn suppressible_exception(
                 stmt.range(),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                if !has_comments(stmt, checker.locator, checker.indexer) {
+                if !has_comments(stmt, checker.locator(), checker.indexer()) {
                     diagnostic.try_set_fix(|| {
-                        let (import_edit, binding) = checker.importer.get_or_import_symbol(
+                        let (import_edit, binding) = checker.importer().get_or_import_symbol(
                             &ImportRequest::import("contextlib", "suppress"),
                             stmt.start(),
                             checker.semantic(),
@@ -128,7 +128,7 @@ pub(crate) fn suppressible_exception(
                             format!("with {binding}({exception})"),
                             TextRange::at(stmt.start(), "try".text_len()),
                         );
-                        let handler_line_begin = checker.locator.line_start(handler.start());
+                        let handler_line_begin = checker.locator().line_start(handler.start());
                         let remove_handler = Edit::deletion(handler_line_begin, handler.end());
                         Ok(Fix::suggested_edits(
                             import_edit,

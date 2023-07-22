@@ -86,8 +86,8 @@ pub(crate) fn duplicate_class_field_definition(
                 let edit = autofix::edits::delete_stmt(
                     stmt,
                     Some(parent),
-                    checker.locator,
-                    checker.indexer,
+                    checker.locator(),
+                    checker.indexer(),
                 );
                 diagnostic.set_fix(Fix::suggested(edit).isolate(checker.isolation(Some(parent))));
             }

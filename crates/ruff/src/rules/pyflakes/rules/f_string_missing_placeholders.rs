@@ -85,13 +85,13 @@ pub(crate) fn f_string_missing_placeholders(expr: &Expr, values: &[Expr], checke
         .iter()
         .any(|value| matches!(value, Expr::FormattedValue(_)))
     {
-        for (prefix_range, tok_range) in find_useless_f_strings(expr, checker.locator) {
+        for (prefix_range, tok_range) in find_useless_f_strings(expr, checker.locator()) {
             let mut diagnostic = Diagnostic::new(FStringMissingPlaceholders, tok_range);
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.set_fix(convert_f_string_to_regular_string(
                     prefix_range,
                     tok_range,
-                    checker.locator,
+                    checker.locator(),
                 ));
             }
             checker.diagnostics.push(diagnostic);

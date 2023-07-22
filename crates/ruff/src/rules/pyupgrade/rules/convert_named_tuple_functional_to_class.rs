@@ -242,7 +242,7 @@ pub(crate) fn convert_named_tuple_functional_to_class(
     );
     if checker.patch(diagnostic.kind.rule()) {
         // TODO(charlie): Preserve indentation, to remove the first-column requirement.
-        if checker.locator.is_at_start_of_line(stmt.start()) {
+        if checker.locator().is_at_start_of_line(stmt.start()) {
             diagnostic.set_fix(convert_to_class(
                 stmt,
                 typename,

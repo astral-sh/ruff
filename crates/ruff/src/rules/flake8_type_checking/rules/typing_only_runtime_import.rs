@@ -434,13 +434,13 @@ fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[Import]) -> Result
         qualified_names.iter().copied(),
         stmt,
         parent,
-        checker.locator,
-        checker.stylist,
-        checker.indexer,
+        checker.locator(),
+        checker.stylist(),
+        checker.indexer(),
     )?;
 
     // Step 2) Add the import to a `TYPE_CHECKING` block.
-    let add_import_edit = checker.importer.typing_import_edit(
+    let add_import_edit = checker.importer().typing_import_edit(
         &StmtImports {
             stmt,
             qualified_names,

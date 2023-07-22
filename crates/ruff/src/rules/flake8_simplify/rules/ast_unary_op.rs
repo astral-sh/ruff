@@ -275,7 +275,7 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: UnaryOp, o
     if checker.patch(diagnostic.kind.rule()) {
         if checker.semantic().in_boolean_test() {
             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                checker.locator.slice(operand.range()).to_string(),
+                checker.locator().slice(operand.range()).to_string(),
                 expr.range(),
             )));
         } else if checker.semantic().is_builtin("bool") {

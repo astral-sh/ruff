@@ -121,7 +121,7 @@ pub(crate) fn replace_stdout_stderr(
         let mut diagnostic = Diagnostic::new(ReplaceStdoutStderr, expr.range());
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.try_set_fix(|| {
-                generate_fix(checker.locator, func, args, keywords, stdout, stderr)
+                generate_fix(checker.locator(), func, args, keywords, stdout, stderr)
             });
         }
         checker.diagnostics.push(diagnostic);

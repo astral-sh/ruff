@@ -141,7 +141,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                 match names_type {
                     types::ParametrizeNameType::Tuple => {
                         let name_range =
-                            get_parametrize_name_range(decorator, expr, checker.locator);
+                            get_parametrize_name_range(decorator, expr, checker.locator());
                         let mut diagnostic = Diagnostic::new(
                             PytestParametrizeNamesWrongType {
                                 expected: names_type,
@@ -172,7 +172,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                     }
                     types::ParametrizeNameType::List => {
                         let name_range =
-                            get_parametrize_name_range(decorator, expr, checker.locator);
+                            get_parametrize_name_range(decorator, expr, checker.locator());
                         let mut diagnostic = Diagnostic::new(
                             PytestParametrizeNamesWrongType {
                                 expected: names_type,

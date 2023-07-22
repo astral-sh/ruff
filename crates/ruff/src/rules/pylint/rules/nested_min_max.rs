@@ -150,7 +150,7 @@ pub(crate) fn nested_min_max(
     }) {
         let mut diagnostic = Diagnostic::new(NestedMinMax { func: min_max }, expr.range());
         if checker.patch(diagnostic.kind.rule()) {
-            if !has_comments(expr, checker.locator, checker.indexer) {
+            if !has_comments(expr, checker.locator(), checker.indexer()) {
                 let flattened_expr = Expr::Call(ast::ExprCall {
                     func: Box::new(func.clone()),
                     args: collect_nested_args(min_max, args, checker.semantic()),

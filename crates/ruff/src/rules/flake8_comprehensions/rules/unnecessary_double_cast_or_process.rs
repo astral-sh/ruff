@@ -135,8 +135,8 @@ pub(crate) fn unnecessary_double_cast_or_process(
             #[allow(deprecated)]
             diagnostic.try_set_fix_from_edit(|| {
                 fixes::fix_unnecessary_double_cast_or_process(
-                    checker.locator,
-                    checker.stylist,
+                    checker.locator(),
+                    checker.stylist(),
                     expr,
                 )
             });

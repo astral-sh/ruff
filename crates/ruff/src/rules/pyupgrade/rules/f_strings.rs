@@ -326,18 +326,18 @@ pub(crate) fn f_strings(
     }
 
     // Avoid refactoring strings that are implicitly concatenated.
-    if is_implicit_concatenation(checker.locator.slice(template.range())) {
+    if is_implicit_concatenation(checker.locator().slice(template.range())) {
         return;
     }
 
     // Currently, the only issue we know of is in LibCST:
     // https://github.com/Instagram/LibCST/issues/846
-    let Some(mut contents) = try_convert_to_f_string(expr, checker.locator) else {
+    let Some(mut contents) = try_convert_to_f_string(expr, checker.locator()) else {
         return;
     };
 
     // Avoid refactors that exceed the line length limit.
-    let col_offset = template.start() - checker.locator.line_start(template.start());
+    let col_offset = template.start() - checker.locator().line_start(template.start());
     if contents.lines().enumerate().any(|(idx, line)| {
         // If `template` is a multiline string, `col_offset` should only be applied to the first
         // line:
@@ -354,7 +354,7 @@ pub(crate) fn f_strings(
 
     // If necessary, add a space between any leading keyword (`return`, `yield`, `assert`, etc.)
     // and the string. For example, `return"foo"` is valid, but `returnf"foo"` is not.
-    let existing = checker.locator.slice(TextRange::up_to(expr.start()));
+    let existing = checker.locator().slice(TextRange::up_to(expr.start()));
     if existing
         .chars()
         .last()

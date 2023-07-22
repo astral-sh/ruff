@@ -92,7 +92,7 @@ pub(crate) fn use_pep585_annotation(
                 ModuleMember::Member(module, member) => {
                     // Imported type, like `collections.deque`.
                     diagnostic.try_set_fix(|| {
-                        let (import_edit, binding) = checker.importer.get_or_import_symbol(
+                        let (import_edit, binding) = checker.importer().get_or_import_symbol(
                             &ImportRequest::import_from(module, member),
                             expr.start(),
                             checker.semantic(),

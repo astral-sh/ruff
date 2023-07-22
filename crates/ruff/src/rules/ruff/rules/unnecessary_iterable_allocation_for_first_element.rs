@@ -113,7 +113,7 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(
     let Some(target) = match_iteration_target(value, checker.semantic()) else {
         return;
     };
-    let iterable = checker.locator.slice(target.range);
+    let iterable = checker.locator().slice(target.range);
     let iterable = if target.iterable {
         Cow::Borrowed(iterable)
     } else {
