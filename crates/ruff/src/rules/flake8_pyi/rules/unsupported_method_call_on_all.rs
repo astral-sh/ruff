@@ -23,7 +23,7 @@ use crate::checkers::ast::Checker;
 /// Use instead:
 /// ```python
 /// __all__ = ["A"]
-/// __all__ += "B"
+/// __all__ += ["B"]
 /// ```
 #[violation]
 pub struct UnsupportedMethodCallOnAll {
