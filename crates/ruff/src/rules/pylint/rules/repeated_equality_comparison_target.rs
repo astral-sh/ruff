@@ -88,7 +88,7 @@ pub(crate) fn repeated_equality_comparison_target(checker: &mut Checker, bool_op
                         left.as_expr(),
                         bool_op.op,
                         &comparators,
-                        checker.locator,
+                        checker.locator(),
                     ),
                 },
                 bool_op.range(),

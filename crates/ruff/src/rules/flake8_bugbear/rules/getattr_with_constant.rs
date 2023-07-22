@@ -80,7 +80,7 @@ pub(crate) fn getattr_with_constant(
     let mut diagnostic = Diagnostic::new(GetAttrWithConstant, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-            format!("{}.{}", checker.locator.slice(obj.range()), value),
+            format!("{}.{}", checker.locator().slice(obj.range()), value),
             expr.range(),
         )));
     }

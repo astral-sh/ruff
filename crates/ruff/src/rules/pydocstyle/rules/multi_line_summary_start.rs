@@ -165,15 +165,15 @@ pub(crate) fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstr
                     // If the docstring isn't on its own line, look at the statement indentation,
                     // and add the default indentation to get the "right" level.
                     if let Definition::Member(Member { stmt, .. }) = &docstring.definition {
-                        let stmt_line_start = checker.locator.line_start(stmt.start());
+                        let stmt_line_start = checker.locator().line_start(stmt.start());
                         let stmt_indentation = checker
-                            .locator
+                            .locator()
                             .slice(TextRange::new(stmt_line_start, stmt.start()));
 
                         if stmt_indentation.chars().all(char::is_whitespace) {
                             indentation.clear();
                             indentation.push_str(stmt_indentation);
-                            indentation.push_str(checker.stylist.indentation());
+                            indentation.push_str(checker.stylist().indentation());
                             fixable = true;
                         }
                     };
@@ -185,7 +185,7 @@ pub(crate) fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstr
                     // quote and text.
                     let repl = format!(
                         "{}{}{}",
-                        checker.stylist.line_ending().as_str(),
+                        checker.stylist().line_ending().as_str(),
                         indentation,
                         first_line.strip_prefix(prefix).unwrap().trim_start()
                     );

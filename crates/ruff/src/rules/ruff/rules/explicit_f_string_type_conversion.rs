@@ -120,7 +120,7 @@ pub(crate) fn explicit_f_string_type_conversion(
         let mut diagnostic = Diagnostic::new(ExplicitFStringTypeConversion, value.range());
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.try_set_fix(|| {
-                convert_call_to_conversion_flag(expr, index, checker.locator, checker.stylist)
+                convert_call_to_conversion_flag(expr, index, checker.locator(), checker.stylist())
             });
         }
         checker.diagnostics.push(diagnostic);

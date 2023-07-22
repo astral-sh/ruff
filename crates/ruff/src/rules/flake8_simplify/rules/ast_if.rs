@@ -371,7 +371,7 @@ pub(crate) fn nested_if_statements(checker: &mut Checker, stmt_if: &StmtIf, pare
 
     let colon = first_colon_range(
         TextRange::new(test.end(), first_stmt.start()),
-        checker.locator,
+        checker.locator(),
     );
 
     // Check if the parent is already emitting a larger diagnostic including this if statement
@@ -396,11 +396,11 @@ pub(crate) fn nested_if_statements(checker: &mut Checker, stmt_if: &StmtIf, pare
         // the outer and inner if statements.
         let nested_if = &body[0];
         if !checker
-            .indexer
+            .indexer()
             .comment_ranges()
             .intersects(TextRange::new(range.start(), nested_if.start()))
         {
-            match fix_if::fix_nested_if_statements(checker.locator, checker.stylist, range) {
+            match fix_if::fix_nested_if_statements(checker.locator(), checker.stylist(), range) {
                 Ok(edit) => {
                     if edit
                         .content()
@@ -508,7 +508,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
     if checker.patch(diagnostic.kind.rule()) {
         if matches!(if_return, Bool::True)
             && matches!(else_return, Bool::False)
-            && !has_comments(&range, checker.locator, checker.indexer)
+            && !has_comments(&range, checker.locator(), checker.indexer())
             && (if_test.is_compare_expr() || checker.semantic().is_builtin("bool"))
         {
             if if_test.is_compare_expr() {
@@ -650,9 +650,9 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt) {
     let contents = checker.generator().stmt(&ternary);
 
     // Don't flag if the resulting expression would exceed the maximum line length.
-    let line_start = checker.locator.line_start(stmt.start());
+    let line_start = checker.locator().line_start(stmt.start());
     if LineWidth::new(checker.settings.tab_size)
-        .add_str(&checker.locator.contents()[TextRange::new(line_start, stmt.start())])
+        .add_str(&checker.locator().contents()[TextRange::new(line_start, stmt.start())])
         .add_str(&contents)
         > checker.settings.line_length
     {
@@ -666,7 +666,7 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt) {
         stmt.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        if !has_comments(stmt, checker.locator, checker.indexer) {
+        if !has_comments(stmt, checker.locator(), checker.indexer()) {
             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                 contents,
                 stmt.range(),
@@ -699,11 +699,11 @@ pub(crate) fn if_with_same_arms(checker: &mut Checker, locator: &Locator, stmt_i
 
         // ...and the same comments
         let first_comments: Vec<_> = checker
-            .indexer
+            .indexer()
             .comments_in_range(current_branch.range, locator)
             .collect();
         let second_comments: Vec<_> = checker
-            .indexer
+            .indexer()
             .comments_in_range(following_branch.range, locator)
             .collect();
         if first_comments != second_comments {
@@ -952,9 +952,9 @@ pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &StmtIf)
     let contents = checker.generator().stmt(&node5.into());
 
     // Don't flag if the resulting expression would exceed the maximum line length.
-    let line_start = checker.locator.line_start(stmt_if.start());
+    let line_start = checker.locator().line_start(stmt_if.start());
     if LineWidth::new(checker.settings.tab_size)
-        .add_str(&checker.locator.contents()[TextRange::new(line_start, stmt_if.start())])
+        .add_str(&checker.locator().contents()[TextRange::new(line_start, stmt_if.start())])
         .add_str(&contents)
         > checker.settings.line_length
     {
@@ -968,7 +968,7 @@ pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &StmtIf)
         stmt_if.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        if !has_comments(stmt_if, checker.locator, checker.indexer) {
+        if !has_comments(stmt_if, checker.locator(), checker.indexer()) {
             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                 contents,
                 stmt_if.range(),

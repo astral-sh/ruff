@@ -180,7 +180,7 @@ pub(crate) fn format_literals(checker: &mut Checker, summary: &FormatSummary, ex
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {
             Ok(Fix::suggested(Edit::range_replacement(
-                generate_call(expr, &summary.indices, checker.locator, checker.stylist)?,
+                generate_call(expr, &summary.indices, checker.locator(), checker.stylist())?,
                 expr.range(),
             )))
         });

@@ -505,7 +505,7 @@ pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
         }
 
         // Avoid removing comments.
-        if has_comments(expr, checker.locator, checker.indexer) {
+        if has_comments(expr, checker.locator(), checker.indexer()) {
             continue;
         }
 

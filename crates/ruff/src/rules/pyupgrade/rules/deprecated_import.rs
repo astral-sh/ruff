@@ -567,8 +567,8 @@ pub(crate) fn deprecated_import(
         stmt,
         module,
         &members,
-        checker.locator,
-        checker.stylist,
+        checker.locator(),
+        checker.stylist(),
         checker.settings.target_version,
     );
 

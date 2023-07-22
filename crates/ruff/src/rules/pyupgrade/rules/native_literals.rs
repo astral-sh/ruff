@@ -156,7 +156,7 @@ pub(crate) fn native_literals(
             }
 
             // Skip implicit string concatenations.
-            let arg_code = checker.locator.slice(arg.range());
+            let arg_code = checker.locator().slice(arg.range());
             if is_implicit_concatenation(arg_code) {
                 return;
             }

@@ -204,13 +204,13 @@ fn remove_unused_variable(
                     // If the expression is complex (`x = foo()`), remove the assignment,
                     // but preserve the right-hand side.
                     let start = target.start();
-                    let end =
-                        match_token_after(start, checker.locator, |tok| tok == Tok::Equal)?.start();
+                    let end = match_token_after(start, checker.locator(), |tok| tok == Tok::Equal)?
+                        .start();
                     let edit = Edit::deletion(start, end);
                     Some(Fix::suggested(edit))
                 } else {
                     // If (e.g.) assigning to a constant (`x = 1`), delete the entire statement.
-                    let edit = delete_stmt(stmt, parent, checker.locator, checker.indexer);
+                    let edit = delete_stmt(stmt, parent, checker.locator(), checker.indexer());
                     Some(Fix::suggested(edit).isolate(checker.isolation(parent)))
                 };
             }
@@ -230,12 +230,12 @@ fn remove_unused_variable(
                 // but preserve the right-hand side.
                 let start = stmt.start();
                 let end =
-                    match_token_after(start, checker.locator, |tok| tok == Tok::Equal)?.start();
+                    match_token_after(start, checker.locator(), |tok| tok == Tok::Equal)?.start();
                 let edit = Edit::deletion(start, end);
                 Some(Fix::suggested(edit))
             } else {
                 // If (e.g.) assigning to a constant (`x = 1`), delete the entire statement.
-                let edit = delete_stmt(stmt, parent, checker.locator, checker.indexer);
+                let edit = delete_stmt(stmt, parent, checker.locator(), checker.indexer());
                 Some(Fix::suggested(edit).isolate(checker.isolation(parent)))
             };
         }
@@ -250,13 +250,13 @@ fn remove_unused_variable(
                 if optional_vars.range() == range {
                     // Find the first token before the `as` keyword.
                     let start =
-                        match_token_before(item.context_expr.start(), checker.locator, |tok| {
+                        match_token_before(item.context_expr.start(), checker.locator(), |tok| {
                             tok == Tok::As
                         })?
                         .end();
 
                     // Find the first colon, comma, or closing bracket after the `as` keyword.
-                    let end = match_token_or_closing_brace(start, checker.locator, |tok| {
+                    let end = match_token_or_closing_brace(start, checker.locator(), |tok| {
                         tok == Tok::Colon || tok == Tok::Comma
                     })?
                     .start();

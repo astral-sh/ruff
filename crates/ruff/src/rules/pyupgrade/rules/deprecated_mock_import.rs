@@ -281,8 +281,8 @@ pub(crate) fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
             {
                 // Generate the fix, if needed, which is shared between all `mock` imports.
                 let content = if checker.patch(Rule::DeprecatedMockImport) {
-                    if let Some(indent) = indentation(checker.locator, stmt) {
-                        match format_import(stmt, indent, checker.locator, checker.stylist) {
+                    if let Some(indent) = indentation(checker.locator(), stmt) {
+                        match format_import(stmt, indent, checker.locator(), checker.stylist()) {
                             Ok(content) => Some(content),
                             Err(e) => {
                                 error!("Failed to rewrite `mock` import: {e}");
@@ -333,10 +333,10 @@ pub(crate) fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                     stmt.range(),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
-                    if let Some(indent) = indentation(checker.locator, stmt) {
+                    if let Some(indent) = indentation(checker.locator(), stmt) {
                         #[allow(deprecated)]
                         diagnostic.try_set_fix_from_edit(|| {
-                            format_import_from(stmt, indent, checker.locator, checker.stylist)
+                            format_import_from(stmt, indent, checker.locator(), checker.stylist())
                                 .map(|content| Edit::range_replacement(content, stmt.range()))
                         });
                     }

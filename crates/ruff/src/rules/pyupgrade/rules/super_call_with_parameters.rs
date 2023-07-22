@@ -143,7 +143,9 @@ pub(crate) fn super_call_with_parameters(
 
     let mut diagnostic = Diagnostic::new(SuperCallWithParameters, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
-        if let Some(edit) = fixes::remove_super_arguments(checker.locator, checker.stylist, expr) {
+        if let Some(edit) =
+            fixes::remove_super_arguments(checker.locator(), checker.stylist(), expr)
+        {
             diagnostic.set_fix(Fix::suggested(edit));
         }
     }

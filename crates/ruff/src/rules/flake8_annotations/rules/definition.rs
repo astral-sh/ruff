@@ -448,11 +448,12 @@ fn check_dynamically_typed<F>(
     }) = annotation
     {
         // Quoted annotations
-        if let Ok((parsed_annotation, _)) = parse_type_annotation(string, *range, checker.locator) {
+        if let Ok((parsed_annotation, _)) = parse_type_annotation(string, *range, checker.locator())
+        {
             if type_hint_resolves_to_any(
                 &parsed_annotation,
                 checker.semantic(),
-                checker.locator,
+                checker.locator(),
                 checker.settings.target_version.minor(),
             ) {
                 diagnostics.push(Diagnostic::new(
@@ -465,7 +466,7 @@ fn check_dynamically_typed<F>(
         if type_hint_resolves_to_any(
             annotation,
             checker.semantic(),
-            checker.locator,
+            checker.locator(),
             checker.settings.target_version.minor(),
         ) {
             diagnostics.push(Diagnostic::new(
@@ -690,7 +691,7 @@ pub(crate) fn definition(
                     );
                     if checker.patch(diagnostic.kind.rule()) {
                         diagnostic.try_set_fix(|| {
-                            fixes::add_return_annotation(checker.locator, stmt, "None")
+                            fixes::add_return_annotation(checker.locator(), stmt, "None")
                                 .map(Fix::suggested)
                         });
                     }
@@ -708,7 +709,7 @@ pub(crate) fn definition(
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(return_type) = simple_magic_return_type(name) {
                         diagnostic.try_set_fix(|| {
-                            fixes::add_return_annotation(checker.locator, stmt, return_type)
+                            fixes::add_return_annotation(checker.locator(), stmt, return_type)
                                 .map(Fix::suggested)
                         });
                     }

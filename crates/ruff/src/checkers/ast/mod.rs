@@ -100,14 +100,14 @@ pub(crate) struct Checker<'a> {
     pub(crate) settings: &'a Settings,
     /// The [`Locator`] for the current file, which enables extraction of source code from byte
     /// offsets.
-    pub(crate) locator: &'a Locator<'a>,
+    locator: &'a Locator<'a>,
     /// The [`Stylist`] for the current file, which detects the current line ending, quote, and
     /// indentation style.
-    pub(crate) stylist: &'a Stylist<'a>,
+    stylist: &'a Stylist<'a>,
     /// The [`Indexer`] for the current file, which contains the offsets of all comments and more.
-    pub(crate) indexer: &'a Indexer,
+    indexer: &'a Indexer,
     /// The [`Importer`] for the current file, which enables importing of other modules.
-    pub(crate) importer: Importer<'a>,
+    importer: Importer<'a>,
     /// The [`SemanticModel`], built up over the course of the AST traversal.
     semantic: SemanticModel<'a>,
     /// A set of deferred nodes to be processed after the current traversal (e.g., function bodies).
@@ -219,16 +219,41 @@ impl<'a> Checker<'a> {
             })
     }
 
+    /// The [`Locator`] for the current file, which enables extraction of source code from byte
+    /// offsets.
+    pub(crate) const fn locator(&self) -> &'a Locator<'a> {
+        self.locator
+    }
+
+    /// The [`Stylist`] for the current file, which detects the current line ending, quote, and
+    /// indentation style.
+    pub(crate) const fn stylist(&self) -> &'a Stylist<'a> {
+        self.stylist
+    }
+
+    /// The [`Indexer`] for the current file, which contains the offsets of all comments and more.
+    pub(crate) const fn indexer(&self) -> &'a Indexer {
+        self.indexer
+    }
+
+    /// The [`Importer`] for the current file, which enables importing of other modules.
+    pub(crate) const fn importer(&self) -> &Importer<'a> {
+        &self.importer
+    }
+
+    /// The [`SemanticModel`], built up over the course of the AST traversal.
     pub(crate) const fn semantic(&self) -> &SemanticModel<'a> {
         &self.semantic
     }
 
-    pub(crate) const fn package(&self) -> Option<&'a Path> {
-        self.package
-    }
-
+    /// The [`Path`] to the file under analysis.
     pub(crate) const fn path(&self) -> &'a Path {
         self.path
+    }
+
+    /// The [`Path`] to the package containing the current file.
+    pub(crate) const fn package(&self) -> Option<&'a Path> {
+        self.package
     }
 
     /// Returns whether the given rule should be checked.

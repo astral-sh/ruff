@@ -192,7 +192,7 @@ pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Exp
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        if !has_comments(expr, checker.locator, checker.indexer) {
+        if !has_comments(expr, checker.locator(), checker.indexer()) {
             // This suggestion could be unsafe if the non-literal expression in the
             // expression has overridden the `__add__` (or `__radd__`) magic methods.
             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
