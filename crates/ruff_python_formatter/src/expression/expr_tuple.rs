@@ -12,7 +12,10 @@ use crate::prelude::*;
 
 #[derive(Eq, PartialEq, Debug, Default)]
 pub enum TupleParentheses {
-    /// Effectively `None` in `Option<Parentheses>`
+    /// By default tuples with a single element will include parentheses. Tuples with multiple elements
+    /// will parenthesize if the expression expands. This means that tuples will often *preserve*
+    /// their parentheses, but this differs from `Preserve` in that we may also *introduce*
+    /// parentheses as well.
     #[default]
     Default,
 
