@@ -13,7 +13,7 @@ use crate::registry::AsRule;
 /// Checks for f-strings that do not contain any placeholder expressions.
 ///
 /// ## Why is this bad?
-/// F-strings are a convenient way to format strings, but they are not
+/// f-strings are a convenient way to format strings, but they are not
 /// necessary if there are no placeholder expressions to format. In this
 /// case, a regular string should be used instead, as an f-string without
 /// placeholders can be confusing for readers, who may expect such a
