@@ -696,27 +696,24 @@ pub(crate) fn percent_format_positional_count_mismatch(
         return;
     }
 
-    match right {
-        Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-            let mut found = 0;
-            for elt in elts {
-                if let Expr::Starred(_) = &elt {
-                    return;
-                }
-                found += 1;
+    if let Expr::Tuple(ast::ExprTuple { elts, .. }) = right {
+        let mut found = 0;
+        for elt in elts {
+            if let Expr::Starred(_) = &elt {
+                return;
             }
-
-            if found != summary.num_positional {
-                checker.diagnostics.push(Diagnostic::new(
-                    PercentFormatPositionalCountMismatch {
-                        wanted: summary.num_positional,
-                        got: found,
-                    },
-                    location,
-                ));
-            }
+            found += 1;
         }
-        _ => {}
+
+        if found != summary.num_positional {
+            checker.diagnostics.push(Diagnostic::new(
+                PercentFormatPositionalCountMismatch {
+                    wanted: summary.num_positional,
+                    got: found,
+                },
+                location,
+            ));
+        }
     }
 }
 
