@@ -4860,26 +4860,22 @@ impl<'a> Checker<'a> {
             ])
         };
         let runtime_imports: Vec<Vec<&Binding>> = if enforce_typing_imports {
-            if self.settings.flake8_type_checking.strict {
-                vec![]
-            } else {
-                self.semantic
-                    .scopes
-                    .iter()
-                    .map(|scope| {
-                        scope
-                            .binding_ids()
-                            .map(|binding_id| self.semantic.binding(binding_id))
-                            .filter(|binding| {
-                                flake8_type_checking::helpers::is_valid_runtime_import(
-                                    binding,
-                                    &self.semantic,
-                                )
-                            })
-                            .collect()
-                    })
-                    .collect::<Vec<_>>()
-            }
+            self.semantic
+                .scopes
+                .iter()
+                .map(|scope| {
+                    scope
+                        .binding_ids()
+                        .map(|binding_id| self.semantic.binding(binding_id))
+                        .filter(|binding| {
+                            flake8_type_checking::helpers::is_valid_runtime_import(
+                                binding,
+                                &self.semantic,
+                            )
+                        })
+                        .collect()
+                })
+                .collect::<Vec<_>>()
         } else {
             vec![]
         };
@@ -5070,17 +5066,13 @@ impl<'a> Checker<'a> {
                 ScopeKind::Function(_) | ScopeKind::AsyncFunction(_) | ScopeKind::Module
             ) {
                 if enforce_typing_imports {
-                    let runtime_imports: Vec<&Binding> =
-                        if self.settings.flake8_type_checking.strict {
-                            vec![]
-                        } else {
-                            self.semantic
-                                .scopes
-                                .ancestor_ids(scope_id)
-                                .flat_map(|scope_id| runtime_imports[scope_id.as_usize()].iter())
-                                .copied()
-                                .collect()
-                        };
+                    let runtime_imports: Vec<&Binding> = self
+                        .semantic
+                        .scopes
+                        .ancestor_ids(scope_id)
+                        .flat_map(|scope_id| runtime_imports[scope_id.as_usize()].iter())
+                        .copied()
+                        .collect();
 
                     if self.enabled(Rule::RuntimeImportInTypeCheckingBlock) {
                         flake8_type_checking::rules::runtime_import_in_type_checking_block(
