@@ -697,9 +697,7 @@ pub(crate) fn percent_format_positional_count_mismatch(
     }
 
     match right {
-        Expr::List(ast::ExprList { elts, .. })
-        | Expr::Tuple(ast::ExprTuple { elts, .. })
-        | Expr::Set(ast::ExprSet { elts, .. }) => {
+        Expr::Tuple(ast::ExprTuple { elts, .. }) => {
             let mut found = 0;
             for elt in elts {
                 if let Expr::Starred(_) = &elt {
