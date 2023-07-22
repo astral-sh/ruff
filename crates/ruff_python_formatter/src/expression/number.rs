@@ -1,4 +1,6 @@
-use ruff_formatter::write;
+use std::borrow::Cow;
+
+use ruff_text_size::TextSize;
 use rustpython_parser::ast::{ExprConstant, Ranged};
 
 use crate::prelude::*;
@@ -19,12 +21,11 @@ impl Format<PyFormatContext<'_>> for FormatInt<'_> {
         let range = self.constant.range();
         let content = f.context().locator().slice(range);
 
-        if content.starts_with("0x") || content.starts_with("0X") {
-            let hex = content.get(2..).unwrap().to_ascii_uppercase();
-            write!(f, [text("0x"), dynamic_text(&hex, None)])
-        } else {
-            let lowercase_content = content.to_ascii_lowercase();
-            dynamic_text(&lowercase_content, None).fmt(f)
+        let normalized = normalize_integer(content);
+
+        match normalized {
+            Cow::Borrowed(_) => source_text_slice(range, ContainsNewlines::No).fmt(f),
+            Cow::Owned(normalized) => dynamic_text(&normalized, Some(range.start())).fmt(f),
         }
     }
 }
@@ -44,7 +45,13 @@ impl Format<PyFormatContext<'_>> for FormatFloat<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         let range = self.constant.range();
         let content = f.context().locator().slice(range);
-        FormatFloatNumber::new(content).fmt(f)
+
+        let normalized = normalize_floating_number(content);
+
+        match normalized {
+            Cow::Borrowed(_) => source_text_slice(range, ContainsNewlines::No).fmt(f),
+            Cow::Owned(normalized) => dynamic_text(&normalized, Some(range.start())).fmt(f),
+        }
     }
 }
 
@@ -63,50 +70,124 @@ impl Format<PyFormatContext<'_>> for FormatComplex<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         let range = self.constant.range();
         let content = f.context().locator().slice(range);
-        write!(
-            f,
-            [
-                FormatFloatNumber::new(content.trim_end_matches(['j', 'J'])),
-                text("j"),
-            ]
-        )
-    }
-}
 
-struct FormatFloatNumber<'a> {
-    number: &'a str,
-}
+        let normalized = normalize_floating_number(content.trim_end_matches(['j', 'J']));
 
-impl<'a> FormatFloatNumber<'a> {
-    fn new(number: &'a str) -> Self {
-        Self { number }
-    }
-}
-
-impl Format<PyFormatContext<'_>> for FormatFloatNumber<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
-        // split exponent
-        let (fraction, exponent) = match self.number.split_once(['e', 'E']) {
-            Some((frac, exp)) => (frac, Some(exp)),
-            None => (self.number, None),
-        };
-
-        write!(
-            f,
-            [
-                fraction.starts_with('.').then_some(text("0")),
-                dynamic_text(fraction, None),
-                fraction.ends_with('.').then_some(text("0")),
-            ]
-        )?;
-
-        if let Some(exp) = exponent {
-            write!(
-                f,
-                [text("e"), dynamic_text(exp.trim_start_matches('+'), None)]
-            )?;
+        match normalized {
+            Cow::Borrowed(_) => {
+                source_text_slice(range.sub_end(TextSize::from(1)), ContainsNewlines::No).fmt(f)?;
+            }
+            Cow::Owned(normalized) => {
+                dynamic_text(&normalized, Some(range.start())).fmt(f)?;
+            }
         }
 
-        Ok(())
+        text("j").fmt(f)
+    }
+}
+
+/// Returns the normalized integer string.
+fn normalize_integer(input: &str) -> Cow<str> {
+    // The normalized string if `input` is not yet normalized.
+    // `output` must remain empty if `input` is already normalized.
+    let mut output = String::new();
+    // Tracks the last index of `input` that has been written to `output`.
+    // If `last_index` is `0` at the end, then the input is already normalized and can be returned as is.
+    let mut last_index = 0;
+
+    let mut is_hex = false;
+
+    let mut chars = input.char_indices();
+
+    if let Some((_, '0')) = chars.next() {
+        if let Some((index, c)) = chars.next() {
+            is_hex = matches!(c, 'x' | 'X');
+            if matches!(c, 'B' | 'O' | 'X') {
+                // Lowercase the prefix.
+                output.push('0');
+                output.push(c.to_ascii_lowercase());
+                last_index = index + c.len_utf8();
+            }
+        }
+    }
+
+    // Skip the rest if `input` is not a hexinteger because there are only digits.
+    if is_hex {
+        for (index, c) in chars {
+            if matches!(c, 'a'..='f') {
+                // Uppercase hexdigits.
+                output.push_str(&input[last_index..index]);
+                output.push(c.to_ascii_uppercase());
+                last_index = index + c.len_utf8();
+            }
+        }
+    }
+
+    if last_index == 0 {
+        Cow::Borrowed(input)
+    } else {
+        output.push_str(&input[last_index..]);
+        Cow::Owned(output)
+    }
+}
+
+/// Returns the normalized floating number string.
+fn normalize_floating_number(input: &str) -> Cow<str> {
+    // The normalized string if `input` is not yet normalized.
+    // `output` must remain empty if `input` is already normalized.
+    let mut output = String::new();
+    // Tracks the last index of `input` that has been written to `output`.
+    // If `last_index` is `0` at the end, then the input is already normalized and can be returned as is.
+    let mut last_index = 0;
+
+    let mut has_exponent = false;
+
+    let mut chars = input.char_indices();
+
+    if let Some((index, '.')) = chars.next() {
+        // Add a leading `0` if `input` starts with `.`.
+        output.push('0');
+        output.push('.');
+        last_index = index + '.'.len_utf8();
+    }
+
+    for (index, c) in chars {
+        if matches!(c, 'e' | 'E') {
+            has_exponent = true;
+            if let Some(prev) = input.as_bytes().get(index - 1).copied().map(char::from) {
+                if prev == '.' {
+                    // Add `0` if fraction part ends with `.`.
+                    output.push_str(&input[last_index..index]);
+                    output.push('0');
+                    last_index = index;
+                }
+            }
+            if c == 'E' {
+                // Lowercase exponent part.
+                output.push_str(&input[last_index..index]);
+                output.push('e');
+                last_index = index + 'E'.len_utf8();
+            }
+        } else if c == '+' {
+            // Remove `+` in exponent part.
+            output.push_str(&input[last_index..index]);
+            last_index = index + '+'.len_utf8();
+        }
+    }
+
+    if !has_exponent {
+        if input.ends_with('.') {
+            // Add `0` if fraction part ends with `.`.
+            output.push_str(&input[last_index..]);
+            output.push('0');
+            last_index = input.len();
+        }
+    }
+
+    if last_index == 0 {
+        Cow::Borrowed(input)
+    } else {
+        output.push_str(&input[last_index..]);
+        Cow::Owned(output)
     }
 }
