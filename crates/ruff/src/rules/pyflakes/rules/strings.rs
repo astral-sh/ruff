@@ -634,40 +634,42 @@ pub(crate) fn percent_format_missing_arguments(
         return;
     }
 
-    if let Expr::Dict(ast::ExprDict { keys, .. }) = &right {
-        if keys.iter().any(Option::is_none) {
-            return; // contains **x splat
-        }
+    let Expr::Dict(ast::ExprDict { keys, .. }) = &right else {
+        return;
+    };
 
-        let mut keywords = FxHashSet::default();
-        for key in keys.iter().flatten() {
-            match key {
-                Expr::Constant(ast::ExprConstant {
-                    value: Constant::Str(value),
-                    ..
-                }) => {
-                    keywords.insert(value);
-                }
-                _ => {
-                    return; // Dynamic keys present
-                }
+    if keys.iter().any(Option::is_none) {
+        return; // contains **x splat
+    }
+
+    let mut keywords = FxHashSet::default();
+    for key in keys.iter().flatten() {
+        match key {
+            Expr::Constant(ast::ExprConstant {
+                value: Constant::Str(value),
+                ..
+            }) => {
+                keywords.insert(value);
+            }
+            _ => {
+                return; // Dynamic keys present
             }
         }
+    }
 
-        let missing: Vec<&String> = summary
-            .keywords
-            .iter()
-            .filter(|k| !keywords.contains(k))
-            .collect();
+    let missing: Vec<&String> = summary
+        .keywords
+        .iter()
+        .filter(|k| !keywords.contains(k))
+        .collect();
 
-        if !missing.is_empty() {
-            checker.diagnostics.push(Diagnostic::new(
-                PercentFormatMissingArgument {
-                    missing: missing.iter().map(|&s| s.clone()).collect(),
-                },
-                location,
-            ));
-        }
+    if !missing.is_empty() {
+        checker.diagnostics.push(Diagnostic::new(
+            PercentFormatMissingArgument {
+                missing: missing.iter().map(|&s| s.clone()).collect(),
+            },
+            location,
+        ));
     }
 }
 
@@ -699,7 +701,7 @@ pub(crate) fn percent_format_positional_count_mismatch(
     if let Expr::Tuple(ast::ExprTuple { elts, .. }) = right {
         let mut found = 0;
         for elt in elts {
-            if let Expr::Starred(_) = &elt {
+            if elt.is_starred_expr() {
                 return;
             }
             found += 1;
