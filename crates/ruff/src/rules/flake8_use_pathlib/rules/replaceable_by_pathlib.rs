@@ -90,8 +90,18 @@ pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, expr: &Expr) {
                 // PTH124
                 ["py", "path", "local"] => Some(PyPath.into()),
                 // PTH207
-                ["glob", "glob"] => Some(Glob.into()),
-                ["glob", "iglob"] => Some(Glob.into()),
+                ["glob", "glob"] => Some(
+                    Glob{
+                        function: "glob".to_string(),
+                    }
+                    .into(),
+                ),
+                ["glob", "glob"] => Some(
+                    Glob{
+                        function: "iglob".to_string(),
+                    }
+                    .into(),
+                ),
                 // PTH115
                 // Python 3.9+
                 ["os", "readlink"] if checker.settings.target_version >= PythonVersion::Py39 => {
