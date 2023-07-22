@@ -48,6 +48,31 @@ impl Format<PyFormatContext<'_>> for FormatFloat<'_> {
     }
 }
 
+pub(super) struct FormatComplex<'a> {
+    constant: &'a ExprConstant,
+}
+
+impl<'a> FormatComplex<'a> {
+    pub(super) fn new(constant: &'a ExprConstant) -> Self {
+        debug_assert!(constant.value.is_complex());
+        Self { constant }
+    }
+}
+
+impl Format<PyFormatContext<'_>> for FormatComplex<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+        let range = self.constant.range();
+        let content = f.context().locator().slice(range);
+        write!(
+            f,
+            [
+                FormatFloatNumber::new(content.trim_end_matches(['j', 'J'])),
+                text("j"),
+            ]
+        )
+    }
+}
+
 struct FormatFloatNumber<'a> {
     number: &'a str,
 }
