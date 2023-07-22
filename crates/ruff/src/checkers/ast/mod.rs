@@ -3037,6 +3037,9 @@ where
                 if self.enabled(Rule::DjangoLocalsInRenderFunction) {
                     flake8_django::rules::locals_in_render_function(self, func, args, keywords);
                 }
+                if self.is_stub && self.enabled(Rule::UnsupportedMethodCallOnAll) {
+                    flake8_pyi::rules::unsupported_method_call_on_all(self, func);
+                }
             }
             Expr::Dict(ast::ExprDict {
                 keys,
