@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::is_const_none;
+use ruff_python_ast::helpers::{find_keyword, is_const_none};
 use rustpython_parser::ast::{Expr, Keyword, Ranged};
 
 use crate::checkers::ast::Checker;
@@ -57,14 +57,7 @@ pub(crate) fn subprocess_popen_preexec_fn(checker: &mut Checker, func: &Expr, kw
             matches!(call_path.as_slice(), ["subprocess", "Popen"])
         })
     {
-        if let Some(preexec_fn) = kwargs
-            .iter()
-            .find(|keyword| {
-                keyword
-                    .arg
-                    .as_ref()
-                    .map_or(false, |keyword| keyword.as_str() == "preexec_fn")
-            })
+        if let Some(preexec_fn) = find_keyword(kwargs, "preexec_fn")
             .map(|keyword| &keyword.value)
             .filter(|value| !is_const_none(value))
         {
