@@ -67,6 +67,7 @@ pub(crate) fn os_sep_split(
     };
 
     let sep = if !args.is_empty() {
+        // `.split(os.sep)`
         let [arg] = args else {
             return;
         };
