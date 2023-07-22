@@ -614,8 +614,8 @@ pub(crate) fn percent_format_extra_named_arguments(
             let edit = remove_unused_format_arguments_from_dict(
                 &indexes,
                 right,
-                checker.locator,
-                checker.stylist,
+                checker.locator(),
+                checker.stylist(),
             )?;
             Ok(Fix::automatic(edit))
         });
@@ -784,8 +784,8 @@ pub(crate) fn string_dot_format_extra_named_arguments(
             let edit = remove_unused_keyword_arguments_from_format_call(
                 &indexes,
                 location,
-                checker.locator,
-                checker.stylist,
+                checker.locator(),
+                checker.stylist(),
             )?;
             Ok(Fix::automatic(edit))
         });
@@ -853,8 +853,8 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
                 let edit = remove_unused_positional_arguments_from_format_call(
                     &missing,
                     location,
-                    checker.locator,
-                    checker.stylist,
+                    checker.locator(),
+                    checker.stylist(),
                 )?;
                 Ok(Fix::automatic(edit))
             });

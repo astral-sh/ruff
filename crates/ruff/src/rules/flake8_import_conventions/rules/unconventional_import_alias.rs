@@ -64,7 +64,7 @@ pub(crate) fn unconventional_import_alias(
         return None;
     };
 
-    let name = binding.name(checker.locator);
+    let name = binding.name(checker.locator());
     if binding.is_alias() && name == expected_alias {
         return None;
     }

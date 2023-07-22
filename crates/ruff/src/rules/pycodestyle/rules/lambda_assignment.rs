@@ -79,10 +79,10 @@ pub(crate) fn lambda_assignment(
     );
 
     if checker.patch(diagnostic.kind.rule()) {
-        if !has_leading_content(stmt.start(), checker.locator)
-            && !has_trailing_content(stmt.end(), checker.locator)
+        if !has_leading_content(stmt.start(), checker.locator())
+            && !has_trailing_content(stmt.end(), checker.locator())
         {
-            let first_line = checker.locator.line(stmt.start());
+            let first_line = checker.locator().line(stmt.start());
             let indentation = leading_indentation(first_line);
             let mut indented = String::new();
             for (idx, line) in function(
@@ -99,7 +99,7 @@ pub(crate) fn lambda_assignment(
                 if idx == 0 {
                     indented.push_str(&line);
                 } else {
-                    indented.push_str(checker.stylist.line_ending().as_str());
+                    indented.push_str(checker.stylist().line_ending().as_str());
                     indented.push_str(indentation);
                     indented.push_str(&line);
                 }

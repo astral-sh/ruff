@@ -134,7 +134,7 @@ pub(crate) fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values
                 if checker.enabled(Rule::MultiValueRepeatedKeyLiteral) {
                     let mut diagnostic = Diagnostic::new(
                         MultiValueRepeatedKeyLiteral {
-                            name: checker.locator.slice(key.range()).to_string(),
+                            name: checker.locator().slice(key.range()).to_string(),
                         },
                         key.range(),
                     );
@@ -153,7 +153,7 @@ pub(crate) fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values
                 if checker.enabled(Rule::MultiValueRepeatedKeyVariable) {
                     let mut diagnostic = Diagnostic::new(
                         MultiValueRepeatedKeyVariable {
-                            name: checker.locator.slice(key.range()).to_string(),
+                            name: checker.locator().slice(key.range()).to_string(),
                         },
                         key.range(),
                     );

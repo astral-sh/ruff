@@ -102,7 +102,7 @@ pub(crate) fn inplace_argument(
                         && !checker.semantic().scope().kind.is_lambda()
                     {
                         if let Some(fix) = convert_inplace_argument_to_assignment(
-                            checker.locator,
+                            checker.locator(),
                             expr,
                             keyword.range(),
                             args,

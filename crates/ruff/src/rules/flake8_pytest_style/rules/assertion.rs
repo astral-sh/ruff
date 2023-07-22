@@ -197,7 +197,7 @@ pub(crate) fn unittest_assertion(
                     if checker.semantic().stmt().is_expr_stmt()
                         && checker.semantic().expr_parent().is_none()
                         && !checker.semantic().scope().kind.is_lambda()
-                        && !checker.indexer.comment_ranges().intersects(expr.range())
+                        && !checker.indexer().comment_ranges().intersects(expr.range())
                     {
                         if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
                             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
@@ -483,11 +483,11 @@ pub(crate) fn composite_condition(
         if checker.patch(diagnostic.kind.rule()) {
             if matches!(composite, CompositionKind::Simple)
                 && msg.is_none()
-                && !checker.indexer.comment_ranges().intersects(stmt.range())
+                && !checker.indexer().comment_ranges().intersects(stmt.range())
             {
                 #[allow(deprecated)]
                 diagnostic.try_set_fix_from_edit(|| {
-                    fix_composite_condition(stmt, checker.locator, checker.stylist)
+                    fix_composite_condition(stmt, checker.locator(), checker.stylist())
                 });
             }
         }

@@ -418,7 +418,7 @@ pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, arguments: &
             if !is_valid_default_value_with_annotation(
                 default,
                 true,
-                checker.locator,
+                checker.locator(),
                 checker.semantic(),
             ) {
                 let mut diagnostic = Diagnostic::new(TypedArgumentDefaultInStub, default.range());
@@ -455,7 +455,7 @@ pub(crate) fn argument_simple_defaults(checker: &mut Checker, arguments: &Argume
             if !is_valid_default_value_with_annotation(
                 default,
                 true,
-                checker.locator,
+                checker.locator(),
                 checker.semantic(),
             ) {
                 let mut diagnostic = Diagnostic::new(ArgumentDefaultInStub, default.range());
@@ -490,7 +490,7 @@ pub(crate) fn assignment_default_in_stub(checker: &mut Checker, targets: &[Expr]
     if is_valid_default_value_without_annotation(value) {
         return;
     }
-    if is_valid_default_value_with_annotation(value, true, checker.locator, checker.semantic()) {
+    if is_valid_default_value_with_annotation(value, true, checker.locator(), checker.semantic()) {
         return;
     }
 
@@ -526,7 +526,7 @@ pub(crate) fn annotated_assignment_default_in_stub(
     if is_final_assignment(annotation, value, checker.semantic()) {
         return;
     }
-    if is_valid_default_value_with_annotation(value, true, checker.locator, checker.semantic()) {
+    if is_valid_default_value_with_annotation(value, true, checker.locator(), checker.semantic()) {
         return;
     }
 
@@ -561,7 +561,7 @@ pub(crate) fn unannotated_assignment_in_stub(
     if is_valid_default_value_without_annotation(value) {
         return;
     }
-    if !is_valid_default_value_with_annotation(value, true, checker.locator, checker.semantic()) {
+    if !is_valid_default_value_with_annotation(value, true, checker.locator(), checker.semantic()) {
         return;
     }
 
@@ -623,7 +623,7 @@ pub(crate) fn type_alias_without_annotation(checker: &mut Checker, value: &Expr,
     );
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = checker.importer.get_or_import_symbol(
+            let (import_edit, binding) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import("typing", "TypeAlias"),
                 target.start(),
                 checker.semantic(),
