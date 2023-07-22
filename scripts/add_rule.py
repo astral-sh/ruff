@@ -20,11 +20,12 @@ from _utils import ROOT_DIR, dir_name, get_indent, pascal_case, snake_case
 def main(*, name: str, prefix: str, code: str, linter: str) -> None:
     """Generate boilerplate for a new rule."""
     # Create a test fixture.
+    filestem = f"{prefix}{code}" if linter != "pylint" else snake_case(name)
     with (
         ROOT_DIR
         / "crates/ruff/resources/test/fixtures"
         / dir_name(linter)
-        / f"{prefix}{code}.py"
+        / f"{filestem}.py"
     ).open(
         "a",
     ):
@@ -45,7 +46,6 @@ def main(*, name: str, prefix: str, code: str, linter: str) -> None:
                 line.strip() == "fn rules(rule_code: Rule, path: &Path) -> Result<()> {"
             ):
                 indent = get_indent(line)
-                filestem = f"{prefix}{code}" if linter != "pylint" else snake_case(name)
                 lines.append(
                     f'{indent}#[test_case(Rule::{name}, Path::new("{filestem}.py"))]',
                 )
