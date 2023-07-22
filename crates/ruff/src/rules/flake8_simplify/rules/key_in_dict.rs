@@ -37,18 +37,27 @@ use crate::registry::AsRule;
 pub struct InDictKeys {
     key: String,
     dict: String,
+    operator: String,
 }
 
 impl AlwaysAutofixableViolation for InDictKeys {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let InDictKeys { key, dict } = self;
-        format!("Use `{key} in {dict}` instead of `{key} in {dict}.keys()`")
+        let InDictKeys {
+            key,
+            dict,
+            operator,
+        } = self;
+        format!("Use `{key} {operator} {dict}` instead of `{key} {operator} {dict}.keys()`")
     }
 
     fn autofix_title(&self) -> String {
-        let InDictKeys { key, dict } = self;
-        format!("Convert to `{key} in {dict}`")
+        let InDictKeys {
+            key,
+            dict,
+            operator,
+        } = self;
+        format!("Convert to `{key} {operator} {dict}`")
     }
 }
 
@@ -66,7 +75,13 @@ fn get_value_content_for_key_in_dict(
 }
 
 /// SIM118
-fn key_in_dict(checker: &mut Checker, left: &Expr, right: &Expr, range: TextRange) {
+fn key_in_dict(
+    checker: &mut Checker,
+    left: &Expr,
+    right: &Expr,
+    operator: String,
+    range: TextRange,
+) {
     let Expr::Call(ast::ExprCall {
         func,
         args,
@@ -102,6 +117,7 @@ fn key_in_dict(checker: &mut Checker, left: &Expr, right: &Expr, range: TextRang
         InDictKeys {
             key: left_content.to_string(),
             dict: value_content.clone(),
+            operator,
         },
         range,
     );
@@ -120,6 +136,7 @@ pub(crate) fn key_in_dict_for(checker: &mut Checker, target: &Expr, iter: &Expr)
         checker,
         target,
         iter,
+        "in".to_string(),
         TextRange::new(target.start(), iter.end()),
     );
 }
@@ -132,7 +149,11 @@ pub(crate) fn key_in_dict_compare(
     ops: &[CmpOp],
     comparators: &[Expr],
 ) {
-    if !matches!(ops[..], [CmpOp::In]) {
+    let [op] = ops else {
+        return;
+    };
+
+    if !matches!(op, CmpOp::In | CmpOp::NotIn) {
         return;
     }
 
@@ -141,5 +162,5 @@ pub(crate) fn key_in_dict_compare(
     }
     let right = comparators.first().unwrap();
 
-    key_in_dict(checker, left, right, expr.range());
+    key_in_dict(checker, left, right, op.as_str().to_string(), expr.range());
 }
