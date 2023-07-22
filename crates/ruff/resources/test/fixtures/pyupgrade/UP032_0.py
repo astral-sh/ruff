@@ -132,6 +132,14 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     ]
 )
 
+"{a}".format(
+    a=[
+        1,
+        2,
+        3,
+    ]
+)
+
 async def c():
     return "{}".format(await 3)
 
