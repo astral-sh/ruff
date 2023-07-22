@@ -5,7 +5,7 @@ use ruff_formatter::write;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::str::is_implicit_concatenation;
 
-use crate::expression::number::FormatInt;
+use crate::expression::number::{FormatFloat, FormatInt};
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::expression::string::{FormatString, StringPrefix, StringQuotes};
 use crate::prelude::*;
@@ -30,7 +30,8 @@ impl FormatNodeRule<ExprConstant> for FormatExprConstant {
                 false => text("False").fmt(f),
             },
             Constant::Int(_) => FormatInt::new(item).fmt(f),
-            Constant::Float(_) | Constant::Complex { .. } => {
+            Constant::Float(_) => FormatFloat::new(item).fmt(f),
+            Constant::Complex { .. } => {
                 write!(f, [verbatim_text(item)])
             }
             Constant::Str(_) => FormatString::new(item).fmt(f),
