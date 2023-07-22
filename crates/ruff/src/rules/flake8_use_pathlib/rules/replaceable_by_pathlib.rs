@@ -91,6 +91,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, expr: &Expr) {
                 ["py", "path", "local"] => Some(PyPath.into()),
                 // PTH207
                 ["glob", "glob"] => Some(Glob.into()),
+                ["glob", "iglob"] => Some(Glob.into()),
                 // PTH115
                 // Python 3.9+
                 ["os", "readlink"] if checker.settings.target_version >= PythonVersion::Py39 => {
