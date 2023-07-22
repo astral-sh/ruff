@@ -163,8 +163,14 @@ pub(crate) fn unnecessary_map(
     let mut diagnostic = Diagnostic::new(UnnecessaryMap { object_type }, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {
-            fixes::fix_unnecessary_map(checker.locator, checker.stylist, expr, parent, object_type)
-                .map(Fix::suggested)
+            fixes::fix_unnecessary_map(
+                checker.locator(),
+                checker.stylist(),
+                expr,
+                parent,
+                object_type,
+            )
+            .map(Fix::suggested)
         });
     }
     checker.diagnostics.push(diagnostic);

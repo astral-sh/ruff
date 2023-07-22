@@ -7,7 +7,7 @@ use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::source_code::Locator;
-use ruff_python_semantic::ScopeId;
+use ruff_python_semantic::Scope;
 
 use crate::autofix::edits::delete_stmt;
 use crate::checkers::ast::Checker;
@@ -204,13 +204,13 @@ fn remove_unused_variable(
                     // If the expression is complex (`x = foo()`), remove the assignment,
                     // but preserve the right-hand side.
                     let start = target.start();
-                    let end =
-                        match_token_after(start, checker.locator, |tok| tok == Tok::Equal)?.start();
+                    let end = match_token_after(start, checker.locator(), |tok| tok == Tok::Equal)?
+                        .start();
                     let edit = Edit::deletion(start, end);
                     Some(Fix::suggested(edit))
                 } else {
                     // If (e.g.) assigning to a constant (`x = 1`), delete the entire statement.
-                    let edit = delete_stmt(stmt, parent, checker.locator, checker.indexer);
+                    let edit = delete_stmt(stmt, parent, checker.locator(), checker.indexer());
                     Some(Fix::suggested(edit).isolate(checker.isolation(parent)))
                 };
             }
@@ -230,12 +230,12 @@ fn remove_unused_variable(
                 // but preserve the right-hand side.
                 let start = stmt.start();
                 let end =
-                    match_token_after(start, checker.locator, |tok| tok == Tok::Equal)?.start();
+                    match_token_after(start, checker.locator(), |tok| tok == Tok::Equal)?.start();
                 let edit = Edit::deletion(start, end);
                 Some(Fix::suggested(edit))
             } else {
                 // If (e.g.) assigning to a constant (`x = 1`), delete the entire statement.
-                let edit = delete_stmt(stmt, parent, checker.locator, checker.indexer);
+                let edit = delete_stmt(stmt, parent, checker.locator(), checker.indexer());
                 Some(Fix::suggested(edit).isolate(checker.isolation(parent)))
             };
         }
@@ -250,13 +250,13 @@ fn remove_unused_variable(
                 if optional_vars.range() == range {
                     // Find the first token before the `as` keyword.
                     let start =
-                        match_token_before(item.context_expr.start(), checker.locator, |tok| {
+                        match_token_before(item.context_expr.start(), checker.locator(), |tok| {
                             tok == Tok::As
                         })?
                         .end();
 
                     // Find the first colon, comma, or closing bracket after the `as` keyword.
-                    let end = match_token_or_closing_brace(start, checker.locator, |tok| {
+                    let end = match_token_or_closing_brace(start, checker.locator(), |tok| {
                         tok == Tok::Colon || tok == Tok::Comma
                     })?
                     .start();
@@ -272,13 +272,12 @@ fn remove_unused_variable(
 }
 
 /// F841
-pub(crate) fn unused_variable(checker: &mut Checker, scope: ScopeId) {
-    let scope = &checker.semantic().scopes[scope];
+pub(crate) fn unused_variable(checker: &Checker, scope: &Scope, diagnostics: &mut Vec<Diagnostic>) {
     if scope.uses_locals() && scope.kind.is_any_function() {
         return;
     }
 
-    let bindings: Vec<_> = scope
+    for (name, range, source) in scope
         .bindings()
         .map(|(name, binding_id)| (name, checker.semantic().binding(binding_id)))
         .filter_map(|(name, binding)| {
@@ -297,9 +296,7 @@ pub(crate) fn unused_variable(checker: &mut Checker, scope: ScopeId) {
 
             None
         })
-        .collect();
-
-    for (name, range, source) in bindings {
+    {
         let mut diagnostic = Diagnostic::new(UnusedVariable { name }, range);
         if checker.patch(diagnostic.kind.rule()) {
             if let Some(source) = source {
@@ -310,6 +307,6 @@ pub(crate) fn unused_variable(checker: &mut Checker, scope: ScopeId) {
                 }
             }
         }
-        checker.diagnostics.push(diagnostic);
+        diagnostics.push(diagnostic);
     }
 }

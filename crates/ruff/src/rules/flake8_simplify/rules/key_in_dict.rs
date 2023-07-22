@@ -88,9 +88,9 @@ fn key_in_dict(checker: &mut Checker, left: &Expr, right: &Expr, range: TextRang
     }
 
     // Slice exact content to preserve formatting.
-    let left_content = checker.locator.slice(left.range());
+    let left_content = checker.locator().slice(left.range());
     let value_content =
-        match get_value_content_for_key_in_dict(checker.locator, checker.stylist, right) {
+        match get_value_content_for_key_in_dict(checker.locator(), checker.stylist(), right) {
             Ok(value_content) => value_content,
             Err(err) => {
                 error!("Failed to get value content for key in dict: {}", err);

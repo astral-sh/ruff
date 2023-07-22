@@ -3,6 +3,7 @@ use rustpython_parser::ast::{Constant, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::find_keyword;
 
 use crate::checkers::ast::Checker;
 
@@ -56,15 +57,7 @@ pub(crate) fn use_of_read_table(checker: &mut Checker, func: &Expr, keywords: &[
         if let Some(Expr::Constant(ast::ExprConstant {
             value: Constant::Str(value),
             ..
-        })) = keywords
-            .iter()
-            .find(|keyword| {
-                keyword
-                    .arg
-                    .as_ref()
-                    .map_or(false, |keyword| keyword.as_str() == "sep")
-            })
-            .map(|keyword| &keyword.value)
+        })) = find_keyword(keywords, "sep").map(|keyword| &keyword.value)
         {
             if value.as_str() == "," {
                 checker

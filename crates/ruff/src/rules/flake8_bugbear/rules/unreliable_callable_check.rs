@@ -83,7 +83,7 @@ pub(crate) fn unreliable_callable_check(
         if id == "hasattr" {
             if checker.semantic().is_builtin("callable") {
                 diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                    format!("callable({})", checker.locator.slice(obj.range())),
+                    format!("callable({})", checker.locator().slice(obj.range())),
                     expr.range(),
                 )));
             }

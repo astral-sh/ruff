@@ -174,7 +174,7 @@ pub(crate) fn yoda_conditions(
         return;
     }
 
-    if let Ok(suggestion) = reverse_comparison(expr, checker.locator, checker.stylist) {
+    if let Ok(suggestion) = reverse_comparison(expr, checker.locator(), checker.stylist()) {
         let mut diagnostic = Diagnostic::new(
             YodaConditions {
                 suggestion: Some(suggestion.to_string()),

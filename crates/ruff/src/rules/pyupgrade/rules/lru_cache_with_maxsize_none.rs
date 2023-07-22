@@ -91,7 +91,7 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list:
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     diagnostic.try_set_fix(|| {
-                        let (import_edit, binding) = checker.importer.get_or_import_symbol(
+                        let (import_edit, binding) = checker.importer().get_or_import_symbol(
                             &ImportRequest::import("functools", "cache"),
                             decorator.start(),
                             checker.semantic(),

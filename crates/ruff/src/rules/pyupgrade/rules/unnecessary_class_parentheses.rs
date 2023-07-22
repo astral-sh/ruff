@@ -49,7 +49,7 @@ pub(crate) fn unnecessary_class_parentheses(checker: &mut Checker, class_def: &a
     }
 
     let offset = class_def.name.end();
-    let contents = checker.locator.after(offset);
+    let contents = checker.locator().after(offset);
 
     // Find the open and closing parentheses between the class name and the colon, if they exist.
     let mut depth = 0u32;

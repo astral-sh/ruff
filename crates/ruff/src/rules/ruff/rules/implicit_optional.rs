@@ -140,7 +140,7 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
             )))
         }
         ConversionType::Optional => {
-            let (import_edit, binding) = checker.importer.get_or_import_symbol(
+            let (import_edit, binding) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import_from("typing", "Optional"),
                 expr.start(),
                 checker.semantic(),
@@ -191,11 +191,12 @@ pub(crate) fn implicit_optional(checker: &mut Checker, arguments: &Arguments) {
         }) = annotation.as_ref()
         {
             // Quoted annotation.
-            if let Ok((annotation, kind)) = parse_type_annotation(string, *range, checker.locator) {
+            if let Ok((annotation, kind)) = parse_type_annotation(string, *range, checker.locator())
+            {
                 let Some(expr) = type_hint_explicitly_allows_none(
                     &annotation,
                     checker.semantic(),
-                    checker.locator,
+                    checker.locator(),
                     checker.settings.target_version.minor(),
                 ) else {
                     continue;
@@ -216,7 +217,7 @@ pub(crate) fn implicit_optional(checker: &mut Checker, arguments: &Arguments) {
             let Some(expr) = type_hint_explicitly_allows_none(
                 annotation,
                 checker.semantic(),
-                checker.locator,
+                checker.locator(),
                 checker.settings.target_version.minor(),
             ) else {
                 continue;

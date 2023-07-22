@@ -175,7 +175,7 @@ pub(crate) fn unnecessary_encode_utf8(
                         expr.range(),
                     );
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
-                        diagnostic.set_fix(replace_with_bytes_literal(checker.locator, expr));
+                        diagnostic.set_fix(replace_with_bytes_literal(checker.locator(), expr));
                     }
                     checker.diagnostics.push(diagnostic);
                 } else if let EncodingArg::Keyword(kwarg) = encoding_arg {
@@ -190,7 +190,7 @@ pub(crate) fn unnecessary_encode_utf8(
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
                         diagnostic.try_set_fix(|| {
                             remove_argument(
-                                checker.locator,
+                                checker.locator(),
                                 func.end(),
                                 kwarg.range(),
                                 args,
@@ -212,7 +212,7 @@ pub(crate) fn unnecessary_encode_utf8(
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
                         diagnostic.try_set_fix(|| {
                             remove_argument(
-                                checker.locator,
+                                checker.locator(),
                                 func.end(),
                                 arg.range(),
                                 args,
@@ -241,7 +241,7 @@ pub(crate) fn unnecessary_encode_utf8(
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
                         diagnostic.try_set_fix(|| {
                             remove_argument(
-                                checker.locator,
+                                checker.locator(),
                                 func.end(),
                                 kwarg.range(),
                                 args,
@@ -263,7 +263,7 @@ pub(crate) fn unnecessary_encode_utf8(
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
                         diagnostic.try_set_fix(|| {
                             remove_argument(
-                                checker.locator,
+                                checker.locator(),
                                 func.end(),
                                 arg.range(),
                                 args,

@@ -422,9 +422,18 @@ fn run() -> Result<()> {
     let loop_start = Instant::now();
     let mut stats = HashMap::new();
 
-    let mut num_iterations = 0;
-    // normalize line endings for the remove newline dependent rules
+    // Normalize line endings for the remove newline dependent rules
     let mut input = fs::read_to_string(args.input_file)?.replace('\r', "");
+
+    // This can happen e.g. when main changed between collecting the errors list and running this
+    // script
+    if !is_failing(&input, &args.output_file, &command_args, &pattern)? {
+        println!("Input doesn't match");
+        fs::write(&args.output_file, "")?;
+        return Ok(());
+    }
+
+    let mut num_iterations = 0;
     let mut last_strategy_and_idx = None;
     loop {
         let start = Instant::now();
@@ -461,9 +470,10 @@ fn run() -> Result<()> {
 
     println!("Strategies taken: {stats:?}");
     println!(
-        "Done with {num_iterations} iterations in {:.2}s. Find your minimized example in {}",
+        "Done with {num_iterations} iterations in {:.2}s. Find your minimized example in {}:\n---\n{}\n---\n",
         loop_start.elapsed().as_secs_f32(),
-        args.output_file.display()
+        args.output_file.display(),
+        input
     );
 
     Ok(())

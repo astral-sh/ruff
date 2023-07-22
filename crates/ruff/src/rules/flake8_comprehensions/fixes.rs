@@ -61,8 +61,8 @@ pub(crate) fn fix_unnecessary_generator_set(
     checker: &Checker,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
-    let locator = checker.locator;
-    let stylist = checker.stylist;
+    let locator = checker.locator();
+    let stylist = checker.stylist();
 
     // Expr(Call(GeneratorExp)))) -> Expr(SetComp)))
     let module_text = locator.slice(expr.range());
@@ -99,8 +99,8 @@ pub(crate) fn fix_unnecessary_generator_dict(
     checker: &Checker,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
-    let locator = checker.locator;
-    let stylist = checker.stylist;
+    let locator = checker.locator();
+    let stylist = checker.stylist();
 
     let module_text = locator.slice(expr.range());
     let mut tree = match_expression(module_text)?;
@@ -142,8 +142,8 @@ pub(crate) fn fix_unnecessary_list_comprehension_set(
     checker: &Checker,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
-    let locator = checker.locator;
-    let stylist = checker.stylist;
+    let locator = checker.locator();
+    let stylist = checker.stylist();
     // Expr(Call(ListComp)))) ->
     // Expr(SetComp)))
     let module_text = locator.slice(expr.range());
@@ -178,8 +178,8 @@ pub(crate) fn fix_unnecessary_list_comprehension_dict(
     checker: &Checker,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
-    let locator = checker.locator;
-    let stylist = checker.stylist;
+    let locator = checker.locator();
+    let stylist = checker.stylist();
 
     let module_text = locator.slice(expr.range());
     let mut tree = match_expression(module_text)?;
@@ -265,8 +265,8 @@ pub(crate) fn fix_unnecessary_literal_set(
     checker: &Checker,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
-    let locator = checker.locator;
-    let stylist = checker.stylist;
+    let locator = checker.locator();
+    let stylist = checker.stylist();
 
     // Expr(Call(List|Tuple)))) -> Expr(Set)))
     let module_text = locator.slice(expr.range());
@@ -309,8 +309,8 @@ pub(crate) fn fix_unnecessary_literal_dict(
     checker: &Checker,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
-    let locator = checker.locator;
-    let stylist = checker.stylist;
+    let locator = checker.locator();
+    let stylist = checker.stylist();
 
     // Expr(Call(List|Tuple)))) -> Expr(Dict)))
     let module_text = locator.slice(expr.range());
@@ -381,8 +381,8 @@ pub(crate) fn fix_unnecessary_collection_call(
         Dict,
     }
 
-    let locator = checker.locator;
-    let stylist = checker.stylist;
+    let locator = checker.locator();
+    let stylist = checker.stylist();
 
     // Expr(Call("list" | "tuple" | "dict")))) -> Expr(List|Tuple|Dict)
     let module_text = locator.slice(expr.range());
@@ -511,12 +511,12 @@ fn pad_expression(content: String, range: TextRange, checker: &Checker) -> Strin
 
     // If the expression is immediately preceded by an opening brace, then
     // we need to add a space before the expression.
-    let prefix = checker.locator.up_to(range.start());
+    let prefix = checker.locator().up_to(range.start());
     let left_pad = matches!(prefix.chars().next_back(), Some('{'));
 
     // If the expression is immediately preceded by an opening brace, then
     // we need to add a space before the expression.
-    let suffix = checker.locator.after(range.end());
+    let suffix = checker.locator().after(range.end());
     let right_pad = matches!(suffix.chars().next(), Some('}'));
 
     if left_pad && right_pad {

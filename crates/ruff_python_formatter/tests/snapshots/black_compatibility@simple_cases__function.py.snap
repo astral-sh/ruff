@@ -141,23 +141,6 @@ def __await__(): return (yield)
  
  
  def long_lines():
-@@ -135,14 +130,8 @@
-     a,
-     **kwargs,
- ) -> A:
--    return (
--        yield from A(
--            very_long_argument_name1=very_long_value_for_the_argument,
--            very_long_argument_name2=very_long_value_for_the_argument,
--            **kwargs,
--        )
--    )
-+    return NOT_YET_IMPLEMENTED_ExprYieldFrom
- 
- 
- def __await__():
--    return (yield)
-+    return NOT_YET_IMPLEMENTED_ExprYield
 ```
 
 ## Ruff Output
@@ -295,11 +278,17 @@ def f(
     a,
     **kwargs,
 ) -> A:
-    return NOT_YET_IMPLEMENTED_ExprYieldFrom
+    return (
+        yield from A(
+            very_long_argument_name1=very_long_value_for_the_argument,
+            very_long_argument_name2=very_long_value_for_the_argument,
+            **kwargs,
+        )
+    )
 
 
 def __await__():
-    return NOT_YET_IMPLEMENTED_ExprYield
+    return (yield)
 ```
 
 ## Black Output

@@ -343,12 +343,8 @@ long_unmergable_string_with_pragma = (
  )
  
  func_with_bad_parens_that_wont_fit_in_one_line(
-@@ -271,10 +267,10 @@
- 
- 
- def foo():
--    yield "This is a really long string that can't possibly be expected to fit all together on one line. In fact it may even take up three or more lines... like four or five... but probably just three."
-+    NOT_YET_IMPLEMENTED_ExprYield
+@@ -274,7 +270,7 @@
+     yield "This is a really long string that can't possibly be expected to fit all together on one line. In fact it may even take up three or more lines... like four or five... but probably just three."
  
  
 -x = f"This is a {{really}} long string that needs to be split without a doubt (i.e. most definitely). In short, this {string} that can't possibly be {{expected}} to fit all together on one line. In {fact} it may even take up three or more lines... like four or five... but probably just four."
@@ -630,7 +626,7 @@ raw_strings = r"Don't" " get" r" merged" " unless they are all raw."
 
 
 def foo():
-    NOT_YET_IMPLEMENTED_ExprYield
+    yield "This is a really long string that can't possibly be expected to fit all together on one line. In fact it may even take up three or more lines... like four or five... but probably just three."
 
 
 x = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"

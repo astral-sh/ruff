@@ -44,7 +44,7 @@ pub(crate) fn static_key_dict_comprehension(checker: &mut Checker, key: &Expr) {
     if is_constant(key) {
         checker.diagnostics.push(Diagnostic::new(
             StaticKeyDictComprehension {
-                key: checker.locator.slice(key.range()).to_string(),
+                key: checker.locator().slice(key.range()).to_string(),
             },
             key.range(),
         ));
