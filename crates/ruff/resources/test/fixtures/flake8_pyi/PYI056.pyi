@@ -1,10 +1,12 @@
 __all__ = ["A", "B", "C"]
 
+# Errors
 __all__.append("D")
 __all__.extend(["E", "Foo"])
 __all__.remove("A")
 
-# these are ok
+# OK
 __all__ += ["D"]
-l = ["Hello"]
-l.append("World")
+foo = ["Hello"]
+foo.append("World")
+foo.bar.append("World")
