@@ -84,14 +84,11 @@ pub(crate) fn type_bivariance(checker: &mut Checker, value: &Expr) {
         return;
     };
 
-    let Some(covariant) = find_keyword(keywords, "covariant")
-        .map(|keyword| &keyword.value)
-    else {
+    let Some(covariant) = find_keyword(keywords, "covariant").map(|keyword| &keyword.value) else {
         return;
     };
 
-    let Some(contravariant) = find_keyword(keywords, "contravariant")
-        .map(|keyword| &keyword.value)
+    let Some(contravariant) = find_keyword(keywords, "contravariant").map(|keyword| &keyword.value)
     else {
         return;
     };

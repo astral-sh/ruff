@@ -89,10 +89,10 @@ pub(crate) fn invalid_envvar_value(
         })
     {
         // Find the `key` argument, if it exists.
-        let Some(expr) = args.get(0).or_else(|| {
-            find_keyword(keywords, "key")
-                .map(|keyword| &keyword.value)
-        }) else {
+        let Some(expr) = args
+            .get(0)
+            .or_else(|| find_keyword(keywords, "key").map(|keyword| &keyword.value))
+        else {
             return;
         };
 
