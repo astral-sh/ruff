@@ -307,6 +307,21 @@ where
                         pycodestyle::rules::ambiguous_variable_name(name, name.range())
                     }));
                 }
+
+                if self.enabled(Rule::NonlocalWithoutBinding) {
+                    if !self.semantic.scope_id.is_global() {
+                        for name in names {
+                            if self.semantic.nonlocal(name).is_none() {
+                                self.diagnostics.push(Diagnostic::new(
+                                    pylint::rules::NonlocalWithoutBinding {
+                                        name: name.to_string(),
+                                    },
+                                    name.range(),
+                                ));
+                            }
+                        }
+                    }
+                }
             }
             Stmt::Break(_) => {
                 if self.enabled(Rule::BreakOutsideLoop) {
@@ -1814,15 +1829,6 @@ where
                             );
                             let scope = self.semantic.scope_mut();
                             scope.add(name, binding_id);
-                        } else {
-                            if self.enabled(Rule::NonlocalWithoutBinding) {
-                                self.diagnostics.push(Diagnostic::new(
-                                    pylint::rules::NonlocalWithoutBinding {
-                                        name: name.to_string(),
-                                    },
-                                    name.range(),
-                                ));
-                            }
                         }
                     }
                 }
