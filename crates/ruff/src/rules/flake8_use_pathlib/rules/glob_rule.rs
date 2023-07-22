@@ -43,11 +43,14 @@ use ruff_macros::{derive_message_formats, violation};
 /// - [Python documentation: `glob.iglob`](https://docs.python.org/3/library/glob.html#glob.glob)
 /// ```
 #[violation]
-pub struct Glob;
+pub struct Glob {
+    pub function: String,
+}
 
 impl Violation for Glob {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Replace `(i)glob` with `Path.(r)glob`")
+        let Glob { function } = self;
+        format!("Replace `{function}` with `Path.glob` or `Path.rglob`")
     }
 }
