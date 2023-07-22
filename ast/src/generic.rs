@@ -1820,7 +1820,7 @@ impl Node for ExprContext {
     const FIELD_NAMES: &'static [&'static str] = &[];
 }
 
-/// See also [boolop](https://docs.python.org/3/library/ast.html#ast.boolop)
+/// See also [boolop](https://docs.python.org/3/library/ast.html#ast.BoolOp)
 #[derive(Clone, Debug, PartialEq, is_macro::Is, Copy, Hash, Eq)]
 pub enum BoolOp {
     And,
