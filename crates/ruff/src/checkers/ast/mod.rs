@@ -3934,11 +3934,7 @@ where
                 }
             }
             Expr::JoinedStr(_) => {
-                self.semantic.flags |= if self.semantic.in_f_string() {
-                    SemanticModelFlags::NESTED_F_STRING
-                } else {
-                    SemanticModelFlags::F_STRING
-                };
+                self.semantic.flags |= SemanticModelFlags::F_STRING;
                 visitor::walk_expr(self, expr);
             }
             _ => visitor::walk_expr(self, expr),

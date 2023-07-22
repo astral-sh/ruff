@@ -81,11 +81,6 @@ pub(crate) fn native_literals(
         return;
     }
 
-    // There's no way to rewrite, e.g., `f"{f'{str()}'}"` within a nested f-string.
-    if checker.semantic().in_nested_f_string() {
-        return;
-    }
-
     if !matches!(id.as_str(), "str" | "bytes") {
         return;
     }
@@ -94,80 +89,95 @@ pub(crate) fn native_literals(
         return;
     }
 
-    let Some(arg) = args.get(0) else {
-        let mut diagnostic = Diagnostic::new(
-            NativeLiterals {
-                literal_type: if id == "str" {
-                    LiteralType::Str
-                } else {
-                    LiteralType::Bytes
-                },
-            },
-            expr.range(),
-        );
-        if checker.patch(diagnostic.kind.rule()) {
-            let constant = if id == "bytes" {
-                Constant::Bytes(vec![])
-            } else {
-                Constant::Str(String::new())
-            };
-            let content = checker.generator().constant(&constant);
-            diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                content,
-                expr.range(),
-            )));
+    // There's no way to rewrite, e.g., `f"{f'{str()}'}"` within a nested f-string.
+    if checker.semantic().in_f_string() {
+        if checker
+            .semantic()
+            .expr_ancestors()
+            .filter(|expr| expr.is_joined_str_expr())
+            .count()
+            > 1
+        {
+            return;
         }
-        checker.diagnostics.push(diagnostic);
-        return;
-    };
-
-    // Look for `str("")`.
-    if id == "str"
-        && !matches!(
-            &arg,
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(_),
-                ..
-            }),
-        )
-    {
-        return;
     }
 
-    // Look for `bytes(b"")`
-    if id == "bytes"
-        && !matches!(
-            &arg,
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::Bytes(_),
-                ..
-            }),
-        )
-    {
-        return;
-    }
+    match args.get(0) {
+        None => {
+            let mut diagnostic = Diagnostic::new(
+                NativeLiterals {
+                    literal_type: if id == "str" {
+                        LiteralType::Str
+                    } else {
+                        LiteralType::Bytes
+                    },
+                },
+                expr.range(),
+            );
+            if checker.patch(diagnostic.kind.rule()) {
+                let constant = if id == "bytes" {
+                    Constant::Bytes(vec![])
+                } else {
+                    Constant::Str(String::new())
+                };
+                let content = checker.generator().constant(&constant);
+                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+                    content,
+                    expr.range(),
+                )));
+            }
+            checker.diagnostics.push(diagnostic);
+        }
+        Some(arg) => {
+            // Look for `str("")`.
+            if id == "str"
+                && !matches!(
+                    &arg,
+                    Expr::Constant(ast::ExprConstant {
+                        value: Constant::Str(_),
+                        ..
+                    }),
+                )
+            {
+                return;
+            }
 
-    // Skip implicit string concatenations.
-    let arg_code = checker.locator.slice(arg.range());
-    if is_implicit_concatenation(arg_code) {
-        return;
-    }
+            // Look for `bytes(b"")`
+            if id == "bytes"
+                && !matches!(
+                    &arg,
+                    Expr::Constant(ast::ExprConstant {
+                        value: Constant::Bytes(_),
+                        ..
+                    }),
+                )
+            {
+                return;
+            }
 
-    let mut diagnostic = Diagnostic::new(
-        NativeLiterals {
-            literal_type: if id == "str" {
-                LiteralType::Str
-            } else {
-                LiteralType::Bytes
-            },
-        },
-        expr.range(),
-    );
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-            arg_code.to_string(),
-            expr.range(),
-        )));
+            // Skip implicit string concatenations.
+            let arg_code = checker.locator.slice(arg.range());
+            if is_implicit_concatenation(arg_code) {
+                return;
+            }
+
+            let mut diagnostic = Diagnostic::new(
+                NativeLiterals {
+                    literal_type: if id == "str" {
+                        LiteralType::Str
+                    } else {
+                        LiteralType::Bytes
+                    },
+                },
+                expr.range(),
+            );
+            if checker.patch(diagnostic.kind.rule()) {
+                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+                    arg_code.to_string(),
+                    expr.range(),
+                )));
+            }
+            checker.diagnostics.push(diagnostic);
+        }
     }
-    checker.diagnostics.push(diagnostic);
 }
