@@ -96,7 +96,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, expr: &Expr) {
                     }
                     .into(),
                 ),
-                ["glob", "glob"] => Some(
+                ["glob", "iglob"] => Some(
                     Glob{
                         function: "iglob".to_string(),
                     }
