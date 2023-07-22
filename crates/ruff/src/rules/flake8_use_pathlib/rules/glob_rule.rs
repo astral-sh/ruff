@@ -2,15 +2,24 @@ use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 
 /// ## What it does
-/// Checks for the use of `glob`.
+/// Checks for the use of `glob` and `iglob`.
 ///
 /// ## Why is this bad?
 /// `pathlib` offers a high-level API for path manipulation, as compared to
 /// the lower-level API offered by `os` and `glob`.
 ///
-/// When possible, using `Path` object methods such as `Path.stat()` can
+/// When possible, using `Path` object methods such as `Path.glob()` can
 /// improve readability over their low-level counterparts (e.g.,
 /// `glob.glob()`).
+///
+/// Note that `glob.glob` and `Path.glob` are not equivalent:
+///
+/// |                   | `glob`                                                                                                                                                                          | `Path.glob`                                                                                                                                |
+/// |-------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------|
+/// | Hidden files      | Excludes hidden files by default. From python 3.11, the `include_hidden` keyword can used.                                                                                      | Includes hidden files by default.                                                                                                          |
+/// | Iterator          | `iglob` returns an interator. `glob` under the hood is simply converts the iterator into a list.                                                                                | `Path.glob` returns an iterator.                                                                                                           |
+/// | Working directory | `glob` takes a `root_dir` keyword to set the current working dir.                                                                                                               | `Path.rglob` can be used to return the relative path.                                                                                      |
+/// | Globstar (`**`)   | `glob` requires the `recursive` flag to be set to `True` for the `**` pattern tomatch any files and zero or more directories, subdirectories and symbolic links to directories. | The `**` pattern in `Path.glob` means “this directory and all subdirectories, recursively”. In other words, it enables recursive globbing. |
 ///
 /// ## Example
 /// ```python
@@ -29,7 +38,9 @@ use ruff_macros::{derive_message_formats, violation};
 ///
 /// ## References
 /// - [Python documentation: `Path.glob`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.glob)
+/// - [Python documentation: `Path.rglob`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.rglob)
 /// - [Python documentation: `glob.glob`](https://docs.python.org/3/library/glob.html#glob.glob)
+/// - [Python documentation: `glob.iglob`](https://docs.python.org/3/library/glob.html#glob.glob)
 /// ```
 #[violation]
 pub struct Glob;
@@ -37,6 +48,6 @@ pub struct Glob;
 impl Violation for Glob {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Replace `glob` with `Path.glob`")
+        format!("Replace `(i)glob` with `Path.(r)glob`")
     }
 }
