@@ -67,7 +67,9 @@ impl<'a> FormatSummaryValues<'a> {
         let mut extracted_kwargs: FxHashMap<&str, &Expr> = FxHashMap::default();
         if let Expr::Call(ast::ExprCall { args, keywords, .. }) = expr {
             for arg in args {
-                if contains_invalids(locator.slice(arg.range())) {
+                if contains_invalids(locator.slice(arg.range()))
+                    || locator.contains_line_break(arg.range())
+                {
                     return None;
                 }
                 extracted_args.push(arg);
@@ -79,7 +81,9 @@ impl<'a> FormatSummaryValues<'a> {
                     range: _,
                 } = keyword;
                 if let Some(key) = arg {
-                    if contains_invalids(locator.slice(value.range())) {
+                    if contains_invalids(locator.slice(value.range()))
+                        || locator.contains_line_break(value.range())
+                    {
                         return None;
                     }
                     extracted_kwargs.insert(key, value);
