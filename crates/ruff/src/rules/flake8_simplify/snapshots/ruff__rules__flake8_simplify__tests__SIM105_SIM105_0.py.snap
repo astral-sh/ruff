@@ -65,18 +65,18 @@ SIM105_0.py:12:1: SIM105 [*] Use `contextlib.suppress(ValueError, OSError)` inst
 18 18 | try:
 19 19 |     foo()
 
-SIM105_0.py:18:1: SIM105 [*] Use `contextlib.suppress(Exception)` instead of `try`-`except`-`pass`
+SIM105_0.py:18:1: SIM105 [*] Use `contextlib.suppress(ValueError, OSError)` instead of `try`-`except`-`pass`
    |
 17 |   # SIM105
 18 | / try:
 19 | |     foo()
-20 | | except:
+20 | | except (ValueError, OSError) as e:
 21 | |     pass
    | |________^ SIM105
 22 |   
 23 |   # SIM105
    |
-   = help: Replace with `contextlib.suppress(Exception)`
+   = help: Replace with `contextlib.suppress(ValueError, OSError)`
 
 ℹ Suggested fix
    1  |+import contextlib
@@ -88,9 +88,9 @@ SIM105_0.py:18:1: SIM105 [*] Use `contextlib.suppress(Exception)` instead of `tr
 16 17 | 
 17 18 | # SIM105
 18    |-try:
-   19 |+with contextlib.suppress(Exception):
+   19 |+with contextlib.suppress(ValueError, OSError):
 19 20 |     foo()
-20    |-except:
+20    |-except (ValueError, OSError) as e:
 21    |-    pass
 22 21 | 
    22 |+
@@ -98,18 +98,18 @@ SIM105_0.py:18:1: SIM105 [*] Use `contextlib.suppress(Exception)` instead of `tr
 24 24 | try:
 25 25 |     foo()
 
-SIM105_0.py:24:1: SIM105 [*] Use `contextlib.suppress(a.Error, b.Error)` instead of `try`-`except`-`pass`
+SIM105_0.py:24:1: SIM105 [*] Use `contextlib.suppress(Exception)` instead of `try`-`except`-`pass`
    |
 23 |   # SIM105
 24 | / try:
 25 | |     foo()
-26 | | except (a.Error, b.Error):
+26 | | except:
 27 | |     pass
    | |________^ SIM105
 28 |   
-29 |   # OK
+29 |   # SIM105
    |
-   = help: Replace with `contextlib.suppress(a.Error, b.Error)`
+   = help: Replace with `contextlib.suppress(Exception)`
 
 ℹ Suggested fix
    1  |+import contextlib
@@ -121,25 +121,58 @@ SIM105_0.py:24:1: SIM105 [*] Use `contextlib.suppress(a.Error, b.Error)` instead
 22 23 | 
 23 24 | # SIM105
 24    |-try:
-   25 |+with contextlib.suppress(a.Error, b.Error):
+   25 |+with contextlib.suppress(Exception):
 25 26 |     foo()
-26    |-except (a.Error, b.Error):
+26    |-except:
 27    |-    pass
 28 27 | 
    28 |+
-29 29 | # OK
+29 29 | # SIM105
 30 30 | try:
 31 31 |     foo()
 
-SIM105_0.py:78:5: SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass`
+SIM105_0.py:30:1: SIM105 [*] Use `contextlib.suppress(a.Error, b.Error)` instead of `try`-`except`-`pass`
    |
-76 |   def with_ellipsis():
-77 |       # OK
-78 |       try:
+29 |   # SIM105
+30 | / try:
+31 | |     foo()
+32 | | except (a.Error, b.Error):
+33 | |     pass
+   | |________^ SIM105
+34 |   
+35 |   # OK
+   |
+   = help: Replace with `contextlib.suppress(a.Error, b.Error)`
+
+ℹ Suggested fix
+   1  |+import contextlib
+1  2  | def foo():
+2  3  |     pass
+3  4  | 
+--------------------------------------------------------------------------------
+27 28 |     pass
+28 29 | 
+29 30 | # SIM105
+30    |-try:
+   31 |+with contextlib.suppress(a.Error, b.Error):
+31 32 |     foo()
+32    |-except (a.Error, b.Error):
+33    |-    pass
+34 33 | 
+   34 |+
+35 35 | # OK
+36 36 | try:
+37 37 |     foo()
+
+SIM105_0.py:84:5: SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass`
+   |
+82 |   def with_ellipsis():
+83 |       # OK
+84 |       try:
    |  _____^
-79 | |         foo()
-80 | |     except ValueError:
-81 | |         ...
+85 | |         foo()
+86 | |     except ValueError:
+87 | |         ...
    | |___________^ SIM105
    |
    = help: Replace with `contextlib.suppress(ValueError)`
@@ -150,31 +183,33 @@ SIM105_0.py:78:5: SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `t
 2  3  |     pass
 3  4  | 
 --------------------------------------------------------------------------------
-75 76 | 
-76 77 | def with_ellipsis():
-77 78 |     # OK
-78    |-    try:
-   79 |+    with contextlib.suppress(ValueError):
-79 80 |         foo()
-80    |-    except ValueError:
-81    |-        ...
-82 81 | 
-83 82 | 
-   83 |+
-84 84 | def with_ellipsis_and_return():
-85 85 |     # OK
-86 86 |     try:
+81 82 | 
+82 83 | def with_ellipsis():
+83 84 |     # OK
+84    |-    try:
+   85 |+    with contextlib.suppress(ValueError):
+85 86 |         foo()
+86    |-    except ValueError:
+87    |-        ...
+88 87 | 
+89 88 | 
+   89 |+
+90 90 | def with_ellipsis_and_return():
+91 91 |     # OK
+92 92 |     try:
 
-SIM105_0.py:93:5: SIM105 Use `contextlib.suppress(ValueError, OSError)` instead of `try`-`except`-`pass`
-   |
-92 |   def with_comment():
-93 |       try:
-   |  _____^
-94 | |         foo()
-95 | |     except (ValueError, OSError):
-96 | |         pass  # Trailing comment.
-   | |____________^ SIM105
-   |
-   = help: Replace with `contextlib.suppress(ValueError, OSError)`
+SIM105_0.py:99:5: SIM105 Use `contextlib.suppress(ValueError, OSError)` instead of `try`-`except`-`pass`
+    |
+ 98 |   def with_comment():
+ 99 |       try:
+    |  _____^
+100 | |         foo()
+101 | |     except (ValueError, OSError):
+102 | |         pass  # Trailing comment.
+    | |____________^ SIM105
+103 |   
+104 |   try:
+    |
+    = help: Replace with `contextlib.suppress(ValueError, OSError)`
 
 

@@ -92,10 +92,10 @@ pub(crate) fn invalid_envvar_default(
         })
     {
         // Find the `default` argument, if it exists.
-        let Some(expr) = args.get(1).or_else(|| {
-            find_keyword(keywords, "default")
-                .map(|keyword| &keyword.value)
-        }) else {
+        let Some(expr) = args
+            .get(1)
+            .or_else(|| find_keyword(keywords, "default").map(|keyword| &keyword.value))
+        else {
             return;
         };
 
