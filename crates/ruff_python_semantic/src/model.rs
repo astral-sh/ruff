@@ -1094,12 +1094,6 @@ impl<'a> SemanticModel<'a> {
     /// Return `true` if the context is in an f-string.
     pub const fn in_f_string(&self) -> bool {
         self.flags.contains(SemanticModelFlags::F_STRING)
-            || self.flags.contains(SemanticModelFlags::NESTED_F_STRING)
-    }
-
-    /// Return `true` if the context is in a nested f-string.
-    pub const fn in_nested_f_string(&self) -> bool {
-        self.flags.contains(SemanticModelFlags::NESTED_F_STRING)
     }
 
     /// Return `true` if the context is in boolean test.
@@ -1304,14 +1298,6 @@ bitflags! {
         /// ```
         const F_STRING = 1 << 7;
 
-        /// The context is in a nested f-string.
-        ///
-        /// For example, the context could be visiting `x` in:
-        /// ```python
-        /// f'{f"{x}"}'
-        /// ```
-        const NESTED_F_STRING = 1 << 8;
-
         /// The context is in a boolean test.
         ///
         /// For example, the context could be visiting `x` in:
@@ -1322,7 +1308,7 @@ bitflags! {
         ///
         /// The implication is that the actual value returned by the current expression is
         /// not used, only its truthiness.
-        const BOOLEAN_TEST = 1 << 9;
+        const BOOLEAN_TEST = 1 << 8;
 
         /// The context is in a `typing::Literal` annotation.
         ///
@@ -1331,7 +1317,7 @@ bitflags! {
         /// def f(x: Literal["A", "B", "C"]):
         ///     ...
         /// ```
-        const LITERAL = 1 << 10;
+        const LITERAL = 1 << 9;
 
         /// The context is in a subscript expression.
         ///
@@ -1339,7 +1325,7 @@ bitflags! {
         /// ```python
         /// x["a"]["b"]
         /// ```
-        const SUBSCRIPT = 1 << 11;
+        const SUBSCRIPT = 1 << 10;
 
         /// The context is in a type-checking block.
         ///
@@ -1351,7 +1337,7 @@ bitflags! {
         /// if TYPE_CHECKING:
         ///    x: int = 1
         /// ```
-        const TYPE_CHECKING_BLOCK = 1 << 12;
+        const TYPE_CHECKING_BLOCK = 1 << 11;
 
         /// The context has traversed past the "top-of-file" import boundary.
         ///
@@ -1364,7 +1350,7 @@ bitflags! {
         ///
         /// x: int = 1
         /// ```
-        const IMPORT_BOUNDARY = 1 << 13;
+        const IMPORT_BOUNDARY = 1 << 12;
 
         /// The context has traversed past the `__future__` import boundary.
         ///
@@ -1379,7 +1365,7 @@ bitflags! {
         ///
         /// Python considers it a syntax error to import from `__future__` after
         /// any other non-`__future__`-importing statements.
-        const FUTURES_BOUNDARY = 1 << 14;
+        const FUTURES_BOUNDARY = 1 << 13;
 
         /// `__future__`-style type annotations are enabled in this context.
         ///
@@ -1391,7 +1377,7 @@ bitflags! {
         /// def f(x: int) -> int:
         ///   ...
         /// ```
-        const FUTURE_ANNOTATIONS = 1 << 15;
+        const FUTURE_ANNOTATIONS = 1 << 14;
     }
 }
 
