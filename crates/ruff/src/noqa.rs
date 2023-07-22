@@ -68,12 +68,8 @@ impl<'a> Directive<'a> {
 
             // If the next character is `:`, then it's a list of codes. Otherwise, it's a directive
             // to ignore all rules.
-            return Ok(Some(
-                if text[noqa_literal_end..]
-                    .chars()
-                    .next()
-                    .map_or(false, |c| c == ':')
-                {
+            let directive = match text[noqa_literal_end..].chars().next() {
+                Some(':') => {
                     // E.g., `# noqa: F401, F841`.
                     let mut codes_start = noqa_literal_end;
 
@@ -120,8 +116,9 @@ impl<'a> Directive<'a> {
                         range: range.add(offset),
                         codes,
                     })
-                } else {
-                    // E.g., `# noqa`.
+                }
+                None | Some('#') => {
+                    // E.g., `# noqa` or `# noqa# ignore`.
                     let range = TextRange::new(
                         TextSize::try_from(comment_start).unwrap(),
                         TextSize::try_from(noqa_literal_end).unwrap(),
@@ -129,8 +126,21 @@ impl<'a> Directive<'a> {
                     Self::All(All {
                         range: range.add(offset),
                     })
-                },
-            ));
+                }
+                Some(c) if c.is_whitespace() => {
+                    // E.g., `# noqa # ignore`.
+                    let range = TextRange::new(
+                        TextSize::try_from(comment_start).unwrap(),
+                        TextSize::try_from(noqa_literal_end).unwrap(),
+                    );
+                    Self::All(All {
+                        range: range.add(offset),
+                    })
+                }
+                _ => return Err(ParseError::InvalidSuffix),
+            };
+
+            return Ok(Some(directive));
         }
 
         Ok(None)
@@ -237,7 +247,7 @@ impl FileExemption {
                     #[allow(deprecated)]
                     let line = locator.compute_line_index(range.start());
                     let path_display = relativize_path(path);
-                    warn!("Invalid `# noqa` directive on {path_display}:{line}: {err}");
+                    warn!("Invalid `# ruff: noqa` directive at {path_display}:{line}: {err}");
                 }
                 Ok(Some(ParsedFileExemption::All)) => {
                     return Some(Self::All);
@@ -250,7 +260,8 @@ impl FileExemption {
                         } else {
                             #[allow(deprecated)]
                             let line = locator.compute_line_index(range.start());
-                            warn!("Invalid code provided to `# ruff: noqa` on line {line}: {code}");
+                            let path_display = relativize_path(path);
+                            warn!("Invalid code provided to `# ruff: noqa` at {path_display}:{line}: {code}");
                             None
                         }
                     }));
@@ -901,6 +912,12 @@ mod tests {
     #[test]
     fn noqa_invalid_codes() {
         let source = "# noqa: unused-import, F401, some other code";
+        assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
+    }
+
+    #[test]
+    fn noqa_invalid_suffix() {
+        let source = "# noqa[F401]";
         assert_debug_snapshot!(Directive::try_extract(source, TextSize::default()));
     }
 
