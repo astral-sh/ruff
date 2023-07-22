@@ -84,14 +84,7 @@ pub(crate) fn type_bivariance(checker: &mut Checker, value: &Expr) {
         return;
     };
 
-    let Some(covariant) = keywords
-        .iter()
-        .find(|keyword| {
-            keyword
-                .arg
-                .as_ref()
-                .map_or(false, |keyword| keyword.as_str() == "covariant")
-        })
+    let Some(covariant) = find_keyword(keywords, "covariant")
         .map(|keyword| &keyword.value)
     else {
         return;
