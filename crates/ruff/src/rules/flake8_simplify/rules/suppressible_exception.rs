@@ -100,10 +100,13 @@ pub(crate) fn suppressible_exception(
             if matches!(**value, Expr::Constant(ast::ExprConstant { value: Constant::Ellipsis, .. }))
             ))
         {
-            let handler_names: Vec<String> = helpers::extract_handled_exceptions(handlers)
+            let Some(handler_names) = helpers::extract_handled_exceptions(handlers)
                 .into_iter()
-                .filter_map(compose_call_path)
-                .collect();
+                .map(compose_call_path)
+                .collect::<Option<Vec<String>>>() else{
+                    return;
+                };
+
             let exception = if handler_names.is_empty() {
                 "Exception".to_string()
             } else {
