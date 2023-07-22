@@ -19,7 +19,7 @@ use crate::checkers::ast::Checker;
 /// ## Why is this bad?
 /// To check if a variable is equal to one of many values, it is common to
 /// write a series of equality comparisons (e.g.,
-/// `foo == "bar" or foo == "baz").
+/// `foo == "bar" or foo == "baz"`).
 ///
 /// Instead, prefer to combine the values into a collection and use the `in`
 /// operator to check for membership, which is more performant and succinct.
