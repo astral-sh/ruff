@@ -90,7 +90,9 @@ fn key_in_dict(
 
     // Slice exact content to preserve formatting.
     let left_content = checker.locator().slice(left.range());
-    let Ok(value_content) = value_content_for_key_in_dict(checker.locator(), checker.stylist(), right) else {
+    let Ok(value_content) =
+        value_content_for_key_in_dict(checker.locator(), checker.stylist(), right)
+    else {
         return;
     };
 

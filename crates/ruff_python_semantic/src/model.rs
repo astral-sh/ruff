@@ -279,10 +279,9 @@ impl<'a> SemanticModel<'a> {
             if let Some(binding_id) = self.scopes.global().get(symbol) {
                 if !self.bindings[binding_id].is_unbound() {
                     // Mark the binding as used.
-                    let context = self.execution_context();
                     let reference_id =
                         self.resolved_references
-                            .push(ScopeId::global(), range, context);
+                            .push(ScopeId::global(), range, self.flags);
                     self.bindings[binding_id].references.push(reference_id);
 
                     // Mark any submodule aliases as used.
@@ -291,7 +290,7 @@ impl<'a> SemanticModel<'a> {
                     {
                         let reference_id =
                             self.resolved_references
-                                .push(ScopeId::global(), range, context);
+                                .push(ScopeId::global(), range, self.flags);
                         self.bindings[binding_id].references.push(reference_id);
                     }
 
@@ -322,13 +321,16 @@ impl<'a> SemanticModel<'a> {
 
             if let Some(binding_id) = scope.get(symbol) {
                 // Mark the binding as used.
-                let context = self.execution_context();
-                let reference_id = self.resolved_references.push(self.scope_id, range, context);
+                let reference_id = self
+                    .resolved_references
+                    .push(self.scope_id, range, self.flags);
                 self.bindings[binding_id].references.push(reference_id);
 
                 // Mark any submodule aliases as used.
                 if let Some(binding_id) = self.resolve_submodule(symbol, scope_id, binding_id) {
-                    let reference_id = self.resolved_references.push(self.scope_id, range, context);
+                    let reference_id =
+                        self.resolved_references
+                            .push(self.scope_id, range, self.flags);
                     self.bindings[binding_id].references.push(reference_id);
                 }
 
@@ -392,9 +394,9 @@ impl<'a> SemanticModel<'a> {
                     // The `x` in `print(x)` should resolve to the `x` in `x = 1`.
                     BindingKind::UnboundException(Some(binding_id)) => {
                         // Mark the binding as used.
-                        let context = self.execution_context();
                         let reference_id =
-                            self.resolved_references.push(self.scope_id, range, context);
+                            self.resolved_references
+                                .push(self.scope_id, range, self.flags);
                         self.bindings[binding_id].references.push(reference_id);
 
                         // Mark any submodule aliases as used.
@@ -402,7 +404,8 @@ impl<'a> SemanticModel<'a> {
                             self.resolve_submodule(symbol, scope_id, binding_id)
                         {
                             let reference_id =
-                                self.resolved_references.push(self.scope_id, range, context);
+                                self.resolved_references
+                                    .push(self.scope_id, range, self.flags);
                             self.bindings[binding_id].references.push(reference_id);
                         }
 
@@ -918,17 +921,17 @@ impl<'a> SemanticModel<'a> {
 
     /// Add a reference to the given [`BindingId`] in the local scope.
     pub fn add_local_reference(&mut self, binding_id: BindingId, range: TextRange) {
-        let reference_id =
-            self.resolved_references
-                .push(self.scope_id, range, ExecutionContext::Runtime);
+        let reference_id = self
+            .resolved_references
+            .push(self.scope_id, range, self.flags);
         self.bindings[binding_id].references.push(reference_id);
     }
 
     /// Add a reference to the given [`BindingId`] in the global scope.
     pub fn add_global_reference(&mut self, binding_id: BindingId, range: TextRange) {
-        let reference_id =
-            self.resolved_references
-                .push(ScopeId::global(), range, ExecutionContext::Runtime);
+        let reference_id = self
+            .resolved_references
+            .push(ScopeId::global(), range, self.flags);
         self.bindings[binding_id].references.push(reference_id);
     }
 
@@ -965,19 +968,6 @@ impl<'a> SemanticModel<'a> {
         self.unresolved_references.iter()
     }
 
-    /// Return the [`ExecutionContext`] of the current scope.
-    pub const fn execution_context(&self) -> ExecutionContext {
-        if self.in_type_checking_block()
-            || self.in_typing_only_annotation()
-            || self.in_complex_string_type_definition()
-            || self.in_simple_string_type_definition()
-        {
-            ExecutionContext::Typing
-        } else {
-            ExecutionContext::Runtime
-        }
-    }
-
     /// Return the union of all handled exceptions as an [`Exceptions`] bitflag.
     pub fn exceptions(&self) -> Exceptions {
         let mut exceptions = Exceptions::empty();
@@ -1011,50 +1001,65 @@ impl<'a> SemanticModel<'a> {
         self.flags = flags;
     }
 
+    /// Return the [`ExecutionContext`] of the current scope.
+    pub const fn execution_context(&self) -> ExecutionContext {
+        if self.flags.intersects(SemanticModelFlags::TYPING_CONTEXT) {
+            ExecutionContext::Typing
+        } else {
+            ExecutionContext::Runtime
+        }
+    }
+
     /// Return `true` if the model is in a type annotation.
     pub const fn in_annotation(&self) -> bool {
-        self.in_typing_only_annotation() || self.in_runtime_annotation()
+        self.flags.intersects(SemanticModelFlags::ANNOTATION)
     }
 
     /// Return `true` if the model is in a typing-only type annotation.
     pub const fn in_typing_only_annotation(&self) -> bool {
         self.flags
-            .contains(SemanticModelFlags::TYPING_ONLY_ANNOTATION)
+            .intersects(SemanticModelFlags::TYPING_ONLY_ANNOTATION)
     }
 
     /// Return `true` if the model is in a runtime-required type annotation.
     pub const fn in_runtime_annotation(&self) -> bool {
-        self.flags.contains(SemanticModelFlags::RUNTIME_ANNOTATION)
+        self.flags
+            .intersects(SemanticModelFlags::RUNTIME_ANNOTATION)
     }
 
     /// Return `true` if the model is in a type definition.
     pub const fn in_type_definition(&self) -> bool {
-        self.flags.contains(SemanticModelFlags::TYPE_DEFINITION)
+        self.flags.intersects(SemanticModelFlags::TYPE_DEFINITION)
+    }
+
+    /// Return `true` if the model is in a string type definition.
+    pub const fn in_string_type_definition(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::STRING_TYPE_DEFINITION)
     }
 
     /// Return `true` if the model is in a "simple" string type definition.
     pub const fn in_simple_string_type_definition(&self) -> bool {
         self.flags
-            .contains(SemanticModelFlags::SIMPLE_STRING_TYPE_DEFINITION)
+            .intersects(SemanticModelFlags::SIMPLE_STRING_TYPE_DEFINITION)
     }
 
     /// Return `true` if the model is in a "complex" string type definition.
     pub const fn in_complex_string_type_definition(&self) -> bool {
         self.flags
-            .contains(SemanticModelFlags::COMPLEX_STRING_TYPE_DEFINITION)
+            .intersects(SemanticModelFlags::COMPLEX_STRING_TYPE_DEFINITION)
     }
 
     /// Return `true` if the model is in a `__future__` type definition.
     pub const fn in_future_type_definition(&self) -> bool {
         self.flags
-            .contains(SemanticModelFlags::FUTURE_TYPE_DEFINITION)
+            .intersects(SemanticModelFlags::FUTURE_TYPE_DEFINITION)
     }
 
     /// Return `true` if the model is in any kind of deferred type definition.
     pub const fn in_deferred_type_definition(&self) -> bool {
-        self.in_simple_string_type_definition()
-            || self.in_complex_string_type_definition()
-            || self.in_future_type_definition()
+        self.flags
+            .intersects(SemanticModelFlags::DEFERRED_TYPE_DEFINITION)
     }
 
     /// Return `true` if the model is in a forward type reference.
@@ -1073,54 +1078,55 @@ impl<'a> SemanticModel<'a> {
     /// cast(Thread, x)  # Non-forward reference
     /// ```
     pub const fn in_forward_reference(&self) -> bool {
-        self.in_simple_string_type_definition()
-            || self.in_complex_string_type_definition()
+        self.in_string_type_definition()
             || (self.in_future_type_definition() && self.in_typing_only_annotation())
     }
 
     /// Return `true` if the model is in an exception handler.
     pub const fn in_exception_handler(&self) -> bool {
-        self.flags.contains(SemanticModelFlags::EXCEPTION_HANDLER)
+        self.flags.intersects(SemanticModelFlags::EXCEPTION_HANDLER)
     }
 
     /// Return `true` if the model is in an f-string.
     pub const fn in_f_string(&self) -> bool {
-        self.flags.contains(SemanticModelFlags::F_STRING)
+        self.flags.intersects(SemanticModelFlags::F_STRING)
     }
 
     /// Return `true` if the model is in boolean test.
     pub const fn in_boolean_test(&self) -> bool {
-        self.flags.contains(SemanticModelFlags::BOOLEAN_TEST)
+        self.flags.intersects(SemanticModelFlags::BOOLEAN_TEST)
     }
 
     /// Return `true` if the model is in a `typing::Literal` annotation.
     pub const fn in_literal(&self) -> bool {
-        self.flags.contains(SemanticModelFlags::LITERAL)
+        self.flags.intersects(SemanticModelFlags::LITERAL)
     }
 
     /// Return `true` if the model is in a subscript expression.
     pub const fn in_subscript(&self) -> bool {
-        self.flags.contains(SemanticModelFlags::SUBSCRIPT)
+        self.flags.intersects(SemanticModelFlags::SUBSCRIPT)
     }
 
     /// Return `true` if the model is in a type-checking block.
     pub const fn in_type_checking_block(&self) -> bool {
-        self.flags.contains(SemanticModelFlags::TYPE_CHECKING_BLOCK)
+        self.flags
+            .intersects(SemanticModelFlags::TYPE_CHECKING_BLOCK)
     }
 
     /// Return `true` if the model has traversed past the "top-of-file" import boundary.
     pub const fn seen_import_boundary(&self) -> bool {
-        self.flags.contains(SemanticModelFlags::IMPORT_BOUNDARY)
+        self.flags.intersects(SemanticModelFlags::IMPORT_BOUNDARY)
     }
 
     /// Return `true` if the model has traverse past the `__future__` import boundary.
     pub const fn seen_futures_boundary(&self) -> bool {
-        self.flags.contains(SemanticModelFlags::FUTURES_BOUNDARY)
+        self.flags.intersects(SemanticModelFlags::FUTURES_BOUNDARY)
     }
 
     /// Return `true` if `__future__`-style type annotations are enabled.
     pub const fn future_annotations(&self) -> bool {
-        self.flags.contains(SemanticModelFlags::FUTURE_ANNOTATIONS)
+        self.flags
+            .intersects(SemanticModelFlags::FUTURE_ANNOTATIONS)
     }
 
     /// Return an iterator over all bindings shadowed by the given [`BindingId`], within the
@@ -1370,6 +1376,22 @@ bitflags! {
         ///   ...
         /// ```
         const FUTURE_ANNOTATIONS = 1 << 14;
+
+        /// The context is in any type annotation.
+        const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_ANNOTATION.bits();
+
+        /// The context is in any string type definition.
+        const STRING_TYPE_DEFINITION = Self::SIMPLE_STRING_TYPE_DEFINITION.bits()
+            | Self::COMPLEX_STRING_TYPE_DEFINITION.bits();
+
+        /// The context is in any deferred type definition.
+        const DEFERRED_TYPE_DEFINITION = Self::SIMPLE_STRING_TYPE_DEFINITION.bits()
+            | Self::COMPLEX_STRING_TYPE_DEFINITION.bits()
+            | Self::FUTURE_TYPE_DEFINITION.bits();
+
+        /// The context is in a typing-only context.
+        const TYPING_CONTEXT = Self::TYPE_CHECKING_BLOCK.bits() | Self::TYPING_ONLY_ANNOTATION.bits() |
+            Self::STRING_TYPE_DEFINITION.bits();
     }
 }
 
