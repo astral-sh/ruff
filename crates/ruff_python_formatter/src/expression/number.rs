@@ -154,13 +154,11 @@ fn normalize_floating_number(input: &str) -> Cow<str> {
     for (index, c) in chars {
         if matches!(c, 'e' | 'E') {
             has_exponent = true;
-            if let Some(prev) = input.as_bytes().get(index - 1).copied().map(char::from) {
-                if prev == '.' {
-                    // Add `0` if fraction part ends with `.`.
-                    output.push_str(&input[last_index..index]);
-                    output.push('0');
-                    last_index = index;
-                }
+            if input.as_bytes().get(index - 1).copied() == Some(b'.') {
+                // Add `0` if fraction part ends with `.`.
+                output.push_str(&input[last_index..index]);
+                output.push('0');
+                last_index = index;
             }
             if c == 'E' {
                 // Lowercase exponent part.
