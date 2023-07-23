@@ -399,10 +399,10 @@ impl Violation for MissingReturnTypeClassMethod {
 ///     ...
 /// ```
 ///
-/// ## Limitations
+/// ## Known problems
 ///
-/// Type aliases are not supported and could lead to false positives.
-/// For example, the following code will trigger the rule:
+/// Type aliases are unsupported and can lead to false positives.
+/// For example, the following will trigger this rule inadvertently:
 /// ```python
 /// from typing import Any
 ///
