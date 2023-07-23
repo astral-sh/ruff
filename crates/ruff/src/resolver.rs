@@ -641,7 +641,7 @@ mod tests {
         let mut paths = paths
             .iter()
             .flatten()
-            .map(|entry| entry.path())
+            .map(ignore::DirEntry::path)
             .collect::<Vec<_>>();
         paths.sort();
         assert_eq!(paths, &[file2, file1]);
