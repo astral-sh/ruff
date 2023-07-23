@@ -1724,6 +1724,15 @@ where
             }) => {
                 self.handle_node_load(target);
             }
+            Stmt::Assign(ast::StmtAssign {targets, range: _, value, type_comment: _ }) => {
+                if let [Expr::Name(ast::ExprName {id, ..})] = &targets[..] {
+                    if id.starts_with('_') {
+                        if self.semantic.match_typing_expr(value, "TypeVar") {
+                            // never gets executed
+                        }
+                    }
+                }
+            }
             Stmt::Import(ast::StmtImport { names, range: _ }) => {
                 for alias in names {
                     if alias.name.contains('.') && alias.asname.is_none() {

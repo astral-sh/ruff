@@ -630,6 +630,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "015") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::AssignmentDefaultInStub),
         (Flake8Pyi, "016") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::DuplicateUnionMember),
         (Flake8Pyi, "017") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::ComplexAssignmentInStub),
+        (Flake8Pyi, "018") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::UnusedPrivateTypeVar),
         (Flake8Pyi, "020") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::QuotedAnnotationInStub),
         (Flake8Pyi, "021") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::DocstringInStub),
         (Flake8Pyi, "024") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::CollectionsNamedTuple),
