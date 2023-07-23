@@ -1,6 +1,6 @@
 """
 Should emit:
-B002 - on lines 15 and 20
+B002 - on lines 18, 19, 24, and 28
 """
 
 
@@ -8,13 +8,17 @@ def this_is_all_fine(n):
     x = n + 1
     y = 1 + n
     z = +x + y
-    return +z
+    a = n - 1
+    b = 1 - n
+    c = -a - b
+    return +z, -c
 
 
 def this_is_buggy(n):
     x = ++n
-    return x
+    y = --n
+    return x, y
 
 
 def this_is_buggy_too(n):
-    return ++n
+    return ++n, --n

@@ -235,7 +235,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Builtins, "003") => (RuleGroup::Unspecified, rules::flake8_builtins::rules::BuiltinAttributeShadowing),
 
         // flake8-bugbear
-        (Flake8Bugbear, "002") => (RuleGroup::Unspecified, rules::flake8_bugbear::rules::UnaryPrefixIncrement),
+        (Flake8Bugbear, "002") => (RuleGroup::Unspecified, rules::flake8_bugbear::rules::UnaryPrefixIncrementDecrement),
         (Flake8Bugbear, "003") => (RuleGroup::Unspecified, rules::flake8_bugbear::rules::AssignmentToOsEnviron),
         (Flake8Bugbear, "004") => (RuleGroup::Unspecified, rules::flake8_bugbear::rules::UnreliableCallableCheck),
         (Flake8Bugbear, "005") => (RuleGroup::Unspecified, rules::flake8_bugbear::rules::StripWithMultiCharacters),
