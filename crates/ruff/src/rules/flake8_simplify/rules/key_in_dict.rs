@@ -1,5 +1,4 @@
 use anyhow::Result;
-use log::error;
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{self, CmpOp, Expr, Ranged};
 
@@ -91,14 +90,9 @@ fn key_in_dict(
 
     // Slice exact content to preserve formatting.
     let left_content = checker.locator().slice(left.range());
-    let value_content =
-        match get_value_content_for_key_in_dict(checker.locator(), checker.stylist(), right) {
-            Ok(value_content) => value_content,
-            Err(err) => {
-                error!("Failed to get value content for key in dict: {}", err);
-                return;
-            }
-        };
+    let Ok(value_content) = value_content_for_key_in_dict(checker.locator(), checker.stylist(), right) else {
+        return;
+    };
 
     let mut diagnostic = Diagnostic::new(
         InDictKeys {
@@ -151,7 +145,7 @@ pub(crate) fn key_in_dict_compare(
     key_in_dict(checker, left, right, *op, expr.range());
 }
 
-fn get_value_content_for_key_in_dict(
+fn value_content_for_key_in_dict(
     locator: &Locator,
     stylist: &Stylist,
     expr: &Expr,
@@ -160,6 +154,5 @@ fn get_value_content_for_key_in_dict(
     let mut expression = match_expression(content)?;
     let call = match_call_mut(&mut expression)?;
     let attribute = match_attribute(&mut call.func)?;
-
     Ok(attribute.value.codegen_stylist(stylist))
 }
