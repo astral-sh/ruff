@@ -431,6 +431,7 @@ fn is_file_excluded(
 
 #[cfg(test)]
 mod tests {
+    use std::fs::{create_dir, File};
     use std::path::Path;
 
     use anyhow::Result;
@@ -618,14 +619,14 @@ mod tests {
         let file2 = dir1.join("file2.py");
         let dir2 = root.join("dir2.py");
         // root
+        // ├── file1.py
         // ├── dir1.py
         // │   └── file2.py
-        // ├── dir2.py
-        // └── file1.py
-        std::fs::File::create(&file1).unwrap();
-        std::fs::create_dir(dir1).unwrap();
-        std::fs::File::create(&file2).unwrap();
-        std::fs::create_dir(dir2).unwrap();
+        // └── dir2.py
+        File::create(&file1).unwrap();
+        create_dir(dir1).unwrap();
+        File::create(&file2).unwrap();
+        create_dir(dir2).unwrap();
         let paths = python_files_in_path(
             &[root.to_path_buf()],
             &PyprojectConfig::new(
@@ -637,10 +638,12 @@ mod tests {
         )
         .unwrap()
         .0;
-        let mut paths = paths.iter().flatten().collect::<Vec<_>>();
-        paths.sort_by(|a, b| a.path().cmp(b.path()));
-        assert_eq!(paths.len(), 2);
-        assert_eq!(paths[0].path(), file2);
-        assert_eq!(paths[1].path(), file1);
+        let mut paths = paths
+            .iter()
+            .flatten()
+            .map(|entry| entry.path())
+            .collect::<Vec<_>>();
+        paths.sort();
+        assert_eq!(paths, &[file2, file1]);
     }
 }
