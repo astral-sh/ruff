@@ -24,6 +24,7 @@ use super::helpers::{is_empty_or_null_string, is_pytest_fail};
 /// def test_bar():
 ///     pytest.fail('')
 ///
+/// def test_baz():
 ///     pytest.fail(reason='')
 /// ```
 ///
