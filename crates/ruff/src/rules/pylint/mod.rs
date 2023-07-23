@@ -116,6 +116,7 @@ mod tests {
         Rule::RepeatedEqualityComparisonTarget,
         Path::new("repeated_equality_comparison_target.py")
     )]
+    #[test_case(Rule::SelfAssigningVariable, Path::new("self_assigning_variable.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

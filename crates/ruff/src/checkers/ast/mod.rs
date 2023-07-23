@@ -1583,6 +1583,9 @@ where
                         self.diagnostics.push(diagnostic);
                     }
                 }
+                if self.settings.rules.enabled(Rule::SelfAssigningVariable) {
+                    pylint::rules::self_assigning_variable(self, targets, value);
+                }
                 if self.settings.rules.enabled(Rule::TypeParamNameMismatch) {
                     pylint::rules::type_param_name_mismatch(self, value, targets);
                 }
