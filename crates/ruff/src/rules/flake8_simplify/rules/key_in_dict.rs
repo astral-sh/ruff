@@ -37,36 +37,38 @@ use crate::registry::AsRule;
 pub struct InDictKeys {
     key: String,
     dict: String,
+    operator: String,
 }
 
 impl AlwaysAutofixableViolation for InDictKeys {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let InDictKeys { key, dict } = self;
-        format!("Use `{key} in {dict}` instead of `{key} in {dict}.keys()`")
+        let InDictKeys {
+            key,
+            dict,
+            operator,
+        } = self;
+        format!("Use `{key} {operator} {dict}` instead of `{key} {operator} {dict}.keys()`")
     }
 
     fn autofix_title(&self) -> String {
-        let InDictKeys { key, dict } = self;
-        format!("Convert to `{key} in {dict}`")
+        let InDictKeys {
+            key,
+            dict,
+            operator,
+        } = self;
+        format!("Convert to `{key} {operator} {dict}`")
     }
 }
 
-fn get_value_content_for_key_in_dict(
-    locator: &Locator,
-    stylist: &Stylist,
-    expr: &Expr,
-) -> Result<String> {
-    let content = locator.slice(expr.range());
-    let mut expression = match_expression(content)?;
-    let call = match_call_mut(&mut expression)?;
-    let attribute = match_attribute(&mut call.func)?;
-
-    Ok(attribute.value.codegen_stylist(stylist))
-}
-
 /// SIM118
-fn key_in_dict(checker: &mut Checker, left: &Expr, right: &Expr, range: TextRange) {
+fn key_in_dict(
+    checker: &mut Checker,
+    left: &Expr,
+    right: &Expr,
+    operator: CmpOp,
+    range: TextRange,
+) {
     let Expr::Call(ast::ExprCall {
         func,
         args,
@@ -101,7 +103,8 @@ fn key_in_dict(checker: &mut Checker, left: &Expr, right: &Expr, range: TextRang
     let mut diagnostic = Diagnostic::new(
         InDictKeys {
             key: left_content.to_string(),
-            dict: value_content.clone(),
+            dict: value_content.to_string(),
+            operator: operator.as_str().to_string(),
         },
         range,
     );
@@ -120,6 +123,7 @@ pub(crate) fn key_in_dict_for(checker: &mut Checker, target: &Expr, iter: &Expr)
         checker,
         target,
         iter,
+        CmpOp::In,
         TextRange::new(target.start(), iter.end()),
     );
 }
@@ -132,14 +136,30 @@ pub(crate) fn key_in_dict_compare(
     ops: &[CmpOp],
     comparators: &[Expr],
 ) {
-    if !matches!(ops[..], [CmpOp::In]) {
+    let [op] = ops else {
+        return;
+    };
+
+    if !matches!(op, CmpOp::In | CmpOp::NotIn) {
         return;
     }
 
-    if comparators.len() != 1 {
+    let [right] = comparators else {
         return;
-    }
-    let right = comparators.first().unwrap();
+    };
 
-    key_in_dict(checker, left, right, expr.range());
+    key_in_dict(checker, left, right, *op, expr.range());
+}
+
+fn get_value_content_for_key_in_dict(
+    locator: &Locator,
+    stylist: &Stylist,
+    expr: &Expr,
+) -> Result<String> {
+    let content = locator.slice(expr.range());
+    let mut expression = match_expression(content)?;
+    let call = match_call_mut(&mut expression)?;
+    let attribute = match_attribute(&mut call.func)?;
+
+    Ok(attribute.value.codegen_stylist(stylist))
 }
