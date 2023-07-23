@@ -49,9 +49,9 @@ use ruff_python_ast::visitor::{walk_except_handler, walk_pattern, Visitor};
 use ruff_python_ast::{cast, helpers, str, visitor};
 use ruff_python_semantic::analyze::{branch_detection, typing, visibility};
 use ruff_python_semantic::{
-    Binding, BindingFlags, BindingId, BindingKind, ContextualizedDefinition, Exceptions,
-    ExecutionContext, Export, FromImport, Globals, Import, Module, ModuleKind, ScopeId, ScopeKind,
-    SemanticModel, SemanticModelFlags, StarImport, SubmoduleImport,
+    Binding, BindingFlags, BindingId, BindingKind, ContextualizedDefinition, Exceptions, Export,
+    FromImport, Globals, Import, Module, ModuleKind, ScopeId, ScopeKind, SemanticModel,
+    SemanticModelFlags, StarImport, SubmoduleImport,
 };
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
 use ruff_python_stdlib::path::is_python_stub_file;
@@ -1835,11 +1835,7 @@ where
                     for name in names {
                         if let Some((scope_id, binding_id)) = self.semantic.nonlocal(name) {
                             // Mark the binding as "used".
-                            self.semantic.add_local_reference(
-                                binding_id,
-                                name.range(),
-                                ExecutionContext::Runtime,
-                            );
+                            self.semantic.add_local_reference(binding_id, name.range());
 
                             // Mark the binding in the enclosing scope as "rebound" in the current
                             // scope.
@@ -4826,8 +4822,7 @@ impl<'a> Checker<'a> {
         for (name, range) in exports {
             if let Some(binding_id) = self.semantic.global_scope().get(name) {
                 // Mark anything referenced in `__all__` as used.
-                self.semantic
-                    .add_global_reference(binding_id, range, ExecutionContext::Runtime);
+                self.semantic.add_global_reference(binding_id, range);
             } else {
                 if self.semantic.global_scope().uses_star_imports() {
                     if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {

@@ -257,7 +257,7 @@ impl<'a> SemanticModel<'a> {
             .get(symbol)
             .map_or(true, |binding_id| {
                 // Treat the deletion of a name as a reference to that name.
-                self.add_local_reference(binding_id, range, ExecutionContext::Runtime);
+                self.add_local_reference(binding_id, range);
                 self.bindings[binding_id].is_unbound()
             });
 
@@ -917,26 +917,18 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Add a reference to the given [`BindingId`] in the local scope.
-    pub fn add_local_reference(
-        &mut self,
-        binding_id: BindingId,
-        range: TextRange,
-        context: ExecutionContext,
-    ) {
-        let reference_id = self.resolved_references.push(self.scope_id, range, context);
+    pub fn add_local_reference(&mut self, binding_id: BindingId, range: TextRange) {
+        let reference_id =
+            self.resolved_references
+                .push(self.scope_id, range, ExecutionContext::Runtime);
         self.bindings[binding_id].references.push(reference_id);
     }
 
     /// Add a reference to the given [`BindingId`] in the global scope.
-    pub fn add_global_reference(
-        &mut self,
-        binding_id: BindingId,
-        range: TextRange,
-        context: ExecutionContext,
-    ) {
-        let reference_id = self
-            .resolved_references
-            .push(ScopeId::global(), range, context);
+    pub fn add_global_reference(&mut self, binding_id: BindingId, range: TextRange) {
+        let reference_id =
+            self.resolved_references
+                .push(ScopeId::global(), range, ExecutionContext::Runtime);
         self.bindings[binding_id].references.push(reference_id);
     }
 
