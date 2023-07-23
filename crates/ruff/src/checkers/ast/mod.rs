@@ -1638,14 +1638,21 @@ where
                 annotation,
                 ..
             }) => {
-                if self.enabled(Rule::LambdaAssignment) {
-                    if let Some(value) = value {
+                if let Some(value) = value {
+                    if self.enabled(Rule::LambdaAssignment) {
                         pycodestyle::rules::lambda_assignment(
                             self,
                             target,
                             value,
                             Some(annotation),
                             stmt,
+                        );
+                    }
+                    if self.enabled(Rule::SelfAssigningVariable) {
+                        pylint::rules::self_assigning_variable(
+                            self,
+                            &[target.as_ref().clone()],
+                            value,
                         );
                     }
                 }
@@ -1656,15 +1663,6 @@ where
                         value.as_deref(),
                         stmt,
                     );
-                }
-                if self.settings.rules.enabled(Rule::SelfAssigningVariable) {
-                    if let Some(value) = value {
-                        pylint::rules::self_assigning_variable(
-                            self,
-                            &[target.as_ref().clone()],
-                            value,
-                        );
-                    }
                 }
                 if self.is_stub {
                     if let Some(value) = value {
