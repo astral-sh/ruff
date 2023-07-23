@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 ---
-B002.py:18:9: B002 Python does not support the unary prefix increment operator `++`
+B002.py:18:9: B002 Python does not support the unary prefix increment operator (`++`)
    |
 17 | def this_is_buggy(n):
 18 |     x = ++n
@@ -10,7 +10,7 @@ B002.py:18:9: B002 Python does not support the unary prefix increment operator `
 20 |     return x, y
    |
 
-B002.py:19:9: B002 Python does not support the unary prefix decrement operator `--`
+B002.py:19:9: B002 Python does not support the unary prefix decrement operator (`--`)
    |
 17 | def this_is_buggy(n):
 18 |     x = ++n
@@ -19,14 +19,14 @@ B002.py:19:9: B002 Python does not support the unary prefix decrement operator `
 20 |     return x, y
    |
 
-B002.py:24:12: B002 Python does not support the unary prefix increment operator `++`
+B002.py:24:12: B002 Python does not support the unary prefix increment operator (`++`)
    |
 23 | def this_is_buggy_too(n):
 24 |     return ++n, --n
    |            ^^^ B002
    |
 
-B002.py:24:17: B002 Python does not support the unary prefix decrement operator `--`
+B002.py:24:17: B002 Python does not support the unary prefix decrement operator (`--`)
    |
 23 | def this_is_buggy_too(n):
 24 |     return ++n, --n

@@ -40,10 +40,10 @@ impl Violation for UnaryPrefixIncrementDecrement {
         let UnaryPrefixIncrementDecrement { operator } = self;
         match operator {
             UnaryPrefixOperatorType::Increment => {
-                format!("Python does not support the unary prefix increment operator `++`")
+                format!("Python does not support the unary prefix increment operator (`++`)")
             }
             UnaryPrefixOperatorType::Decrement => {
-                format!("Python does not support the unary prefix decrement operator `--`")
+                format!("Python does not support the unary prefix decrement operator (`--`)")
             }
         }
     }
@@ -56,18 +56,19 @@ pub(crate) fn unary_prefix_increment_decrement(
     op: UnaryOp,
     operand: &Expr,
 ) {
-    if !matches!(op, UnaryOp::UAdd | UnaryOp::USub) {
+    let Expr::UnaryOp(ast::ExprUnaryOp { op: nested_op, .. }) = operand else {
         return;
-    }
-    if let Expr::UnaryOp(ast::ExprUnaryOp { op: inner_op, .. }) = operand {
-        if matches!(op, UnaryOp::UAdd) && matches!(inner_op, UnaryOp::UAdd) {
+    };
+    match (op, nested_op) {
+        (UnaryOp::UAdd, UnaryOp::UAdd) => {
             checker.diagnostics.push(Diagnostic::new(
                 UnaryPrefixIncrementDecrement {
                     operator: UnaryPrefixOperatorType::Increment,
                 },
                 expr.range(),
             ));
-        } else if matches!(op, UnaryOp::USub) && matches!(inner_op, UnaryOp::USub) {
+        }
+        (UnaryOp::USub, UnaryOp::USub) => {
             checker.diagnostics.push(Diagnostic::new(
                 UnaryPrefixIncrementDecrement {
                     operator: UnaryPrefixOperatorType::Decrement,
@@ -75,6 +76,7 @@ pub(crate) fn unary_prefix_increment_decrement(
                 expr.range(),
             ));
         }
+        _ => {}
     }
 }
 
