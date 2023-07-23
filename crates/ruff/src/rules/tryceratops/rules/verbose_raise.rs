@@ -1,4 +1,4 @@
-use ruff_text_size::TextSize;
+use ruff_text_size::TextRange;
 use rustpython_parser::ast::{self, ExceptHandler, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
@@ -48,7 +48,7 @@ impl AlwaysAutofixableViolation for VerboseRaise {
 
 #[derive(Default)]
 struct RaiseStatementVisitor<'a> {
-    raises: Vec<(Option<&'a Expr>, Option<&'a Expr>)>,
+    raises: Vec<&'a ast::StmtRaise>,
 }
 
 impl<'a, 'b> StatementVisitor<'b> for RaiseStatementVisitor<'a>
@@ -57,12 +57,8 @@ where
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         match stmt {
-            Stmt::Raise(ast::StmtRaise {
-                exc,
-                cause,
-                range: _,
-            }) => {
-                self.raises.push((exc.as_deref(), cause.as_deref()));
+            Stmt::Raise(raise @ ast::StmtRaise { .. }) => {
+                self.raises.push(raise);
             }
             Stmt::Try(ast::StmtTry {
                 body, finalbody, ..
@@ -95,13 +91,13 @@ pub(crate) fn verbose_raise(checker: &mut Checker, handlers: &[ExceptHandler]) {
                 visitor.visit_body(body);
                 visitor.raises
             };
-            for (exc, cause) in raises {
-                if cause.is_some() {
+            for raise in raises {
+                if raise.cause.is_some() {
                     continue;
                 }
-                if let Some(exc) = exc {
+                if let Some(exc) = raise.exc.as_ref() {
                     // ...and the raised object is bound to the same name...
-                    if let Expr::Name(ast::ExprName { id, .. }) = exc {
+                    if let Expr::Name(ast::ExprName { id, .. }) = exc.as_ref() {
                         if id == exception_name.as_str() {
                             let mut diagnostic = Diagnostic::new(VerboseRaise, exc.range());
                             if checker.patch(diagnostic.kind.rule()) {
@@ -110,10 +106,13 @@ pub(crate) fn verbose_raise(checker: &mut Checker, handlers: &[ExceptHandler]) {
                                         expr.range().end(),
                                         exception_name.range().end(),
                                     ),
-                                    [Edit::range_deletion(
-                                        // SAFETY: No space between `raise` and exception name
-                                        // is a syntax error.
-                                        exc.range().sub_start(TextSize::new(1)),
+                                    [Edit::range_replacement(
+                                        checker.generator().stmt(&Stmt::Raise(ast::StmtRaise {
+                                            range: TextRange::default(),
+                                            exc: None,
+                                            cause: None,
+                                        })),
+                                        raise.range(),
                                     )],
                                 ));
                             }
