@@ -637,7 +637,8 @@ mod tests {
         )
         .unwrap()
         .0;
-        let paths = paths.iter().flatten().collect::<Vec<_>>();
+        let mut paths = paths.iter().flatten().collect::<Vec<_>>();
+        paths.sort_by(|a, b| a.path().cmp(b.path()));
         assert_eq!(paths.len(), 2);
         assert_eq!(paths[0].path(), file2);
         assert_eq!(paths[1].path(), file1);
