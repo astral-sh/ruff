@@ -410,7 +410,7 @@ impl Violation for MissingReturnTypeClassMethod {
 ///
 ///
 /// def foo(x: MyAny):
-///    ...
+///     ...
 /// ```
 ///
 /// ## References
