@@ -1659,7 +1659,6 @@ where
                 }
                 if self.settings.rules.enabled(Rule::SelfAssigningVariable) {
                     if let Some(value) = value {
-                        // Function expects targets: &[Expr], but we have target: &Box<Expr>
                         pylint::rules::self_assigning_variable(
                             self,
                             &[target.as_ref().clone()],
