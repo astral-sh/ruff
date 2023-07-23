@@ -22,12 +22,15 @@ use crate::checkers::ast::Checker;
 /// country = "Poland"
 /// ```
 #[violation]
-pub struct SelfAssigningVariable;
+pub struct SelfAssigningVariable {
+    name: String,
+}
 
 impl Violation for SelfAssigningVariable {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Self-assignment of variable")
+        let SelfAssigningVariable { name } = self;
+        format!("Self-assignment of variable `{name}`")
     }
 }
 
@@ -50,9 +53,12 @@ pub(crate) fn self_assigning_variable(checker: &mut Checker, targets: &[Expr], v
             Expr::Name(ast::ExprName { id: lhs_name, .. }),
             Expr::Name(ast::ExprName { id: rhs_name, .. }),
         ) if lhs_name == rhs_name => {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(SelfAssigningVariable, target.range()));
+            checker.diagnostics.push(Diagnostic::new(
+                SelfAssigningVariable {
+                    name: lhs_name.to_string(),
+                },
+                target.range(),
+            ));
         }
         _ => {}
     }

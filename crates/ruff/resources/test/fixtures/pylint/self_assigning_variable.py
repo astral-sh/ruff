@@ -21,8 +21,6 @@ foo, (bar, baz) = foo, (bar, 1)
 bar, (foo, baz) = bar, (foo, 1)
 (foo, bar), baz = (foo, bar), 1
 (foo, (bar, baz)) = (foo, (bar, 1))
-
-# Ambiguous.
 foo: int = foo
 bar: int = bar
 
@@ -31,3 +29,8 @@ foo = bar
 bar = foo
 foo, bar = bar, foo
 foo, bar = bar, foo
+(foo, bar) = (bar, foo)
+foo, bar = bar, 1
+bar, foo = foo, 1
+foo: int = bar
+bar: int = 1
