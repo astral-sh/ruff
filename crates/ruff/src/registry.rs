@@ -238,9 +238,8 @@ impl Rule {
         match self {
             Rule::InvalidPyprojectToml => LintSource::PyprojectToml,
             Rule::UnusedNOQA => LintSource::Noqa,
-            Rule::BlanketNOQA
-            | Rule::BlanketTypeIgnore
-            | Rule::DocLineTooLong
+
+            Rule::DocLineTooLong
             | Rule::LineTooLong
             | Rule::MixedSpacesAndTabs
             | Rule::MissingNewlineAtEndOfFile
@@ -262,6 +261,8 @@ impl Rule {
             | Rule::BadQuotesDocstring
             | Rule::BadQuotesInlineString
             | Rule::BadQuotesMultilineString
+            | Rule::BlanketNOQA
+            | Rule::BlanketTypeIgnore
             | Rule::CommentedOutCode
             | Rule::MultiLineImplicitStringConcatenation
             | Rule::InvalidCharacterBackspace
