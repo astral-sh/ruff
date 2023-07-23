@@ -61,25 +61,12 @@ impl AlwaysAutofixableViolation for InDictKeys {
     }
 }
 
-fn get_value_content_for_key_in_dict(
-    locator: &Locator,
-    stylist: &Stylist,
-    expr: &Expr,
-) -> Result<String> {
-    let content = locator.slice(expr.range());
-    let mut expression = match_expression(content)?;
-    let call = match_call_mut(&mut expression)?;
-    let attribute = match_attribute(&mut call.func)?;
-
-    Ok(attribute.value.codegen_stylist(stylist))
-}
-
 /// SIM118
 fn key_in_dict(
     checker: &mut Checker,
     left: &Expr,
     right: &Expr,
-    operator: String,
+    operator: CmpOp,
     range: TextRange,
 ) {
     let Expr::Call(ast::ExprCall {
@@ -116,8 +103,8 @@ fn key_in_dict(
     let mut diagnostic = Diagnostic::new(
         InDictKeys {
             key: left_content.to_string(),
-            dict: value_content.clone(),
-            operator,
+            dict: value_content.to_string(),
+            operator: operator.as_str().to_string(),
         },
         range,
     );
@@ -136,7 +123,7 @@ pub(crate) fn key_in_dict_for(checker: &mut Checker, target: &Expr, iter: &Expr)
         checker,
         target,
         iter,
-        "in".to_string(),
+        CmpOp::In,
         TextRange::new(target.start(), iter.end()),
     );
 }
@@ -157,10 +144,22 @@ pub(crate) fn key_in_dict_compare(
         return;
     }
 
-    if comparators.len() != 1 {
+    let [right] = comparators else {
         return;
-    }
-    let right = comparators.first().unwrap();
+    };
 
-    key_in_dict(checker, left, right, op.as_str().to_string(), expr.range());
+    key_in_dict(checker, left, right, *op, expr.range());
+}
+
+fn get_value_content_for_key_in_dict(
+    locator: &Locator,
+    stylist: &Stylist,
+    expr: &Expr,
+) -> Result<String> {
+    let content = locator.slice(expr.range());
+    let mut expression = match_expression(content)?;
+    let call = match_call_mut(&mut expression)?;
+    let attribute = match_attribute(&mut call.func)?;
+
+    Ok(attribute.value.codegen_stylist(stylist))
 }
