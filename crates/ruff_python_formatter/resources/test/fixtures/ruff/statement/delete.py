@@ -70,3 +70,6 @@ del (
     # Deleted
 )  # Completed
 # Done
+
+del (  # dangling end of line comment
+)
