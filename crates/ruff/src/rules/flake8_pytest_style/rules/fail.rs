@@ -18,25 +18,30 @@ use super::helpers::{is_empty_or_null_string, is_pytest_fail};
 /// ```python
 /// import pytest
 ///
+///
 /// def test_foo():
 ///     pytest.fail()
 ///
+///
 /// def test_bar():
-///     pytest.fail('')
+///     pytest.fail("")
+///
 ///
 /// def test_baz():
-///     pytest.fail(reason='')
+///     pytest.fail(reason="")
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// import pytest
 ///
+///
 /// def test_foo():
-///     pytest.fail('...')
+///     pytest.fail("...")
+///
 ///
 /// def test_bar():
-///     pytest.fail(reason='...')
+///     pytest.fail(reason="...")
 /// ```
 ///
 /// ## References
