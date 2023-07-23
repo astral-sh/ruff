@@ -38,6 +38,34 @@ impl Violation for PytestRaisesTooBroad {
     }
 }
 
+/// ## What it does
+/// Checks for `pytest.raises` calls without an expected exception.
+///
+/// ## Why is this bad?
+/// `pytest.raises()` is an invalid call and fails at runtime.
+///
+/// ## Example
+/// ```python
+/// import pytest
+///
+///
+/// def test_foo():
+///     with pytest.raises():
+///         do_something()
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import pytest
+///
+///
+/// def test_foo():
+///     with pytest.raises(SomeException):
+///         do_something()
+/// ```
+///
+/// ## References
+/// - [API Reference: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
 #[violation]
 pub struct PytestRaisesWithoutException;
 
