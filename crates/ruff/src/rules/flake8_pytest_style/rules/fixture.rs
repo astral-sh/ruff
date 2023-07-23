@@ -145,7 +145,7 @@ impl Violation for PytestFixtureParamWithoutValue {
 /// ```
 ///
 /// ## References
-/// - [`yield_fixture` functions](https://docs.pytest.org/en/latest/yieldfixture.html
+/// - [`yield_fixture` functions](https://docs.pytest.org/en/latest/yieldfixture.html)
 #[violation]
 pub struct PytestDeprecatedYieldFixture;
 
