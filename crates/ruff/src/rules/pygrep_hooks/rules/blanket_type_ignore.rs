@@ -5,7 +5,7 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_trivia::Line;
+use ruff_python_ast::source_code::{Indexer, Locator};
 
 /// ## What it does
 /// Check for `type: ignore` annotations that suppress all type warnings, as
@@ -41,17 +41,24 @@ impl Violation for BlanketTypeIgnore {
 }
 
 /// PGH003
-pub(crate) fn blanket_type_ignore(diagnostics: &mut Vec<Diagnostic>, line: &Line) {
-    for match_ in TYPE_IGNORE_PATTERN.find_iter(line) {
-        if let Ok(codes) = parse_type_ignore_tag(line[match_.end()..].trim()) {
-            if codes.is_empty() {
-                diagnostics.push(Diagnostic::new(
-                    BlanketTypeIgnore,
-                    TextRange::at(
-                        line.start() + TextSize::try_from(match_.start()).unwrap(),
-                        match_.as_str().text_len(),
-                    ),
-                ));
+pub(crate) fn blanket_type_ignore(
+    diagnostics: &mut Vec<Diagnostic>,
+    indexer: &Indexer,
+    locator: &Locator,
+) {
+    for range in indexer.comment_ranges() {
+        let line = locator.slice(*range);
+        for match_ in TYPE_IGNORE_PATTERN.find_iter(line) {
+            if let Ok(codes) = parse_type_ignore_tag(line[match_.end()..].trim()) {
+                if codes.is_empty() {
+                    diagnostics.push(Diagnostic::new(
+                        BlanketTypeIgnore,
+                        TextRange::at(
+                            range.start() + TextSize::try_from(match_.start()).unwrap(),
+                            match_.as_str().text_len(),
+                        ),
+                    ));
+                }
             }
         }
     }

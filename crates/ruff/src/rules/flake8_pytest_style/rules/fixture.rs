@@ -8,7 +8,7 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
-use ruff_python_ast::helpers::includes_arg_name;
+use ruff_python_ast::helpers::{find_keyword, includes_arg_name};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
@@ -306,11 +306,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &D
             }
 
             if checker.enabled(Rule::PytestExtraneousScopeFunction) {
-                let scope_keyword = keywords
-                    .iter()
-                    .find(|kw| kw.arg.as_ref().map_or(false, |arg| arg == "scope"));
-
-                if let Some(scope_keyword) = scope_keyword {
+                if let Some(scope_keyword) = find_keyword(keywords, "scope") {
                     if keyword_is_literal(scope_keyword, "function") {
                         let mut diagnostic =
                             Diagnostic::new(PytestExtraneousScopeFunction, scope_keyword.range());
