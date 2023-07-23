@@ -1,4 +1,3 @@
-use ruff_text_size::TextRange;
 use rustpython_parser::ast::{self, ExceptHandler, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
@@ -101,19 +100,12 @@ pub(crate) fn verbose_raise(checker: &mut Checker, handlers: &[ExceptHandler]) {
                         if id == exception_name.as_str() {
                             let mut diagnostic = Diagnostic::new(VerboseRaise, exc.range());
                             if checker.patch(diagnostic.kind.rule()) {
-                                diagnostic.set_fix(Fix::automatic_edits(
+                                diagnostic.set_fix(Fix::suggested_edits(
                                     Edit::deletion(
                                         expr.range().end(),
                                         exception_name.range().end(),
                                     ),
-                                    [Edit::range_replacement(
-                                        checker.generator().stmt(&Stmt::Raise(ast::StmtRaise {
-                                            range: TextRange::default(),
-                                            exc: None,
-                                            cause: None,
-                                        })),
-                                        raise.range(),
-                                    )],
+                                    [Edit::range_replacement("raise".to_string(), raise.range())],
                                 ));
                             }
                             checker.diagnostics.push(diagnostic);
