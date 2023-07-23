@@ -126,6 +126,7 @@ pub(crate) fn check_tokens(
             }
         }
     }
+
     // PLE2510, PLE2512, PLE2513
     if enforce_invalid_string_character {
         for (tok, range) in tokens.iter().flatten() {
@@ -177,7 +178,7 @@ pub(crate) fn check_tokens(
     }
 
     // TD001, TD002, TD003, TD004, TD005, TD006, TD007
-    // T001, T002, T003, T004
+    // FIX001, FIX002, FIX003, FIX004
     if enforce_todos {
         let todo_comments: Vec<TodoComment> = indexer
             .comment_ranges()
@@ -188,9 +189,7 @@ pub(crate) fn check_tokens(
                 TodoComment::from_comment(comment, *comment_range, i)
             })
             .collect();
-
         flake8_todos::rules::todos(&mut diagnostics, &todo_comments, locator, indexer, settings);
-
         flake8_fixme::rules::todos(&mut diagnostics, &todo_comments);
     }
 
