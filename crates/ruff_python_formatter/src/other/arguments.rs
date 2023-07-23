@@ -152,7 +152,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
             // Functions use the regular magic trailing comma logic, lambdas may or may not have
             // a trailing comma but it's just preserved without any magic.
             // ```python
-            // # Never expands
+            // # Add magic trailing comma if its expands
             // def f(a): pass
             // # Expands if magic trailing comma setting is respect, otherwise remove the comma
             // def g(a,): pass
