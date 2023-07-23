@@ -3302,8 +3302,10 @@ where
                         check_not_is,
                     );
                 }
-                if self.enabled(Rule::UnaryPrefixIncrement) {
-                    flake8_bugbear::rules::unary_prefix_increment(self, expr, *op, operand);
+                if self.enabled(Rule::UnaryPrefixIncrementDecrement) {
+                    flake8_bugbear::rules::unary_prefix_increment_decrement(
+                        self, expr, *op, operand,
+                    );
                 }
                 if self.enabled(Rule::NegateEqualOp) {
                     flake8_simplify::rules::negation_with_equal_op(self, expr, *op, operand);
