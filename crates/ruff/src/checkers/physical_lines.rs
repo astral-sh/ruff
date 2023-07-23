@@ -17,7 +17,6 @@ use crate::rules::pycodestyle::rules::{
     doc_line_too_long, line_too_long, mixed_spaces_and_tabs, no_newline_at_end_of_file,
     tab_indentation, trailing_whitespace,
 };
-use crate::rules::pygrep_hooks::rules::{blanket_noqa, blanket_type_ignore};
 use crate::rules::pylint;
 use crate::rules::pyupgrade::rules::unnecessary_coding_comment;
 use crate::settings::Settings;
@@ -33,13 +32,11 @@ pub(crate) fn check_physical_lines(
     let mut diagnostics: Vec<Diagnostic> = vec![];
     let mut has_any_shebang = false;
 
-    let enforce_blanket_noqa = settings.rules.enabled(Rule::BlanketNOQA);
     let enforce_shebang_not_executable = settings.rules.enabled(Rule::ShebangNotExecutable);
     let enforce_shebang_missing = settings.rules.enabled(Rule::ShebangMissingExecutableFile);
     let enforce_shebang_whitespace = settings.rules.enabled(Rule::ShebangLeadingWhitespace);
     let enforce_shebang_newline = settings.rules.enabled(Rule::ShebangNotFirstLine);
     let enforce_shebang_python = settings.rules.enabled(Rule::ShebangMissingPython);
-    let enforce_blanket_type_ignore = settings.rules.enabled(Rule::BlanketTypeIgnore);
     let enforce_doc_line_too_long = settings.rules.enabled(Rule::DocLineTooLong);
     let enforce_line_too_long = settings.rules.enabled(Rule::LineTooLong);
     let enforce_no_newline_at_end_of_file = settings.rules.enabled(Rule::MissingNewlineAtEndOfFile);
@@ -71,14 +68,6 @@ pub(crate) fn check_physical_lines(
                         diagnostics.push(diagnostic);
                     }
                 }
-            }
-
-            if enforce_blanket_type_ignore {
-                blanket_type_ignore(&mut diagnostics, &line);
-            }
-
-            if enforce_blanket_noqa {
-                blanket_noqa(&mut diagnostics, &line);
             }
 
             if enforce_shebang_missing
