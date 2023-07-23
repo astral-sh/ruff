@@ -8,6 +8,38 @@ use crate::checkers::ast::Checker;
 
 use super::helpers::{is_empty_or_null_string, is_pytest_fail};
 
+/// ## What it does
+/// Checks for ``pytest.fail`` calls without a message.
+///
+/// ## Why is this bad?
+/// `pytest.fail` calls without a message make it harder to understand and debug test failures.
+///
+/// ## Example
+/// ```python
+/// import pytest
+///
+/// def test_foo():
+///     pytest.fail()
+///
+/// def test_bar():
+///     pytest.fail('')
+///
+///     pytest.fail(reason='')
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import pytest
+///
+/// def test_foo():
+///     pytest.fail('...')
+///
+/// def test_bar():
+///     pytest.fail(reason='...')
+/// ```
+///
+/// ## References
+/// - [API Reference: pytest.fail](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fail)
 #[violation]
 pub struct PytestFailWithoutMessage;
 
