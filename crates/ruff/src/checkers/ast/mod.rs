@@ -4513,10 +4513,10 @@ impl<'a> Checker<'a> {
                 extract_all_names(parent, |name| self.semantic.is_builtin(name));
 
             let mut flags = BindingFlags::empty();
-            if all_flags.contains(DunderAllFlags::INVALID_OBJECT) {
+            if all_flags.intersects(DunderAllFlags::INVALID_OBJECT) {
                 flags |= BindingFlags::INVALID_ALL_OBJECT;
             }
-            if all_flags.contains(DunderAllFlags::INVALID_FORMAT) {
+            if all_flags.intersects(DunderAllFlags::INVALID_FORMAT) {
                 flags |= BindingFlags::INVALID_ALL_FORMAT;
             }
 
