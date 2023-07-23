@@ -444,6 +444,7 @@ mod tests {
     };
     use crate::settings::pyproject::find_settings_toml;
     use crate::settings::types::FilePattern;
+    use crate::settings::AllSettings;
     use crate::test::test_resource_path;
 
     fn make_exclusion(file_pattern: FilePattern) -> GlobSet {
@@ -622,12 +623,16 @@ mod tests {
         // ├── dir2.py
         // └── file1.py
         std::fs::File::create(&file1).unwrap();
-        std::fs::create_dir(&dir1).unwrap();
+        std::fs::create_dir(dir1).unwrap();
         std::fs::File::create(&file2).unwrap();
-        std::fs::create_dir(&dir2).unwrap();
+        std::fs::create_dir(dir2).unwrap();
         let paths = python_files_in_path(
             &[root.to_path_buf()],
-            &PyprojectConfig::new(PyprojectDiscoveryStrategy::Fixed, Default::default(), None),
+            &PyprojectConfig::new(
+                PyprojectDiscoveryStrategy::Fixed,
+                AllSettings::default(),
+                None,
+            ),
             &NoOpProcessor,
         )
         .unwrap()
