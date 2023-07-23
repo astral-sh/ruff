@@ -335,7 +335,7 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
 /// ```
 /// These comments are dangling because they can't be assigned to any element inside as they would
 /// in all other cases.
-pub(crate) fn empty_with_dangling_comments(
+pub(crate) fn empty_parenthesized_with_dangling_comments(
     opening: StaticText,
     comments: &[SourceComment],
     closing: StaticText,

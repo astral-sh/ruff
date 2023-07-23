@@ -1,4 +1,4 @@
-use crate::builders::empty_with_dangling_comments;
+use crate::builders::empty_parenthesized_with_dangling_comments;
 use crate::comments::leading_comments;
 use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
@@ -66,7 +66,7 @@ impl FormatNodeRule<ExprDict> for FormatExprDict {
 
         if values.is_empty() {
             let comments = f.context().comments().clone();
-            return empty_with_dangling_comments(
+            return empty_parenthesized_with_dangling_comments(
                 text("{"),
                 comments.dangling_comments(item),
                 text("}"),

@@ -1,7 +1,7 @@
 use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::{Expr, ExprCall, Ranged};
 
-use crate::builders::empty_with_dangling_comments;
+use crate::builders::empty_parenthesized_with_dangling_comments;
 use ruff_formatter::write;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
@@ -38,7 +38,7 @@ impl FormatNodeRule<ExprCall> for FormatExprCall {
                 f,
                 [
                     func.format(),
-                    empty_with_dangling_comments(
+                    empty_parenthesized_with_dangling_comments(
                         text("("),
                         comments.dangling_comments(item),
                         text(")"),

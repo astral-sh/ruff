@@ -5,7 +5,7 @@ use rustpython_parser::ast::{Expr, Ranged};
 use ruff_formatter::{format_args, write, FormatRuleWithOptions};
 use ruff_python_ast::node::AnyNodeRef;
 
-use crate::builders::{empty_with_dangling_comments, parenthesize_if_expands};
+use crate::builders::{empty_parenthesized_with_dangling_comments, parenthesize_if_expands};
 use crate::expression::parentheses::{
     parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
 };
@@ -78,7 +78,7 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
         match elts.as_slice() {
             [] => {
                 let comments = f.context().comments().clone();
-                return empty_with_dangling_comments(
+                return empty_parenthesized_with_dangling_comments(
                     text("("),
                     comments.dangling_comments(item),
                     text(")"),

@@ -1,4 +1,4 @@
-use crate::builders::empty_with_dangling_comments;
+use crate::builders::empty_parenthesized_with_dangling_comments;
 use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 use crate::FormatNodeRule;
@@ -20,7 +20,8 @@ impl FormatNodeRule<ExprList> for FormatExprList {
         let dangling = comments.dangling_comments(item);
 
         if elts.is_empty() {
-            return empty_with_dangling_comments(text("["), dangling, text("]")).fmt(f);
+            return empty_parenthesized_with_dangling_comments(text("["), dangling, text("]"))
+                .fmt(f);
         }
 
         debug_assert!(
