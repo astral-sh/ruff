@@ -436,10 +436,11 @@ mod tests {
     use anyhow::Result;
     use globset::GlobSet;
     use path_absolutize::Absolutize;
+    use tempfile::TempDir;
 
     use crate::resolver::{
-        is_file_excluded, match_exclusion, resolve_settings_with_processor, NoOpProcessor,
-        PyprojectConfig, PyprojectDiscoveryStrategy, Relativity, Resolver,
+        is_file_excluded, match_exclusion, python_files_in_path, resolve_settings_with_processor,
+        NoOpProcessor, PyprojectConfig, PyprojectDiscoveryStrategy, Relativity, Resolver,
     };
     use crate::settings::pyproject::find_settings_toml;
     use crate::settings::types::FilePattern;
@@ -605,5 +606,35 @@ mod tests {
             &pyproject_config,
         ));
         Ok(())
+    }
+
+    #[test]
+    fn test_python_files_in_path() {
+        let tmp_dir = TempDir::new().unwrap();
+        let root = tmp_dir.path();
+        let file1 = root.join("file1.py");
+        let dir1 = root.join("dir1.py");
+        let file2 = dir1.join("file2.py");
+        let dir2 = root.join("dir2.py");
+        // root
+        // ├── dir1.py
+        // │   └── file2.py
+        // ├── dir2.py
+        // └── file1.py
+        std::fs::File::create(&file1).unwrap();
+        std::fs::create_dir(&dir1).unwrap();
+        std::fs::File::create(&file2).unwrap();
+        std::fs::create_dir(&dir2).unwrap();
+        let paths = python_files_in_path(
+            &[root.to_path_buf()],
+            &PyprojectConfig::new(PyprojectDiscoveryStrategy::Fixed, Default::default(), None),
+            &NoOpProcessor,
+        )
+        .unwrap()
+        .0;
+        let paths = paths.iter().flatten().collect::<Vec<_>>();
+        assert_eq!(paths.len(), 2);
+        assert_eq!(paths[0].path(), file2);
+        assert_eq!(paths[1].path(), file1);
     }
 }
