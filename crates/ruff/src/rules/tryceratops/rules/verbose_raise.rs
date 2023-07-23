@@ -1,10 +1,12 @@
+use ruff_text_size::TextSize;
 use rustpython_parser::ast::{self, ExceptHandler, Expr, Ranged, Stmt};
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 
 use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for needless exception names in `raise` statements.
@@ -33,10 +35,14 @@ use crate::checkers::ast::Checker;
 #[violation]
 pub struct VerboseRaise;
 
-impl Violation for VerboseRaise {
+impl AlwaysAutofixableViolation for VerboseRaise {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use `raise` without specifying exception name")
+    }
+
+    fn autofix_title(&self) -> String {
+        format!("Remove exception name")
     }
 }
 
@@ -78,6 +84,7 @@ pub(crate) fn verbose_raise(checker: &mut Checker, handlers: &[ExceptHandler]) {
     for handler in handlers {
         // If the handler assigned a name to the exception...
         if let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+            type_: Some(expr),
             name: Some(exception_name),
             body,
             ..
@@ -96,9 +103,21 @@ pub(crate) fn verbose_raise(checker: &mut Checker, handlers: &[ExceptHandler]) {
                     // ...and the raised object is bound to the same name...
                     if let Expr::Name(ast::ExprName { id, .. }) = exc {
                         if id == exception_name.as_str() {
-                            checker
-                                .diagnostics
-                                .push(Diagnostic::new(VerboseRaise, exc.range()));
+                            let mut diagnostic = Diagnostic::new(VerboseRaise, exc.range());
+                            if checker.patch(diagnostic.kind.rule()) {
+                                diagnostic.set_fix(Fix::automatic_edits(
+                                    Edit::deletion(
+                                        expr.range().end(),
+                                        exception_name.range().end(),
+                                    ),
+                                    [Edit::range_deletion(
+                                        // SAFETY: No space between `raise` and exception name
+                                        // is a syntax error.
+                                        exc.range().sub_start(TextSize::new(1)),
+                                    )],
+                                ));
+                            }
+                            checker.diagnostics.push(diagnostic);
                         }
                     }
                 }
