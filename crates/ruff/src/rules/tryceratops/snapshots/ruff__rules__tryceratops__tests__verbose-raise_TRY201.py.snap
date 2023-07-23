@@ -10,7 +10,7 @@ TRY201.py:20:15: TRY201 [*] Use `raise` without specifying exception name
    |
    = help: Remove exception name
 
-ℹ Fix
+ℹ Suggested fix
 15 15 | def bad():
 16 16 |     try:
 17 17 |         process()
@@ -32,7 +32,7 @@ TRY201.py:63:19: TRY201 [*] Use `raise` without specifying exception name
    |
    = help: Remove exception name
 
-ℹ Fix
+ℹ Suggested fix
 57 57 | def bad_that_needs_recursion():
 58 58 |     try:
 59 59 |         process()
@@ -54,7 +54,7 @@ TRY201.py:74:23: TRY201 [*] Use `raise` without specifying exception name
    |
    = help: Remove exception name
 
-ℹ Fix
+ℹ Suggested fix
 66 66 | def bad_that_needs_recursion_2():
 67 67 |     try:
 68 68 |         process()
