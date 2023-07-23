@@ -1724,11 +1724,13 @@ where
             }) => {
                 self.handle_node_load(target);
             }
-            Stmt::Assign(ast::StmtAssign {targets, range: _, value, type_comment: _ }) => {
-                if let [Expr::Name(ast::ExprName {id, ..})] = &targets[..] {
+            Stmt::Assign(ast::StmtAssign {targets, value, range: _, type_comment: _ }) => {
+                if let [Expr::Name(ast::ExprName {id, range, ..})] = &targets[..] {
                     if id.starts_with('_') {
-                        if self.semantic.match_typing_expr(value, "TypeVar") {
-                            // never gets executed
+                        if let Expr::Call(ast::ExprCall {func, ..}) = value.as_ref() {
+                            if self.semantic.match_typing_expr(func, "TypeVar") {
+                                self.add_binding(id, *range, BindingKind::Assignment, BindingFlags::PRIVATE_TYPE_VAR);
+                            }
                         }
                     }
                 }
@@ -4756,6 +4758,7 @@ impl<'a> Checker<'a> {
             Rule::UnaliasedCollectionsAbcSetImport,
             Rule::UnconventionalImportAlias,
             Rule::UnusedVariable,
+            Rule::UnusedPrivateTypeVar
         ]) {
             return;
         }
@@ -4807,6 +4810,11 @@ impl<'a> Checker<'a> {
                     if let Some(diagnostic) =
                         flake8_pyi::rules::unaliased_collections_abc_set_import(self, binding)
                     {
+                        self.diagnostics.push(diagnostic);
+                    }
+                }
+                if self.enabled(Rule::UnusedPrivateTypeVar) {
+                    if let Some(diagnostic) = flake8_pyi::rules::unused_private_type_var(binding, self.locator) {
                         self.diagnostics.push(diagnostic);
                     }
                 }

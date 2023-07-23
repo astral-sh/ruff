@@ -94,6 +94,10 @@ impl<'a> Binding<'a> {
         )
     }
 
+    pub const fn is_private_type_var(&self) -> bool {
+        self.flags.contains(BindingFlags::PRIVATE_TYPE_VAR)
+    }
+
     /// Return `true` if this binding redefines the given binding.
     pub fn redefines(&self, existing: &'a Binding) -> bool {
         match &self.kind {
@@ -113,28 +117,23 @@ impl<'a> Binding<'a> {
                     return qualified_name == existing;
                 }
             }
-            BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }) => {
-                match &existing.kind {
-                    BindingKind::Import(Import {
-                        qualified_name: existing,
-                    })
-                    | BindingKind::SubmoduleImport(SubmoduleImport {
-                        qualified_name: existing,
-                    }) => {
-                        return qualified_name == existing;
-                    }
-                    BindingKind::FromImport(FromImport {
-                        qualified_name: existing,
-                    }) => {
-                        return qualified_name == existing;
-                    }
-                    _ => {}
+            BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }) => match &existing.kind {
+                BindingKind::Import(Import {
+                    qualified_name: existing,
+                })
+                | BindingKind::SubmoduleImport(SubmoduleImport {
+                    qualified_name: existing,
+                }) => {
+                    return qualified_name == existing;
                 }
-            }
-            BindingKind::Deletion
-            | BindingKind::Annotation
-            | BindingKind::FutureImport
-            | BindingKind::Builtin => {
+                BindingKind::FromImport(FromImport {
+                    qualified_name: existing,
+                }) => {
+                    return qualified_name == existing;
+                }
+                _ => {}
+            },
+            BindingKind::Deletion | BindingKind::Annotation | BindingKind::FutureImport | BindingKind::Builtin => {
                 return false;
             }
             _ => {}
@@ -154,9 +153,7 @@ impl<'a> Binding<'a> {
         match &self.kind {
             BindingKind::Import(Import { qualified_name }) => Some(qualified_name),
             BindingKind::FromImport(FromImport { qualified_name }) => Some(qualified_name),
-            BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }) => {
-                Some(qualified_name)
-            }
+            BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }) => Some(qualified_name),
             _ => None,
         }
     }
@@ -185,15 +182,13 @@ impl<'a> Binding<'a> {
 
     /// Returns the range of the binding's parent.
     pub fn parent_range(&self, semantic: &SemanticModel) -> Option<TextRange> {
-        self.source
-            .map(|node_id| semantic.stmts[node_id])
-            .and_then(|parent| {
-                if parent.is_import_from_stmt() {
-                    Some(parent.range())
-                } else {
-                    None
-                }
-            })
+        self.source.map(|node_id| semantic.stmts[node_id]).and_then(|parent| {
+            if parent.is_import_from_stmt() {
+                Some(parent.range())
+            } else {
+                None
+            }
+        })
     }
 }
 
@@ -264,6 +259,8 @@ bitflags! {
         /// __all__ = [1]
         /// ```
         const INVALID_ALL_OBJECT = 1 << 6;
+
+        const PRIVATE_TYPE_VAR = 1 << 7;
     }
 }
 
