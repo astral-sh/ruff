@@ -1,5 +1,7 @@
 use std::fmt;
+use std::str::FromStr;
 
+use num_bigint::BigInt;
 use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
@@ -10,9 +12,54 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub(crate) enum LiteralType {
+enum LiteralType {
     Str,
     Bytes,
+    Int,
+    Float,
+    Bool,
+}
+
+impl FromStr for LiteralType {
+    type Err = ();
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "str" => Ok(LiteralType::Str),
+            "bytes" => Ok(LiteralType::Bytes),
+            "int" => Ok(LiteralType::Int),
+            "float" => Ok(LiteralType::Float),
+            "bool" => Ok(LiteralType::Bool),
+            _ => Err(()),
+        }
+    }
+}
+
+impl From<LiteralType> for Constant {
+    fn from(value: LiteralType) -> Self {
+        match value {
+            LiteralType::Str => Constant::Str(String::new()),
+            LiteralType::Bytes => Constant::Bytes(vec![]),
+            LiteralType::Int => Constant::Int(BigInt::from(0)),
+            LiteralType::Float => Constant::Float(0.0),
+            LiteralType::Bool => Constant::Bool(false),
+        }
+    }
+}
+
+impl TryFrom<&Constant> for LiteralType {
+    type Error = ();
+
+    fn try_from(value: &Constant) -> Result<Self, Self::Error> {
+        match value {
+            Constant::Str(_) => Ok(LiteralType::Str),
+            Constant::Bytes(_) => Ok(LiteralType::Bytes),
+            Constant::Int(_) => Ok(LiteralType::Int),
+            Constant::Float(_) => Ok(LiteralType::Float),
+            Constant::Bool(_) => Ok(LiteralType::Bool),
+            _ => Err(()),
+        }
+    }
 }
 
 impl fmt::Display for LiteralType {
@@ -20,16 +67,19 @@ impl fmt::Display for LiteralType {
         match self {
             LiteralType::Str => fmt.write_str("str"),
             LiteralType::Bytes => fmt.write_str("bytes"),
+            LiteralType::Int => fmt.write_str("int"),
+            LiteralType::Float => fmt.write_str("float"),
+            LiteralType::Bool => fmt.write_str("bool"),
         }
     }
 }
 
 /// ## What it does
-/// Checks for unnecessary calls to `str` and `bytes`.
+/// Checks for unnecessary calls to `str`, `bytes`, `int`, `float`, and `bool`.
 ///
 /// ## Why is this bad?
-/// The `str` and `bytes` constructors can be replaced with string and bytes
-/// literals, which are more readable and idiomatic.
+/// The mentioned constructors can be replaced with their respective literal
+/// forms, which are more readable and idiomatic.
 ///
 /// ## Example
 /// ```python
@@ -44,6 +94,9 @@ impl fmt::Display for LiteralType {
 /// ## References
 /// - [Python documentation: `str`](https://docs.python.org/3/library/stdtypes.html#str)
 /// - [Python documentation: `bytes`](https://docs.python.org/3/library/stdtypes.html#bytes)
+/// - [Python documentation: `int`](https://docs.python.org/3/library/functions.html#int)
+/// - [Python documentation: `float`](https://docs.python.org/3/library/functions.html#float)
+/// - [Python documentation: `bool`](https://docs.python.org/3/library/functions.html#bool)
 #[violation]
 pub struct NativeLiterals {
     literal_type: LiteralType,
@@ -53,7 +106,7 @@ impl AlwaysAutofixableViolation for NativeLiterals {
     #[derive_message_formats]
     fn message(&self) -> String {
         let NativeLiterals { literal_type } = self;
-        format!("Unnecessary call to `{literal_type}`")
+        format!("Unnecessary `{literal_type}` call (rewrite as a literal)")
     }
 
     fn autofix_title(&self) -> String {
@@ -61,6 +114,9 @@ impl AlwaysAutofixableViolation for NativeLiterals {
         match literal_type {
             LiteralType::Str => "Replace with empty string".to_string(),
             LiteralType::Bytes => "Replace with empty bytes".to_string(),
+            LiteralType::Int => "Replace with 0".to_string(),
+            LiteralType::Float => "Replace with 0.0".to_string(),
+            LiteralType::Bool => "Replace with `False`".to_string(),
         }
     }
 }
@@ -81,9 +137,9 @@ pub(crate) fn native_literals(
         return;
     }
 
-    if !matches!(id.as_str(), "str" | "bytes") {
+    let Ok(literal_type) = LiteralType::from_str(id.as_str()) else {
         return;
-    }
+    };
 
     if !checker.semantic().is_builtin(id) {
         return;
@@ -104,22 +160,9 @@ pub(crate) fn native_literals(
 
     match args.get(0) {
         None => {
-            let mut diagnostic = Diagnostic::new(
-                NativeLiterals {
-                    literal_type: if id == "str" {
-                        LiteralType::Str
-                    } else {
-                        LiteralType::Bytes
-                    },
-                },
-                expr.range(),
-            );
+            let mut diagnostic = Diagnostic::new(NativeLiterals { literal_type }, expr.range());
             if checker.patch(diagnostic.kind.rule()) {
-                let constant = if id == "bytes" {
-                    Constant::Bytes(vec![])
-                } else {
-                    Constant::Str(String::new())
-                };
+                let constant = Constant::from(literal_type);
                 let content = checker.generator().constant(&constant);
                 diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                     content,
@@ -129,48 +172,28 @@ pub(crate) fn native_literals(
             checker.diagnostics.push(diagnostic);
         }
         Some(arg) => {
-            // Look for `str("")`.
-            if id == "str"
-                && !matches!(
-                    &arg,
-                    Expr::Constant(ast::ExprConstant {
-                        value: Constant::Str(_),
-                        ..
-                    }),
-                )
-            {
+            let Expr::Constant(ast::ExprConstant { value, .. }) = arg else {
+                return;
+            };
+
+            let Ok(arg_literal_type) = LiteralType::try_from(value) else {
+                return;
+            };
+
+            if arg_literal_type != literal_type {
                 return;
             }
 
-            // Look for `bytes(b"")`
-            if id == "bytes"
-                && !matches!(
-                    &arg,
-                    Expr::Constant(ast::ExprConstant {
-                        value: Constant::Bytes(_),
-                        ..
-                    }),
-                )
-            {
-                return;
-            }
+            let arg_code = checker.locator().slice(arg.range());
 
             // Skip implicit string concatenations.
-            let arg_code = checker.locator().slice(arg.range());
-            if is_implicit_concatenation(arg_code) {
+            if matches!(arg_literal_type, LiteralType::Str | LiteralType::Bytes)
+                && is_implicit_concatenation(arg_code)
+            {
                 return;
             }
 
-            let mut diagnostic = Diagnostic::new(
-                NativeLiterals {
-                    literal_type: if id == "str" {
-                        LiteralType::Str
-                    } else {
-                        LiteralType::Bytes
-                    },
-                },
-                expr.range(),
-            );
+            let mut diagnostic = Diagnostic::new(NativeLiterals { literal_type }, expr.range());
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                     arg_code.to_string(),
