@@ -6,29 +6,53 @@ use ruff_formatter::{format_args, write, FormatRuleWithOptions};
 use ruff_python_ast::node::AnyNodeRef;
 
 use crate::builders::{empty_parenthesized_with_dangling_comments, parenthesize_if_expands};
-use crate::expression::parentheses::{
-    parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
-};
+use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 
 #[derive(Eq, PartialEq, Debug, Default)]
 pub enum TupleParentheses {
-    /// Black omits parentheses for tuples inside of comprehensions.
-    Comprehension,
-
-    /// Effectively `None` in `Option<Parentheses>`
+    /// By default tuples with a single element will include parentheses. Tuples with multiple elements
+    /// will parenthesize if the expression expands. This means that tuples will often *preserve*
+    /// their parentheses, but this differs from `Preserve` in that we may also *introduce*
+    /// parentheses as well.
     #[default]
     Default,
-    /// Effectively `Some(Parentheses)` in `Option<Parentheses>`
-    Expr(Parentheses),
 
-    /// Black omits parentheses for tuples inside of subscripts except if the tuple is parenthesized
-    /// in the source code.
-    Subscript,
-
-    /// Handle the special case where we remove parentheses even if they were initially present
+    /// Handle special cases where parentheses are to be preserved.
     ///
-    /// Normally, black keeps parentheses, but in the case of loops it formats
+    /// Black omits parentheses for tuples inside subscripts except if the tuple is already
+    /// parenthesized in the source code.
+    /// ```python
+    /// x[a, :]
+    /// x[a, b:]
+    /// x[(a, b):]
+    /// ```
+    Preserve,
+
+    /// Handle the special cases where we don't include parentheses at all.
+    ///
+    ///
+    /// Black never formats tuple targets of for loops with parentheses if inside a comprehension.
+    /// For example, tuple targets will always be formatted on the same line, except when an element supports
+    /// line-breaking in an un-parenthesized context.
+    /// ```python
+    /// # Input
+    /// {k: v for x, (k, v) in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension}
+    ///
+    /// # Black
+    /// {
+    ///     k: v
+    ///     for x, (
+    ///         k,
+    ///         v,
+    ///     ) in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
+    /// }
+    /// ```
+    Never,
+
+    /// Handle the special cases where we don't include parentheses if they are not required.
+    ///
+    /// Normally, black keeps parentheses, but in the case of for loops it formats
     /// ```python
     /// for (a, b) in x:
     ///     pass
@@ -38,9 +62,24 @@ pub enum TupleParentheses {
     /// for a, b in x:
     ///     pass
     /// ```
-    /// Black still does use parentheses in this position if the group breaks or magic trailing
+    /// Black still does use parentheses in these positions if the group breaks or magic trailing
     /// comma is used.
-    StripInsideForLoop,
+    ///
+    /// Additional examples:
+    /// ```python
+    /// for (a,) in []:
+    /// pass
+    /// for a, b in []:
+    ///     pass
+    /// for a, b in []:  # Strips parentheses
+    ///     pass
+    /// for (
+    ///     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+    ///     b,
+    /// ) in []:
+    ///     pass
+    /// ```
+    NeverPreserve,
 }
 
 #[derive(Default)]
@@ -86,7 +125,7 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                 .fmt(f);
             }
             [single] => match self.parentheses {
-                TupleParentheses::Subscript
+                TupleParentheses::Preserve
                     if !is_parenthesized(*range, elts, f.context().source()) =>
                 {
                     write!(f, [single.format(), text(",")])
@@ -103,19 +142,19 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
             // Unlike other expression parentheses, tuple parentheses are part of the range of the
             // tuple itself.
             _ if is_parenthesized(*range, elts, f.context().source())
-                && self.parentheses != TupleParentheses::StripInsideForLoop =>
+                && self.parentheses != TupleParentheses::NeverPreserve =>
             {
                 parenthesized("(", &ExprSequence::new(item), ")").fmt(f)
             }
             _ => match self.parentheses {
-                TupleParentheses::Comprehension => {
+                TupleParentheses::Never => {
                     let separator =
                         format_with(|f| group(&format_args![text(","), space()]).fmt(f));
                     f.join_with(separator)
                         .entries(elts.iter().formatted())
                         .finish()
                 }
-                TupleParentheses::Subscript => group(&ExprSequence::new(item)).fmt(f),
+                TupleParentheses::Preserve => group(&ExprSequence::new(item)).fmt(f),
                 _ => parenthesize_if_expands(&ExprSequence::new(item)).fmt(f),
             },
         }
