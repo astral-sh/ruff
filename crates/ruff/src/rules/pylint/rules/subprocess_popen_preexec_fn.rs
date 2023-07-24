@@ -9,9 +9,8 @@ use crate::checkers::ast::Checker;
 /// Checks for uses of `subprocess.Popen` with a `preexec_fn` argument.
 ///
 /// ## Why is this bad?
-/// The `preexec_fn` argument is unsafe when using threads as the child process
-/// could deadlock (where no thread can proceed as each waits for another).
-/// Furthermore, `preexec_fn` is [targeted for deprecation].
+/// The `preexec_fn` argument is unsafe within threads as it can lead to
+/// deadlocks. Furthermore, `preexec_fn` is [targeted for deprecation].
 ///
 /// Instead, consider using task-specific arguments such as `env`,
 /// `start_new_session`, and `process_group`. These are not prone to deadlocks
@@ -57,14 +56,12 @@ pub(crate) fn subprocess_popen_preexec_fn(checker: &mut Checker, func: &Expr, kw
             matches!(call_path.as_slice(), ["subprocess", "Popen"])
         })
     {
-        if let Some(preexec_fn) = find_keyword(kwargs, "preexec_fn")
-            .map(|keyword| &keyword.value)
-            .filter(|value| !is_const_none(value))
+        if let Some(keyword) =
+            find_keyword(kwargs, "preexec_fn").filter(|keyword| !is_const_none(&keyword.value))
         {
-            checker.diagnostics.push(Diagnostic::new(
-                SubprocessPopenPreexecFn,
-                preexec_fn.range(),
-            ));
+            checker
+                .diagnostics
+                .push(Diagnostic::new(SubprocessPopenPreexecFn, keyword.range()));
         }
     }
 }
