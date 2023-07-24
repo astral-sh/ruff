@@ -2971,6 +2971,9 @@ where
                         self.diagnostics.push(diagnostic);
                     }
                 }
+                if self.enabled(Rule::SubprocessPopenPreexecFn) {
+                    pylint::rules::subprocess_popen_preexec_fn(self, func, keywords);
+                }
                 if self.any_enabled(&[
                     Rule::PytestRaisesWithoutException,
                     Rule::PytestRaisesTooBroad,
