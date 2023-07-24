@@ -1343,6 +1343,10 @@ impl<'a> Checker<'a> {
     /// Visit a list of [`Comprehension`] nodes, assumed to be the comprehensions that compose a
     /// generator expression, like a list or set comprehension.
     fn visit_generators(&mut self, generators: &'a [Comprehension]) {
+        for generator in generators {
+            analyze::comprehension(generator, self);
+        }
+
         let mut generators = generators.iter();
 
         let Some(generator) = generators.next() else {

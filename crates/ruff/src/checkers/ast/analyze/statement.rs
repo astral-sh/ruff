@@ -34,7 +34,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     pycodestyle::rules::ambiguous_variable_name(name, name.range())
                 }));
             }
-
             if checker.enabled(Rule::NonlocalWithoutBinding) {
                 if !checker.semantic.scope_id.is_global() {
                     for name in names {
