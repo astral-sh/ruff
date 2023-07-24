@@ -43,3 +43,7 @@
     if
     gggggggggggggggggggggggggggggggggggggggggggg
 ]
+
+# Tuples with BinOp
+[i for i in (aaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb, ccccccccccccccccccccc)]
+[(aaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb, ccccccccccccccccccccc) for i in b]

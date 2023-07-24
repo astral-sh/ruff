@@ -49,6 +49,10 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression
     if
     gggggggggggggggggggggggggggggggggggggggggggg
 ]
+
+# Tuples with BinOp
+[i for i in (aaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb, ccccccccccccccccccccc)]
+[(aaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb, ccccccccccccccccccccc) for i in b]
 ```
 
 ## Output
@@ -100,6 +104,22 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression
     < gggggggggggggggggggggggggggggggggggggggggggggg
     < hhhhhhhhhhhhhhhhhhhhhhhhhh
     if gggggggggggggggggggggggggggggggggggggggggggg
+]
+
+# Tuples with BinOp
+[
+    i
+    for i in (
+        aaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+        ccccccccccccccccccccc,
+    )
+]
+[
+    (
+        aaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+        ccccccccccccccccccccc,
+    )
+    for i in b
 ]
 ```
 
