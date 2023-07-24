@@ -847,8 +847,7 @@ where
                 visitor.visit_expr(expr);
             }
         }
-        TypeParam::TypeVarTuple(_) => {}
-        TypeParam::ParamSpec(_) => {}
+        TypeParam::TypeVarTuple(_) | TypeParam::ParamSpec(_) => {}
     }
 }
 

@@ -708,8 +708,7 @@ pub fn walk_type_param<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, type_param:
                 visitor.visit_expr(expr);
             }
         }
-        TypeParam::TypeVarTuple(_) => {}
-        TypeParam::ParamSpec(_) => {}
+        TypeParam::TypeVarTuple(_) | TypeParam::ParamSpec(_) => {}
     }
 }
 
