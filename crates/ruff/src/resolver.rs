@@ -436,6 +436,7 @@ mod tests {
 
     use anyhow::Result;
     use globset::GlobSet;
+    use itertools::Itertools;
     use path_absolutize::Absolutize;
     use tempfile::TempDir;
 
@@ -611,23 +612,25 @@ mod tests {
     }
 
     #[test]
-    fn test_python_files_in_path() {
-        let tmp_dir = TempDir::new().unwrap();
+    fn find_python_files() -> Result<()> {
+        // Initialize the filesystem:
+        //   root
+        //   ├── file1.py
+        //   ├── dir1.py
+        //   │   └── file2.py
+        //   └── dir2.py
+        let tmp_dir = TempDir::new()?;
         let root = tmp_dir.path();
         let file1 = root.join("file1.py");
         let dir1 = root.join("dir1.py");
         let file2 = dir1.join("file2.py");
         let dir2 = root.join("dir2.py");
-        // root
-        // ├── file1.py
-        // ├── dir1.py
-        // │   └── file2.py
-        // └── dir2.py
-        File::create(&file1).unwrap();
-        create_dir(dir1).unwrap();
-        File::create(&file2).unwrap();
-        create_dir(dir2).unwrap();
-        let paths = python_files_in_path(
+        File::create(&file1)?;
+        create_dir(dir1)?;
+        File::create(&file2)?;
+        create_dir(dir2)?;
+
+        let (paths, _) = python_files_in_path(
             &[root.to_path_buf()],
             &PyprojectConfig::new(
                 PyprojectDiscoveryStrategy::Fixed,
@@ -635,15 +638,15 @@ mod tests {
                 None,
             ),
             &NoOpProcessor,
-        )
-        .unwrap()
-        .0;
-        let mut paths = paths
+        )?;
+        let paths = paths
             .iter()
             .flatten()
             .map(ignore::DirEntry::path)
+            .sorted()
             .collect::<Vec<_>>();
-        paths.sort();
         assert_eq!(paths, &[file2, file1]);
+
+        Ok(())
     }
 }
