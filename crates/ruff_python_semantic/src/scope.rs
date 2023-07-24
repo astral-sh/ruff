@@ -163,7 +163,7 @@ impl<'a> Scope<'a> {
 
     /// Returns `true` if this scope uses locals (e.g., `locals()`).
     pub const fn uses_locals(&self) -> bool {
-        self.flags.contains(ScopeFlags::USES_LOCALS)
+        self.flags.intersects(ScopeFlags::USES_LOCALS)
     }
 }
 

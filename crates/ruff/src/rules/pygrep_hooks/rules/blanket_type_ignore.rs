@@ -1,11 +1,12 @@
 use anyhow::{anyhow, Result};
+use memchr::memchr_iter;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use ruff_text_size::TextSize;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_trivia::Line;
+use ruff_python_ast::source_code::{Indexer, Locator};
 
 /// ## What it does
 /// Check for `type: ignore` annotations that suppress all type warnings, as
@@ -41,26 +42,56 @@ impl Violation for BlanketTypeIgnore {
 }
 
 /// PGH003
-pub(crate) fn blanket_type_ignore(diagnostics: &mut Vec<Diagnostic>, line: &Line) {
-    for match_ in TYPE_IGNORE_PATTERN.find_iter(line) {
-        if let Ok(codes) = parse_type_ignore_tag(line[match_.end()..].trim()) {
-            if codes.is_empty() {
-                diagnostics.push(Diagnostic::new(
-                    BlanketTypeIgnore,
-                    TextRange::at(
-                        line.start() + TextSize::try_from(match_.start()).unwrap(),
-                        match_.as_str().text_len(),
-                    ),
-                ));
+pub(crate) fn blanket_type_ignore(
+    diagnostics: &mut Vec<Diagnostic>,
+    indexer: &Indexer,
+    locator: &Locator,
+) {
+    for range in indexer.comment_ranges() {
+        let line = locator.slice(*range);
+
+        // Match, e.g., `# type: ignore` or `# type: ignore[attr-defined]`.
+        // See: https://github.com/python/mypy/blob/b43e0d34247a6d1b3b9d9094d184bbfcb9808bb9/mypy/fastparse.py#L248
+        for start in memchr_iter(b'#', line.as_bytes()) {
+            // Strip the `#` and any trailing whitespace.
+            let comment = &line[start + 1..].trim_start();
+
+            // Match the `type` or `pyright` prefixes (in, e.g., `# type: ignore`).
+            let Some(comment) = comment
+                .strip_prefix("type")
+                .or_else(|| comment.strip_prefix("pyright"))
+            else {
+                continue;
+            };
+
+            // Next character must be a colon.
+            if !comment.starts_with(':') {
+                continue;
+            }
+
+            // Strip the colon and any trailing whitespace.
+            let comment = &comment[1..].trim_start();
+
+            // Match the `ignore`.
+            let Some(comment) = comment.strip_prefix("ignore") else {
+                continue;
+            };
+
+            // Strip any trailing whitespace.
+            let comment = comment.trim_start();
+
+            // Match the optional `[...]` tag.
+            if let Ok(codes) = parse_type_ignore_tag(comment) {
+                if codes.is_empty() {
+                    diagnostics.push(Diagnostic::new(
+                        BlanketTypeIgnore,
+                        range.add_start(TextSize::try_from(start).unwrap()),
+                    ));
+                }
             }
         }
     }
 }
-
-// Match, e.g., `# type: ignore` or `# type: ignore[attr-defined]`.
-// See: https://github.com/python/mypy/blob/b43e0d34247a6d1b3b9d9094d184bbfcb9808bb9/mypy/fastparse.py#L248
-static TYPE_IGNORE_PATTERN: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"#\s*(type|pyright):\s*ignore\s*").unwrap());
 
 // Match, e.g., `[attr-defined]` or `[attr-defined, misc]`.
 // See: https://github.com/python/mypy/blob/b43e0d34247a6d1b3b9d9094d184bbfcb9808bb9/mypy/fastparse.py#L327

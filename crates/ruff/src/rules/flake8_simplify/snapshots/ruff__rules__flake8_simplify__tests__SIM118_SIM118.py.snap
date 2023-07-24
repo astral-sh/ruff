@@ -6,7 +6,7 @@ SIM118.py:1:1: SIM118 [*] Use `key in obj` instead of `key in obj.keys()`
 1 | key in obj.keys()  # SIM118
   | ^^^^^^^^^^^^^^^^^ SIM118
 2 | 
-3 | foo["bar"] in obj.keys()  # SIM118
+3 | key not in obj.keys()  # SIM118
   |
   = help: Convert to `key in obj`
 
@@ -14,188 +14,272 @@ SIM118.py:1:1: SIM118 [*] Use `key in obj` instead of `key in obj.keys()`
 1   |-key in obj.keys()  # SIM118
   1 |+key in obj  # SIM118
 2 2 | 
-3 3 | foo["bar"] in obj.keys()  # SIM118
+3 3 | key not in obj.keys()  # SIM118
 4 4 | 
 
-SIM118.py:3:1: SIM118 [*] Use `foo["bar"] in obj` instead of `foo["bar"] in obj.keys()`
+SIM118.py:3:1: SIM118 [*] Use `key not in obj` instead of `key not in obj.keys()`
   |
 1 | key in obj.keys()  # SIM118
 2 | 
-3 | foo["bar"] in obj.keys()  # SIM118
-  | ^^^^^^^^^^^^^^^^^^^^^^^^ SIM118
+3 | key not in obj.keys()  # SIM118
+  | ^^^^^^^^^^^^^^^^^^^^^ SIM118
 4 | 
-5 | foo['bar'] in obj.keys()  # SIM118
+5 | foo["bar"] in obj.keys()  # SIM118
   |
-  = help: Convert to `foo["bar"] in obj`
+  = help: Convert to `key not in obj`
 
 ℹ Suggested fix
 1 1 | key in obj.keys()  # SIM118
 2 2 | 
-3   |-foo["bar"] in obj.keys()  # SIM118
-  3 |+foo["bar"] in obj  # SIM118
+3   |-key not in obj.keys()  # SIM118
+  3 |+key not in obj  # SIM118
 4 4 | 
-5 5 | foo['bar'] in obj.keys()  # SIM118
+5 5 | foo["bar"] in obj.keys()  # SIM118
 6 6 | 
 
-SIM118.py:5:1: SIM118 [*] Use `foo['bar'] in obj` instead of `foo['bar'] in obj.keys()`
+SIM118.py:5:1: SIM118 [*] Use `foo["bar"] in obj` instead of `foo["bar"] in obj.keys()`
   |
-3 | foo["bar"] in obj.keys()  # SIM118
+3 | key not in obj.keys()  # SIM118
 4 | 
-5 | foo['bar'] in obj.keys()  # SIM118
+5 | foo["bar"] in obj.keys()  # SIM118
   | ^^^^^^^^^^^^^^^^^^^^^^^^ SIM118
 6 | 
-7 | foo() in obj.keys()  # SIM118
+7 | foo["bar"] not in obj.keys()  # SIM118
   |
-  = help: Convert to `foo['bar'] in obj`
+  = help: Convert to `foo["bar"] in obj`
 
 ℹ Suggested fix
 2 2 | 
-3 3 | foo["bar"] in obj.keys()  # SIM118
+3 3 | key not in obj.keys()  # SIM118
 4 4 | 
-5   |-foo['bar'] in obj.keys()  # SIM118
-  5 |+foo['bar'] in obj  # SIM118
+5   |-foo["bar"] in obj.keys()  # SIM118
+  5 |+foo["bar"] in obj  # SIM118
 6 6 | 
-7 7 | foo() in obj.keys()  # SIM118
+7 7 | foo["bar"] not in obj.keys()  # SIM118
 8 8 | 
 
-SIM118.py:7:1: SIM118 [*] Use `foo() in obj` instead of `foo() in obj.keys()`
+SIM118.py:7:1: SIM118 [*] Use `foo["bar"] not in obj` instead of `foo["bar"] not in obj.keys()`
   |
-5 | foo['bar'] in obj.keys()  # SIM118
+5 | foo["bar"] in obj.keys()  # SIM118
 6 | 
-7 | foo() in obj.keys()  # SIM118
-  | ^^^^^^^^^^^^^^^^^^^ SIM118
+7 | foo["bar"] not in obj.keys()  # SIM118
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM118
 8 | 
-9 | for key in obj.keys():  # SIM118
+9 | foo['bar'] in obj.keys()  # SIM118
   |
-  = help: Convert to `foo() in obj`
+  = help: Convert to `foo["bar"] not in obj`
 
 ℹ Suggested fix
 4 4 | 
-5 5 | foo['bar'] in obj.keys()  # SIM118
+5 5 | foo["bar"] in obj.keys()  # SIM118
 6 6 | 
-7   |-foo() in obj.keys()  # SIM118
-  7 |+foo() in obj  # SIM118
+7   |-foo["bar"] not in obj.keys()  # SIM118
+  7 |+foo["bar"] not in obj  # SIM118
 8 8 | 
-9 9 | for key in obj.keys():  # SIM118
-10 10 |     pass
+9 9 | foo['bar'] in obj.keys()  # SIM118
+10 10 | 
 
-SIM118.py:9:5: SIM118 [*] Use `key in obj` instead of `key in obj.keys()`
+SIM118.py:9:1: SIM118 [*] Use `foo['bar'] in obj` instead of `foo['bar'] in obj.keys()`
    |
- 7 | foo() in obj.keys()  # SIM118
+ 7 | foo["bar"] not in obj.keys()  # SIM118
  8 | 
- 9 | for key in obj.keys():  # SIM118
+ 9 | foo['bar'] in obj.keys()  # SIM118
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ SIM118
+10 | 
+11 | foo['bar'] not in obj.keys()  # SIM118
+   |
+   = help: Convert to `foo['bar'] in obj`
+
+ℹ Suggested fix
+6  6  | 
+7  7  | foo["bar"] not in obj.keys()  # SIM118
+8  8  | 
+9     |-foo['bar'] in obj.keys()  # SIM118
+   9  |+foo['bar'] in obj  # SIM118
+10 10 | 
+11 11 | foo['bar'] not in obj.keys()  # SIM118
+12 12 | 
+
+SIM118.py:11:1: SIM118 [*] Use `foo['bar'] not in obj` instead of `foo['bar'] not in obj.keys()`
+   |
+ 9 | foo['bar'] in obj.keys()  # SIM118
+10 | 
+11 | foo['bar'] not in obj.keys()  # SIM118
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM118
+12 | 
+13 | foo() in obj.keys()  # SIM118
+   |
+   = help: Convert to `foo['bar'] not in obj`
+
+ℹ Suggested fix
+8  8  | 
+9  9  | foo['bar'] in obj.keys()  # SIM118
+10 10 | 
+11    |-foo['bar'] not in obj.keys()  # SIM118
+   11 |+foo['bar'] not in obj  # SIM118
+12 12 | 
+13 13 | foo() in obj.keys()  # SIM118
+14 14 | 
+
+SIM118.py:13:1: SIM118 [*] Use `foo() in obj` instead of `foo() in obj.keys()`
+   |
+11 | foo['bar'] not in obj.keys()  # SIM118
+12 | 
+13 | foo() in obj.keys()  # SIM118
+   | ^^^^^^^^^^^^^^^^^^^ SIM118
+14 | 
+15 | foo() not in obj.keys()  # SIM118
+   |
+   = help: Convert to `foo() in obj`
+
+ℹ Suggested fix
+10 10 | 
+11 11 | foo['bar'] not in obj.keys()  # SIM118
+12 12 | 
+13    |-foo() in obj.keys()  # SIM118
+   13 |+foo() in obj  # SIM118
+14 14 | 
+15 15 | foo() not in obj.keys()  # SIM118
+16 16 | 
+
+SIM118.py:15:1: SIM118 [*] Use `foo() not in obj` instead of `foo() not in obj.keys()`
+   |
+13 | foo() in obj.keys()  # SIM118
+14 | 
+15 | foo() not in obj.keys()  # SIM118
+   | ^^^^^^^^^^^^^^^^^^^^^^^ SIM118
+16 | 
+17 | for key in obj.keys():  # SIM118
+   |
+   = help: Convert to `foo() not in obj`
+
+ℹ Suggested fix
+12 12 | 
+13 13 | foo() in obj.keys()  # SIM118
+14 14 | 
+15    |-foo() not in obj.keys()  # SIM118
+   15 |+foo() not in obj  # SIM118
+16 16 | 
+17 17 | for key in obj.keys():  # SIM118
+18 18 |     pass
+
+SIM118.py:17:5: SIM118 [*] Use `key in obj` instead of `key in obj.keys()`
+   |
+15 | foo() not in obj.keys()  # SIM118
+16 | 
+17 | for key in obj.keys():  # SIM118
    |     ^^^^^^^^^^^^^^^^^ SIM118
-10 |     pass
+18 |     pass
    |
    = help: Convert to `key in obj`
 
 ℹ Suggested fix
-6  6  | 
-7  7  | foo() in obj.keys()  # SIM118
-8  8  | 
-9     |-for key in obj.keys():  # SIM118
-   9  |+for key in obj:  # SIM118
-10 10 |     pass
-11 11 | 
-12 12 | for key in list(obj.keys()):
+14 14 | 
+15 15 | foo() not in obj.keys()  # SIM118
+16 16 | 
+17    |-for key in obj.keys():  # SIM118
+   17 |+for key in obj:  # SIM118
+18 18 |     pass
+19 19 | 
+20 20 | for key in list(obj.keys()):
 
-SIM118.py:16:8: SIM118 [*] Use `k in obj` instead of `k in obj.keys()`
+SIM118.py:24:8: SIM118 [*] Use `k in obj` instead of `k in obj.keys()`
    |
-14 |         del obj[key]
-15 | 
-16 | [k for k in obj.keys()]  # SIM118
+22 |         del obj[key]
+23 | 
+24 | [k for k in obj.keys()]  # SIM118
    |        ^^^^^^^^^^^^^^^ SIM118
-17 | 
-18 | {k for k in obj.keys()}  # SIM118
+25 | 
+26 | {k for k in obj.keys()}  # SIM118
    |
    = help: Convert to `k in obj`
 
 ℹ Suggested fix
-13 13 |     if some_property(key):
-14 14 |         del obj[key]
-15 15 | 
-16    |-[k for k in obj.keys()]  # SIM118
-   16 |+[k for k in obj]  # SIM118
-17 17 | 
-18 18 | {k for k in obj.keys()}  # SIM118
-19 19 | 
+21 21 |     if some_property(key):
+22 22 |         del obj[key]
+23 23 | 
+24    |-[k for k in obj.keys()]  # SIM118
+   24 |+[k for k in obj]  # SIM118
+25 25 | 
+26 26 | {k for k in obj.keys()}  # SIM118
+27 27 | 
 
-SIM118.py:18:8: SIM118 [*] Use `k in obj` instead of `k in obj.keys()`
+SIM118.py:26:8: SIM118 [*] Use `k in obj` instead of `k in obj.keys()`
    |
-16 | [k for k in obj.keys()]  # SIM118
-17 | 
-18 | {k for k in obj.keys()}  # SIM118
+24 | [k for k in obj.keys()]  # SIM118
+25 | 
+26 | {k for k in obj.keys()}  # SIM118
    |        ^^^^^^^^^^^^^^^ SIM118
-19 | 
-20 | {k: k for k in obj.keys()}  # SIM118
+27 | 
+28 | {k: k for k in obj.keys()}  # SIM118
    |
    = help: Convert to `k in obj`
 
 ℹ Suggested fix
-15 15 | 
-16 16 | [k for k in obj.keys()]  # SIM118
-17 17 | 
-18    |-{k for k in obj.keys()}  # SIM118
-   18 |+{k for k in obj}  # SIM118
-19 19 | 
-20 20 | {k: k for k in obj.keys()}  # SIM118
-21 21 | 
+23 23 | 
+24 24 | [k for k in obj.keys()]  # SIM118
+25 25 | 
+26    |-{k for k in obj.keys()}  # SIM118
+   26 |+{k for k in obj}  # SIM118
+27 27 | 
+28 28 | {k: k for k in obj.keys()}  # SIM118
+29 29 | 
 
-SIM118.py:20:11: SIM118 [*] Use `k in obj` instead of `k in obj.keys()`
+SIM118.py:28:11: SIM118 [*] Use `k in obj` instead of `k in obj.keys()`
    |
-18 | {k for k in obj.keys()}  # SIM118
-19 | 
-20 | {k: k for k in obj.keys()}  # SIM118
+26 | {k for k in obj.keys()}  # SIM118
+27 | 
+28 | {k: k for k in obj.keys()}  # SIM118
    |           ^^^^^^^^^^^^^^^ SIM118
-21 | 
-22 | (k for k in obj.keys())  # SIM118
+29 | 
+30 | (k for k in obj.keys())  # SIM118
    |
    = help: Convert to `k in obj`
 
 ℹ Suggested fix
-17 17 | 
-18 18 | {k for k in obj.keys()}  # SIM118
-19 19 | 
-20    |-{k: k for k in obj.keys()}  # SIM118
-   20 |+{k: k for k in obj}  # SIM118
-21 21 | 
-22 22 | (k for k in obj.keys())  # SIM118
-23 23 | 
+25 25 | 
+26 26 | {k for k in obj.keys()}  # SIM118
+27 27 | 
+28    |-{k: k for k in obj.keys()}  # SIM118
+   28 |+{k: k for k in obj}  # SIM118
+29 29 | 
+30 30 | (k for k in obj.keys())  # SIM118
+31 31 | 
 
-SIM118.py:22:8: SIM118 [*] Use `k in obj` instead of `k in obj.keys()`
+SIM118.py:30:8: SIM118 [*] Use `k in obj` instead of `k in obj.keys()`
    |
-20 | {k: k for k in obj.keys()}  # SIM118
-21 | 
-22 | (k for k in obj.keys())  # SIM118
+28 | {k: k for k in obj.keys()}  # SIM118
+29 | 
+30 | (k for k in obj.keys())  # SIM118
    |        ^^^^^^^^^^^^^^^ SIM118
-23 | 
-24 | key in (obj or {}).keys()  # SIM118
+31 | 
+32 | key in (obj or {}).keys()  # SIM118
    |
    = help: Convert to `k in obj`
 
 ℹ Suggested fix
-19 19 | 
-20 20 | {k: k for k in obj.keys()}  # SIM118
-21 21 | 
-22    |-(k for k in obj.keys())  # SIM118
-   22 |+(k for k in obj)  # SIM118
-23 23 | 
-24 24 | key in (obj or {}).keys()  # SIM118
+27 27 | 
+28 28 | {k: k for k in obj.keys()}  # SIM118
+29 29 | 
+30    |-(k for k in obj.keys())  # SIM118
+   30 |+(k for k in obj)  # SIM118
+31 31 | 
+32 32 | key in (obj or {}).keys()  # SIM118
 
-SIM118.py:24:1: SIM118 [*] Use `key in (obj or {})` instead of `key in (obj or {}).keys()`
+SIM118.py:32:1: SIM118 [*] Use `key in (obj or {})` instead of `key in (obj or {}).keys()`
    |
-22 | (k for k in obj.keys())  # SIM118
-23 | 
-24 | key in (obj or {}).keys()  # SIM118
+30 | (k for k in obj.keys())  # SIM118
+31 | 
+32 | key in (obj or {}).keys()  # SIM118
    | ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM118
    |
    = help: Convert to `key in (obj or {})`
 
 ℹ Suggested fix
-21 21 | 
-22 22 | (k for k in obj.keys())  # SIM118
-23 23 | 
-24    |-key in (obj or {}).keys()  # SIM118
-   24 |+key in (obj or {})  # SIM118
+29 29 | 
+30 30 | (k for k in obj.keys())  # SIM118
+31 31 | 
+32    |-key in (obj or {}).keys()  # SIM118
+   32 |+key in (obj or {})  # SIM118
 
 

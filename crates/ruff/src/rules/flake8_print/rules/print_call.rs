@@ -2,7 +2,7 @@ use rustpython_parser::ast::{Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::is_const_none;
+use ruff_python_ast::helpers::{find_keyword, is_const_none};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -84,10 +84,7 @@ pub(crate) fn print_call(checker: &mut Checker, func: &Expr, keywords: &[Keyword
         }) {
             // If the print call has a `file=` argument (that isn't `None`, `"sys.stdout"`,
             // or `"sys.stderr"`), don't trigger T201.
-            if let Some(keyword) = keywords
-                .iter()
-                .find(|keyword| keyword.arg.as_ref().map_or(false, |arg| arg == "file"))
-            {
+            if let Some(keyword) = find_keyword(keywords, "file") {
                 if !is_const_none(&keyword.value) {
                     if checker.semantic().resolve_call_path(&keyword.value).map_or(
                         true,

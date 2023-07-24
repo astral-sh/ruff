@@ -56,22 +56,22 @@ impl AlwaysAutofixableViolation for PrintfStringFormatting {
 
 fn simplify_conversion_flag(flags: CConversionFlags) -> String {
     let mut flag_string = String::new();
-    if flags.contains(CConversionFlags::LEFT_ADJUST) {
+    if flags.intersects(CConversionFlags::LEFT_ADJUST) {
         flag_string.push('<');
     }
-    if flags.contains(CConversionFlags::SIGN_CHAR) {
+    if flags.intersects(CConversionFlags::SIGN_CHAR) {
         flag_string.push('+');
     }
-    if flags.contains(CConversionFlags::ALTERNATE_FORM) {
+    if flags.intersects(CConversionFlags::ALTERNATE_FORM) {
         flag_string.push('#');
     }
-    if flags.contains(CConversionFlags::BLANK_SIGN) {
-        if !flags.contains(CConversionFlags::SIGN_CHAR) {
+    if flags.intersects(CConversionFlags::BLANK_SIGN) {
+        if !flags.intersects(CConversionFlags::SIGN_CHAR) {
             flag_string.push(' ');
         }
     }
-    if flags.contains(CConversionFlags::ZERO_PAD) {
-        if !flags.contains(CConversionFlags::LEFT_ADJUST) {
+    if flags.intersects(CConversionFlags::ZERO_PAD) {
+        if !flags.intersects(CConversionFlags::LEFT_ADJUST) {
             flag_string.push('0');
         }
     }

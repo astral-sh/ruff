@@ -1,5 +1,6 @@
 use std::fmt;
 
+use ruff_python_ast::helpers::find_keyword;
 use rustpython_parser::ast;
 use rustpython_parser::ast::{CmpOp, Constant, Expr, Keyword};
 
@@ -11,14 +12,7 @@ use crate::settings::Settings;
 /// Returns the value of the `name` parameter to, e.g., a `TypeVar` constructor.
 pub(super) fn type_param_name<'a>(args: &'a [Expr], keywords: &'a [Keyword]) -> Option<&'a str> {
     // Handle both `TypeVar("T")` and `TypeVar(name="T")`.
-    let name_param = keywords
-        .iter()
-        .find(|keyword| {
-            keyword
-                .arg
-                .as_ref()
-                .map_or(false, |keyword| keyword.as_str() == "name")
-        })
+    let name_param = find_keyword(keywords, "name")
         .map(|keyword| &keyword.value)
         .or_else(|| args.get(0))?;
     if let Expr::Constant(ast::ExprConstant {

@@ -42,7 +42,7 @@ mod tests {
     #[test_case(Rule::SetAttrWithConstant, Path::new("B009_B010.py"))]
     #[test_case(Rule::StarArgUnpackingAfterKeywordArg, Path::new("B026.py"))]
     #[test_case(Rule::StripWithMultiCharacters, Path::new("B005.py"))]
-    #[test_case(Rule::UnaryPrefixIncrement, Path::new("B002.py"))]
+    #[test_case(Rule::UnaryPrefixIncrementDecrement, Path::new("B002.py"))]
     #[test_case(Rule::UnintentionalTypeAnnotation, Path::new("B032.py"))]
     #[test_case(Rule::UnreliableCallableCheck, Path::new("B004.py"))]
     #[test_case(Rule::UnusedLoopControlVariable, Path::new("B007.py"))]

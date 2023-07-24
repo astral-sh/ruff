@@ -2,6 +2,7 @@ use rustpython_parser::ast::{self, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::find_keyword;
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
@@ -65,10 +66,7 @@ pub(crate) fn locals_in_render_function(
             return;
         }
         &args[2]
-    } else if let Some(keyword) = keywords
-        .iter()
-        .find(|keyword| keyword.arg.as_ref().map_or(false, |arg| arg == "context"))
-    {
+    } else if let Some(keyword) = find_keyword(keywords, "context") {
         if !is_locals_call(&keyword.value, checker.semantic()) {
             return;
         }

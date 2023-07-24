@@ -99,7 +99,7 @@ impl Printer {
 
     fn write_summary_text(&self, writer: &mut dyn Write, diagnostics: &Diagnostics) -> Result<()> {
         if self.log_level >= LogLevel::Default {
-            if self.flags.contains(Flags::SHOW_VIOLATIONS) {
+            if self.flags.intersects(Flags::SHOW_VIOLATIONS) {
                 let fixed = diagnostics
                     .fixed
                     .values()
@@ -160,12 +160,12 @@ impl Printer {
             return Ok(());
         }
 
-        if !self.flags.contains(Flags::SHOW_VIOLATIONS) {
+        if !self.flags.intersects(Flags::SHOW_VIOLATIONS) {
             if matches!(
                 self.format,
                 SerializationFormat::Text | SerializationFormat::Grouped
             ) {
-                if self.flags.contains(Flags::SHOW_FIX_SUMMARY) {
+                if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
                     if !diagnostics.fixed.is_empty() {
                         writeln!(writer)?;
                         print_fix_summary(writer, &diagnostics.fixed)?;
@@ -192,11 +192,11 @@ impl Printer {
             SerializationFormat::Text => {
                 TextEmitter::default()
                     .with_show_fix_status(show_fix_status(self.autofix_level))
-                    .with_show_fix_diff(self.flags.contains(Flags::SHOW_FIX_DIFF))
-                    .with_show_source(self.flags.contains(Flags::SHOW_SOURCE))
+                    .with_show_fix_diff(self.flags.intersects(Flags::SHOW_FIX_DIFF))
+                    .with_show_source(self.flags.intersects(Flags::SHOW_SOURCE))
                     .emit(writer, &diagnostics.messages, &context)?;
 
-                if self.flags.contains(Flags::SHOW_FIX_SUMMARY) {
+                if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
                     if !diagnostics.fixed.is_empty() {
                         writeln!(writer)?;
                         print_fix_summary(writer, &diagnostics.fixed)?;
@@ -208,11 +208,11 @@ impl Printer {
             }
             SerializationFormat::Grouped => {
                 GroupedEmitter::default()
-                    .with_show_source(self.flags.contains(Flags::SHOW_SOURCE))
+                    .with_show_source(self.flags.intersects(Flags::SHOW_SOURCE))
                     .with_show_fix_status(show_fix_status(self.autofix_level))
                     .emit(writer, &diagnostics.messages, &context)?;
 
-                if self.flags.contains(Flags::SHOW_FIX_SUMMARY) {
+                if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
                     if !diagnostics.fixed.is_empty() {
                         writeln!(writer)?;
                         print_fix_summary(writer, &diagnostics.fixed)?;
@@ -367,7 +367,7 @@ impl Printer {
             let context = EmitterContext::new(&diagnostics.source_kind);
             TextEmitter::default()
                 .with_show_fix_status(show_fix_status(self.autofix_level))
-                .with_show_source(self.flags.contains(Flags::SHOW_SOURCE))
+                .with_show_source(self.flags.intersects(Flags::SHOW_SOURCE))
                 .emit(writer, &diagnostics.messages, &context)?;
         }
         writer.flush()?;

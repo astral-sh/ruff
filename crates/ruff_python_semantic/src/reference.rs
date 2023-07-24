@@ -7,7 +7,7 @@ use ruff_python_ast::source_code::Locator;
 
 use crate::context::ExecutionContext;
 use crate::scope::ScopeId;
-use crate::Exceptions;
+use crate::{Exceptions, SemanticModelFlags};
 
 /// A resolved read reference to a name in a program.
 #[derive(Debug, Clone)]
@@ -16,21 +16,28 @@ pub struct ResolvedReference {
     scope_id: ScopeId,
     /// The range of the reference in the source code.
     range: TextRange,
-    /// The context in which the reference occurs.
-    context: ExecutionContext,
+    /// The model state in which the reference occurs.
+    flags: SemanticModelFlags,
 }
 
 impl ResolvedReference {
+    /// The scope in which the reference is defined.
     pub const fn scope_id(&self) -> ScopeId {
         self.scope_id
     }
 
+    /// The range of the reference in the source code.
     pub const fn range(&self) -> TextRange {
         self.range
     }
 
+    /// The [`ExecutionContext`] of the reference.
     pub const fn context(&self) -> ExecutionContext {
-        self.context
+        if self.flags.intersects(SemanticModelFlags::TYPING_CONTEXT) {
+            ExecutionContext::Typing
+        } else {
+            ExecutionContext::Runtime
+        }
     }
 }
 
@@ -48,12 +55,12 @@ impl ResolvedReferences {
         &mut self,
         scope_id: ScopeId,
         range: TextRange,
-        context: ExecutionContext,
+        flags: SemanticModelFlags,
     ) -> ResolvedReferenceId {
         self.0.push(ResolvedReference {
             scope_id,
             range,
-            context,
+            flags,
         })
     }
 }
@@ -78,6 +85,11 @@ pub struct UnresolvedReference {
 }
 
 impl UnresolvedReference {
+    /// Returns the name of the reference.
+    pub fn name<'a>(&self, locator: &Locator<'a>) -> &'a str {
+        locator.slice(self.range)
+    }
+
     /// The range of the reference in the source code.
     pub const fn range(&self) -> TextRange {
         self.range
@@ -92,11 +104,6 @@ impl UnresolvedReference {
     pub const fn is_wildcard_import(&self) -> bool {
         self.flags
             .contains(UnresolvedReferenceFlags::WILDCARD_IMPORT)
-    }
-
-    /// Returns the name of the reference.
-    pub fn name<'a>(&self, locator: &Locator<'a>) -> &'a str {
-        locator.slice(self.range)
     }
 }
 

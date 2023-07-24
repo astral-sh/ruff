@@ -3,6 +3,7 @@ use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::find_keyword;
 
 use crate::checkers::ast::Checker;
 
@@ -50,12 +51,7 @@ pub(crate) fn snmp_insecure_version(checker: &mut Checker, func: &Expr, keywords
             matches!(call_path.as_slice(), ["pysnmp", "hlapi", "CommunityData"])
         })
     {
-        if let Some(keyword) = keywords.iter().find(|keyword| {
-            keyword
-                .arg
-                .as_ref()
-                .map_or(false, |arg| arg.as_str() == "mpModel")
-        }) {
+        if let Some(keyword) = find_keyword(keywords, "mpModel") {
             if let Expr::Constant(ast::ExprConstant {
                 value: Constant::Int(value),
                 ..
