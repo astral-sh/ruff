@@ -1056,7 +1056,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             op: Operator::Add, ..
         }) => {
             if checker.enabled(Rule::ExplicitStringConcatenation) {
-                if let Some(diagnostic) = flake8_implicit_str_concat::rules::explicit(expr) {
+                if let Some(diagnostic) =
+                    flake8_implicit_str_concat::rules::explicit(expr, checker.locator)
+                {
                     checker.diagnostics.push(diagnostic);
                 }
             }
