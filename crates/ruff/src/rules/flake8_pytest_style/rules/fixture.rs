@@ -24,7 +24,8 @@ use super::helpers::{
 };
 
 /// ## What it does
-/// Checks whether `@pytest.fixture()` without parameters has parentheses.
+/// Checks whether `@pytest.fixture()` without parameters has parentheses. The preferred style
+/// can be configured with the `flake8-pytest-style.fixture-parentheses` setting.
 ///
 /// ## Why is this bad?
 /// Code style inconsistency.
