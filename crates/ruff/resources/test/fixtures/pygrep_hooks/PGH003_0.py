@@ -1,6 +1,7 @@
 x = 1  # type: ignore
 x = 1  # type:ignore
 x = 1  # type: ignore[attr-defined]  # type: ignore
+x = 1  # type: ignoreme # type: ignore
 
 x = 1
 x = 1  # type ignore

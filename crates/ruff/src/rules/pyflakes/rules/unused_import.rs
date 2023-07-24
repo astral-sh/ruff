@@ -233,9 +233,9 @@ fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[Import]) -> Result
             .map(|Import { qualified_name, .. }| *qualified_name),
         stmt,
         parent,
-        checker.locator,
-        checker.stylist,
-        checker.indexer,
+        checker.locator(),
+        checker.stylist(),
+        checker.indexer(),
     )?;
     Ok(Fix::automatic(edit).isolate(checker.isolation(parent)))
 }

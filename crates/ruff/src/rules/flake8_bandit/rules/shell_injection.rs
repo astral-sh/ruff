@@ -4,7 +4,7 @@ use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::Truthiness;
+use ruff_python_ast::helpers::{find_keyword, Truthiness};
 use ruff_python_semantic::SemanticModel;
 
 use crate::{
@@ -272,13 +272,10 @@ fn find_shell_keyword<'a>(
     keywords: &'a [Keyword],
     semantic: &SemanticModel,
 ) -> Option<ShellKeyword<'a>> {
-    keywords
-        .iter()
-        .find(|keyword| keyword.arg.as_ref().map_or(false, |arg| arg == "shell"))
-        .map(|keyword| ShellKeyword {
-            truthiness: Truthiness::from_expr(&keyword.value, |id| semantic.is_builtin(id)),
-            keyword,
-        })
+    find_keyword(keywords, "shell").map(|keyword| ShellKeyword {
+        truthiness: Truthiness::from_expr(&keyword.value, |id| semantic.is_builtin(id)),
+        keyword,
+    })
 }
 
 /// Return `true` if the value provided to the `shell` call seems safe. This is based on Bandit's

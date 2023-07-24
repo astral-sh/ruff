@@ -201,7 +201,7 @@ fn is_valid_dict(
 /// PLE1307
 pub(crate) fn bad_string_format_type(checker: &mut Checker, expr: &Expr, right: &Expr) {
     // Grab each string segment (in case there's an implicit concatenation).
-    let content = checker.locator.slice(expr.range());
+    let content = checker.locator().slice(expr.range());
     let mut strings: Vec<TextRange> = vec![];
     for (tok, range) in lexer::lex_starts_at(content, Mode::Module, expr.start()).flatten() {
         if tok.is_string() {
@@ -220,7 +220,7 @@ pub(crate) fn bad_string_format_type(checker: &mut Checker, expr: &Expr, right: 
     // Parse each string segment.
     let mut format_strings = vec![];
     for range in &strings {
-        let string = checker.locator.slice(*range);
+        let string = checker.locator().slice(*range);
         let (Some(leader), Some(trailer)) = (leading_quote(string), trailing_quote(string)) else {
             return;
         };

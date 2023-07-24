@@ -2,6 +2,7 @@ use rustpython_parser::ast::{Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::find_keyword;
 
 use crate::checkers::ast::Checker;
 
@@ -48,12 +49,7 @@ pub(crate) fn no_explicit_stacklevel(checker: &mut Checker, func: &Expr, keyword
         return;
     }
 
-    if keywords.iter().any(|keyword| {
-        keyword
-            .arg
-            .as_ref()
-            .map_or(false, |arg| arg.as_str() == "stacklevel")
-    }) {
+    if find_keyword(keywords, "stacklevel").is_some() {
         return;
     }
 

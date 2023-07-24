@@ -71,12 +71,12 @@ pub fn extract_directives(
     indexer: &Indexer,
 ) -> Directives {
     Directives {
-        noqa_line_for: if flags.contains(Flags::NOQA) {
+        noqa_line_for: if flags.intersects(Flags::NOQA) {
             extract_noqa_line_for(lxr, locator, indexer)
         } else {
             NoqaMapping::default()
         },
-        isort: if flags.contains(Flags::ISORT) {
+        isort: if flags.intersects(Flags::ISORT) {
             extract_isort_directives(lxr, locator)
         } else {
             IsortDirectives::default()

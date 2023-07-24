@@ -7,7 +7,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 
 use crate::registry::AsRule;
-use crate::rules::ruff::rules::confusables::CONFUSABLES;
+use crate::rules::ruff::rules::confusables::confusable;
 use crate::rules::ruff::rules::Context;
 use crate::settings::Settings;
 
@@ -193,7 +193,7 @@ pub(crate) fn ambiguous_unicode_character(
             // Check if the boundary character is itself an ambiguous unicode character, in which
             // case, it's always included as a diagnostic.
             if !current_char.is_ascii() {
-                if let Some(representant) = CONFUSABLES.get(&(current_char as u32)).copied() {
+                if let Some(representant) = confusable(current_char as u32) {
                     let candidate = Candidate::new(
                         TextSize::try_from(relative_offset).unwrap() + range.start(),
                         current_char,
@@ -207,7 +207,7 @@ pub(crate) fn ambiguous_unicode_character(
         } else if current_char.is_ascii() {
             // The current word contains at least one ASCII character.
             word_flags |= WordFlags::ASCII;
-        } else if let Some(representant) = CONFUSABLES.get(&(current_char as u32)).copied() {
+        } else if let Some(representant) = confusable(current_char as u32) {
             // The current word contains an ambiguous unicode character.
             word_candidates.push(Candidate::new(
                 TextSize::try_from(relative_offset).unwrap() + range.start(),

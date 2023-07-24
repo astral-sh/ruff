@@ -311,16 +311,15 @@ d={'a':1,
  
  def yield_expr():
      # fmt: off
--    yield hello
+     yield hello
 -    'unformatted'
-+    NOT_YET_IMPLEMENTED_ExprYield
 +    "unformatted"
      # fmt: on
      "formatted"
      # fmt: off
 -    ( yield hello )
 -    'unformatted'
-+    (NOT_YET_IMPLEMENTED_ExprYield)
++    (yield hello)
 +    "unformatted"
      # fmt: on
  
@@ -379,7 +378,7 @@ d={'a':1,
  )
  # fmt: off
 -yield  'hello'
-+NOT_YET_IMPLEMENTED_ExprYield
++yield "hello"
  # No formatting to the end of the file
 -l=[1,2,3]
 -d={'a':1,
@@ -500,12 +499,12 @@ def testlist_star_expr():
 
 def yield_expr():
     # fmt: off
-    NOT_YET_IMPLEMENTED_ExprYield
+    yield hello
     "unformatted"
     # fmt: on
     "formatted"
     # fmt: off
-    (NOT_YET_IMPLEMENTED_ExprYield)
+    (yield hello)
     "unformatted"
     # fmt: on
 
@@ -617,7 +616,7 @@ cfg.rule(
     xxxxxxxxxx_xxxxxxxxxxx_xxxxxxx_xxxxxxxxx=5,
 )
 # fmt: off
-NOT_YET_IMPLEMENTED_ExprYield
+yield "hello"
 # No formatting to the end of the file
 l = [1, 2, 3]
 d = {"a": 1, "b": 2}

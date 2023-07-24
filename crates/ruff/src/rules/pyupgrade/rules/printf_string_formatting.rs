@@ -56,22 +56,22 @@ impl AlwaysAutofixableViolation for PrintfStringFormatting {
 
 fn simplify_conversion_flag(flags: CConversionFlags) -> String {
     let mut flag_string = String::new();
-    if flags.contains(CConversionFlags::LEFT_ADJUST) {
+    if flags.intersects(CConversionFlags::LEFT_ADJUST) {
         flag_string.push('<');
     }
-    if flags.contains(CConversionFlags::SIGN_CHAR) {
+    if flags.intersects(CConversionFlags::SIGN_CHAR) {
         flag_string.push('+');
     }
-    if flags.contains(CConversionFlags::ALTERNATE_FORM) {
+    if flags.intersects(CConversionFlags::ALTERNATE_FORM) {
         flag_string.push('#');
     }
-    if flags.contains(CConversionFlags::BLANK_SIGN) {
-        if !flags.contains(CConversionFlags::SIGN_CHAR) {
+    if flags.intersects(CConversionFlags::BLANK_SIGN) {
+        if !flags.intersects(CConversionFlags::SIGN_CHAR) {
             flag_string.push(' ');
         }
     }
-    if flags.contains(CConversionFlags::ZERO_PAD) {
-        if !flags.contains(CConversionFlags::LEFT_ADJUST) {
+    if flags.intersects(CConversionFlags::ZERO_PAD) {
+        if !flags.intersects(CConversionFlags::LEFT_ADJUST) {
             flag_string.push('0');
         }
     }
@@ -161,7 +161,7 @@ fn percent_to_format(format_string: &CFormatString) -> String {
 
 /// If a tuple has one argument, remove the comma; otherwise, return it as-is.
 fn clean_params_tuple(checker: &mut Checker, right: &Expr, locator: &Locator) -> String {
-    let mut contents = checker.locator.slice(right.range()).to_string();
+    let mut contents = checker.locator().slice(right.range()).to_string();
     if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &right {
         if elts.len() == 1 {
             if !locator.contains_line_break(right.range()) {
@@ -215,11 +215,11 @@ fn clean_params_dictionary(
                         seen.push(key_string);
                         if is_multi_line {
                             if indent.is_none() {
-                                indent = indentation(checker.locator, key);
+                                indent = indentation(checker.locator(), key);
                             }
                         }
 
-                        let value_string = checker.locator.slice(value.range());
+                        let value_string = checker.locator().slice(value.range());
                         arguments.push(format!("{key_string}={value_string}"));
                     } else {
                         // If there are any non-string keys, abort.
@@ -227,7 +227,7 @@ fn clean_params_dictionary(
                     }
                 }
                 None => {
-                    let value_string = checker.locator.slice(value.range());
+                    let value_string = checker.locator().slice(value.range());
                     arguments.push(format!("**{value_string}"));
                 }
             }
@@ -243,16 +243,16 @@ fn clean_params_dictionary(
             };
 
             for item in &arguments {
-                contents.push_str(checker.stylist.line_ending().as_str());
+                contents.push_str(checker.stylist().line_ending().as_str());
                 contents.push_str(indent);
                 contents.push_str(item);
                 contents.push(',');
             }
 
-            contents.push_str(checker.stylist.line_ending().as_str());
+            contents.push_str(checker.stylist().line_ending().as_str());
 
             // For the ending parentheses, go back one indent.
-            let default_indent: &str = checker.stylist.indentation();
+            let default_indent: &str = checker.stylist().indentation();
             if let Some(ident) = indent.strip_prefix(default_indent) {
                 contents.push_str(ident);
             } else {
@@ -338,7 +338,7 @@ pub(crate) fn printf_string_formatting(
     let mut strings: Vec<TextRange> = vec![];
     let mut extension = None;
     for (tok, range) in lexer::lex_starts_at(
-        checker.locator.slice(expr.range()),
+        checker.locator().slice(expr.range()),
         Mode::Module,
         expr.start(),
     )
@@ -365,7 +365,7 @@ pub(crate) fn printf_string_formatting(
     let mut num_keyword_arguments = 0;
     let mut format_strings = Vec::with_capacity(strings.len());
     for range in &strings {
-        let string = checker.locator.slice(*range);
+        let string = checker.locator().slice(*range);
         let (Some(leader), Some(trailer)) = (leading_quote(string), trailing_quote(string)) else {
             return;
         };
@@ -399,16 +399,16 @@ pub(crate) fn printf_string_formatting(
     // Parse the parameters.
     let params_string = match right {
         Expr::Constant(_) | Expr::JoinedStr(_) => {
-            format!("({})", checker.locator.slice(right.range()))
+            format!("({})", checker.locator().slice(right.range()))
         }
         Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) | Expr::Call(_) => {
             if num_keyword_arguments > 0 {
                 // If we have _any_ named fields, assume the right-hand side is a mapping.
-                format!("(**{})", checker.locator.slice(right.range()))
+                format!("(**{})", checker.locator().slice(right.range()))
             } else if num_positional_arguments > 1 {
                 // If we have multiple fields, but no named fields, assume the right-hand side is a
                 // tuple.
-                format!("(*{})", checker.locator.slice(right.range()))
+                format!("(*{})", checker.locator().slice(right.range()))
             } else {
                 // Otherwise, if we have a single field, we can't make any assumptions about the
                 // right-hand side. It _could_ be a tuple, but it could also be a single value,
@@ -442,12 +442,12 @@ pub(crate) fn printf_string_formatting(
             None => {
                 contents.push_str(
                     checker
-                        .locator
+                        .locator()
                         .slice(TextRange::new(expr.start(), range.start())),
                 );
             }
             Some(prev) => {
-                contents.push_str(checker.locator.slice(TextRange::new(prev, range.start())));
+                contents.push_str(checker.locator().slice(TextRange::new(prev, range.start())));
             }
         }
         // Add the string itself.
@@ -458,7 +458,7 @@ pub(crate) fn printf_string_formatting(
     if let Some(range) = extension {
         contents.push_str(
             checker
-                .locator
+                .locator()
                 .slice(TextRange::new(prev.unwrap(), range.end())),
         );
     }

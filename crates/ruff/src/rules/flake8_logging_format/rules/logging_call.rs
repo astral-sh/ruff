@@ -1,8 +1,7 @@
-use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::{self, Constant, Expr, Keyword, Operator, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
-use ruff_python_ast::helpers::{find_keyword, SimpleCallArgs};
+use ruff_python_ast::helpers::{find_keyword, CallArguments};
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
 
@@ -133,7 +132,7 @@ fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 enum LoggingCallType {
     /// Logging call with a level method, e.g., `logging.info`.
     LevelCall(LoggingLevel),
@@ -158,73 +157,73 @@ pub(crate) fn logging_call(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    if !logging::is_logger_candidate(func, checker.semantic()) {
+    let Expr::Attribute(ast::ExprAttribute { value: _, attr, .. }) = func else {
+        return;
+    };
+
+    let Some(logging_call_type) = LoggingCallType::from_attribute(attr.as_str()) else {
+        return;
+    };
+
+    if !logging::is_logger_candidate(func, checker.semantic(), &checker.settings.logger_objects) {
         return;
     }
 
-    if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func {
-        if let Some(logging_call_type) = LoggingCallType::from_attribute(attr.as_str()) {
-            let call_args = SimpleCallArgs::new(args, keywords);
-            let level_call_range = TextRange::new(value.end() + TextSize::from(1), func.end());
+    // G001 - G004
+    let msg_pos = usize::from(matches!(logging_call_type, LoggingCallType::LogCall));
+    if let Some(format_arg) = CallArguments::new(args, keywords).argument("msg", msg_pos) {
+        check_msg(checker, format_arg);
+    }
 
-            // G001 - G004
-            let msg_pos = usize::from(matches!(logging_call_type, LoggingCallType::LogCall));
-            if let Some(format_arg) = call_args.argument("msg", msg_pos) {
-                check_msg(checker, format_arg);
+    // G010
+    if checker.enabled(Rule::LoggingWarn) {
+        if matches!(
+            logging_call_type,
+            LoggingCallType::LevelCall(LoggingLevel::Warn)
+        ) {
+            let mut diagnostic = Diagnostic::new(LoggingWarn, attr.range());
+            if checker.patch(diagnostic.kind.rule()) {
+                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+                    "warning".to_string(),
+                    attr.range(),
+                )));
             }
+            checker.diagnostics.push(diagnostic);
+        }
+    }
 
-            // G010
-            if checker.enabled(Rule::LoggingWarn)
-                && matches!(
-                    logging_call_type,
-                    LoggingCallType::LevelCall(LoggingLevel::Warn)
-                )
-            {
-                let mut diagnostic = Diagnostic::new(LoggingWarn, level_call_range);
-                if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                        "warning".to_string(),
-                        level_call_range,
-                    )));
-                }
-                checker.diagnostics.push(diagnostic);
-            }
+    // G101
+    if checker.enabled(Rule::LoggingExtraAttrClash) {
+        if let Some(extra) = find_keyword(keywords, "extra") {
+            check_log_record_attr_clash(checker, extra);
+        }
+    }
 
-            // G101
-            if checker.enabled(Rule::LoggingExtraAttrClash) {
-                if let Some(extra) = find_keyword(keywords, "extra") {
-                    check_log_record_attr_clash(checker, extra);
-                }
-            }
-
-            // G201, G202
-            if checker.any_enabled(&[Rule::LoggingExcInfo, Rule::LoggingRedundantExcInfo]) {
-                if !checker.semantic().in_exception_handler() {
-                    return;
-                }
-                let Some(exc_info) = logging::exc_info(keywords, checker.semantic()) else {
-                    return;
-                };
-                if let LoggingCallType::LevelCall(logging_level) = logging_call_type {
-                    match logging_level {
-                        LoggingLevel::Error => {
-                            if checker.enabled(Rule::LoggingExcInfo) {
-                                checker
-                                    .diagnostics
-                                    .push(Diagnostic::new(LoggingExcInfo, level_call_range));
-                            }
-                        }
-                        LoggingLevel::Exception => {
-                            if checker.enabled(Rule::LoggingRedundantExcInfo) {
-                                checker.diagnostics.push(Diagnostic::new(
-                                    LoggingRedundantExcInfo,
-                                    exc_info.range(),
-                                ));
-                            }
-                        }
-                        _ => {}
+    // G201, G202
+    if checker.any_enabled(&[Rule::LoggingExcInfo, Rule::LoggingRedundantExcInfo]) {
+        if !checker.semantic().in_exception_handler() {
+            return;
+        }
+        let Some(exc_info) = logging::exc_info(keywords, checker.semantic()) else {
+            return;
+        };
+        if let LoggingCallType::LevelCall(logging_level) = logging_call_type {
+            match logging_level {
+                LoggingLevel::Error => {
+                    if checker.enabled(Rule::LoggingExcInfo) {
+                        checker
+                            .diagnostics
+                            .push(Diagnostic::new(LoggingExcInfo, attr.range()));
                     }
                 }
+                LoggingLevel::Exception => {
+                    if checker.enabled(Rule::LoggingRedundantExcInfo) {
+                        checker
+                            .diagnostics
+                            .push(Diagnostic::new(LoggingRedundantExcInfo, exc_info.range()));
+                    }
+                }
+                _ => {}
             }
         }
     }

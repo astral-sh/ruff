@@ -61,3 +61,8 @@ a = (
     lambda  # Dangling
            : 1
 )
+
+# Regression test: lambda empty arguments ranges were too long, leading to unstable
+# formatting
+(lambda:(#
+),)

@@ -78,7 +78,7 @@ pub(crate) fn sys_exit_alias(checker: &mut Checker, func: &Expr) {
     );
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = checker.importer.get_or_import_symbol(
+            let (import_edit, binding) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import("sys", "exit"),
                 func.start(),
                 checker.semantic(),

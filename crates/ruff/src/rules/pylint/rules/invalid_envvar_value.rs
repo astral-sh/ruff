@@ -2,6 +2,7 @@ use rustpython_parser::ast::{self, Constant, Expr, Keyword, Operator, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::find_keyword;
 
 use crate::checkers::ast::Checker;
 
@@ -88,12 +89,10 @@ pub(crate) fn invalid_envvar_value(
         })
     {
         // Find the `key` argument, if it exists.
-        let Some(expr) = args.get(0).or_else(|| {
-            keywords
-                .iter()
-                .find(|keyword| keyword.arg.as_ref().map_or(false, |arg| arg == "key"))
-                .map(|keyword| &keyword.value)
-        }) else {
+        let Some(expr) = args
+            .get(0)
+            .or_else(|| find_keyword(keywords, "key").map(|keyword| &keyword.value))
+        else {
             return;
         };
 

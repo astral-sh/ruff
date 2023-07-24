@@ -1419,7 +1419,7 @@ fn blanks_and_section_underline(
                             "{}{}{}",
                             clean_space(docstring.indentation),
                             "-".repeat(context.section_name().len()),
-                            checker.stylist.line_ending().as_str()
+                            checker.stylist().line_ending().as_str()
                         );
                         diagnostic.set_fix(Fix::automatic(Edit::replacement(
                             content,
@@ -1520,7 +1520,7 @@ fn blanks_and_section_underline(
                     // Add a dashed line (of the appropriate length) under the section header.
                     let content = format!(
                         "{}{}{}",
-                        checker.stylist.line_ending().as_str(),
+                        checker.stylist().line_ending().as_str(),
                         clean_space(docstring.indentation),
                         "-".repeat(context.section_name().len()),
                     );
@@ -1576,7 +1576,7 @@ fn blanks_and_section_underline(
                 // Add a dashed line (of the appropriate length) under the section header.
                 let content = format!(
                     "{}{}{}",
-                    checker.stylist.line_ending().as_str(),
+                    checker.stylist().line_ending().as_str(),
                     clean_space(docstring.indentation),
                     "-".repeat(context.section_name().len()),
                 );
@@ -1651,7 +1651,7 @@ fn common_section(
         }
     }
 
-    let line_end = checker.stylist.line_ending().as_str();
+    let line_end = checker.stylist().line_ending().as_str();
     let last_line = context.following_lines().last();
     if last_line.map_or(true, |line| !line.trim().is_empty()) {
         if let Some(next) = next {

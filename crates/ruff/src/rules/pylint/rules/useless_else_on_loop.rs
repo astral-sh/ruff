@@ -109,7 +109,7 @@ pub(crate) fn useless_else_on_loop(
     if !orelse.is_empty() && !loop_exits_early(body) {
         checker.diagnostics.push(Diagnostic::new(
             UselessElseOnLoop,
-            identifier::else_(stmt, checker.locator).unwrap(),
+            identifier::else_(stmt, checker.locator()).unwrap(),
         ));
     }
 }

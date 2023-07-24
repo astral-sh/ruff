@@ -4,6 +4,7 @@ use rustpython_parser::ast::{self, Expr, Ranged, WithItem};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::find_keyword;
 
 use crate::checkers::ast::Checker;
 
@@ -115,9 +116,7 @@ pub(crate) fn assert_raises_exception(checker: &mut Checker, items: &[WithItem])
             .map_or(false, |call_path| {
                 matches!(call_path.as_slice(), ["pytest", "raises"])
             })
-            && !keywords
-                .iter()
-                .any(|keyword| keyword.arg.as_ref().map_or(false, |arg| arg == "match"))
+            && find_keyword(keywords, "match").is_none()
         {
             AssertionKind::PytestRaises
         } else {

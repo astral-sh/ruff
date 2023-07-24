@@ -1,5 +1,5 @@
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{self, ExceptHandler, MatchCase, Ranged, Stmt};
+use rustpython_parser::ast::{self, ElifElseClause, ExceptHandler, MatchCase, Ranged, Stmt};
 use std::iter::Peekable;
 use std::slice;
 
@@ -254,7 +254,6 @@ where
                 for clause in elif_else_clauses {
                     self.visit_elif_else_clause(clause);
                 }
-                self.finalize(None);
             }
             Stmt::With(ast::StmtWith { body, .. }) => {
                 for stmt in body {
@@ -327,6 +326,13 @@ where
 
     fn visit_match_case(&mut self, match_case: &'b MatchCase) {
         for stmt in &match_case.body {
+            self.visit_stmt(stmt);
+        }
+        self.finalize(None);
+    }
+
+    fn visit_elif_else_clause(&mut self, elif_else_clause: &'b ElifElseClause) {
+        for stmt in &elif_else_clause.body {
             self.visit_stmt(stmt);
         }
         self.finalize(None);

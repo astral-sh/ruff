@@ -734,7 +734,7 @@ dependencies = [
 
 [[package]]
 name = "flake8-to-ruff"
-version = "0.0.278"
+version = "0.0.280"
 dependencies = [
  "anyhow",
  "clap",
@@ -1524,7 +1524,6 @@ version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ade2d8b8f33c7333b51bcf0428d37e217e9f32192ae4772156f65063b8ce03dc"
 dependencies = [
- "phf_macros",
  "phf_shared",
 ]
 
@@ -1546,19 +1545,6 @@ checksum = "48e4cc64c2ad9ebe670cb8fd69dd50ae301650392e81c05f9bfcb2d5bdbc24b0"
 dependencies = [
  "phf_shared",
  "rand",
-]
-
-[[package]]
-name = "phf_macros"
-version = "0.11.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3444646e286606587e49f3bcf1679b8cef1dc2c5ecc29ddacaffc305180d464b"
-dependencies = [
- "phf_generator",
- "phf_shared",
- "proc-macro2",
- "quote",
- "syn 2.0.23",
 ]
 
 [[package]]
@@ -1888,7 +1874,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.0.278"
+version = "0.0.280"
 dependencies = [
  "annotate-snippets 0.9.1",
  "anyhow",
@@ -1916,7 +1902,6 @@ dependencies = [
  "path-absolutize",
  "pathdiff",
  "pep440_rs",
- "phf",
  "pretty_assertions",
  "pyproject-toml",
  "quick-junit",
@@ -1988,7 +1973,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_cli"
-version = "0.0.278"
+version = "0.0.280"
 dependencies = [
  "annotate-snippets 0.9.1",
  "anyhow",
@@ -2232,7 +2217,7 @@ dependencies = [
 [[package]]
 name = "ruff_text_size"
 version = "0.0.0"
-source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=db04fd415774032e1e2ceb03bcbf5305e0d22c8c#db04fd415774032e1e2ceb03bcbf5305e0d22c8c"
+source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=4d03b9b5b212fc869e4cfda151414438186a7779#4d03b9b5b212fc869e4cfda151414438186a7779"
 dependencies = [
  "schemars",
  "serde",
@@ -2334,7 +2319,7 @@ dependencies = [
 [[package]]
 name = "rustpython-ast"
 version = "0.2.0"
-source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=db04fd415774032e1e2ceb03bcbf5305e0d22c8c#db04fd415774032e1e2ceb03bcbf5305e0d22c8c"
+source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=4d03b9b5b212fc869e4cfda151414438186a7779#4d03b9b5b212fc869e4cfda151414438186a7779"
 dependencies = [
  "is-macro",
  "num-bigint",
@@ -2345,7 +2330,7 @@ dependencies = [
 [[package]]
 name = "rustpython-format"
 version = "0.2.0"
-source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=db04fd415774032e1e2ceb03bcbf5305e0d22c8c#db04fd415774032e1e2ceb03bcbf5305e0d22c8c"
+source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=4d03b9b5b212fc869e4cfda151414438186a7779#4d03b9b5b212fc869e4cfda151414438186a7779"
 dependencies = [
  "bitflags 2.3.3",
  "itertools",
@@ -2357,7 +2342,7 @@ dependencies = [
 [[package]]
 name = "rustpython-literal"
 version = "0.2.0"
-source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=db04fd415774032e1e2ceb03bcbf5305e0d22c8c#db04fd415774032e1e2ceb03bcbf5305e0d22c8c"
+source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=4d03b9b5b212fc869e4cfda151414438186a7779#4d03b9b5b212fc869e4cfda151414438186a7779"
 dependencies = [
  "hexf-parse",
  "is-macro",
@@ -2369,7 +2354,7 @@ dependencies = [
 [[package]]
 name = "rustpython-parser"
 version = "0.2.0"
-source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=db04fd415774032e1e2ceb03bcbf5305e0d22c8c#db04fd415774032e1e2ceb03bcbf5305e0d22c8c"
+source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=4d03b9b5b212fc869e4cfda151414438186a7779#4d03b9b5b212fc869e4cfda151414438186a7779"
 dependencies = [
  "anyhow",
  "is-macro",
@@ -2392,7 +2377,7 @@ dependencies = [
 [[package]]
 name = "rustpython-parser-core"
 version = "0.2.0"
-source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=db04fd415774032e1e2ceb03bcbf5305e0d22c8c#db04fd415774032e1e2ceb03bcbf5305e0d22c8c"
+source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=4d03b9b5b212fc869e4cfda151414438186a7779#4d03b9b5b212fc869e4cfda151414438186a7779"
 dependencies = [
  "is-macro",
  "memchr",

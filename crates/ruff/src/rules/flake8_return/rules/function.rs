@@ -409,14 +409,14 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
             ) {
                 let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());
                 if checker.patch(diagnostic.kind.rule()) {
-                    if let Some(indent) = indentation(checker.locator, stmt) {
+                    if let Some(indent) = indentation(checker.locator(), stmt) {
                         let mut content = String::new();
-                        content.push_str(checker.stylist.line_ending().as_str());
+                        content.push_str(checker.stylist().line_ending().as_str());
                         content.push_str(indent);
                         content.push_str("return None");
                         diagnostic.set_fix(Fix::suggested(Edit::insertion(
                             content,
-                            end_of_last_statement(stmt, checker.locator),
+                            end_of_last_statement(stmt, checker.locator()),
                         )));
                     }
                 }
@@ -433,14 +433,14 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
             } else {
                 let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());
                 if checker.patch(diagnostic.kind.rule()) {
-                    if let Some(indent) = indentation(checker.locator, stmt) {
+                    if let Some(indent) = indentation(checker.locator(), stmt) {
                         let mut content = String::new();
-                        content.push_str(checker.stylist.line_ending().as_str());
+                        content.push_str(checker.stylist().line_ending().as_str());
                         content.push_str(indent);
                         content.push_str("return None");
                         diagnostic.set_fix(Fix::suggested(Edit::insertion(
                             content,
-                            end_of_last_statement(stmt, checker.locator),
+                            end_of_last_statement(stmt, checker.locator()),
                         )));
                     }
                 }
@@ -470,14 +470,14 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
         _ => {
             let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());
             if checker.patch(diagnostic.kind.rule()) {
-                if let Some(indent) = indentation(checker.locator, stmt) {
+                if let Some(indent) = indentation(checker.locator(), stmt) {
                     let mut content = String::new();
-                    content.push_str(checker.stylist.line_ending().as_str());
+                    content.push_str(checker.stylist().line_ending().as_str());
                     content.push_str(indent);
                     content.push_str("return None");
                     diagnostic.set_fix(Fix::suggested(Edit::insertion(
                         content,
-                        end_of_last_statement(stmt, checker.locator),
+                        end_of_last_statement(stmt, checker.locator()),
                     )));
                 }
             }
@@ -537,10 +537,10 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
                 // edit, since we're editing the preceding statement, so no conflicting edit would
                 // be allowed to remove that preceding statement.
                 let delete_return =
-                    edits::delete_stmt(stmt, None, checker.locator, checker.indexer);
+                    edits::delete_stmt(stmt, None, checker.locator(), checker.indexer());
 
                 // Replace the `x = 1` statement with `return 1`.
-                let content = checker.locator.slice(assign.range());
+                let content = checker.locator().slice(assign.range());
                 let equals_index = content
                     .find('=')
                     .ok_or(anyhow::anyhow!("expected '=' in assignment statement"))?;
@@ -591,7 +591,7 @@ fn superfluous_else_node(
         if child.is_return_stmt() {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseReturn { branch },
-                elif_else_range(elif_else, checker.locator).unwrap_or_else(|| elif_else.range()),
+                elif_else_range(elif_else, checker.locator()).unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
@@ -600,7 +600,7 @@ fn superfluous_else_node(
         } else if child.is_break_stmt() {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseBreak { branch },
-                elif_else_range(elif_else, checker.locator).unwrap_or_else(|| elif_else.range()),
+                elif_else_range(elif_else, checker.locator()).unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
@@ -609,7 +609,7 @@ fn superfluous_else_node(
         } else if child.is_raise_stmt() {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseRaise { branch },
-                elif_else_range(elif_else, checker.locator).unwrap_or_else(|| elif_else.range()),
+                elif_else_range(elif_else, checker.locator()).unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
@@ -618,7 +618,7 @@ fn superfluous_else_node(
         } else if child.is_continue_stmt() {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseContinue { branch },
-                elif_else_range(elif_else, checker.locator).unwrap_or_else(|| elif_else.range()),
+                elif_else_range(elif_else, checker.locator()).unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);

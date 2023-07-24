@@ -3,6 +3,7 @@ use rustpython_parser::ast::{Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::find_keyword;
 use rustpython_parser::ast::Constant;
 
 use crate::checkers::ast::Checker;
@@ -73,9 +74,7 @@ pub(crate) fn variable_name_task_id(
     }
 
     // If the call doesn't have a `task_id` keyword argument, we can't do anything.
-    let keyword = keywords
-        .iter()
-        .find(|keyword| keyword.arg.as_ref().map_or(false, |arg| arg == "task_id"))?;
+    let keyword = find_keyword(keywords, "task_id")?;
 
     // If the keyword argument is not a string, we can't do anything.
     let task_id = match &keyword.value {

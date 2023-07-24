@@ -4,7 +4,7 @@ use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::is_const_true;
+use ruff_python_ast::helpers::{find_keyword, is_const_true};
 
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::type_param_name;
@@ -84,28 +84,11 @@ pub(crate) fn type_bivariance(checker: &mut Checker, value: &Expr) {
         return;
     };
 
-    let Some(covariant) = keywords
-        .iter()
-        .find(|keyword| {
-            keyword
-                .arg
-                .as_ref()
-                .map_or(false, |keyword| keyword.as_str() == "covariant")
-        })
-        .map(|keyword| &keyword.value)
-    else {
+    let Some(covariant) = find_keyword(keywords, "covariant").map(|keyword| &keyword.value) else {
         return;
     };
 
-    let Some(contravariant) = keywords
-        .iter()
-        .find(|keyword| {
-            keyword
-                .arg
-                .as_ref()
-                .map_or(false, |keyword| keyword.as_str() == "contravariant")
-        })
-        .map(|keyword| &keyword.value)
+    let Some(contravariant) = find_keyword(keywords, "contravariant").map(|keyword| &keyword.value)
     else {
         return;
     };

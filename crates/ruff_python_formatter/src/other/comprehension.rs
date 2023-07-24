@@ -113,7 +113,7 @@ impl Format<PyFormatContext<'_>> for ExprTupleWithoutParentheses<'_> {
         match self.0 {
             Expr::Tuple(expr_tuple) => expr_tuple
                 .format()
-                .with_options(TupleParentheses::Comprehension)
+                .with_options(TupleParentheses::Never)
                 .fmt(f),
             other => other.format().fmt(f),
         }
