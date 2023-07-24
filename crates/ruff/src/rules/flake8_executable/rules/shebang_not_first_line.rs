@@ -1,9 +1,9 @@
-use ruff_text_size::{TextLen, TextRange};
+use ruff_text_size::{TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-
-use crate::comments::shebang::ShebangDirective;
+use ruff_python_ast::source_code::Locator;
+use ruff_python_trivia::is_python_whitespace;
 
 /// ## What it does
 /// Checks for a shebang directive that is not at the beginning of the file.
@@ -42,19 +42,20 @@ impl Violation for ShebangNotFirstLine {
 }
 
 /// EXE005
-pub(crate) fn shebang_newline(
-    range: TextRange,
-    shebang: &ShebangDirective,
-    first_line: bool,
-) -> Option<Diagnostic> {
-    let ShebangDirective { offset, contents } = shebang;
-
-    if first_line {
-        None
-    } else {
-        Some(Diagnostic::new(
-            ShebangNotFirstLine,
-            TextRange::at(range.start() + offset, contents.text_len()),
-        ))
+pub(crate) fn shebang_not_first_line(range: TextRange, locator: &Locator) -> Option<Diagnostic> {
+    // If the shebang is at the beginning of the file, abort.
+    if range.start() == TextSize::from(0) {
+        return None;
     }
+
+    // If the entire prefix is whitespace, abort (this is handled by EXE004).
+    if locator
+        .up_to(range.start())
+        .chars()
+        .all(|c| is_python_whitespace(c) || matches!(c, '\r' | '\n'))
+    {
+        return None;
+    }
+
+    Some(Diagnostic::new(ShebangNotFirstLine, range))
 }

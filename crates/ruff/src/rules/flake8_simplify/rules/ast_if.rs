@@ -10,7 +10,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::{ComparableConstant, ComparableExpr, ComparableStmt};
 use ruff_python_ast::helpers::{any_over_expr, contains_effect, first_colon_range, has_comments};
 use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::stmt_if::if_elif_branches;
+use ruff_python_ast::stmt_if::{if_elif_branches, IfElifBranch};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::UniversalNewlines;
 
@@ -676,6 +676,15 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt) {
     checker.diagnostics.push(diagnostic);
 }
 
+/// Return the [`TextRange`] of an [`IfElifBranch`]'s body (from the end of the test to the end of
+/// the body).
+fn body_range(branch: &IfElifBranch, locator: &Locator) -> TextRange {
+    TextRange::new(
+        locator.line_end(branch.test.end()),
+        locator.line_end(branch.range.end()),
+    )
+}
+
 /// SIM114
 pub(crate) fn if_with_same_arms(checker: &mut Checker, locator: &Locator, stmt_if: &StmtIf) {
     let mut branches_iter = if_elif_branches(stmt_if).peekable();
@@ -698,24 +707,19 @@ pub(crate) fn if_with_same_arms(checker: &mut Checker, locator: &Locator, stmt_i
         }
 
         // ...and the same comments
-        let first_comments: Vec<_> = checker
+        let first_comments = checker
             .indexer()
-            .comments_in_range(current_branch.range, locator)
-            .collect();
-        let second_comments: Vec<_> = checker
+            .comments_in_range(body_range(&current_branch, locator), locator);
+        let second_comments = checker
             .indexer()
-            .comments_in_range(following_branch.range, locator)
-            .collect();
-        if first_comments != second_comments {
+            .comments_in_range(body_range(following_branch, locator), locator);
+        if !first_comments.eq(second_comments) {
             continue;
         }
 
         checker.diagnostics.push(Diagnostic::new(
             IfWithSameArms,
-            TextRange::new(
-                current_branch.range.start(),
-                following_branch.body.last().unwrap().end(),
-            ),
+            TextRange::new(current_branch.range.start(), following_branch.range.end()),
         ));
     }
 }

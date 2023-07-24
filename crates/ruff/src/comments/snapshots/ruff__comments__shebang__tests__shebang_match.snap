@@ -3,8 +3,7 @@ source: crates/ruff/src/comments/shebang.rs
 expression: "ShebangDirective::try_extract(source)"
 ---
 Some(
-    ShebangDirective {
-        offset: 2,
-        contents: "/usr/bin/env python",
-    },
+    ShebangDirective(
+        "/usr/bin/env python",
+    ),
 )
