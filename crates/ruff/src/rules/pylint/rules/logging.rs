@@ -2,7 +2,7 @@ use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::SimpleCallArgs;
+use ruff_python_ast::helpers::CallArguments;
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
 
@@ -102,10 +102,6 @@ pub(crate) fn logging_call(
         return;
     }
 
-    if !logging::is_logger_candidate(func, checker.semantic(), &checker.settings.logger_objects) {
-        return;
-    }
-
     let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func else {
         return;
     };
@@ -114,7 +110,7 @@ pub(crate) fn logging_call(
         return;
     }
 
-    let call_args = SimpleCallArgs::new(args, keywords);
+    let call_args = CallArguments::new(args, keywords);
     let Some(Expr::Constant(ast::ExprConstant {
         value: Constant::Str(value),
         ..
@@ -122,6 +118,10 @@ pub(crate) fn logging_call(
     else {
         return;
     };
+
+    if !logging::is_logger_candidate(func, checker.semantic(), &checker.settings.logger_objects) {
+        return;
+    }
 
     let Ok(summary) = CFormatSummary::try_from(value.as_str()) else {
         return;
