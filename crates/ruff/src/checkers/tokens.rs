@@ -1,5 +1,7 @@
 //! Lint rules based on token traversal.
 
+use std::path::Path;
+
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
@@ -11,15 +13,16 @@ use crate::lex::docstring_detection::StateMachine;
 use crate::registry::{AsRule, Rule};
 use crate::rules::ruff::rules::Context;
 use crate::rules::{
-    eradicate, flake8_commas, flake8_fixme, flake8_implicit_str_concat, flake8_pyi, flake8_quotes,
-    flake8_todos, pycodestyle, pygrep_hooks, pylint, pyupgrade, ruff,
+    eradicate, flake8_commas, flake8_executable, flake8_fixme, flake8_implicit_str_concat,
+    flake8_pyi, flake8_quotes, flake8_todos, pycodestyle, pygrep_hooks, pylint, pyupgrade, ruff,
 };
 use crate::settings::Settings;
 
 pub(crate) fn check_tokens(
+    tokens: &[LexResult],
+    path: &Path,
     locator: &Locator,
     indexer: &Indexer,
-    tokens: &[LexResult],
     settings: &Settings,
     is_stub: bool,
 ) -> Vec<Diagnostic> {
@@ -141,6 +144,16 @@ pub(crate) fn check_tokens(
 
     if is_stub && settings.rules.enabled(Rule::TypeCommentInStub) {
         flake8_pyi::rules::type_comment_in_stub(&mut diagnostics, locator, indexer);
+    }
+
+    if settings.rules.any_enabled(&[
+        Rule::ShebangNotExecutable,
+        Rule::ShebangMissingExecutableFile,
+        Rule::ShebangLeadingWhitespace,
+        Rule::ShebangNotFirstLine,
+        Rule::ShebangMissingPython,
+    ]) {
+        flake8_executable::rules::from_tokens(tokens, path, locator, settings, &mut diagnostics);
     }
 
     if settings.rules.any_enabled(&[

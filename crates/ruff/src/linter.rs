@@ -100,7 +100,9 @@ pub fn check_path(
         .any(|rule_code| rule_code.lint_source().is_tokens())
     {
         let is_stub = is_python_stub_file(path);
-        diagnostics.extend(check_tokens(locator, indexer, &tokens, settings, is_stub));
+        diagnostics.extend(check_tokens(
+            &tokens, path, locator, indexer, settings, is_stub,
+        ));
     }
 
     // Run the filesystem-based rules.
@@ -193,7 +195,7 @@ pub fn check_path(
         .any(|rule_code| rule_code.lint_source().is_physical_lines())
     {
         diagnostics.extend(check_physical_lines(
-            path, locator, stylist, indexer, &doc_lines, settings,
+            locator, stylist, indexer, &doc_lines, settings,
         ));
     }
 

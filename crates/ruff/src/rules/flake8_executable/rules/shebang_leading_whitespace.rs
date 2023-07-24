@@ -1,11 +1,12 @@
-use std::ops::Sub;
-
 use ruff_text_size::{TextRange, TextSize};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::source_code::Locator;
+use ruff_python_trivia::is_python_whitespace;
 
-use crate::comments::shebang::ShebangDirective;
+use crate::registry::AsRule;
+use crate::settings::Settings;
 
 /// ## What it does
 /// Checks for whitespace before a shebang directive.
@@ -46,31 +47,29 @@ impl AlwaysAutofixableViolation for ShebangLeadingWhitespace {
 }
 
 /// EXE004
-pub(crate) fn shebang_whitespace(
+pub(crate) fn shebang_leading_whitespace(
     range: TextRange,
-    shebang: &ShebangDirective,
-    autofix: bool,
+    locator: &Locator,
+    settings: &Settings,
 ) -> Option<Diagnostic> {
-    let ShebangDirective {
-        offset,
-        contents: _,
-    } = shebang;
-
-    if *offset > TextSize::from(2) {
-        let leading_space_start = range.start();
-        let leading_space_len = offset.sub(TextSize::new(2));
-        let mut diagnostic = Diagnostic::new(
-            ShebangLeadingWhitespace,
-            TextRange::at(leading_space_start, leading_space_len),
-        );
-        if autofix {
-            diagnostic.set_fix(Fix::automatic(Edit::range_deletion(TextRange::at(
-                leading_space_start,
-                leading_space_len,
-            ))));
-        }
-        Some(diagnostic)
-    } else {
-        None
+    // If the shebang is at the beginning of the file, abort.
+    if range.start() == TextSize::from(0) {
+        return None;
     }
+
+    // If the entire prefix _isn't_ whitespace, abort (this is handled by EXE005).
+    if !locator
+        .up_to(range.start())
+        .chars()
+        .all(|c| is_python_whitespace(c) || matches!(c, '\r' | '\n'))
+    {
+        return None;
+    }
+
+    let prefix = TextRange::up_to(range.start());
+    let mut diagnostic = Diagnostic::new(ShebangLeadingWhitespace, prefix);
+    if settings.rules.should_fix(diagnostic.kind.rule()) {
+        diagnostic.set_fix(Fix::automatic(Edit::range_deletion(prefix)));
+    }
+    Some(diagnostic)
 }
