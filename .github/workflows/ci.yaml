@@ -323,7 +323,7 @@ jobs:
     name: "Formatter ecosystem and progress checks"
     runs-on: ubuntu-latest
     needs: determine_changes
-    # if: needs.determine_changes.outputs.formatter == 'true'
+    if: needs.determine_changes.outputs.formatter == 'true'
     steps:
       - uses: actions/checkout@v3
       - name: "Install Rust toolchain"
