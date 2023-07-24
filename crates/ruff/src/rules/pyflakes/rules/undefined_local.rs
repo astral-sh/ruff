@@ -33,7 +33,7 @@ use crate::checkers::ast::Checker;
 /// ```
 #[violation]
 pub struct UndefinedLocal {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for UndefinedLocal {
