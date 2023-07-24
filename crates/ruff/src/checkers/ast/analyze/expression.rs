@@ -1305,15 +1305,6 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::FunctionUsesLoopVariable) {
                 flake8_bugbear::rules::function_uses_loop_variable(checker, &Node::Expr(expr));
             }
-            if checker.enabled(Rule::InDictKeys) {
-                for generator in generators {
-                    flake8_simplify::rules::key_in_dict_for(
-                        checker,
-                        &generator.target,
-                        &generator.iter,
-                    );
-                }
-            }
             if checker.enabled(Rule::IterationOverSet) {
                 for generator in generators {
                     pylint::rules::iteration_over_set(checker, &generator.iter);
@@ -1334,15 +1325,6 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::FunctionUsesLoopVariable) {
                 flake8_bugbear::rules::function_uses_loop_variable(checker, &Node::Expr(expr));
             }
-            if checker.enabled(Rule::InDictKeys) {
-                for generator in generators {
-                    flake8_simplify::rules::key_in_dict_for(
-                        checker,
-                        &generator.target,
-                        &generator.iter,
-                    );
-                }
-            }
             if checker.enabled(Rule::IterationOverSet) {
                 for generator in generators {
                     pylint::rules::iteration_over_set(checker, &generator.iter);
@@ -1359,15 +1341,6 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
         }) => {
             if checker.enabled(Rule::FunctionUsesLoopVariable) {
                 flake8_bugbear::rules::function_uses_loop_variable(checker, &Node::Expr(expr));
-            }
-            if checker.enabled(Rule::InDictKeys) {
-                for generator in generators {
-                    flake8_simplify::rules::key_in_dict_for(
-                        checker,
-                        &generator.target,
-                        &generator.iter,
-                    );
-                }
             }
             if checker.enabled(Rule::IterationOverSet) {
                 for generator in generators {
