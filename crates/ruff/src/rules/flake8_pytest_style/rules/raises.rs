@@ -42,7 +42,8 @@ impl Violation for PytestRaisesTooBroad {
 /// Checks for `pytest.raises` calls without an expected exception.
 ///
 /// ## Why is this bad?
-/// `pytest.raises()` fails at runtime because it's missing the `expected_exception` parameter.
+/// `pytest.raises` expects to receive an expected exception as its first
+/// argument. If omitted, the `pytest.raises` call will fail at runtime.
 ///
 /// ## Example
 /// ```python
