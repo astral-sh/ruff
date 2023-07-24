@@ -1,46 +1,46 @@
 ---
 source: crates/ruff/src/rules/flake8_implicit_str_concat/mod.rs
 ---
-ISC.py:3:5: ISC002 Implicitly concatenated string literals over multiple lines
+ISC.py:5:5: ISC002 Implicitly concatenated string literals over multiple lines
   |
-1 |   _ = "a" "b" "c"
-2 |   
-3 |   _ = "abc" \
+3 |   _ = "abc" + "def"
+4 |   
+5 |   _ = "abc" \
   |  _____^
-4 | |     "def"
+6 | |     "def"
   | |_________^ ISC002
-5 |   
-6 |   _ = (
+7 |   
+8 |   _ = (
   |
 
-ISC.py:22:3: ISC002 Implicitly concatenated string literals over multiple lines
+ISC.py:24:3: ISC002 Implicitly concatenated string literals over multiple lines
    |
-21 |   _ = (
-22 |     "abc"
+23 |   _ = (
+24 |     "abc"
    |  ___^
-23 | |   "def"
+25 | |   "def"
    | |_______^ ISC002
-24 |   )
+26 |   )
    |
 
-ISC.py:27:3: ISC002 Implicitly concatenated string literals over multiple lines
+ISC.py:29:3: ISC002 Implicitly concatenated string literals over multiple lines
    |
-26 |   _ = (
-27 |     f"abc"
+28 |   _ = (
+29 |     f"abc"
    |  ___^
-28 | |   "def"
+30 | |   "def"
    | |_______^ ISC002
-29 |   )
+31 |   )
    |
 
-ISC.py:32:3: ISC002 Implicitly concatenated string literals over multiple lines
+ISC.py:34:3: ISC002 Implicitly concatenated string literals over multiple lines
    |
-31 |   _ = (
-32 |     b"abc"
+33 |   _ = (
+34 |     b"abc"
    |  ___^
-33 | |   b"def"
+35 | |   b"def"
    | |________^ ISC002
-34 |   )
+36 |   )
    |
 
 
