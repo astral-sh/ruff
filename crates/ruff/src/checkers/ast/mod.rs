@@ -1724,17 +1724,6 @@ where
             }) => {
                 self.handle_node_load(target);
             }
-            Stmt::Assign(ast::StmtAssign {targets, value, range: _, type_comment: _ }) => {
-                if let [Expr::Name(ast::ExprName {id, range, ..})] = &targets[..] {
-                    if id.starts_with('_') {
-                        if let Expr::Call(ast::ExprCall {func, ..}) = value.as_ref() {
-                            if self.semantic.match_typing_expr(func, "TypeVar") {
-                                self.add_binding(id, *range, BindingKind::Assignment, BindingFlags::PRIVATE_TYPE_VAR);
-                            }
-                        }
-                    }
-                }
-            }
             Stmt::Import(ast::StmtImport { names, range: _ }) => {
                 for alias in names {
                     if alias.name.contains('.') && alias.asname.is_none() {
@@ -4494,6 +4483,24 @@ impl<'a> Checker<'a> {
             return;
         }
 
+        if let Stmt::Assign(ast::StmtAssign { targets, value, .. }) = parent {
+            if let [Expr::Name(ast::ExprName { id, range, .. })] = &targets[..] {
+                if id.starts_with('_') {
+                    if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
+                        if self.semantic.match_typing_expr(func, "TypeVar") {
+                            self.add_binding(
+                                id,
+                                *range,
+                                BindingKind::Assignment,
+                                BindingFlags::PRIVATE_TYPE_VAR,
+                            );
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
         let scope = self.semantic.scope();
 
         if scope.kind.is_module()
@@ -4758,7 +4765,7 @@ impl<'a> Checker<'a> {
             Rule::UnaliasedCollectionsAbcSetImport,
             Rule::UnconventionalImportAlias,
             Rule::UnusedVariable,
-            Rule::UnusedPrivateTypeVar
+            Rule::UnusedPrivateTypeVar,
         ]) {
             return;
         }
@@ -4814,7 +4821,9 @@ impl<'a> Checker<'a> {
                     }
                 }
                 if self.enabled(Rule::UnusedPrivateTypeVar) {
-                    if let Some(diagnostic) = flake8_pyi::rules::unused_private_type_var(binding, self.locator) {
+                    if let Some(diagnostic) =
+                        flake8_pyi::rules::unused_private_type_var(binding, self.locator)
+                    {
                         self.diagnostics.push(diagnostic);
                     }
                 }
