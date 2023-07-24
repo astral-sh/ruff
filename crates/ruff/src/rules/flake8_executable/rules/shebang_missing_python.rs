@@ -1,4 +1,4 @@
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -41,15 +41,13 @@ impl Violation for ShebangMissingPython {
 }
 
 /// EXE003
-pub(crate) fn shebang_python(range: TextRange, shebang: &ShebangDirective) -> Option<Diagnostic> {
-    let ShebangDirective { offset, contents } = shebang;
-
-    if contents.contains("python") || contents.contains("pytest") {
-        None
-    } else {
-        Some(Diagnostic::new(
-            ShebangMissingPython,
-            TextRange::at(range.start() + offset, contents.text_len()).sub_start(TextSize::from(2)),
-        ))
+pub(crate) fn shebang_missing_python(
+    range: TextRange,
+    shebang: &ShebangDirective,
+) -> Option<Diagnostic> {
+    if shebang.contains("python") || shebang.contains("pytest") {
+        return None;
     }
+
+    Some(Diagnostic::new(ShebangMissingPython, range))
 }
