@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
-
-# The pinned revisions are the latest of this writing, update freely
+# Check black compatibility and check for formatter instabilities and other
+# errors.
+#
+# This script will first clone a diverse set of (mostly) black formatted
+# repositories with fixed revisions to target/progress_projects. Each project
+# gets formatted (without modifying the files on disk) to check how
+# similar our style is to black. It also catches common issues such as
+# unstable formatting, internal formatter errors and printing invalid syntax.
+#
+# The pinned revisions are the latest of this writing, update freely.
 
 set -ex
 
