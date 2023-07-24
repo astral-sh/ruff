@@ -106,16 +106,35 @@ except RuntimeError:
     raise
 
 try:
-    def f2():
+    def f():
         pass
         # a
 except:
-    def f2():
+    def f():
         pass
         # b
+else:
+    def f():
+        pass
+        # c
+finally:
+    def f():
+        pass
+        # d
 
 try: pass # a
 except ZeroDivisionError: pass # b
-except: pass # b
+except: pass # c
 else: pass # d
-finally: pass # c
+finally: pass # e
+
+try:  # 1 preceding: any, following: first in body, enclosing: try
+    print(1)  # 2 preceding: last in body, following: fist in alt body, enclosing: try
+except ZeroDivisionError:  # 3 preceding: test, following: fist in alt body, enclosing: try
+    print(2)  # 4 preceding: last in body, following: fist in alt body, enclosing: exc
+except:  # 5 preceding: last in body, following: fist in alt body, enclosing: try
+    print(2)  # 6 preceding: last in body, following: fist in alt body, enclosing: exc
+else:  # 7 preceding: last in body, following: fist in alt body, enclosing: exc
+    print(3)  # 8 preceding: last in body, following: fist in alt body, enclosing: try
+finally:  # 9 preceding: last in body, following: fist in alt body, enclosing: try
+    print(3)  # 10 preceding: last in body, following: any, enclosing: try
