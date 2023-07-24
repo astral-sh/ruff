@@ -113,3 +113,9 @@ except:
     def f2():
         pass
         # b
+
+try: pass # a
+except ZeroDivisionError: pass # b
+except: pass # b
+else: pass # d
+finally: pass # c

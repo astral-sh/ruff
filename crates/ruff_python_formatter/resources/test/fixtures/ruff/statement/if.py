@@ -95,3 +95,7 @@ else:
     def f2():
         pass
         # 2
+
+if True: print("a") # 1
+elif True: print("b") # 2
+else: print("c") # 3
