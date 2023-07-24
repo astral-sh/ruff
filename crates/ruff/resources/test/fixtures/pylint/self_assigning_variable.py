@@ -34,3 +34,8 @@ foo, bar = bar, 1
 bar, foo = foo, 1
 foo: int = bar
 bar: int = 1
+
+
+class Foo:
+    foo = foo
+    bar = bar

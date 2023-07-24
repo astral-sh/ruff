@@ -36,30 +36,39 @@ impl Violation for SelfAssigningVariable {
 
 /// PLW0127
 pub(crate) fn self_assigning_variable(checker: &mut Checker, targets: &[Expr], value: &Expr) {
+    // Assignments in class bodies are attributes (e.g., `x = x` assigns `x` to `self.x`, and thus
+    // is not a self-assignment).
+    if checker.semantic().scope().kind.is_class() {
+        return;
+    }
+
     let [target] = targets else {
         return;
     };
-    match (target, value) {
-        (
-            Expr::Tuple(ast::ExprTuple { elts: lhs_elts, .. }),
-            Expr::Tuple(ast::ExprTuple { elts: rhs_elts, .. }),
-        ) if lhs_elts.len() == rhs_elts.len() => {
-            lhs_elts
+
+    fn inner(left: &Expr, right: &Expr, diagnostics: &mut Vec<Diagnostic>) {
+        match (left, right) {
+            (
+                Expr::Tuple(ast::ExprTuple { elts: lhs_elts, .. }),
+                Expr::Tuple(ast::ExprTuple { elts: rhs_elts, .. }),
+            ) if lhs_elts.len() == rhs_elts.len() => lhs_elts
                 .iter()
                 .zip(rhs_elts.iter())
-                .for_each(|(lhs, rhs)| self_assigning_variable(checker, &[lhs.clone()], rhs));
+                .for_each(|(lhs, rhs)| inner(lhs, rhs, diagnostics)),
+            (
+                Expr::Name(ast::ExprName { id: lhs_name, .. }),
+                Expr::Name(ast::ExprName { id: rhs_name, .. }),
+            ) if lhs_name == rhs_name => {
+                diagnostics.push(Diagnostic::new(
+                    SelfAssigningVariable {
+                        name: lhs_name.to_string(),
+                    },
+                    left.range(),
+                ));
+            }
+            _ => {}
         }
-        (
-            Expr::Name(ast::ExprName { id: lhs_name, .. }),
-            Expr::Name(ast::ExprName { id: rhs_name, .. }),
-        ) if lhs_name == rhs_name => {
-            checker.diagnostics.push(Diagnostic::new(
-                SelfAssigningVariable {
-                    name: lhs_name.to_string(),
-                },
-                target.range(),
-            ));
-        }
-        _ => {}
     }
+
+    inner(target, value, &mut checker.diagnostics);
 }
