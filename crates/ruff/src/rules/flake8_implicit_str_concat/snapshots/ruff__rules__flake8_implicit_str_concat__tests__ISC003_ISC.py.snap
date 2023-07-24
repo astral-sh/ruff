@@ -1,44 +1,34 @@
 ---
 source: crates/ruff/src/rules/flake8_implicit_str_concat/mod.rs
 ---
-ISC.py:3:5: ISC003 Explicitly concatenated string should be implicitly concatenated
+ISC.py:7:3: ISC003 Explicitly concatenated string should be implicitly concatenated
   |
-1 | _ = "a" "b" "c"
-2 | 
-3 | _ = "abc" + "def"
-  |     ^^^^^^^^^^^^^ ISC003
-4 | 
-5 | _ = "abc" \
+6 |   _ = (
+7 |     "abc" +
+  |  ___^
+8 | |   "def"
+  | |_______^ ISC003
+9 |   )
   |
 
-ISC.py:9:3: ISC003 Explicitly concatenated string should be implicitly concatenated
+ISC.py:12:3: ISC003 Explicitly concatenated string should be implicitly concatenated
    |
- 8 |   _ = (
- 9 |     "abc" +
+11 |   _ = (
+12 |     f"abc" +
    |  ___^
-10 | |   "def"
+13 | |   "def"
    | |_______^ ISC003
-11 |   )
+14 |   )
    |
 
-ISC.py:14:3: ISC003 Explicitly concatenated string should be implicitly concatenated
+ISC.py:17:3: ISC003 Explicitly concatenated string should be implicitly concatenated
    |
-13 |   _ = (
-14 |     f"abc" +
+16 |   _ = (
+17 |     b"abc" +
    |  ___^
-15 | |   "def"
-   | |_______^ ISC003
-16 |   )
-   |
-
-ISC.py:19:3: ISC003 Explicitly concatenated string should be implicitly concatenated
-   |
-18 |   _ = (
-19 |     b"abc" +
-   |  ___^
-20 | |   b"def"
+18 | |   b"def"
    | |________^ ISC003
-21 |   )
+19 |   )
    |
 
 

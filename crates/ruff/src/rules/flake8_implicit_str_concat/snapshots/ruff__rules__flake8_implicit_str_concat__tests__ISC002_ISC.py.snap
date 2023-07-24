@@ -1,16 +1,16 @@
 ---
 source: crates/ruff/src/rules/flake8_implicit_str_concat/mod.rs
 ---
-ISC.py:5:5: ISC002 Implicitly concatenated string literals over multiple lines
+ISC.py:3:5: ISC002 Implicitly concatenated string literals over multiple lines
   |
-3 |   _ = "abc" + "def"
-4 |   
-5 |   _ = "abc" \
+1 |   _ = "a" "b" "c"
+2 |   
+3 |   _ = "abc" \
   |  _____^
-6 | |     "def"
+4 | |     "def"
   | |_________^ ISC002
-7 |   
-8 |   _ = (
+5 |   
+6 |   _ = (
   |
 
 
