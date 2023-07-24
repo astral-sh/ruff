@@ -91,8 +91,8 @@ fn handle_match_comment<'a>(
 
     let comment_indentation =
         whitespace::indentation_at_offset(locator, comment.slice().range().start())
-            .map(str::len)
-            .unwrap_or_default();
+            .unwrap_or_default()
+            .len();
     let match_case_indentation = whitespace::indentation(locator, match_case).unwrap().len();
 
     if let Some(next_case) = next_case {
@@ -176,8 +176,8 @@ fn handle_in_between_except_handlers_or_except_handler_and_else_or_finally_comme
     // the following `finally` or indeed a trailing comment of the previous body's last statement.
     let comment_indentation =
         whitespace::indentation_at_offset(locator, comment.slice().range().start())
-            .map(str::len)
-            .unwrap_or_default();
+            .unwrap_or_default()
+            .len();
 
     let Some(except_indentation) =
         whitespace::indentation(locator, preceding_except_handler).map(str::len)
@@ -271,8 +271,8 @@ fn handle_in_between_bodies_own_line_comment<'a>(
     // the following `elif` or indeed a trailing comment of the previous body's last statement.
     let comment_indentation =
         whitespace::indentation_at_offset(locator, comment.slice().range().start())
-            .map(str::len)
-            .unwrap_or_default();
+            .unwrap_or_default()
+            .len();
 
     let Some(preceding_indentation) = whitespace::indentation(locator, &preceding).map(str::len)
     else {
@@ -447,8 +447,8 @@ fn own_line_comment_after_branch<'a>(
     // the indent-level doesn't depend on the tab width (the indent level must be the same if the tab width is 1 or 8).
     let comment_indentation =
         whitespace::indentation_at_offset(locator, comment.slice().range().start())
-            .map(str::len)
-            .unwrap_or_default();
+            .unwrap_or_default()
+            .len();
 
     // Keep the comment on the entire statement in case it's a trailing comment
     // ```python
@@ -461,7 +461,8 @@ fn own_line_comment_after_branch<'a>(
     // Here we keep the comment a trailing comment of the `if`
     let preceding_node_indentation =
         whitespace::indentation_at_offset(locator, preceding_node.start())
-            .map_or(usize::MAX, str::len);
+            .unwrap_or_default()
+            .len();
     if comment_indentation == preceding_node_indentation {
         return CommentPlacement::Default(comment);
     }
