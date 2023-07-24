@@ -2,6 +2,14 @@ name: Benchmark
 
 on:
   pull_request:
+    paths:
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain'
+      - 'crates/**'
+      - '!crates/ruff_dev'
+      - '!crates/ruff_shrinking'
+
   workflow_dispatch:
 
 concurrency:

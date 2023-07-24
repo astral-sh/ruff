@@ -7,7 +7,7 @@ use ruff_python_ast::source_code::Locator;
 
 use crate::context::ExecutionContext;
 use crate::scope::ScopeId;
-use crate::Exceptions;
+use crate::{Exceptions, SemanticModelFlags};
 
 /// A resolved read reference to a name in a program.
 #[derive(Debug, Clone)]
@@ -16,21 +16,28 @@ pub struct ResolvedReference {
     scope_id: ScopeId,
     /// The range of the reference in the source code.
     range: TextRange,
-    /// The context in which the reference occurs.
-    context: ExecutionContext,
+    /// The model state in which the reference occurs.
+    flags: SemanticModelFlags,
 }
 
 impl ResolvedReference {
+    /// The scope in which the reference is defined.
     pub const fn scope_id(&self) -> ScopeId {
         self.scope_id
     }
 
+    /// The range of the reference in the source code.
     pub const fn range(&self) -> TextRange {
         self.range
     }
 
+    /// The [`ExecutionContext`] of the reference.
     pub const fn context(&self) -> ExecutionContext {
-        self.context
+        if self.flags.intersects(SemanticModelFlags::TYPING_CONTEXT) {
+            ExecutionContext::Typing
+        } else {
+            ExecutionContext::Runtime
+        }
     }
 }
 
@@ -48,12 +55,12 @@ impl ResolvedReferences {
         &mut self,
         scope_id: ScopeId,
         range: TextRange,
-        context: ExecutionContext,
+        flags: SemanticModelFlags,
     ) -> ResolvedReferenceId {
         self.0.push(ResolvedReference {
             scope_id,
             range,
-            context,
+            flags,
         })
     }
 }
@@ -78,28 +85,40 @@ pub struct UnresolvedReference {
 }
 
 impl UnresolvedReference {
+    /// Returns the name of the reference.
+    pub fn name<'a>(&self, locator: &Locator<'a>) -> &'a str {
+        locator.slice(self.range)
+    }
+
+    /// The range of the reference in the source code.
     pub const fn range(&self) -> TextRange {
         self.range
     }
 
+    /// The set of exceptions that were handled when resolution was attempted.
     pub const fn exceptions(&self) -> Exceptions {
         self.exceptions
     }
 
-    pub const fn wildcard_import(&self) -> bool {
+    /// Returns `true` if the unresolved reference may be resolved by a wildcard import.
+    pub const fn is_wildcard_import(&self) -> bool {
         self.flags
             .contains(UnresolvedReferenceFlags::WILDCARD_IMPORT)
-    }
-
-    pub fn name<'a>(&self, locator: &Locator<'a>) -> &'a str {
-        locator.slice(self.range)
     }
 }
 
 bitflags! {
     #[derive(Copy, Clone, Debug)]
     pub struct UnresolvedReferenceFlags: u8 {
-        /// The unresolved reference appeared in a context that includes a wildcard import.
+        /// The unresolved reference may be resolved by a wildcard import.
+        ///
+        /// For example, the reference `x` in the following code may be resolved by the wildcard
+        /// import of `module`:
+        /// ```python
+        /// from module import *
+        ///
+        /// print(x)
+        /// ```
         const WILDCARD_IMPORT = 1 << 0;
     }
 }

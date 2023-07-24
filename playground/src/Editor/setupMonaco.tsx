@@ -596,6 +596,7 @@ function defineRustPythonAstLanguage(monaco: Monaco) {
       ],
       string: [
         [/[^\\"]+/, "string"],
+        [/\\[\\"]/, "string.escape"],
         [/"/, { token: "string.quote", bracket: "@close", next: "@pop" }],
       ],
     },
@@ -650,6 +651,7 @@ function defineRustPythonTokensLanguage(monaco: Monaco) {
       ],
       string: [
         [/[^\\"]+/, "string"],
+        [/\\[\\"]/, "string.escape"],
         [/"/, { token: "string.quote", bracket: "@close", next: "@pop" }],
       ],
     },
@@ -695,6 +697,7 @@ function defineFirLanguage(monaco: Monaco) {
       ],
       string: [
         [/[^\\"]+/, "string"],
+        [/\\[\\"]/, "string.escape"],
         [/"/, { token: "string.quote", bracket: "@close", next: "@pop" }],
       ],
     },

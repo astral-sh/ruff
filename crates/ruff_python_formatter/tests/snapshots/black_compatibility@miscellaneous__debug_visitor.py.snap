@@ -56,8 +56,7 @@ class DebugVisitor(Visitor[T]):
 +            out(f"NOT_YET_IMPLEMENTED_ExprJoinedStr", fg="yellow")
              self.tree_depth += 1
              for child in node.children:
--                yield from self.visit(child)
-+                NOT_YET_IMPLEMENTED_ExprYieldFrom
+                 yield from self.visit(child)
  
              self.tree_depth -= 1
 -            out(f'{indent}/{_type}', fg='yellow', bold=False)
@@ -97,7 +96,7 @@ class DebugVisitor(Visitor[T]):
             out(f"NOT_YET_IMPLEMENTED_ExprJoinedStr", fg="yellow")
             self.tree_depth += 1
             for child in node.children:
-                NOT_YET_IMPLEMENTED_ExprYieldFrom
+                yield from self.visit(child)
 
             self.tree_depth -= 1
             out(f"NOT_YET_IMPLEMENTED_ExprJoinedStr", fg="yellow", bold=False)

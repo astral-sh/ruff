@@ -121,9 +121,9 @@ pub(crate) fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, name
                 unused_imports.iter().map(String::as_str),
                 stmt,
                 parent,
-                checker.locator,
-                checker.stylist,
-                checker.indexer,
+                checker.locator(),
+                checker.stylist(),
+                checker.indexer(),
             )?;
             Ok(Fix::suggested(edit).isolate(checker.isolation(parent)))
         });

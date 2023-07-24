@@ -75,3 +75,14 @@
     ) in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension  # Trailing
 }  # Trailing
 # Trailing
+
+
+# Regression tests for https://github.com/astral-sh/ruff/issues/5911
+selected_choices = {
+    k: str(v) for v in value if str(v) not in self.choices.field.empty_values
+}
+
+selected_choices = {
+    k: str(v)
+    for vvvvvvvvvvvvvvvvvvvvvvv in value if str(v) not in self.choices.field.empty_values
+}

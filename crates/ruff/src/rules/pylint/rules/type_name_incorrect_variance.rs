@@ -4,7 +4,7 @@ use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::is_const_true;
+use ruff_python_ast::helpers::{find_keyword, is_const_true};
 
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::type_param_name;
@@ -79,25 +79,9 @@ pub(crate) fn type_name_incorrect_variance(checker: &mut Checker, value: &Expr) 
         return;
     };
 
-    let covariant = keywords
-        .iter()
-        .find(|keyword| {
-            keyword
-                .arg
-                .as_ref()
-                .map_or(false, |keyword| keyword.as_str() == "covariant")
-        })
-        .map(|keyword| &keyword.value);
+    let covariant = find_keyword(keywords, "covariant").map(|keyword| &keyword.value);
 
-    let contravariant = keywords
-        .iter()
-        .find(|keyword| {
-            keyword
-                .arg
-                .as_ref()
-                .map_or(false, |keyword| keyword.as_str() == "contravariant")
-        })
-        .map(|keyword| &keyword.value);
+    let contravariant = find_keyword(keywords, "contravariant").map(|keyword| &keyword.value);
 
     if !mismatch(param_name, covariant, contravariant) {
         return;
@@ -130,7 +114,7 @@ pub(crate) fn type_name_incorrect_variance(checker: &mut Checker, value: &Expr) 
         .trim_end_matches("_co")
         .trim_end_matches("_contra");
     let replacement_name: String = match variance {
-        VarVariance::Bivariance => return, // Bivariate type are invalid, so ignore them for this rule.
+        VarVariance::Bivariance => return, // Bivariate types are invalid, so ignore them for this rule.
         VarVariance::Covariance => format!("{name_root}_co"),
         VarVariance::Contravariance => format!("{name_root}_contra"),
         VarVariance::Invariance => name_root.to_string(),

@@ -37,6 +37,7 @@ use ruff_python_ast::statement_visitor::{walk_body, walk_stmt, StatementVisitor}
 use ruff_python_ast::visitor::{walk_expr, Visitor};
 use rustpython_ast::text_size::TextRange;
 use rustpython_ast::{Expr, Ranged, Stmt, Suite};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 use std::str;
@@ -47,9 +48,10 @@ const STRATEGIES: &[&dyn Strategy] = &[
     (&StrategyRemoveModuleMember),
     (&StrategyRemoveStatement),
     (&StrategyRemoveExpression),
-    (&StrategyReplaceStatementWithPass),
     (&StrategyRemoveLine),
     (&StrategyRemoveNewline),
+    (&StrategyRemoveToken),
+    (&StrategyRemoveChar),
 ];
 
 /// Each strategy is a way of producing possible minimizations
@@ -160,22 +162,6 @@ impl Strategy for StrategyRemoveStatement {
     }
 }
 
-/// A body is invalid without any statements, but maybe replacing it with a pass works.
-struct StrategyReplaceStatementWithPass;
-
-impl Strategy for StrategyReplaceStatementWithPass {
-    fn name(&self) -> &'static str {
-        "replace statement with pass"
-    }
-    fn candidates<'a>(
-        &self,
-        input: &'a str,
-        ast: &'a Suite,
-    ) -> Result<Box<dyn ExactSizeStringIter + 'a>> {
-        Ok(strategy_statement(input, ast, true))
-    }
-}
-
 /// Finds the ranges of all expressions.
 #[derive(Default)]
 struct ExpressionCollector {
@@ -269,8 +255,58 @@ impl Strategy for StrategyRemoveNewline {
             .collect();
         let iter = newline_positions.into_iter().map(move |newline_position| {
             // trim to remove the indentation
-            input[..newline_position].to_string() + input[newline_position + 1..].trim_start()
+            input[..newline_position].to_string()
+                + input[newline_position + '\n'.len_utf8()..].trim_start()
         });
+        Ok(Box::new(iter))
+    }
+}
+
+/// Try removing each python token. This is really slow and runs at the end
+struct StrategyRemoveToken;
+
+impl Strategy for StrategyRemoveToken {
+    fn name(&self) -> &'static str {
+        "remove token"
+    }
+
+    fn candidates<'a>(
+        &self,
+        input: &'a str,
+        _ast: &'a Suite,
+    ) -> Result<Box<dyn ExactSizeStringIter + 'a>> {
+        let token_ranges: Vec<_> = ruff_rustpython::tokenize(input)
+            .into_iter()
+            // At this point we know we have valid python code
+            .map(Result::unwrap)
+            .filter(|token| token.1.len().to_usize() > 0)
+            .map(|token| token.1)
+            .collect();
+
+        let iter = token_ranges.into_iter().map(move |range| {
+            input[..range.start().to_usize()].to_string() + &input[range.end().to_usize()..]
+        });
+        Ok(Box::new(iter))
+    }
+}
+
+/// Try removing each individual character in the file. This is really slow and runs at the end
+struct StrategyRemoveChar;
+
+impl Strategy for StrategyRemoveChar {
+    fn name(&self) -> &'static str {
+        "remove character"
+    }
+
+    fn candidates<'a>(
+        &self,
+        input: &'a str,
+        _ast: &'a Suite,
+    ) -> Result<Box<dyn ExactSizeStringIter + 'a>> {
+        let char_indices: Vec<_> = input.char_indices().collect();
+        let iter = char_indices
+            .into_iter()
+            .map(move |(pos, char)| input[..pos].to_string() + &input[pos + char.len_utf8()..]);
         Ok(Box::new(iter))
     }
 }
@@ -384,10 +420,20 @@ fn run() -> Result<()> {
     let command_args = shlex::split(&args.command).context("Couldn't split command input")?;
 
     let loop_start = Instant::now();
+    let mut stats = HashMap::new();
+
+    // Normalize line endings for the remove newline dependent rules
+    let mut input = fs::read_to_string(args.input_file)?.replace('\r', "");
+
+    // This can happen e.g. when main changed between collecting the errors list and running this
+    // script
+    if !is_failing(&input, &args.output_file, &command_args, &pattern)? {
+        println!("Input doesn't match");
+        fs::write(&args.output_file, "")?;
+        return Ok(());
+    }
 
     let mut num_iterations = 0;
-    // normalize line endings for the remove newline dependent rules
-    let mut input = fs::read_to_string(args.input_file)?.replace('\r', "");
     let mut last_strategy_and_idx = None;
     loop {
         let start = Instant::now();
@@ -402,24 +448,32 @@ fn run() -> Result<()> {
         let duration = start.elapsed();
         if let Some((strategy, idx, smaller_failure)) = smaller_failure {
             println!(
-                "Match found with {} {idx} in {:.1}s, {} bytes remaining",
+                "Match found with {} {idx} in {:.2}s, {} bytes remaining",
                 strategy.name(),
                 duration.as_secs_f32(),
                 smaller_failure.len()
             );
+            *stats.entry(strategy.name()).or_insert(0) += 1;
             input = smaller_failure;
             last_strategy_and_idx = Some((strategy, idx));
         } else {
             // The last minimization failed, write back the original content
             fs::write(&args.output_file, input.as_bytes())?;
+            println!(
+                "Last iteration in {:.2}s, {} bytes remaining",
+                duration.as_secs_f32(),
+                input.as_bytes().len()
+            );
             break;
         }
     }
 
+    println!("Strategies taken: {stats:?}");
     println!(
-        "Done with {num_iterations} iterations in {:.1}s. Find your minimized example in {}",
+        "Done with {num_iterations} iterations in {:.2}s. Find your minimized example in {}:\n---\n{}\n---\n",
         loop_start.elapsed().as_secs_f32(),
-        args.output_file.display()
+        args.output_file.display(),
+        input
     );
 
     Ok(())
@@ -429,7 +483,7 @@ fn main() -> ExitCode {
     if let Err(e) = run() {
         eprintln!("💥 Minimizer failed");
         for cause in e.chain() {
-            eprintln!("  Caused by: {cause}");
+            eprintln!("  Cause: {cause}");
         }
         ExitCode::FAILURE
     } else {

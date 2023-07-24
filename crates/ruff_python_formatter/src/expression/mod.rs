@@ -42,6 +42,7 @@ pub(crate) mod expr_tuple;
 pub(crate) mod expr_unary_op;
 pub(crate) mod expr_yield;
 pub(crate) mod expr_yield_from;
+pub(crate) mod number;
 pub(crate) mod parentheses;
 pub(crate) mod string;
 

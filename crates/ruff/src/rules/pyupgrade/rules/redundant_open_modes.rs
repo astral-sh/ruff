@@ -82,7 +82,7 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
                                 expr,
                                 &keyword.value,
                                 mode.replacement_value(),
-                                checker.locator,
+                                checker.locator(),
                                 checker.patch(Rule::RedundantOpenModes),
                             ));
                         }
@@ -101,7 +101,7 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
                         expr,
                         mode_param,
                         mode.replacement_value(),
-                        checker.locator,
+                        checker.locator(),
                         checker.patch(Rule::RedundantOpenModes),
                     ));
                 }

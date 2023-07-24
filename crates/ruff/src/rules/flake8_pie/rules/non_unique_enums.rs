@@ -53,13 +53,7 @@ impl Violation for NonUniqueEnums {
 }
 
 /// PIE796
-pub(crate) fn non_unique_enums<'a, 'b>(
-    checker: &mut Checker<'a>,
-    parent: &'b Stmt,
-    body: &'b [Stmt],
-) where
-    'b: 'a,
-{
+pub(crate) fn non_unique_enums(checker: &mut Checker, parent: &Stmt, body: &[Stmt]) {
     let Stmt::ClassDef(ast::StmtClassDef { bases, .. }) = parent else {
         return;
     };

@@ -7,7 +7,7 @@ use rustpython_parser::ast::{
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::is_dunder;
+use ruff_python_ast::helpers::{find_keyword, is_dunder};
 use ruff_python_ast::source_code::Generator;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::identifiers::is_identifier;
@@ -200,19 +200,6 @@ fn properties_from_keywords(keywords: &[Keyword]) -> Result<Vec<Stmt>> {
         .collect()
 }
 
-// The only way to have the `total` keyword is to use the args version, like:
-// ```
-// TypedDict('name', {'a': int}, total=True)
-// ```
-fn match_total_from_only_keyword(keywords: &[Keyword]) -> Option<&Keyword> {
-    keywords.iter().find(|keyword| {
-        let Some(arg) = &keyword.arg else {
-            return false;
-        };
-        arg.as_str() == "total"
-    })
-}
-
 fn match_properties_and_total<'a>(
     args: &'a [Expr],
     keywords: &'a [Keyword],
@@ -223,7 +210,7 @@ fn match_properties_and_total<'a>(
     // MyType = TypedDict('MyType', {'a': int, 'b': str}, a=int, b=str)
     // ```
     if let Some(dict) = args.get(1) {
-        let total = match_total_from_only_keyword(keywords);
+        let total = find_keyword(keywords, "total");
         match dict {
             Expr::Dict(ast::ExprDict {
                 keys,
@@ -294,7 +281,7 @@ pub(crate) fn convert_typed_dict_functional_to_class(
     );
     if checker.patch(diagnostic.kind.rule()) {
         // TODO(charlie): Preserve indentation, to remove the first-column requirement.
-        if checker.locator.is_at_start_of_line(stmt.start()) {
+        if checker.locator().is_at_start_of_line(stmt.start()) {
             diagnostic.set_fix(convert_to_class(
                 stmt,
                 class_name,

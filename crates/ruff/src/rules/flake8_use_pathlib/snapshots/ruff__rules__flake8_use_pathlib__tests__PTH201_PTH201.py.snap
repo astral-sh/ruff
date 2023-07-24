@@ -1,0 +1,65 @@
+---
+source: crates/ruff/src/rules/flake8_use_pathlib/mod.rs
+---
+PTH201.py:5:10: PTH201 [*] Do not pass the current directory explicitly to `Path`
+  |
+4 | # match
+5 | _ = Path(".")
+  |          ^^^ PTH201
+6 | _ = pth(".")
+7 | _ = PurePath(".")
+  |
+  = help: Remove the current directory argument
+
+ℹ Fix
+2 2 | from pathlib import Path as pth
+3 3 | 
+4 4 | # match
+5   |-_ = Path(".")
+  5 |+_ = Path()
+6 6 | _ = pth(".")
+7 7 | _ = PurePath(".")
+8 8 | 
+
+PTH201.py:6:9: PTH201 [*] Do not pass the current directory explicitly to `Path`
+  |
+4 | # match
+5 | _ = Path(".")
+6 | _ = pth(".")
+  |         ^^^ PTH201
+7 | _ = PurePath(".")
+  |
+  = help: Remove the current directory argument
+
+ℹ Fix
+3 3 | 
+4 4 | # match
+5 5 | _ = Path(".")
+6   |-_ = pth(".")
+  6 |+_ = pth()
+7 7 | _ = PurePath(".")
+8 8 | 
+9 9 | # no match
+
+PTH201.py:7:14: PTH201 [*] Do not pass the current directory explicitly to `Path`
+  |
+5 | _ = Path(".")
+6 | _ = pth(".")
+7 | _ = PurePath(".")
+  |              ^^^ PTH201
+8 | 
+9 | # no match
+  |
+  = help: Remove the current directory argument
+
+ℹ Fix
+4 4 | # match
+5 5 | _ = Path(".")
+6 6 | _ = pth(".")
+7   |-_ = PurePath(".")
+  7 |+_ = PurePath()
+8 8 | 
+9 9 | # no match
+10 10 | _ = Path()
+
+

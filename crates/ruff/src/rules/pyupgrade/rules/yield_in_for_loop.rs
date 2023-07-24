@@ -187,7 +187,7 @@ pub(crate) fn yield_in_for_loop(checker: &mut Checker, stmt: &Stmt) {
 
             let mut diagnostic = Diagnostic::new(YieldInForLoop, item.stmt.range());
             if checker.patch(diagnostic.kind.rule()) {
-                let contents = checker.locator.slice(item.iter.range());
+                let contents = checker.locator().slice(item.iter.range());
                 let contents = format!("yield from {contents}");
                 diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                     contents,

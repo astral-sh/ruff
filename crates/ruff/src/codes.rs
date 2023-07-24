@@ -172,10 +172,10 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "C0131") => (RuleGroup::Unspecified, rules::pylint::rules::TypeBivariance),
         (Pylint, "C0132") => (RuleGroup::Unspecified, rules::pylint::rules::TypeParamNameMismatch),
         (Pylint, "C0205") => (RuleGroup::Unspecified, rules::pylint::rules::SingleStringSlots),
+        (Pylint, "C0208") => (RuleGroup::Unspecified, rules::pylint::rules::IterationOverSet),
         (Pylint, "C0414") => (RuleGroup::Unspecified, rules::pylint::rules::UselessImportAlias),
         (Pylint, "C1901") => (RuleGroup::Nursery, rules::pylint::rules::CompareToEmptyString),
         (Pylint, "C3002") => (RuleGroup::Unspecified, rules::pylint::rules::UnnecessaryDirectLambdaCall),
-        (Pylint, "C0208") => (RuleGroup::Unspecified, rules::pylint::rules::IterationOverSet),
         (Pylint, "E0100") => (RuleGroup::Unspecified, rules::pylint::rules::YieldInInit),
         (Pylint, "E0101") => (RuleGroup::Unspecified, rules::pylint::rules::ReturnInInit),
         (Pylint, "E0116") => (RuleGroup::Unspecified, rules::pylint::rules::ContinueInFinally),
@@ -214,6 +214,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "R2004") => (RuleGroup::Unspecified, rules::pylint::rules::MagicValueComparison),
         (Pylint, "R5501") => (RuleGroup::Unspecified, rules::pylint::rules::CollapsibleElseIf),
         (Pylint, "W0120") => (RuleGroup::Unspecified, rules::pylint::rules::UselessElseOnLoop),
+        (Pylint, "W0127") => (RuleGroup::Unspecified, rules::pylint::rules::SelfAssigningVariable),
         (Pylint, "W0129") => (RuleGroup::Unspecified, rules::pylint::rules::AssertOnStringLiteral),
         (Pylint, "W0131") => (RuleGroup::Unspecified, rules::pylint::rules::NamedExprWithoutContext),
         (Pylint, "W0406") => (RuleGroup::Unspecified, rules::pylint::rules::ImportSelf),
@@ -221,6 +222,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "W0603") => (RuleGroup::Unspecified, rules::pylint::rules::GlobalStatement),
         (Pylint, "W0711") => (RuleGroup::Unspecified, rules::pylint::rules::BinaryOpException),
         (Pylint, "W1508") => (RuleGroup::Unspecified, rules::pylint::rules::InvalidEnvvarDefault),
+        (Pylint, "W1509") => (RuleGroup::Unspecified, rules::pylint::rules::SubprocessPopenPreexecFn),
         (Pylint, "W2901") => (RuleGroup::Unspecified, rules::pylint::rules::RedefinedLoopName),
         (Pylint, "W3301") => (RuleGroup::Unspecified, rules::pylint::rules::NestedMinMax),
 
@@ -235,7 +237,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Builtins, "003") => (RuleGroup::Unspecified, rules::flake8_builtins::rules::BuiltinAttributeShadowing),
 
         // flake8-bugbear
-        (Flake8Bugbear, "002") => (RuleGroup::Unspecified, rules::flake8_bugbear::rules::UnaryPrefixIncrement),
+        (Flake8Bugbear, "002") => (RuleGroup::Unspecified, rules::flake8_bugbear::rules::UnaryPrefixIncrementDecrement),
         (Flake8Bugbear, "003") => (RuleGroup::Unspecified, rules::flake8_bugbear::rules::AssignmentToOsEnviron),
         (Flake8Bugbear, "004") => (RuleGroup::Unspecified, rules::flake8_bugbear::rules::UnreliableCallableCheck),
         (Flake8Bugbear, "005") => (RuleGroup::Unspecified, rules::flake8_bugbear::rules::StripWithMultiCharacters),
@@ -629,10 +631,12 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "014") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::ArgumentDefaultInStub),
         (Flake8Pyi, "015") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::AssignmentDefaultInStub),
         (Flake8Pyi, "016") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::DuplicateUnionMember),
+        (Flake8Pyi, "017") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::ComplexAssignmentInStub),
         (Flake8Pyi, "020") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::QuotedAnnotationInStub),
         (Flake8Pyi, "021") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::DocstringInStub),
         (Flake8Pyi, "024") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::CollectionsNamedTuple),
         (Flake8Pyi, "025") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::UnaliasedCollectionsAbcSetImport),
+        (Flake8Pyi, "026") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::TypeAliasWithoutAnnotation),
         (Flake8Pyi, "029") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::StrOrReprDefinedInStub),
         (Flake8Pyi, "030") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::UnnecessaryLiteralUnion),
         (Flake8Pyi, "032") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::AnyEqNeAnnotation),
@@ -650,6 +654,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "052") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::UnannotatedAssignmentInStub),
         (Flake8Pyi, "054") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::NumericLiteralTooLong),
         (Flake8Pyi, "053") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::StringOrBytesTooLong),
+        (Flake8Pyi, "056") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::UnsupportedMethodCallOnAll),
 
         // flake8-pytest-style
         (Flake8PytestStyle, "001") => (RuleGroup::Unspecified, rules::flake8_pytest_style::rules::PytestFixtureIncorrectParenthesesStyle),
@@ -747,6 +752,13 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8UsePathlib, "122") => (RuleGroup::Unspecified, rules::flake8_use_pathlib::violations::OsPathSplitext),
         (Flake8UsePathlib, "123") => (RuleGroup::Unspecified, rules::flake8_use_pathlib::violations::BuiltinOpen),
         (Flake8UsePathlib, "124") => (RuleGroup::Unspecified, rules::flake8_use_pathlib::violations::PyPath),
+        (Flake8UsePathlib, "201") => (RuleGroup::Unspecified, rules::flake8_use_pathlib::rules::PathConstructorCurrentDirectory),
+        (Flake8UsePathlib, "202") => (RuleGroup::Unspecified, rules::flake8_use_pathlib::rules::OsPathGetsize),
+        (Flake8UsePathlib, "202") => (RuleGroup::Unspecified, rules::flake8_use_pathlib::rules::OsPathGetsize),
+        (Flake8UsePathlib, "203") => (RuleGroup::Unspecified, rules::flake8_use_pathlib::rules::OsPathGetatime),
+        (Flake8UsePathlib, "204") => (RuleGroup::Unspecified, rules::flake8_use_pathlib::rules::OsPathGetmtime),
+        (Flake8UsePathlib, "205") => (RuleGroup::Unspecified, rules::flake8_use_pathlib::rules::OsPathGetctime),
+        (Flake8UsePathlib, "206") => (RuleGroup::Unspecified, rules::flake8_use_pathlib::rules::OsSepSplit),
 
         // flake8-logging-format
         (Flake8LoggingFormat, "001") => (RuleGroup::Unspecified, rules::flake8_logging_format::violations::LoggingStringFormat),

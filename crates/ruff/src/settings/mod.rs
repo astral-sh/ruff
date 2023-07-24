@@ -101,9 +101,10 @@ pub struct Settings {
     pub external: FxHashSet<String>,
     pub ignore_init_module_imports: bool,
     pub line_length: LineLength,
-    pub tab_size: TabSize,
+    pub logger_objects: Vec<String>,
     pub namespace_packages: Vec<PathBuf>,
     pub src: Vec<PathBuf>,
+    pub tab_size: TabSize,
     pub task_tags: Vec<String>,
     pub typing_modules: Vec<String>,
     // Plugins
@@ -189,6 +190,7 @@ impl Settings {
                     .map(ToString::to_string)
                     .collect()
             }),
+            logger_objects: config.logger_objects.unwrap_or_default(),
             typing_modules: config.typing_modules.unwrap_or_default(),
             // Plugins
             flake8_annotations: config
@@ -293,7 +295,6 @@ impl Settings {
         })
     }
 
-    #[cfg(test)]
     pub fn for_rule(rule_code: Rule) -> Self {
         Self {
             rules: RuleTable::from_iter([rule_code]),
@@ -301,7 +302,6 @@ impl Settings {
         }
     }
 
-    #[cfg(test)]
     pub fn for_rules(rules: impl IntoIterator<Item = Rule>) -> Self {
         Self {
             rules: RuleTable::from_iter(rules),

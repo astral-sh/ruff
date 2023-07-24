@@ -1,6 +1,6 @@
 [package]
 name = "ruff_cli"
-version = "0.0.278"
+version = "0.0.280"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -64,6 +64,8 @@ wild = { version = "2" }
 
 [dev-dependencies]
 assert_cmd = { version = "2.0.8" }
+insta = { workspace = true, features = ["filters"] }
+tempfile = "3.6.0"
 ureq = { version = "2.6.2", features = [] }
 
 [target.'cfg(target_os = "windows")'.dependencies]

@@ -19,6 +19,39 @@ env:
   PYTHON_VERSION: "3.11" # to build abi3 wheels
 
 jobs:
+  determine_changes:
+    name: "Determine changes"
+    runs-on: ubuntu-latest
+    outputs:
+      linter: ${{ steps.changed.outputs.linter_any_changed }}
+      formatter: ${{ steps.changed.outputs.formatter_any_changed }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - uses: tj-actions/changed-files@v37
+        id: changed
+        with:
+          files_yaml: |
+            linter:
+              - Cargo.toml
+              - Cargo.lock
+              - crates/**
+              - "!crates/ruff_python_formatter/**"
+              - "!crates/ruff_formatter/**"
+              - "!crates/ruff_dev/**"
+              - "!crates/ruff_shrinking/**"
+
+            formatter:
+              - Cargo.toml
+              - Cargo.lock
+              - crates/ruff_python_formatter/**
+              - crates/ruff_formatter/**
+              - crates/ruff_python_trivia/**
+              - crates/ruff_python_ast/**
+
+
   cargo-fmt:
     name: "cargo fmt"
     runs-on: ubuntu-latest
@@ -137,9 +170,11 @@ jobs:
   ecosystem:
     name: "ecosystem"
     runs-on: ubuntu-latest
-    needs: cargo-test
+    needs:
+      - cargo-test
+      - determine_changes
     # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && needs.determine_changes.outputs.linter == 'true'
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
@@ -284,16 +319,23 @@ jobs:
         if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS != 'true' }}
         run: mkdocs build --strict -f mkdocs.generated.yml
 
-  check-formatter-stability:
-    name: "Check formatter stability"
+  check-formatter-ecosystem:
+    name: "Formatter ecosystem and progress checks"
     runs-on: ubuntu-latest
+    needs: determine_changes
+    if: needs.determine_changes.outputs.formatter == 'true'
     steps:
       - uses: actions/checkout@v3
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Cache rust"
         uses: Swatinem/rust-cache@v2
+      - name: "Formatter progress"
+        run: scripts/formatter_progress.sh
+      - name: "Github step summary"
+        run: grep "similarity index" target/progress_projects_report.txt | sort > $GITHUB_STEP_SUMMARY
+      # CPython is not black formatted, so we run only the stability check
       - name: "Clone CPython 3.10"
         run: git clone --branch 3.10 --depth 1 https://github.com/python/cpython.git crates/ruff/resources/test/cpython
-      - name: "Check stability"
+      - name: "Check CPython stability"
         run: cargo run --bin ruff_dev -- format-dev --stability-check crates/ruff/resources/test/cpython

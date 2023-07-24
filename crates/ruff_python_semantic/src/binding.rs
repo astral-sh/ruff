@@ -45,44 +45,44 @@ impl<'a> Binding<'a> {
     /// Return `true` if this [`Binding`] represents an explicit re-export
     /// (e.g., `FastAPI` in `from fastapi import FastAPI as FastAPI`).
     pub const fn is_explicit_export(&self) -> bool {
-        self.flags.contains(BindingFlags::EXPLICIT_EXPORT)
+        self.flags.intersects(BindingFlags::EXPLICIT_EXPORT)
     }
 
     /// Return `true` if this [`Binding`] represents an external symbol
     /// (e.g., `FastAPI` in `from fastapi import FastAPI`).
     pub const fn is_external(&self) -> bool {
-        self.flags.contains(BindingFlags::EXTERNAL)
+        self.flags.intersects(BindingFlags::EXTERNAL)
     }
 
     /// Return `true` if this [`Binding`] represents an aliased symbol
     /// (e.g., `app` in `from fastapi import FastAPI as app`).
     pub const fn is_alias(&self) -> bool {
-        self.flags.contains(BindingFlags::ALIAS)
+        self.flags.intersects(BindingFlags::ALIAS)
     }
 
     /// Return `true` if this [`Binding`] represents a `nonlocal`. A [`Binding`] is a `nonlocal`
     /// if it's declared by a `nonlocal` statement, or shadows a [`Binding`] declared by a
     /// `nonlocal` statement.
     pub const fn is_nonlocal(&self) -> bool {
-        self.flags.contains(BindingFlags::NONLOCAL)
+        self.flags.intersects(BindingFlags::NONLOCAL)
     }
 
     /// Return `true` if this [`Binding`] represents a `global`. A [`Binding`] is a `global` if it's
     /// declared by a `global` statement, or shadows a [`Binding`] declared by a `global` statement.
     pub const fn is_global(&self) -> bool {
-        self.flags.contains(BindingFlags::GLOBAL)
+        self.flags.intersects(BindingFlags::GLOBAL)
     }
 
     /// Return `true` if this [`Binding`] represents an assignment to `__all__` with an invalid
     /// value (e.g., `__all__ = "Foo"`).
     pub const fn is_invalid_all_format(&self) -> bool {
-        self.flags.contains(BindingFlags::INVALID_ALL_FORMAT)
+        self.flags.intersects(BindingFlags::INVALID_ALL_FORMAT)
     }
 
     /// Return `true` if this [`Binding`] represents an assignment to `__all__` that includes an
     /// invalid member (e.g., `__all__ = ["Foo", 1]`).
     pub const fn is_invalid_all_object(&self) -> bool {
-        self.flags.contains(BindingFlags::INVALID_ALL_OBJECT)
+        self.flags.intersects(BindingFlags::INVALID_ALL_OBJECT)
     }
 
     /// Return `true` if this [`Binding`] represents an unbound variable

@@ -376,7 +376,7 @@ impl Violation for MissingReturnTypeClassMethod {
 }
 
 /// ## What it does
-/// Checks that an expression is annotated with a more specific type than
+/// Checks that function arguments are annotated with a more specific type than
 /// `Any`.
 ///
 /// ## Why is this bad?
@@ -399,9 +399,23 @@ impl Violation for MissingReturnTypeClassMethod {
 ///     ...
 /// ```
 ///
+/// ## Known problems
+///
+/// Type aliases are unsupported and can lead to false positives.
+/// For example, the following will trigger this rule inadvertently:
+/// ```python
+/// from typing import Any
+///
+/// MyAny = Any
+///
+///
+/// def foo(x: MyAny):
+///     ...
+/// ```
+///
 /// ## References
 /// - [PEP 484](https://www.python.org/dev/peps/pep-0484/#the-any-type)
-/// - [`typing.Any`](https://docs.python.org/3/library/typing.html#typing.Any)
+/// - [Python documentation: `typing.Any`](https://docs.python.org/3/library/typing.html#typing.Any)
 /// - [Mypy: The Any type](https://mypy.readthedocs.io/en/stable/kinds_of_types.html#the-any-type)
 #[violation]
 pub struct AnyType {
@@ -448,11 +462,12 @@ fn check_dynamically_typed<F>(
     }) = annotation
     {
         // Quoted annotations
-        if let Ok((parsed_annotation, _)) = parse_type_annotation(string, *range, checker.locator) {
+        if let Ok((parsed_annotation, _)) = parse_type_annotation(string, *range, checker.locator())
+        {
             if type_hint_resolves_to_any(
                 &parsed_annotation,
                 checker.semantic(),
-                checker.locator,
+                checker.locator(),
                 checker.settings.target_version.minor(),
             ) {
                 diagnostics.push(Diagnostic::new(
@@ -465,7 +480,7 @@ fn check_dynamically_typed<F>(
         if type_hint_resolves_to_any(
             annotation,
             checker.semantic(),
-            checker.locator,
+            checker.locator(),
             checker.settings.target_version.minor(),
         ) {
             diagnostics.push(Diagnostic::new(
@@ -690,7 +705,7 @@ pub(crate) fn definition(
                     );
                     if checker.patch(diagnostic.kind.rule()) {
                         diagnostic.try_set_fix(|| {
-                            fixes::add_return_annotation(checker.locator, stmt, "None")
+                            fixes::add_return_annotation(checker.locator(), stmt, "None")
                                 .map(Fix::suggested)
                         });
                     }
@@ -708,7 +723,7 @@ pub(crate) fn definition(
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(return_type) = simple_magic_return_type(name) {
                         diagnostic.try_set_fix(|| {
-                            fixes::add_return_annotation(checker.locator, stmt, return_type)
+                            fixes::add_return_annotation(checker.locator(), stmt, return_type)
                                 .map(Fix::suggested)
                         });
                     }

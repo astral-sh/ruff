@@ -1,0 +1,326 @@
+---
+source: crates/ruff_python_trivia/src/tokenizer.rs
+expression: test_case.tokenize_reverse()
+---
+[
+    SimpleToken {
+        kind: Other,
+        range: 79..80,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 78..79,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 77..78,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 76..77,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 75..76,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 74..75,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 73..74,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 72..73,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 71..72,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 70..71,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 69..70,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 68..69,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 67..68,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 66..67,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 65..66,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 64..65,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 63..64,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 62..63,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 61..62,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 60..61,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 59..60,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 58..59,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 57..58,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 56..57,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 55..56,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 54..55,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 53..54,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 52..53,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 51..52,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 50..51,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 49..50,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 48..49,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 47..48,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 46..47,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 45..46,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 44..45,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 43..44,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 42..43,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 41..42,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 40..41,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 39..40,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 38..39,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 37..38,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 36..37,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 35..36,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 34..35,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 33..34,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 32..33,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 31..32,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 30..31,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 29..30,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 28..29,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 27..28,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 26..27,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 25..26,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 24..25,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 23..24,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 22..23,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 21..22,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 20..21,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 19..20,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 18..19,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 17..18,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 16..17,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 15..16,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 14..15,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 13..14,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 12..13,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 11..12,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 10..11,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 9..10,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 8..9,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 7..8,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 6..7,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 5..6,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 4..5,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 3..4,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 2..3,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 1..2,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 0..1,
+    },
+]

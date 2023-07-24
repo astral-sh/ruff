@@ -8,8 +8,7 @@ use ruff_python_ast::node::{AnyNodeRef, AstNode};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::whitespace;
 use ruff_python_trivia::{
-    first_non_trivia_token_rev, PythonWhitespace, SimpleToken, SimpleTokenKind, SimpleTokenizer,
-    UniversalNewlines,
+    PythonWhitespace, SimpleToken, SimpleTokenKind, SimpleTokenizer, UniversalNewlines,
 };
 
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
@@ -747,50 +746,49 @@ fn handle_trailing_end_of_line_condition_comment<'a>(
 
     // If the preceding is the node before the `colon`
     // `while true:` The node before the `colon` is the `true` constant.
-    if preceding.ptr_eq(last_before_colon) {
-        let tokens = SimpleTokenizer::new(
-            locator.contents(),
-            TextRange::new(preceding.end(), following.start()),
-        )
-        .skip_trivia();
+    if !preceding.ptr_eq(last_before_colon) {
+        return CommentPlacement::Default(comment);
+    }
+    let mut colon_token = SimpleTokenizer::new(
+        locator.contents(),
+        TextRange::new(preceding.end(), following.start()),
+    )
+    .skip_trivia()
+    // Skip over any closing parentheses and any trailing comma
+    .skip_while(|token| {
+        token.kind == SimpleTokenKind::RParen || token.kind == SimpleTokenKind::Comma
+    });
 
-        for token in tokens {
-            match token.kind() {
-                SimpleTokenKind::Colon => {
-                    if comment.slice().start() > token.start() {
-                        // Comment comes after the colon
-                        // ```python
-                        // while a: # comment
-                        //      ...
-                        // ```
-                        return CommentPlacement::dangling(enclosing_node, comment);
-                    }
-
-                    // Comment comes before the colon
-                    // ```python
-                    // while (
-                    //  a # comment
-                    // ):
-                    //      ...
-                    // ```
-                    break;
-                }
-                SimpleTokenKind::RParen => {
-                    // Skip over any closing parentheses
-                }
-                SimpleTokenKind::Comma => {
-                    // Skip over any trailing comma
-                }
-                kind => {
-                    unreachable!(
-                        "Only ')' or ':' should follow the condition but encountered {kind:?}"
-                    )
-                }
+    match colon_token.next() {
+        Some(token) if token.kind == SimpleTokenKind::Colon => {
+            if comment.slice().start() > token.start() {
+                // Comment comes after the colon
+                // ```python
+                // while a: # comment
+                //      ...
+                // ```
+                return CommentPlacement::dangling(enclosing_node, comment);
             }
+
+            // Comment comes before the colon
+            // ```python
+            // while (
+            //  a # comment
+            // ):
+            //      ...
+            // ```
+            return CommentPlacement::Default(comment);
+        }
+        Some(token) => {
+            unreachable!(
+                "Only ')' or ':' should follow the condition but encountered {:?}",
+                token.kind
+            )
+        }
+        None => {
+            unreachable!("Expected trailing condition comment to be preceded by a token",)
         }
     }
-
-    CommentPlacement::Default(comment)
 }
 
 /// Handles end of line comments after the `:` of an except clause
@@ -1060,7 +1058,9 @@ fn handle_slice_comments<'a>(
 
     // Check for `foo[ # comment`, but only if they are on the same line
     let after_lbracket = matches!(
-        first_non_trivia_token_rev(comment.slice().start(), locator.contents()),
+        SimpleTokenizer::up_to_without_back_comment(comment.slice().start(), locator.contents())
+            .skip_trivia()
+            .next_back(),
         Some(SimpleToken {
             kind: SimpleTokenKind::LBracket,
             ..
@@ -1173,35 +1173,33 @@ fn handle_dict_unpacking_comment<'a>(
         locator.contents(),
         TextRange::new(preceding_end, comment.slice().start()),
     )
-    .skip_trivia();
+    .skip_trivia()
+    .skip_while(|token| token.kind == SimpleTokenKind::RParen);
 
     // if the remaining tokens from the previous node are exactly `**`,
     // re-assign the comment to the one that follows the stars
     let mut count = 0;
 
     // we start from the preceding node but we skip its token
-    for token in tokens.by_ref() {
-        // Skip closing parentheses that are not part of the node range
-        if token.kind == SimpleTokenKind::RParen {
-            continue;
-        }
+    if let Some(token) = tokens.next() {
         // The Keyword case
         if token.kind == SimpleTokenKind::Star {
             count += 1;
-            break;
+        } else {
+            // The dict case
+            debug_assert!(
+                matches!(
+                    token,
+                    SimpleToken {
+                        kind: SimpleTokenKind::LBrace
+                            | SimpleTokenKind::Comma
+                            | SimpleTokenKind::Colon,
+                        ..
+                    }
+                ),
+                "{token:?}",
+            );
         }
-        // The dict case
-        debug_assert!(
-            matches!(
-                token,
-                SimpleToken {
-                    kind: SimpleTokenKind::LBrace | SimpleTokenKind::Comma | SimpleTokenKind::Colon,
-                    ..
-                }
-            ),
-            "{token:?}",
-        );
-        break;
     }
 
     for token in tokens {

@@ -25,6 +25,8 @@ mod tests {
     #[test_case(Rule::BadVersionInfoComparison, Path::new("PYI006.pyi"))]
     #[test_case(Rule::CollectionsNamedTuple, Path::new("PYI024.py"))]
     #[test_case(Rule::CollectionsNamedTuple, Path::new("PYI024.pyi"))]
+    #[test_case(Rule::ComplexAssignmentInStub, Path::new("PYI017.py"))]
+    #[test_case(Rule::ComplexAssignmentInStub, Path::new("PYI017.pyi"))]
     #[test_case(Rule::ComplexIfStatementInStub, Path::new("PYI002.py"))]
     #[test_case(Rule::ComplexIfStatementInStub, Path::new("PYI002.pyi"))]
     #[test_case(Rule::DocstringInStub, Path::new("PYI021.py"))]
@@ -87,6 +89,10 @@ mod tests {
     #[test_case(Rule::UnrecognizedVersionInfoCheck, Path::new("PYI003.pyi"))]
     #[test_case(Rule::WrongTupleLengthVersionComparison, Path::new("PYI005.py"))]
     #[test_case(Rule::WrongTupleLengthVersionComparison, Path::new("PYI005.pyi"))]
+    #[test_case(Rule::TypeAliasWithoutAnnotation, Path::new("PYI026.py"))]
+    #[test_case(Rule::TypeAliasWithoutAnnotation, Path::new("PYI026.pyi"))]
+    #[test_case(Rule::UnsupportedMethodCallOnAll, Path::new("PYI056.py"))]
+    #[test_case(Rule::UnsupportedMethodCallOnAll, Path::new("PYI056.pyi"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

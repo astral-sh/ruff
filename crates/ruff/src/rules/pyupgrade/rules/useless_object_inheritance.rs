@@ -67,7 +67,7 @@ pub(crate) fn useless_object_inheritance(checker: &mut Checker, class_def: &ast:
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.try_set_fix(|| {
                 let edit = remove_argument(
-                    checker.locator,
+                    checker.locator(),
                     class_def.name.end(),
                     expr.range(),
                     &class_def.bases,

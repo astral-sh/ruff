@@ -4,7 +4,6 @@ use std::path::Path;
 
 use num_traits::Zero;
 use ruff_text_size::{TextRange, TextSize};
-use rustc_hash::FxHashMap;
 use rustpython_ast::CmpOp;
 use rustpython_parser::ast::{
     self, Arguments, Constant, ExceptHandler, Expr, Keyword, MatchCase, Pattern, Ranged, Stmt,
@@ -1217,67 +1216,61 @@ pub fn is_docstring_stmt(stmt: &Stmt) -> bool {
     }
 }
 
-/// A simple representation of a call's positional and keyword arguments.
+/// A representation of a function call's positional and keyword arguments that ignores
+/// starred expressions.
 #[derive(Default)]
-pub struct SimpleCallArgs<'a> {
-    args: Vec<&'a Expr>,
-    kwargs: FxHashMap<&'a str, &'a Expr>,
+pub struct CallArguments<'a> {
+    args: &'a [Expr],
+    keywords: &'a [Keyword],
 }
 
-impl<'a> SimpleCallArgs<'a> {
-    pub fn new(
-        args: impl IntoIterator<Item = &'a Expr>,
-        keywords: impl IntoIterator<Item = &'a Keyword>,
-    ) -> Self {
-        let args = args
-            .into_iter()
-            .take_while(|arg| !arg.is_starred_expr())
-            .collect();
-
-        let kwargs = keywords
-            .into_iter()
-            .filter_map(|keyword| {
-                let node = keyword;
-                node.arg.as_ref().map(|arg| (arg.as_str(), &node.value))
-            })
-            .collect();
-
-        SimpleCallArgs { args, kwargs }
+impl<'a> CallArguments<'a> {
+    pub fn new(args: &'a [Expr], keywords: &'a [Keyword]) -> Self {
+        Self { args, keywords }
     }
 
-    /// Get the argument with the given name.
-    /// If the argument is not found by name, return
-    /// `None`.
-    pub fn keyword_argument(&self, name: &str) -> Option<&'a Expr> {
-        self.kwargs.get(name).copied()
-    }
-
-    /// Get the argument with the given name or position.
-    /// If the argument is not found with either name or position, return
-    /// `None`.
+    /// Get the argument with the given name or position, or `None` if no such
+    /// argument exists.
     pub fn argument(&self, name: &str, position: usize) -> Option<&'a Expr> {
-        self.keyword_argument(name)
-            .or_else(|| self.args.get(position).copied())
+        self.keywords
+            .iter()
+            .find(|keyword| {
+                let Keyword { arg, .. } = keyword;
+                arg.as_ref().map_or(false, |arg| arg == name)
+            })
+            .map(|keyword| &keyword.value)
+            .or_else(|| {
+                self.args
+                    .iter()
+                    .take_while(|expr| !expr.is_starred_expr())
+                    .nth(position)
+            })
     }
 
-    /// Return the number of positional and keyword arguments.
+    /// Return the number of arguments.
     pub fn len(&self) -> usize {
-        self.args.len() + self.kwargs.len()
+        self.args.len() + self.keywords.len()
+    }
+
+    /// Return `true` if there are no arguments.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     /// Return the number of positional arguments.
     pub fn num_args(&self) -> usize {
-        self.args.len()
+        self.args
+            .iter()
+            .take_while(|expr| !expr.is_starred_expr())
+            .count()
     }
 
     /// Return the number of keyword arguments.
     pub fn num_kwargs(&self) -> usize {
-        self.kwargs.len()
-    }
-
-    /// Return `true` if there are no positional or keyword arguments.
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        self.keywords
+            .iter()
+            .filter(|keyword| keyword.arg.is_some())
+            .count()
     }
 }
 

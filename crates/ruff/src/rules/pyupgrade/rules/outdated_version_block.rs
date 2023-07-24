@@ -126,7 +126,7 @@ fn fix_py2_block(checker: &Checker, stmt_if: &StmtIf, branch: &IfElifBranch) -> 
             None => {
                 let stmt = checker.semantic().stmt();
                 let parent = checker.semantic().stmt_parent();
-                let edit = delete_stmt(stmt, parent, checker.locator, checker.indexer);
+                let edit = delete_stmt(stmt, parent, checker.locator(), checker.indexer());
                 Some(Fix::suggested(edit))
             }
             // If we have an `if` and an `elif`, turn the `elif` into an `if`
@@ -136,7 +136,7 @@ fn fix_py2_block(checker: &Checker, stmt_if: &StmtIf, branch: &IfElifBranch) -> 
                 ..
             }) => {
                 debug_assert!(
-                    &checker.locator.contents()[TextRange::at(range.start(), "elif".text_len())]
+                    &checker.locator().contents()[TextRange::at(range.start(), "elif".text_len())]
                         == "elif"
                 );
                 let end_location = range.start() + ("elif".text_len() - "if".text_len());
@@ -151,33 +151,33 @@ fn fix_py2_block(checker: &Checker, stmt_if: &StmtIf, branch: &IfElifBranch) -> 
             }) => {
                 let start = body.first()?;
                 let end = body.last()?;
-                if indentation(checker.locator, start).is_none() {
+                if indentation(checker.locator(), start).is_none() {
                     // Inline `else` block (e.g., `else: x = 1`).
                     Some(Fix::suggested(Edit::range_replacement(
                         checker
-                            .locator
+                            .locator()
                             .slice(TextRange::new(start.start(), end.end()))
                             .to_string(),
                         stmt_if.range(),
                     )))
                 } else {
-                    indentation(checker.locator, stmt_if)
+                    indentation(checker.locator(), stmt_if)
                         .and_then(|indentation| {
                             adjust_indentation(
                                 TextRange::new(
-                                    checker.locator.line_start(start.start()),
+                                    checker.locator().line_start(start.start()),
                                     end.end(),
                                 ),
                                 indentation,
-                                checker.locator,
-                                checker.stylist,
+                                checker.locator(),
+                                checker.stylist(),
                             )
                             .ok()
                         })
                         .map(|contents| {
                             Fix::suggested(Edit::replacement(
                                 contents,
-                                checker.locator.line_start(stmt_if.start()),
+                                checker.locator().line_start(stmt_if.start()),
                                 stmt_if.end(),
                             ))
                         })
@@ -218,30 +218,30 @@ fn fix_py3_block(checker: &mut Checker, stmt_if: &StmtIf, branch: &IfElifBranch)
             // the rest.
             let start = branch.body.first()?;
             let end = branch.body.last()?;
-            if indentation(checker.locator, start).is_none() {
+            if indentation(checker.locator(), start).is_none() {
                 // Inline `if` block (e.g., `if ...: x = 1`).
                 Some(Fix::suggested(Edit::range_replacement(
                     checker
-                        .locator
+                        .locator()
                         .slice(TextRange::new(start.start(), end.end()))
                         .to_string(),
                     stmt_if.range,
                 )))
             } else {
-                indentation(checker.locator, &stmt_if)
+                indentation(checker.locator(), &stmt_if)
                     .and_then(|indentation| {
                         adjust_indentation(
-                            TextRange::new(checker.locator.line_start(start.start()), end.end()),
+                            TextRange::new(checker.locator().line_start(start.start()), end.end()),
                             indentation,
-                            checker.locator,
-                            checker.stylist,
+                            checker.locator(),
+                            checker.stylist(),
                         )
                         .ok()
                     })
                     .map(|contents| {
                         Fix::suggested(Edit::replacement(
                             contents,
-                            checker.locator.line_start(stmt_if.start()),
+                            checker.locator().line_start(stmt_if.start()),
                             stmt_if.end(),
                         ))
                     })
@@ -252,7 +252,7 @@ fn fix_py3_block(checker: &mut Checker, stmt_if: &StmtIf, branch: &IfElifBranch)
             // the rest.
             let end = branch.body.last()?;
             let text = checker
-                .locator
+                .locator()
                 .slice(TextRange::new(branch.test.end(), end.end()));
             Some(Fix::suggested(Edit::range_replacement(
                 format!("else{text}"),

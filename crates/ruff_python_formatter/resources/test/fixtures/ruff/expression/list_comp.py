@@ -44,6 +44,16 @@
     gggggggggggggggggggggggggggggggggggggggggggg
 ]
 
+# Regression tests for https://github.com/astral-sh/ruff/issues/5911
+selected_choices = [
+    str(v) for v in value if str(v) not in self.choices.field.empty_values
+]
+
+selected_choices = [
+    str(v)
+    for vvvvvvvvvvvvvvvvvvvvvvv in value if str(v) not in self.choices.field.empty_values
+]
+
 # Tuples with BinOp
 [i for i in (aaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb, ccccccccccccccccccccc)]
 [(aaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb, ccccccccccccccccccccc) for i in b]

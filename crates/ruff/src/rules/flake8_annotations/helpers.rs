@@ -30,7 +30,7 @@ pub(super) fn match_function_def(
             body,
             decorator_list,
         ),
-        _ => panic!("Found non-FunctionDef in match_name"),
+        _ => panic!("Found non-FunctionDef in match_function_def"),
     }
 }
 

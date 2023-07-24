@@ -37,6 +37,7 @@ use crate::settings::types::PythonVersion;
 /// ```python
 /// # Evaluates to "foo".
 /// "bar foo baz".removeprefix("bar ").removesuffix(" baz")
+/// ```
 ///
 /// ## Options
 /// - `target-version`
