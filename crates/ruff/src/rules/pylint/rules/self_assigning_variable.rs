@@ -35,17 +35,7 @@ impl Violation for SelfAssigningVariable {
 }
 
 /// PLW0127
-pub(crate) fn self_assigning_variable(checker: &mut Checker, targets: &[Expr], value: &Expr) {
-    // Assignments in class bodies are attributes (e.g., `x = x` assigns `x` to `self.x`, and thus
-    // is not a self-assignment).
-    if checker.semantic().scope().kind.is_class() {
-        return;
-    }
-
-    let [target] = targets else {
-        return;
-    };
-
+pub(crate) fn self_assigning_variable(checker: &mut Checker, target: &Expr, value: &Expr) {
     fn inner(left: &Expr, right: &Expr, diagnostics: &mut Vec<Diagnostic>) {
         match (left, right) {
             (
@@ -68,6 +58,12 @@ pub(crate) fn self_assigning_variable(checker: &mut Checker, targets: &[Expr], v
             }
             _ => {}
         }
+    }
+
+    // Assignments in class bodies are attributes (e.g., `x = x` assigns `x` to `self.x`, and thus
+    // is not a self-assignment).
+    if checker.semantic().scope().kind.is_class() {
+        return;
     }
 
     inner(target, value, &mut checker.diagnostics);

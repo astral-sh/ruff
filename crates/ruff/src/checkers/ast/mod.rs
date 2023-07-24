@@ -1584,7 +1584,9 @@ where
                     }
                 }
                 if self.settings.rules.enabled(Rule::SelfAssigningVariable) {
-                    pylint::rules::self_assigning_variable(self, targets, value);
+                    if let [target] = targets.as_slice() {
+                        pylint::rules::self_assigning_variable(self, target, value);
+                    }
                 }
                 if self.settings.rules.enabled(Rule::TypeParamNameMismatch) {
                     pylint::rules::type_param_name_mismatch(self, value, targets);
@@ -1649,11 +1651,7 @@ where
                         );
                     }
                     if self.enabled(Rule::SelfAssigningVariable) {
-                        pylint::rules::self_assigning_variable(
-                            self,
-                            &[target.as_ref().clone()],
-                            value,
-                        );
+                        pylint::rules::self_assigning_variable(self, target, value);
                     }
                 }
                 if self.enabled(Rule::UnintentionalTypeAnnotation) {
