@@ -1,14 +1,14 @@
 use ruff_text_size::{TextLen, TextRange};
 use rustpython_parser::ast::{Constant, ExprConstant, Ranged};
 
-use ruff_formatter::write;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::str::is_implicit_concatenation;
 
+use crate::expression::number::{FormatComplex, FormatFloat, FormatInt};
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::expression::string::{FormatString, StringPrefix, StringQuotes};
 use crate::prelude::*;
-use crate::{not_yet_implemented_custom_text, verbatim_text, FormatNodeRule};
+use crate::{not_yet_implemented_custom_text, FormatNodeRule};
 
 #[derive(Default)]
 pub struct FormatExprConstant;
@@ -28,9 +28,9 @@ impl FormatNodeRule<ExprConstant> for FormatExprConstant {
                 true => text("True").fmt(f),
                 false => text("False").fmt(f),
             },
-            Constant::Int(_) | Constant::Float(_) | Constant::Complex { .. } => {
-                write!(f, [verbatim_text(item)])
-            }
+            Constant::Int(_) => FormatInt::new(item).fmt(f),
+            Constant::Float(_) => FormatFloat::new(item).fmt(f),
+            Constant::Complex { .. } => FormatComplex::new(item).fmt(f),
             Constant::Str(_) => FormatString::new(item).fmt(f),
             Constant::Bytes(_) => {
                 not_yet_implemented_custom_text(r#"b"NOT_YET_IMPLEMENTED_BYTE_STRING""#).fmt(f)
