@@ -79,7 +79,6 @@ pub(crate) fn verbose_raise(checker: &mut Checker, handlers: &[ExceptHandler]) {
     for handler in handlers {
         // If the handler assigned a name to the exception...
         if let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
-            type_: Some(expr),
             name: Some(exception_name),
             body,
             ..
@@ -100,13 +99,10 @@ pub(crate) fn verbose_raise(checker: &mut Checker, handlers: &[ExceptHandler]) {
                         if id == exception_name.as_str() {
                             let mut diagnostic = Diagnostic::new(VerboseRaise, exc.range());
                             if checker.patch(diagnostic.kind.rule()) {
-                                diagnostic.set_fix(Fix::suggested_edits(
-                                    Edit::deletion(
-                                        expr.range().end(),
-                                        exception_name.range().end(),
-                                    ),
-                                    [Edit::range_replacement("raise".to_string(), raise.range())],
-                                ));
+                                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                                    "raise".to_string(),
+                                    raise.range(),
+                                )));
                             }
                             checker.diagnostics.push(diagnostic);
                         }
