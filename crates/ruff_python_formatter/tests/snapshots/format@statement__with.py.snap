@@ -143,8 +143,9 @@ with (
 
 
 with (
-    a as b,  # a  # as
-    # own line  # b  # comma
+    a as  # a  # as
+    # own line
+    b,  # b  # comma
     c,  # c
 ):  # colon
     ...  # body
