@@ -255,7 +255,7 @@ fn format_dev_multi_project(args: &Args) -> anyhow::Result<bool> {
 
                 bar.suspend(|| {
                     println!(
-                        "Finished {} with {} files (similarity index {:.3}) in {:.2}s",
+                        "Finished {}: {} files, similarity index {:.3}, {:.2}s",
                         project_path.display(),
                         result.file_count,
                         result.statistics.similarity_index(),
@@ -275,6 +275,7 @@ fn format_dev_multi_project(args: &Args) -> anyhow::Result<bool> {
                 bar.inc(1);
             }
         }
+        bar.finish_and_clear();
     }
 
     let duration = start.elapsed();
