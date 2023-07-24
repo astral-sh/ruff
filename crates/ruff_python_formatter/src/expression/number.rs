@@ -140,45 +140,54 @@ fn normalize_floating_number(input: &str) -> Cow<str> {
     // If `last_index` is `0` at the end, then the input is already normalized and can be returned as is.
     let mut last_index = 0;
 
-    let mut has_exponent = false;
-
     let mut chars = input.char_indices();
 
-    if let Some((index, '.')) = chars.next() {
+    let fraction_ends_with_dot = if let Some((index, '.')) = chars.next() {
         // Add a leading `0` if `input` starts with `.`.
         output.push('0');
         output.push('.');
         last_index = index + '.'.len_utf8();
-    }
+        true
+    } else {
+        false
+    };
 
-    for (index, c) in chars {
-        if matches!(c, 'e' | 'E') {
-            has_exponent = true;
-            if input.as_bytes().get(index - 1).copied() == Some(b'.') {
-                // Add `0` if fraction part ends with `.`.
-                output.push_str(&input[last_index..index]);
-                output.push('0');
-                last_index = index;
-            }
-            if c == 'E' {
-                // Lowercase exponent part.
-                output.push_str(&input[last_index..index]);
-                output.push('e');
-                last_index = index + 'E'.len_utf8();
-            }
-        } else if c == '+' {
-            // Remove `+` in exponent part.
-            output.push_str(&input[last_index..index]);
-            last_index = index + '+'.len_utf8();
-        }
-    }
+    loop {
+        match chars.next() {
+            Some((index, c @ ('e' | 'E'))) => {
+                if fraction_ends_with_dot {
+                    // Add `0` if fraction part ends with `.`.
+                    output.push_str(&input[last_index..index]);
+                    output.push('0');
+                    last_index = index;
+                }
 
-    if !has_exponent {
-        if input.ends_with('.') {
-            // Add `0` if fraction part ends with `.`.
-            output.push_str(&input[last_index..]);
-            output.push('0');
-            last_index = input.len();
+                if c == 'E' {
+                    // Lowercase exponent part.
+                    output.push_str(&input[last_index..index]);
+                    output.push('e');
+                    last_index = index + 'E'.len_utf8();
+                }
+
+                if let Some((index, '+')) = chars.next() {
+                    // Remove `+` in exponent part.
+                    output.push_str(&input[last_index..index]);
+                    last_index = index + '+'.len_utf8();
+                }
+
+                break;
+            }
+            Some(_) => continue,
+            None => {
+                if input.ends_with('.') {
+                    // Add `0` if fraction part ends with `.`.
+                    output.push_str(&input[last_index..]);
+                    output.push('0');
+                    last_index = input.len();
+                }
+
+                break;
+            }
         }
     }
 
