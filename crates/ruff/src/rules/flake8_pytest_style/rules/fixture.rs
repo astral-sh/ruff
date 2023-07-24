@@ -45,6 +45,9 @@ use super::helpers::{
 /// ```
 /// ## Options
 /// - `flake8-pytest-style.fixture-parentheses`
+///
+/// ## References
+/// - [API Reference: Fixtures](https://docs.pytest.org/en/latest/reference/reference.html#fixtures-api)
 #[violation]
 pub struct PytestFixtureIncorrectParenthesesStyle {
     expected: Parentheses,
