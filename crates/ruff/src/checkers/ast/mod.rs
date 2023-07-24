@@ -1458,6 +1458,9 @@ where
                 if self.enabled(Rule::UnnecessaryListCast) {
                     perflint::rules::unnecessary_list_cast(self, iter);
                 }
+                if self.enabled(Rule::ManualDictComprehension) {
+                    perflint::rules::manual_dict_comprehension(self, target, body);
+                }
             }
             Stmt::Try(ast::StmtTry {
                 body,

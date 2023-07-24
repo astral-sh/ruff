@@ -1,0 +1,40 @@
+---
+source: crates/ruff/src/rules/perflint/mod.rs
+---
+PERF403.py:5:9: PERF403 Use a dictionary comprehension instead of a for-loop
+  |
+3 |     fruit = ["apple", "pear", "orange"]
+4 |     for idx, name in enumerate(fruit):
+5 |         result[idx] = name  # PERF403
+  |         ^^^^^^^^^^^^^^^^^^ PERF403
+  |
+
+PERF403.py:13:13: PERF403 Use a dictionary comprehension instead of a for-loop
+   |
+11 |     for idx, name in enumerate(fruit):
+12 |         if idx % 2:
+13 |             result[idx] = name  # PERF403
+   |             ^^^^^^^^^^^^^^^^^^ PERF403
+   |
+
+PERF403.py:21:13: PERF403 Use a dictionary comprehension instead of a for-loop
+   |
+19 |     for idx, name in enumerate(fruit):
+20 |         if idx % 2:
+21 |             result[idx] = name  # PERF403
+   |             ^^^^^^^^^^^^^^^^^^ PERF403
+22 |         elif idx % 3:
+23 |             result[idx] = name
+   |
+
+PERF403.py:33:13: PERF403 Use a dictionary comprehension instead of a for-loop
+   |
+31 |     for idx, name in enumerate(fruit):
+32 |         if idx % 2:
+33 |             result[idx] = name  # PERF403
+   |             ^^^^^^^^^^^^^^^^^^ PERF403
+34 |         else:
+35 |             result[idx] = name
+   |
+
+
