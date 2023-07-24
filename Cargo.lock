@@ -1296,12 +1296,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "nohash-hasher"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2bf50223579dc7cdcfb3bfcacf7069ff68243f8c363f62ffa99cf000a6b9c451"
-
-[[package]]
 name = "nom"
 version = "7.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1895,7 +1889,6 @@ dependencies = [
  "log",
  "memchr",
  "natord",
- "nohash-hasher",
  "num-bigint",
  "num-traits",
  "once_cell",
@@ -2164,7 +2157,6 @@ version = "0.0.0"
 dependencies = [
  "bitflags 2.3.3",
  "is-macro",
- "nohash-hasher",
  "num-traits",
  "ruff_index",
  "ruff_python_ast",

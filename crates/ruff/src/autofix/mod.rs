@@ -1,9 +1,8 @@
 use std::collections::BTreeSet;
 
 use itertools::Itertools;
-use nohash_hasher::IntSet;
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, IsolationLevel};
 use ruff_python_ast::source_code::Locator;
@@ -47,7 +46,7 @@ fn apply_fixes<'a>(
     let mut output = String::with_capacity(locator.len());
     let mut last_pos: Option<TextSize> = None;
     let mut applied: BTreeSet<&Edit> = BTreeSet::default();
-    let mut isolated: IntSet<u32> = IntSet::default();
+    let mut isolated: FxHashSet<u32> = FxHashSet::default();
     let mut fixed = FxHashMap::default();
     let mut source_map = SourceMap::default();
 
