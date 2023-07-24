@@ -3,7 +3,7 @@ use rustpython_parser::ast::{self, Arguments, Expr, Keyword, Ranged};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
-use ruff_python_ast::helpers::{includes_arg_name, SimpleCallArgs};
+use ruff_python_ast::helpers::{find_keyword, includes_arg_name, CallArguments};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 
@@ -50,30 +50,30 @@ fn check_patch_call(
     keywords: &[Keyword],
     new_arg_number: usize,
 ) -> Option<Diagnostic> {
-    let simple_args = SimpleCallArgs::new(args, keywords);
-    if simple_args.keyword_argument("return_value").is_some() {
+    if find_keyword(keywords, "return_value").is_some() {
         return None;
     }
 
-    if let Some(Expr::Lambda(ast::ExprLambda {
+    let ast::ExprLambda {
         args,
         body,
         range: _,
-    })) = simple_args.argument("new", new_arg_number)
-    {
-        // Walk the lambda body.
-        let mut visitor = LambdaBodyVisitor {
-            arguments: args,
-            uses_args: false,
-        };
-        visitor.visit_expr(body);
+    } = CallArguments::new(args, keywords)
+        .argument("new", new_arg_number)?
+        .as_lambda_expr()?;
 
-        if !visitor.uses_args {
-            return Some(Diagnostic::new(PytestPatchWithLambda, call.range()));
-        }
+    // Walk the lambda body.
+    let mut visitor = LambdaBodyVisitor {
+        arguments: args,
+        uses_args: false,
+    };
+    visitor.visit_expr(body);
+
+    if visitor.uses_args {
+        None
+    } else {
+        Some(Diagnostic::new(PytestPatchWithLambda, call.range()))
     }
-
-    None
 }
 
 pub(crate) fn patch_with_lambda(

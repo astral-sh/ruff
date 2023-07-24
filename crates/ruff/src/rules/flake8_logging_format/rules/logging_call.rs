@@ -2,7 +2,7 @@ use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::{self, Constant, Expr, Keyword, Operator, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
-use ruff_python_ast::helpers::{find_keyword, SimpleCallArgs};
+use ruff_python_ast::helpers::{find_keyword, CallArguments};
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
 
@@ -164,7 +164,7 @@ pub(crate) fn logging_call(
 
     if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func {
         if let Some(logging_call_type) = LoggingCallType::from_attribute(attr.as_str()) {
-            let call_args = SimpleCallArgs::new(args, keywords);
+            let call_args = CallArguments::new(args, keywords);
             let level_call_range = TextRange::new(value.end() + TextSize::from(1), func.end());
 
             // G001 - G004

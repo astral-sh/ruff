@@ -2,7 +2,7 @@ use rustpython_parser::ast::{Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{is_const_false, SimpleCallArgs};
+use ruff_python_ast::helpers::{find_keyword, is_const_false, CallArguments};
 
 use crate::checkers::ast::Checker;
 
@@ -78,15 +78,12 @@ pub(crate) fn hashlib_insecure_hash_functions(
             _ => None,
         })
     {
+        if !is_used_for_security(keywords) {
+            return;
+        }
         match hashlib_call {
             HashlibCall::New => {
-                let call_args = SimpleCallArgs::new(args, keywords);
-
-                if !is_used_for_security(&call_args) {
-                    return;
-                }
-
-                if let Some(name_arg) = call_args.argument("name", 0) {
+                if let Some(name_arg) = CallArguments::new(args, keywords).argument("name", 0) {
                     if let Some(hash_func_name) = string_literal(name_arg) {
                         // `hashlib.new` accepts both lowercase and uppercase names for hash
                         // functions.
@@ -105,12 +102,6 @@ pub(crate) fn hashlib_insecure_hash_functions(
                 }
             }
             HashlibCall::WeakHash(func_name) => {
-                let call_args = SimpleCallArgs::new(args, keywords);
-
-                if !is_used_for_security(&call_args) {
-                    return;
-                }
-
                 checker.diagnostics.push(Diagnostic::new(
                     HashlibInsecureHashFunction {
                         string: (*func_name).to_string(),
@@ -122,13 +113,12 @@ pub(crate) fn hashlib_insecure_hash_functions(
     }
 }
 
-fn is_used_for_security(call_args: &SimpleCallArgs) -> bool {
-    match call_args.keyword_argument("usedforsecurity") {
-        Some(expr) => !is_const_false(expr),
-        _ => true,
-    }
+fn is_used_for_security(keywords: &[Keyword]) -> bool {
+    find_keyword(keywords, "usedforsecurity")
+        .map_or(true, |keyword| !is_const_false(&keyword.value))
 }
 
+#[derive(Debug)]
 enum HashlibCall {
     New,
     WeakHash(&'static str),

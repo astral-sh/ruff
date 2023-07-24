@@ -2,7 +2,7 @@ use rustpython_parser::ast::{Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::SimpleCallArgs;
+use ruff_python_ast::helpers::CallArguments;
 
 use crate::checkers::ast::Checker;
 
@@ -58,7 +58,7 @@ impl Violation for PytestFailWithoutMessage {
 
 pub(crate) fn fail_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
     if is_pytest_fail(func, checker.semantic()) {
-        let call_args = SimpleCallArgs::new(args, keywords);
+        let call_args = CallArguments::new(args, keywords);
 
         // Allow either `pytest.fail(reason="...")` (introduced in pytest 7.0) or
         // `pytest.fail(msg="...")` (deprecated in pytest 7.0)
