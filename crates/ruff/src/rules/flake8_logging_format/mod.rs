@@ -31,16 +31,19 @@ mod tests {
         let snapshot = path.to_string_lossy().into_owned();
         let diagnostics = test_path(
             Path::new("flake8_logging_format").join(path).as_path(),
-            &settings::Settings::for_rules(vec![
-                Rule::LoggingStringFormat,
-                Rule::LoggingPercentFormat,
-                Rule::LoggingStringConcat,
-                Rule::LoggingFString,
-                Rule::LoggingWarn,
-                Rule::LoggingExtraAttrClash,
-                Rule::LoggingExcInfo,
-                Rule::LoggingRedundantExcInfo,
-            ]),
+            &settings::Settings {
+                logger_objects: vec!["logging_setup.logger".to_string()],
+                ..settings::Settings::for_rules(vec![
+                    Rule::LoggingStringFormat,
+                    Rule::LoggingPercentFormat,
+                    Rule::LoggingStringConcat,
+                    Rule::LoggingFString,
+                    Rule::LoggingWarn,
+                    Rule::LoggingExtraAttrClash,
+                    Rule::LoggingExcInfo,
+                    Rule::LoggingRedundantExcInfo,
+                ])
+            },
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
