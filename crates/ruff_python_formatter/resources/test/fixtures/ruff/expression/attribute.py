@@ -101,3 +101,9 @@ x53 = (
     a.askjdfahdlskjflsajfadhsaf.akjdsf.aksjdlfadhaljsashdfljaf.askjdflhasfdlashdlfaskjfd.asdkjfksahdfkjafs
 )
 
+x6 = (
+    # Check assumption with enclosing nodes
+    a.b
+)
+
+

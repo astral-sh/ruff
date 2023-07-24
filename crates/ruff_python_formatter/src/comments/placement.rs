@@ -30,7 +30,7 @@ pub(super) fn place_comment<'a>(
         handle_trailing_body_comment,
         handle_trailing_end_of_line_body_comment,
         handle_trailing_end_of_line_condition_comment,
-        handle_trailing_end_of_line_except_comment,
+        handle_comment_after_colon_where_branch_has_node,
         handle_module_level_own_line_comment_before_class_or_function_comment,
         handle_arguments_separator_comment,
         handle_trailing_binary_expression_left_or_operator_comment,
@@ -215,7 +215,7 @@ fn handle_in_between_except_handlers_or_except_handler_and_else_or_finally_comme
 /// Handles own line comments between the last statement and the first statement of two bodies.
 ///
 /// ```python
-/// if x == y:
+/// for x in y:
 ///     pass
 ///     # This should be a trailing comment of `pass` and not a leading comment of the `print`
 ///     # in the `else` branch
@@ -231,116 +231,103 @@ fn handle_in_between_bodies_own_line_comment<'a>(
     }
 
     // The comment must be between two statements...
-    if let (Some(preceding), Some(following)) = (comment.preceding_node(), comment.following_node())
-    {
-        // ...and the following statement must be the first statement in an alternate body of the parent...
-        if !is_first_statement_in_enclosing_alternate_body(following, comment.enclosing_node()) {
-            // ```python
-            // if test:
-            //     a
-            //     # comment
-            //     b
-            // ```
-            return CommentPlacement::Default(comment);
-        }
+    let (Some(preceding), Some(following)) = (comment.preceding_node(), comment.following_node())
+    else {
+        return CommentPlacement::Default(comment);
+    };
 
-        // If there's any non-trivia token between the preceding node and the comment, than it means that
-        // we're past the case of the alternate branch, defer to the default rules
+    // ...and the following statement must be the first statement in an alternate body of the parent...
+    if !is_first_statement_in_enclosing_alternate_body(following, comment.enclosing_node()) {
         // ```python
-        // if a:
-        //      pass
-        //  else:
-        //      # leading comment
-        //      def inline_after_else(): ...
+        // if test:
+        //     a
+        //     # comment
+        //     b
         // ```
-        if SimpleTokenizer::new(
-            locator.contents(),
-            TextRange::new(preceding.end(), comment.slice().start()),
-        )
-        .skip_trivia()
-        .next()
-        .is_some()
-        {
-            return CommentPlacement::Default(comment);
-        }
-
-        // it now depends on the indentation level of the comment if it is a leading comment for e.g.
-        // the following `elif` or indeed a trailing comment of the previous body's last statement.
-        let comment_indentation =
-            whitespace::indentation_at_offset(locator, comment.slice().range().start())
-                .map(str::len)
-                .unwrap_or_default();
-
-        if let Some(preceding_indentation) =
-            whitespace::indentation(locator, &preceding).map(str::len)
-        {
-            return if comment_indentation >= preceding_indentation {
-                // `# comment` has the same or a larger indent than the `pass` statement.
-                // It likely is a trailing comment of the `pass` statement.
-                // ```python
-                // if x == y:
-                //     pass
-                //     # comment
-                // else:
-                //     print("noop")
-                // ```
-                CommentPlacement::trailing(preceding, comment)
-            } else {
-                // Otherwise it has less indent than the previous statement. Meaning that it is a leading comment
-                // of the following block.
-                //
-                // ```python
-                // if x == y:
-                //     pass
-                // # I'm a leading comment of the `elif` statement.
-                // elif True:
-                //     print("nooop")
-                // ```
-                if following.is_except_handler() {
-                    // The except handlers have their own body to which we can attach the leading comment
-                    CommentPlacement::leading(following, comment)
-                } else if let AnyNodeRef::StmtIf(stmt_if) = comment.enclosing_node() {
-                    if let Some(clause) = stmt_if
-                        .elif_else_clauses
-                        .iter()
-                        .find(|clause| are_same_optional(following, clause.test.as_ref()))
-                    {
-                        CommentPlacement::leading(clause.into(), comment)
-                    } else {
-                        // Since we know we're between bodies and we know that the following node is
-                        // not the condition of any `elif`, we know the next node must be the `else`
-                        let else_clause = stmt_if.elif_else_clauses.last().unwrap();
-                        debug_assert!(else_clause.test.is_none());
-                        CommentPlacement::leading(else_clause.into(), comment)
-                    }
-                } else {
-                    // There are no bodies for the "else" branch and other bodies that are represented as a `Vec<Stmt>`.
-                    // This means, there's no good place to attach the comments to.
-                    // That's why we make these dangling comments and format them  manually
-                    // in the enclosing node's formatting logic. For `try`, it's the formatters responsibility
-                    // to correctly identify the comments for the `finally` and `orelse` block by looking
-                    // at the comment's range.
-                    //
-                    // ```python
-                    // if x == y:
-                    //     pass
-                    // # I'm a leading comment of the `else` branch but there's no `else` node.
-                    // else:
-                    //     print("nooop")
-                    // ```
-                    CommentPlacement::dangling(comment.enclosing_node(), comment)
-                }
-            };
-        }
+        return CommentPlacement::Default(comment);
     }
 
-    CommentPlacement::Default(comment)
+    // If there's any non-trivia token between the preceding node and the comment, than it means that
+    // we're past the case of the alternate branch, defer to the default rules
+    // ```python
+    // if a:
+    //      pass
+    //  else:
+    //      # leading comment
+    //      def inline_after_else(): ...
+    // ```
+    if SimpleTokenizer::new(
+        locator.contents(),
+        TextRange::new(preceding.end(), comment.slice().start()),
+    )
+    .skip_trivia()
+    .next()
+    .is_some()
+    {
+        return CommentPlacement::Default(comment);
+    }
+
+    // it now depends on the indentation level of the comment if it is a leading comment for e.g.
+    // the following `elif` or indeed a trailing comment of the previous body's last statement.
+    let comment_indentation =
+        whitespace::indentation_at_offset(locator, comment.slice().range().start())
+            .map(str::len)
+            .unwrap_or_default();
+
+    let Some(preceding_indentation) = whitespace::indentation(locator, &preceding).map(str::len)
+    else {
+        return CommentPlacement::Default(comment);
+    };
+
+    return if comment_indentation >= preceding_indentation {
+        // `# comment` has the same or a larger indent than the `pass` statement.
+        // It likely is a trailing comment of the `pass` statement.
+        // ```python
+        // if x == y:
+        //     pass
+        //     # comment
+        // else:
+        //     print("noop")
+        // ```
+        CommentPlacement::trailing(preceding, comment)
+    } else {
+        // Otherwise it has less indent than the previous statement. Meaning that it is a leading comment
+        // of the following block.
+        //
+        // ```python
+        // if x == y:
+        //     pass
+        // # I'm a leading comment of the `elif` statement.
+        // elif True:
+        //     print("nooop")
+        // ```
+        if following.is_except_handler() {
+            // The except handlers have their own body to which we can attach the leading comment
+            CommentPlacement::leading(following, comment)
+        } else {
+            // There are no bodies for the "else" branch and other bodies that are represented as a `Vec<Stmt>`.
+            // This means, there's no good place to attach the comments to.
+            // That's why we make these dangling comments and format them  manually
+            // in the enclosing node's formatting logic. For `try`, it's the formatters responsibility
+            // to correctly identify the comments for the `finally` and `orelse` block by looking
+            // at the comment's range.
+            //
+            // ```python
+            // if x == y:
+            //     pass
+            // # I'm a leading comment of the `else` branch but there's no `else` node.
+            // else:
+            //     print("nooop")
+            // ```
+            CommentPlacement::dangling(comment.enclosing_node(), comment)
+        }
+    };
 }
 
 /// Handles end of line comments comments between the last statement and the first statement of two bodies.
 ///
 /// ```python
-/// if x == y:
+/// for x in y:
 ///     pass # trailing comment of pass
 /// else: # trailing comment of `else`
 ///     print("I have no comments")
@@ -363,45 +350,13 @@ fn handle_in_between_bodies_end_of_line_comment<'a>(
     if !is_first_statement_in_enclosing_alternate_body(following, comment.enclosing_node()) {
         // ```python
         // if test:
-        //     a
-        //     # comment
+        //     a # comment
         //     b
         // ```
         return CommentPlacement::Default(comment);
     }
 
     if locator.contains_line_break(TextRange::new(preceding.end(), comment.slice().start())) {
-        // The  except handlers have their own body to which we can attach the trailing comment
-        // ```python
-        // try:
-        //     f()  # comment
-        // except RuntimeError:
-        //     raise
-        // ```
-        if following.is_except_handler() {
-            return CommentPlacement::trailing(following, comment);
-        }
-
-        // Handle the `else` of an `if`. It is special because we don't have a test but unlike other
-        // `else` (e.g. for `while`), we have a dedicated node.
-        // ```python
-        // if x == y:
-        //     pass
-        // elif x < y:
-        //     pass
-        // else:  # 12 trailing else condition
-        //     pass
-        // ```
-        if let AnyNodeRef::StmtIf(stmt_if) = comment.enclosing_node() {
-            if let Some(else_clause) = stmt_if.elif_else_clauses.last() {
-                if else_clause.test.is_none()
-                    && following.ptr_eq(else_clause.body.first().unwrap().into())
-                {
-                    return CommentPlacement::dangling(else_clause.into(), comment);
-                }
-            }
-        }
-
         // There are no bodies for the "else" branch (only `Vec<Stmt>`) expect for StmtIf, so
         // we make this a dangling comments of the node containing the alternate branch and
         // manually format the comment in that node's formatting logic. For `try`, it's the
@@ -524,7 +479,7 @@ fn handle_trailing_body_comment<'a>(
     let Some(comment_indentation) =
         whitespace::indentation_at_offset(locator, comment.slice().range().start())
     else {
-        // The comment can't be a comment for the previous block if it isn't indented..
+        // The comment can't be a comment for the previous block if it isn't indented.
         return CommentPlacement::Default(comment);
     };
 
@@ -686,23 +641,6 @@ fn handle_trailing_end_of_line_condition_comment<'a>(
         return CommentPlacement::Default(comment);
     }
 
-    // We handle trailing else comments separately because we the preceding node is None for their
-    // case
-    // ```python
-    // if True:
-    //     pass
-    // else: # 12 trailing else condition
-    //     pass
-    // ```
-    if let AnyNodeRef::ElifElseClause(ast::ElifElseClause {
-        body, test: None, ..
-    }) = comment.enclosing_node()
-    {
-        if comment.start() < body.first().unwrap().start() {
-            return CommentPlacement::dangling(comment.enclosing_node(), comment);
-        }
-    }
-
     // Must be between the condition expression and the first body element
     let (Some(preceding), Some(following)) = (comment.preceding_node(), comment.following_node())
     else {
@@ -711,9 +649,6 @@ fn handle_trailing_end_of_line_condition_comment<'a>(
 
     let enclosing_node = comment.enclosing_node();
     let expression_before_colon = match enclosing_node {
-        AnyNodeRef::ElifElseClause(ast::ElifElseClause {
-            test: Some(expr), ..
-        }) => Some(AnyNodeRef::from(expr)),
         AnyNodeRef::StmtIf(ast::StmtIf { test: expr, .. })
         | AnyNodeRef::StmtWhile(ast::StmtWhile { test: expr, .. })
         | AnyNodeRef::StmtFor(ast::StmtFor { iter: expr, .. })
@@ -791,7 +726,10 @@ fn handle_trailing_end_of_line_condition_comment<'a>(
     }
 }
 
-/// Handles end of line comments after the `:` of an except clause
+/// Handles end of line comments after the `:` of an except clause and elif/else clauses, those
+/// alternative branches that has their own node.
+///
+/// It attaches the comment as dangling comment to the enclosing node.
 ///
 /// ```python
 /// try:
@@ -800,25 +738,33 @@ fn handle_trailing_end_of_line_condition_comment<'a>(
 ///     pass
 /// ```
 ///
-/// It attaches the comment as dangling comment to the enclosing except handler.
-fn handle_trailing_end_of_line_except_comment<'a>(
+/// ```python
+/// if True:
+///     pass
+/// else: # 12 trailing else condition
+///     pass
+/// ```
+fn handle_comment_after_colon_where_branch_has_node<'a>(
     comment: DecoratedComment<'a>,
     _locator: &Locator,
 ) -> CommentPlacement<'a> {
-    let AnyNodeRef::ExceptHandlerExceptHandler(handler) = comment.enclosing_node() else {
-        return CommentPlacement::Default(comment);
-    };
-
     // Must be an end of line comment
     if comment.line_position().is_own_line() {
         return CommentPlacement::Default(comment);
     }
 
-    let Some(first_body_statement) = handler.body.first() else {
-        return CommentPlacement::Default(comment);
+    let body = match comment.enclosing_node() {
+        AnyNodeRef::ExceptHandlerExceptHandler(ast::ExceptHandlerExceptHandler {
+            body, ..
+        }) => body,
+        AnyNodeRef::ElifElseClause(ast::ElifElseClause { body, .. }) => body,
+        _ => return CommentPlacement::Default(comment),
     };
 
-    if comment.slice().start() < first_body_statement.range().start() {
+    // Line breaks between `else`/`except` and the colon `:` are not allowed, so if the comment
+    // is end-of-line after the branch start but before the fist body statement, it must be trailing
+    // after the colon
+    if comment.slice().start() < body.first().unwrap().range().start() {
         CommentPlacement::dangling(comment.enclosing_node(), comment)
     } else {
         CommentPlacement::Default(comment)
@@ -881,13 +827,13 @@ fn handle_trailing_binary_expression_left_or_operator_comment<'a>(
         binary_expression.right.start(),
     );
 
-    let mut tokens = SimpleTokenizer::new(locator.contents(), between_operands_range).skip_trivia();
-    let operator_offset =
-        if let Some(non_r_paren) = tokens.find(|t| t.kind() != SimpleTokenKind::RParen) {
-            non_r_paren.start()
-        } else {
-            return CommentPlacement::Default(comment);
-        };
+    let mut tokens = SimpleTokenizer::new(locator.contents(), between_operands_range)
+        .skip_trivia()
+        .skip_while(|token| token.kind == SimpleTokenKind::RParen);
+    let operator_offset = tokens
+        .next()
+        .expect("Expected a token for hte operator")
+        .start();
 
     let comment_range = comment.slice().range();
 
@@ -1166,9 +1112,6 @@ fn handle_dict_unpacking_comment<'a>(
         Some(preceding) => preceding.end(),
         None => comment.enclosing_node().start(),
     };
-    if preceding_end > comment.slice().start() {
-        return CommentPlacement::Default(comment);
-    }
     let mut tokens = SimpleTokenizer::new(
         locator.contents(),
         TextRange::new(preceding_end, comment.slice().start()),
@@ -1203,9 +1146,7 @@ fn handle_dict_unpacking_comment<'a>(
     }
 
     for token in tokens {
-        if token.kind != SimpleTokenKind::Star {
-            return CommentPlacement::Default(comment);
-        }
+        debug_assert!(token.kind == SimpleTokenKind::Star, "Expected star token");
         count += 1;
     }
     if count == 2 {
@@ -1233,33 +1174,31 @@ fn handle_attribute_comment<'a>(
         return CommentPlacement::Default(comment);
     };
 
-    // It must be a comment AFTER the name
-    if comment.preceding_node().is_none() {
-        return CommentPlacement::Default(comment);
-    }
+    debug_assert!(
+        comment.preceding_node().is_some(),
+        "The enclosing node an attribute expression, expected to be at least after the name"
+    );
 
-    if TextRange::new(attribute.value.end(), attribute.attr.start())
-        .contains(comment.slice().start())
-    {
-        // ```text
-        // value   .   attr
-        //      ^^^^^^^ the range of dangling comments
+    // ```text
+    // value   .   attr
+    //      ^^^^^^^ we're in this range
+    // ```
+    debug_assert!(
+        TextRange::new(attribute.value.end(), attribute.attr.start())
+            .contains(comment.slice().start())
+    );
+    if comment.line_position().is_end_of_line() {
+        // Attach to node with b
+        // ```python
+        // x322 = (
+        //     a
+        //     . # end-of-line dot comment 2
+        //     b
+        // )
         // ```
-        if comment.line_position().is_end_of_line() {
-            // Attach to node with b
-            // ```python
-            // x322 = (
-            //     a
-            //     . # end-of-line dot comment 2
-            //     b
-            // )
-            // ```
-            CommentPlacement::trailing(comment.enclosing_node(), comment)
-        } else {
-            CommentPlacement::dangling(attribute.into(), comment)
-        }
+        CommentPlacement::trailing(comment.enclosing_node(), comment)
     } else {
-        CommentPlacement::Default(comment)
+        CommentPlacement::dangling(attribute.into(), comment)
     }
 }
 
@@ -1296,23 +1235,21 @@ fn handle_expr_if_comment<'a>(
         return CommentPlacement::Default(comment);
     }
 
-    // Find the if and the else
     let if_token = find_only_token_in_range(
         TextRange::new(body.end(), test.start()),
         locator,
         SimpleTokenKind::If,
     );
-    let else_token = find_only_token_in_range(
-        TextRange::new(test.end(), orelse.start()),
-        locator,
-        SimpleTokenKind::Else,
-    );
-
     // Between `if` and `test`
     if if_token.range.start() < comment.slice().start() && comment.slice().start() < test.start() {
         return CommentPlacement::leading(test.as_ref().into(), comment);
     }
 
+    let else_token = find_only_token_in_range(
+        TextRange::new(test.end(), orelse.start()),
+        locator,
+        SimpleTokenKind::Else,
+    );
     // Between `else` and `orelse`
     if else_token.range.start() < comment.slice().start()
         && comment.slice().start() < orelse.start()
@@ -1323,17 +1260,37 @@ fn handle_expr_if_comment<'a>(
     CommentPlacement::Default(comment)
 }
 
+/// Moving
+/// ``` python
+/// call(
+///     # Leading starred comment
+///     * # Trailing star comment
+///     []
+/// )
+/// ```
+/// to
+/// ``` python
+/// call(
+///     # Leading starred comment
+///     # Trailing star comment
+///     * []
+/// )
+/// ```
 fn handle_trailing_expression_starred_star_end_of_line_comment<'a>(
     comment: DecoratedComment<'a>,
     _locator: &Locator,
 ) -> CommentPlacement<'a> {
-    if comment.line_position().is_own_line() || comment.following_node().is_none() {
+    if comment.line_position().is_own_line() {
         return CommentPlacement::Default(comment);
     }
 
     let AnyNodeRef::ExprStarred(starred) = comment.enclosing_node() else {
         return CommentPlacement::Default(comment);
     };
+
+    if comment.following_node().is_none() {
+        return CommentPlacement::Default(comment);
+    }
 
     CommentPlacement::leading(starred.as_any_node_ref(), comment)
 }
@@ -1428,7 +1385,7 @@ fn handle_comprehension_comment<'a>(
     // ```python
     // [
     //      a
-    //      for  # attache as dangling on the comprehension
+    //      for  # attach as dangling on the comprehension
     //      b in c
     //  ]
     // ```
@@ -1612,25 +1569,6 @@ fn is_first_statement_in_enclosing_alternate_body(
     enclosing: AnyNodeRef,
 ) -> bool {
     match enclosing {
-        AnyNodeRef::StmtIf(ast::StmtIf {
-            elif_else_clauses, ..
-        }) => {
-            for clause in elif_else_clauses {
-                if let Some(test) = &clause.test {
-                    // `elif`, the following node is the test
-                    if following.ptr_eq(test.into()) {
-                        return true;
-                    }
-                } else {
-                    // `else`, there is no test and the following node is the first entry in the
-                    // body
-                    if following.ptr_eq(clause.body.first().unwrap().into()) {
-                        return true;
-                    }
-                }
-            }
-            false
-        }
         AnyNodeRef::StmtFor(ast::StmtFor { orelse, .. })
         | AnyNodeRef::StmtAsyncFor(ast::StmtAsyncFor { orelse, .. })
         | AnyNodeRef::StmtWhile(ast::StmtWhile { orelse, .. }) => {

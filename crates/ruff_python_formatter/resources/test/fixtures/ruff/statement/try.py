@@ -99,3 +99,8 @@ try:
         print(1)  # issue7208
 except A:
     pass
+
+try:
+    f()  # end-of-line last comment
+except RuntimeError:
+    raise
