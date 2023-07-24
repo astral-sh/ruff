@@ -49,7 +49,8 @@ use ruff_python_parser::typing::{parse_type_annotation, AnnotationKind};
 use ruff_python_semantic::analyze::{typing, visibility};
 use ruff_python_semantic::{
     BindingFlags, BindingId, BindingKind, Exceptions, Export, FromImport, Globals, Import, Module,
-    ModuleKind, ScopeId, ScopeKind, SemanticModel, SemanticModelFlags, StarImport, SubmoduleImport,
+    ModuleKind, ReadResult, ScopeId, ScopeKind, SemanticModel, SemanticModelFlags, StarImport,
+    SubmoduleImport,
 };
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
 use ruff_python_stdlib::path::is_python_stub_file;
@@ -1547,10 +1548,13 @@ impl<'a> Checker<'a> {
     }
 
     fn handle_node_load(&mut self, expr: &Expr) {
-        let Expr::Name(ast::ExprName { id, .. }) = expr else {
+        let Expr::Name(expr) = expr else {
             return;
         };
-        self.semantic.resolve_load(id, expr.range());
+        if let ReadResult::Resolved(binding_id) = self.semantic.resolve_load(&expr.id, expr.range())
+        {
+            self.semantic.set_resolved_name(expr, binding_id);
+        }
     }
 
     fn handle_node_store(&mut self, id: &'a str, expr: &Expr) {

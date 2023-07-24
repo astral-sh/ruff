@@ -1,8 +1,8 @@
 use std::path::Path;
 
 use bitflags::bitflags;
-use ruff_python_ast::{Expr, Ranged, Stmt};
-use ruff_text_size::TextRange;
+use ruff_python_ast::{self, Expr, Ranged, Stmt};
+use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
 
@@ -118,6 +118,10 @@ pub struct SemanticModel<'a> {
 
     /// Exceptions that have been handled by the current scope.
     pub handled_exceptions: Vec<Exceptions>,
+
+    /// Map from [`ast::ExprName`] node (represented as a [`NameId`]) to the [`Binding`] to which
+    /// it resolved (represented as a [`BindingId`]).
+    resolved_names: FxHashMap<NameId, BindingId>,
 }
 
 impl<'a> SemanticModel<'a> {
@@ -141,6 +145,7 @@ impl<'a> SemanticModel<'a> {
             rebinding_scopes: FxHashMap::default(),
             flags: SemanticModelFlags::new(path),
             handled_exceptions: Vec::default(),
+            resolved_names: FxHashMap::default(),
         }
     }
 
@@ -585,13 +590,30 @@ impl<'a> SemanticModel<'a> {
     ///
     /// ...then `resolve_call_path(${python_version})` will resolve to `sys.version_info`.
     pub fn resolve_call_path(&'a self, value: &'a Expr) -> Option<CallPath<'a>> {
-        let call_path = collect_call_path(value)?;
-        let (head, tail) = call_path.split_first()?;
-        let binding = self.find_binding(head)?;
+        /// Return the [`ast::ExprName`] at the head of the expression, if any.
+        const fn match_head(value: &Expr) -> Option<&ast::ExprName> {
+            match value {
+                Expr::Attribute(ast::ExprAttribute { value, .. }) => match_head(value),
+                Expr::Name(name) => Some(name),
+                _ => None,
+            }
+        }
+
+        // If the name was already resolved, look it up; otherwise, search for the symbol.
+        let head = match_head(value)?;
+        let binding = self
+            .resolved_names
+            .get(&head.into())
+            .map(|id| self.binding(*id))
+            .or_else(|| self.find_binding(&head.id))?;
+
         match &binding.kind {
             BindingKind::Import(Import {
                 qualified_name: name,
             }) => {
+                let call_path = collect_call_path(value)?;
+                let (_, tail) = call_path.split_first()?;
+
                 let mut source_path: CallPath = from_unqualified_name(name);
                 source_path.extend_from_slice(tail);
                 Some(source_path)
@@ -599,6 +621,9 @@ impl<'a> SemanticModel<'a> {
             BindingKind::SubmoduleImport(SubmoduleImport {
                 qualified_name: name,
             }) => {
+                let call_path = collect_call_path(value)?;
+                let (_, tail) = call_path.split_first()?;
+
                 let name = name.split('.').next().unwrap_or(name);
                 let mut source_path: CallPath = from_unqualified_name(name);
                 source_path.extend_from_slice(tail);
@@ -607,6 +632,9 @@ impl<'a> SemanticModel<'a> {
             BindingKind::FromImport(FromImport {
                 qualified_name: name,
             }) => {
+                let call_path = collect_call_path(value)?;
+                let (_, tail) = call_path.split_first()?;
+
                 if name.starts_with('.') {
                     let mut source_path = from_relative_import(self.module_path?, name);
                     if source_path.is_empty() {
@@ -622,6 +650,8 @@ impl<'a> SemanticModel<'a> {
                 }
             }
             BindingKind::Builtin => {
+                let call_path = collect_call_path(value)?;
+
                 let mut source_path: CallPath = SmallVec::with_capacity(1 + call_path.len());
                 source_path.push("");
                 source_path.extend_from_slice(call_path.as_slice());
@@ -723,6 +753,11 @@ impl<'a> SemanticModel<'a> {
                 None
             })
         })
+    }
+
+    /// Associate a [`BindingId`] with a [`NameId`].
+    pub fn set_resolved_name(&mut self, name: &ast::ExprName, binding_id: BindingId) {
+        self.resolved_names.insert(name.into(), binding_id);
     }
 
     /// Push a [`Stmt`] onto the stack.
@@ -1502,5 +1537,16 @@ impl ImportedName {
 impl Ranged for ImportedName {
     fn range(&self) -> TextRange {
         self.range
+    }
+}
+
+/// A unique identifier for an [`ast::ExprName`]. No two names can even appear at the same location
+/// in the source code, so the starting offset is a cheap and sufficient unique identifier.
+#[derive(Debug, Hash, PartialEq, Eq)]
+struct NameId(TextSize);
+
+impl From<&ast::ExprName> for NameId {
+    fn from(name: &ast::ExprName) -> Self {
+        Self(name.start())
     }
 }
