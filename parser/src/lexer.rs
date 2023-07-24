@@ -175,6 +175,8 @@ pub struct Lexer<T: Iterator<Item = char>> {
     pending: Vec<Spanned>,
     // The current location.
     location: TextSize,
+    // Is the last token an equal sign?
+    last_token_is_equal: bool,
     // Lexer mode.
     mode: Mode,
 }
@@ -233,6 +235,7 @@ where
             pending: Vec::with_capacity(5),
             location: start,
             window: CharWindow::new(input),
+            last_token_is_equal: false,
             mode,
         };
         // Fill the window.
@@ -945,15 +948,19 @@ where
                 }
             }
             '%' => {
-                let tok_start = self.get_pos();
-                self.next_char();
-                if let Some('=') = self.window[0] {
-                    self.next_char();
-                    let tok_end = self.get_pos();
-                    self.emit((Tok::PercentEqual, TextRange::new(tok_start, tok_end)));
+                if self.mode == Mode::Jupyter && self.nesting == 0 && self.last_token_is_equal {
+                    self.lex_and_emit_magic_command();
                 } else {
-                    let tok_end = self.get_pos();
-                    self.emit((Tok::Percent, TextRange::new(tok_start, tok_end)));
+                    let tok_start = self.get_pos();
+                    self.next_char();
+                    if let Some('=') = self.window[0] {
+                        self.next_char();
+                        let tok_end = self.get_pos();
+                        self.emit((Tok::PercentEqual, TextRange::new(tok_start, tok_end)));
+                    } else {
+                        let tok_end = self.get_pos();
+                        self.emit((Tok::Percent, TextRange::new(tok_start, tok_end)));
+                    }
                 }
             }
             '|' => {
@@ -1025,17 +1032,21 @@ where
                 }
             }
             '!' => {
-                let tok_start = self.get_pos();
-                self.next_char();
-                if let Some('=') = self.window[0] {
-                    self.next_char();
-                    let tok_end = self.get_pos();
-                    self.emit((Tok::NotEqual, TextRange::new(tok_start, tok_end)));
+                if self.mode == Mode::Jupyter && self.nesting == 0 && self.last_token_is_equal {
+                    self.lex_and_emit_magic_command();
                 } else {
-                    return Err(LexicalError {
-                        error: LexicalErrorType::UnrecognizedToken { tok: '!' },
-                        location: tok_start,
-                    });
+                    let tok_start = self.get_pos();
+                    self.next_char();
+                    if let Some('=') = self.window[0] {
+                        self.next_char();
+                        let tok_end = self.get_pos();
+                        self.emit((Tok::NotEqual, TextRange::new(tok_start, tok_end)));
+                    } else {
+                        return Err(LexicalError {
+                            error: LexicalErrorType::UnrecognizedToken { tok: '!' },
+                            location: tok_start,
+                        });
+                    }
                 }
             }
             '~' => {
@@ -1292,6 +1303,7 @@ where
 
     // Helper function to emit a lexed token to the queue of tokens.
     fn emit(&mut self, spanned: Spanned) {
+        self.last_token_is_equal = matches!(spanned.0, Tok::Equal);
         self.pending.push(spanned);
     }
 }
@@ -1667,6 +1679,85 @@ mod tests {
                 },
             ]
         )
+    }
+
+    #[test]
+    fn test_jupyter_magic_assignment() {
+        let source = r"
+pwd = !pwd
+foo = %timeit a = b
+bar = %timeit a % 3
+baz = %matplotlib \
+        inline"
+            .trim();
+        let tokens = lex_jupyter_source(source);
+        assert_eq!(
+            tokens,
+            vec![
+                Tok::Name {
+                    name: "pwd".to_string()
+                },
+                Tok::Equal,
+                Tok::MagicCommand {
+                    value: "pwd".to_string(),
+                    kind: MagicKind::Shell,
+                },
+                Tok::Newline,
+                Tok::Name {
+                    name: "foo".to_string()
+                },
+                Tok::Equal,
+                Tok::MagicCommand {
+                    value: "timeit a = b".to_string(),
+                    kind: MagicKind::Magic,
+                },
+                Tok::Newline,
+                Tok::Name {
+                    name: "bar".to_string()
+                },
+                Tok::Equal,
+                Tok::MagicCommand {
+                    value: "timeit a % 3".to_string(),
+                    kind: MagicKind::Magic,
+                },
+                Tok::Newline,
+                Tok::Name {
+                    name: "baz".to_string()
+                },
+                Tok::Equal,
+                Tok::MagicCommand {
+                    value: "matplotlib         inline".to_string(),
+                    kind: MagicKind::Magic,
+                },
+                Tok::Newline,
+            ]
+        )
+    }
+
+    fn assert_no_jupyter_magic(tokens: &[Tok]) {
+        for tok in tokens {
+            match tok {
+                Tok::MagicCommand { .. } => panic!("Unexpected magic command token: {:?}", tok),
+                _ => {}
+            }
+        }
+    }
+
+    #[test]
+    fn test_jupyter_magic_not_an_assignment() {
+        let source = r"
+# Other magic kinds are not valid here (can't test `foo = ?str` because '?' is not a valid token)
+foo = /func
+foo = ;func
+foo = ,func
+
+(foo == %timeit a = b)
+(foo := %timeit a = b)
+def f(arg=%timeit a = b):
+    pass"
+            .trim();
+        let tokens = lex_jupyter_source(source);
+        assert_no_jupyter_magic(&tokens);
     }
 
     #[test]
