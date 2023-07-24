@@ -2,6 +2,7 @@ use rustpython_parser::ast::{self, Constant, Expr, Keyword, Operator, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::find_keyword;
 
 use crate::checkers::ast::Checker;
 
@@ -91,17 +92,10 @@ pub(crate) fn invalid_envvar_default(
         })
     {
         // Find the `default` argument, if it exists.
-        let Some(expr) = args.get(1).or_else(|| {
-            keywords
-                .iter()
-                .find(|keyword| {
-                    keyword
-                        .arg
-                        .as_ref()
-                        .map_or(false, |arg| arg.as_str() == "default")
-                })
-                .map(|keyword| &keyword.value)
-        }) else {
+        let Some(expr) = args
+            .get(1)
+            .or_else(|| find_keyword(keywords, "default").map(|keyword| &keyword.value))
+        else {
             return;
         };
 

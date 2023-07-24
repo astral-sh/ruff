@@ -109,11 +109,11 @@ impl Emitter for TextEmitter {
                 sep = ":".cyan(),
                 code_and_body = RuleCodeAndBody {
                     message,
-                    show_fix_status: self.flags.contains(EmitterFlags::SHOW_FIX_STATUS)
+                    show_fix_status: self.flags.intersects(EmitterFlags::SHOW_FIX_STATUS)
                 }
             )?;
 
-            if self.flags.contains(EmitterFlags::SHOW_SOURCE) {
+            if self.flags.intersects(EmitterFlags::SHOW_SOURCE) {
                 writeln!(
                     writer,
                     "{}",
@@ -124,7 +124,7 @@ impl Emitter for TextEmitter {
                 )?;
             }
 
-            if self.flags.contains(EmitterFlags::SHOW_FIX_DIFF) {
+            if self.flags.intersects(EmitterFlags::SHOW_FIX_DIFF) {
                 if let Some(diff) = Diff::from_message(message) {
                     writeln!(writer, "{diff}")?;
                 }

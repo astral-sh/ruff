@@ -257,7 +257,7 @@ impl<'a> SemanticModel<'a> {
             .get(symbol)
             .map_or(true, |binding_id| {
                 // Treat the deletion of a name as a reference to that name.
-                self.add_local_reference(binding_id, range, ExecutionContext::Runtime);
+                self.add_local_reference(binding_id, range);
                 self.bindings[binding_id].is_unbound()
             });
 
@@ -279,10 +279,9 @@ impl<'a> SemanticModel<'a> {
             if let Some(binding_id) = self.scopes.global().get(symbol) {
                 if !self.bindings[binding_id].is_unbound() {
                     // Mark the binding as used.
-                    let context = self.execution_context();
                     let reference_id =
                         self.resolved_references
-                            .push(ScopeId::global(), range, context);
+                            .push(ScopeId::global(), range, self.flags);
                     self.bindings[binding_id].references.push(reference_id);
 
                     // Mark any submodule aliases as used.
@@ -291,7 +290,7 @@ impl<'a> SemanticModel<'a> {
                     {
                         let reference_id =
                             self.resolved_references
-                                .push(ScopeId::global(), range, context);
+                                .push(ScopeId::global(), range, self.flags);
                         self.bindings[binding_id].references.push(reference_id);
                     }
 
@@ -322,13 +321,16 @@ impl<'a> SemanticModel<'a> {
 
             if let Some(binding_id) = scope.get(symbol) {
                 // Mark the binding as used.
-                let context = self.execution_context();
-                let reference_id = self.resolved_references.push(self.scope_id, range, context);
+                let reference_id = self
+                    .resolved_references
+                    .push(self.scope_id, range, self.flags);
                 self.bindings[binding_id].references.push(reference_id);
 
                 // Mark any submodule aliases as used.
                 if let Some(binding_id) = self.resolve_submodule(symbol, scope_id, binding_id) {
-                    let reference_id = self.resolved_references.push(self.scope_id, range, context);
+                    let reference_id =
+                        self.resolved_references
+                            .push(self.scope_id, range, self.flags);
                     self.bindings[binding_id].references.push(reference_id);
                 }
 
@@ -392,9 +394,9 @@ impl<'a> SemanticModel<'a> {
                     // The `x` in `print(x)` should resolve to the `x` in `x = 1`.
                     BindingKind::UnboundException(Some(binding_id)) => {
                         // Mark the binding as used.
-                        let context = self.execution_context();
                         let reference_id =
-                            self.resolved_references.push(self.scope_id, range, context);
+                            self.resolved_references
+                                .push(self.scope_id, range, self.flags);
                         self.bindings[binding_id].references.push(reference_id);
 
                         // Mark any submodule aliases as used.
@@ -402,7 +404,8 @@ impl<'a> SemanticModel<'a> {
                             self.resolve_submodule(symbol, scope_id, binding_id)
                         {
                             let reference_id =
-                                self.resolved_references.push(self.scope_id, range, context);
+                                self.resolved_references
+                                    .push(self.scope_id, range, self.flags);
                             self.bindings[binding_id].references.push(reference_id);
                         }
 
@@ -917,26 +920,18 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Add a reference to the given [`BindingId`] in the local scope.
-    pub fn add_local_reference(
-        &mut self,
-        binding_id: BindingId,
-        range: TextRange,
-        context: ExecutionContext,
-    ) {
-        let reference_id = self.resolved_references.push(self.scope_id, range, context);
+    pub fn add_local_reference(&mut self, binding_id: BindingId, range: TextRange) {
+        let reference_id = self
+            .resolved_references
+            .push(self.scope_id, range, self.flags);
         self.bindings[binding_id].references.push(reference_id);
     }
 
     /// Add a reference to the given [`BindingId`] in the global scope.
-    pub fn add_global_reference(
-        &mut self,
-        binding_id: BindingId,
-        range: TextRange,
-        context: ExecutionContext,
-    ) {
+    pub fn add_global_reference(&mut self, binding_id: BindingId, range: TextRange) {
         let reference_id = self
             .resolved_references
-            .push(ScopeId::global(), range, context);
+            .push(ScopeId::global(), range, self.flags);
         self.bindings[binding_id].references.push(reference_id);
     }
 
@@ -973,19 +968,6 @@ impl<'a> SemanticModel<'a> {
         self.unresolved_references.iter()
     }
 
-    /// Return the [`ExecutionContext`] of the current scope.
-    pub const fn execution_context(&self) -> ExecutionContext {
-        if self.in_type_checking_block()
-            || self.in_typing_only_annotation()
-            || self.in_complex_string_type_definition()
-            || self.in_simple_string_type_definition()
-        {
-            ExecutionContext::Typing
-        } else {
-            ExecutionContext::Runtime
-        }
-    }
-
     /// Return the union of all handled exceptions as an [`Exceptions`] bitflag.
     pub fn exceptions(&self) -> Exceptions {
         let mut exceptions = Exceptions::empty();
@@ -995,7 +977,7 @@ impl<'a> SemanticModel<'a> {
         exceptions
     }
 
-    /// Generate a [`Snapshot`] of the current context.
+    /// Generate a [`Snapshot`] of the current model.
     pub fn snapshot(&self) -> Snapshot {
         Snapshot {
             scope_id: self.scope_id,
@@ -1005,7 +987,7 @@ impl<'a> SemanticModel<'a> {
         }
     }
 
-    /// Restore the context to the given [`Snapshot`].
+    /// Restore the model to the given [`Snapshot`].
     pub fn restore(&mut self, snapshot: Snapshot) {
         let Snapshot {
             scope_id,
@@ -1019,53 +1001,68 @@ impl<'a> SemanticModel<'a> {
         self.flags = flags;
     }
 
-    /// Return `true` if the context is in a type annotation.
-    pub const fn in_annotation(&self) -> bool {
-        self.in_typing_only_annotation() || self.in_runtime_annotation()
+    /// Return the [`ExecutionContext`] of the current scope.
+    pub const fn execution_context(&self) -> ExecutionContext {
+        if self.flags.intersects(SemanticModelFlags::TYPING_CONTEXT) {
+            ExecutionContext::Typing
+        } else {
+            ExecutionContext::Runtime
+        }
     }
 
-    /// Return `true` if the context is in a typing-only type annotation.
+    /// Return `true` if the model is in a type annotation.
+    pub const fn in_annotation(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::ANNOTATION)
+    }
+
+    /// Return `true` if the model is in a typing-only type annotation.
     pub const fn in_typing_only_annotation(&self) -> bool {
         self.flags
-            .contains(SemanticModelFlags::TYPING_ONLY_ANNOTATION)
+            .intersects(SemanticModelFlags::TYPING_ONLY_ANNOTATION)
     }
 
-    /// Return `true` if the context is in a runtime-required type annotation.
+    /// Return `true` if the model is in a runtime-required type annotation.
     pub const fn in_runtime_annotation(&self) -> bool {
-        self.flags.contains(SemanticModelFlags::RUNTIME_ANNOTATION)
+        self.flags
+            .intersects(SemanticModelFlags::RUNTIME_ANNOTATION)
     }
 
-    /// Return `true` if the context is in a type definition.
+    /// Return `true` if the model is in a type definition.
     pub const fn in_type_definition(&self) -> bool {
-        self.flags.contains(SemanticModelFlags::TYPE_DEFINITION)
+        self.flags.intersects(SemanticModelFlags::TYPE_DEFINITION)
     }
 
-    /// Return `true` if the context is in a "simple" string type definition.
+    /// Return `true` if the model is in a string type definition.
+    pub const fn in_string_type_definition(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::STRING_TYPE_DEFINITION)
+    }
+
+    /// Return `true` if the model is in a "simple" string type definition.
     pub const fn in_simple_string_type_definition(&self) -> bool {
         self.flags
-            .contains(SemanticModelFlags::SIMPLE_STRING_TYPE_DEFINITION)
+            .intersects(SemanticModelFlags::SIMPLE_STRING_TYPE_DEFINITION)
     }
 
-    /// Return `true` if the context is in a "complex" string type definition.
+    /// Return `true` if the model is in a "complex" string type definition.
     pub const fn in_complex_string_type_definition(&self) -> bool {
         self.flags
-            .contains(SemanticModelFlags::COMPLEX_STRING_TYPE_DEFINITION)
+            .intersects(SemanticModelFlags::COMPLEX_STRING_TYPE_DEFINITION)
     }
 
-    /// Return `true` if the context is in a `__future__` type definition.
+    /// Return `true` if the model is in a `__future__` type definition.
     pub const fn in_future_type_definition(&self) -> bool {
         self.flags
-            .contains(SemanticModelFlags::FUTURE_TYPE_DEFINITION)
+            .intersects(SemanticModelFlags::FUTURE_TYPE_DEFINITION)
     }
 
-    /// Return `true` if the context is in any kind of deferred type definition.
+    /// Return `true` if the model is in any kind of deferred type definition.
     pub const fn in_deferred_type_definition(&self) -> bool {
-        self.in_simple_string_type_definition()
-            || self.in_complex_string_type_definition()
-            || self.in_future_type_definition()
+        self.flags
+            .intersects(SemanticModelFlags::DEFERRED_TYPE_DEFINITION)
     }
 
-    /// Return `true` if the context is in a forward type reference.
+    /// Return `true` if the model is in a forward type reference.
     ///
     /// Includes deferred string types, and future types in annotations.
     ///
@@ -1081,54 +1078,55 @@ impl<'a> SemanticModel<'a> {
     /// cast(Thread, x)  # Non-forward reference
     /// ```
     pub const fn in_forward_reference(&self) -> bool {
-        self.in_simple_string_type_definition()
-            || self.in_complex_string_type_definition()
+        self.in_string_type_definition()
             || (self.in_future_type_definition() && self.in_typing_only_annotation())
     }
 
-    /// Return `true` if the context is in an exception handler.
+    /// Return `true` if the model is in an exception handler.
     pub const fn in_exception_handler(&self) -> bool {
-        self.flags.contains(SemanticModelFlags::EXCEPTION_HANDLER)
+        self.flags.intersects(SemanticModelFlags::EXCEPTION_HANDLER)
     }
 
-    /// Return `true` if the context is in an f-string.
+    /// Return `true` if the model is in an f-string.
     pub const fn in_f_string(&self) -> bool {
-        self.flags.contains(SemanticModelFlags::F_STRING)
+        self.flags.intersects(SemanticModelFlags::F_STRING)
     }
 
-    /// Return `true` if the context is in boolean test.
+    /// Return `true` if the model is in boolean test.
     pub const fn in_boolean_test(&self) -> bool {
-        self.flags.contains(SemanticModelFlags::BOOLEAN_TEST)
+        self.flags.intersects(SemanticModelFlags::BOOLEAN_TEST)
     }
 
-    /// Return `true` if the context is in a `typing::Literal` annotation.
+    /// Return `true` if the model is in a `typing::Literal` annotation.
     pub const fn in_literal(&self) -> bool {
-        self.flags.contains(SemanticModelFlags::LITERAL)
+        self.flags.intersects(SemanticModelFlags::LITERAL)
     }
 
-    /// Return `true` if the context is in a subscript expression.
+    /// Return `true` if the model is in a subscript expression.
     pub const fn in_subscript(&self) -> bool {
-        self.flags.contains(SemanticModelFlags::SUBSCRIPT)
+        self.flags.intersects(SemanticModelFlags::SUBSCRIPT)
     }
 
-    /// Return `true` if the context is in a type-checking block.
+    /// Return `true` if the model is in a type-checking block.
     pub const fn in_type_checking_block(&self) -> bool {
-        self.flags.contains(SemanticModelFlags::TYPE_CHECKING_BLOCK)
+        self.flags
+            .intersects(SemanticModelFlags::TYPE_CHECKING_BLOCK)
     }
 
-    /// Return `true` if the context has traversed past the "top-of-file" import boundary.
+    /// Return `true` if the model has traversed past the "top-of-file" import boundary.
     pub const fn seen_import_boundary(&self) -> bool {
-        self.flags.contains(SemanticModelFlags::IMPORT_BOUNDARY)
+        self.flags.intersects(SemanticModelFlags::IMPORT_BOUNDARY)
     }
 
-    /// Return `true` if the context has traverse past the `__future__` import boundary.
+    /// Return `true` if the model has traverse past the `__future__` import boundary.
     pub const fn seen_futures_boundary(&self) -> bool {
-        self.flags.contains(SemanticModelFlags::FUTURES_BOUNDARY)
+        self.flags.intersects(SemanticModelFlags::FUTURES_BOUNDARY)
     }
 
     /// Return `true` if `__future__`-style type annotations are enabled.
     pub const fn future_annotations(&self) -> bool {
-        self.flags.contains(SemanticModelFlags::FUTURE_ANNOTATIONS)
+        self.flags
+            .intersects(SemanticModelFlags::FUTURE_ANNOTATIONS)
     }
 
     /// Return an iterator over all bindings shadowed by the given [`BindingId`], within the
@@ -1196,12 +1194,12 @@ impl ShadowedBinding {
 }
 
 bitflags! {
-    /// Flags indicating the current context of the analysis.
+    /// Flags indicating the current model state.
     #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
     pub struct SemanticModelFlags: u16 {
-        /// The context is in a typing-time-only type annotation.
+        /// The model is in a typing-time-only type annotation.
         ///
-        /// For example, the context could be visiting `int` in:
+        /// For example, the model could be visiting `int` in:
         /// ```python
         /// def foo() -> int:
         ///     x: int = 1
@@ -1214,9 +1212,9 @@ bitflags! {
         /// are any annotated assignments in module or class scopes.
         const TYPING_ONLY_ANNOTATION = 1 << 0;
 
-        /// The context is in a runtime type annotation.
+        /// The model is in a runtime type annotation.
         ///
-        /// For example, the context could be visiting `int` in:
+        /// For example, the model could be visiting `int` in:
         /// ```python
         /// def foo(x: int) -> int:
         ///     ...
@@ -1230,9 +1228,9 @@ bitflags! {
         /// are any annotated assignments in module or class scopes.
         const RUNTIME_ANNOTATION = 1 << 1;
 
-        /// The context is in a type definition.
+        /// The model is in a type definition.
         ///
-        /// For example, the context could be visiting `int` in:
+        /// For example, the model could be visiting `int` in:
         /// ```python
         /// from typing import NewType
         ///
@@ -1244,9 +1242,9 @@ bitflags! {
         /// doesn't appear in a type annotation context, but rather in a type definition.
         const TYPE_DEFINITION = 1 << 2;
 
-        /// The context is in a (deferred) "simple" string type definition.
+        /// The model is in a (deferred) "simple" string type definition.
         ///
-        /// For example, the context could be visiting `list[int]` in:
+        /// For example, the model could be visiting `list[int]` in:
         /// ```python
         /// x: "list[int]" = []
         /// ```
@@ -1255,9 +1253,9 @@ bitflags! {
         /// as opposed to an implicitly concatenated string literal.
         const SIMPLE_STRING_TYPE_DEFINITION =  1 << 3;
 
-        /// The context is in a (deferred) "complex" string type definition.
+        /// The model is in a (deferred) "complex" string type definition.
         ///
-        /// For example, the context could be visiting `list[int]` in:
+        /// For example, the model could be visiting `list[int]` in:
         /// ```python
         /// x: ("list" "[int]") = []
         /// ```
@@ -1266,9 +1264,9 @@ bitflags! {
         /// string literals. These are uncommon but valid.
         const COMPLEX_STRING_TYPE_DEFINITION = 1 << 4;
 
-        /// The context is in a (deferred) `__future__` type definition.
+        /// The model is in a (deferred) `__future__` type definition.
         ///
-        /// For example, the context could be visiting `list[int]` in:
+        /// For example, the model could be visiting `list[int]` in:
         /// ```python
         /// from __future__ import annotations
         ///
@@ -1279,9 +1277,9 @@ bitflags! {
         /// is enabled via `from __future__ import annotations`.
         const FUTURE_TYPE_DEFINITION = 1 << 5;
 
-        /// The context is in an exception handler.
+        /// The model is in an exception handler.
         ///
-        /// For example, the context could be visiting `x` in:
+        /// For example, the model could be visiting `x` in:
         /// ```python
         /// try:
         ///     ...
@@ -1290,17 +1288,17 @@ bitflags! {
         /// ```
         const EXCEPTION_HANDLER = 1 << 6;
 
-        /// The context is in an f-string.
+        /// The model is in an f-string.
         ///
-        /// For example, the context could be visiting `x` in:
+        /// For example, the model could be visiting `x` in:
         /// ```python
         /// f'{x}'
         /// ```
         const F_STRING = 1 << 7;
 
-        /// The context is in a boolean test.
+        /// The model is in a boolean test.
         ///
-        /// For example, the context could be visiting `x` in:
+        /// For example, the model could be visiting `x` in:
         /// ```python
         /// if x:
         ///     ...
@@ -1310,26 +1308,26 @@ bitflags! {
         /// not used, only its truthiness.
         const BOOLEAN_TEST = 1 << 8;
 
-        /// The context is in a `typing::Literal` annotation.
+        /// The model is in a `typing::Literal` annotation.
         ///
-        /// For example, the context could be visiting any of `"A"`, `"B"`, or `"C"` in:
+        /// For example, the model could be visiting any of `"A"`, `"B"`, or `"C"` in:
         /// ```python
         /// def f(x: Literal["A", "B", "C"]):
         ///     ...
         /// ```
         const LITERAL = 1 << 9;
 
-        /// The context is in a subscript expression.
+        /// The model is in a subscript expression.
         ///
-        /// For example, the context could be visiting `x["a"]` in:
+        /// For example, the model could be visiting `x["a"]` in:
         /// ```python
         /// x["a"]["b"]
         /// ```
         const SUBSCRIPT = 1 << 10;
 
-        /// The context is in a type-checking block.
+        /// The model is in a type-checking block.
         ///
-        /// For example, the context could be visiting `x` in:
+        /// For example, the model could be visiting `x` in:
         /// ```python
         /// from typing import TYPE_CHECKING
         ///
@@ -1339,9 +1337,9 @@ bitflags! {
         /// ```
         const TYPE_CHECKING_BLOCK = 1 << 11;
 
-        /// The context has traversed past the "top-of-file" import boundary.
+        /// The model has traversed past the "top-of-file" import boundary.
         ///
-        /// For example, the context could be visiting `x` in:
+        /// For example, the model could be visiting `x` in:
         /// ```python
         /// import os
         ///
@@ -1352,9 +1350,9 @@ bitflags! {
         /// ```
         const IMPORT_BOUNDARY = 1 << 12;
 
-        /// The context has traversed past the `__future__` import boundary.
+        /// The model has traversed past the `__future__` import boundary.
         ///
-        /// For example, the context could be visiting `x` in:
+        /// For example, the model could be visiting `x` in:
         /// ```python
         /// from __future__ import annotations
         ///
@@ -1367,9 +1365,9 @@ bitflags! {
         /// any other non-`__future__`-importing statements.
         const FUTURES_BOUNDARY = 1 << 13;
 
-        /// `__future__`-style type annotations are enabled in this context.
+        /// `__future__`-style type annotations are enabled in this model.
         ///
-        /// For example, the context could be visiting `x` in:
+        /// For example, the model could be visiting `x` in:
         /// ```python
         /// from __future__ import annotations
         ///
@@ -1378,6 +1376,22 @@ bitflags! {
         ///   ...
         /// ```
         const FUTURE_ANNOTATIONS = 1 << 14;
+
+        /// The context is in any type annotation.
+        const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_ANNOTATION.bits();
+
+        /// The context is in any string type definition.
+        const STRING_TYPE_DEFINITION = Self::SIMPLE_STRING_TYPE_DEFINITION.bits()
+            | Self::COMPLEX_STRING_TYPE_DEFINITION.bits();
+
+        /// The context is in any deferred type definition.
+        const DEFERRED_TYPE_DEFINITION = Self::SIMPLE_STRING_TYPE_DEFINITION.bits()
+            | Self::COMPLEX_STRING_TYPE_DEFINITION.bits()
+            | Self::FUTURE_TYPE_DEFINITION.bits();
+
+        /// The context is in a typing-only context.
+        const TYPING_CONTEXT = Self::TYPE_CHECKING_BLOCK.bits() | Self::TYPING_ONLY_ANNOTATION.bits() |
+            Self::STRING_TYPE_DEFINITION.bits();
     }
 }
 

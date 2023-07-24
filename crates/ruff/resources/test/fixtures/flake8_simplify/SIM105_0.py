@@ -17,6 +17,12 @@ except (ValueError, OSError):
 # SIM105
 try:
     foo()
+except (ValueError, OSError) as e:
+    pass
+
+# SIM105
+try:
+    foo()
 except:
     pass
 
@@ -94,3 +100,13 @@ def with_comment():
         foo()
     except (ValueError, OSError):
         pass  # Trailing comment.
+
+try:
+    print()
+except ("not", "an", "exception"):
+    pass
+
+try:
+    print()
+except "not an exception":
+    pass
