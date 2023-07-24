@@ -155,7 +155,7 @@ pub(crate) fn explicit_true_false_in_ifexpr(
     if checker.patch(diagnostic.kind.rule()) {
         if test.is_compare_expr() {
             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                checker.locator.slice(test.range()).to_string(),
+                checker.locator().slice(test.range()).to_string(),
                 expr.range(),
             )));
         } else if checker.semantic().is_builtin("bool") {

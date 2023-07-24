@@ -118,7 +118,7 @@ pub(crate) fn multiple_with_statements(
                     .map_or(last_item.context_expr.end(), |v| v.end()),
                 body.first().expect("Expected body to be non-empty").start(),
             ),
-            checker.locator,
+            checker.locator(),
         );
 
         let mut diagnostic = Diagnostic::new(
@@ -130,13 +130,13 @@ pub(crate) fn multiple_with_statements(
         );
         if checker.patch(diagnostic.kind.rule()) {
             if !checker
-                .indexer
+                .indexer()
                 .comment_ranges()
                 .intersects(TextRange::new(with_stmt.start(), with_body[0].start()))
             {
                 match fix_with::fix_multiple_with_statements(
-                    checker.locator,
-                    checker.stylist,
+                    checker.locator(),
+                    checker.stylist(),
                     with_stmt,
                 ) {
                     Ok(edit) => {

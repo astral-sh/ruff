@@ -9,7 +9,6 @@ use ruff_python_ast::visitor::preorder::{walk_expr, PreorderVisitor};
 
 use crate::builders::parenthesize_if_expands;
 use crate::context::NodeLevel;
-use crate::expression::expr_tuple::TupleParentheses;
 use crate::expression::parentheses::{
     is_expression_parenthesized, optional_parentheses, parenthesized, NeedsParentheses,
     OptionalParentheses, Parentheses, Parenthesize,
@@ -43,6 +42,7 @@ pub(crate) mod expr_tuple;
 pub(crate) mod expr_unary_op;
 pub(crate) mod expr_yield;
 pub(crate) mod expr_yield_from;
+pub(crate) mod number;
 pub(crate) mod parentheses;
 pub(crate) mod string;
 
@@ -90,10 +90,7 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             Expr::Starred(expr) => expr.format().fmt(f),
             Expr::Name(expr) => expr.format().fmt(f),
             Expr::List(expr) => expr.format().fmt(f),
-            Expr::Tuple(expr) => expr
-                .format()
-                .with_options(TupleParentheses::Expr(parentheses))
-                .fmt(f),
+            Expr::Tuple(expr) => expr.format().fmt(f),
             Expr::Slice(expr) => expr.format().fmt(f),
         });
 

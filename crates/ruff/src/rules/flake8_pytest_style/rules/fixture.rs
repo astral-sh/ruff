@@ -8,7 +8,7 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
-use ruff_python_ast::helpers::includes_arg_name;
+use ruff_python_ast::helpers::{find_keyword, includes_arg_name};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
@@ -114,6 +114,38 @@ impl Violation for PytestFixtureParamWithoutValue {
     }
 }
 
+/// ## What it does
+/// Checks for `pytest.yield_fixture` usage.
+///
+/// ## Why is this bad?
+/// `pytest.yield_fixture` is deprecated. `pytest.fixture` should be used instead.
+///
+/// ## Example
+/// ```python
+/// import pytest
+///
+///
+/// @pytest.yield_fixture()
+/// def my_fixture():
+///     obj = SomeClass()
+///     yield obj
+///     obj.cleanup()
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import pytest
+///
+///
+/// @pytest.fixture()
+/// def my_fixture():
+///     obj = SomeClass()
+///     yield obj
+///     obj.cleanup()
+/// ```
+///
+/// ## References
+/// - [`yield_fixture` functions](https://docs.pytest.org/en/latest/yieldfixture.html)
 #[violation]
 pub struct PytestDeprecatedYieldFixture;
 
@@ -306,18 +338,14 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &D
             }
 
             if checker.enabled(Rule::PytestExtraneousScopeFunction) {
-                let scope_keyword = keywords
-                    .iter()
-                    .find(|kw| kw.arg.as_ref().map_or(false, |arg| arg == "scope"));
-
-                if let Some(scope_keyword) = scope_keyword {
+                if let Some(scope_keyword) = find_keyword(keywords, "scope") {
                     if keyword_is_literal(scope_keyword, "function") {
                         let mut diagnostic =
                             Diagnostic::new(PytestExtraneousScopeFunction, scope_keyword.range());
                         if checker.patch(diagnostic.kind.rule()) {
                             diagnostic.try_set_fix(|| {
                                 remove_argument(
-                                    checker.locator,
+                                    checker.locator(),
                                     func.end(),
                                     scope_keyword.range,
                                     args,
@@ -473,7 +501,7 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Decorator]) {
                 let mut diagnostic =
                     Diagnostic::new(PytestUnnecessaryAsyncioMarkOnFixture, expr.range());
                 if checker.patch(diagnostic.kind.rule()) {
-                    let range = checker.locator.full_lines_range(expr.range());
+                    let range = checker.locator().full_lines_range(expr.range());
                     diagnostic.set_fix(Fix::automatic(Edit::range_deletion(range)));
                 }
                 checker.diagnostics.push(diagnostic);
@@ -485,7 +513,7 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Decorator]) {
                 let mut diagnostic =
                     Diagnostic::new(PytestErroneousUseFixturesOnFixture, expr.range());
                 if checker.patch(diagnostic.kind.rule()) {
-                    let line_range = checker.locator.full_lines_range(expr.range());
+                    let line_range = checker.locator().full_lines_range(expr.range());
                     diagnostic.set_fix(Fix::automatic(Edit::range_deletion(line_range)));
                 }
                 checker.diagnostics.push(diagnostic);

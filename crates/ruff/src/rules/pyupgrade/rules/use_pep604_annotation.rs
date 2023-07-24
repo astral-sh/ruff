@@ -67,7 +67,7 @@ pub(crate) fn use_pep604_annotation(
             let mut diagnostic = Diagnostic::new(NonPEP604Annotation, expr.range());
             if fixable && checker.patch(diagnostic.kind.rule()) {
                 diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                    optional(slice, checker.locator),
+                    optional(slice, checker.locator()),
                     expr.range(),
                 )));
             }
@@ -82,14 +82,14 @@ pub(crate) fn use_pep604_annotation(
                     }
                     Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                         diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                            union(elts, checker.locator),
+                            union(elts, checker.locator()),
                             expr.range(),
                         )));
                     }
                     _ => {
                         // Single argument.
                         diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                            checker.locator.slice(slice.range()).to_string(),
+                            checker.locator().slice(slice.range()).to_string(),
                             expr.range(),
                         )));
                     }

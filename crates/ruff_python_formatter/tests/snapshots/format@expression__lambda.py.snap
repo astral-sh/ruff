@@ -66,7 +66,13 @@ z)  # Trailing
 a = (
     lambda  # Dangling
            : 1
-)```
+)
+
+# Regression test: lambda empty arguments ranges were too long, leading to unstable
+# formatting
+(lambda:(#
+),)
+```
 
 ## Output
 ```py
@@ -129,6 +135,13 @@ lambda x: lambda y: lambda z: (
 
 a = (
     lambda: 1  # Dangling
+)
+
+# Regression test: lambda empty arguments ranges were too long, leading to unstable
+# formatting
+(
+    lambda: (  #
+    ),
 )
 ```
 

@@ -65,7 +65,7 @@ pub(crate) fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: 
                 return;
             }
 
-            let range = match_parens(func.end(), checker.locator)
+            let range = match_parens(func.end(), checker.locator())
                 .expect("Expected call to include parentheses");
             let mut diagnostic = Diagnostic::new(UnnecessaryParenOnRaiseException, range);
             if checker.patch(diagnostic.kind.rule()) {

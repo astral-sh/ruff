@@ -23,7 +23,7 @@ mod tests {
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("pygrep-hooks").join(path).as_path(),
+            Path::new("pygrep_hooks").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
         assert_messages!(snapshot, diagnostics);

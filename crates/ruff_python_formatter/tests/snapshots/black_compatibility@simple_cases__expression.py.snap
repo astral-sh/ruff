@@ -323,32 +323,6 @@ last_call()
  )  # note: no trailing comma pre-3.6
  call(*gidgets[:2])
  call(a, *gidgets[:2])
-@@ -152,13 +159,13 @@
- slice[0:1]
- slice[0:1:2]
- slice[:]
--slice[:-1]
-+slice[ : -1]
- slice[1:]
--slice[::-1]
-+slice[ :: -1]
- slice[d :: d + 1]
- slice[:c, c - 1]
- numpy[:, 0:1]
--numpy[:, :-1]
-+numpy[:,  : -1]
- numpy[0, :]
- numpy[:, i]
- numpy[0, :2]
-@@ -172,7 +179,7 @@
- numpy[1 : c + 1, c]
- numpy[-(c + 1) :, d]
- numpy[:, l[-2]]
--numpy[:, ::-1]
-+numpy[:,  :: -1]
- numpy[np.newaxis, :]
- (str or None) if (sys.version_info[0] > (3,)) else (str or bytes or None)
- {"2.7": dead, "3.7": long_live or die_hard}
 @@ -207,25 +214,15 @@
  )
  what_is_up_with_those_new_coord_names = (coord_names | set(vars_to_create)) - set(
@@ -383,21 +357,6 @@ last_call()
  Ø = set()
  authors.łukasz.say_thanks()
  mapping = {
-@@ -237,10 +234,10 @@
- 
- 
- def gen():
--    yield from outside_of_generator
--    a = yield
--    b = yield
--    c = yield
-+    NOT_YET_IMPLEMENTED_ExprYieldFrom
-+    a = NOT_YET_IMPLEMENTED_ExprYield
-+    b = NOT_YET_IMPLEMENTED_ExprYield
-+    c = NOT_YET_IMPLEMENTED_ExprYield
- 
- 
- async def f():
 @@ -328,13 +325,18 @@
  ):
      return True
@@ -596,13 +555,13 @@ slice[0]
 slice[0:1]
 slice[0:1:2]
 slice[:]
-slice[ : -1]
+slice[:-1]
 slice[1:]
-slice[ :: -1]
+slice[::-1]
 slice[d :: d + 1]
 slice[:c, c - 1]
 numpy[:, 0:1]
-numpy[:,  : -1]
+numpy[:, :-1]
 numpy[0, :]
 numpy[:, i]
 numpy[0, :2]
@@ -616,7 +575,7 @@ numpy[:, [i]]
 numpy[1 : c + 1, c]
 numpy[-(c + 1) :, d]
 numpy[:, l[-2]]
-numpy[:,  :: -1]
+numpy[:, ::-1]
 numpy[np.newaxis, :]
 (str or None) if (sys.version_info[0] > (3,)) else (str or bytes or None)
 {"2.7": dead, "3.7": long_live or die_hard}
@@ -671,10 +630,10 @@ mapping = {
 
 
 def gen():
-    NOT_YET_IMPLEMENTED_ExprYieldFrom
-    a = NOT_YET_IMPLEMENTED_ExprYield
-    b = NOT_YET_IMPLEMENTED_ExprYield
-    c = NOT_YET_IMPLEMENTED_ExprYield
+    yield from outside_of_generator
+    a = yield
+    b = yield
+    c = yield
 
 
 async def f():

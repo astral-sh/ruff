@@ -132,9 +132,9 @@ pub(crate) fn unnecessary_builtin_import(
                 unused_imports.iter().map(String::as_str),
                 stmt,
                 parent,
-                checker.locator,
-                checker.stylist,
-                checker.indexer,
+                checker.locator(),
+                checker.stylist(),
+                checker.indexer(),
             )?;
             Ok(Fix::suggested(edit).isolate(checker.isolation(parent)))
         });

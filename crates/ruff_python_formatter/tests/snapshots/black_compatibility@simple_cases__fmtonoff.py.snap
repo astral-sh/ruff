@@ -211,7 +211,7 @@ d={'a':1,
  # Comment 1
  
  # Comment 2
-@@ -17,30 +16,44 @@
+@@ -17,26 +16,40 @@
  
  # fmt: off
  def func_no_args():
@@ -264,17 +264,12 @@ d={'a':1,
 +    debug: bool = False,
 +    **kwargs,
 +) -> str:
-+    return text[number : -1]
++    return text[number:-1]
 +
 +
  # fmt: on
  def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r""):
      offset = attr.ib(default=attr.Factory(lambda: _r.uniform(1, 2)))
--    assert task._cancel_stack[: len(old_stack)] == old_stack
-+    assert task._cancel_stack[ : len(old_stack)] == old_stack
- 
- 
- def spaces_types(
 @@ -63,15 +76,15 @@
  
  something = {
@@ -316,16 +311,15 @@ d={'a':1,
  
  def yield_expr():
      # fmt: off
--    yield hello
+     yield hello
 -    'unformatted'
-+    NOT_YET_IMPLEMENTED_ExprYield
 +    "unformatted"
      # fmt: on
      "formatted"
      # fmt: off
 -    ( yield hello )
 -    'unformatted'
-+    (NOT_YET_IMPLEMENTED_ExprYield)
++    (yield hello)
 +    "unformatted"
      # fmt: on
  
@@ -384,7 +378,7 @@ d={'a':1,
  )
  # fmt: off
 -yield  'hello'
-+NOT_YET_IMPLEMENTED_ExprYield
++yield "hello"
  # No formatting to the end of the file
 -l=[1,2,3]
 -d={'a':1,
@@ -445,13 +439,13 @@ def function_signature_stress_test(
     debug: bool = False,
     **kwargs,
 ) -> str:
-    return text[number : -1]
+    return text[number:-1]
 
 
 # fmt: on
 def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r""):
     offset = attr.ib(default=attr.Factory(lambda: _r.uniform(1, 2)))
-    assert task._cancel_stack[ : len(old_stack)] == old_stack
+    assert task._cancel_stack[: len(old_stack)] == old_stack
 
 
 def spaces_types(
@@ -505,12 +499,12 @@ def testlist_star_expr():
 
 def yield_expr():
     # fmt: off
-    NOT_YET_IMPLEMENTED_ExprYield
+    yield hello
     "unformatted"
     # fmt: on
     "formatted"
     # fmt: off
-    (NOT_YET_IMPLEMENTED_ExprYield)
+    (yield hello)
     "unformatted"
     # fmt: on
 
@@ -622,7 +616,7 @@ cfg.rule(
     xxxxxxxxxx_xxxxxxxxxxx_xxxxxxx_xxxxxxxxx=5,
 )
 # fmt: off
-NOT_YET_IMPLEMENTED_ExprYield
+yield "hello"
 # No formatting to the end of the file
 l = [1, 2, 3]
 d = {"a": 1, "b": 2}

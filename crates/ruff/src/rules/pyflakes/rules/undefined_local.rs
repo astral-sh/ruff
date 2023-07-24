@@ -2,6 +2,7 @@ use std::string::ToString;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_semantic::{Scope, ScopeId};
 
 use crate::checkers::ast::Checker;
 
@@ -44,55 +45,35 @@ impl Violation for UndefinedLocal {
 }
 
 /// F823
-pub(crate) fn undefined_local(checker: &mut Checker, name: &str) {
-    // If the name hasn't already been defined in the current scope...
-    let current = checker.semantic().scope();
-    if !current.kind.is_any_function() || current.has(name) {
-        return;
-    }
-
-    let Some(parent) = current.parent else {
-        return;
-    };
-
-    // For every function and module scope above us...
-    let local_access = checker
-        .semantic()
-        .scopes
-        .ancestors(parent)
-        .find_map(|scope| {
-            if !(scope.kind.is_any_function() || scope.kind.is_module()) {
-                return None;
-            }
-
-            // If the name was defined in that scope...
-            if let Some(binding) = scope
-                .get(name)
-                .map(|binding_id| checker.semantic().binding(binding_id))
-            {
-                // And has already been accessed in the current scope...
-                if let Some(range) = binding.references().find_map(|reference_id| {
+pub(crate) fn undefined_local(
+    checker: &Checker,
+    scope_id: ScopeId,
+    scope: &Scope,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    if scope.kind.is_any_function() {
+        for (name, binding_id) in scope.bindings() {
+            // If the variable shadows a binding in a parent scope...
+            if let Some(shadowed_id) = checker.semantic().shadowed_binding(binding_id) {
+                let shadowed = checker.semantic().binding(shadowed_id);
+                // And that binding was referenced in the current scope...
+                if let Some(range) = shadowed.references().find_map(|reference_id| {
                     let reference = checker.semantic().reference(reference_id);
-                    if checker.semantic().is_current_scope(reference.scope_id()) {
+                    if reference.scope_id() == scope_id {
                         Some(reference.range())
                     } else {
                         None
                     }
                 }) {
                     // Then it's probably an error.
-                    return Some(range);
+                    diagnostics.push(Diagnostic::new(
+                        UndefinedLocal {
+                            name: name.to_string(),
+                        },
+                        range,
+                    ));
                 }
             }
-
-            None
-        });
-
-    if let Some(location) = local_access {
-        checker.diagnostics.push(Diagnostic::new(
-            UndefinedLocal {
-                name: name.to_string(),
-            },
-            location,
-        ));
+        }
     }
 }

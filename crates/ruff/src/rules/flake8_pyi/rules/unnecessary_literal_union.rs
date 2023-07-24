@@ -64,7 +64,7 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &mut Checker, expr: &'a Exp
             UnnecessaryLiteralUnion {
                 members: literal_exprs
                     .into_iter()
-                    .map(|literal_expr| checker.locator.slice(literal_expr.range()).to_string())
+                    .map(|literal_expr| checker.locator().slice(literal_expr.range()).to_string())
                     .collect(),
             },
             expr.range(),

@@ -58,7 +58,7 @@ pub(crate) fn load_before_global_declaration(checker: &mut Checker, name: &str, 
     if let Some(stmt) = checker.semantic().global(name) {
         if expr.start() < stmt.start() {
             #[allow(deprecated)]
-            let location = checker.locator.compute_source_location(stmt.start());
+            let location = checker.locator().compute_source_location(stmt.start());
             checker.diagnostics.push(Diagnostic::new(
                 LoadBeforeGlobalDeclaration {
                     name: name.to_string(),

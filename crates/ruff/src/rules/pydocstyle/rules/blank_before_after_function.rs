@@ -114,7 +114,7 @@ pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Doc
 
     if checker.enabled(Rule::NoBlankLineBeforeFunction) {
         let before = checker
-            .locator
+            .locator()
             .slice(TextRange::new(stmt.start(), docstring.start()));
 
         let mut lines = UniversalNewlineIterator::with_offset(before, stmt.start()).rev();
@@ -150,7 +150,7 @@ pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Doc
 
     if checker.enabled(Rule::NoBlankLineAfterFunction) {
         let after = checker
-            .locator
+            .locator()
             .slice(TextRange::new(docstring.end(), stmt.end()));
 
         // If the docstring is only followed by blank and commented lines, abort.

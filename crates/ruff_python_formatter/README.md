@@ -231,6 +231,13 @@ additional test cases in `resources/test/fixtures/ruff`.
 
 The full Ruff test suite is slow, `cargo test -p ruff_python_formatter` is a lot faster.
 
+You can check the black compatibility on a number of projects using `scripts/formatter_progress`.
+It will print the similarity index, the percentage of lines that remains unchanged between black's
+formatting and our formatting. You could compute it as the number of neutral lines in a diff divided
+by the neutral plus the removed lines. It also checks for common problems such unstable formatting,
+internal formatter errors and printing invalid syntax. We run this script in CI and you can view the
+results in a PR page under "Checks" > "CI" > "Summary" at the bottom of the page.
+
 There is a `ruff_python_formatter` binary that avoid building and linking the main `ruff` crate.
 
 You can use `scratch.py` as a playground, e.g.
@@ -239,7 +246,7 @@ and `--print-comments` options.
 
 The origin of Ruff's formatter is the [Rome formatter](https://github.com/rome/tools/tree/main/crates/rome_json_formatter),
 e.g. the ruff_formatter crate is forked from the [rome_formatter crate](https://github.com/rome/tools/tree/main/crates/rome_formatter).
-The Rome repository can be a helpful reference when implementing something in the Ruff formatter
+The Rome repository can be a helpful reference when implementing something in the Ruff formatter.
 
 ### Checking entire projects
 
@@ -267,15 +274,6 @@ git clone --branch 3.10 https://github.com/python/cpython.git crates/ruff/resour
 cargo run --bin ruff_dev -- format-dev --stability-check crates/ruff/resources/test/cpython
 ```
 
-It is also possible large number of repositories using ruff. This dataset is large (~60GB), so we
-only do this occasionally:
-
-```shell
-curl https://raw.githubusercontent.com/akx/ruff-usage-aggregate/master/data/known-github-tomls-clean.jsonl> github_search.jsonl
-python scripts/check_ecosystem.py --checkouts target/checkouts --projects github_search.jsonl -v $(which true) $(which true)
-cargo run --bin ruff_dev -- format-dev --stability-check --multi-project target/checkouts
-```
-
 Compared to `ruff check`, `cargo run --bin ruff_dev -- format-dev` has 4 additional options:
 
 - `--write`: Format the files and write them back to disk
@@ -283,6 +281,33 @@ Compared to `ruff check`, `cargo run --bin ruff_dev -- format-dev` has 4 additio
 - `--multi-project`: Treat every subdirectory as a separate project. Useful for ecosystem checks.
 - `--error-file`: Use together with `--multi-project`, this writes all errors (but not status
     messages) to a file.
+
+It is also possible to check a large number of repositories. This dataset is large (~60GB), so we
+only do this occasionally:
+
+```shell
+# Get the list of projects
+curl https://raw.githubusercontent.com/akx/ruff-usage-aggregate/master/data/known-github-tomls-clean.jsonl > github_search.jsonl
+# Repurpose this script to download the repositories for us
+python scripts/check_ecosystem.py --checkouts target/checkouts --projects github_search.jsonl -v $(which true) $(which true)
+# Check each project for formatter stability
+cargo run --bin ruff_dev -- format-dev --stability-check --error-file target/formatter-ecosystem-errors.txt --multi-project target/checkouts
+```
+
+To shrink a formatter error from an entire file to a minimal reproducible example, you can use
+`ruff_shrinking`:
+
+```shell
+cargo run --bin ruff_shrinking -- <your_file> target/shrinking.py "Unstable formatting" "target/release/ruff_dev format-dev --stability-check target/shrinking.py"
+```
+
+The first argument is the input file, the second is the output file where the candidates
+and the eventual minimized version will be written to. The third argument is a regex matching the
+error message, e.g. "Unstable formatting" or "Formatter error". The last argument is the command
+with the error, e.g. running the stability check on the candidate file. The script will try various
+strategies to remove parts of the code. If the output of the command still matches, it will use that
+slightly smaller code as starting point for the next iteration, otherwise it will revert and try
+a different strategy until all strategies are exhausted.
 
 ## The orphan rules and trait structure
 

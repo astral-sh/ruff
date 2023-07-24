@@ -276,7 +276,7 @@ pub(crate) fn literal_comparisons(
             .map(|(idx, op)| bad_ops.get(&idx).unwrap_or(op))
             .copied()
             .collect::<Vec<_>>();
-        let content = compare(left, &ops, comparators, checker.locator);
+        let content = compare(left, &ops, comparators, checker.locator());
         for diagnostic in &mut diagnostics {
             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                 content.to_string(),
