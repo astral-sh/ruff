@@ -275,8 +275,6 @@ bitflags! {
 #[newtype_index]
 pub struct BindingId;
 
-impl nohash_hasher::IsEnabled for BindingId {}
-
 /// The bindings in a program.
 ///
 /// Bindings are indexed by [`BindingId`]

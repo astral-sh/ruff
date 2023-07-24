@@ -45,7 +45,6 @@ libcst = { workspace = true }
 log = { workspace = true }
 memchr = { workspace = true }
 natord = { version = "1.0.9" }
-nohash-hasher = { workspace = true }
 num-bigint = { workspace = true }
 num-traits = { workspace = true }
 once_cell = { workspace = true }
