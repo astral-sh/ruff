@@ -1370,15 +1370,11 @@ fn handle_with_item_comment<'a>(
         SimpleTokenKind::As,
     );
 
-    // If before the `as` keyword, then it must be a trailing comment of the context expression.
     if comment.end() < as_token.start() {
+        // If before the `as` keyword, then it must be a trailing comment of the context expression.
         CommentPlacement::trailing(context_expr, comment)
-    }
-    // Trailing end of line comment coming after the `as` keyword`.
-    else if comment.line_position().is_end_of_line() {
-        CommentPlacement::dangling(comment.enclosing_node(), comment)
     } else {
-        CommentPlacement::Default(comment)
+        CommentPlacement::dangling(comment.enclosing_node(), comment)
     }
 }
 

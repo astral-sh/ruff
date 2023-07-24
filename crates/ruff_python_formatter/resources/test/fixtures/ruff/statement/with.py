@@ -25,6 +25,7 @@ with (
 with (
         a  # a
         as  # as
+        # own line
         b  # b
         ,  # comma
         c  # c

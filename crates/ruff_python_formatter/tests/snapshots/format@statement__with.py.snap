@@ -31,6 +31,7 @@ with (
 with (
         a  # a
         as  # as
+        # own line
         b  # b
         ,  # comma
         c  # c
@@ -142,7 +143,8 @@ with (
 
 
 with (
-    a as b,  # a  # as  # b  # comma
+    a as b,  # a  # as
+    # own line  # b  # comma
     c,  # c
 ):  # colon
     ...  # body
