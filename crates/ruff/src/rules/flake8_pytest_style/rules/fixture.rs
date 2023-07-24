@@ -23,6 +23,27 @@ use super::helpers::{
     get_mark_decorators, is_pytest_fixture, is_pytest_yield_fixture, keyword_is_literal,
 };
 
+/// ## What it does
+/// Checks whether `@pytest.fixture()` without parameters has parentheses.
+///
+/// ## Why is this bad?
+/// Code style inconsistency.
+///
+/// ## Example
+/// ```python
+/// @pytest.fixture
+/// def my_fixture():
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// @pytest.fixture()
+/// def my_fixture():
+///     ...
+/// ```
+/// ## Options
+/// - `flake8-pytest-style.fixture-parentheses`
 #[violation]
 pub struct PytestFixtureIncorrectParenthesesStyle {
     expected: Parentheses,
