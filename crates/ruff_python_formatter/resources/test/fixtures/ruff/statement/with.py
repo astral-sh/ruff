@@ -33,6 +33,13 @@ with (
     ...  # body
     # body trailing own
 
+with (
+        a  # a
+        as  # as
+        # own line
+        bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb  # b
+): pass
+
 
 with (a,):  # magic trailing comma
     ...
