@@ -49,6 +49,7 @@ impl Expr {
             Expr::Lambda { .. } => "lambda",
             Expr::IfExp { .. } => "conditional expression",
             Expr::NamedExpr { .. } => "named expression",
+            Expr::LineMagic(_) => "line magic",
         }
     }
 }

@@ -207,6 +207,11 @@ impl Ranged for crate::generic::StmtContinue {
         self.range
     }
 }
+impl Ranged for crate::generic::StmtLineMagic {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
 impl Ranged for crate::Stmt {
     fn range(&self) -> TextRange {
         match self {
@@ -238,6 +243,7 @@ impl Ranged for crate::Stmt {
             Self::Pass(node) => node.range(),
             Self::Break(node) => node.range(),
             Self::Continue(node) => node.range(),
+            Self::LineMagic(node) => node.range(),
         }
     }
 }
@@ -377,6 +383,11 @@ impl Ranged for crate::generic::ExprSlice {
         self.range
     }
 }
+impl Ranged for crate::generic::ExprLineMagic {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
 impl Ranged for crate::Expr {
     fn range(&self) -> TextRange {
         match self {
@@ -407,6 +418,7 @@ impl Ranged for crate::Expr {
             Self::List(node) => node.range(),
             Self::Tuple(node) => node.range(),
             Self::Slice(node) => node.range(),
+            Self::LineMagic(node) => node.range(),
         }
     }
 }

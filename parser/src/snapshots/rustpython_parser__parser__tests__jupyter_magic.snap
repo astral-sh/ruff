@@ -4,7 +4,7 @@ expression: parse_ast
 ---
 Module(
     ModModule {
-        range: 0..736,
+        range: 0..803,
         body: [
             Expr(
                 StmtExpr {
@@ -29,6 +29,97 @@ Module(
                             ),
                         },
                     ),
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 66..73,
+                    kind: Help2,
+                    value: "a.foo",
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 74..80,
+                    kind: Help,
+                    value: "a.foo",
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 81..88,
+                    kind: Help,
+                    value: "a.foo?",
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 89..100,
+                    kind: Help2,
+                    value: "a.foo()??",
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 115..128,
+                    kind: Magic,
+                    value: "timeit a = b",
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 129..147,
+                    kind: Magic,
+                    value: "timeit foo(b) % 3",
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 148..176,
+                    kind: Magic,
+                    value: "alias showPath pwd && ls -a",
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 177..205,
+                    kind: Magic,
+                    value: "timeit a =  foo(b); b = 2",
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 206..226,
+                    kind: Magic,
+                    value: "matplotlib --inline",
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 227..253,
+                    kind: Magic,
+                    value: "matplotlib     --inline",
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 277..309,
+                    kind: Shell,
+                    value: "pwd && ls -a | sed 's/^/\\    /'",
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 310..347,
+                    kind: Shell,
+                    value: "pwd   && ls -a | sed 's/^/\\\\    /'",
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 348..393,
+                    kind: ShCap,
+                    value: "cd /Users/foo/Library/Application\\ Support/",
                 },
             ),
             FunctionDef(
@@ -85,9 +176,30 @@ Module(
                     type_comment: None,
                 },
             ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 656..664,
+                    kind: Paren,
+                    value: "foo 1 2",
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 665..673,
+                    kind: Quote2,
+                    value: "foo 1 2",
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 674..682,
+                    kind: Quote,
+                    value: "foo 1 2",
+                },
+            ),
             For(
                 StmtFor {
-                    range: 701..736,
+                    range: 701..727,
                     target: Name(
                         ExprName {
                             range: 705..706,
@@ -120,13 +232,117 @@ Module(
                         },
                     ),
                     body: [
-                        Pass(
-                            StmtPass {
-                                range: 732..736,
+                        LineMagic(
+                            StmtLineMagic {
+                                range: 724..727,
+                                kind: Shell,
+                                value: "ls",
                             },
                         ),
                     ],
                     orelse: [],
+                    type_comment: None,
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 729..738,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 729..731,
+                                id: "p1",
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: LineMagic(
+                        ExprLineMagic {
+                            range: 734..738,
+                            kind: Shell,
+                            value: "pwd",
+                        },
+                    ),
+                    type_comment: None,
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 739..753,
+                    target: Name(
+                        ExprName {
+                            range: 739..741,
+                            id: "p2",
+                            ctx: Store,
+                        },
+                    ),
+                    annotation: Name(
+                        ExprName {
+                            range: 743..746,
+                            id: "str",
+                            ctx: Load,
+                        },
+                    ),
+                    value: Some(
+                        LineMagic(
+                            ExprLineMagic {
+                                range: 749..753,
+                                kind: Shell,
+                                value: "pwd",
+                            },
+                        ),
+                    ),
+                    simple: true,
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 754..774,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 754..757,
+                                id: "foo",
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: LineMagic(
+                        ExprLineMagic {
+                            range: 760..774,
+                            kind: Magic,
+                            value: "foo     bar",
+                        },
+                    ),
+                    type_comment: None,
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 776..781,
+                    kind: Magic,
+                    value: " foo",
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 782..803,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 782..785,
+                                id: "foo",
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: LineMagic(
+                        ExprLineMagic {
+                            range: 788..803,
+                            kind: Magic,
+                            value: "foo  # comment",
+                        },
+                    ),
                     type_comment: None,
                 },
             ),

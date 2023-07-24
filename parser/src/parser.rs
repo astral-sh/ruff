@@ -409,9 +409,6 @@ pub fn parse_starts_at(
 ///
 /// This could allow you to perform some preprocessing on the tokens before parsing them.
 ///
-/// When in [`Mode::Jupyter`], this will filter out all the Jupyter magic commands
-/// before parsing the tokens.
-///
 /// # Example
 ///
 /// As an example, instead of parsing a string, we can parse a list of tokens after we generate
@@ -432,12 +429,7 @@ pub fn parse_tokens(
     #[cfg(feature = "full-lexer")]
     let lxr =
         lxr.filter_ok(|(tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline));
-    if mode == Mode::Jupyter {
-        let lxr = lxr.filter_ok(|(tok, _)| !matches!(tok, Tok::MagicCommand { .. }));
-        parse_filtered_tokens(lxr, mode, source_path)
-    } else {
-        parse_filtered_tokens(lxr, mode, source_path)
-    }
+    parse_filtered_tokens(lxr, mode, source_path)
 }
 
 fn parse_filtered_tokens(
@@ -449,6 +441,7 @@ fn parse_filtered_tokens(
     let lexer = iter::once(Ok(marker_token)).chain(lxr);
     python::TopParser::new()
         .parse(
+            mode,
             lexer
                 .into_iter()
                 .map_ok(|(t, range)| (range.start(), t, range.end())),
@@ -1319,8 +1312,15 @@ def foo():
 
 # Indented magic
 for a in range(5):
-    %ls
-    pass
+    !ls
+
+p1 = !pwd
+p2: str = !pwd
+foo = %foo \
+    bar
+
+% foo
+foo = %foo  # comment
 "#
             .trim(),
             Mode::Jupyter,
@@ -1328,5 +1328,20 @@ for a in range(5):
         )
         .unwrap();
         insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
+    fn test_jupyter_magic_parse_error() {
+        let source = r#"
+a = 1
+%timeit a == 1
+    "#
+        .trim();
+        let lxr = lexer::lex_starts_at(source, Mode::Jupyter, TextSize::default());
+        let parse_err = parse_tokens(lxr, Mode::Module, "<test>").unwrap_err();
+        assert_eq!(
+            parse_err.to_string(),
+            "line magics are only allowed in Jupyter mode at byte offset 6".to_string()
+        );
     }
 }

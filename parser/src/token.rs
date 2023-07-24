@@ -5,6 +5,7 @@
 //!
 //! [CPython source]: https://github.com/python/cpython/blob/dfc2e065a2e71011017077e549cd2f9bf4944c54/Include/internal/pycore_token.h
 use crate::ast::bigint::BigInt;
+use crate::ast::MagicKind;
 use crate::{text_size::TextSize, Mode};
 use std::fmt;
 
@@ -331,93 +332,6 @@ impl fmt::Display for Tok {
             Yield => f.write_str("'yield'"),
             ColonEqual => f.write_str("':='"),
         }
-    }
-}
-
-/// The kind of magic command as defined in [IPython Syntax] in the IPython codebase.
-///
-/// [IPython Syntax]: https://github.com/ipython/ipython/blob/635815e8f1ded5b764d66cacc80bbe25e9e2587f/IPython/core/inputtransformer2.py#L335-L343
-#[derive(PartialEq, Eq, Debug, Clone, Hash, Copy)]
-pub enum MagicKind {
-    /// Send line to underlying system shell.
-    Shell,
-    /// Send line to system shell and capture output.
-    ShCap,
-    /// Show help on object.
-    Help,
-    /// Show help on object, with extra verbosity.
-    Help2,
-    /// Call magic function.
-    Magic,
-    /// Call cell magic function.
-    Magic2,
-    /// Call first argument with rest of line as arguments after splitting on whitespace
-    /// and quote each as string.
-    Quote,
-    /// Call first argument with rest of line as an argument quoted as a single string.
-    Quote2,
-    /// Call first argument with rest of line as arguments.
-    Paren,
-}
-
-impl TryFrom<char> for MagicKind {
-    type Error = String;
-
-    fn try_from(ch: char) -> Result<Self, Self::Error> {
-        match ch {
-            '!' => Ok(MagicKind::Shell),
-            '?' => Ok(MagicKind::Help),
-            '%' => Ok(MagicKind::Magic),
-            ',' => Ok(MagicKind::Quote),
-            ';' => Ok(MagicKind::Quote2),
-            '/' => Ok(MagicKind::Paren),
-            _ => Err(format!("Unexpected magic escape: {ch}")),
-        }
-    }
-}
-
-impl TryFrom<[char; 2]> for MagicKind {
-    type Error = String;
-
-    fn try_from(ch: [char; 2]) -> Result<Self, Self::Error> {
-        match ch {
-            ['!', '!'] => Ok(MagicKind::ShCap),
-            ['?', '?'] => Ok(MagicKind::Help2),
-            ['%', '%'] => Ok(MagicKind::Magic2),
-            [c1, c2] => Err(format!("Unexpected magic escape: {c1}{c2}")),
-        }
-    }
-}
-
-impl fmt::Display for MagicKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            MagicKind::Shell => f.write_str("!"),
-            MagicKind::ShCap => f.write_str("!!"),
-            MagicKind::Help => f.write_str("?"),
-            MagicKind::Help2 => f.write_str("??"),
-            MagicKind::Magic => f.write_str("%"),
-            MagicKind::Magic2 => f.write_str("%%"),
-            MagicKind::Quote => f.write_str(","),
-            MagicKind::Quote2 => f.write_str(";"),
-            MagicKind::Paren => f.write_str("/"),
-        }
-    }
-}
-
-impl MagicKind {
-    /// Returns the length of the magic command prefix.
-    pub fn prefix_len(self) -> TextSize {
-        let len = match self {
-            MagicKind::Shell
-            | MagicKind::Magic
-            | MagicKind::Help
-            | MagicKind::Quote
-            | MagicKind::Quote2
-            | MagicKind::Paren => 1,
-            MagicKind::ShCap | MagicKind::Magic2 | MagicKind::Help2 => 2,
-        };
-        len.into()
     }
 }
 

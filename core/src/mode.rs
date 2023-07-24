@@ -15,16 +15,12 @@ pub enum Mode {
     ///
     /// ## Limitations:
     ///
-    /// These escaped commands are only supported when they are the only
-    /// statement on a line. If they're part of a larger statement such as
-    /// on the right-hand side of an assignment, the lexer will not recognize
-    /// them as escape commands.
-    ///
     /// For [Dynamic object information], the escape characters (`?`, `??`)
     /// must be used before an object. For example, `?foo` will be recognized,
     /// but `foo?` will not.
     ///
     /// ## Supported escape commands:
+    ///
     /// - [Magic command system] which is limited to [line magics] and can start
     ///   with `?` or `??`.
     /// - [Dynamic object information] which can start with `?` or `??`.
