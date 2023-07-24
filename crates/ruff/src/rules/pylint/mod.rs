@@ -116,6 +116,7 @@ mod tests {
         Rule::RepeatedEqualityComparisonTarget,
         Path::new("repeated_equality_comparison_target.py")
     )]
+    #[test_case(Rule::SelfAssigningVariable, Path::new("self_assigning_variable.py"))]
     #[test_case(
         Rule::SubprocessPopenPreexecFn,
         Path::new("subprocess_popen_preexec_fn.py")

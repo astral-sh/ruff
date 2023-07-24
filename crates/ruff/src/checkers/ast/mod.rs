@@ -1583,6 +1583,11 @@ where
                         self.diagnostics.push(diagnostic);
                     }
                 }
+                if self.settings.rules.enabled(Rule::SelfAssigningVariable) {
+                    if let [target] = targets.as_slice() {
+                        pylint::rules::self_assigning_variable(self, target, value);
+                    }
+                }
                 if self.settings.rules.enabled(Rule::TypeParamNameMismatch) {
                     pylint::rules::type_param_name_mismatch(self, value, targets);
                 }
@@ -1635,8 +1640,8 @@ where
                 annotation,
                 ..
             }) => {
-                if self.enabled(Rule::LambdaAssignment) {
-                    if let Some(value) = value {
+                if let Some(value) = value {
+                    if self.enabled(Rule::LambdaAssignment) {
                         pycodestyle::rules::lambda_assignment(
                             self,
                             target,
@@ -1644,6 +1649,9 @@ where
                             Some(annotation),
                             stmt,
                         );
+                    }
+                    if self.enabled(Rule::SelfAssigningVariable) {
+                        pylint::rules::self_assigning_variable(self, target, value);
                     }
                 }
                 if self.enabled(Rule::UnintentionalTypeAnnotation) {
