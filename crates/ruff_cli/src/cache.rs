@@ -164,21 +164,20 @@ impl Cache {
         path.strip_prefix(&self.package.package_root).ok()
     }
 
-    /// Get the cached results for a single file at relative `path`. This uses
-    /// `file_last_modified` to determine if the results are still accurate
+    /// Get the cached results for a single file at relative `path`. This
+    /// uses `key` to determine if the results are still accurate.
     /// (i.e. if the file hasn't been modified since the cached run).
     ///
-    /// This returns `None` if `file_last_modified` differs from the cached
-    /// timestamp or if the cache doesn't contain results for the file.
-    pub(crate) fn get(
-        &self,
-        path: &RelativePath,
-        file_last_modified: SystemTime,
-    ) -> Option<&FileCache> {
+    /// This returns `None` if `key` differs from the cached key or if the
+    /// cache doesn't contain results for the file.
+    pub(crate) fn get<T: CacheKey>(&self, path: &RelativePath, key: &T) -> Option<&FileCache> {
         let file = self.package.files.get(path)?;
 
+        let mut hasher = CacheKeyHasher::new();
+        key.cache_key(&mut hasher);
+
         // Make sure the file hasn't changed since the cached run.
-        if file.last_modified != file_last_modified {
+        if file.key != hasher.finish() {
             return None;
         }
 
@@ -188,10 +187,10 @@ impl Cache {
     }
 
     /// Add or update a file cache at `path` relative to the package root.
-    pub(crate) fn update(
+    pub(crate) fn update<T: CacheKey>(
         &self,
         path: RelativePathBuf,
-        last_modified: SystemTime,
+        key: T,
         messages: &[Message],
         imports: &ImportMap,
     ) {
@@ -218,8 +217,11 @@ impl Cache {
             })
             .collect();
 
+        let mut hasher = CacheKeyHasher::new();
+        key.cache_key(&mut hasher);
+
         let file = FileCache {
-            last_modified,
+            key: hasher.finish(),
             last_seen: AtomicU64::new(self.last_seen_cache),
             imports: imports.clone(),
             messages,
@@ -244,8 +246,8 @@ struct PackageCache {
 /// On disk representation of the cache per source file.
 #[derive(Deserialize, Debug, Serialize)]
 pub(crate) struct FileCache {
-    /// Timestamp when the file was last modified before the (cached) check.
-    last_modified: SystemTime,
+    /// Key that determines if the cached item is still valid.
+    key: u64,
     /// Timestamp when we last linted this file.
     ///
     /// Represented as the number of milliseconds since Unix epoch. This will
@@ -332,7 +334,6 @@ mod tests {
     use std::io::{self, Write};
     use std::path::{Path, PathBuf};
     use std::sync::atomic::AtomicU64;
-    use std::time::SystemTime;
 
     use ruff::settings::{flags, AllSettings};
     use ruff_cache::CACHE_DIR_NAME;
@@ -487,6 +488,11 @@ mod tests {
                 flip_execute_permission_bit(path)?;
                 Ok(flip_execute_permission_bit)
             },
+            #[cfg(windows)]
+            |path| {
+                flip_read_only_permission(path)?;
+                Ok(flip_read_only_permission)
+            },
         ];
 
         #[cfg(unix)]
@@ -496,6 +502,15 @@ mod tests {
             let file = fs::OpenOptions::new().write(true).open(path)?;
             let perms = file.metadata()?.permissions();
             file.set_permissions(PermissionsExt::from_mode(perms.mode() ^ 0o111))
+        }
+
+        #[cfg(windows)]
+        #[allow(clippy::items_after_statements)]
+        fn flip_read_only_permission(path: &Path) -> io::Result<()> {
+            let file = fs::OpenOptions::new().write(true).open(path)?;
+            let mut perms = file.metadata()?.permissions();
+            perms.set_readonly(!perms.readonly());
+            file.set_permissions(perms)
         }
 
         for change_file in tests {
@@ -546,7 +561,7 @@ mod tests {
         cache.package.files.insert(
             PathBuf::from("old.py"),
             FileCache {
-                last_modified: SystemTime::UNIX_EPOCH,
+                key: 123,
                 last_seen: AtomicU64::new(123),
                 imports: ImportMap::new(),
                 messages: Vec::new(),
