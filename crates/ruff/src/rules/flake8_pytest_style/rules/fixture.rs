@@ -197,6 +197,29 @@ impl AlwaysAutofixableViolation for PytestErroneousUseFixturesOnFixture {
     }
 }
 
+/// ## What it does
+/// Checks for unnecessary `@pytest.mark.asyncio` decorators applied to fixtures.
+///
+/// ## Why is this bad?
+/// `pytest.mark.asyncio` is unnecessary for fixtures.
+///
+/// ## Example
+/// ```python
+/// @pytest.mark.asyncio()
+/// @pytest.fixture()
+/// async def my_fixture():
+///     return 0
+/// ```
+///
+/// Use instead:
+/// ```python
+/// @pytest.fixture()
+/// async def my_fixture():
+///     return 0
+/// ```
+///
+/// ## References
+/// - [`pytest-asyncio`](https://pypi.org/project/pytest-asyncio/)
 #[violation]
 pub struct PytestUnnecessaryAsyncioMarkOnFixture;
 
