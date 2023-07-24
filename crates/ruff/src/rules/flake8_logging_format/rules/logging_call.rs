@@ -158,7 +158,7 @@ pub(crate) fn logging_call(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    if !logging::is_logger_candidate(func, checker.semantic()) {
+    if !logging::is_logger_candidate(func, checker.semantic(), &checker.settings.logger_objects) {
         return;
     }
 

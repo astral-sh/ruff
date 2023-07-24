@@ -102,48 +102,55 @@ pub(crate) fn logging_call(
         return;
     }
 
-    if !logging::is_logger_candidate(func, checker.semantic()) {
+    if !logging::is_logger_candidate(func, checker.semantic(), &checker.settings.logger_objects) {
         return;
     }
 
-    if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func {
-        if LoggingLevel::from_attribute(attr.as_str()).is_some() {
-            let call_args = SimpleCallArgs::new(args, keywords);
-            if let Some(Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(value),
-                ..
-            })) = call_args.argument("msg", 0)
-            {
-                if let Ok(summary) = CFormatSummary::try_from(value.as_str()) {
-                    if summary.starred {
-                        return;
-                    }
-                    if !summary.keywords.is_empty() {
-                        return;
-                    }
+    let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func else {
+        return;
+    };
 
-                    let message_args = call_args.num_args() - 1;
+    if LoggingLevel::from_attribute(attr.as_str()).is_none() {
+        return;
+    }
 
-                    if checker.enabled(Rule::LoggingTooManyArgs) {
-                        if summary.num_positional < message_args {
-                            checker
-                                .diagnostics
-                                .push(Diagnostic::new(LoggingTooManyArgs, func.range()));
-                        }
-                    }
+    let call_args = SimpleCallArgs::new(args, keywords);
+    let Some(Expr::Constant(ast::ExprConstant {
+        value: Constant::Str(value),
+        ..
+    })) = call_args.argument("msg", 0)
+    else {
+        return;
+    };
 
-                    if checker.enabled(Rule::LoggingTooFewArgs) {
-                        if message_args > 0
-                            && call_args.num_kwargs() == 0
-                            && summary.num_positional > message_args
-                        {
-                            checker
-                                .diagnostics
-                                .push(Diagnostic::new(LoggingTooFewArgs, func.range()));
-                        }
-                    }
-                }
-            }
+    let Ok(summary) = CFormatSummary::try_from(value.as_str()) else {
+        return;
+    };
+
+    if summary.starred {
+        return;
+    }
+
+    if !summary.keywords.is_empty() {
+        return;
+    }
+
+    let message_args = call_args.num_args() - 1;
+
+    if checker.enabled(Rule::LoggingTooManyArgs) {
+        if summary.num_positional < message_args {
+            checker
+                .diagnostics
+                .push(Diagnostic::new(LoggingTooManyArgs, func.range()));
+        }
+    }
+
+    if checker.enabled(Rule::LoggingTooFewArgs) {
+        if message_args > 0 && call_args.num_kwargs() == 0 && summary.num_positional > message_args
+        {
+            checker
+                .diagnostics
+                .push(Diagnostic::new(LoggingTooFewArgs, func.range()));
         }
     }
 }
