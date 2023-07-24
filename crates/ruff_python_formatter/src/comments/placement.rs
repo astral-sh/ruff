@@ -787,7 +787,7 @@ fn handle_trailing_binary_expression_left_or_operator_comment<'a>(
         .skip_while(|token| token.kind == SimpleTokenKind::RParen);
     let operator_offset = tokens
         .next()
-        .expect("Expected a token for hte operator")
+        .expect("Expected a token for the operator")
         .start();
 
     let comment_range = comment.slice().range();
