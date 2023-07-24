@@ -1,11 +1,10 @@
 ---
 source: crates/ruff/src/rules/flake8_executable/mod.rs
 ---
-EXE004_3.py:1:1: EXE002 The file is executable but no shebang is present
+EXE004_3.py:2:7: EXE005 Shebang should be at the beginning of the file
   |
-1 | 
-  |  EXE002
 2 | pass  #!/usr/bin/env python
+  |       ^^^^^^^^^^^^^^^^^^^^^ EXE005
   |
 
 

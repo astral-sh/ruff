@@ -2,15 +2,12 @@
 
 use std::path::Path;
 
+use ruff_text_size::TextRange;
 use wsl;
-
-use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
-use crate::comments::shebang::ShebangDirective;
-use crate::registry::AsRule;
 #[cfg(target_family = "unix")]
 use crate::rules::flake8_executable::helpers::is_executable;
 
@@ -45,34 +42,21 @@ impl Violation for ShebangNotExecutable {
 
 /// EXE001
 #[cfg(target_family = "unix")]
-pub(crate) fn shebang_not_executable(
-    filepath: &Path,
-    range: TextRange,
-    shebang: &ShebangDirective,
-) -> Option<Diagnostic> {
+pub(crate) fn shebang_not_executable(filepath: &Path, range: TextRange) -> Option<Diagnostic> {
     // WSL supports Windows file systems, which do not have executable bits.
     // Instead, everything is executable. Therefore, we skip this rule on WSL.
     if wsl::is_wsl() {
         return None;
     }
-    let ShebangDirective { offset, contents } = shebang;
 
     if let Ok(false) = is_executable(filepath) {
-        let diagnostic = Diagnostic::new(
-            ShebangNotExecutable,
-            TextRange::at(range.start() + offset, contents.text_len()),
-        );
-        return Some(diagnostic);
+        return Some(Diagnostic::new(ShebangNotExecutable, range));
     }
 
     None
 }
 
 #[cfg(not(target_family = "unix"))]
-pub(crate) fn shebang_not_executable(
-    _filepath: &Path,
-    _range: TextRange,
-    _shebang: &ShebangDirective,
-) -> Option<Diagnostic> {
+pub(crate) fn shebang_not_executable(_filepath: &Path, _range: TextRange) -> Option<Diagnostic> {
     None
 }
