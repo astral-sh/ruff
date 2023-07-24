@@ -43,6 +43,7 @@ use super::helpers::{
 /// def my_fixture():
 ///     ...
 /// ```
+///
 /// ## Options
 /// - `flake8-pytest-style.fixture-parentheses`
 ///
