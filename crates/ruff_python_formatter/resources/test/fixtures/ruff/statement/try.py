@@ -104,3 +104,12 @@ try:
     f()  # end-of-line last comment
 except RuntimeError:
     raise
+
+try:
+    def f2():
+        pass
+        # a
+except:
+    def f2():
+        pass
+        # b

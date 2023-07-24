@@ -86,3 +86,12 @@ def f():
         pass
 
         # comment
+
+if True:
+    def f2():
+        pass
+        # 1
+else:
+    def f2():
+        pass
+        # 2

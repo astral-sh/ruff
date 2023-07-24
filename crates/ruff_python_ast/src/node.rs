@@ -4390,6 +4390,16 @@ impl AnyNodeRef<'_> {
                 | AnyNodeRef::StmtTryStar(_)
         )
     }
+
+    /// In our AST, only some alternative branches are represented as a node. This has historical
+    /// reasons, e.g. we added a node for elif/else in if statements which was not originally
+    /// present in the RustPython parser.
+    pub const fn is_alternative_branch_with_node(self) -> bool {
+        matches!(
+            self,
+            AnyNodeRef::ExceptHandlerExceptHandler(_) | AnyNodeRef::ElifElseClause(_)
+        )
+    }
 }
 
 impl<'a> From<&'a ast::ModModule> for AnyNodeRef<'a> {

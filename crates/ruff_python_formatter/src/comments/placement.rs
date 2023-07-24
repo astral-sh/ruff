@@ -212,8 +212,8 @@ fn handle_in_between_except_handlers_or_except_handler_and_else_or_finally_comme
     }
 }
 
-/// Handles own line comments between the last statement and the first statement of two bodies.
-///
+/// Handles own line comments between two branches of a statement, more precisely between the last
+/// statement and the first statement of two bodies.
 /// ```python
 /// for x in y:
 ///     pass
@@ -279,49 +279,62 @@ fn handle_in_between_bodies_own_line_comment<'a>(
         return CommentPlacement::Default(comment);
     };
 
-    return if comment_indentation >= preceding_indentation {
-        // `# comment` has the same or a larger indent than the `pass` statement.
-        // It likely is a trailing comment of the `pass` statement.
-        // ```python
-        // if x == y:
-        //     pass
-        //     # comment
-        // else:
-        //     print("noop")
-        // ```
-        CommentPlacement::trailing(preceding, comment)
-    } else {
-        // Otherwise it has less indent than the previous statement. Meaning that it is a leading comment
-        // of the following block.
-        //
-        // ```python
-        // if x == y:
-        //     pass
-        // # I'm a leading comment of the `elif` statement.
-        // elif True:
-        //     print("nooop")
-        // ```
-        if following.is_except_handler() {
-            // The except handlers have their own body to which we can attach the leading comment
-            CommentPlacement::leading(following, comment)
-        } else {
-            // There are no bodies for the "else" branch and other bodies that are represented as a `Vec<Stmt>`.
-            // This means, there's no good place to attach the comments to.
-            // That's why we make these dangling comments and format them  manually
-            // in the enclosing node's formatting logic. For `try`, it's the formatters responsibility
-            // to correctly identify the comments for the `finally` and `orelse` block by looking
-            // at the comment's range.
-            //
+    // Compare to the last statement in the body
+    match comment_indentation.cmp(&preceding_indentation) {
+        Ordering::Greater => {
+            // The comment might belong to an arbitrarily deeply nested inner statement
             // ```python
-            // if x == y:
-            //     pass
-            // # I'm a leading comment of the `else` branch but there's no `else` node.
+            // while True:
+            //     def f_inner():
+            //         pass
+            //         # comment
             // else:
+            //     print("noop")
+            // ```
+            own_line_comment_after_branch(comment, locator, preceding)
+        }
+        Ordering::Equal => {
+            // The comment belongs to the last statement.
+            // ```python
+            // try:
+            //     pass
+            //     # I'm a trailing comment of the `pass`
+            // except ZeroDivisionError:
             //     print("nooop")
             // ```
-            CommentPlacement::dangling(comment.enclosing_node(), comment)
+            CommentPlacement::trailing(preceding, comment)
         }
-    };
+        Ordering::Less => {
+            // The comment is leading on the following block.
+            // ```python
+            // try:
+            //     pass
+            // # I'm a leading comment of the `except` statement.
+            // except ZeroDivisionError:
+            //     print("nooop")
+            // ```
+            if following.is_alternative_branch_with_node() {
+                // For some alternative branches, there are nodes ...
+                CommentPlacement::Default(comment)
+            } else {
+                // ... while for others, such as "else" of for loops and finally branches, the bodies
+                // that are represented as a `Vec<Stmt>`, lacking a no node for the branch that we could
+                // attach the comments to. We mark these as dangling comments and format them manually
+                // in the enclosing node's formatting logic. For `try`, it's the formatters
+                // responsibility to correctly identify the comments for the `finally` and `orelse`
+                // block by looking at the comment's range.
+                //
+                // ```python
+                // for x in y:
+                //     pass
+                // # I'm a leading comment of the `else` branch but there's no `else` node.
+                // else:
+                //     print("nooop")
+                // ```
+                CommentPlacement::dangling(comment.enclosing_node(), comment)
+            }
+        }
+    }
 }
 
 /// Handles end of line comments comments between the last statement and the first statement of two bodies.
@@ -395,64 +408,6 @@ fn handle_in_between_bodies_end_of_line_comment<'a>(
     }
 }
 
-/// Without the `StmtIf` special, this function would just be the following:
-/// ```ignore
-/// if let Some(preceding_node) = comment.preceding_node() {
-///     Some((preceding_node, last_child_in_body(preceding_node)?))
-/// } else {
-///     None
-/// }
-/// ```
-/// We handle two special cases here:
-/// ```python
-/// if True:
-///     pass
-///     # Comment between if and elif/else clause, needs to be manually attached to the `StmtIf`
-/// else:
-///     pass
-///     # Comment after the `StmtIf`, needs to be manually attached to the ElifElseClause
-/// ```
-/// The problem is that `StmtIf` spans the whole range (there is no "inner if" node), so the first
-/// comment doesn't see it as preceding node, and the second comment takes the entire `StmtIf` when
-/// it should only take the `ElifElseClause`
-fn find_preceding_and_handle_stmt_if_special_cases<'a>(
-    comment: &DecoratedComment<'a>,
-) -> Option<(AnyNodeRef<'a>, AnyNodeRef<'a>)> {
-    if let (stmt_if @ AnyNodeRef::StmtIf(stmt_if_inner), Some(AnyNodeRef::ElifElseClause(..))) =
-        (comment.enclosing_node(), comment.following_node())
-    {
-        if let Some(preceding_node @ AnyNodeRef::ElifElseClause(..)) = comment.preceding_node() {
-            // We're already after and elif or else, defaults work
-            Some((preceding_node, last_child_in_body(preceding_node)?))
-        } else {
-            // Special case 1: The comment is between if body and an elif/else clause. We have
-            // to handle this separately since StmtIf spans the entire range, so it's not the
-            // preceding node
-            Some((
-                stmt_if,
-                AnyNodeRef::from(stmt_if_inner.body.last().unwrap()),
-            ))
-        }
-    } else if let Some(preceding_node @ AnyNodeRef::StmtIf(stmt_if_inner)) =
-        comment.preceding_node()
-    {
-        if let Some(clause) = stmt_if_inner.elif_else_clauses.last() {
-            // Special case 2: We're after an if statement and need to narrow the preceding
-            // down to the elif/else clause
-            Some((clause.into(), last_child_in_body(clause.into())?))
-        } else {
-            // After an if without any elif/else, defaults work
-            Some((preceding_node, last_child_in_body(preceding_node)?))
-        }
-    } else if let Some(preceding_node) = comment.preceding_node() {
-        // The normal case
-        Some((preceding_node, last_child_in_body(preceding_node)?))
-    } else {
-        // Only do something if the preceding node has a body (has indented statements).
-        None
-    }
-}
-
 /// Handles trailing comments at the end of a body block (or any other block that is indented).
 /// ```python
 /// def test():
@@ -470,22 +425,30 @@ fn handle_trailing_body_comment<'a>(
         return CommentPlacement::Default(comment);
     }
 
-    let Some((preceding_node, last_child)) =
-        find_preceding_and_handle_stmt_if_special_cases(&comment)
-    else {
+    let Some(preceding_node) = comment.preceding_node() else {
+        // Only do something if the preceding node has a body (has indented statements).
         return CommentPlacement::Default(comment);
     };
 
-    let Some(comment_indentation) =
-        whitespace::indentation_at_offset(locator, comment.slice().range().start())
-    else {
-        // The comment can't be a comment for the previous block if it isn't indented.
+    own_line_comment_after_branch(comment, locator, preceding_node)
+}
+
+/// Determine where to attach an own line comment after a branch depending on its indentation
+fn own_line_comment_after_branch<'a>(
+    comment: DecoratedComment<'a>,
+    locator: &Locator,
+    preceding_node: AnyNodeRef<'a>,
+) -> CommentPlacement<'a> {
+    let Some(last_child) = last_child_in_body(preceding_node) else {
         return CommentPlacement::Default(comment);
     };
 
     // We only care about the length because indentations with mixed spaces and tabs are only valid if
     // the indent-level doesn't depend on the tab width (the indent level must be the same if the tab width is 1 or 8).
-    let comment_indentation_len = comment_indentation.len();
+    let comment_indentation =
+        whitespace::indentation_at_offset(locator, comment.slice().range().start())
+            .map(str::len)
+            .unwrap_or_default();
 
     // Keep the comment on the entire statement in case it's a trailing comment
     // ```python
@@ -496,39 +459,42 @@ fn handle_trailing_body_comment<'a>(
     // # Trailing if comment
     // ```
     // Here we keep the comment a trailing comment of the `if`
-    let Some(preceding_node_indentation) =
+    let preceding_node_indentation =
         whitespace::indentation_at_offset(locator, preceding_node.start())
-    else {
-        return CommentPlacement::Default(comment);
-    };
-    if comment_indentation_len == preceding_node_indentation.len() {
+            .map_or(usize::MAX, str::len);
+    if comment_indentation == preceding_node_indentation {
         return CommentPlacement::Default(comment);
     }
 
-    let mut current_child = last_child;
-    let mut parent_body = Some(preceding_node);
-    let mut grand_parent_body = None;
+    let mut parent_body = None;
+    let mut current_body = Some(preceding_node);
+    let mut last_child_in_current_body = last_child;
 
     loop {
-        let child_indentation =
-            whitespace::indentation(locator, &current_child).map_or(usize::MAX, str::len);
+        let child_indentation = whitespace::indentation(locator, &last_child_in_current_body)
+            .map_or(usize::MAX, str::len);
 
-        match comment_indentation_len.cmp(&child_indentation) {
+        // There a three cases:
+        // ```python
+        // if parent_body:
+        //     if current_body:
+        //         child_in_body()
+        //         last_child_in_current_body # may or may not have children on its own
+        // # less: Comment belongs to the parent block.
+        //   # less
+        //     # equal: The comment belongs to this block.
+        //        # greater
+        //          # greater: The comment belongs to the inner block.
+        match comment_indentation.cmp(&child_indentation) {
             Ordering::Less => {
-                break if let Some(parent_block) = grand_parent_body {
+                return if let Some(parent_block) = parent_body {
                     // Comment belongs to the parent block.
-                    // ```python
-                    // if test:
-                    //      if other:
-                    //          pass
-                    //        # comment
-                    // ```
                     CommentPlacement::trailing(parent_block, comment)
                 } else {
                     // The comment does not belong to this block.
                     // ```python
                     // if test:
-                    //      pass
+                    //     pass
                     // # comment
                     // ```
                     CommentPlacement::Default(comment)
@@ -536,34 +502,22 @@ fn handle_trailing_body_comment<'a>(
             }
             Ordering::Equal => {
                 // The comment belongs to this block.
-                // ```python
-                // if test:
-                //     pass
-                //     # comment
-                // ```
-                break CommentPlacement::trailing(current_child, comment);
+                return CommentPlacement::trailing(last_child_in_current_body, comment);
             }
             Ordering::Greater => {
-                if let Some(nested_child) = last_child_in_body(current_child) {
+                if let Some(nested_child) = last_child_in_body(last_child_in_current_body) {
                     // The comment belongs to the inner block.
-                    // ```python
-                    // def a():
-                    //     if test:
-                    //         pass
-                    //         # comment
-                    // ```
-                    // Comment belongs to the `if`'s inner body
-                    grand_parent_body = parent_body;
-                    parent_body = Some(current_child);
-                    current_child = nested_child;
+                    parent_body = current_body;
+                    current_body = Some(last_child_in_current_body);
+                    last_child_in_current_body = nested_child;
                 } else {
-                    // The comment belongs to this block.
+                    // The comment is overindented, we assign it to the most indented child we have.
                     // ```python
                     // if test:
                     //     pass
-                    //         # comment
+                    //       # comment
                     // ```
-                    break CommentPlacement::trailing(current_child, comment);
+                    return CommentPlacement::trailing(last_child_in_current_body, comment);
                 }
             }
         }
@@ -1588,13 +1542,16 @@ fn is_first_statement_in_enclosing_alternate_body(
             ..
         }) => {
             are_same_optional(following, handlers.first())
-                // Comments between the handlers and the `else`, or comments between the `handlers` and the `finally`
-                // are already handled by `handle_in_between_except_handlers_or_except_handler_and_else_or_finally_comment`
-                || handlers.is_empty() && are_same_optional(following, orelse.first())
-                || (handlers.is_empty() || !orelse.is_empty())
-                && are_same_optional(following, finalbody.first())
+                  // Comments between the handlers and the `else`, or comments between the `handlers` and the `finally`
+                  // are already handled by `handle_in_between_except_handlers_or_except_handler_and_else_or_finally_comment`
+                  || handlers.is_empty() && are_same_optional(following, orelse.first())
+                  || (handlers.is_empty() || !orelse.is_empty())
+                  && are_same_optional(following, finalbody.first())
         }
 
+        AnyNodeRef::StmtIf(ast::StmtIf {
+            elif_else_clauses, ..
+        }) => are_same_optional(following, elif_else_clauses.first()),
         _ => false,
     }
 }
