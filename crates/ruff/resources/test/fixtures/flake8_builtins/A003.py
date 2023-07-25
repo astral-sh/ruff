@@ -39,3 +39,20 @@ class CustomFilter(Filter):
 
     def str(self) -> None:
         ...
+
+
+from typing_extensions import override
+
+
+class MyClass:
+    ImportError = 4
+    id: int
+    dir = "/"
+
+    def __init__(self):
+        self.float = 5  # is fine
+        self.id = 10
+        self.dir = "."
+
+    def str(self):
+        pass

@@ -332,10 +332,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if let ScopeKind::Class(class_def) = checker.semantic.scope().kind {
                 if checker.enabled(Rule::BuiltinAttributeShadowing) {
-                    flake8_builtins::rules::builtin_attribute_shadowing(
+                    flake8_builtins::rules::builtin_method_shadowing(
                         checker,
                         class_def,
                         name,
+                        decorator_list,
                         name.range(),
                     );
                 }
