@@ -22,6 +22,11 @@ use crate::settings::Settings;
 /// characters), and lines that end with a URL (as long as the URL starts
 /// before the line-length threshold).
 ///
+/// Note that this rule will only be enforced after providing a value for
+/// [`pycodestyle.max-doc-length`] in your Ruff configuration file. If no
+/// value is provided, this rule will be ignored, even if it's added to your
+/// `--select` list.
+///
 /// If [`pycodestyle.ignore-overlong-task-comments`] is `true`, this rule will
 /// also ignore comments that start with any of the specified [`task-tags`]
 /// (e.g., `# TODO:`).
@@ -43,8 +48,8 @@ use crate::settings::Settings;
 ///
 /// ## Options
 /// - `task-tags`
-/// - `pycodestyle.ignore-overlong-task-comments`
 /// - `pycodestyle.max-doc-length`
+/// - `pycodestyle.ignore-overlong-task-comments`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#maximum-line-length
 #[violation]
