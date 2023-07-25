@@ -27,8 +27,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                 f,
                 [
                     space(),
-                    args.format()
-                        .with_options(ArgumentsParentheses::SkipInsideLambda),
+                    args.format().with_options(ArgumentsParentheses::Never),
                 ]
             )?;
         }
