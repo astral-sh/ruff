@@ -14,12 +14,14 @@ use ruff_python_trivia::{leading_indentation, Line};
 ///
 /// ## Example
 /// ```python
-/// if True:\n\ta = 1
+/// if True:
+/// 	a = 1
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// if True:\n    a = 1
+/// if True:
+///     a = 1
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#tabs-or-spaces
