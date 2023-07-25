@@ -99,3 +99,23 @@ try:
         print(1)  # issue7208
 except A:
     pass
+
+try:
+    f()  # end-of-line last comment
+except RuntimeError:
+    raise
+
+try:
+    def f2():
+        pass
+        # a
+except:
+    def f2():
+        pass
+        # b
+
+try: pass # a
+except ZeroDivisionError: pass # b
+except: pass # b
+else: pass # d
+finally: pass # c
