@@ -12,7 +12,7 @@ expression: parse_ast
                     values: [
                         Constant(
                             ExprConstant {
-                                range: 0..22,
+                                range: 1..16,
                                 value: Str(
                                     "Hello world",
                                 ),
@@ -21,7 +21,7 @@ expression: parse_ast
                         ),
                         FormattedValue(
                             ExprFormattedValue {
-                                range: 9..22,
+                                range: 16..21,
                                 value: Constant(
                                     ExprConstant {
                                         range: 17..20,

@@ -5,7 +5,7 @@ expression: parse_ast
 [
     FormattedValue(
         ExprFormattedValue {
-            range: 0..11,
+            range: 2..10,
             value: Compare(
                 ExprCompare {
                     range: 3..9,

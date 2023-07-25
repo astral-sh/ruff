@@ -5,7 +5,7 @@ expression: parse_ast
 [
     FormattedValue(
         ExprFormattedValue {
-            range: 0..15,
+            range: 2..14,
             value: Name(
                 ExprName {
                     range: 3..6,
@@ -17,11 +17,11 @@ expression: parse_ast
             format_spec: Some(
                 JoinedStr(
                     ExprJoinedStr {
-                        range: 0..15,
+                        range: 7..13,
                         values: [
                             FormattedValue(
                                 ExprFormattedValue {
-                                    range: 0..15,
+                                    range: 7..13,
                                     value: Name(
                                         ExprName {
                                             range: 8..12,

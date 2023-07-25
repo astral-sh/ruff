@@ -5,7 +5,7 @@ expression: parse_ast
 [
     Constant(
         ExprConstant {
-            range: 0..14,
+            range: 2..13,
             value: Str(
                 "user=",
             ),
@@ -14,7 +14,7 @@ expression: parse_ast
     ),
     Constant(
         ExprConstant {
-            range: 0..14,
+            range: 2..13,
             value: Str(
                 "",
             ),
@@ -23,7 +23,7 @@ expression: parse_ast
     ),
     FormattedValue(
         ExprFormattedValue {
-            range: 0..14,
+            range: 2..13,
             value: Name(
                 ExprName {
                     range: 3..7,
@@ -35,11 +35,11 @@ expression: parse_ast
             format_spec: Some(
                 JoinedStr(
                     ExprJoinedStr {
-                        range: 0..14,
+                        range: 9..12,
                         values: [
                             Constant(
                                 ExprConstant {
-                                    range: 0..14,
+                                    range: 9..12,
                                     value: Str(
                                         ">10",
                                     ),

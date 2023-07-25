@@ -5,7 +5,7 @@ expression: parse_ast
 [
     Constant(
         ExprConstant {
-            range: 0..38,
+            range: 2..6,
             value: Str(
                 "mix ",
             ),
@@ -14,7 +14,7 @@ expression: parse_ast
     ),
     Constant(
         ExprConstant {
-            range: 0..38,
+            range: 6..13,
             value: Str(
                 "user=",
             ),
@@ -23,7 +23,7 @@ expression: parse_ast
     ),
     Constant(
         ExprConstant {
-            range: 0..38,
+            range: 6..13,
             value: Str(
                 "",
             ),
@@ -32,7 +32,7 @@ expression: parse_ast
     ),
     FormattedValue(
         ExprFormattedValue {
-            range: 0..38,
+            range: 6..13,
             value: Name(
                 ExprName {
                     range: 7..11,
@@ -46,7 +46,7 @@ expression: parse_ast
     ),
     Constant(
         ExprConstant {
-            range: 0..38,
+            range: 13..28,
             value: Str(
                 " with text and ",
             ),
@@ -55,7 +55,7 @@ expression: parse_ast
     ),
     Constant(
         ExprConstant {
-            range: 0..38,
+            range: 28..37,
             value: Str(
                 "second=",
             ),
@@ -64,7 +64,7 @@ expression: parse_ast
     ),
     Constant(
         ExprConstant {
-            range: 0..38,
+            range: 28..37,
             value: Str(
                 "",
             ),
@@ -73,7 +73,7 @@ expression: parse_ast
     ),
     FormattedValue(
         ExprFormattedValue {
-            range: 0..38,
+            range: 28..37,
             value: Name(
                 ExprName {
                     range: 29..35,

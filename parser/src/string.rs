@@ -11,6 +11,7 @@ use crate::{
     token::{StringKind, Tok},
 };
 use itertools::Itertools;
+use rustpython_ast::Ranged;
 use rustpython_parser_core::{
     text_size::{TextLen, TextSize},
     ConversionFlag,
@@ -20,21 +21,13 @@ use rustpython_parser_core::{
 const MAX_UNICODE_NAME: usize = 88;
 
 struct StringParser<'a> {
-    chars: std::iter::Peekable<std::str::Chars<'a>>,
+    chars: std::str::Chars<'a>,
     kind: StringKind,
-    start: TextSize,
-    end: TextSize,
     location: TextSize,
 }
 
 impl<'a> StringParser<'a> {
-    fn new(
-        source: &'a str,
-        kind: StringKind,
-        triple_quoted: bool,
-        start: TextSize,
-        end: TextSize,
-    ) -> Self {
+    fn new(source: &'a str, kind: StringKind, triple_quoted: bool, start: TextSize) -> Self {
         let offset = kind.prefix_len()
             + if triple_quoted {
                 TextSize::from(3)
@@ -42,10 +35,8 @@ impl<'a> StringParser<'a> {
                 TextSize::from(1)
             };
         Self {
-            chars: source.chars().peekable(),
+            chars: source.chars(),
             kind,
-            start,
-            end,
             location: start + offset,
         }
     }
@@ -58,8 +49,15 @@ impl<'a> StringParser<'a> {
     }
 
     #[inline]
-    fn peek(&mut self) -> Option<&char> {
-        self.chars.peek()
+    fn peek(&mut self) -> Option<char> {
+        self.chars.clone().next()
+    }
+
+    #[inline]
+    fn peek2(&mut self) -> Option<char> {
+        let mut chars = self.chars.clone();
+        chars.next();
+        chars.next()
     }
 
     #[inline]
@@ -68,12 +66,13 @@ impl<'a> StringParser<'a> {
     }
 
     #[inline]
-    fn expr(&self, node: Expr) -> Expr {
-        node
+    fn range(&self, start_location: TextSize) -> TextRange {
+        TextRange::new(start_location, self.location)
     }
 
-    fn range(&self) -> TextRange {
-        TextRange::new(self.start, self.end)
+    #[inline]
+    fn expr(&self, node: Expr) -> Expr {
+        node
     }
 
     fn parse_unicode_literal(&mut self, literal_number: usize) -> Result<char, LexicalError> {
@@ -191,18 +190,20 @@ impl<'a> StringParser<'a> {
         let mut conversion = ConversionFlag::None;
         let mut self_documenting = false;
         let mut trailing_seq = String::new();
-        let location = self.get_pos();
+        let start_location = self.get_pos();
+
+        assert_eq!(self.next_char(), Some('{'));
 
         while let Some(ch) = self.next_char() {
             match ch {
                 // can be integrated better with the remaining code, but as a starting point ok
                 // in general I would do here a tokenizing of the fstrings to omit this peeking.
-                '!' | '=' | '>' | '<' if self.peek() == Some(&'=') => {
+                '!' | '=' | '>' | '<' if self.peek() == Some('=') => {
                     expression.push(ch);
                     expression.push('=');
                     self.next_char();
                 }
-                '!' if delimiters.is_empty() && self.peek() != Some(&'=') => {
+                '!' if delimiters.is_empty() && self.peek() != Some('=') => {
                     if expression.trim().is_empty() {
                         return Err(FStringError::new(EmptyExpression, self.get_pos()).into());
                     }
@@ -231,18 +232,19 @@ impl<'a> StringParser<'a> {
 
                 // match a python 3.8 self documenting expression
                 // format '{' PYTHON_EXPRESSION '=' FORMAT_SPECIFIER? '}'
-                '=' if self.peek() != Some(&'=') && delimiters.is_empty() => {
+                '=' if self.peek() != Some('=') && delimiters.is_empty() => {
                     self_documenting = true;
                 }
 
                 ':' if delimiters.is_empty() => {
+                    let start_location = self.get_pos();
                     let parsed_spec = self.parse_spec(nested)?;
 
                     spec = Some(Box::new(
                         self.expr(
                             ast::ExprJoinedStr {
                                 values: parsed_spec,
-                                range: self.range(),
+                                range: self.range(start_location),
                             }
                             .into(),
                         ),
@@ -313,26 +315,30 @@ impl<'a> StringParser<'a> {
                         vec![self.expr(
                             ast::ExprFormattedValue {
                                 value: Box::new(
-                                    parse_fstring_expr(&expression, location).map_err(|e| {
-                                        FStringError::new(
-                                            InvalidExpression(Box::new(e.error)),
-                                            location,
-                                        )
-                                    })?,
+                                    parse_fstring_expr(&expression, start_location).map_err(
+                                        |e| {
+                                            FStringError::new(
+                                                InvalidExpression(Box::new(e.error)),
+                                                start_location,
+                                            )
+                                        },
+                                    )?,
                                 ),
                                 conversion,
                                 format_spec: spec,
-                                range: self.range(),
+                                range: self.range(start_location),
                             }
                             .into(),
                         )]
                     } else {
+                        // TODO: range is wrong but `self_documenting` needs revisiting beyond
+                        // ranges: https://github.com/astral-sh/ruff/issues/5970
                         vec![
                             self.expr(
                                 ast::ExprConstant {
                                     value: Constant::Str(expression.to_owned() + "="),
                                     kind: None,
-                                    range: self.range(),
+                                    range: self.range(start_location),
                                 }
                                 .into(),
                             ),
@@ -340,19 +346,21 @@ impl<'a> StringParser<'a> {
                                 ast::ExprConstant {
                                     value: trailing_seq.into(),
                                     kind: None,
-                                    range: self.range(),
+                                    range: self.range(start_location),
                                 }
                                 .into(),
                             ),
                             self.expr(
                                 ast::ExprFormattedValue {
                                     value: Box::new(
-                                        parse_fstring_expr(&expression, location).map_err(|e| {
-                                            FStringError::new(
-                                                InvalidExpression(Box::new(e.error)),
-                                                location,
-                                            )
-                                        })?,
+                                        parse_fstring_expr(&expression, start_location).map_err(
+                                            |e| {
+                                                FStringError::new(
+                                                    InvalidExpression(Box::new(e.error)),
+                                                    start_location,
+                                                )
+                                            },
+                                        )?,
                                     ),
                                     conversion: if conversion == ConversionFlag::None
                                         && spec.is_none()
@@ -362,7 +370,7 @@ impl<'a> StringParser<'a> {
                                         conversion
                                     },
                                     format_spec: spec,
-                                    range: self.range(),
+                                    range: self.range(start_location),
                                 }
                                 .into(),
                             ),
@@ -401,7 +409,8 @@ impl<'a> StringParser<'a> {
     fn parse_spec(&mut self, nested: u8) -> Result<Vec<Expr>, LexicalError> {
         let mut spec_constructor = Vec::new();
         let mut constant_piece = String::new();
-        while let Some(&next) = self.peek() {
+        let mut start_location = self.get_pos();
+        while let Some(next) = self.peek() {
             match next {
                 '{' => {
                     if !constant_piece.is_empty() {
@@ -410,7 +419,7 @@ impl<'a> StringParser<'a> {
                                 ast::ExprConstant {
                                     value: constant_piece.drain(..).collect::<String>().into(),
                                     kind: None,
-                                    range: self.range(),
+                                    range: self.range(start_location),
                                 }
                                 .into(),
                             ),
@@ -418,6 +427,7 @@ impl<'a> StringParser<'a> {
                     }
                     let parsed_expr = self.parse_fstring(nested + 1)?;
                     spec_constructor.extend(parsed_expr);
+                    start_location = self.get_pos();
                     continue;
                 }
                 '}' => {
@@ -435,7 +445,7 @@ impl<'a> StringParser<'a> {
                     ast::ExprConstant {
                         value: constant_piece.drain(..).collect::<String>().into(),
                         kind: None,
-                        range: self.range(),
+                        range: self.range(start_location),
                     }
                     .into(),
                 ),
@@ -452,15 +462,16 @@ impl<'a> StringParser<'a> {
         }
 
         let mut content = String::new();
+        let mut start_location = self.get_pos();
         let mut values = vec![];
 
-        while let Some(&ch) = self.peek() {
+        while let Some(ch) = self.peek() {
             match ch {
                 '{' => {
-                    self.next_char();
                     if nested == 0 {
-                        match self.peek() {
+                        match self.peek2() {
                             Some('{') => {
+                                self.next_char();
                                 self.next_char();
                                 content.push('{');
                                 continue;
@@ -477,7 +488,7 @@ impl<'a> StringParser<'a> {
                                 ast::ExprConstant {
                                     value: content.drain(..).collect::<String>().into(),
                                     kind: None,
-                                    range: self.range(),
+                                    range: self.range(start_location),
                                 }
                                 .into(),
                             ),
@@ -486,6 +497,7 @@ impl<'a> StringParser<'a> {
 
                     let parsed_values = self.parse_formatted_value(nested)?;
                     values.extend(parsed_values);
+                    start_location = self.get_pos();
                 }
                 '}' => {
                     if nested > 0 {
@@ -516,7 +528,7 @@ impl<'a> StringParser<'a> {
                     ast::ExprConstant {
                         value: content.into(),
                         kind: None,
-                        range: self.range(),
+                        range: self.range(start_location),
                     }
                     .into(),
                 ),
@@ -528,6 +540,7 @@ impl<'a> StringParser<'a> {
 
     fn parse_bytes(&mut self) -> Result<Expr, LexicalError> {
         let mut content = String::new();
+        let start_location = self.get_pos();
         while let Some(ch) = self.next_char() {
             match ch {
                 '\\' if !self.kind.is_raw() => {
@@ -551,7 +564,7 @@ impl<'a> StringParser<'a> {
             ast::ExprConstant {
                 value: Constant::Bytes(content.chars().map(|c| c as u8).collect()),
                 kind: None,
-                range: self.range(),
+                range: self.range(start_location),
             }
             .into(),
         ))
@@ -559,6 +572,7 @@ impl<'a> StringParser<'a> {
 
     fn parse_string(&mut self) -> Result<Expr, LexicalError> {
         let mut content = String::new();
+        let start_location = self.get_pos();
         while let Some(ch) = self.next_char() {
             match ch {
                 '\\' if !self.kind.is_raw() => {
@@ -571,7 +585,7 @@ impl<'a> StringParser<'a> {
             ast::ExprConstant {
                 value: Constant::Str(content),
                 kind: self.kind.is_unicode().then(|| "u".to_string()),
-                range: self.range(),
+                range: self.range(start_location),
             }
             .into(),
         ))
@@ -590,8 +604,7 @@ impl<'a> StringParser<'a> {
 
 fn parse_fstring_expr(source: &str, location: TextSize) -> Result<Expr, ParseError> {
     let fstring_body = format!("({source})");
-    let start = location - TextSize::from(1);
-    ast::Expr::parse_starts_at(&fstring_body, "<fstring>", start)
+    ast::Expr::parse_starts_at(&fstring_body, "<fstring>", location)
 }
 
 fn parse_string(
@@ -599,9 +612,8 @@ fn parse_string(
     kind: StringKind,
     triple_quoted: bool,
     start: TextSize,
-    end: TextSize,
 ) -> Result<Vec<Expr>, LexicalError> {
-    StringParser::new(source, kind, triple_quoted, start, end).parse()
+    StringParser::new(source, kind, triple_quoted, start).parse()
 }
 
 pub(crate) fn parse_strings(
@@ -631,8 +643,8 @@ pub(crate) fn parse_strings(
 
     if has_bytes {
         let mut content: Vec<u8> = vec![];
-        for (start, (source, kind, triple_quoted), end) in values {
-            for value in parse_string(&source, kind, triple_quoted, start, end)? {
+        for (start, (source, kind, triple_quoted), _) in values {
+            for value in parse_string(&source, kind, triple_quoted, start)? {
                 match value {
                     Expr::Constant(ast::ExprConstant {
                         value: Constant::Bytes(value),
@@ -652,8 +664,8 @@ pub(crate) fn parse_strings(
 
     if !has_fstring {
         let mut content: Vec<String> = vec![];
-        for (start, (source, kind, triple_quoted), end) in values {
-            for value in parse_string(&source, kind, triple_quoted, start, end)? {
+        for (start, (source, kind, triple_quoted), _) in values {
+            for value in parse_string(&source, kind, triple_quoted, start)? {
                 match value {
                     Expr::Constant(ast::ExprConstant {
                         value: Constant::Str(value),
@@ -674,34 +686,43 @@ pub(crate) fn parse_strings(
     // De-duplicate adjacent constants.
     let mut deduped: Vec<Expr> = vec![];
     let mut current: Vec<String> = vec![];
+    let mut current_start = initial_start;
+    let mut current_end = last_end;
 
-    let take_current = |current: &mut Vec<String>| -> Expr {
+    let take_current = |current: &mut Vec<String>, start, end| -> Expr {
         Expr::Constant(ast::ExprConstant {
             value: Constant::Str(current.drain(..).join("")),
             kind: initial_kind.clone(),
-            range: TextRange::new(initial_start, last_end),
+            range: TextRange::new(start, end),
         })
     };
 
-    for (start, (source, kind, triple_quoted), end) in values {
-        for value in parse_string(&source, kind, triple_quoted, start, end)? {
+    for (start, (source, kind, triple_quoted), _) in values {
+        for value in parse_string(&source, kind, triple_quoted, start)? {
+            let value_range = value.range();
             match value {
                 Expr::FormattedValue { .. } => {
                     if !current.is_empty() {
-                        deduped.push(take_current(&mut current));
+                        deduped.push(take_current(&mut current, current_start, current_end));
                     }
                     deduped.push(value)
                 }
                 Expr::Constant(ast::ExprConstant {
-                    value: Constant::Str(value),
+                    value: Constant::Str(inner),
                     ..
-                }) => current.push(value),
+                }) => {
+                    if current.is_empty() {
+                        current_start = value_range.start();
+                    }
+                    current_end = value_range.end();
+                    current.push(inner);
+                }
                 _ => unreachable!("Unexpected non-string expression."),
             }
         }
     }
     if !current.is_empty() {
-        deduped.push(take_current(&mut current));
+        deduped.push(take_current(&mut current, current_start, current_end));
     }
 
     Ok(Expr::JoinedStr(ast::ExprJoinedStr {
@@ -818,14 +839,7 @@ mod tests {
     use crate::{ast, Parse};
 
     fn parse_fstring(source: &str) -> Result<Vec<Expr>, LexicalError> {
-        StringParser::new(
-            source,
-            StringKind::FString,
-            false,
-            TextSize::default(),
-            TextSize::default() + source.text_len() + TextSize::from(3), // 3 for prefix and quotes
-        )
-        .parse()
+        StringParser::new(source, StringKind::FString, false, TextSize::default()).parse()
     }
 
     #[test]
@@ -1065,6 +1079,13 @@ mod tests {
     #[test]
     fn test_fstring_escaped_newline() {
         let source = r#"f"\n{x}""#;
+        let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
+        insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
+    fn test_fstring_constant_range() {
+        let source = r#"f"aaa{bbb}ccc{ddd}eee""#;
         let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }

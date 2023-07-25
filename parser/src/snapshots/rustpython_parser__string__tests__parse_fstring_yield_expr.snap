@@ -5,7 +5,7 @@ expression: parse_ast
 [
     FormattedValue(
         ExprFormattedValue {
-            range: 0..10,
+            range: 2..9,
             value: Yield(
                 ExprYield {
                     range: 3..8,
