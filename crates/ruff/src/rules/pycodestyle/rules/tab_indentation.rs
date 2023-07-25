@@ -5,6 +5,24 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Indexer;
 use ruff_python_trivia::{leading_indentation, Line};
 
+/// ## What it does
+/// Checks for indentation that uses tabs.
+///
+/// ## Why is this bad?
+/// According to [PEP 8], spaces are preferred over tabs (unless used to remain
+/// consistent with code that is already indented with tabs).
+///
+/// ## Example
+/// ```python
+/// if True:\n\ta = 1
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if True:\n    a = 1
+/// ```
+///
+/// [PEP 8]: https://peps.python.org/pep-0008/#tabs-or-spaces
 #[violation]
 pub struct TabIndentation;
 
