@@ -4,6 +4,7 @@ use rustpython_parser::ast;
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_builtins::helpers::shadows_builtin;
@@ -80,11 +81,40 @@ pub(crate) fn builtin_attribute_shadowing(
             return;
         }
 
+        // Ignore some standard-library methods. Ideally, we'd ignore all overridden methods, since
+        // those should be flagged on the superclass, but that's more difficult.
+        if is_standard_library_override(name, class_def, checker.semantic()) {
+            return;
+        }
+
         checker.diagnostics.push(Diagnostic::new(
             BuiltinAttributeShadowing {
                 name: name.to_string(),
             },
             range,
         ));
+    }
+}
+
+/// Return `true` if an attribute appears to be an override of a standard-library method.
+fn is_standard_library_override(
+    name: &str,
+    class_def: &ast::StmtClassDef,
+    model: &SemanticModel,
+) -> bool {
+    match name {
+        // Ex) `Event#set`
+        "set" => class_def.bases.iter().any(|base| {
+            model.resolve_call_path(base).map_or(false, |call_path| {
+                matches!(call_path.as_slice(), ["threading", "Event"])
+            })
+        }),
+        // Ex) `Filter#filter`
+        "filter" => class_def.bases.iter().any(|base| {
+            model.resolve_call_path(base).map_or(false, |call_path| {
+                matches!(call_path.as_slice(), ["logging", "Filter"])
+            })
+        }),
+        _ => false,
     }
 }
