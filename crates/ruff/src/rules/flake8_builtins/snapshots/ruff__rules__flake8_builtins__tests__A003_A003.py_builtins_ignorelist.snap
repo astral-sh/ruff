@@ -19,4 +19,22 @@ A003.py:11:9: A003 Class attribute `str` is shadowing a Python builtin
 12 |         pass
    |
 
+A003.py:29:9: A003 Class attribute `str` is shadowing a Python builtin
+   |
+27 |         ...
+28 | 
+29 |     def str(self) -> None:
+   |         ^^^ A003
+30 |         ...
+   |
+
+A003.py:40:9: A003 Class attribute `str` is shadowing a Python builtin
+   |
+38 |         ...
+39 | 
+40 |     def str(self) -> None:
+   |         ^^^ A003
+41 |         ...
+   |
+
 

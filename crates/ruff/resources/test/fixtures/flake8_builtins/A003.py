@@ -17,3 +17,25 @@ from typing import TypedDict
 
 class MyClass(TypedDict):
     id: int
+
+
+from threading import Event
+
+
+class CustomEvent(Event):
+    def set(self) -> None:
+        ...
+
+    def str(self) -> None:
+        ...
+
+
+from logging import Filter, LogRecord
+
+
+class CustomFilter(Filter):
+    def filter(self, record: LogRecord) -> bool:
+        ...
+
+    def str(self) -> None:
+        ...
