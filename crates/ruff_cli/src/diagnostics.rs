@@ -6,7 +6,7 @@ use std::io::Write;
 use std::ops::AddAssign;
 use std::path::Path;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use colored::Colorize;
 use filetime::FileTime;
 use log::{debug, error, warn};
@@ -38,6 +38,23 @@ pub(crate) struct FileCacheKey {
     file_last_modified: FileTime,
     /// Permissions of the file before the (cached) check.
     file_permissions_mode: u32,
+}
+
+impl FileCacheKey {
+    fn from_path(path: &Path) -> io::Result<FileCacheKey> {
+        // Construct a cache key for the file
+        let metadata = path.metadata()?;
+
+        #[cfg(unix)]
+        let permissions = metadata.permissions().mode();
+        #[cfg(windows)]
+        let permissions: u32 = metadata.permissions().readonly().into();
+
+        Ok(FileCacheKey {
+            file_last_modified: FileTime::from_last_modification_time(&metadata),
+            file_permissions_mode: permissions,
+        })
+    }
 }
 
 #[derive(Debug, Default, PartialEq)]
@@ -129,17 +146,7 @@ pub(crate) fn lint_path(
                 .relative_path(path)
                 .expect("wrong package cache for file");
 
-            // Construct a cache key for the file
-            let metadata = path.metadata()?;
-
-            #[cfg(unix)]
-            let permissions = metadata.permissions().mode();
-            #[cfg(windows)]
-            let permissions: u32 = metadata.permissions().readonly().into();
-            let cache_key = FileCacheKey {
-                file_last_modified: FileTime::from_last_modification_time(&metadata),
-                file_permissions_mode: permissions,
-            };
+            let cache_key = FileCacheKey::from_path(path).context("Failed to create cache key")?;
 
             if let Some(cache) = cache.get(relative_path, &cache_key) {
                 return Ok(cache.as_diagnostics(path));

@@ -532,8 +532,8 @@ mod tests {
             "Cache should not be used, the file should be treated as new and added to the cache"
         );
 
-        assert!(
-            expected_diagnostics == got_diagnostics,
+        assert_eq!(
+            expected_diagnostics, got_diagnostics,
             "The diagnostics should not change"
         );
     }
@@ -590,8 +590,8 @@ mod tests {
             "Cache should not be used, the file should be treated as new and added to the cache"
         );
 
-        assert!(
-            expected_diagnostics == got_diagnostics,
+        assert_eq!(
+            expected_diagnostics, got_diagnostics,
             "The diagnostics should not change"
         );
     }
