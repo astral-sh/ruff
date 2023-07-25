@@ -55,6 +55,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "prohibited-trailing-comma",
     "shebang-leading-whitespace",
     "surrounding-whitespace",
+    "tab-indentation",
     "too-few-spaces-before-inline-comment",
     "trailing-comma-on-bare-tuple",
     "triple-single-quotes",
