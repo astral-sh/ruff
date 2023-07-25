@@ -39,3 +39,15 @@ class CustomFilter(Filter):
 
     def str(self) -> None:
         ...
+
+
+from typing_extensions import override
+
+
+class MyClass:
+    @override
+    def str(self):
+        pass
+
+    def int(self):
+        pass
