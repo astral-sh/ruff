@@ -517,6 +517,9 @@ mod tests {
         let cache = test_cache.open();
 
         // Write the same contents to the source file (updating the modified time)
+        // We must sleep for a millisecond or this can happen too fast on some systems resulting in a modified time collision.
+        // Once `std::fs::File.set_modified` is stable we can use that instead.
+        std::thread::sleep(std::time::Duration::from_millis(1));
         test_cache.write_source_file("source.py", source);
 
         let got_diagnostics = test_cache
