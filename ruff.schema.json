@@ -1471,7 +1471,7 @@
           ]
         },
         "max-doc-length": {
-          "description": "The maximum line length to allow for line-length violations within documentation (`W505`), including standalone comments.",
+          "description": "The maximum line length to allow for line-length violations within documentation (`W505`), including standalone comments. `None` means unlimited.",
           "anyOf": [
             {
               "$ref": "#/definitions/LineLength"
