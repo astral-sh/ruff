@@ -44,6 +44,7 @@ use crate::settings::Settings;
 /// ## Options
 /// - `task-tags`
 /// - `pycodestyle.ignore-overlong-task-comments`
+/// - `pycodestyle.max-doc-length`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#maximum-line-length
 #[violation]
