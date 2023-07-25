@@ -329,11 +329,13 @@ pub(crate) fn init(path: &Path) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use filetime::{set_file_mtime, FileTime};
     use std::env::temp_dir;
     use std::fs;
     use std::io;
     use std::io::Write;
     use std::path::{Path, PathBuf};
+    use std::time::SystemTime;
 
     use itertools::Itertools;
     use ruff::settings::{flags, AllSettings};
@@ -506,7 +508,7 @@ mod tests {
 
         let test_cache = TestCache::new("cache_invalidated_on_file_modified_time");
         let cache = test_cache.open();
-        test_cache.write_source_file("source.py", source);
+        let source_path = test_cache.write_source_file("source.py", source);
         assert_eq!(cache.new_files.lock().unwrap().len(), 0);
 
         let expected_diagnostics = test_cache
@@ -516,11 +518,12 @@ mod tests {
         cache.store().unwrap();
         let cache = test_cache.open();
 
-        // Write the same contents to the source file (updating the modified time)
-        // We must sleep for a little or this can happen too fast on some systems resulting in a modified time collision.
-        // Once `std::fs::File.set_modified` is stable we can use that instead.
-        std::thread::sleep(std::time::Duration::from_millis(10));
-        test_cache.write_source_file("source.py", source);
+        // Update the modified time of the file to a time in the future
+        set_file_mtime(
+            source_path,
+            FileTime::from_system_time(SystemTime::now() + std::time::Duration::from_secs(1)),
+        )
+        .unwrap();
 
         let got_diagnostics = test_cache
             .lint_file_with_cache("source.py", &cache)
