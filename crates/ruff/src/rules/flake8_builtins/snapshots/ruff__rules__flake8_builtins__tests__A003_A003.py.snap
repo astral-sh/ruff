@@ -56,4 +56,13 @@ A003.py:40:9: A003 Class attribute `str` is shadowing a Python builtin
 41 |         ...
    |
 
+A003.py:52:9: A003 Class attribute `int` is shadowing a Python builtin
+   |
+50 |         pass
+51 | 
+52 |     def int(self):
+   |         ^^^ A003
+53 |         pass
+   |
+
 

@@ -22,7 +22,9 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 ///
 /// Builtins can be marked as exceptions to this rule via the
 /// [`flake8-builtins.builtins-ignorelist`] configuration option, or
-/// converted to the appropriate dunder method.
+/// converted to the appropriate dunder method. Methods decorated with
+/// `@typing.override` or `@typing_extensions.override` are also
+/// ignored.
 ///
 /// ## Example
 /// ```python
