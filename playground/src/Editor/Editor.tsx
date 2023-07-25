@@ -10,7 +10,7 @@ import init, { Diagnostic, Workspace } from "../pkg";
 import { ErrorMessage } from "./ErrorMessage";
 import Header from "./Header";
 import { useTheme } from "./theme";
-import { persist, restore, stringify } from "./settings";
+import { persist, persistLocal, restore, stringify } from "./settings";
 import SettingsEditor from "./SettingsEditor";
 import SourceEditor from "./SourceEditor";
 import { Panel, PanelGroup } from "react-resizable-panels";
@@ -50,17 +50,45 @@ export default function Editor() {
   });
 
   const [tab, setTab] = useState<Tab>("Source");
-  const [theme, setTheme] = useTheme();
   const [secondaryTool, setSecondaryTool] = useState<SecondaryTool | null>(
-    null,
+    () => {
+      const secondaryValue = new URLSearchParams(location.search).get(
+        "secondary",
+      );
+      if (secondaryValue == null) {
+        return null;
+      } else {
+        return parseSecondaryTool(secondaryValue);
+      }
+    },
   );
+  const [theme, setTheme] = useTheme();
 
   const initialized = ruffVersion != null;
 
+  // Ideally this would be retrieved right from the URl... but routing without a proper
+  // router is hard (there's no location changed event) and pulling in a router
+  // feels overkill.
+  const handleSecondaryToolSelected = (tool: SecondaryTool | null) => {
+    if (tool === secondaryTool) {
+      tool = null;
+    }
+
+    const url = new URL(location.href);
+
+    if (tool == null) {
+      url.searchParams.delete("secondary");
+    } else {
+      url.searchParams.set("secondary", tool);
+    }
+
+    history.replaceState(null, "", url);
+
+    setSecondaryTool(tool);
+  };
+
   useEffect(() => {
     init().then(() => {
-      setRuffVersion(Workspace.version());
-
       const [settingsSource, pythonSource] = restore() ?? [
         stringify(Workspace.defaultSettings()),
         DEFAULT_PYTHON_SOURCE,
@@ -71,6 +99,7 @@ export default function Editor() {
         revision: 0,
         settingsSource,
       });
+      setRuffVersion(Workspace.version());
     });
   }, []);
 
@@ -140,6 +169,12 @@ export default function Editor() {
       });
     }
   }, [initialized, deferredSource, secondaryTool]);
+
+  useEffect(() => {
+    if (initialized) {
+      persistLocal(source);
+    }
+  }, [initialized, source]);
 
   const handleShare = useMemo(() => {
     if (!initialized) {
@@ -215,13 +250,7 @@ export default function Editor() {
             )}
             <SecondarySideBar
               selected={secondaryTool}
-              onSelected={(tool) => {
-                if (secondaryTool === tool) {
-                  setSecondaryTool(null);
-                } else {
-                  setSecondaryTool(tool);
-                }
-              }}
+              onSelected={handleSecondaryToolSelected}
             />
           </PanelGroup>
         ) : null}
@@ -240,4 +269,12 @@ export default function Editor() {
       ) : null}
     </main>
   );
+}
+
+function parseSecondaryTool(tool: string): SecondaryTool | null {
+  if (Object.hasOwn(SecondaryTool, tool)) {
+    return tool as any;
+  }
+
+  return null;
 }
