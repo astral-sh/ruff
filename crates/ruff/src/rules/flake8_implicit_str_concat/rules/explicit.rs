@@ -47,7 +47,7 @@ pub(crate) fn explicit(expr: &Expr, locator: &Locator) -> Option<Diagnostic> {
         range,
     }) = expr
     {
-        if locator.contains_line_break(*range) && matches!(op, Operator::Add) {
+        if matches!(op, Operator::Add) {
             if matches!(
                 left.as_ref(),
                 Expr::JoinedStr(_)
@@ -62,7 +62,8 @@ pub(crate) fn explicit(expr: &Expr, locator: &Locator) -> Option<Diagnostic> {
                         value: Constant::Str(..) | Constant::Bytes(..),
                         ..
                     })
-            ) {
+            ) && locator.contains_line_break(*range)
+            {
                 return Some(Diagnostic::new(ExplicitStringConcatenation, expr.range()));
             }
         }
