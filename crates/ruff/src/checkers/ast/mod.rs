@@ -545,14 +545,14 @@ where
                     ..
                 },
             ) => {
+                for decorator in decorator_list {
+                    self.visit_decorator(decorator);
+                }
                 for expr in bases {
                     self.visit_expr(expr);
                 }
                 for keyword in keywords {
                     self.visit_keyword(keyword);
-                }
-                for decorator in decorator_list {
-                    self.visit_decorator(decorator);
                 }
 
                 let definition = docstrings::extraction::extract_definition(
