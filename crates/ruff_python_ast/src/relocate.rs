@@ -200,5 +200,8 @@ pub fn relocate_expr(expr: &mut Expr, location: TextRange) {
                 relocate_expr(expr, location);
             }
         }
+        Expr::LineMagic(ast::ExprLineMagic { range, .. }) => {
+            *range = location;
+        }
     }
 }

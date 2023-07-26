@@ -720,6 +720,11 @@ impl<'a> Generator<'a> {
                     self.p("continue");
                 });
             }
+            Stmt::LineMagic(ast::StmtLineMagic { kind, value, .. }) => {
+                statement!({
+                    self.p(&format!("{kind}{value}"));
+                });
+            }
         }
     }
 
@@ -1269,6 +1274,9 @@ impl<'a> Generator<'a> {
                     self.p(":");
                     self.unparse_expr(step, precedence::SLICE);
                 }
+            }
+            Expr::LineMagic(ast::ExprLineMagic { kind, value, .. }) => {
+                self.p(&format!("{kind}{value}"));
             }
         }
     }

@@ -54,6 +54,7 @@ pub enum AnyNode {
     StmtPass(ast::StmtPass),
     StmtBreak(ast::StmtBreak),
     StmtContinue(ast::StmtContinue),
+    StmtLineMagic(ast::StmtLineMagic),
     ExprBoolOp(ast::ExprBoolOp),
     ExprNamedExpr(ast::ExprNamedExpr),
     ExprBinOp(ast::ExprBinOp),
@@ -81,6 +82,7 @@ pub enum AnyNode {
     ExprList(ast::ExprList),
     ExprTuple(ast::ExprTuple),
     ExprSlice(ast::ExprSlice),
+    ExprLineMagic(ast::ExprLineMagic),
     ExceptHandlerExceptHandler(ast::ExceptHandlerExceptHandler),
     PatternMatchValue(ast::PatternMatchValue),
     PatternMatchSingleton(ast::PatternMatchSingleton),
@@ -137,6 +139,7 @@ impl AnyNode {
             AnyNode::StmtPass(node) => Some(Stmt::Pass(node)),
             AnyNode::StmtBreak(node) => Some(Stmt::Break(node)),
             AnyNode::StmtContinue(node) => Some(Stmt::Continue(node)),
+            AnyNode::StmtLineMagic(node) => Some(Stmt::LineMagic(node)),
 
             AnyNode::ModModule(_)
             | AnyNode::ModInteractive(_)
@@ -169,6 +172,7 @@ impl AnyNode {
             | AnyNode::ExprList(_)
             | AnyNode::ExprTuple(_)
             | AnyNode::ExprSlice(_)
+            | AnyNode::ExprLineMagic(_)
             | AnyNode::ExceptHandlerExceptHandler(_)
             | AnyNode::PatternMatchValue(_)
             | AnyNode::PatternMatchSingleton(_)
@@ -224,6 +228,7 @@ impl AnyNode {
             AnyNode::ExprList(node) => Some(Expr::List(node)),
             AnyNode::ExprTuple(node) => Some(Expr::Tuple(node)),
             AnyNode::ExprSlice(node) => Some(Expr::Slice(node)),
+            AnyNode::ExprLineMagic(node) => Some(Expr::LineMagic(node)),
 
             AnyNode::ModModule(_)
             | AnyNode::ModInteractive(_)
@@ -257,6 +262,7 @@ impl AnyNode {
             | AnyNode::StmtPass(_)
             | AnyNode::StmtBreak(_)
             | AnyNode::StmtContinue(_)
+            | AnyNode::StmtLineMagic(_)
             | AnyNode::ExceptHandlerExceptHandler(_)
             | AnyNode::PatternMatchValue(_)
             | AnyNode::PatternMatchSingleton(_)
@@ -318,6 +324,7 @@ impl AnyNode {
             | AnyNode::StmtPass(_)
             | AnyNode::StmtBreak(_)
             | AnyNode::StmtContinue(_)
+            | AnyNode::StmtLineMagic(_)
             | AnyNode::ExprBoolOp(_)
             | AnyNode::ExprNamedExpr(_)
             | AnyNode::ExprBinOp(_)
@@ -345,6 +352,7 @@ impl AnyNode {
             | AnyNode::ExprList(_)
             | AnyNode::ExprTuple(_)
             | AnyNode::ExprSlice(_)
+            | AnyNode::ExprLineMagic(_)
             | AnyNode::ExceptHandlerExceptHandler(_)
             | AnyNode::PatternMatchValue(_)
             | AnyNode::PatternMatchSingleton(_)
@@ -414,6 +422,7 @@ impl AnyNode {
             | AnyNode::StmtPass(_)
             | AnyNode::StmtBreak(_)
             | AnyNode::StmtContinue(_)
+            | AnyNode::StmtLineMagic(_)
             | AnyNode::ExprBoolOp(_)
             | AnyNode::ExprNamedExpr(_)
             | AnyNode::ExprBinOp(_)
@@ -441,6 +450,7 @@ impl AnyNode {
             | AnyNode::ExprList(_)
             | AnyNode::ExprTuple(_)
             | AnyNode::ExprSlice(_)
+            | AnyNode::ExprLineMagic(_)
             | AnyNode::ExceptHandlerExceptHandler(_)
             | AnyNode::TypeIgnoreTypeIgnore(_)
             | AnyNode::Comprehension(_)
@@ -495,6 +505,7 @@ impl AnyNode {
             | AnyNode::StmtPass(_)
             | AnyNode::StmtBreak(_)
             | AnyNode::StmtContinue(_)
+            | AnyNode::StmtLineMagic(_)
             | AnyNode::ExprBoolOp(_)
             | AnyNode::ExprNamedExpr(_)
             | AnyNode::ExprBinOp(_)
@@ -522,6 +533,7 @@ impl AnyNode {
             | AnyNode::ExprList(_)
             | AnyNode::ExprTuple(_)
             | AnyNode::ExprSlice(_)
+            | AnyNode::ExprLineMagic(_)
             | AnyNode::PatternMatchValue(_)
             | AnyNode::PatternMatchSingleton(_)
             | AnyNode::PatternMatchSequence(_)
@@ -583,6 +595,7 @@ impl AnyNode {
             | AnyNode::StmtPass(_)
             | AnyNode::StmtBreak(_)
             | AnyNode::StmtContinue(_)
+            | AnyNode::StmtLineMagic(_)
             | AnyNode::ExprBoolOp(_)
             | AnyNode::ExprNamedExpr(_)
             | AnyNode::ExprBinOp(_)
@@ -610,6 +623,7 @@ impl AnyNode {
             | AnyNode::ExprList(_)
             | AnyNode::ExprTuple(_)
             | AnyNode::ExprSlice(_)
+            | AnyNode::ExprLineMagic(_)
             | AnyNode::PatternMatchValue(_)
             | AnyNode::PatternMatchSingleton(_)
             | AnyNode::PatternMatchSequence(_)
@@ -693,6 +707,7 @@ impl AnyNode {
             Self::StmtPass(node) => AnyNodeRef::StmtPass(node),
             Self::StmtBreak(node) => AnyNodeRef::StmtBreak(node),
             Self::StmtContinue(node) => AnyNodeRef::StmtContinue(node),
+            Self::StmtLineMagic(node) => AnyNodeRef::StmtLineMagic(node),
             Self::ExprBoolOp(node) => AnyNodeRef::ExprBoolOp(node),
             Self::ExprNamedExpr(node) => AnyNodeRef::ExprNamedExpr(node),
             Self::ExprBinOp(node) => AnyNodeRef::ExprBinOp(node),
@@ -720,6 +735,7 @@ impl AnyNode {
             Self::ExprList(node) => AnyNodeRef::ExprList(node),
             Self::ExprTuple(node) => AnyNodeRef::ExprTuple(node),
             Self::ExprSlice(node) => AnyNodeRef::ExprSlice(node),
+            Self::ExprLineMagic(node) => AnyNodeRef::ExprLineMagic(node),
             Self::ExceptHandlerExceptHandler(node) => AnyNodeRef::ExceptHandlerExceptHandler(node),
             Self::PatternMatchValue(node) => AnyNodeRef::PatternMatchValue(node),
             Self::PatternMatchSingleton(node) => AnyNodeRef::PatternMatchSingleton(node),
@@ -1676,6 +1692,34 @@ impl AstNode for ast::StmtContinue {
         AnyNode::from(self)
     }
 }
+impl AstNode for ast::StmtLineMagic {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::StmtLineMagic(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::StmtLineMagic(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
 impl AstNode for ast::ExprBoolOp {
     fn cast(kind: AnyNode) -> Option<Self>
     where
@@ -2432,6 +2476,34 @@ impl AstNode for ast::ExprSlice {
         AnyNode::from(self)
     }
 }
+impl AstNode for ast::ExprLineMagic {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExprLineMagic(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExprLineMagic(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
 impl AstNode for ast::ExceptHandlerExceptHandler {
     fn cast(kind: AnyNode) -> Option<Self>
     where
@@ -3081,6 +3153,7 @@ impl From<Stmt> for AnyNode {
             Stmt::Pass(node) => AnyNode::StmtPass(node),
             Stmt::Break(node) => AnyNode::StmtBreak(node),
             Stmt::Continue(node) => AnyNode::StmtContinue(node),
+            Stmt::LineMagic(node) => AnyNode::StmtLineMagic(node),
         }
     }
 }
@@ -3115,6 +3188,7 @@ impl From<Expr> for AnyNode {
             Expr::List(node) => AnyNode::ExprList(node),
             Expr::Tuple(node) => AnyNode::ExprTuple(node),
             Expr::Slice(node) => AnyNode::ExprSlice(node),
+            Expr::LineMagic(node) => AnyNode::ExprLineMagic(node),
         }
     }
 }
@@ -3359,6 +3433,12 @@ impl From<ast::StmtContinue> for AnyNode {
     }
 }
 
+impl From<ast::StmtLineMagic> for AnyNode {
+    fn from(node: ast::StmtLineMagic) -> Self {
+        AnyNode::StmtLineMagic(node)
+    }
+}
+
 impl From<ast::ExprBoolOp> for AnyNode {
     fn from(node: ast::ExprBoolOp) -> Self {
         AnyNode::ExprBoolOp(node)
@@ -3521,6 +3601,12 @@ impl From<ast::ExprSlice> for AnyNode {
     }
 }
 
+impl From<ast::ExprLineMagic> for AnyNode {
+    fn from(node: ast::ExprLineMagic) -> Self {
+        AnyNode::ExprLineMagic(node)
+    }
+}
+
 impl From<ast::ExceptHandlerExceptHandler> for AnyNode {
     fn from(node: ast::ExceptHandlerExceptHandler) -> Self {
         AnyNode::ExceptHandlerExceptHandler(node)
@@ -3679,6 +3765,7 @@ impl Ranged for AnyNode {
             AnyNode::StmtPass(node) => node.range(),
             AnyNode::StmtBreak(node) => node.range(),
             AnyNode::StmtContinue(node) => node.range(),
+            AnyNode::StmtLineMagic(node) => node.range(),
             AnyNode::ExprBoolOp(node) => node.range(),
             AnyNode::ExprNamedExpr(node) => node.range(),
             AnyNode::ExprBinOp(node) => node.range(),
@@ -3706,6 +3793,7 @@ impl Ranged for AnyNode {
             AnyNode::ExprList(node) => node.range(),
             AnyNode::ExprTuple(node) => node.range(),
             AnyNode::ExprSlice(node) => node.range(),
+            AnyNode::ExprLineMagic(node) => node.range(),
             AnyNode::ExceptHandlerExceptHandler(node) => node.range(),
             AnyNode::PatternMatchValue(node) => node.range(),
             AnyNode::PatternMatchSingleton(node) => node.range(),
@@ -3767,6 +3855,7 @@ pub enum AnyNodeRef<'a> {
     StmtPass(&'a ast::StmtPass),
     StmtBreak(&'a ast::StmtBreak),
     StmtContinue(&'a ast::StmtContinue),
+    StmtLineMagic(&'a ast::StmtLineMagic),
     ExprBoolOp(&'a ast::ExprBoolOp),
     ExprNamedExpr(&'a ast::ExprNamedExpr),
     ExprBinOp(&'a ast::ExprBinOp),
@@ -3794,6 +3883,7 @@ pub enum AnyNodeRef<'a> {
     ExprList(&'a ast::ExprList),
     ExprTuple(&'a ast::ExprTuple),
     ExprSlice(&'a ast::ExprSlice),
+    ExprLineMagic(&'a ast::ExprLineMagic),
     ExceptHandlerExceptHandler(&'a ast::ExceptHandlerExceptHandler),
     PatternMatchValue(&'a ast::PatternMatchValue),
     PatternMatchSingleton(&'a ast::PatternMatchSingleton),
@@ -3854,6 +3944,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::StmtPass(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtBreak(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtContinue(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::StmtLineMagic(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprBoolOp(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprNamedExpr(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprBinOp(node) => NonNull::from(*node).cast(),
@@ -3881,6 +3972,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::ExprList(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprTuple(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprSlice(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprLineMagic(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExceptHandlerExceptHandler(node) => NonNull::from(*node).cast(),
             AnyNodeRef::PatternMatchValue(node) => NonNull::from(*node).cast(),
             AnyNodeRef::PatternMatchSingleton(node) => NonNull::from(*node).cast(),
@@ -3947,6 +4039,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::StmtPass(_) => NodeKind::StmtPass,
             AnyNodeRef::StmtBreak(_) => NodeKind::StmtBreak,
             AnyNodeRef::StmtContinue(_) => NodeKind::StmtContinue,
+            AnyNodeRef::StmtLineMagic(_) => NodeKind::StmtLineMagic,
             AnyNodeRef::ExprBoolOp(_) => NodeKind::ExprBoolOp,
             AnyNodeRef::ExprNamedExpr(_) => NodeKind::ExprNamedExpr,
             AnyNodeRef::ExprBinOp(_) => NodeKind::ExprBinOp,
@@ -3974,6 +4067,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::ExprList(_) => NodeKind::ExprList,
             AnyNodeRef::ExprTuple(_) => NodeKind::ExprTuple,
             AnyNodeRef::ExprSlice(_) => NodeKind::ExprSlice,
+            AnyNodeRef::ExprLineMagic(_) => NodeKind::ExprLineMagic,
             AnyNodeRef::ExceptHandlerExceptHandler(_) => NodeKind::ExceptHandlerExceptHandler,
             AnyNodeRef::PatternMatchValue(_) => NodeKind::PatternMatchValue,
             AnyNodeRef::PatternMatchSingleton(_) => NodeKind::PatternMatchSingleton,
@@ -4029,7 +4123,8 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtExpr(_)
             | AnyNodeRef::StmtPass(_)
             | AnyNodeRef::StmtBreak(_)
-            | AnyNodeRef::StmtContinue(_) => true,
+            | AnyNodeRef::StmtContinue(_)
+            | AnyNodeRef::StmtLineMagic(_) => true,
 
             AnyNodeRef::ModModule(_)
             | AnyNodeRef::ModInteractive(_)
@@ -4062,6 +4157,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprList(_)
             | AnyNodeRef::ExprTuple(_)
             | AnyNodeRef::ExprSlice(_)
+            | AnyNodeRef::ExprLineMagic(_)
             | AnyNodeRef::ExceptHandlerExceptHandler(_)
             | AnyNodeRef::PatternMatchValue(_)
             | AnyNodeRef::PatternMatchSingleton(_)
@@ -4116,7 +4212,8 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprName(_)
             | AnyNodeRef::ExprList(_)
             | AnyNodeRef::ExprTuple(_)
-            | AnyNodeRef::ExprSlice(_) => true,
+            | AnyNodeRef::ExprSlice(_)
+            | AnyNodeRef::ExprLineMagic(_) => true,
 
             AnyNodeRef::ModModule(_)
             | AnyNodeRef::ModInteractive(_)
@@ -4150,6 +4247,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtPass(_)
             | AnyNodeRef::StmtBreak(_)
             | AnyNodeRef::StmtContinue(_)
+            | AnyNodeRef::StmtLineMagic(_)
             | AnyNodeRef::ExceptHandlerExceptHandler(_)
             | AnyNodeRef::PatternMatchValue(_)
             | AnyNodeRef::PatternMatchSingleton(_)
@@ -4211,6 +4309,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtPass(_)
             | AnyNodeRef::StmtBreak(_)
             | AnyNodeRef::StmtContinue(_)
+            | AnyNodeRef::StmtLineMagic(_)
             | AnyNodeRef::ExprBoolOp(_)
             | AnyNodeRef::ExprNamedExpr(_)
             | AnyNodeRef::ExprBinOp(_)
@@ -4238,6 +4337,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprList(_)
             | AnyNodeRef::ExprTuple(_)
             | AnyNodeRef::ExprSlice(_)
+            | AnyNodeRef::ExprLineMagic(_)
             | AnyNodeRef::ExceptHandlerExceptHandler(_)
             | AnyNodeRef::PatternMatchValue(_)
             | AnyNodeRef::PatternMatchSingleton(_)
@@ -4307,6 +4407,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtPass(_)
             | AnyNodeRef::StmtBreak(_)
             | AnyNodeRef::StmtContinue(_)
+            | AnyNodeRef::StmtLineMagic(_)
             | AnyNodeRef::ExprBoolOp(_)
             | AnyNodeRef::ExprNamedExpr(_)
             | AnyNodeRef::ExprBinOp(_)
@@ -4334,6 +4435,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprList(_)
             | AnyNodeRef::ExprTuple(_)
             | AnyNodeRef::ExprSlice(_)
+            | AnyNodeRef::ExprLineMagic(_)
             | AnyNodeRef::ExceptHandlerExceptHandler(_)
             | AnyNodeRef::TypeIgnoreTypeIgnore(_)
             | AnyNodeRef::Comprehension(_)
@@ -4388,6 +4490,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtPass(_)
             | AnyNodeRef::StmtBreak(_)
             | AnyNodeRef::StmtContinue(_)
+            | AnyNodeRef::StmtLineMagic(_)
             | AnyNodeRef::ExprBoolOp(_)
             | AnyNodeRef::ExprNamedExpr(_)
             | AnyNodeRef::ExprBinOp(_)
@@ -4415,6 +4518,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprList(_)
             | AnyNodeRef::ExprTuple(_)
             | AnyNodeRef::ExprSlice(_)
+            | AnyNodeRef::ExprLineMagic(_)
             | AnyNodeRef::PatternMatchValue(_)
             | AnyNodeRef::PatternMatchSingleton(_)
             | AnyNodeRef::PatternMatchSequence(_)
@@ -4476,6 +4580,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtPass(_)
             | AnyNodeRef::StmtBreak(_)
             | AnyNodeRef::StmtContinue(_)
+            | AnyNodeRef::StmtLineMagic(_)
             | AnyNodeRef::ExprBoolOp(_)
             | AnyNodeRef::ExprNamedExpr(_)
             | AnyNodeRef::ExprBinOp(_)
@@ -4503,6 +4608,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprList(_)
             | AnyNodeRef::ExprTuple(_)
             | AnyNodeRef::ExprSlice(_)
+            | AnyNodeRef::ExprLineMagic(_)
             | AnyNodeRef::PatternMatchValue(_)
             | AnyNodeRef::PatternMatchSingleton(_)
             | AnyNodeRef::PatternMatchSequence(_)
@@ -4755,6 +4861,12 @@ impl<'a> From<&'a ast::StmtContinue> for AnyNodeRef<'a> {
     }
 }
 
+impl<'a> From<&'a ast::StmtLineMagic> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::StmtLineMagic) -> Self {
+        AnyNodeRef::StmtLineMagic(node)
+    }
+}
+
 impl<'a> From<&'a ast::ExprBoolOp> for AnyNodeRef<'a> {
     fn from(node: &'a ast::ExprBoolOp) -> Self {
         AnyNodeRef::ExprBoolOp(node)
@@ -4917,6 +5029,12 @@ impl<'a> From<&'a ast::ExprSlice> for AnyNodeRef<'a> {
     }
 }
 
+impl<'a> From<&'a ast::ExprLineMagic> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::ExprLineMagic) -> Self {
+        AnyNodeRef::ExprLineMagic(node)
+    }
+}
+
 impl<'a> From<&'a ast::ExceptHandlerExceptHandler> for AnyNodeRef<'a> {
     fn from(node: &'a ast::ExceptHandlerExceptHandler) -> Self {
         AnyNodeRef::ExceptHandlerExceptHandler(node)
@@ -5032,6 +5150,7 @@ impl<'a> From<&'a Stmt> for AnyNodeRef<'a> {
             Stmt::Pass(node) => AnyNodeRef::StmtPass(node),
             Stmt::Break(node) => AnyNodeRef::StmtBreak(node),
             Stmt::Continue(node) => AnyNodeRef::StmtContinue(node),
+            Stmt::LineMagic(node) => AnyNodeRef::StmtLineMagic(node),
         }
     }
 }
@@ -5066,6 +5185,7 @@ impl<'a> From<&'a Expr> for AnyNodeRef<'a> {
             Expr::List(node) => AnyNodeRef::ExprList(node),
             Expr::Tuple(node) => AnyNodeRef::ExprTuple(node),
             Expr::Slice(node) => AnyNodeRef::ExprSlice(node),
+            Expr::LineMagic(node) => AnyNodeRef::ExprLineMagic(node),
         }
     }
 }
@@ -5200,6 +5320,7 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::StmtPass(node) => node.range(),
             AnyNodeRef::StmtBreak(node) => node.range(),
             AnyNodeRef::StmtContinue(node) => node.range(),
+            AnyNodeRef::StmtLineMagic(node) => node.range(),
             AnyNodeRef::ExprBoolOp(node) => node.range(),
             AnyNodeRef::ExprNamedExpr(node) => node.range(),
             AnyNodeRef::ExprBinOp(node) => node.range(),
@@ -5227,6 +5348,7 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::ExprList(node) => node.range(),
             AnyNodeRef::ExprTuple(node) => node.range(),
             AnyNodeRef::ExprSlice(node) => node.range(),
+            AnyNodeRef::ExprLineMagic(node) => node.range(),
             AnyNodeRef::ExceptHandlerExceptHandler(node) => node.range(),
             AnyNodeRef::PatternMatchValue(node) => node.range(),
             AnyNodeRef::PatternMatchSingleton(node) => node.range(),
@@ -5284,6 +5406,7 @@ pub enum NodeKind {
     StmtImportFrom,
     StmtGlobal,
     StmtNonlocal,
+    StmtLineMagic,
     StmtExpr,
     StmtPass,
     StmtBreak,
@@ -5315,6 +5438,7 @@ pub enum NodeKind {
     ExprList,
     ExprTuple,
     ExprSlice,
+    ExprLineMagic,
     ExceptHandlerExceptHandler,
     PatternMatchValue,
     PatternMatchSingleton,
