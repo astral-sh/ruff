@@ -332,4 +332,26 @@ SIM102.py:132:5: SIM102 [*] Use a single `if` statement instead of nested `if` s
 136 135 |     print("bar")
 137 136 | 
 
+SIM102.py:165:5: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+    |
+163 |       if a:
+164 |           pass
+165 |       elif b:
+    |  _____^
+166 | |         if c:
+    | |_____________^ SIM102
+167 |               d
+    |
+    = help: Combine `if` statements using `and`
+
+ℹ Suggested fix
+162 162 | def f():
+163 163 |     if a:
+164 164 |         pass
+165     |-    elif b:
+166     |-        if c:
+167     |-            d
+    165 |+    elif b and c:
+    166 |+        d
+
 

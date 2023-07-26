@@ -312,7 +312,8 @@ fn find_last_nested_if(body: &[Stmt]) -> Option<(&Expr, &Stmt)> {
     })
 }
 
-fn nested_if_body(stmt_if: &StmtIf) -> Option<(&[Stmt], TextRange)> {
+/// Returns the body, the range of the `if` or `elif` and whether the range is for an `if` or `elif`
+fn nested_if_body(stmt_if: &StmtIf) -> Option<(&[Stmt], TextRange, bool)> {
     let StmtIf {
         test,
         body,
@@ -322,15 +323,15 @@ fn nested_if_body(stmt_if: &StmtIf) -> Option<(&[Stmt], TextRange)> {
 
     // It must be the last condition, otherwise there could be another `elif` or `else` that only
     // depends on the outer of the two conditions
-    let (test, body, range) = if let Some(clause) = elif_else_clauses.last() {
+    let (test, body, range, is_elif) = if let Some(clause) = elif_else_clauses.last() {
         if let Some(test) = &clause.test {
-            (test, &clause.body, clause.range())
+            (test, &clause.body, clause.range(), true)
         } else {
             // The last condition is an `else` (different rule)
             return None;
         }
     } else {
-        (test.as_ref(), body, stmt_if.range())
+        (test.as_ref(), body, stmt_if.range(), false)
     };
 
     // The nested if must be the only child, otherwise there is at least one more statement that
@@ -355,12 +356,12 @@ fn nested_if_body(stmt_if: &StmtIf) -> Option<(&[Stmt], TextRange)> {
         return None;
     }
 
-    Some((body, range))
+    Some((body, range, is_elif))
 }
 
 /// SIM102
 pub(crate) fn nested_if_statements(checker: &mut Checker, stmt_if: &StmtIf, parent: Option<&Stmt>) {
-    let Some((body, range)) = nested_if_body(stmt_if) else {
+    let Some((body, range, is_elif)) = nested_if_body(stmt_if) else {
         return;
     };
 
@@ -376,7 +377,7 @@ pub(crate) fn nested_if_statements(checker: &mut Checker, stmt_if: &StmtIf, pare
 
     // Check if the parent is already emitting a larger diagnostic including this if statement
     if let Some(Stmt::If(stmt_if)) = parent {
-        if let Some((body, _range)) = nested_if_body(stmt_if) {
+        if let Some((body, _range, _is_elif)) = nested_if_body(stmt_if) {
             // In addition to repeating the `nested_if_body` and `find_last_nested_if` check, we
             // also need to be the first child in the parent
             if matches!(&body[0], Stmt::If(inner) if inner == stmt_if)
@@ -400,7 +401,12 @@ pub(crate) fn nested_if_statements(checker: &mut Checker, stmt_if: &StmtIf, pare
             .comment_ranges()
             .intersects(TextRange::new(range.start(), nested_if.start()))
         {
-            match fix_if::fix_nested_if_statements(checker.locator(), checker.stylist(), range) {
+            match fix_if::fix_nested_if_statements(
+                checker.locator(),
+                checker.stylist(),
+                range,
+                is_elif,
+            ) {
                 Ok(edit) => {
                     if edit
                         .content()

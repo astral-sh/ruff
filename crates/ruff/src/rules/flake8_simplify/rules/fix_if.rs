@@ -34,6 +34,7 @@ pub(crate) fn fix_nested_if_statements(
     locator: &Locator,
     stylist: &Stylist,
     range: TextRange,
+    is_elif: bool,
 ) -> Result<Edit> {
     // Infer the indentation of the outer block.
     let Some(outer_indent) = whitespace::indentation(locator, &range) else {
@@ -45,7 +46,6 @@ pub(crate) fn fix_nested_if_statements(
 
     // If this is an `elif`, we have to remove the `elif` keyword for now. (We'll
     // restore the `el` later on.)
-    let is_elif = contents.starts_with("elif");
     let module_text = if is_elif {
         Cow::Owned(contents.replacen("elif", "if", 1))
     } else {
