@@ -119,8 +119,8 @@ pub(crate) fn check_tokens(
     }
 
     if settings.rules.any_enabled(&[
-        Rule::SingleLineImplicitStringConcatenation,
         Rule::MultiLineImplicitStringConcatenation,
+        Rule::SingleLineImplicitStringConcatenation,
     ]) {
         flake8_implicit_str_concat::rules::implicit(
             &mut diagnostics,
@@ -128,6 +128,10 @@ pub(crate) fn check_tokens(
             &settings.flake8_implicit_str_concat,
             locator,
         );
+    }
+
+    if settings.rules.enabled(Rule::ExplicitStringConcatenation) {
+        flake8_implicit_str_concat::rules::explicit(&mut diagnostics, tokens);
     }
 
     if settings.rules.any_enabled(&[

@@ -31,4 +31,24 @@ ISC.py:19:3: ISC003 Explicitly concatenated string should be implicitly concaten
 21 |   )
    |
 
+ISC.py:64:7: ISC003 Explicitly concatenated string should be implicitly concatenated
+   |
+63 |   _ = (
+64 |     a + f"abc" +
+   |  _______^
+65 | |   "def"
+   | |_______^ ISC003
+66 |   )
+   |
+
+ISC.py:69:3: ISC003 Explicitly concatenated string should be implicitly concatenated
+   |
+68 |   _ = (
+69 |     f"abc" +
+   |  ___^
+70 | |   "def" + a
+   | |_______^ ISC003
+71 |   )
+   |
+
 

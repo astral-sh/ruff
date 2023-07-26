@@ -59,3 +59,13 @@ _ = "abc" + "def" + foo
 _ = foo + bar + "abc"
 _ = "abc" + foo + bar
 _ = foo + "abc" + bar
+
+_ = (
+  a + f"abc" +
+  "def"
+)
+
+_ = (
+  f"abc" +
+  "def" + a
+)

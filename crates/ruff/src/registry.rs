@@ -258,6 +258,7 @@ impl Rule {
             | Rule::BlanketNOQA
             | Rule::BlanketTypeIgnore
             | Rule::CommentedOutCode
+            | Rule::ExplicitStringConcatenation
             | Rule::ExtraneousParentheses
             | Rule::InvalidCharacterBackspace
             | Rule::InvalidCharacterEsc

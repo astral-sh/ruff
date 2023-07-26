@@ -1,8 +1,11 @@
-use rustpython_parser::ast::{self, Constant, Expr, Operator, Ranged};
+use itertools::Itertools;
+use ruff_text_size::TextRange;
+use rustpython_parser::ast::Ranged;
+use rustpython_parser::lexer::LexResult;
+use rustpython_parser::Tok;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::Locator;
 
 /// ## What it does
 /// Checks for string literals that are explicitly concatenated (using the
@@ -39,34 +42,31 @@ impl Violation for ExplicitStringConcatenation {
 }
 
 /// ISC003
-pub(crate) fn explicit(expr: &Expr, locator: &Locator) -> Option<Diagnostic> {
-    if let Expr::BinOp(ast::ExprBinOp {
-        left,
-        op,
-        right,
-        range,
-    }) = expr
+pub(crate) fn explicit(diagnostics: &mut Vec<Diagnostic>, tokens: &[LexResult]) {
+    for ((a_tok, a_range), (b_tok, _), (c_tok, _), (d_tok, d_range)) in tokens
+        .iter()
+        .flatten()
+        .filter(|(tok, _)| !tok.is_comment())
+        .tuple_windows()
     {
-        if matches!(op, Operator::Add) {
-            if matches!(
-                left.as_ref(),
-                Expr::JoinedStr(_)
-                    | Expr::Constant(ast::ExprConstant {
-                        value: Constant::Str(..) | Constant::Bytes(..),
-                        ..
-                    })
-            ) && matches!(
-                right.as_ref(),
-                Expr::JoinedStr(_)
-                    | Expr::Constant(ast::ExprConstant {
-                        value: Constant::Str(..) | Constant::Bytes(..),
-                        ..
-                    })
-            ) && locator.contains_line_break(*range)
-            {
-                return Some(Diagnostic::new(ExplicitStringConcatenation, expr.range()));
-            }
+        if matches!(
+            (a_tok, b_tok, c_tok, d_tok),
+            (
+                Tok::String { .. },
+                Tok::NonLogicalNewline,
+                Tok::Plus,
+                Tok::String { .. }
+            ) | (
+                Tok::String { .. },
+                Tok::Plus,
+                Tok::NonLogicalNewline,
+                Tok::String { .. }
+            )
+        ) {
+            diagnostics.push(Diagnostic::new(
+                ExplicitStringConcatenation,
+                TextRange::new(a_range.start(), d_range.end()),
+            ));
         }
     }
-    None
 }
