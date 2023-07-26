@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, StmtAssign};
+use rustpython_ast::{Expr, StmtAssign};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Decorator, Stmt};
+use rustpython_ast::{self as ast, Decorator, Stmt};
 
 pub fn name(stmt: &Stmt) -> &str {
     match stmt {

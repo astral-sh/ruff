@@ -1,8 +1,8 @@
 use std::fmt;
 
 use ruff_text_size::{TextLen, TextRange};
-use rustpython_parser::ast::Decorator;
-use rustpython_parser::ast::{self, ArgWithDefault, Arguments, Expr, Ranged, Stmt};
+use rustpython_ast::Decorator;
+use rustpython_ast::{self as ast, ArgWithDefault, Arguments, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};

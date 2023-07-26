@@ -1,18 +1,18 @@
 use std::str::FromStr;
 
 use ruff_text_size::TextRange;
+use rustpython_ast::{self as ast, Constant, Expr, Ranged};
 use rustpython_format::cformat::{
     CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatString,
 };
-use rustpython_parser::ast::{self, Constant, Expr, Ranged};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_stdlib::identifiers::is_identifier;
+use ruff_source_file::Locator;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;

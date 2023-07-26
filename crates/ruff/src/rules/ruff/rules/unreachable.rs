@@ -1,7 +1,7 @@
 use std::{fmt, iter, usize};
 
 use log::error;
-use rustpython_parser::ast::{
+use rustpython_ast::{
     Expr, Identifier, MatchCase, Pattern, PatternMatchAs, Ranged, Stmt, StmtAsyncFor,
     StmtAsyncWith, StmtFor, StmtMatch, StmtReturn, StmtTry, StmtTryStar, StmtWhile, StmtWith,
 };
@@ -1053,7 +1053,7 @@ mod tests {
     use std::fs;
     use std::path::PathBuf;
 
-    use rustpython_parser::ast::Ranged;
+    use rustpython_ast::Ranged;
     use rustpython_parser::{parse, Mode};
     use std::fmt::Write;
     use test_case::test_case;

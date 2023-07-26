@@ -6,7 +6,8 @@ use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
 use ruff_diagnostics::Diagnostic;
-use ruff_python_ast::source_code::{Indexer, Locator};
+use ruff_python::index::Indexer;
+use ruff_source_file::Locator;
 
 use crate::directives::TodoComment;
 use crate::lex::docstring_detection::StateMachine;

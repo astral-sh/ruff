@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use num_bigint::BigInt;
 use num_traits::{One, Zero};
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{self, Comprehension, Constant, Expr, Ranged};
+use rustpython_ast::{self as ast, Comprehension, Constant, Expr, Ranged};
 use unicode_width::UnicodeWidthStr;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};

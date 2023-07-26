@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprAttribute};
+use rustpython_ast::{Expr, ExprAttribute};
 
 use crate::checkers::ast::Checker;
 

@@ -8,7 +8,7 @@ use rustpython_parser::lexer::lex;
 use rustpython_parser::{parse_tokens, Mode};
 
 use ruff_formatter::SourceCode;
-use ruff_python_ast::source_code::CommentRangesBuilder;
+use ruff_python::index::CommentRangesBuilder;
 
 use crate::{format_node, PyFormatOptions};
 

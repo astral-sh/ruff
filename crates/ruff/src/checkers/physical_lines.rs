@@ -2,8 +2,10 @@
 use ruff_text_size::TextSize;
 
 use ruff_diagnostics::Diagnostic;
-use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
+use ruff_python::codegen::Stylist;
+use ruff_python::index::Indexer;
 use ruff_python_trivia::UniversalNewlines;
+use ruff_source_file::Locator;
 
 use crate::registry::Rule;
 use crate::rules::flake8_copyright::rules::missing_copyright_notice;
@@ -121,7 +123,9 @@ mod tests {
     use rustpython_parser::lexer::lex;
     use rustpython_parser::Mode;
 
-    use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
+    use ruff_python::codegen::Stylist;
+    use ruff_python::index::Indexer;
+    use ruff_source_file::Locator;
 
     use crate::line_width::LineLength;
     use crate::registry::Rule;

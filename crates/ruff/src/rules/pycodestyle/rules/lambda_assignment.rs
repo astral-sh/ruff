@@ -1,14 +1,15 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{
-    self, Arg, ArgWithDefault, Arguments, Constant, Expr, Identifier, Ranged, Stmt,
+use rustpython_ast::{
+    self as ast, Arg, ArgWithDefault, Arguments, Constant, Expr, Identifier, Ranged, Stmt,
 };
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{has_leading_content, has_trailing_content};
-use ruff_python_ast::source_code::Generator;
+use ruff_python::codegen::Generator;
 use ruff_python_semantic::SemanticModel;
-use ruff_python_trivia::{leading_indentation, UniversalNewlines};
+use ruff_python_trivia::{
+    has_leading_content, has_trailing_content, leading_indentation, UniversalNewlines,
+};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;

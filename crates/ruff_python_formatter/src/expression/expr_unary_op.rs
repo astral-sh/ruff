@@ -1,6 +1,6 @@
 use ruff_text_size::{TextLen, TextRange};
-use rustpython_parser::ast::UnaryOp;
-use rustpython_parser::ast::{ExprUnaryOp, Ranged};
+use rustpython_ast::UnaryOp;
+use rustpython_ast::{ExprUnaryOp, Ranged};
 
 use ruff_formatter::prelude::{hard_line_break, space, text};
 use ruff_formatter::{Format, FormatContext, FormatResult};

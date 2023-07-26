@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_parser::ast::{self, ExceptHandler, Expr, ExprContext, Ranged};
+use rustpython_ast::{self as ast, ExceptHandler, Expr, ExprContext, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};

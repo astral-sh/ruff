@@ -2,11 +2,10 @@
 
 pub mod preorder;
 
-use rustpython_ast::ElifElseClause;
-use rustpython_parser::ast::{
-    self, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Decorator, ExceptHandler, Expr,
-    ExprContext, Keyword, MatchCase, Operator, Pattern, Stmt, TypeParam, TypeParamTypeVar, UnaryOp,
-    WithItem,
+use rustpython_ast::{
+    self as ast, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Decorator, ElifElseClause,
+    ExceptHandler, Expr, ExprContext, Keyword, MatchCase, Operator, Pattern, Stmt, TypeParam,
+    TypeParamTypeVar, UnaryOp, WithItem,
 };
 
 /// A trait for AST visitors. Visits all nodes in the AST recursively in evaluation-order.
@@ -803,8 +802,9 @@ mod tests {
     use std::fmt::{Debug, Write};
 
     use insta::assert_snapshot;
+    use rustpython_ast as ast;
     use rustpython_parser::lexer::lex;
-    use rustpython_parser::{ast, parse_tokens, Mode};
+    use rustpython_parser::{parse_tokens, Mode};
 
     use crate::node::AnyNodeRef;
     use crate::visitor::{

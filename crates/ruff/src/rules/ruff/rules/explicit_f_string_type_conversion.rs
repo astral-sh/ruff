@@ -2,11 +2,12 @@ use anyhow::{bail, Result};
 use libcst_native::{
     ConcatenatedString, Expression, FormattedStringContent, FormattedStringExpression,
 };
-use rustpython_parser::ast::{self, Expr, Ranged};
+use rustpython_ast::{self as ast, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python::codegen::Stylist;
+use ruff_source_file::Locator;
 
 use crate::autofix::codemods::CodegenStylist;
 use crate::checkers::ast::Checker;

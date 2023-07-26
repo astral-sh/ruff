@@ -1,10 +1,11 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Decorator, Expr, ExprContext, Ranged};
+use rustpython_ast::{self as ast, Constant, Decorator, Expr, ExprContext, Ranged};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::{Generator, Locator};
+use ruff_python::codegen::Generator;
+use ruff_source_file::Locator;
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};

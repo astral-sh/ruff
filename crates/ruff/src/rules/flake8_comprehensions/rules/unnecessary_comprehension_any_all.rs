@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, Keyword, Ranged};
+use rustpython_ast::{self as ast, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{AutofixKind, Diagnostic};

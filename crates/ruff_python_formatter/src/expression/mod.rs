@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 
+use rustpython_ast::{Expr, Operator};
 use rustpython_parser::ast;
-use rustpython_parser::ast::{Expr, Operator};
 
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions};
 use ruff_python_ast::node::AnyNodeRef;

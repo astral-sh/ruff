@@ -26,8 +26,10 @@ doc = false
 ruff = { path = "../ruff", features = ["clap"] }
 ruff_cache = { path = "../ruff_cache" }
 ruff_diagnostics = { path = "../ruff_diagnostics" }
+ruff_python= { path = "../ruff_python" }
 ruff_python_ast = { path = "../ruff_python_ast" }
 ruff_python_formatter = { path = "../ruff_python_formatter" }
+ruff_source_file = { path = "../ruff_source_file" }
 ruff_text_size = { workspace = true }
 ruff_textwrap = { path = "../ruff_textwrap" }
 ruff_macros = { path = "../ruff_macros" }

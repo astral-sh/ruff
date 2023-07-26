@@ -1,7 +1,7 @@
 use crate::{FormatNodeRule, FormattedIterExt, PyFormatter};
 use ruff_formatter::prelude::{format_args, format_with, space, text};
 use ruff_formatter::{write, Buffer, FormatResult};
-use rustpython_parser::ast::StmtImport;
+use rustpython_ast::StmtImport;
 
 #[derive(Default)]
 pub struct FormatStmtImport;

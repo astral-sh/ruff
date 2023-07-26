@@ -3,7 +3,7 @@ use std::path::Path;
 use bitflags::bitflags;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{Expr, Ranged, Stmt};
+use rustpython_ast::{Expr, Ranged, Stmt};
 use smallvec::SmallVec;
 
 use ruff_python_ast::call_path::{collect_call_path, from_unqualified_name, CallPath};

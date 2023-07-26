@@ -3,7 +3,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustc_hash::FxHashSet;
-use rustpython_parser::ast::{self, ArgWithDefault, Stmt};
+use rustpython_ast::{self as ast, ArgWithDefault, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};

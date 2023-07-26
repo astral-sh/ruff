@@ -1,5 +1,6 @@
 use rustpython_parser::Tok;
 
+// TODO move to ruff_python_parser?
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub enum TokenKind {
     /// Token value for a name, commonly known as an identifier.

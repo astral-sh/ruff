@@ -1,8 +1,8 @@
-use rustpython_parser::ast::{Ranged, Stmt};
+use rustpython_ast::{Ranged, Stmt};
 use rustpython_parser::{lexer, Mode, Tok};
 
-use ruff_python_ast::source_code::Locator;
 use ruff_python_trivia::{PythonWhitespace, UniversalNewlines};
+use ruff_source_file::Locator;
 
 use crate::rules::isort::types::TrailingComma;
 

@@ -3,16 +3,16 @@
 use rustpython_ast::ArgWithDefault;
 use std::ops::Deref;
 
-use rustpython_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
-use rustpython_parser::ast::{
-    self, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Constant, ConversionFlag,
+use rustpython_ast::{
+    self as ast, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Constant, ConversionFlag,
     ExceptHandler, Expr, Identifier, MatchCase, Operator, Pattern, Stmt, Suite, TypeParam,
     TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
 };
+use rustpython_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
 
 use ruff_python_trivia::LineEnding;
 
-use crate::source_code::stylist::{Indentation, Quote, Stylist};
+use super::stylist::{Indentation, Quote, Stylist};
 
 mod precedence {
     pub(crate) const ASSIGN: u8 = 3;
@@ -972,7 +972,7 @@ impl<'a> Generator<'a> {
                 let (op, prec) = opprec!(
                     un,
                     op,
-                    rustpython_parser::ast::UnaryOp,
+                    rustpython_ast::UnaryOp,
                     Invert("~", INVERT),
                     Not("not ", NOT),
                     UAdd("+", UADD),
@@ -1480,8 +1480,8 @@ mod tests {
 
     use ruff_python_trivia::LineEnding;
 
-    use crate::source_code::stylist::{Indentation, Quote};
-    use crate::source_code::Generator;
+    use super::Generator;
+    use crate::codegen::stylist::{Indentation, Quote};
 
     fn round_trip(contents: &str) -> String {
         let indentation = Indentation::default();

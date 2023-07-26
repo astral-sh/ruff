@@ -2,9 +2,9 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::token_kind::TokenKind;
+use ruff_python_parser::token_kind::TokenKind;
 use ruff_python_trivia::PythonWhitespace;
+use ruff_source_file::Locator;
 
 use crate::checkers::logical_lines::LogicalLinesContext;
 use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;

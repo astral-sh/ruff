@@ -1,13 +1,16 @@
 //! Interface for generating autofix edits from higher-level actions (e.g., "remove an argument").
 use anyhow::{bail, Result};
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_parser::ast::{self, ExceptHandler, Expr, Keyword, Ranged, Stmt};
+use rustpython_ast::{self as ast, ExceptHandler, Expr, Keyword, Ranged, Stmt};
 use rustpython_parser::{lexer, Mode};
 
 use ruff_diagnostics::Edit;
-use ruff_python_ast::helpers;
-use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
-use ruff_python_trivia::{is_python_whitespace, NewlineWithTrailingNewline, PythonWhitespace};
+use ruff_python::codegen::Stylist;
+use ruff_python::index::Indexer;
+use ruff_python_trivia::{
+    has_leading_content, is_python_whitespace, NewlineWithTrailingNewline, PythonWhitespace,
+};
+use ruff_source_file::Locator;
 
 use crate::autofix::codemods;
 
@@ -41,11 +44,9 @@ pub(crate) fn delete_stmt(
         if let Some(semicolon) = trailing_semicolon(stmt.end(), locator) {
             let next = next_stmt_break(semicolon, locator);
             Edit::deletion(stmt.start(), next)
-        } else if helpers::has_leading_content(stmt.start(), locator) {
+        } else if has_leading_content(stmt.start(), locator) {
             Edit::range_deletion(stmt.range())
-        } else if let Some(start) =
-            helpers::preceded_by_continuations(stmt.start(), locator, indexer)
-        {
+        } else if let Some(start) = indexer.preceded_by_continuations(stmt.start(), locator) {
             Edit::range_deletion(TextRange::new(start, stmt.end()))
         } else {
             let range = locator.full_lines_range(stmt.range());
@@ -296,10 +297,10 @@ fn next_stmt_break(semicolon: TextSize, locator: &Locator) -> TextSize {
 mod tests {
     use anyhow::Result;
     use ruff_text_size::TextSize;
-    use rustpython_parser::ast::{Ranged, Suite};
+    use rustpython_ast::{Ranged, Suite};
     use rustpython_parser::Parse;
 
-    use ruff_python_ast::source_code::Locator;
+    use ruff_source_file::Locator;
 
     use crate::autofix::edits::{next_stmt_break, trailing_semicolon};
 

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Identifier, Ranged};
+use rustpython_ast::{Identifier, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};

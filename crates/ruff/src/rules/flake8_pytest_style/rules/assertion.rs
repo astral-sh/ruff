@@ -7,14 +7,15 @@ use libcst_native::{
     ParenthesizedNode, SimpleStatementLine, SimpleWhitespace, SmallStatement, Statement,
     TrailingWhitespace, UnaryOperation,
 };
-use rustpython_parser::ast::{self, BoolOp, ExceptHandler, Expr, Keyword, Ranged, Stmt, UnaryOp};
+use rustpython_ast::{self as ast, BoolOp, ExceptHandler, Expr, Keyword, Ranged, Stmt, UnaryOp};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python::codegen::Stylist;
 use ruff_python_ast::helpers::Truthiness;
-use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{visitor, whitespace};
+use ruff_source_file::Locator;
 
 use crate::autofix::codemods::CodegenStylist;
 use crate::checkers::ast::Checker;

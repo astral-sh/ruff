@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Constant, Expr, Operator, Ranged};
+use rustpython_ast::{self as ast, Constant, Expr, Operator, Ranged};
 
 use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};

@@ -7,7 +7,7 @@ use crate::prelude::*;
 use crate::FormatNodeRule;
 use ruff_formatter::{format_args, write};
 use ruff_python_ast::node::AnyNodeRef;
-use rustpython_parser::ast::ExprIfExp;
+use rustpython_ast::ExprIfExp;
 
 #[derive(Default)]
 pub struct FormatExprIfExp;

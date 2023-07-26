@@ -8,8 +8,9 @@ use libcst_native::{
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::Edit;
-use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python::codegen::Stylist;
 use ruff_python_ast::whitespace;
+use ruff_source_file::Locator;
 
 use crate::autofix::codemods::CodegenStylist;
 use crate::cst::matchers::{match_function_def, match_if, match_indented_block, match_statement};

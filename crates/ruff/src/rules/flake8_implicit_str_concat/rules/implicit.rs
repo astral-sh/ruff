@@ -4,8 +4,8 @@ use rustpython_parser::lexer::LexResult;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::str::{leading_quote, trailing_quote};
+use ruff_source_file::Locator;
 
 use crate::rules::flake8_implicit_str_concat::settings::Settings;
 

@@ -6,9 +6,7 @@ use memchr::{memchr2, memrchr2};
 use once_cell::unsync::OnceCell;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
-use ruff_python_trivia::find_newline;
-
-use crate::source_code::{LineIndex, OneIndexed, SourceCode, SourceLocation};
+use crate::{LineIndex, OneIndexed, SourceCode, SourceLocation};
 
 pub struct Locator<'a> {
     contents: &'a str,
@@ -59,7 +57,7 @@ impl<'a> Locator<'a> {
     ///
     /// ```
     /// # use ruff_text_size::TextSize;
-    /// # use ruff_python_ast::source_code::Locator;
+    /// # use ruff_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\rthird line");
     ///
@@ -93,7 +91,7 @@ impl<'a> Locator<'a> {
     ///
     /// ```
     /// # use ruff_text_size::{TextRange, TextSize};
-    /// # use ruff_python_ast::source_code::Locator;
+    /// # use ruff_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
     ///
@@ -107,8 +105,8 @@ impl<'a> Locator<'a> {
     /// If `offset` is passed the end of the content.
     pub fn full_line_end(&self, offset: TextSize) -> TextSize {
         let slice = &self.contents[usize::from(offset)..];
-        if let Some((index, line_ending)) = find_newline(slice) {
-            offset + TextSize::try_from(index).unwrap() + line_ending.text_len()
+        if let Some((index, len)) = find_newline(slice) {
+            offset + TextSize::try_from(index).unwrap() + len
         } else {
             self.contents.text_len()
         }
@@ -120,7 +118,7 @@ impl<'a> Locator<'a> {
     ///
     /// ```
     /// # use ruff_text_size::{TextRange, TextSize};
-    /// # use ruff_python_ast::source_code::Locator;
+    /// # use ruff_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
     ///
@@ -150,7 +148,7 @@ impl<'a> Locator<'a> {
     ///
     /// ```
     /// # use ruff_text_size::{TextRange, TextSize};
-    /// # use ruff_python_ast::source_code::Locator;
+    /// # use ruff_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
     ///
@@ -174,7 +172,7 @@ impl<'a> Locator<'a> {
     ///
     /// ```
     /// # use ruff_text_size::{TextRange, TextSize};
-    /// # use ruff_python_ast::source_code::Locator;
+    /// # use ruff_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
     ///
@@ -197,7 +195,7 @@ impl<'a> Locator<'a> {
     ///
     /// ```
     /// # use ruff_text_size::{TextRange, TextSize};
-    /// # use ruff_python_ast::source_code::Locator;
+    /// # use ruff_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
     ///
@@ -220,7 +218,7 @@ impl<'a> Locator<'a> {
     ///
     /// ```
     /// # use ruff_text_size::{TextRange, TextSize};
-    /// # use ruff_python_ast::source_code::Locator;
+    /// # use ruff_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
     ///
@@ -244,7 +242,7 @@ impl<'a> Locator<'a> {
     ///
     /// ```
     /// # use ruff_text_size::{TextRange, TextSize};
-    /// # use ruff_python_ast::source_code::Locator;
+    /// # use ruff_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
     ///
@@ -276,7 +274,7 @@ impl<'a> Locator<'a> {
     ///
     /// ```
     /// # use ruff_text_size::{TextRange, TextSize};
-    /// # use ruff_python_ast::source_code::Locator;
+    /// # use ruff_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
     ///
@@ -300,7 +298,7 @@ impl<'a> Locator<'a> {
     ///
     /// ```
     /// # use ruff_text_size::{TextRange, TextSize};
-    /// # use ruff_python_ast::source_code::Locator;
+    /// # use ruff_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
     ///
@@ -325,7 +323,7 @@ impl<'a> Locator<'a> {
     ///
     /// ```
     /// # use ruff_text_size::{TextRange, TextSize};
-    /// # use ruff_python_ast::source_code::Locator;
+    /// # use ruff_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
     ///
@@ -353,7 +351,7 @@ impl<'a> Locator<'a> {
     ///
     /// ```
     /// # use ruff_text_size::{TextRange, TextSize};
-    /// # use ruff_python_ast::source_code::Locator;
+    /// # use ruff_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
     ///
@@ -408,5 +406,28 @@ impl<'a> Locator<'a> {
     /// Return `true` if the source code is empty.
     pub const fn is_empty(&self) -> bool {
         self.contents.is_empty()
+    }
+}
+
+#[inline]
+fn find_newline(text: &str) -> Option<(usize, TextSize)> {
+    let bytes = text.as_bytes();
+    if let Some(position) = memchr2(b'\n', b'\r', bytes) {
+        // SAFETY: memchr guarantees to return valid positions
+        #[allow(unsafe_code)]
+        let newline_character = unsafe { *bytes.get_unchecked(position) };
+
+        let len = match newline_character {
+            // Explicit branch for `\n` as this is the most likely path
+            b'\n' => TextSize::new(1),
+            // '\r\n'
+            b'\r' if bytes.get(position.saturating_add(1)) == Some(&b'\n') => TextSize::new(2),
+            // '\r'
+            _ => TextSize::new(1),
+        };
+
+        Some((position, len))
+    } else {
+        None
     }
 }

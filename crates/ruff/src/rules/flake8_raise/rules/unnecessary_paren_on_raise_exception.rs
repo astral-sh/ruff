@@ -1,9 +1,8 @@
-use rustpython_parser::ast::{self, Expr, Ranged};
+use rustpython_ast::{self as ast, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-
-use ruff_python_ast::helpers::match_parens;
+use ruff_python::trivia::match_parens;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;

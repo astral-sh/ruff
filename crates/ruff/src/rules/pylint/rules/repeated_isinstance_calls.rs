@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_parser::ast::{self, BoolOp, Expr, Ranged};
+use rustpython_ast::{self as ast, BoolOp, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};

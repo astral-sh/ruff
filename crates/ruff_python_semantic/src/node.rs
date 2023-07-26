@@ -2,7 +2,7 @@ use std::ops::{Index, IndexMut};
 
 use ruff_index::{newtype_index, IndexVec};
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::Stmt;
+use rustpython_ast::Stmt;
 
 use ruff_python_ast::types::RefEquality;
 

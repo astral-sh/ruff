@@ -9,8 +9,8 @@ use rustpython_literal::escape::Quote as StrQuote;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
-use crate::source_code::Locator;
-use crate::str::leading_quote;
+use ruff_python_ast::str::leading_quote;
+use ruff_source_file::Locator;
 
 pub struct Stylist<'a> {
     locator: &'a Locator<'a>,
@@ -168,8 +168,8 @@ mod tests {
 
     use ruff_python_trivia::{find_newline, LineEnding};
 
-    use crate::source_code::stylist::{Indentation, Quote};
-    use crate::source_code::{Locator, Stylist};
+    use super::{Indentation, Quote, Stylist};
+    use ruff_source_file::Locator;
 
     #[test]
     fn indentation() {

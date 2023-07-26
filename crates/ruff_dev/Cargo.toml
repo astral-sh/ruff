@@ -15,6 +15,7 @@ ruff = { path = "../ruff", features = ["schemars"] }
 ruff_cli = { path = "../ruff_cli" }
 ruff_diagnostics = { path = "../ruff_diagnostics" }
 ruff_formatter = { path = "../ruff_formatter" }
+ruff_python = { path = "../ruff_python" }
 ruff_python_formatter = { path = "../ruff_python_formatter" }
 ruff_python_stdlib = { path = "../ruff_python_stdlib" }
 ruff_textwrap = { path = "../ruff_textwrap" }
@@ -30,6 +31,7 @@ once_cell = { workspace = true }
 pretty_assertions = { version = "1.3.0" }
 rayon = "1.7.0"
 regex = { workspace = true }
+rustpython-ast = { workspace = true }
 rustpython-format = { workspace = true }
 rustpython-parser = { workspace = true }
 schemars = { workspace = true }

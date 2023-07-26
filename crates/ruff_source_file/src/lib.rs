@@ -3,35 +3,13 @@ use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::{ast, lexer, Mode, Parse, ParseError};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-pub use comment_ranges::{CommentRanges, CommentRangesBuilder};
-pub use generator::Generator;
-pub use indexer::Indexer;
-pub use locator::Locator;
-pub use stylist::{Quote, Stylist};
-
-pub use crate::source_code::line_index::{LineIndex, OneIndexed};
-
-mod comment_ranges;
-mod generator;
-mod indexer;
-mod line_index;
+pub mod line_index;
 mod locator;
-mod stylist;
-
-/// Run round-trip source code generation on a given Python code.
-pub fn round_trip(code: &str, source_path: &str) -> Result<String, ParseError> {
-    let locator = Locator::new(code);
-    let python_ast = ast::Suite::parse(code, source_path)?;
-    let tokens: Vec<_> = lexer::lex(code, Mode::Module).collect();
-    let stylist = Stylist::from_tokens(&tokens, &locator);
-    let mut generator: Generator = (&stylist).into();
-    generator.unparse_suite(&python_ast);
-    Ok(generator.generate())
-}
+pub use crate::line_index::{LineIndex, OneIndexed};
+pub use locator::Locator;
 
 /// Gives access to the source code of a file and allows mapping between [`TextSize`] and [`SourceLocation`].
 #[derive(Debug)]

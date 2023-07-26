@@ -1,9 +1,9 @@
 use ruff_text_size::TextSize;
+use rustpython_ast::{Expr, Ranged, Stmt};
 use rustpython_parser::ast;
-use rustpython_parser::ast::{Expr, Ranged, Stmt};
 
-use ruff_python_ast::source_code::Locator;
 use ruff_python_trivia::UniversalNewlines;
+use ruff_source_file::Locator;
 
 /// Return `true` if a function's return statement include at least one
 /// non-`None` value.

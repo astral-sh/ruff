@@ -189,6 +189,9 @@ pub enum SimpleTokenKind {
     /// `if`
     If,
 
+    /// `elif`
+    Elif,
+
     /// `in`
     In,
 
@@ -295,6 +298,7 @@ impl<'a> SimpleTokenizer<'a> {
             "as" => SimpleTokenKind::As,
             "async" => SimpleTokenKind::Async,
             "else" => SimpleTokenKind::Else,
+            "elif" => SimpleTokenKind::Elif,
             "if" => SimpleTokenKind::If,
             "in" => SimpleTokenKind::In,
             "match" => SimpleTokenKind::Match, // Match is a soft keyword that depends on the context but we can always lex it as a keyword and leave it to the caller (parser) to decide if it should be handled as an identifier or keyword.

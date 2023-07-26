@@ -1,18 +1,20 @@
 use log::error;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
-use rustpython_parser::ast::{
-    self, CmpOp, Constant, ElifElseClause, Expr, ExprContext, Identifier, Ranged, Stmt, StmtIf,
+use rustpython_ast::{
+    self as ast, CmpOp, Constant, ElifElseClause, Expr, ExprContext, Identifier, Ranged, Stmt,
+    StmtIf,
 };
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::{ComparableConstant, ComparableExpr, ComparableStmt};
-use ruff_python_ast::helpers::{any_over_expr, contains_effect, first_colon_range, has_comments};
-use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::helpers::{any_over_expr, contains_effect};
 use ruff_python_ast::stmt_if::{if_elif_branches, IfElifBranch};
+use ruff_python_parser::first_colon_range;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::UniversalNewlines;
+use ruff_source_file::Locator;
 
 use crate::checkers::ast::Checker;
 use crate::line_width::LineWidth;
@@ -371,7 +373,7 @@ pub(crate) fn nested_if_statements(checker: &mut Checker, stmt_if: &StmtIf, pare
 
     let colon = first_colon_range(
         TextRange::new(test.end(), first_stmt.start()),
-        checker.locator(),
+        checker.locator().contents(),
     );
 
     // Check if the parent is already emitting a larger diagnostic including this if statement
@@ -508,7 +510,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
     if checker.patch(diagnostic.kind.rule()) {
         if matches!(if_return, Bool::True)
             && matches!(else_return, Bool::False)
-            && !has_comments(&range, checker.locator(), checker.indexer())
+            && !checker.indexer().has_comments(&range, checker.locator())
             && (if_test.is_compare_expr() || checker.semantic().is_builtin("bool"))
         {
             if if_test.is_compare_expr() {
@@ -666,7 +668,7 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt) {
         stmt.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        if !has_comments(stmt, checker.locator(), checker.indexer()) {
+        if !checker.indexer().has_comments(stmt, checker.locator()) {
             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                 contents,
                 stmt.range(),
@@ -972,7 +974,7 @@ pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &StmtIf)
         stmt_if.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        if !has_comments(stmt_if, checker.locator(), checker.indexer()) {
+        if !checker.indexer().has_comments(stmt_if, checker.locator()) {
             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                 contents,
                 stmt_if.range(),

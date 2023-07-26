@@ -7,7 +7,7 @@ use ruff_formatter::prelude::{
 };
 use ruff_formatter::{write, Buffer, FormatResult};
 use ruff_python_ast::node::AnyNodeRef;
-use rustpython_parser::ast::ExprDictComp;
+use rustpython_ast::ExprDictComp;
 
 #[derive(Default)]
 pub struct FormatExprDictComp;

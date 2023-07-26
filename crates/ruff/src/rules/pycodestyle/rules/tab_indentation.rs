@@ -2,7 +2,7 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::Indexer;
+use ruff_python::index::Indexer;
 use ruff_python_trivia::{leading_indentation, Line};
 
 /// ## What it does

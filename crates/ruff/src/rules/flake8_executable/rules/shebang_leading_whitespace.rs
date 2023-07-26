@@ -2,8 +2,8 @@ use ruff_text_size::{TextRange, TextSize};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::Locator;
 use ruff_python_trivia::is_python_whitespace;
+use ruff_source_file::Locator;
 
 use crate::registry::AsRule;
 use crate::settings::Settings;

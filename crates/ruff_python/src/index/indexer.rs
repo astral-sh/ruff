@@ -1,12 +1,14 @@
 //! Struct used to index source code, to enable efficient lookup of tokens that
 //! are omitted from the AST (e.g., commented lines).
 
+use ruff_python_trivia::{has_leading_content, has_trailing_content, is_python_whitespace};
 use ruff_text_size::{TextRange, TextSize};
+use rustpython_ast::{Ranged, Stmt};
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::{StringKind, Tok};
 
-use crate::source_code::comment_ranges::{CommentRanges, CommentRangesBuilder};
-use crate::source_code::Locator;
+use super::comment_ranges::{CommentRanges, CommentRangesBuilder};
+use ruff_source_file::Locator;
 
 pub struct Indexer {
     comment_ranges: CommentRanges,
@@ -151,6 +153,113 @@ impl Indexer {
         };
         Some(self.f_string_ranges[string_range_index])
     }
+
+    /// Returns `true` if a statement or expression includes at least one comment.
+    pub fn has_comments<T>(&self, node: &T, locator: &Locator) -> bool
+    where
+        T: Ranged,
+    {
+        let start = if has_leading_content(node.start(), locator) {
+            node.start()
+        } else {
+            locator.line_start(node.start())
+        };
+        let end = if has_trailing_content(node.end(), locator) {
+            node.end()
+        } else {
+            locator.line_end(node.end())
+        };
+
+        self.comment_ranges().intersects(TextRange::new(start, end))
+    }
+
+    /// Given an offset at the end of a line (including newlines), return the offset of the
+    /// continuation at the end of that line.
+    fn find_continuation(&self, offset: TextSize, locator: &Locator) -> Option<TextSize> {
+        let newline_pos = usize::from(offset).saturating_sub(1);
+
+        // Skip the newline.
+        let newline_len = match locator.contents().as_bytes()[newline_pos] {
+            b'\n' => {
+                if locator
+                    .contents()
+                    .as_bytes()
+                    .get(newline_pos.saturating_sub(1))
+                    == Some(&b'\r')
+                {
+                    2
+                } else {
+                    1
+                }
+            }
+            b'\r' => 1,
+            // No preceding line.
+            _ => return None,
+        };
+
+        self.is_continuation(offset - TextSize::from(newline_len), locator)
+            .then(|| offset - TextSize::from(newline_len) - TextSize::from(1))
+    }
+
+    /// If the node starting at the given [`TextSize`] is preceded by at least one continuation line
+    /// (i.e., a line ending in a backslash), return the starting offset of the first such continuation
+    /// character.
+    ///
+    /// For example, given:
+    /// ```python
+    /// x = 1; \
+    ///    y = 2
+    /// ```
+    ///
+    /// When passed the offset of `y`, this function will return the offset of the backslash at the end
+    /// of the first line.
+    ///
+    /// Similarly, given:
+    /// ```python
+    /// x = 1; \
+    ///        \
+    ///   y = 2;
+    /// ```
+    ///
+    /// When passed the offset of `y`, this function will again return the offset of the backslash at
+    /// the end of the first line.
+    pub fn preceded_by_continuations(
+        &self,
+        offset: TextSize,
+        locator: &Locator,
+    ) -> Option<TextSize> {
+        // Find the first preceding continuation.
+        let mut continuation = self.find_continuation(locator.line_start(offset), locator)?;
+
+        // Continue searching for continuations, in the unlikely event that we have multiple
+        // continuations in a row.
+        loop {
+            let previous_line_end = locator.line_start(continuation);
+            if locator
+                .slice(TextRange::new(previous_line_end, continuation))
+                .chars()
+                .all(is_python_whitespace)
+            {
+                if let Some(next_continuation) = self.find_continuation(previous_line_end, locator)
+                {
+                    continuation = next_continuation;
+                    continue;
+                }
+            }
+            break;
+        }
+
+        Some(continuation)
+    }
+
+    /// Return `true` if a `Stmt` appears to be part of a multi-statement line, with
+    /// other statements preceding it.
+    pub fn preceded_by_multi_statement_line(&self, stmt: &Stmt, locator: &Locator) -> bool {
+        has_leading_content(stmt.start(), locator)
+            || self
+                .preceded_by_continuations(stmt.start(), locator)
+                .is_some()
+    }
 }
 
 #[cfg(test)]
@@ -159,7 +268,8 @@ mod tests {
     use rustpython_parser::lexer::LexResult;
     use rustpython_parser::{lexer, Mode};
 
-    use crate::source_code::{Indexer, Locator};
+    use crate::index::Indexer;
+    use ruff_source_file::Locator;
 
     #[test]
     fn continuation() {

@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use crate::AsFormat;
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule};
-use rustpython_parser::ast::{Identifier, Ranged};
+use rustpython_ast::{Identifier, Ranged};
 
 pub struct FormatIdentifier;
 

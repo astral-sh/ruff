@@ -16,7 +16,7 @@ use ruff::warn_user;
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_diagnostics::{DiagnosticKind, Fix};
 use ruff_python_ast::imports::ImportMap;
-use ruff_python_ast::source_code::SourceFileBuilder;
+use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::diagnostics::Diagnostics;

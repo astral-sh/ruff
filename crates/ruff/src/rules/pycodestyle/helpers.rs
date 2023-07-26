@@ -1,9 +1,9 @@
 use ruff_text_size::{TextLen, TextRange};
-use rustpython_parser::ast::{CmpOp, Expr, Ranged};
+use rustpython_ast::{CmpOp, Expr, Ranged};
 use unicode_width::UnicodeWidthStr;
 
-use ruff_python_ast::source_code::Locator;
 use ruff_python_trivia::Line;
+use ruff_source_file::Locator;
 
 use crate::line_width::{LineLength, LineWidth, TabSize};
 

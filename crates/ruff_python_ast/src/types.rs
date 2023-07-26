@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use rustpython_parser::ast::{Expr, Stmt};
+use rustpython_ast::{Expr, Stmt};
 
 #[derive(Clone)]
 pub enum Node<'a> {

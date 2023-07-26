@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 
 use ruff::jupyter;
-use ruff::round_trip;
+use ruff_python::codegen::round_trip;
 use ruff_python_stdlib::path::is_jupyter_notebook;
 
 #[derive(clap::Args)]

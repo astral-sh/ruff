@@ -1,7 +1,7 @@
 use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::prelude::text;
 use ruff_formatter::{Format, FormatResult};
-use rustpython_parser::ast::StmtBreak;
+use rustpython_ast::StmtBreak;
 
 #[derive(Default)]
 pub struct FormatStmtBreak;

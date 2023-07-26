@@ -2,15 +2,15 @@ use std::path::Path;
 
 use itertools::{EitherOrBoth, Itertools};
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{Ranged, Stmt};
+use rustpython_ast::{Ranged, Stmt};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{
-    followed_by_multi_statement_line, preceded_by_multi_statement_line, trailing_lines_end,
-};
-use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
+use ruff_python::codegen::Stylist;
+use ruff_python::index::Indexer;
+use ruff_python_ast::whitespace::{followed_by_multi_statement_line, trailing_lines_end};
 use ruff_python_trivia::{leading_indentation, PythonWhitespace, UniversalNewlines};
+use ruff_source_file::Locator;
 use ruff_textwrap::indent;
 
 use crate::line_width::LineWidth;
@@ -96,7 +96,7 @@ pub(crate) fn organize_imports(
 
     // Special-cases: there's leading or trailing content in the import block. These
     // are too hard to get right, and relatively rare, so flag but don't fix.
-    if preceded_by_multi_statement_line(block.imports.first().unwrap(), locator, indexer)
+    if indexer.preceded_by_multi_statement_line(block.imports.first().unwrap(), locator)
         || followed_by_multi_statement_line(block.imports.last().unwrap(), locator)
     {
         return Some(Diagnostic::new(UnsortedImports, range));

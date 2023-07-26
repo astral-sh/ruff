@@ -2,7 +2,7 @@ use crate::prelude::*;
 use crate::statement::stmt_for::AnyStatementFor;
 use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::FormatResult;
-use rustpython_parser::ast::StmtAsyncFor;
+use rustpython_ast::StmtAsyncFor;
 
 #[derive(Default)]
 pub struct FormatStmtAsyncFor;

@@ -5,8 +5,8 @@ use rustpython_parser::Tok;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers;
-use ruff_python_ast::source_code::{Indexer, Locator};
+use ruff_python::index::Indexer;
+use ruff_source_file::Locator;
 
 use crate::registry::Rule;
 use crate::settings::Settings;
@@ -171,7 +171,8 @@ pub(crate) fn compound_statements(
                         Diagnostic::new(UselessSemicolon, TextRange::new(start, end));
                     if settings.rules.should_fix(Rule::UselessSemicolon) {
                         diagnostic.set_fix(Fix::automatic(Edit::deletion(
-                            helpers::preceded_by_continuations(start, locator, indexer)
+                            indexer
+                                .preceded_by_continuations(start, locator)
                                 .unwrap_or(start),
                             end,
                         )));
