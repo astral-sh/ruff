@@ -3,7 +3,7 @@ use rustpython_ast::{self as ast, Constant, Expr, ExprContext, Identifier, Range
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python::codegen::Generator;
+use ruff_python_codegen::Generator;
 use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
 
 use crate::checkers::ast::Checker;

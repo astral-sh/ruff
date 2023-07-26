@@ -4,7 +4,7 @@
 #![no_main]
 
 use libfuzzer_sys::{fuzz_target, Corpus};
-use ruff_python::codegen::{Generator, Stylist};
+use ruff_python_codegen::{Generator, Stylist};
 use ruff_source_file::Locator;
 use rustpython_ast::Suite;
 use rustpython_parser::{lexer, Mode, Parse, ParseError};

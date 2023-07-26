@@ -5,11 +5,11 @@ use std::path::Path;
 use rustpython_ast::{self as ast, Ranged, Stmt, Suite};
 
 use ruff_diagnostics::Diagnostic;
-use ruff_python::codegen::Stylist;
 use ruff_python::index::Indexer;
 use ruff_python_ast::helpers::to_module_path;
 use ruff_python_ast::imports::{ImportMap, ModuleImport};
 use ruff_python_ast::statement_visitor::StatementVisitor;
+use ruff_python_codegen::Stylist;
 use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_source_file::Locator;
 

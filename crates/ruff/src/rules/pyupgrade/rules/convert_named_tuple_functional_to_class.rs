@@ -5,8 +5,8 @@ use rustpython_ast::{self as ast, Constant, Expr, ExprContext, Identifier, Keywo
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python::codegen::Generator;
 use ruff_python_ast::helpers::is_dunder;
+use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::identifiers::is_identifier;
 

@@ -5,9 +5,9 @@ use rustpython_parser::Parse;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python::codegen::Stylist;
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::imports::{Alias, AnyImport, FutureImport, Import, ImportFrom};
+use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
 
 use crate::importer::Importer;

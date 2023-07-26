@@ -11,7 +11,7 @@ pub use categorize::{ImportSection, ImportType};
 use comments::Comment;
 use normalize::normalize_imports;
 use order::order_imports;
-use ruff_python::codegen::Stylist;
+use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
 use settings::RelativeImportsOrder;
 use sorting::cmp_either_import;

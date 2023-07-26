@@ -21,10 +21,11 @@ ruff_index = { path = "../ruff_index" }
 ruff_macros = { path = "../ruff_macros" }
 ruff_python_ast = { path = "../ruff_python_ast", features = ["serde"] }
 ruff_python = { path = "../ruff_python" }
-ruff_python_trivia = { path = "../ruff_python_trivia" }
+ruff_python_codegen = { path = "../ruff_python_codegen" }
 ruff_python_semantic = { path = "../ruff_python_semantic" }
 ruff_python_stdlib = { path = "../ruff_python_stdlib" }
 ruff_source_file = { path = "../ruff_source_file" }
+ruff_python_trivia = { path = "../ruff_python_trivia" }
 ruff_python_parser = { path = "../ruff_python_parser" }
 ruff_text_size = { workspace = true }
 

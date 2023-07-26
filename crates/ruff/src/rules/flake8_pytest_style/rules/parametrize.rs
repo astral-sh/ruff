@@ -4,7 +4,7 @@ use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python::codegen::Generator;
+use ruff_python_codegen::Generator;
 use ruff_source_file::Locator;
 
 use crate::checkers::ast::Checker;

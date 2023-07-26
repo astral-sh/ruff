@@ -3,8 +3,8 @@ use rustpython_ast::{self as ast, Constant, Expr, ExprContext, Ranged, Stmt};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python::codegen::{Generator, Stylist};
 use ruff_python_ast::whitespace;
+use ruff_python_codegen::{Generator, Stylist};
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};

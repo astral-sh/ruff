@@ -11,8 +11,8 @@ use ruff_text_size::TextSize;
 use rustpython_ast::{self as ast, Ranged, Stmt, Suite};
 
 use ruff_diagnostics::Edit;
-use ruff_python::codegen::Stylist;
 use ruff_python_ast::imports::{AnyImport, Import, ImportFrom};
+use ruff_python_codegen::Stylist;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::textwrap::indent;
 use ruff_source_file::Locator;

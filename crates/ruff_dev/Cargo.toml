@@ -16,6 +16,7 @@ ruff_cli = { path = "../ruff_cli" }
 ruff_diagnostics = { path = "../ruff_diagnostics" }
 ruff_formatter = { path = "../ruff_formatter" }
 ruff_python = { path = "../ruff_python" }
+ruff_python_codegen = { path = "../ruff_python_codegen" }
 ruff_python_formatter = { path = "../ruff_python_formatter" }
 ruff_python_stdlib = { path = "../ruff_python_stdlib" }
 ruff_python_trivia = { path = "../ruff_python_trivia" }

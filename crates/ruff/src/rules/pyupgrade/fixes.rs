@@ -6,7 +6,7 @@ use rustpython_parser::{lexer, Mode, Tok};
 
 use crate::autofix::codemods::CodegenStylist;
 use ruff_diagnostics::Edit;
-use ruff_python::codegen::Stylist;
+use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
 
 use crate::cst::matchers::{

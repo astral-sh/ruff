@@ -37,7 +37,6 @@ use rustpython_ast::{
 };
 
 use ruff_diagnostics::{Diagnostic, IsolationLevel};
-use ruff_python::codegen::{Generator, Quote, Stylist};
 use ruff_python::index::Indexer;
 use ruff_python_ast::all::{extract_all_names, DunderAllFlags};
 use ruff_python_ast::helpers::{extract_handled_exceptions, to_module_path};
@@ -45,6 +44,7 @@ use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::str::trailing_quote;
 use ruff_python_ast::visitor::{walk_except_handler, walk_pattern, Visitor};
 use ruff_python_ast::{helpers, str, visitor};
+use ruff_python_codegen::{Generator, Quote, Stylist};
 use ruff_python_parser::typing::{parse_type_annotation, AnnotationKind};
 use ruff_python_semantic::analyze::{typing, visibility};
 use ruff_python_semantic::{

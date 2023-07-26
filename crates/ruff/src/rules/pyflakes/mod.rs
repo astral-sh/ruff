@@ -15,7 +15,8 @@ mod tests {
     use test_case::test_case;
 
     use ruff_diagnostics::Diagnostic;
-    use ruff_python::{codegen::Stylist, index::Indexer};
+    use ruff_python::index::Indexer;
+    use ruff_python_codegen::Stylist;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::Locator;
 

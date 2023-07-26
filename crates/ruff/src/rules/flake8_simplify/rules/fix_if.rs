@@ -8,8 +8,8 @@ use libcst_native::{
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::Edit;
-use ruff_python::codegen::Stylist;
 use ruff_python_ast::whitespace;
+use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
 
 use crate::autofix::codemods::CodegenStylist;

@@ -2,7 +2,7 @@ use ruff_text_size::TextRange;
 use rustpython_parser::lexer::LexResult;
 
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
-use ruff_python::codegen::Stylist;
+use ruff_python_codegen::Stylist;
 use ruff_python_parser::token_kind::TokenKind;
 use ruff_source_file::Locator;
 

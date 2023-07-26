@@ -1906,6 +1906,7 @@ dependencies = [
  "ruff_macros",
  "ruff_python",
  "ruff_python_ast",
+ "ruff_python_codegen",
  "ruff_python_parser",
  "ruff_python_semantic",
  "ruff_python_stdlib",
@@ -2040,6 +2041,7 @@ dependencies = [
  "ruff_diagnostics",
  "ruff_formatter",
  "ruff_python",
+ "ruff_python_codegen",
  "ruff_python_formatter",
  "ruff_python_stdlib",
  "ruff_python_trivia",
@@ -2104,7 +2106,6 @@ dependencies = [
 name = "ruff_python"
 version = "0.0.0"
 dependencies = [
- "bitflags 2.3.3",
  "insta",
  "is-macro",
  "itertools",
@@ -2112,13 +2113,11 @@ dependencies = [
  "num-bigint",
  "num-traits",
  "once_cell",
- "ruff_python_ast",
  "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
  "rustc-hash",
  "rustpython-ast",
- "rustpython-literal",
  "rustpython-parser",
  "serde",
  "smallvec",
@@ -2143,6 +2142,18 @@ dependencies = [
  "rustpython-parser",
  "serde",
  "smallvec",
+]
+
+[[package]]
+name = "ruff_python_codegen"
+version = "0.0.0"
+dependencies = [
+ "once_cell",
+ "ruff_python_ast",
+ "ruff_source_file",
+ "rustpython-ast",
+ "rustpython-literal",
+ "rustpython-parser",
 ]
 
 [[package]]
@@ -2279,6 +2290,7 @@ dependencies = [
  "ruff_diagnostics",
  "ruff_python",
  "ruff_python_ast",
+ "ruff_python_codegen",
  "ruff_python_formatter",
  "ruff_python_parser",
  "ruff_source_file",

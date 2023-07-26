@@ -6,7 +6,7 @@ use libcst_native::{
 };
 use rustpython_ast::{Ranged, Stmt};
 
-use ruff_python::codegen::Stylist;
+use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
 
 use crate::cst::helpers::compose_module_path;

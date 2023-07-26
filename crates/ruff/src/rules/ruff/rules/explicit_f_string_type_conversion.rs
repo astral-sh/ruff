@@ -6,7 +6,7 @@ use rustpython_ast::{self as ast, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python::codegen::Stylist;
+use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
 
 use crate::autofix::codemods::CodegenStylist;

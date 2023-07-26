@@ -3,8 +3,8 @@ use rustpython_ast::{self as ast, Identifier, Int, Ranged, Stmt};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python::codegen::Generator;
 use ruff_python_ast::helpers::resolve_imported_module_path;
+use ruff_python_codegen::Generator;
 use ruff_python_stdlib::identifiers::is_identifier;
 
 use crate::checkers::ast::Checker;

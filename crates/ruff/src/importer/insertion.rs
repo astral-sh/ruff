@@ -6,8 +6,8 @@ use rustpython_ast::{Ranged, Stmt};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::Edit;
-use ruff_python::codegen::Stylist;
 use ruff_python_ast::helpers::is_docstring_stmt;
+use ruff_python_codegen::Stylist;
 use ruff_python_trivia::{textwrap::indent, PythonWhitespace};
 use ruff_source_file::{Locator, UniversalNewlineIterator};
 
@@ -304,7 +304,7 @@ mod tests {
     use rustpython_parser::lexer::LexResult;
     use rustpython_parser::Parse;
 
-    use ruff_python::codegen::Stylist;
+    use ruff_python_codegen::Stylist;
     use ruff_source_file::{LineEnding, Locator};
 
     use super::Insertion;

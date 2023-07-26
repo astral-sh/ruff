@@ -1481,7 +1481,7 @@ mod tests {
     use ruff_source_file::LineEnding;
 
     use super::Generator;
-    use crate::codegen::stylist::{Indentation, Quote};
+    use crate::stylist::{Indentation, Quote};
 
     fn round_trip(contents: &str) -> String {
         let indentation = Indentation::default();

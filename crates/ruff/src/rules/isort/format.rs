@@ -1,4 +1,4 @@
-use ruff_python::codegen::Stylist;
+use ruff_python_codegen::Stylist;
 
 use crate::line_width::{LineLength, LineWidth};
 

@@ -11,7 +11,7 @@ use ruff_text_size::TextRange;
 use rustpython_ast::Ranged;
 
 use ruff_diagnostics::{Edit, Fix};
-use ruff_python::codegen::Stylist;
+use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
 
 use crate::autofix::codemods::CodegenStylist;
