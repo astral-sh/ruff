@@ -1,10 +1,10 @@
 use std::path::Path;
 
 use bitflags::bitflags;
-use ruff_python_ast::{self, Expr, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Expr, Ranged, Stmt};
 use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::FxHashMap;
-use smallvec::SmallVec;
+use smallvec::smallvec;
 
 use ruff_python_ast::call_path::{collect_call_path, from_unqualified_name, CallPath};
 use ruff_python_ast::helpers::from_relative_import;
@@ -275,29 +275,32 @@ impl<'a> SemanticModel<'a> {
         }
     }
 
-    /// Resolve a `load` reference to `symbol` at `range`.
-    pub fn resolve_load(&mut self, symbol: &str, range: TextRange) -> ReadResult {
+    /// Resolve a `load` reference to an [`ast::ExprName`].
+    pub fn resolve_load(&mut self, name: &ast::ExprName) -> ReadResult {
         // PEP 563 indicates that if a forward reference can be resolved in the module scope, we
         // should prefer it over local resolutions.
         if self.in_forward_reference() {
-            if let Some(binding_id) = self.scopes.global().get(symbol) {
+            if let Some(binding_id) = self.scopes.global().get(name.id.as_str()) {
                 if !self.bindings[binding_id].is_unbound() {
                     // Mark the binding as used.
                     let reference_id =
                         self.resolved_references
-                            .push(ScopeId::global(), range, self.flags);
+                            .push(ScopeId::global(), name.range, self.flags);
                     self.bindings[binding_id].references.push(reference_id);
 
                     // Mark any submodule aliases as used.
                     if let Some(binding_id) =
-                        self.resolve_submodule(symbol, ScopeId::global(), binding_id)
+                        self.resolve_submodule(name.id.as_str(), ScopeId::global(), binding_id)
                     {
-                        let reference_id =
-                            self.resolved_references
-                                .push(ScopeId::global(), range, self.flags);
+                        let reference_id = self.resolved_references.push(
+                            ScopeId::global(),
+                            name.range,
+                            self.flags,
+                        );
                         self.bindings[binding_id].references.push(reference_id);
                     }
 
+                    self.resolved_names.insert(name.into(), binding_id);
                     return ReadResult::Resolved(binding_id);
                 }
             }
@@ -315,7 +318,7 @@ impl<'a> SemanticModel<'a> {
                 //     def __init__(self):
                 //         print(__class__)
                 // ```
-                if seen_function && matches!(symbol, "__class__") {
+                if seen_function && matches!(name.id.as_str(), "__class__") {
                     return ReadResult::ImplicitGlobal;
                 }
                 // Do not allow usages of class symbols unless it is the immediate parent, e.g.:
@@ -337,18 +340,20 @@ impl<'a> SemanticModel<'a> {
                 }
             }
 
-            if let Some(binding_id) = scope.get(symbol) {
+            if let Some(binding_id) = scope.get(name.id.as_str()) {
                 // Mark the binding as used.
-                let reference_id = self
-                    .resolved_references
-                    .push(self.scope_id, range, self.flags);
+                let reference_id =
+                    self.resolved_references
+                        .push(self.scope_id, name.range, self.flags);
                 self.bindings[binding_id].references.push(reference_id);
 
                 // Mark any submodule aliases as used.
-                if let Some(binding_id) = self.resolve_submodule(symbol, scope_id, binding_id) {
+                if let Some(binding_id) =
+                    self.resolve_submodule(name.id.as_str(), scope_id, binding_id)
+                {
                     let reference_id =
                         self.resolved_references
-                            .push(self.scope_id, range, self.flags);
+                            .push(self.scope_id, name.range, self.flags);
                     self.bindings[binding_id].references.push(reference_id);
                 }
 
@@ -388,7 +393,7 @@ impl<'a> SemanticModel<'a> {
                     // The `x` in `print(x)` should be treated as unresolved.
                     BindingKind::Deletion | BindingKind::UnboundException(None) => {
                         self.unresolved_references.push(
-                            range,
+                            name.range,
                             self.exceptions(),
                             UnresolvedReferenceFlags::empty(),
                         );
@@ -414,24 +419,30 @@ impl<'a> SemanticModel<'a> {
                         // Mark the binding as used.
                         let reference_id =
                             self.resolved_references
-                                .push(self.scope_id, range, self.flags);
+                                .push(self.scope_id, name.range, self.flags);
                         self.bindings[binding_id].references.push(reference_id);
 
                         // Mark any submodule aliases as used.
                         if let Some(binding_id) =
-                            self.resolve_submodule(symbol, scope_id, binding_id)
+                            self.resolve_submodule(name.id.as_str(), scope_id, binding_id)
                         {
-                            let reference_id =
-                                self.resolved_references
-                                    .push(self.scope_id, range, self.flags);
+                            let reference_id = self.resolved_references.push(
+                                self.scope_id,
+                                name.range,
+                                self.flags,
+                            );
                             self.bindings[binding_id].references.push(reference_id);
                         }
 
+                        self.resolved_names.insert(name.into(), binding_id);
                         return ReadResult::Resolved(binding_id);
                     }
 
-                    // Otherwise, treat it as resolved.
-                    _ => return ReadResult::Resolved(binding_id),
+                    _ => {
+                        // Otherwise, treat it as resolved.
+                        self.resolved_names.insert(name.into(), binding_id);
+                        return ReadResult::Resolved(binding_id);
+                    }
                 }
             }
 
@@ -451,7 +462,7 @@ impl<'a> SemanticModel<'a> {
             //     print(__qualname__)
             // ```
             if index == 0 && scope.kind.is_class() {
-                if matches!(symbol, "__module__" | "__qualname__") {
+                if matches!(name.id.as_str(), "__module__" | "__qualname__") {
                     return ReadResult::ImplicitGlobal;
                 }
             }
@@ -462,14 +473,14 @@ impl<'a> SemanticModel<'a> {
 
         if import_starred {
             self.unresolved_references.push(
-                range,
+                name.range,
                 self.exceptions(),
                 UnresolvedReferenceFlags::WILDCARD_IMPORT,
             );
             ReadResult::WildcardImport
         } else {
             self.unresolved_references.push(
-                range,
+                name.range,
                 self.exceptions(),
                 UnresolvedReferenceFlags::empty(),
             );
@@ -649,14 +660,7 @@ impl<'a> SemanticModel<'a> {
                     Some(source_path)
                 }
             }
-            BindingKind::Builtin => {
-                let call_path = collect_call_path(value)?;
-
-                let mut source_path: CallPath = SmallVec::with_capacity(1 + call_path.len());
-                source_path.push("");
-                source_path.extend_from_slice(call_path.as_slice());
-                Some(source_path)
-            }
+            BindingKind::Builtin => Some(smallvec!["", head.id.as_str()]),
             _ => None,
         }
     }
@@ -753,11 +757,6 @@ impl<'a> SemanticModel<'a> {
                 None
             })
         })
-    }
-
-    /// Associate a [`BindingId`] with a [`NameId`].
-    pub fn set_resolved_name(&mut self, name: &ast::ExprName, binding_id: BindingId) {
-        self.resolved_names.insert(name.into(), binding_id);
     }
 
     /// Push a [`Stmt`] onto the stack.
