@@ -19,7 +19,7 @@ PTH201.py:5:10: PTH201 [*] Do not pass the current directory explicitly to `Path
   5 |+_ = Path()
 6 6 | _ = pth(".")
 7 7 | _ = PurePath(".")
-8 8 | 
+8 8 | _ = Path("")
 
 PTH201.py:6:9: PTH201 [*] Do not pass the current directory explicitly to `Path`
   |
@@ -28,6 +28,7 @@ PTH201.py:6:9: PTH201 [*] Do not pass the current directory explicitly to `Path`
 6 | _ = pth(".")
   |         ^^^ PTH201
 7 | _ = PurePath(".")
+8 | _ = Path("")
   |
   = help: Remove the current directory argument
 
@@ -38,8 +39,8 @@ PTH201.py:6:9: PTH201 [*] Do not pass the current directory explicitly to `Path`
 6   |-_ = pth(".")
   6 |+_ = pth()
 7 7 | _ = PurePath(".")
-8 8 | 
-9 9 | # no match
+8 8 | _ = Path("")
+9 9 | 
 
 PTH201.py:7:14: PTH201 [*] Do not pass the current directory explicitly to `Path`
   |
@@ -47,8 +48,7 @@ PTH201.py:7:14: PTH201 [*] Do not pass the current directory explicitly to `Path
 6 | _ = pth(".")
 7 | _ = PurePath(".")
   |              ^^^ PTH201
-8 | 
-9 | # no match
+8 | _ = Path("")
   |
   = help: Remove the current directory argument
 
@@ -58,8 +58,29 @@ PTH201.py:7:14: PTH201 [*] Do not pass the current directory explicitly to `Path
 6 6 | _ = pth(".")
 7   |-_ = PurePath(".")
   7 |+_ = PurePath()
-8 8 | 
-9 9 | # no match
-10 10 | _ = Path()
+8 8 | _ = Path("")
+9 9 | 
+10 10 | # no match
+
+PTH201.py:8:10: PTH201 [*] Do not pass the current directory explicitly to `Path`
+   |
+ 6 | _ = pth(".")
+ 7 | _ = PurePath(".")
+ 8 | _ = Path("")
+   |          ^^ PTH201
+ 9 | 
+10 | # no match
+   |
+   = help: Remove the current directory argument
+
+ℹ Fix
+5 5 | _ = Path(".")
+6 6 | _ = pth(".")
+7 7 | _ = PurePath(".")
+8   |-_ = Path("")
+  8 |+_ = Path()
+9 9 | 
+10 10 | # no match
+11 11 | _ = Path()
 
 

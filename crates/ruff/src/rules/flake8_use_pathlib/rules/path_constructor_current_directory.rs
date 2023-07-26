@@ -73,7 +73,7 @@ pub(crate) fn path_constructor_current_directory(checker: &mut Checker, expr: &E
         return;
     };
 
-    if value != "." {
+    if !value.is_empty() && value != "." {
         return;
     }
 
