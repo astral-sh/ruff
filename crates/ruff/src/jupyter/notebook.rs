@@ -7,6 +7,7 @@ use std::path::Path;
 
 use itertools::Itertools;
 use once_cell::sync::OnceCell;
+use rustpython_parser::lexer::lex;
 use rustpython_parser::Mode;
 use serde::Serialize;
 use serde_json::error::Category;
