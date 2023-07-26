@@ -51,7 +51,7 @@ impl Violation for RuntimeImportInTypeCheckingBlock {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RuntimeImportInTypeCheckingBlock { qualified_name } = self;
+        let RuntimeImportInTypeCheckingBlock { qualified_name, .. } = self;
         format!(
             "Move import `{qualified_name}` out of type-checking block. Import is used for more than type hinting."
         )

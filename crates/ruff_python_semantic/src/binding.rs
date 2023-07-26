@@ -5,6 +5,7 @@ use ruff_python_ast::Ranged;
 use ruff_text_size::TextRange;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
+use ruff_python_ast::source_code::Locator;
 use ruff_source_file::Locator;
 
 use crate::context::ExecutionContext;
@@ -117,38 +118,38 @@ impl<'a> Binding<'a> {
             // import foo.baz
             // ```
             BindingKind::Import(Import {
-                qualified_name: redefinition,
+                call_path: redefinition,
             }) => {
                 if let BindingKind::SubmoduleImport(SubmoduleImport {
-                    qualified_name: definition,
+                    call_path: definition,
                 }) = &existing.kind
                 {
                     return redefinition == definition;
                 }
             }
             BindingKind::FromImport(FromImport {
-                qualified_name: redefinition,
+                call_path: redefinition,
             }) => {
                 if let BindingKind::SubmoduleImport(SubmoduleImport {
-                    qualified_name: definition,
+                    call_path: definition,
                 }) = &existing.kind
                 {
                     return redefinition == definition;
                 }
             }
             BindingKind::SubmoduleImport(SubmoduleImport {
-                qualified_name: redefinition,
+                call_path: redefinition,
             }) => match &existing.kind {
                 BindingKind::Import(Import {
-                    qualified_name: definition,
+                    call_path: definition,
                 })
                 | BindingKind::SubmoduleImport(SubmoduleImport {
-                    qualified_name: definition,
+                    call_path: definition,
                 }) => {
                     return redefinition == definition;
                 }
                 BindingKind::FromImport(FromImport {
-                    qualified_name: definition,
+                    call_path: definition,
                 }) => {
                     return redefinition == definition;
                 }
@@ -178,9 +179,9 @@ impl<'a> Binding<'a> {
     /// Returns the fully-qualified symbol name, if this symbol was imported from another module.
     pub fn qualified_name(&self) -> Option<&str> {
         match &self.kind {
-            BindingKind::Import(Import { qualified_name }) => Some(qualified_name),
-            BindingKind::FromImport(FromImport { qualified_name }) => Some(qualified_name),
-            BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }) => {
+            BindingKind::Import(Import { qualified_name, .. }) => Some(qualified_name),
+            BindingKind::FromImport(FromImport { qualified_name, .. }) => Some(qualified_name),
+            BindingKind::SubmoduleImport(SubmoduleImport { qualified_name, .. }) => {
                 Some(qualified_name)
             }
             _ => None,
@@ -191,11 +192,11 @@ impl<'a> Binding<'a> {
     /// symbol was imported from another module.
     pub fn module_name(&self) -> Option<&str> {
         match &self.kind {
-            BindingKind::Import(Import { qualified_name })
-            | BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }) => {
+            BindingKind::Import(Import { qualified_name, .. })
+            | BindingKind::SubmoduleImport(SubmoduleImport { qualified_name, .. }) => {
                 Some(qualified_name.split('.').next().unwrap_or(qualified_name))
             }
-            BindingKind::FromImport(FromImport { qualified_name }) => Some(
+            BindingKind::FromImport(FromImport { qualified_name, .. }) => Some(
                 qualified_name
                     .rsplit_once('.')
                     .map_or(qualified_name, |(module, _)| module),
@@ -357,17 +358,19 @@ pub struct Import<'a> {
     /// Ex) Given `import foo`, `qualified_name` would be "foo".
     /// Ex) Given `import foo as bar`, `qualified_name` would be "foo".
     pub qualified_name: &'a str,
+    pub call_path: Box<[&'a str]>,
 }
 
 /// A binding for a member imported from a module, keyed on the name to which the member is bound.
 /// Ex) `from foo import bar` would be keyed on "bar".
 /// Ex) `from foo import bar as baz` would be keyed on "baz".
 #[derive(Debug, Clone)]
-pub struct FromImport {
+pub struct FromImport<'a> {
     /// The full name of the member being imported.
     /// Ex) Given `from foo import bar`, `qualified_name` would be "foo.bar".
     /// Ex) Given `from foo import bar as baz`, `qualified_name` would be "foo.bar".
     pub qualified_name: String,
+    pub call_path: Box<[&'a str]>,
 }
 
 /// A binding for a submodule imported from a module, keyed on the name of the parent module.
@@ -377,6 +380,7 @@ pub struct SubmoduleImport<'a> {
     /// The full name of the submodule being imported.
     /// Ex) Given `import foo.bar`, `qualified_name` would be "foo.bar".
     pub qualified_name: &'a str,
+    pub call_path: Box<[&'a str]>,
 }
 
 #[derive(Debug, Clone, is_macro::Is)]
@@ -485,7 +489,7 @@ pub enum BindingKind<'a> {
     /// ```python
     /// from foo import bar
     /// ```
-    FromImport(FromImport),
+    FromImport(FromImport<'a>),
 
     /// A binding for a submodule imported from a module, like `bar` in:
     /// ```python

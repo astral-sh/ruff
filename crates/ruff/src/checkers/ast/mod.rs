@@ -26,6 +26,7 @@
 //! represents the lint-rule analysis phase. In the future, these steps may be separated into
 //! distinct passes over the AST.
 
+use std::iter::once;
 use std::path::Path;
 
 use itertools::Itertools;
@@ -321,10 +322,14 @@ where
                         // "foo.bar".
                         let name = alias.name.split('.').next().unwrap();
                         let qualified_name = &alias.name;
+                        let call_path: Box<[&str]> = qualified_name.split('.').collect();
                         self.add_binding(
                             name,
                             alias.identifier(),
-                            BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }),
+                            BindingKind::SubmoduleImport(SubmoduleImport {
+                                qualified_name,
+                                call_path,
+                            }),
                             BindingFlags::EXTERNAL,
                         );
                     } else {
@@ -342,10 +347,14 @@ where
 
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
                         let qualified_name = &alias.name;
+                        let call_path: Box<[&str]> = qualified_name.split('.').collect();
                         self.add_binding(
                             name,
                             alias.identifier(),
-                            BindingKind::Import(Import { qualified_name }),
+                            BindingKind::Import(Import {
+                                qualified_name,
+                                call_path,
+                            }),
                             flags,
                         );
                     }
@@ -391,10 +400,16 @@ where
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
                         let qualified_name =
                             helpers::format_import_from_member(level, module, &alias.name);
+                        let module = module.unwrap();
+                        let call_path: Box<[&str]> =
+                            module.split('.').chain(once(alias.name.as_str())).collect();
                         self.add_binding(
                             name,
                             alias.identifier(),
-                            BindingKind::FromImport(FromImport { qualified_name }),
+                            BindingKind::FromImport(FromImport {
+                                qualified_name,
+                                call_path,
+                            }),
                             flags,
                         );
                     }

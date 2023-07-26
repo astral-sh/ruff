@@ -50,7 +50,7 @@ pub(crate) fn unaliased_collections_abc_set_import(
     checker: &Checker,
     binding: &Binding,
 ) -> Option<Diagnostic> {
-    let BindingKind::FromImport(FromImport { qualified_name }) = &binding.kind else {
+    let BindingKind::FromImport(FromImport { qualified_name, .. }) = &binding.kind else {
         return None;
     };
     if qualified_name.as_str() != "collections.abc.Set" {

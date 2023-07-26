@@ -60,7 +60,8 @@ pub(crate) fn inplace_argument(checker: &mut Checker, call: &ast::ExprCall) {
                 matches!(
                     binding.kind,
                     BindingKind::Import(Import {
-                        qualified_name: "pandas"
+                        qualified_name: "pandas",
+                        ..
                     })
                 )
             })

@@ -1,15 +1,14 @@
 use std::path::Path;
 
 use bitflags::bitflags;
-use ruff_python_ast::{self as ast, Expr, Ranged, Stmt};
-use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::FxHashMap;
-use smallvec::smallvec;
+use smallvec::{smallvec, SmallVec};
 
 use ruff_python_ast::call_path::{collect_call_path, from_unqualified_name, CallPath};
-use ruff_python_ast::helpers::from_relative_import;
+use ruff_python_ast::{self as ast, Expr, Ranged, Stmt};
 use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_python_stdlib::typing::is_typing_extension;
+use ruff_text_size::{TextRange, TextSize};
 
 use crate::binding::{
     Binding, BindingFlags, BindingId, BindingKind, Bindings, Exceptions, FromImport, Import,
@@ -632,46 +631,32 @@ impl<'a> SemanticModel<'a> {
             .or_else(|| self.find_binding(&head.id))?;
 
         match &binding.kind {
-            BindingKind::Import(Import {
-                qualified_name: name,
-            }) => {
-                let call_path = collect_call_path(value)?;
-                let (_, tail) = call_path.split_first()?;
+            BindingKind::Import(Import { call_path, .. }) => {
+                let x = collect_call_path(value)?;
+                let (_, tail) = x.split_first()?;
 
+                let mut resolved = SmallVec::with_capacity(call_path.len() + tail.len());
+                resolved.extend_from_slice(call_path);
+                resolved.extend_from_slice(tail);
+                Some(resolved)
+            }
+            BindingKind::SubmoduleImport(SubmoduleImport { qualified_name, .. }) => {
+                let x = collect_call_path(value)?;
+                let (_, tail) = x.split_first()?;
+
+                let name = qualified_name.split('.').next().unwrap_or(qualified_name);
                 let mut source_path: CallPath = from_unqualified_name(name);
                 source_path.extend_from_slice(tail);
                 Some(source_path)
             }
-            BindingKind::SubmoduleImport(SubmoduleImport {
-                qualified_name: name,
-            }) => {
-                let call_path = collect_call_path(value)?;
-                let (_, tail) = call_path.split_first()?;
+            BindingKind::FromImport(FromImport { call_path, .. }) => {
+                let x = collect_call_path(value)?;
+                let (_, tail) = x.split_first()?;
 
-                let name = name.split('.').next().unwrap_or(name);
-                let mut source_path: CallPath = from_unqualified_name(name);
-                source_path.extend_from_slice(tail);
-                Some(source_path)
-            }
-            BindingKind::FromImport(FromImport {
-                qualified_name: name,
-            }) => {
-                let call_path = collect_call_path(value)?;
-                let (_, tail) = call_path.split_first()?;
-
-                if name.starts_with('.') {
-                    let mut source_path = from_relative_import(self.module_path?, name);
-                    if source_path.is_empty() {
-                        None
-                    } else {
-                        source_path.extend_from_slice(tail);
-                        Some(source_path)
-                    }
-                } else {
-                    let mut source_path: CallPath = from_unqualified_name(name);
-                    source_path.extend_from_slice(tail);
-                    Some(source_path)
-                }
+                let mut resolved = SmallVec::with_capacity(call_path.len() + tail.len());
+                resolved.extend_from_slice(call_path);
+                resolved.extend_from_slice(tail);
+                Some(resolved)
             }
             BindingKind::Builtin => Some(smallvec!["", head.id.as_str()]),
             _ => None,
@@ -702,7 +687,7 @@ impl<'a> SemanticModel<'a> {
                     // Ex) Given `module="sys"` and `object="exit"`:
                     // `import sys`         -> `sys.exit`
                     // `import sys as sys2` -> `sys2.exit`
-                    BindingKind::Import(Import { qualified_name }) => {
+                    BindingKind::Import(Import { qualified_name, .. }) => {
                         if qualified_name == &module {
                             if let Some(source) = binding.source {
                                 // Verify that `sys` isn't bound in an inner scope.
@@ -723,7 +708,7 @@ impl<'a> SemanticModel<'a> {
                     // Ex) Given `module="os.path"` and `object="join"`:
                     // `from os.path import join`          -> `join`
                     // `from os.path import join as join2` -> `join2`
-                    BindingKind::FromImport(FromImport { qualified_name }) => {
+                    BindingKind::FromImport(FromImport { qualified_name, .. }) => {
                         if let Some((target_module, target_member)) = qualified_name.split_once('.')
                         {
                             if target_module == module && target_member == member {
