@@ -1,4 +1,4 @@
-use ruff_python_ast::helpers::find_keyword;
+use ruff_python_ast::helpers::{find_keyword, is_compound_statement};
 use rustpython_parser::ast::{self, Expr, Keyword, Ranged, Stmt, WithItem};
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -81,24 +81,6 @@ fn is_pytest_raises(func: &Expr, semantic: &SemanticModel) -> bool {
     semantic.resolve_call_path(func).map_or(false, |call_path| {
         matches!(call_path.as_slice(), ["pytest", "raises"])
     })
-}
-
-const fn is_compound_statement(stmt: &Stmt) -> bool {
-    matches!(
-        stmt,
-        Stmt::FunctionDef(_)
-            | Stmt::AsyncFunctionDef(_)
-            | Stmt::ClassDef(_)
-            | Stmt::While(_)
-            | Stmt::For(_)
-            | Stmt::AsyncFor(_)
-            | Stmt::Match(_)
-            | Stmt::With(_)
-            | Stmt::AsyncWith(_)
-            | Stmt::If(_)
-            | Stmt::Try(_)
-            | Stmt::TryStar(_)
-    )
 }
 
 const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {

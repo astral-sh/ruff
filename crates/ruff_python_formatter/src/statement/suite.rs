@@ -3,6 +3,7 @@ use rustpython_parser::ast::{Ranged, Stmt, Suite};
 use ruff_formatter::{
     format_args, write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions,
 };
+use ruff_python_ast::helpers::is_compound_statement;
 use ruff_python_trivia::lines_before;
 
 use crate::context::NodeLevel;
@@ -139,24 +140,6 @@ const fn is_class_or_function_definition(stmt: &Stmt) -> bool {
     matches!(
         stmt,
         Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) | Stmt::ClassDef(_)
-    )
-}
-
-const fn is_compound_statement(stmt: &Stmt) -> bool {
-    matches!(
-        stmt,
-        Stmt::FunctionDef(_)
-            | Stmt::AsyncFunctionDef(_)
-            | Stmt::ClassDef(_)
-            | Stmt::While(_)
-            | Stmt::For(_)
-            | Stmt::AsyncFor(_)
-            | Stmt::Match(_)
-            | Stmt::With(_)
-            | Stmt::AsyncWith(_)
-            | Stmt::If(_)
-            | Stmt::Try(_)
-            | Stmt::TryStar(_)
     )
 }
 

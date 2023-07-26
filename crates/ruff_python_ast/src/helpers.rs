@@ -18,6 +18,25 @@ use crate::call_path::CallPath;
 use crate::source_code::{Indexer, Locator};
 use crate::statement_visitor::{walk_body, walk_stmt, StatementVisitor};
 
+/// Return `true` if the `Stmt` is a compound statement (as opposed to a simple statement).
+pub const fn is_compound_statement(stmt: &Stmt) -> bool {
+    matches!(
+        stmt,
+        Stmt::FunctionDef(_)
+            | Stmt::AsyncFunctionDef(_)
+            | Stmt::ClassDef(_)
+            | Stmt::While(_)
+            | Stmt::For(_)
+            | Stmt::AsyncFor(_)
+            | Stmt::Match(_)
+            | Stmt::With(_)
+            | Stmt::AsyncWith(_)
+            | Stmt::If(_)
+            | Stmt::Try(_)
+            | Stmt::TryStar(_)
+    )
+}
+
 fn is_iterable_initializer<F>(id: &str, is_builtin: F) -> bool
 where
     F: Fn(&str) -> bool,
