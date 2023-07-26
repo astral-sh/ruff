@@ -578,19 +578,9 @@ impl<'a> SemanticModel<'a> {
             BindingKind::Import(Import {
                 qualified_name: name,
             }) => {
-                if name.starts_with('.') {
-                    let mut source_path = from_relative_import(self.module_path?, name);
-                    if source_path.is_empty() {
-                        None
-                    } else {
-                        source_path.extend_from_slice(tail);
-                        Some(source_path)
-                    }
-                } else {
-                    let mut source_path: CallPath = from_unqualified_name(name);
-                    source_path.extend_from_slice(tail);
-                    Some(source_path)
-                }
+                let mut source_path: CallPath = from_unqualified_name(name);
+                source_path.extend_from_slice(tail);
+                Some(source_path)
             }
             BindingKind::SubmoduleImport(SubmoduleImport {
                 qualified_name: name,
