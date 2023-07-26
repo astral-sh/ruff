@@ -1,11 +1,12 @@
-use crate::{nodes, Expr};
 use smallvec::{smallvec, SmallVec};
+
+use crate::{nodes, Expr};
 
 /// A representation of a qualified name, like `typing.List`.
 pub type CallPath<'a> = SmallVec<[&'a str; 8]>;
 
 /// Convert an `Expr` to its [`CallPath`] segments (like `["typing", "List"]`).
-pub fn collect_head_path(expr: &Expr) -> Option<(&ast::ExprName, CallPath)> {
+pub fn collect_head_path(expr: &Expr) -> Option<(&nodes::ExprName, CallPath)> {
     // Unroll the loop up to eight times, to match the maximum number of expected attributes.
     // In practice, unrolling appears to give about a 4x speed-up on this hot path.
     let attr1 = match expr {

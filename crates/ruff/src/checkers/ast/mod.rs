@@ -26,7 +26,6 @@
 //! represents the lint-rule analysis phase. In the future, these steps may be separated into
 //! distinct passes over the AST.
 
-use std::iter::once;
 use std::path::Path;
 
 use itertools::Itertools;
@@ -40,7 +39,7 @@ use ruff_text_size::{TextRange, TextSize};
 use ruff_diagnostics::{Diagnostic, IsolationLevel};
 use ruff_python_ast::all::{extract_all_names, DunderAllFlags};
 use ruff_python_ast::helpers::{
-    extract_handled_exceptions, from_relative_import, from_relative_import_parts, to_module_path,
+    extract_handled_exceptions, from_relative_import_parts, to_module_path,
 };
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::str::trailing_quote;
@@ -322,15 +321,11 @@ where
                         // Given `import foo.bar`, `name` would be "foo", and `qualified_name` would be
                         // "foo.bar".
                         let name = alias.name.split('.').next().unwrap();
-                        let qualified_name = &alias.name;
-                        let call_path: Box<[&str]> = qualified_name.split('.').collect();
+                        let call_path: Box<[&str]> = alias.name.split('.').collect();
                         self.add_binding(
                             name,
                             alias.identifier(),
-                            BindingKind::SubmoduleImport(SubmoduleImport {
-                                qualified_name,
-                                call_path,
-                            }),
+                            BindingKind::SubmoduleImport(SubmoduleImport { call_path }),
                             BindingFlags::EXTERNAL,
                         );
                     } else {
@@ -347,15 +342,11 @@ where
                         }
 
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
-                        let qualified_name = &alias.name;
-                        let call_path: Box<[&str]> = qualified_name.split('.').collect();
+                        let call_path: Box<[&str]> = alias.name.split('.').collect();
                         self.add_binding(
                             name,
                             alias.identifier(),
-                            BindingKind::Import(Import {
-                                qualified_name,
-                                call_path,
-                            }),
+                            BindingKind::Import(Import { call_path }),
                             flags,
                         );
                     }
@@ -399,25 +390,20 @@ where
                         // be "foo.bar". Given `from foo import bar as baz`, `name` would be "baz"
                         // and `qualified_name` would be "foo.bar".
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
-
-                        let qualified_name =
-                            helpers::format_import_from_member(level, module, &alias.name);
-                        let call_path = from_relative_import_parts(
+                        if let Some(call_path) = from_relative_import_parts(
                             self.module_path.unwrap_or_default(),
                             level,
                             module,
                             &alias.name,
-                        );
-                        let call_path: Box<[&str]> = call_path.into_boxed_slice();
-                        self.add_binding(
-                            name,
-                            alias.identifier(),
-                            BindingKind::FromImport(FromImport {
-                                qualified_name,
-                                call_path,
-                            }),
-                            flags,
-                        );
+                        ) {
+                            let call_path: Box<[&str]> = call_path.into_boxed_slice();
+                            self.add_binding(
+                                name,
+                                alias.identifier(),
+                                BindingKind::FromImport(FromImport { call_path }),
+                                flags,
+                            );
+                        }
                     }
                 }
             }

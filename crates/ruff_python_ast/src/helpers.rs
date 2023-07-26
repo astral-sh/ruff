@@ -899,18 +899,21 @@ pub fn from_relative_import_parts<'a>(
     level: Option<u32>,
     module: Option<&'a str>,
     member: &'a str,
-) -> CallPath<'a> {
+) -> Option<CallPath<'a>> {
     let mut call_path: CallPath = SmallVec::with_capacity(module_path.len() + 1);
 
-    // Start with the module path.
-    call_path.extend(module_path.iter().map(String::as_str));
-
     // Remove segments based on the number of dots.
-    for _ in 0..level.unwrap_or(0) {
-        if call_path.is_empty() {
-            return SmallVec::new();
+    if let Some(level) = level {
+        if level > 0 {
+            call_path.extend(module_path.iter().map(String::as_str));
+
+            for _ in 0..level {
+                if call_path.is_empty() {
+                    return None;
+                }
+                call_path.pop();
+            }
         }
-        call_path.pop();
     }
 
     // Add the remaining segments.
@@ -921,7 +924,7 @@ pub fn from_relative_import_parts<'a>(
     // Add the member.
     call_path.push(member);
 
-    call_path
+    Some(call_path)
 }
 
 /// Given an imported module (based on its relative import level and module name), return the

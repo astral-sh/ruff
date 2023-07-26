@@ -75,7 +75,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
     for binding_id in scope.binding_ids() {
         let binding = checker.semantic().binding(binding_id);
 
-        let Some(qualified_name) = binding.qualified_name() else {
+        let Some(call_path) = binding.call_path() else {
             continue;
         };
 
@@ -97,7 +97,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
             };
 
             let import = Import {
-                qualified_name,
+                call_path,
                 reference_id,
                 range: binding.range,
                 parent_range: binding.parent_range(checker.semantic()),
@@ -131,7 +131,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
         };
 
         for Import {
-            qualified_name,
+            call_path,
             range,
             parent_range,
             ..
@@ -139,7 +139,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
         {
             let mut diagnostic = Diagnostic::new(
                 RuntimeImportInTypeCheckingBlock {
-                    qualified_name: qualified_name.to_string(),
+                    qualified_name: call_path.join("."),
                 },
                 range,
             );
@@ -156,7 +156,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
     // Separately, generate a diagnostic for every _ignored_ import, to ensure that the
     // suppression comments aren't marked as unused.
     for Import {
-        qualified_name,
+        call_path,
         range,
         parent_range,
         ..
@@ -164,7 +164,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
     {
         let mut diagnostic = Diagnostic::new(
             RuntimeImportInTypeCheckingBlock {
-                qualified_name: qualified_name.to_string(),
+                qualified_name: call_path.join("."),
             },
             range,
         );
@@ -178,7 +178,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
 /// A runtime-required import with its surrounding context.
 struct Import<'a> {
     /// The qualified name of the import (e.g., `typing.List` for `from typing import List`).
-    qualified_name: &'a str,
+    call_path: &'a [&'a str],
     /// The first reference to the imported symbol.
     reference_id: ResolvedReferenceId,
     /// The trimmed range of the import (e.g., `List` in `from typing import List`).
@@ -191,9 +191,9 @@ struct Import<'a> {
 fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[Import]) -> Result<Fix> {
     let stmt = checker.semantic().stmts[stmt_id];
     let parent = checker.semantic().stmts.parent(stmt);
-    let qualified_names: Vec<&str> = imports
+    let qualified_names: Vec<String> = imports
         .iter()
-        .map(|Import { qualified_name, .. }| *qualified_name)
+        .map(|Import { call_path, .. }| call_path.join("."))
         .collect();
 
     // Find the first reference across all imports.
@@ -207,7 +207,7 @@ fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[Import]) -> Result
 
     // Step 1) Remove the import.
     let remove_import_edit = autofix::edits::remove_unused_imports(
-        qualified_names.iter().copied(),
+        qualified_names.iter().map(|name| name.as_str()),
         stmt,
         parent,
         checker.locator(),
@@ -219,7 +219,7 @@ fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[Import]) -> Result
     let add_import_edit = checker.importer().runtime_import_edit(
         &StmtImports {
             stmt,
-            qualified_names,
+            qualified_names: qualified_names.iter().map(|name| name.as_str()).collect(),
         },
         at,
     )?;

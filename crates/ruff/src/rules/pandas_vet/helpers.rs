@@ -26,28 +26,25 @@ pub(super) fn test_expression(expr: &Expr, semantic: &SemanticModel) -> Resoluti
         | Expr::ListComp(_)
         | Expr::DictComp(_)
         | Expr::GeneratorExp(_) => Resolution::IrrelevantExpression,
-        Expr::Name(ast::ExprName { id, .. }) => {
-            semantic
-                .find_binding(id)
-                .map_or(Resolution::IrrelevantBinding, |binding| {
-                    match binding.kind {
-                        BindingKind::Annotation
-                        | BindingKind::Argument
-                        | BindingKind::Assignment
-                        | BindingKind::NamedExprAssignment
-                        | BindingKind::UnpackedAssignment
-                        | BindingKind::LoopVar
-                        | BindingKind::Global
-                        | BindingKind::Nonlocal(_) => Resolution::RelevantLocal,
-                        BindingKind::Import(Import { qualified_name, .. })
-                            if qualified_name == "pandas" =>
-                        {
-                            Resolution::PandasModule
-                        }
-                        _ => Resolution::IrrelevantBinding,
-                    }
-                })
-        }
+        Expr::Name(ast::ExprName { id, .. }) => semantic.find_binding(id).map_or(
+            Resolution::IrrelevantBinding,
+            |binding| match &binding.kind {
+                BindingKind::Annotation
+                | BindingKind::Argument
+                | BindingKind::Assignment
+                | BindingKind::NamedExprAssignment
+                | BindingKind::UnpackedAssignment
+                | BindingKind::LoopVar
+                | BindingKind::Global
+                | BindingKind::Nonlocal(_) => Resolution::RelevantLocal,
+                BindingKind::Import(Import { call_path })
+                    if matches!(call_path.as_ref(), ["pandas"]) =>
+                {
+                    Resolution::PandasModule
+                }
+                _ => Resolution::IrrelevantBinding,
+            },
+        ),
         _ => Resolution::RelevantLocal,
     }
 }

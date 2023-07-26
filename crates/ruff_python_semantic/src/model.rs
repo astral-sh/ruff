@@ -29,7 +29,6 @@ use crate::{UnresolvedReference, UnresolvedReferenceFlags};
 /// A semantic model for a Python module, to enable querying the module's semantic information.
 pub struct SemanticModel<'a> {
     typing_modules: &'a [String],
-    module_path: Option<&'a [String]>,
 
     /// Stack of all visited statements.
     pub stmts: Nodes<'a>,
@@ -129,7 +128,6 @@ impl<'a> SemanticModel<'a> {
     pub fn new(typing_modules: &'a [String], path: &'a Path, module: Module<'a>) -> Self {
         Self {
             typing_modules,
-            module_path: module.path(),
             stmts: Nodes::default(),
             stmt_id: None,
             exprs: Vec::default(),
@@ -585,17 +583,13 @@ impl<'a> SemanticModel<'a> {
         // import pyarrow.csv
         // print(pa.csv.read_csv("test.csv"))
         // ```
-        let qualified_name = self.bindings[binding_id].qualified_name()?;
-        let has_alias = qualified_name
-            .split('.')
-            .last()
-            .map(|segment| segment != symbol)
-            .unwrap_or_default();
-        if !has_alias {
+        let call_path = self.bindings[binding_id].call_path()?;
+        let segment = call_path.last()?;
+        if *segment == symbol {
             return None;
         }
 
-        let binding_id = self.scopes[scope_id].get(qualified_name)?;
+        let binding_id = self.scopes[scope_id].get(segment)?;
         if !self.bindings[binding_id].kind.is_submodule_import() {
             return None;
         }
@@ -635,23 +629,17 @@ impl<'a> SemanticModel<'a> {
         };
 
         match &binding.kind {
-            BindingKind::Import(Import { call_path, .. }) => {
+            BindingKind::Import(Import { call_path }) => {
                 let resolved: CallPath = call_path.iter().chain(tail.iter()).copied().collect();
-                // resolved.extend_from_slice(call_path);
-                // resolved.extend_from_slice(tail);
                 Some(resolved)
             }
-            BindingKind::SubmoduleImport(SubmoduleImport { qualified_name, .. }) => {
-                let name = qualified_name.split('.').next().unwrap_or(qualified_name);
-                let mut source_path: CallPath = from_unqualified_name(name);
+            BindingKind::SubmoduleImport(SubmoduleImport { call_path }) => {
+                let mut source_path: CallPath = CallPath::from_slice(&call_path[..1]);
                 source_path.extend_from_slice(tail.as_slice());
                 Some(source_path)
             }
-            BindingKind::FromImport(FromImport { call_path, .. }) => {
+            BindingKind::FromImport(FromImport { call_path }) => {
                 let resolved: CallPath = call_path.iter().chain(tail.iter()).copied().collect();
-                // let mut resolved = SmallVec::with_capacity(call_path.len() + tail.len());
-                // resolved.extend_from_slice(call_path);
-                // resolved.extend_from_slice(tail);
                 Some(resolved)
             }
             BindingKind::Builtin => Some(smallvec!["", head.id.as_str()]),
@@ -676,6 +664,7 @@ impl<'a> SemanticModel<'a> {
         module: &str,
         member: &str,
     ) -> Option<ImportedName> {
+        let module_path: Vec<&str> = module.split('.').collect();
         self.scopes().enumerate().find_map(|(scope_index, scope)| {
             scope.bindings().find_map(|(name, binding_id)| {
                 let binding = &self.bindings[binding_id];
@@ -683,8 +672,8 @@ impl<'a> SemanticModel<'a> {
                     // Ex) Given `module="sys"` and `object="exit"`:
                     // `import sys`         -> `sys.exit`
                     // `import sys as sys2` -> `sys2.exit`
-                    BindingKind::Import(Import { qualified_name, .. }) => {
-                        if qualified_name == &module {
+                    BindingKind::Import(Import { call_path }) => {
+                        if call_path.as_ref() == module_path.as_slice() {
                             if let Some(source) = binding.source {
                                 // Verify that `sys` isn't bound in an inner scope.
                                 if self
@@ -704,10 +693,9 @@ impl<'a> SemanticModel<'a> {
                     // Ex) Given `module="os.path"` and `object="join"`:
                     // `from os.path import join`          -> `join`
                     // `from os.path import join as join2` -> `join2`
-                    BindingKind::FromImport(FromImport { qualified_name, .. }) => {
-                        if let Some((target_module, target_member)) = qualified_name.split_once('.')
-                        {
-                            if target_module == module && target_member == member {
+                    BindingKind::FromImport(FromImport { call_path }) => {
+                        if let Some((target_member, target_module)) = call_path.split_last() {
+                            if target_module == module_path.as_slice() && target_member == &member {
                                 if let Some(source) = binding.source {
                                     // Verify that `join` isn't bound in an inner scope.
                                     if self
