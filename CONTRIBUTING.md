@@ -313,7 +313,7 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
 1. Run the release workflow with the version number (without starting `v`) as input. Make sure
     main has your merged PR as last commit
 1. The release workflow will do the following:
-    1. Build all the assets. If this fails (even though we tested in step 4), we haven’t tagged or
+    1. Build all the assets. If this fails (even though we tested in step 4), we haven't tagged or
         uploaded anything, you can restart after pushing a fix.
     1. Upload to PyPI.
     1. Create and push the Git tag (as extracted from `pyproject.toml`). We create the Git tag only
@@ -726,9 +726,9 @@ diagnostics, then our current compilation pipeline proceeds as follows:
 
 1. **File discovery**: Given paths like `foo/`, locate all Python files in any specified subdirectories, taking into account our hierarchical settings system and any `exclude` options.
 
-1. **Package resolution**: Determine the “package root” for every file by traversing over its parent directories and looking for `__init__.py` files.
+1. **Package resolution**: Determine the "package root" for every file by traversing over its parent directories and looking for `__init__.py` files.
 
-1. **Cache initialization**: For every “package root”, initialize an empty cache.
+1. **Cache initialization**: For every "package root", initialize an empty cache.
 
 1. **Analysis**: For every file, in parallel:
 
@@ -736,7 +736,7 @@ diagnostics, then our current compilation pipeline proceeds as follows:
 
     1. **Tokenization**: Run the lexer over the file to generate a token stream.
 
-    1. **Indexing**: Extract metadata from the token stream, such as: comment ranges, `# noqa` locations, `# isort: off` locations, “doc lines”, etc.
+    1. **Indexing**: Extract metadata from the token stream, such as: comment ranges, `# noqa` locations, `# isort: off` locations, "doc lines", etc.
 
     1. **Token-based rule evaluation**: Run any lint rules that are based on the contents of the token stream (e.g., commented-out code).
 
@@ -746,9 +746,9 @@ diagnostics, then our current compilation pipeline proceeds as follows:
 
     1. **Parsing**: Run the parser over the token stream to produce an AST. (This consumes the token stream, so anything that relies on the token stream needs to happen before parsing.)
 
-    1. **AST-based rule evaluation**: Run any lint rules that are based on the AST. This includes the vast majority of lint rules. As part of this step, we also build the semantic model for the current file as we traverse over the AST. Some lint rules are evaluated eagerly, as we iterate over the AST, while others are evaluated in a deferred manner (e.g., unused imports, since we can’t determine whether an import is unused until we’ve finished analyzing the entire file), after we’ve finished the initial traversal.
+    1. **AST-based rule evaluation**: Run any lint rules that are based on the AST. This includes the vast majority of lint rules. As part of this step, we also build the semantic model for the current file as we traverse over the AST. Some lint rules are evaluated eagerly, as we iterate over the AST, while others are evaluated in a deferred manner (e.g., unused imports, since we can't determine whether an import is unused until we've finished analyzing the entire file), after we've finished the initial traversal.
 
-    1. **Import-based rule evaluation**: Run any lint rules that are based on the module’s imports (e.g., import sorting). These could, in theory, be included in the AST-based rule evaluation phase — they’re just separated for simplicity.
+    1. **Import-based rule evaluation**: Run any lint rules that are based on the module's imports (e.g., import sorting). These could, in theory, be included in the AST-based rule evaluation phase — they're just separated for simplicity.
 
     1. **Physical line-based rule evaluation**: Run any lint rules that are based on physical lines (e.g., line-length).
 
@@ -757,3 +757,116 @@ diagnostics, then our current compilation pipeline proceeds as follows:
     1. **Cache write**: Write the generated diagnostics to the package cache using the file as a key.
 
 1. **Reporting**: Print diagnostics in the specified format (text, JSON, etc.), to the specified output channel (stdout, a file, etc.).
+
+### Import Categorization
+
+To understand Ruff's import categorization system, we first need to define two concepts:
+
+- "Project root": The directory containing the `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file,
+    discovered by identifying the "closest" such directory for each Python file. (If you're running
+    via `ruff --config /path/to/pyproject.toml`, then the current working directory is used as the
+    "project root".)
+- "Package root": The top-most directory defining the Python package that includes a given Python
+    file. To find the package root for a given Python file, traverse up its parent directories until
+    you reach a parent directory that doesn't contain an `__init__.py` file (and isn't marked as
+    a [namespace package](https://beta.ruff.rs/docs/settings/#namespace-packages)); take the directory
+    just before that, i.e., the first directory in the package.
+
+For example, given:
+
+```text
+my_project
+├── pyproject.toml
+└── src
+    └── foo
+        ├── __init__.py
+        └── bar
+            ├── __init__.py
+            └── baz.py
+```
+
+Then when analyzing `baz.py`, the project root would be the top-level directory (`./my_project`),
+and the package root would be `./my_project/src/foo`.
+
+#### Project root
+
+The project root does not have a significant impact beyond that all relative paths within the loaded
+configuration file are resolved relative to the project root.
+
+For example, to indicate that `bar` above is a namespace package (it isn't, but let's run with it),
+the `pyproject.toml` would list `namespace-packages = ["./src/bar"]`, which would resolve
+to `my_project/src/bar`.
+
+The same logic applies when providing a configuration file via `--config`. In that case, the
+_current working directory_ is used as the project root, and so all paths in that configuration file
+are resolved relative to the current working directory. (As a general rule, we want to avoid relying
+on the current working directory as much as possible, to ensure that Ruff exhibits the same behavior
+regardless of where and how you invoke it — but that's hard to avoid in this case.)
+
+Additionally, if a `pyproject.toml` file _extends_ another configuration file, Ruff will still use
+the directory containing that `pyproject.toml` file as the project root. For example, if
+`./my_project/pyproject.toml` contains:
+
+```toml
+[tool.ruff]
+extend = "/path/to/pyproject.toml"
+```
+
+Then Ruff will use `./my_project` as the project root, even though the configuration file extends
+`/path/to/pyproject.toml`. As such, if the configuration file at `/path/to/pyproject.toml` contains
+any relative paths, they will be resolved relative to `./my_project`.
+
+If a project uses nested configuration files, then Ruff would detect multiple project roots, one for
+each configuration file.
+
+#### Package root
+
+The package root is used to determine a file's "module path". Consider, again, `baz.py`. In that
+case, `./my_project/src/foo` was identified as the package root, so the module path for `baz.py`
+would resolve to  `foo.bar.baz` — as computed by taking the relative path from the package root
+(inclusive of the root itself). The module path can be thought of as "the path you would use to
+import the module" (e.g., `import foo.bar.baz`).
+
+The package root and module path are used to, e.g., convert relative to absolute imports, and for
+import categorization, as described below.
+
+#### Import categorization
+
+When sorting and formatting import blocks, Ruff categorizes every import into one of five
+categories:
+
+1. **"Future"**: the import is a `__future__` import. That's easy: just look at the name of the
+    imported module!
+1. **"Standard library"**: the import comes from the Python standard library (e.g., `import os`).
+    This is easy too: we include a list of all known standard library modules in Ruff itself, so it's
+    a simple lookup.
+1. **"Local folder"**: the import is a relative import (e.g., `from .foo import bar`). This is easy
+    too: just check if the import includes a `level` (i.e., a dot-prefix).
+1. **"First party"**: the import is part of the current project. (More on this below.)
+1. **"Third party"**: everything else.
+
+The real challenge lies in determining whether an import is first-party — everything else is either
+trivial, or (as in the case of third-party) merely defined as "not first-party".
+
+There are three ways in which an import can be categorized as "first-party":
+
+1. **Explicit settings**: the import is marked as such via the `known-first-party` setting. (This
+    should generally be seen as an escape hatch.)
+1. **Same-package**: the imported module is in the same package as the current file. This gets back
+    to the importance of the "package root" and the file's "module path". Imagine that we're
+    analyzing `baz.py` above. If `baz.py` contains any imports that appear to come from the `foo`
+    package (e.g., `from foo import bar` or `import foo.bar`), they'll be classified as first-party
+    automatically. This check is as simple as comparing the first segment of the current file's
+    module path to the first segment of the import.
+1. **Source roots**: Ruff supports a `[src](https://beta.ruff.rs/docs/settings/#src)` setting, which
+    sets the directories to scan when identifying first-party imports. The algorithm is
+    straightforward: given an import, like `import foo`, iterate over the directories enumerated in
+    the `src` setting and, for each directory, check for the existence of a subdirectory `foo` or a
+    file `foo.py`.
+
+By default, `src` is set to the project root. In the above example, we'd want to set
+`src = ["./src"]` to ensure that we locate `./my_project/src/foo` and thus categorize `import foo`
+as first-party in `baz.py`. In practice, for this limited example, setting `src = ["./src"]` is
+unnecessary, as all imports within `./my_project/src/foo` would be categorized as first-party via
+the same-package heuristic; but your project contains multiple packages, you'll want to set `src`
+explicitly.
