@@ -46,35 +46,35 @@ pub(super) fn place_comment<'a>(
     // fixups.
     match comment.enclosing_node() {
         AnyNodeRef::Arguments(arguments) => {
-            handle_arguments_separator_comment(comment, locator, arguments)
+            handle_arguments_separator_comment(comment, arguments, locator)
         }
         AnyNodeRef::Comprehension(comprehension) => {
-            handle_comprehension_comment(comment, locator, comprehension)
+            handle_comprehension_comment(comment, comprehension, locator)
         }
         AnyNodeRef::ExprAttribute(attribute) => handle_attribute_comment(comment, attribute),
         AnyNodeRef::ExprBinOp(binary_expression) => {
             handle_trailing_binary_expression_left_or_operator_comment(
                 comment,
-                locator,
                 binary_expression,
+                locator,
             )
         }
         AnyNodeRef::ExprDict(_) | AnyNodeRef::Keyword(_) => {
             handle_dict_unpacking_comment(comment, locator)
         }
-        AnyNodeRef::ExprIfExp(expr_if) => handle_expr_if_comment(comment, locator, expr_if),
-        AnyNodeRef::ExprSlice(expr_slice) => handle_slice_comments(comment, locator, expr_slice),
+        AnyNodeRef::ExprIfExp(expr_if) => handle_expr_if_comment(comment, expr_if, locator),
+        AnyNodeRef::ExprSlice(expr_slice) => handle_slice_comments(comment, expr_slice, locator),
         AnyNodeRef::ExprStarred(starred) => {
             handle_trailing_expression_starred_star_end_of_line_comment(comment, starred)
         }
         AnyNodeRef::ExprSubscript(expr_subscript) => {
             if let Expr::Slice(expr_slice) = expr_subscript.slice.as_ref() {
-                handle_slice_comments(comment, locator, expr_slice)
+                handle_slice_comments(comment, expr_slice, locator)
             } else {
                 CommentPlacement::Default(comment)
             }
         }
-        AnyNodeRef::MatchCase(match_case) => handle_match_comment(comment, locator, match_case),
+        AnyNodeRef::MatchCase(match_case) => handle_match_comment(comment, match_case, locator),
         AnyNodeRef::ModModule(_) => {
             handle_module_level_own_line_comment_before_class_or_function_comment(comment, locator)
         }
@@ -98,13 +98,15 @@ fn handle_end_of_line_comment_around_body<'a>(
     //     pass
     // ```
     if let Some(following) = comment.following_node() {
-        if is_first_statement_in_body(following, comment.enclosing_node()) && SimpleTokenizer::new(
+        if is_first_statement_in_body(following, comment.enclosing_node())
+            && SimpleTokenizer::new(
                 locator.contents(),
                 TextRange::new(comment.end(), following.start()),
             )
             .skip_trivia()
             .next()
-            .is_none() {
+            .is_none()
+        {
             return CommentPlacement::dangling(comment.enclosing_node(), comment);
         }
     }
@@ -239,7 +241,7 @@ fn handle_own_line_comment_after_body<'a>(
         return CommentPlacement::Default(comment);
     };
 
-    // If there's any non-trivia token between the preceding node and the comment, than it means that
+    // If there's any non-trivia token between the preceding node and the comment, than it means
     // we're past the case of the alternate branch, defer to the default rules
     // ```python
     // if a:
@@ -249,24 +251,23 @@ fn handle_own_line_comment_after_body<'a>(
     //     # default placement comment
     //     def inline_after_else(): ...
     // ```
-    if SimpleTokenizer::new(
+    let maybe_token = SimpleTokenizer::new(
         locator.contents(),
         TextRange::new(preceding.end(), comment.slice().start()),
     )
     .skip_trivia()
-    .next()
-    .is_some()
-    {
+    .next();
+    if maybe_token.is_some() {
         return CommentPlacement::Default(comment);
     }
 
     // Check if we're between bodies and should attach to the following body. If that is not the
     // case, either because there is no following branch or because the indentation is too deep,
     // attach to the recursively last statement in the preceding body with the matching indentation.
-    match handle_own_line_comment_between_branches(comment, locator, preceding) {
+    match handle_own_line_comment_between_branches(comment, preceding, locator) {
         CommentPlacement::Default(comment) => {
             // Knowing the comment is not between branches, handle comments after the last branch
-            handle_own_line_comment_after_branch(comment, locator, preceding)
+            handle_own_line_comment_after_branch(comment, preceding, locator)
         }
         placement => placement,
     }
@@ -283,8 +284,8 @@ fn handle_own_line_comment_after_body<'a>(
 /// ```
 fn handle_own_line_comment_between_branches<'a>(
     comment: DecoratedComment<'a>,
-    locator: &Locator,
     preceding: AnyNodeRef<'a>,
+    locator: &Locator,
 ) -> CommentPlacement<'a> {
     // The following statement must be the first statement in an alternate body, otherwise check
     // if it's a comment after the final body and handle that case
@@ -380,8 +381,8 @@ fn handle_own_line_comment_between_branches<'a>(
 /// ```
 fn handle_match_comment<'a>(
     comment: DecoratedComment<'a>,
-    locator: &Locator,
     match_case: &'a MatchCase,
+    locator: &Locator,
 ) -> CommentPlacement<'a> {
     // Must be an own line comment after the last statement in a match case
     if comment.line_position().is_end_of_line() || comment.following_node().is_some() {
@@ -471,8 +472,8 @@ fn handle_match_comment<'a>(
 /// Determine where to attach an own line comment after a branch depending on its indentation
 fn handle_own_line_comment_after_branch<'a>(
     comment: DecoratedComment<'a>,
-    locator: &Locator,
     preceding_node: AnyNodeRef<'a>,
+    locator: &Locator,
 ) -> CommentPlacement<'a> {
     let Some(last_child) = last_child_in_body(preceding_node) else {
         return CommentPlacement::Default(comment);
@@ -565,8 +566,8 @@ fn handle_own_line_comment_after_branch<'a>(
 /// See [`assign_argument_separator_comment_placement`]
 fn handle_arguments_separator_comment<'a>(
     comment: DecoratedComment<'a>,
-    locator: &Locator,
     arguments: &Arguments,
+    locator: &Locator,
 ) -> CommentPlacement<'a> {
     let (slash, star) = find_argument_separators(locator.contents(), arguments);
     let comment_range = comment.slice().range();
@@ -596,8 +597,8 @@ fn handle_arguments_separator_comment<'a>(
 /// ```
 fn handle_trailing_binary_expression_left_or_operator_comment<'a>(
     comment: DecoratedComment<'a>,
-    locator: &Locator,
     binary_expression: &'a ExprBinOp,
+    locator: &Locator,
 ) -> CommentPlacement<'a> {
     // Only if there's a preceding node (in which case, the preceding node is `left`).
     if comment.preceding_node().is_none() || comment.following_node().is_none() {
@@ -760,8 +761,8 @@ fn handle_module_level_own_line_comment_before_class_or_function_comment<'a>(
 /// ```
 fn handle_slice_comments<'a>(
     comment: DecoratedComment<'a>,
-    locator: &Locator,
     expr_slice: &'a ExprSlice,
+    locator: &Locator,
 ) -> CommentPlacement<'a> {
     let ExprSlice {
         range: _,
@@ -976,8 +977,8 @@ fn handle_attribute_comment<'a>(
 /// happens if the comments are in a weird position but it also doesn't hurt handling it.
 fn handle_expr_if_comment<'a>(
     comment: DecoratedComment<'a>,
-    locator: &Locator,
     expr_if: &'a ExprIfExp,
+    locator: &Locator,
 ) -> CommentPlacement<'a> {
     let ExprIfExp {
         range: _,
@@ -992,8 +993,8 @@ fn handle_expr_if_comment<'a>(
 
     let if_token = find_only_token_in_range(
         TextRange::new(body.end(), test.start()),
-        locator,
         SimpleTokenKind::If,
+        locator,
     );
     // Between `if` and `test`
     if if_token.range.start() < comment.slice().start() && comment.slice().start() < test.start() {
@@ -1002,8 +1003,8 @@ fn handle_expr_if_comment<'a>(
 
     let else_token = find_only_token_in_range(
         TextRange::new(test.end(), orelse.start()),
-        locator,
         SimpleTokenKind::Else,
+        locator,
     );
     // Between `else` and `orelse`
     if else_token.range.start() < comment.slice().start()
@@ -1072,8 +1073,8 @@ fn handle_with_item_comment<'a>(
 
     let as_token = find_only_token_in_range(
         TextRange::new(context_expr.end(), optional_vars.start()),
-        locator,
         SimpleTokenKind::As,
+        locator,
     );
 
     if comment.end() < as_token.start() {
@@ -1092,8 +1093,8 @@ fn handle_with_item_comment<'a>(
 /// the expression ranges
 fn find_only_token_in_range(
     range: TextRange,
-    locator: &Locator,
     token_kind: SimpleTokenKind,
+    locator: &Locator,
 ) -> SimpleToken {
     let mut tokens = SimpleTokenizer::new(locator.contents(), range)
         .skip_trivia()
@@ -1123,8 +1124,8 @@ fn find_only_token_in_range(
 // ```
 fn handle_comprehension_comment<'a>(
     comment: DecoratedComment<'a>,
-    locator: &Locator,
     comprehension: &'a Comprehension,
+    locator: &Locator,
 ) -> CommentPlacement<'a> {
     let is_own_line = comment.line_position().is_own_line();
 
@@ -1151,8 +1152,8 @@ fn handle_comprehension_comment<'a>(
             comprehension.target.range().end(),
             comprehension.iter.range().start(),
         ),
-        locator,
         SimpleTokenKind::In,
+        locator,
     );
 
     // Comments between the target and the `in`
@@ -1214,8 +1215,8 @@ fn handle_comprehension_comment<'a>(
         // ```
         let if_token = find_only_token_in_range(
             TextRange::new(last_end, if_node.range().start()),
-            locator,
             SimpleTokenKind::If,
+            locator,
         );
         if is_own_line {
             if last_end < comment.slice().start() && comment.slice().start() < if_token.start() {
