@@ -9,6 +9,28 @@ use crate::checkers::ast::Checker;
 
 use super::helpers;
 
+/// ## What it does
+/// Checks for `datetime` instantiations that lack a `tzinfo` argument.
+///
+/// ## Why is this bad?
+/// `datetime` objects are "naive" by default, in that they do not include
+/// timezone information. By providing a `tzinfo`, a `datetime` can be made
+/// timezone "aware". "Naive" objects are easy to understand, but ignore some
+/// aspects of reality, which can lead to subtle bugs.
+///
+/// ## Example
+/// ```python
+/// import datetime
+///
+/// datetime.datetime(2000, 1, 1, 0, 0, 0)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import datetime
+///
+/// datetime.datetime(2000, 1, 1, 0, 0, 0, tzinfo=datetime.UTC)
+/// ```
 #[violation]
 pub struct CallDatetimeWithoutTzinfo;
 
