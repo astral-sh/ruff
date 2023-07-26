@@ -281,6 +281,7 @@ where
                     .map_or(false, |value| any_over_expr(value, func))
         }
         Expr::Name(_) | Expr::Constant(_) => false,
+        Expr::LineMagic(_) => false,
     }
 }
 
@@ -583,6 +584,7 @@ where
             range: _range,
         }) => any_over_expr(value, func),
         Stmt::Pass(_) | Stmt::Break(_) | Stmt::Continue(_) => false,
+        Stmt::LineMagic(_) => false,
     }
 }
 

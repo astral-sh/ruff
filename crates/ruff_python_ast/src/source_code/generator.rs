@@ -720,6 +720,11 @@ impl<'a> Generator<'a> {
                     self.p("continue");
                 });
             }
+            Stmt::LineMagic(ast::StmtLineMagic { kind, value, .. }) => {
+                statement!({
+                    self.p(&format!("{kind}{value}"));
+                });
+            }
         }
     }
 
@@ -1270,6 +1275,9 @@ impl<'a> Generator<'a> {
                     self.unparse_expr(step, precedence::SLICE);
                 }
             }
+            Expr::LineMagic(ast::ExprLineMagic { kind, value, .. }) => {
+                self.p(&format!("{kind}{value}"));
+            }
         }
     }
 
@@ -1467,8 +1475,8 @@ impl<'a> Generator<'a> {
 
 #[cfg(test)]
 mod tests {
-    use rustpython_ast::Stmt;
-    use rustpython_parser::Parse;
+    use rustpython_ast::{Mod, ModModule, Stmt};
+    use rustpython_parser::{self, Mode, Parse};
 
     use ruff_python_trivia::LineEnding;
 
@@ -1497,6 +1505,22 @@ mod tests {
         generator.generate()
     }
 
+    fn jupyter_round_trip(contents: &str) -> String {
+        let indentation = Indentation::default();
+        let quote = Quote::default();
+        let line_ending = LineEnding::default();
+        let ast = rustpython_parser::parse(contents, Mode::Jupyter, "<filename>").unwrap();
+        let Mod::Module(ModModule { body, .. }) = ast else {
+            panic!("Source code didn't return ModModule")
+        };
+        let [stmt] = body.as_slice() else {
+            panic!("Expected only one statement in source code")
+        };
+        let mut generator = Generator::new(&indentation, quote, line_ending);
+        generator.unparse_stmt(stmt);
+        generator.generate()
+    }
+
     macro_rules! assert_round_trip {
         ($contents:expr) => {
             assert_eq!(
@@ -1504,6 +1528,19 @@ mod tests {
                 $contents.replace('\n', LineEnding::default().as_str())
             );
         };
+    }
+
+    #[test]
+    fn unparse_magic_commands() {
+        assert_eq!(
+            jupyter_round_trip("%matplotlib inline"),
+            "%matplotlib inline"
+        );
+        assert_eq!(
+            jupyter_round_trip("%matplotlib \\\n  inline"),
+            "%matplotlib   inline"
+        );
+        assert_eq!(jupyter_round_trip("dir = !pwd"), "dir = !pwd");
     }
 
     #[test]

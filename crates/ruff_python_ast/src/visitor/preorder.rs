@@ -428,7 +428,8 @@ where
         | Stmt::Break(_)
         | Stmt::Continue(_)
         | Stmt::Global(_)
-        | Stmt::Nonlocal(_) => {}
+        | Stmt::Nonlocal(_)
+        | Stmt::LineMagic(_) => {}
     }
 }
 
@@ -723,6 +724,7 @@ where
                 visitor.visit_expr(expr);
             }
         }
+        Expr::LineMagic(_) => (),
     }
 }
 
