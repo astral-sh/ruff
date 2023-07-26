@@ -7,6 +7,25 @@ use ruff_python_parser::token_kind::TokenKind;
 use crate::checkers::logical_lines::LogicalLinesContext;
 use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 
+/// ## What it does
+/// Checks for extraneous whitespace immediately before the open parenthesis
+/// that starts the argument list of a function call
+///
+/// ## Why is this bad?
+/// According to [PEP 8], open parentheses should not have any space before or
+/// after them.
+///
+/// ## Example
+/// ```python
+/// spam (1)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// spam(1)
+/// ```
+///
+/// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
 #[violation]
 pub struct WhitespaceBeforeParameters {
     bracket: TokenKind,
