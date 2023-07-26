@@ -760,6 +760,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8UsePathlib, "204") => (RuleGroup::Unspecified, rules::flake8_use_pathlib::rules::OsPathGetmtime),
         (Flake8UsePathlib, "205") => (RuleGroup::Unspecified, rules::flake8_use_pathlib::rules::OsPathGetctime),
         (Flake8UsePathlib, "206") => (RuleGroup::Unspecified, rules::flake8_use_pathlib::rules::OsSepSplit),
+        (Flake8UsePathlib, "207") => (RuleGroup::Unspecified, rules::flake8_use_pathlib::rules::Glob),
 
         // flake8-logging-format
         (Flake8LoggingFormat, "001") => (RuleGroup::Unspecified, rules::flake8_logging_format::violations::LoggingStringFormat),
