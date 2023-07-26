@@ -313,6 +313,20 @@ impl<'a> SemanticModel<'a> {
                 if seen_function && matches!(symbol, "__class__") {
                     return ReadResult::ImplicitGlobal;
                 }
+                // Do not allow usages of class symbols unless it is the immediate parent, e.g.:
+                //
+                // ```python
+                // class Foo:
+                //      a = 0
+                //
+                //      b = a  # allowed
+                //      def c(self, arg=a):  # allowed
+                //          print(arg)
+                //
+                //      def d(self):
+                //          print(a)  # not allowed
+                // ```
+                //
                 if index > 0 {
                     continue;
                 }
