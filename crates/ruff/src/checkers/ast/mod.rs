@@ -453,12 +453,14 @@ where
                 args,
                 decorator_list,
                 returns,
+                type_params,
                 ..
             })
             | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
                 body,
                 args,
                 decorator_list,
+                type_params,
                 returns,
                 ..
             }) => {
@@ -471,6 +473,12 @@ where
                 // Function annotations are always evaluated at runtime, unless future annotations
                 // are enabled.
                 let runtime_annotation = !self.semantic.future_annotations();
+
+                self.semantic.push_scope(ScopeKind::Type);
+
+                for type_param in type_params {
+                    self.visit_type_param(type_param);
+                }
 
                 for arg_with_default in args
                     .posonlyargs
@@ -542,11 +550,18 @@ where
                     bases,
                     keywords,
                     decorator_list,
+                    type_params,
                     ..
                 },
             ) => {
                 for decorator in decorator_list {
                     self.visit_decorator(decorator);
+                }
+
+                self.semantic.push_scope(ScopeKind::Type);
+
+                for type_param in type_params {
+                    self.visit_type_param(type_param);
                 }
                 for expr in bases {
                     self.visit_expr(expr);
@@ -562,7 +577,6 @@ where
                     &self.semantic.definitions,
                 );
                 self.semantic.push_definition(definition);
-
                 self.semantic.push_scope(ScopeKind::Class(class_def));
 
                 // Extract any global bindings from the class body.
@@ -715,8 +729,9 @@ where
             | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { name, .. }) => {
                 let scope_id = self.semantic.scope_id;
                 self.deferred.scopes.push(scope_id);
-                self.semantic.pop_scope();
+                self.semantic.pop_scope(); // Function scope
                 self.semantic.pop_definition();
+                self.semantic.pop_scope(); // Type parameter scope
                 self.add_binding(
                     name,
                     stmt.identifier(),
@@ -727,8 +742,9 @@ where
             Stmt::ClassDef(ast::StmtClassDef { name, .. }) => {
                 let scope_id = self.semantic.scope_id;
                 self.deferred.scopes.push(scope_id);
-                self.semantic.pop_scope();
+                self.semantic.pop_scope(); // Class scope
                 self.semantic.pop_definition();
+                self.semantic.pop_scope(); // Type parameter scope
                 self.add_binding(
                     name,
                     stmt.identifier(),
@@ -1329,6 +1345,21 @@ where
         // Step 2: Traversal
         for stmt in body {
             self.visit_stmt(stmt);
+        }
+    }
+
+    fn visit_type_param(&mut self, type_param: &'b ast::TypeParam) {
+        match type_param {
+            ast::TypeParam::TypeVar(ast::TypeParamTypeVar { name, range, .. })
+            | ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { name, range, .. })
+            | ast::TypeParam::ParamSpec(ast::TypeParamParamSpec { name, range, .. }) => {
+                self.add_binding(
+                    name.as_str(),
+                    *range,
+                    BindingKind::TypeParam,
+                    BindingFlags::empty(),
+                );
+            }
         }
     }
 }
