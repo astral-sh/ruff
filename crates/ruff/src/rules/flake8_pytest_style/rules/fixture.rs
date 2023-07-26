@@ -24,11 +24,16 @@ use super::helpers::{
 };
 
 /// ## What it does
-/// Checks whether `@pytest.fixture()` without parameters has parentheses. The preferred style
-/// can be configured with the `flake8-pytest-style.fixture-parentheses` setting.
+/// Checks for parameter-free `@pytest.fixture()` decorators with or without
+/// parentheses, depending on the `flake8-pytest-style.fixture-parentheses`
+/// setting.
 ///
 /// ## Why is this bad?
-/// Code style inconsistency.
+/// If a `@pytext.fixture()` doesn't take any arguments, the parentheses are
+/// optional.
+///
+/// Either removing those unnecessary parentheses _or_ requiring them for all
+/// fixtures is fine, but it's best to be consistent.
 ///
 /// ## Example
 /// ```python
