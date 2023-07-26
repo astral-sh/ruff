@@ -1,24 +1,16 @@
-use ruff_python_trivia::{is_python_whitespace, Cursor};
-use ruff_text_size::{TextLen, TextSize};
+use std::ops::Deref;
+
+use ruff_python_trivia::Cursor;
 
 /// A shebang directive (e.g., `#!/usr/bin/env python3`).
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) struct ShebangDirective<'a> {
-    /// The offset of the directive contents (e.g., `/usr/bin/env python3`) from the start of the
-    /// line.
-    pub(crate) offset: TextSize,
-    /// The contents of the directive (e.g., `"/usr/bin/env python3"`).
-    pub(crate) contents: &'a str,
-}
+pub(crate) struct ShebangDirective<'a>(&'a str);
 
 impl<'a> ShebangDirective<'a> {
     /// Parse a shebang directive from a line, or return `None` if the line does not contain a
     /// shebang directive.
     pub(crate) fn try_extract(line: &'a str) -> Option<Self> {
         let mut cursor = Cursor::new(line);
-
-        // Trim whitespace.
-        cursor.eat_while(is_python_whitespace);
 
         // Trim the `#!` prefix.
         if !cursor.eat_char('#') {
@@ -28,10 +20,15 @@ impl<'a> ShebangDirective<'a> {
             return None;
         }
 
-        Some(Self {
-            offset: line.text_len() - cursor.text_len(),
-            contents: cursor.chars().as_str(),
-        })
+        Some(Self(cursor.chars().as_str()))
+    }
+}
+
+impl Deref for ShebangDirective<'_> {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.0
     }
 }
 
@@ -56,6 +53,12 @@ mod tests {
     #[test]
     fn shebang_match() {
         let source = "#!/usr/bin/env python";
+        assert_debug_snapshot!(ShebangDirective::try_extract(source));
+    }
+
+    #[test]
+    fn shebang_match_trailing_comment() {
+        let source = "#!/usr/bin/env python # trailing comment";
         assert_debug_snapshot!(ShebangDirective::try_extract(source));
     }
 

@@ -1,5 +1,5 @@
 use rustc_hash::FxHashSet;
-use rustpython_parser::ast::{self, Expr, Ranged};
+use rustpython_ast::{self as ast, Expr, Ranged};
 use std::collections::HashSet;
 
 use crate::checkers::ast::Checker;

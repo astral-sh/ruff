@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use ruff_python_ast::source_code::SourceLocation;
+use ruff_source_file::SourceLocation;
 
 use crate::message::{Emitter, EmitterContext, Message};
 use crate::registry::AsRule;

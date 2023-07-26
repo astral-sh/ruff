@@ -1,6 +1,6 @@
 use itertools::izip;
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{self, CmpOp, Constant, Expr, Ranged};
+use rustpython_ast::{self as ast, CmpOp, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};

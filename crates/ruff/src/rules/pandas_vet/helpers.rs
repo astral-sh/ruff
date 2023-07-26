@@ -1,5 +1,5 @@
+use rustpython_ast::Expr;
 use rustpython_parser::ast;
-use rustpython_parser::ast::Expr;
 
 use ruff_python_semantic::{BindingKind, Import, SemanticModel};
 

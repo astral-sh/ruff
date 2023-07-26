@@ -1,10 +1,10 @@
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{self, ElifElseClause, ExceptHandler, MatchCase, Ranged, Stmt};
+use rustpython_ast::{self as ast, ElifElseClause, ExceptHandler, MatchCase, Ranged, Stmt};
 use std::iter::Peekable;
 use std::slice;
 
-use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::statement_visitor::StatementVisitor;
+use ruff_source_file::Locator;
 
 use crate::directives::IsortDirectives;
 use crate::jupyter::Notebook;

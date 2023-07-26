@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Constant, Expr, ExprAttribute, ExprConstant};
+use rustpython_ast::{Constant, Expr, ExprAttribute, ExprConstant};
 
 use ruff_formatter::write;
 use ruff_python_ast::node::AnyNodeRef;

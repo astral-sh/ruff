@@ -330,6 +330,30 @@ pub struct Options {
             required-version = "0.0.193"
         "#
     )]
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"logger-objects = ["logging_setup.logger"]"#
+    )]
+    /// A list of objects that should be treated equivalently to a
+    /// `logging.Logger` object.
+    ///
+    /// This is useful for ensuring proper diagnostics (e.g., to identify
+    /// `logging` deprecations and other best-practices) for projects that
+    /// re-export a `logging.Logger` object from a common module.
+    ///
+    /// For example, if you have a module `logging_setup.py` with the following
+    /// contents:
+    /// ```python
+    /// import logging
+    ///
+    /// logger = logging.getLogger(__name__)
+    /// ```
+    ///
+    /// Adding `"logging_setup.logger"` to `logger-objects` will ensure that
+    /// `logging_setup.logger` is treated as a `logging.Logger` object when
+    /// imported from other modules (e.g., `from logging_setup import logger`).
+    pub logger_objects: Option<Vec<String>>,
     /// Require a specific version of Ruff to be running (useful for unifying
     /// results across many environments, e.g., with a `pyproject.toml`
     /// file).
@@ -463,7 +487,7 @@ pub struct Options {
         value_type = "list[str]",
         example = r#"typing-modules = ["airflow.typing_compat"]"#
     )]
-    /// A list of modules whose imports should be treated equivalently to
+    /// A list of modules whose exports should be treated equivalently to
     /// members of the `typing` module.
     ///
     /// This is useful for ensuring proper type annotation inference for

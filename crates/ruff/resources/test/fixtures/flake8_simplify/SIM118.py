@@ -1,10 +1,18 @@
 key in obj.keys()  # SIM118
 
+key not in obj.keys()  # SIM118
+
 foo["bar"] in obj.keys()  # SIM118
+
+foo["bar"] not in obj.keys()  # SIM118
 
 foo['bar'] in obj.keys()  # SIM118
 
+foo['bar'] not in obj.keys()  # SIM118
+
 foo() in obj.keys()  # SIM118
+
+foo() not in obj.keys()  # SIM118
 
 for key in obj.keys():  # SIM118
     pass

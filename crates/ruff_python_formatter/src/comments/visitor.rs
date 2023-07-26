@@ -1,14 +1,15 @@
 use std::iter::Peekable;
 
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{
+use rustpython_ast::{
     Alias, Arg, ArgWithDefault, Arguments, Comprehension, Decorator, ElifElseClause, ExceptHandler,
-    Expr, Keyword, MatchCase, Mod, Pattern, Ranged, Stmt, WithItem,
+    Expr, Keyword, MatchCase, Mod, Pattern, Ranged, Stmt, TypeParam, WithItem,
 };
 
 use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::source_code::{CommentRanges, Locator};
+use ruff_python_index::CommentRanges;
+use ruff_source_file::Locator;
 // The interface is designed to only export the members relevant for iterating nodes in
 // pre-order.
 #[allow(clippy::wildcard_imports)]
@@ -290,6 +291,13 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast> {
             walk_elif_else_clause(self, elif_else_clause);
         }
         self.finish_node(elif_else_clause);
+    }
+
+    fn visit_type_param(&mut self, type_param: &'ast TypeParam) {
+        if self.start_node(type_param).is_traverse() {
+            walk_type_param(self, type_param);
+        }
+        self.finish_node(type_param);
     }
 }
 

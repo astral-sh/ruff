@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, ExceptHandler, Expr, Ranged};
+use rustpython_ast::{self as ast, ExceptHandler, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -58,7 +58,8 @@ pub(crate) fn error_instead_of_exception(checker: &mut Checker, handlers: &[Exce
     for handler in handlers {
         let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, .. }) = handler;
         let calls = {
-            let mut visitor = LoggerCandidateVisitor::new(checker.semantic());
+            let mut visitor =
+                LoggerCandidateVisitor::new(checker.semantic(), &checker.settings.logger_objects);
             visitor.visit_body(body);
             visitor.calls
         };

@@ -1,9 +1,8 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Expr, Keyword, Ranged};
+use rustpython_ast::{self as ast, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::has_comments;
 use ruff_python_semantic::SemanticModel;
 
 use crate::{checkers::ast::Checker, registry::AsRule};
@@ -150,7 +149,7 @@ pub(crate) fn nested_min_max(
     }) {
         let mut diagnostic = Diagnostic::new(NestedMinMax { func: min_max }, expr.range());
         if checker.patch(diagnostic.kind.rule()) {
-            if !has_comments(expr, checker.locator(), checker.indexer()) {
+            if !checker.indexer().has_comments(expr, checker.locator()) {
                 let flattened_expr = Expr::Call(ast::ExprCall {
                     func: Box::new(func.clone()),
                     args: collect_nested_args(min_max, args, checker.semantic()),

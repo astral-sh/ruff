@@ -1,8 +1,8 @@
-use rustpython_parser::ast::{self, Expr, Keyword, Ranged};
+use rustpython_ast::{self as ast, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::is_const_none;
+use ruff_python_ast::helpers::{find_keyword, is_const_none};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
@@ -51,9 +51,7 @@ pub(crate) fn zip_without_explicit_strict(
     if let Expr::Name(ast::ExprName { id, .. }) = func {
         if id == "zip"
             && checker.semantic().is_builtin("zip")
-            && !kwargs
-                .iter()
-                .any(|keyword| keyword.arg.as_ref().map_or(false, |name| name == "strict"))
+            && find_keyword(kwargs, "strict").is_none()
             && !args
                 .iter()
                 .any(|arg| is_infinite_iterator(arg, checker.semantic()))

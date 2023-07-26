@@ -2,11 +2,12 @@ use anyhow::{anyhow, Result};
 use libcst_native::{Arg, Expression};
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustpython_parser::ast::{Expr, Ranged};
+use rustpython_ast::{Expr, Ranged};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python_codegen::Stylist;
+use ruff_source_file::Locator;
 
 use crate::autofix::codemods::CodegenStylist;
 use crate::checkers::ast::Checker;

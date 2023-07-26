@@ -10,8 +10,10 @@ use serde::Serialize;
 use serde_json::error::Category;
 
 use ruff_diagnostics::Diagnostic;
-use ruff_python_trivia::{NewlineWithTrailingNewline, UniversalNewlineIterator};
+use ruff_source_file::{NewlineWithTrailingNewline, UniversalNewlineIterator};
 use ruff_text_size::{TextRange, TextSize};
+use rustpython_parser::lexer::lex;
+use rustpython_parser::Mode;
 
 use crate::autofix::source_map::{SourceMap, SourceMarker};
 use crate::jupyter::index::JupyterIndex;
@@ -158,10 +160,7 @@ impl Notebook {
                                 )
                             })?;
                             // Check if tokenizing was successful and the file is non-empty
-                            if (ruff_rustpython::tokenize(&contents))
-                                .last()
-                                .map_or(true, Result::is_err)
-                            {
+                            if lex(&contents, Mode::Module).any(|result| result.is_err()) {
                                 Diagnostic::new(
                                     SyntaxError {
                                         message: format!(

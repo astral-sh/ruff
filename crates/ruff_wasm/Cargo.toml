@@ -21,8 +21,11 @@ default = ["console_error_panic_hook"]
 ruff = { path = "../ruff" }
 ruff_diagnostics = { path = "../ruff_diagnostics" }
 ruff_python_ast = { path = "../ruff_python_ast" }
+ruff_python_codegen = { path = "../ruff_python_codegen" }
 ruff_python_formatter = { path = "../ruff_python_formatter" }
-ruff_rustpython = { path = "../ruff_rustpython" }
+ruff_python_index = { path = "../ruff_python_index" }
+ruff_python_parser = { path = "../ruff_python_parser" }
+ruff_source_file = { path = "../ruff_source_file" }
 
 console_error_panic_hook = { version = "0.1.7", optional = true }
 console_log = { version = "1.0.0" }

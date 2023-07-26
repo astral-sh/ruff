@@ -1,14 +1,14 @@
 use std::fmt;
 
 use ruff_text_size::{TextLen, TextRange};
-use rustpython_parser::ast::Decorator;
-use rustpython_parser::ast::{self, ArgWithDefault, Arguments, Expr, Ranged, Stmt};
+use rustpython_ast::Decorator;
+use rustpython_ast::{self as ast, ArgWithDefault, Arguments, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
-use ruff_python_ast::helpers::includes_arg_name;
+use ruff_python_ast::helpers::{find_keyword, includes_arg_name};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
@@ -23,6 +23,37 @@ use super::helpers::{
     get_mark_decorators, is_pytest_fixture, is_pytest_yield_fixture, keyword_is_literal,
 };
 
+/// ## What it does
+/// Checks for parameter-free `@pytest.fixture()` decorators with or without
+/// parentheses, depending on the `flake8-pytest-style.fixture-parentheses`
+/// setting.
+///
+/// ## Why is this bad?
+/// If a `@pytext.fixture()` doesn't take any arguments, the parentheses are
+/// optional.
+///
+/// Either removing those unnecessary parentheses _or_ requiring them for all
+/// fixtures is fine, but it's best to be consistent.
+///
+/// ## Example
+/// ```python
+/// @pytest.fixture
+/// def my_fixture():
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// @pytest.fixture()
+/// def my_fixture():
+///     ...
+/// ```
+///
+/// ## Options
+/// - `flake8-pytest-style.fixture-parentheses`
+///
+/// ## References
+/// - [API Reference: Fixtures](https://docs.pytest.org/en/latest/reference/reference.html#fixtures-api)
 #[violation]
 pub struct PytestFixtureIncorrectParenthesesStyle {
     expected: Parentheses,
@@ -114,6 +145,38 @@ impl Violation for PytestFixtureParamWithoutValue {
     }
 }
 
+/// ## What it does
+/// Checks for `pytest.yield_fixture` usage.
+///
+/// ## Why is this bad?
+/// `pytest.yield_fixture` is deprecated. `pytest.fixture` should be used instead.
+///
+/// ## Example
+/// ```python
+/// import pytest
+///
+///
+/// @pytest.yield_fixture()
+/// def my_fixture():
+///     obj = SomeClass()
+///     yield obj
+///     obj.cleanup()
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import pytest
+///
+///
+/// @pytest.fixture()
+/// def my_fixture():
+///     obj = SomeClass()
+///     yield obj
+///     obj.cleanup()
+/// ```
+///
+/// ## References
+/// - [`yield_fixture` functions](https://docs.pytest.org/en/latest/yieldfixture.html)
 #[violation]
 pub struct PytestDeprecatedYieldFixture;
 
@@ -165,6 +228,29 @@ impl AlwaysAutofixableViolation for PytestErroneousUseFixturesOnFixture {
     }
 }
 
+/// ## What it does
+/// Checks for unnecessary `@pytest.mark.asyncio` decorators applied to fixtures.
+///
+/// ## Why is this bad?
+/// `pytest.mark.asyncio` is unnecessary for fixtures.
+///
+/// ## Example
+/// ```python
+/// @pytest.mark.asyncio()
+/// @pytest.fixture()
+/// async def my_fixture():
+///     return 0
+/// ```
+///
+/// Use instead:
+/// ```python
+/// @pytest.fixture()
+/// async def my_fixture():
+///     return 0
+/// ```
+///
+/// ## References
+/// - [`pytest-asyncio`](https://pypi.org/project/pytest-asyncio/)
 #[violation]
 pub struct PytestUnnecessaryAsyncioMarkOnFixture;
 
@@ -306,11 +392,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &D
             }
 
             if checker.enabled(Rule::PytestExtraneousScopeFunction) {
-                let scope_keyword = keywords
-                    .iter()
-                    .find(|kw| kw.arg.as_ref().map_or(false, |arg| arg == "scope"));
-
-                if let Some(scope_keyword) = scope_keyword {
+                if let Some(scope_keyword) = find_keyword(keywords, "scope") {
                     if keyword_is_literal(scope_keyword, "function") {
                         let mut diagnostic =
                             Diagnostic::new(PytestExtraneousScopeFunction, scope_keyword.range());

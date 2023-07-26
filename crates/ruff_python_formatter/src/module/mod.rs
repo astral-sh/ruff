@@ -1,7 +1,7 @@
 use crate::context::PyFormatContext;
 use crate::{AsFormat, IntoFormat, PyFormatter};
 use ruff_formatter::{Format, FormatOwnedWithRule, FormatRefWithRule, FormatResult, FormatRule};
-use rustpython_parser::ast::Mod;
+use rustpython_ast::Mod;
 
 pub(crate) mod mod_expression;
 pub(crate) mod mod_function_type;

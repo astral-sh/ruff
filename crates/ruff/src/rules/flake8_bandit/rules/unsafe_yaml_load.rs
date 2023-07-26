@@ -1,8 +1,8 @@
-use rustpython_parser::ast::{self, Expr, Keyword, Ranged};
+use rustpython_ast::{self as ast, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::SimpleCallArgs;
+use ruff_python_ast::helpers::CallArguments;
 
 use crate::checkers::ast::Checker;
 
@@ -73,7 +73,7 @@ pub(crate) fn unsafe_yaml_load(
             matches!(call_path.as_slice(), ["yaml", "load"])
         })
     {
-        let call_args = SimpleCallArgs::new(args, keywords);
+        let call_args = CallArguments::new(args, keywords);
         if let Some(loader_arg) = call_args.argument("Loader", 1) {
             if !checker
                 .semantic()

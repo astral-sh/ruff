@@ -6,7 +6,7 @@ use crate::AsFormat;
 use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::{format_args, write, Buffer, FormatResult, FormatRuleWithOptions};
 use ruff_python_ast::node::AnyNodeRef;
-use rustpython_parser::ast::ExprGeneratorExp;
+use rustpython_ast::ExprGeneratorExp;
 
 #[derive(Eq, PartialEq, Debug, Default)]
 pub enum GeneratorExpParentheses {

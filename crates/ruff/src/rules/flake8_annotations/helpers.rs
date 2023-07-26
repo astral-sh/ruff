@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Arguments, Expr, Stmt};
+use rustpython_ast::{self as ast, Arguments, Expr, Stmt};
 
 use ruff_python_ast::cast;
 use ruff_python_semantic::analyze::visibility;
@@ -30,7 +30,7 @@ pub(super) fn match_function_def(
             body,
             decorator_list,
         ),
-        _ => panic!("Found non-FunctionDef in match_name"),
+        _ => panic!("Found non-FunctionDef in match_function_def"),
     }
 }
 

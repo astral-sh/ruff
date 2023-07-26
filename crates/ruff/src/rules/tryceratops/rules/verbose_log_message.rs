@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, ExceptHandler, Expr, Ranged};
+use rustpython_ast::{self as ast, ExceptHandler, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -67,7 +67,8 @@ pub(crate) fn verbose_log_message(checker: &mut Checker, handlers: &[ExceptHandl
 
         // Find all calls to `logging.exception`.
         let calls = {
-            let mut visitor = LoggerCandidateVisitor::new(checker.semantic());
+            let mut visitor =
+                LoggerCandidateVisitor::new(checker.semantic(), &checker.settings.logger_objects);
             visitor.visit_body(body);
             visitor.calls
         };

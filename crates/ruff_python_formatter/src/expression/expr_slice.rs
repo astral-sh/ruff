@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{Expr, ExprSlice, ExprUnaryOp, Ranged, UnaryOp};
+use rustpython_ast::{Expr, ExprSlice, ExprUnaryOp, Ranged, UnaryOp};
 
 use ruff_formatter::prelude::{hard_line_break, line_suffix_boundary, space, text};
 use ruff_formatter::{write, Buffer, Format, FormatError, FormatResult};
@@ -132,14 +132,12 @@ impl FormatNodeRule<ExprSlice> for FormatExprSlice {
                 let step_leading_comments = comments.leading_comments(step.as_ref());
                 leading_comments_spacing(f, step_leading_comments)?;
                 step.format().fmt(f)?;
-            } else {
-                if !dangling_step_comments.is_empty() {
-                    // Put the colon and comments on their own lines
-                    write!(
-                        f,
-                        [hard_line_break(), dangling_comments(dangling_step_comments)]
-                    )?;
-                }
+            } else if !dangling_step_comments.is_empty() {
+                // Put the colon and comments on their own lines
+                write!(
+                    f,
+                    [hard_line_break(), dangling_comments(dangling_step_comments)]
+                )?;
             }
         } else {
             debug_assert!(step.is_none(), "step can't exist without a second colon");

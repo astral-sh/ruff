@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, ArgWithDefault, Constant, Expr, Ranged, Stmt};
+use rustpython_ast::{self as ast, ArgWithDefault, Constant, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -6,7 +6,7 @@ use ruff_python_ast::cast;
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::statement_visitor::StatementVisitor;
-use ruff_python_ast::typing::parse_type_annotation;
+use ruff_python_parser::typing::parse_type_annotation;
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{Definition, Member, MemberKind};
 use ruff_python_stdlib::typing::simple_magic_return_type;
@@ -376,7 +376,7 @@ impl Violation for MissingReturnTypeClassMethod {
 }
 
 /// ## What it does
-/// Checks that an expression is annotated with a more specific type than
+/// Checks that function arguments are annotated with a more specific type than
 /// `Any`.
 ///
 /// ## Why is this bad?
@@ -399,9 +399,23 @@ impl Violation for MissingReturnTypeClassMethod {
 ///     ...
 /// ```
 ///
+/// ## Known problems
+///
+/// Type aliases are unsupported and can lead to false positives.
+/// For example, the following will trigger this rule inadvertently:
+/// ```python
+/// from typing import Any
+///
+/// MyAny = Any
+///
+///
+/// def foo(x: MyAny):
+///     ...
+/// ```
+///
 /// ## References
 /// - [PEP 484](https://www.python.org/dev/peps/pep-0484/#the-any-type)
-/// - [`typing.Any`](https://docs.python.org/3/library/typing.html#typing.Any)
+/// - [Python documentation: `typing.Any`](https://docs.python.org/3/library/typing.html#typing.Any)
 /// - [Mypy: The Any type](https://mypy.readthedocs.io/en/stable/kinds_of_types.html#the-any-type)
 #[violation]
 pub struct AnyType {
@@ -448,7 +462,8 @@ fn check_dynamically_typed<F>(
     }) = annotation
     {
         // Quoted annotations
-        if let Ok((parsed_annotation, _)) = parse_type_annotation(string, *range, checker.locator())
+        if let Ok((parsed_annotation, _)) =
+            parse_type_annotation(string, *range, checker.locator().contents())
         {
             if type_hint_resolves_to_any(
                 &parsed_annotation,

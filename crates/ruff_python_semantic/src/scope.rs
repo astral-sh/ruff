@@ -1,8 +1,6 @@
-use bitflags::bitflags;
-use nohash_hasher::{BuildNoHashHasher, IntMap};
-use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 
+use bitflags::bitflags;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast;
 
@@ -37,7 +35,7 @@ pub struct Scope<'a> {
     /// ```
     ///
     /// In this case, the binding created by `x = 2` shadows the binding created by `x = 1`.
-    shadowed_bindings: HashMap<BindingId, BindingId, BuildNoHashHasher<BindingId>>,
+    shadowed_bindings: FxHashMap<BindingId, BindingId>,
 
     /// Index into the globals arena, if the scope contains any globally-declared symbols.
     globals_id: Option<GlobalsId>,
@@ -53,7 +51,7 @@ impl<'a> Scope<'a> {
             parent: None,
             star_imports: Vec::default(),
             bindings: FxHashMap::default(),
-            shadowed_bindings: IntMap::default(),
+            shadowed_bindings: FxHashMap::default(),
             globals_id: None,
             flags: ScopeFlags::empty(),
         }
@@ -65,7 +63,7 @@ impl<'a> Scope<'a> {
             parent: Some(parent),
             star_imports: Vec::default(),
             bindings: FxHashMap::default(),
-            shadowed_bindings: IntMap::default(),
+            shadowed_bindings: FxHashMap::default(),
             globals_id: None,
             flags: ScopeFlags::empty(),
         }
@@ -163,7 +161,7 @@ impl<'a> Scope<'a> {
 
     /// Returns `true` if this scope uses locals (e.g., `locals()`).
     pub const fn uses_locals(&self) -> bool {
-        self.flags.contains(ScopeFlags::USES_LOCALS)
+        self.flags.intersects(ScopeFlags::USES_LOCALS)
     }
 }
 

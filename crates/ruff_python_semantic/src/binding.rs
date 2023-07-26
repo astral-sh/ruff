@@ -2,10 +2,10 @@ use std::ops::{Deref, DerefMut};
 
 use bitflags::bitflags;
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::Ranged;
+use rustpython_ast::Ranged;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
-use ruff_python_ast::source_code::Locator;
+use ruff_source_file::Locator;
 
 use crate::context::ExecutionContext;
 use crate::model::SemanticModel;
@@ -45,44 +45,44 @@ impl<'a> Binding<'a> {
     /// Return `true` if this [`Binding`] represents an explicit re-export
     /// (e.g., `FastAPI` in `from fastapi import FastAPI as FastAPI`).
     pub const fn is_explicit_export(&self) -> bool {
-        self.flags.contains(BindingFlags::EXPLICIT_EXPORT)
+        self.flags.intersects(BindingFlags::EXPLICIT_EXPORT)
     }
 
     /// Return `true` if this [`Binding`] represents an external symbol
     /// (e.g., `FastAPI` in `from fastapi import FastAPI`).
     pub const fn is_external(&self) -> bool {
-        self.flags.contains(BindingFlags::EXTERNAL)
+        self.flags.intersects(BindingFlags::EXTERNAL)
     }
 
     /// Return `true` if this [`Binding`] represents an aliased symbol
     /// (e.g., `app` in `from fastapi import FastAPI as app`).
     pub const fn is_alias(&self) -> bool {
-        self.flags.contains(BindingFlags::ALIAS)
+        self.flags.intersects(BindingFlags::ALIAS)
     }
 
     /// Return `true` if this [`Binding`] represents a `nonlocal`. A [`Binding`] is a `nonlocal`
     /// if it's declared by a `nonlocal` statement, or shadows a [`Binding`] declared by a
     /// `nonlocal` statement.
     pub const fn is_nonlocal(&self) -> bool {
-        self.flags.contains(BindingFlags::NONLOCAL)
+        self.flags.intersects(BindingFlags::NONLOCAL)
     }
 
     /// Return `true` if this [`Binding`] represents a `global`. A [`Binding`] is a `global` if it's
     /// declared by a `global` statement, or shadows a [`Binding`] declared by a `global` statement.
     pub const fn is_global(&self) -> bool {
-        self.flags.contains(BindingFlags::GLOBAL)
+        self.flags.intersects(BindingFlags::GLOBAL)
     }
 
     /// Return `true` if this [`Binding`] represents an assignment to `__all__` with an invalid
     /// value (e.g., `__all__ = "Foo"`).
     pub const fn is_invalid_all_format(&self) -> bool {
-        self.flags.contains(BindingFlags::INVALID_ALL_FORMAT)
+        self.flags.intersects(BindingFlags::INVALID_ALL_FORMAT)
     }
 
     /// Return `true` if this [`Binding`] represents an assignment to `__all__` that includes an
     /// invalid member (e.g., `__all__ = ["Foo", 1]`).
     pub const fn is_invalid_all_object(&self) -> bool {
-        self.flags.contains(BindingFlags::INVALID_ALL_OBJECT)
+        self.flags.intersects(BindingFlags::INVALID_ALL_OBJECT)
     }
 
     /// Return `true` if this [`Binding`] represents an unbound variable
@@ -97,7 +97,7 @@ impl<'a> Binding<'a> {
     /// Return `true` if this [`Binding`] represents an private variable
     /// (e.g., `_x` in `_x = "private variable"`)
     pub const fn is_private_variable(&self) -> bool {
-        self.flags.contains(BindingFlags::PRIVATE_VARIABLE)
+        self.flags.contains(BindingFlags::PRIVATE_DECLARATION)
     }
 
     /// Return `true` if this binding redefines the given binding.
@@ -271,13 +271,13 @@ bitflags! {
         /// ```
         const INVALID_ALL_OBJECT = 1 << 6;
 
-        /// The binding represents a private variable declaration.
+        /// The binding represents a private declaration.
         ///
         /// For example, the binding could be `_T` in:
         /// ```python
         /// _T = "This is a private variable"
         /// ```
-        const PRIVATE_VARIABLE = 1 << 7;
+        const PRIVATE_DECLARATION = 1 << 7;
     }
 }
 
@@ -288,8 +288,6 @@ bitflags! {
 /// bindings because bindings must be separated by whitespace (and have an assignment).
 #[newtype_index]
 pub struct BindingId;
-
-impl nohash_hasher::IsEnabled for BindingId {}
 
 /// The bindings in a program.
 ///

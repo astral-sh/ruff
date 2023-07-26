@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 
+use rustpython_ast::{Expr, Operator};
 use rustpython_parser::ast;
-use rustpython_parser::ast::{Expr, Operator};
 
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions};
 use ruff_python_ast::node::AnyNodeRef;
@@ -9,7 +9,6 @@ use ruff_python_ast::visitor::preorder::{walk_expr, PreorderVisitor};
 
 use crate::builders::parenthesize_if_expands;
 use crate::context::NodeLevel;
-use crate::expression::expr_tuple::TupleParentheses;
 use crate::expression::parentheses::{
     is_expression_parenthesized, optional_parentheses, parenthesized, NeedsParentheses,
     OptionalParentheses, Parentheses, Parenthesize,
@@ -43,6 +42,7 @@ pub(crate) mod expr_tuple;
 pub(crate) mod expr_unary_op;
 pub(crate) mod expr_yield;
 pub(crate) mod expr_yield_from;
+pub(crate) mod number;
 pub(crate) mod parentheses;
 pub(crate) mod string;
 
@@ -90,11 +90,9 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             Expr::Starred(expr) => expr.format().fmt(f),
             Expr::Name(expr) => expr.format().fmt(f),
             Expr::List(expr) => expr.format().fmt(f),
-            Expr::Tuple(expr) => expr
-                .format()
-                .with_options(TupleParentheses::Expr(parentheses))
-                .fmt(f),
+            Expr::Tuple(expr) => expr.format().fmt(f),
             Expr::Slice(expr) => expr.format().fmt(f),
+            Expr::LineMagic(_) => todo!(),
         });
 
         let parenthesize = match parentheses {
@@ -236,6 +234,7 @@ impl NeedsParentheses for Expr {
             Expr::List(expr) => expr.needs_parentheses(parent, context),
             Expr::Tuple(expr) => expr.needs_parentheses(parent, context),
             Expr::Slice(expr) => expr.needs_parentheses(parent, context),
+            Expr::LineMagic(_) => todo!(),
         }
     }
 }
@@ -408,6 +407,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             | Expr::Starred(_)
             | Expr::Name(_)
             | Expr::Slice(_) => {}
+            Expr::LineMagic(_) => todo!(),
         };
 
         walk_expr(self, expr);

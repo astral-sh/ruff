@@ -1,6 +1,6 @@
 use std::fmt;
 
-use rustpython_parser::ast::{self, Ranged};
+use rustpython_ast::{self as ast, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};

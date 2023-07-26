@@ -1,9 +1,10 @@
+use memchr::memchr_iter;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::str::{leading_quote, trailing_quote};
+use ruff_source_file::Locator;
 
 /// ## What it does
 /// Checks for invalid escape sequences.
@@ -60,29 +61,26 @@ pub(crate) fn invalid_escape_sequence(
         return;
     }
 
-    let start_offset = range.start() + TextSize::try_from(leading_quote.len()).unwrap();
-
-    let mut chars_iter = body.char_indices().peekable();
-
     let mut contains_valid_escape_sequence = false;
-
     let mut invalid_escape_sequence = Vec::new();
-    while let Some((i, c)) = chars_iter.next() {
-        if c != '\\' {
-            continue;
-        }
 
+    let mut prev = None;
+    let bytes = body.as_bytes();
+    for i in memchr_iter(b'\\', bytes) {
         // If the previous character was also a backslash, skip.
-        if i > 0 && body.as_bytes()[i - 1] == b'\\' {
+        if prev.map_or(false, |prev| prev == i - 1) {
+            prev = None;
             continue;
         }
 
-        // If we're at the end of the file, skip.
-        let Some((_, next_char)) = chars_iter.peek() else {
+        prev = Some(i);
+
+        let Some(next_char) = body[i + 1..].chars().next() else {
+            // If we're at the end of the file, skip.
             continue;
         };
 
-        // If we're at the end of the line, skip
+        // If we're at the end of line, skip.
         if matches!(next_char, '\n' | '\r') {
             continue;
         }
@@ -120,9 +118,9 @@ pub(crate) fn invalid_escape_sequence(
             continue;
         }
 
-        let location = start_offset + TextSize::try_from(i).unwrap();
+        let location = range.start() + leading_quote.text_len() + TextSize::try_from(i).unwrap();
         let range = TextRange::at(location, next_char.text_len() + TextSize::from(1));
-        invalid_escape_sequence.push(Diagnostic::new(InvalidEscapeSequence(*next_char), range));
+        invalid_escape_sequence.push(Diagnostic::new(InvalidEscapeSequence(next_char), range));
     }
 
     if autofix {

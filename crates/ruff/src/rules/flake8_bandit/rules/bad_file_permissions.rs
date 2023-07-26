@@ -1,10 +1,10 @@
 use num_traits::ToPrimitive;
-use rustpython_parser::ast::{self, Constant, Expr, Keyword, Operator, Ranged};
+use rustpython_ast::{self as ast, Constant, Expr, Keyword, Operator, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::CallPath;
-use ruff_python_ast::helpers::SimpleCallArgs;
+use ruff_python_ast::helpers::CallArguments;
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
@@ -61,7 +61,7 @@ pub(crate) fn bad_file_permissions(
             matches!(call_path.as_slice(), ["os", "chmod"])
         })
     {
-        let call_args = SimpleCallArgs::new(args, keywords);
+        let call_args = CallArguments::new(args, keywords);
         if let Some(mode_arg) = call_args.argument("mode", 1) {
             if let Some(int_value) = int_value(mode_arg, checker.semantic()) {
                 if (int_value & WRITE_WORLD > 0) || (int_value & EXECUTE_GROUP > 0) {

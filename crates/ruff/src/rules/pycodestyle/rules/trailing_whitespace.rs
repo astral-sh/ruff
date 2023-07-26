@@ -2,9 +2,8 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers;
-use ruff_python_ast::source_code::{Indexer, Locator};
-use ruff_python_trivia::Line;
+use ruff_python_index::Indexer;
+use ruff_source_file::{Line, Locator};
 
 use crate::registry::Rule;
 use crate::settings::Settings;
@@ -96,7 +95,8 @@ pub(crate) fn trailing_whitespace(
                     // Remove any preceding continuations, to avoid introducing a potential
                     // syntax error.
                     diagnostic.set_fix(Fix::automatic(Edit::range_deletion(TextRange::new(
-                        helpers::preceded_by_continuations(line.start(), locator, indexer)
+                        indexer
+                            .preceded_by_continuations(line.start(), locator)
                             .unwrap_or(range.start()),
                         range.end(),
                     ))));

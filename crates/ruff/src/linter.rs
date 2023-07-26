@@ -12,8 +12,10 @@ use rustpython_parser::ParseError;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::imports::ImportMap;
-use ruff_python_ast::source_code::{Indexer, Locator, SourceFileBuilder, Stylist};
+use ruff_python_codegen::Stylist;
+use ruff_python_index::Indexer;
 use ruff_python_stdlib::path::is_python_stub_file;
+use ruff_source_file::{Locator, SourceFileBuilder};
 
 use crate::autofix::{fix_file, FixResult};
 use crate::checkers::ast::check_ast;
@@ -100,7 +102,9 @@ pub fn check_path(
         .any(|rule_code| rule_code.lint_source().is_tokens())
     {
         let is_stub = is_python_stub_file(path);
-        diagnostics.extend(check_tokens(locator, indexer, &tokens, settings, is_stub));
+        diagnostics.extend(check_tokens(
+            &tokens, path, locator, indexer, settings, is_stub,
+        ));
     }
 
     // Run the filesystem-based rules.
@@ -134,7 +138,7 @@ pub fn check_path(
             .iter_enabled()
             .any(|rule_code| rule_code.lint_source().is_imports());
     if use_ast || use_imports || use_doc_lines {
-        match ruff_rustpython::parse_program_tokens(tokens, &path.to_string_lossy()) {
+        match ruff_python_parser::parse_program_tokens(tokens, &path.to_string_lossy()) {
             Ok(python_ast) => {
                 if use_ast {
                     diagnostics.extend(check_ast(
@@ -193,7 +197,7 @@ pub fn check_path(
         .any(|rule_code| rule_code.lint_source().is_physical_lines())
     {
         diagnostics.extend(check_physical_lines(
-            path, locator, stylist, indexer, &doc_lines, settings,
+            locator, stylist, indexer, &doc_lines, settings,
         ));
     }
 
@@ -256,7 +260,7 @@ pub fn add_noqa_to_path(path: &Path, package: Option<&Path>, settings: &Settings
     let contents = std::fs::read_to_string(path)?;
 
     // Tokenize once.
-    let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&contents);
+    let tokens: Vec<LexResult> = ruff_python_parser::tokenize(&contents);
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(&contents);
@@ -324,7 +328,7 @@ pub fn lint_only(
     source_kind: Option<&SourceKind>,
 ) -> LinterResult<(Vec<Message>, Option<ImportMap>)> {
     // Tokenize once.
-    let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents);
+    let tokens: Vec<LexResult> = ruff_python_parser::tokenize(contents);
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(contents);
@@ -416,7 +420,7 @@ pub fn lint_fix<'a>(
     // Continuously autofix until the source code stabilizes.
     loop {
         // Tokenize once.
-        let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&transformed);
+        let tokens: Vec<LexResult> = ruff_python_parser::tokenize(&transformed);
 
         // Map row and column locations to byte slices (lazily).
         let locator = Locator::new(&transformed);

@@ -1,6 +1,7 @@
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::Ranged;
+use rustpython_ast::Ranged;
 
+use crate::comments::{dangling_comments, SourceComment};
 use ruff_formatter::{format_args, write, Argument, Arguments};
 use ruff_python_trivia::{
     lines_after, skip_trailing_trivia, SimpleToken, SimpleTokenKind, SimpleTokenizer,
@@ -323,9 +324,60 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
     }
 }
 
+/// Format comments inside empty parentheses, brackets or curly braces.
+///
+/// Empty `()`, `[]` and `{}` are special because there can be dangling comments, and they can be in
+/// two positions:
+/// ```python
+/// x = [  # end-of-line
+///     # own line
+/// ]
+/// ```
+/// These comments are dangling because they can't be assigned to any element inside as they would
+/// in all other cases.
+pub(crate) fn empty_parenthesized_with_dangling_comments(
+    opening: StaticText,
+    comments: &[SourceComment],
+    closing: StaticText,
+) -> EmptyWithDanglingComments {
+    EmptyWithDanglingComments {
+        opening,
+        comments,
+        closing,
+    }
+}
+
+pub(crate) struct EmptyWithDanglingComments<'a> {
+    opening: StaticText,
+    comments: &'a [SourceComment],
+    closing: StaticText,
+}
+
+impl<'ast> Format<PyFormatContext<'ast>> for EmptyWithDanglingComments<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext>) -> FormatResult<()> {
+        let end_of_line_split = self
+            .comments
+            .partition_point(|comment| comment.line_position().is_end_of_line());
+        debug_assert!(self.comments[end_of_line_split..]
+            .iter()
+            .all(|comment| comment.line_position().is_own_line()));
+        write!(
+            f,
+            [group(&format_args![
+                self.opening,
+                // end-of-line comments
+                dangling_comments(&self.comments[..end_of_line_split]),
+                // own line comments, which need to be indented
+                soft_block_indent(&dangling_comments(&self.comments[end_of_line_split..])),
+                self.closing
+            ])]
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use rustpython_parser::ast::ModModule;
+    use rustpython_ast::ModModule;
     use rustpython_parser::Parse;
 
     use ruff_formatter::format;

@@ -13,7 +13,9 @@ license = { workspace = true }
 [dependencies]
 ruff_formatter = { path = "../ruff_formatter" }
 ruff_python_trivia = { path = "../ruff_python_trivia" }
+ruff_source_file = { path = "../ruff_source_file" }
 ruff_python_ast = { path = "../ruff_python_ast" }
+ruff_python_index = { path = "../ruff_python_index" }
 ruff_text_size = { workspace = true }
 
 anyhow = { workspace = true }
@@ -24,6 +26,7 @@ is-macro = { workspace = true }
 itertools = { workspace = true }
 once_cell = { workspace = true }
 rustc-hash = { workspace = true }
+rustpython-ast = { workspace = true }
 rustpython-parser = { workspace = true }
 serde = { workspace = true, optional = true }
 smallvec = { workspace = true }
@@ -44,5 +47,5 @@ test = true
 required-features = [ "serde" ]
 
 [features]
-serde = ["dep:serde", "ruff_formatter/serde"]
+serde = ["dep:serde", "ruff_formatter/serde", "ruff_source_file/serde"]
 default = ["serde"]

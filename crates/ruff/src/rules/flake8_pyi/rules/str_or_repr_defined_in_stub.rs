@@ -1,5 +1,5 @@
+use rustpython_ast::Stmt;
 use rustpython_parser::ast;
-use rustpython_parser::ast::Stmt;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};

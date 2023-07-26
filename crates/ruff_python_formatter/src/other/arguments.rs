@@ -1,7 +1,7 @@
 use std::usize;
 
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{Arguments, Ranged};
+use rustpython_ast::{Arguments, Ranged};
 
 use ruff_formatter::{format_args, write, FormatRuleWithOptions};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
@@ -18,11 +18,22 @@ use crate::FormatNodeRule;
 
 #[derive(Eq, PartialEq, Debug, Default)]
 pub enum ArgumentsParentheses {
+    /// By default, arguments will always preserve their surrounding parentheses.
     #[default]
-    Default,
+    Preserve,
 
-    /// Arguments should never be inside parentheses for lambda expressions.
-    SkipInsideLambda,
+    /// Handle special cases where parentheses should never be used.
+    ///
+    /// An example where parentheses are never used for arguments would be with lambda
+    /// expressions. The following is invalid syntax:
+    /// ```python
+    /// lambda (x, y, z): ...
+    /// ```
+    /// Instead the lambda here should be:
+    /// ```python
+    /// lambda x, y, z: ...
+    /// ```
+    Never,
 }
 
 #[derive(Default)]
@@ -190,7 +201,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
             + kwonlyargs.len()
             + usize::from(kwarg.is_some());
 
-        if self.parentheses == ArgumentsParentheses::SkipInsideLambda {
+        if self.parentheses == ArgumentsParentheses::Never {
             group(&format_inner).fmt(f)?;
         } else if num_arguments == 0 {
             // No arguments, format any dangling comments between `()`

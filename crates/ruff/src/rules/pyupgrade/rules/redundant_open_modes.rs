@@ -2,14 +2,14 @@ use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
 use ruff_text_size::TextSize;
-use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
+use rustpython_ast::{self as ast, Constant, Expr, Keyword, Ranged};
 use rustpython_parser::{lexer, Mode};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::find_keyword;
-use ruff_python_ast::source_code::Locator;
 use ruff_python_semantic::SemanticModel;
+use ruff_source_file::Locator;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;

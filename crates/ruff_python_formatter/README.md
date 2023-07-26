@@ -231,6 +231,13 @@ additional test cases in `resources/test/fixtures/ruff`.
 
 The full Ruff test suite is slow, `cargo test -p ruff_python_formatter` is a lot faster.
 
+You can check the black compatibility on a number of projects using `scripts/formatter_progress`.
+It will print the similarity index, the percentage of lines that remains unchanged between black's
+formatting and our formatting. You could compute it as the number of neutral lines in a diff divided
+by the neutral plus the removed lines. It also checks for common problems such unstable formatting,
+internal formatter errors and printing invalid syntax. We run this script in CI and you can view the
+results in a PR page under "Checks" > "CI" > "Summary" at the bottom of the page.
+
 There is a `ruff_python_formatter` binary that avoid building and linking the main `ruff` crate.
 
 You can use `scratch.py` as a playground, e.g.
@@ -239,7 +246,7 @@ and `--print-comments` options.
 
 The origin of Ruff's formatter is the [Rome formatter](https://github.com/rome/tools/tree/main/crates/rome_json_formatter),
 e.g. the ruff_formatter crate is forked from the [rome_formatter crate](https://github.com/rome/tools/tree/main/crates/rome_formatter).
-The Rome repository can be a helpful reference when implementing something in the Ruff formatter
+The Rome repository can be a helpful reference when implementing something in the Ruff formatter.
 
 ### Checking entire projects
 

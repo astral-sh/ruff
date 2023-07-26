@@ -2,14 +2,16 @@
 use std::borrow::Cow;
 use std::path::Path;
 
-use rustpython_parser::ast::{self, Ranged, Stmt, Suite};
+use rustpython_ast::{self as ast, Ranged, Stmt, Suite};
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::helpers::to_module_path;
 use ruff_python_ast::imports::{ImportMap, ModuleImport};
-use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 use ruff_python_ast::statement_visitor::StatementVisitor;
+use ruff_python_codegen::Stylist;
+use ruff_python_index::Indexer;
 use ruff_python_stdlib::path::is_python_stub_file;
+use ruff_source_file::Locator;
 
 use crate::directives::IsortDirectives;
 use crate::registry::Rule;

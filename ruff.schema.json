@@ -386,6 +386,16 @@
         }
       ]
     },
+    "logger-objects": {
+      "description": "A list of objects that should be treated equivalently to a `logging.Logger` object.\n\nThis is useful for ensuring proper diagnostics (e.g., to identify `logging` deprecations and other best-practices) for projects that re-export a `logging.Logger` object from a common module.\n\nFor example, if you have a module `logging_setup.py` with the following contents: ```python import logging\n\nlogger = logging.getLogger(__name__) ```\n\nAdding `\"logging_setup.logger\"` to `logger-objects` will ensure that `logging_setup.logger` is treated as a `logging.Logger` object when imported from other modules (e.g., `from logging_setup import logger`).",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
     "mccabe": {
       "description": "Options for the `mccabe` plugin.",
       "anyOf": [
@@ -571,7 +581,7 @@
       }
     },
     "typing-modules": {
-      "description": "A list of modules whose imports should be treated equivalently to members of the `typing` module.\n\nThis is useful for ensuring proper type annotation inference for projects that re-export `typing` and `typing_extensions` members from a compatibility module. If omitted, any members imported from modules apart from `typing` and `typing_extensions` will be treated as ordinary Python objects.",
+      "description": "A list of modules whose exports should be treated equivalently to members of the `typing` module.\n\nThis is useful for ensuring proper type annotation inference for projects that re-export `typing` and `typing_extensions` members from a compatibility module. If omitted, any members imported from modules apart from `typing` and `typing_extensions` will be treated as ordinary Python objects.",
       "type": [
         "array",
         "null"
@@ -2241,6 +2251,7 @@
         "PLW01",
         "PLW012",
         "PLW0120",
+        "PLW0127",
         "PLW0129",
         "PLW013",
         "PLW0131",
@@ -2258,6 +2269,7 @@
         "PLW15",
         "PLW150",
         "PLW1508",
+        "PLW1509",
         "PLW2",
         "PLW29",
         "PLW290",
@@ -2333,6 +2345,7 @@
         "PTH203",
         "PTH204",
         "PTH205",
+        "PTH206",
         "PYI",
         "PYI0",
         "PYI00",

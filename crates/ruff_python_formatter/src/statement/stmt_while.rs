@@ -5,7 +5,7 @@ use crate::prelude::*;
 use crate::FormatNodeRule;
 use ruff_formatter::write;
 use ruff_python_ast::node::AstNode;
-use rustpython_parser::ast::{Ranged, Stmt, StmtWhile};
+use rustpython_ast::{Ranged, Stmt, StmtWhile};
 
 #[derive(Default)]
 pub struct FormatStmtWhile;

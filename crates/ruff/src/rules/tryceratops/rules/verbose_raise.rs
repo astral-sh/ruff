@@ -1,10 +1,11 @@
-use rustpython_parser::ast::{self, ExceptHandler, Expr, Ranged, Stmt};
+use rustpython_ast::{self as ast, ExceptHandler, Expr, Ranged, Stmt};
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 
 use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for needless exception names in `raise` statements.
@@ -33,16 +34,20 @@ use crate::checkers::ast::Checker;
 #[violation]
 pub struct VerboseRaise;
 
-impl Violation for VerboseRaise {
+impl AlwaysAutofixableViolation for VerboseRaise {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use `raise` without specifying exception name")
+    }
+
+    fn autofix_title(&self) -> String {
+        format!("Remove exception name")
     }
 }
 
 #[derive(Default)]
 struct RaiseStatementVisitor<'a> {
-    raises: Vec<(Option<&'a Expr>, Option<&'a Expr>)>,
+    raises: Vec<&'a ast::StmtRaise>,
 }
 
 impl<'a, 'b> StatementVisitor<'b> for RaiseStatementVisitor<'a>
@@ -51,12 +56,8 @@ where
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         match stmt {
-            Stmt::Raise(ast::StmtRaise {
-                exc,
-                cause,
-                range: _,
-            }) => {
-                self.raises.push((exc.as_deref(), cause.as_deref()));
+            Stmt::Raise(raise @ ast::StmtRaise { .. }) => {
+                self.raises.push(raise);
             }
             Stmt::Try(ast::StmtTry {
                 body, finalbody, ..
@@ -88,17 +89,22 @@ pub(crate) fn verbose_raise(checker: &mut Checker, handlers: &[ExceptHandler]) {
                 visitor.visit_body(body);
                 visitor.raises
             };
-            for (exc, cause) in raises {
-                if cause.is_some() {
+            for raise in raises {
+                if raise.cause.is_some() {
                     continue;
                 }
-                if let Some(exc) = exc {
+                if let Some(exc) = raise.exc.as_ref() {
                     // ...and the raised object is bound to the same name...
-                    if let Expr::Name(ast::ExprName { id, .. }) = exc {
+                    if let Expr::Name(ast::ExprName { id, .. }) = exc.as_ref() {
                         if id == exception_name.as_str() {
-                            checker
-                                .diagnostics
-                                .push(Diagnostic::new(VerboseRaise, exc.range()));
+                            let mut diagnostic = Diagnostic::new(VerboseRaise, exc.range());
+                            if checker.patch(diagnostic.kind.rule()) {
+                                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                                    "raise".to_string(),
+                                    raise.range(),
+                                )));
+                            }
+                            checker.diagnostics.push(diagnostic);
                         }
                     }
                 }
