@@ -312,7 +312,7 @@ mod tests {
     fn start_of_file() -> Result<()> {
         fn insert(contents: &str) -> Result<Insertion> {
             let program = parse_suite(contents, "<filename>")?;
-            let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents, Mode::Module);
+            let tokens: Vec<LexResult> = ruff_python_parser::tokenize(contents, Mode::Module);
             let locator = Locator::new(contents);
             let stylist = Stylist::from_tokens(&tokens, &locator);
             Ok(Insertion::start_of_file(&program, &locator, &stylist))
@@ -423,7 +423,7 @@ x = 1
     #[test]
     fn start_of_block() {
         fn insert(contents: &str, offset: TextSize) -> Insertion {
-            let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents, Mode::Module);
+            let tokens: Vec<LexResult> = ruff_python_parser::tokenize(contents, Mode::Module);
             let locator = Locator::new(contents);
             let stylist = Stylist::from_tokens(&tokens, &locator);
             Insertion::start_of_block(offset, &locator, &stylist)
