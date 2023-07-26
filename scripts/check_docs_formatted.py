@@ -66,6 +66,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "useless-semicolon",
     "whitespace-after-open-bracket",
     "whitespace-before-close-bracket",
+    "whitespace-before-parameters",
     "whitespace-before-punctuation",
 ]
 
