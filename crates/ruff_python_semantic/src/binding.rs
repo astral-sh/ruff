@@ -1,12 +1,12 @@
 use std::ops::{Deref, DerefMut};
 
 use bitflags::bitflags;
-use ruff_python_ast::Ranged;
-use ruff_text_size::TextRange;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
-use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::call_path::format_call_path;
+use ruff_python_ast::Ranged;
 use ruff_source_file::Locator;
+use ruff_text_size::TextRange;
 
 use crate::context::ExecutionContext;
 use crate::model::SemanticModel;
@@ -177,30 +177,29 @@ impl<'a> Binding<'a> {
     }
 
     /// Returns the fully-qualified symbol name, if this symbol was imported from another module.
-    pub fn qualified_name(&self) -> Option<&str> {
+    pub fn call_path(&self) -> Option<&[&str]> {
         match &self.kind {
-            BindingKind::Import(Import { qualified_name, .. }) => Some(qualified_name),
-            BindingKind::FromImport(FromImport { qualified_name, .. }) => Some(qualified_name),
-            BindingKind::SubmoduleImport(SubmoduleImport { qualified_name, .. }) => {
-                Some(qualified_name)
-            }
+            BindingKind::Import(Import { call_path }) => Some(call_path),
+            BindingKind::FromImport(FromImport { call_path }) => Some(call_path),
+            BindingKind::SubmoduleImport(SubmoduleImport { call_path }) => Some(call_path),
             _ => None,
         }
     }
 
+    /// Returns the fully-qualified symbol name, if this symbol was imported from another module.
+    pub fn qualified_name(&self) -> Option<String> {
+        self.call_path().map(format_call_path)
+    }
+
     /// Returns the fully-qualified name of the module from which this symbol was imported, if this
     /// symbol was imported from another module.
-    pub fn module_name(&self) -> Option<&str> {
+    pub fn module_name(&self) -> Option<&[&str]> {
         match &self.kind {
-            BindingKind::Import(Import { qualified_name, .. })
-            | BindingKind::SubmoduleImport(SubmoduleImport { qualified_name, .. }) => {
-                Some(qualified_name.split('.').next().unwrap_or(qualified_name))
+            BindingKind::Import(Import { call_path })
+            | BindingKind::SubmoduleImport(SubmoduleImport { call_path }) => Some(&call_path[..1]),
+            BindingKind::FromImport(FromImport { call_path }) => {
+                Some(&call_path[..call_path.len() - 1])
             }
-            BindingKind::FromImport(FromImport { qualified_name, .. }) => Some(
-                qualified_name
-                    .rsplit_once('.')
-                    .map_or(qualified_name, |(module, _)| module),
-            ),
             _ => None,
         }
     }
@@ -357,7 +356,6 @@ pub struct Import<'a> {
     /// The full name of the module being imported.
     /// Ex) Given `import foo`, `qualified_name` would be "foo".
     /// Ex) Given `import foo as bar`, `qualified_name` would be "foo".
-    pub qualified_name: &'a str,
     pub call_path: Box<[&'a str]>,
 }
 
@@ -369,7 +367,6 @@ pub struct FromImport<'a> {
     /// The full name of the member being imported.
     /// Ex) Given `from foo import bar`, `qualified_name` would be "foo.bar".
     /// Ex) Given `from foo import bar as baz`, `qualified_name` would be "foo.bar".
-    pub qualified_name: String,
     pub call_path: Box<[&'a str]>,
 }
 
@@ -379,7 +376,6 @@ pub struct FromImport<'a> {
 pub struct SubmoduleImport<'a> {
     /// The full name of the submodule being imported.
     /// Ex) Given `import foo.bar`, `qualified_name` would be "foo.bar".
-    pub qualified_name: &'a str,
     pub call_path: Box<[&'a str]>,
 }
 

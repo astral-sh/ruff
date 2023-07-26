@@ -231,7 +231,7 @@ impl Renamer {
             }
             BindingKind::SubmoduleImport(import) => {
                 // Ex) Rename `import pandas.core` to `import pandas as pd`.
-                let module_name = import.qualified_name.split('.').next().unwrap();
+                let module_name = import.call_path.first().unwrap();
                 Some(Edit::range_replacement(
                     format!("{module_name} as {target}"),
                     binding.range,

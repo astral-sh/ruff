@@ -60,7 +60,7 @@ pub(crate) fn unconventional_import_alias(
         return None;
     };
 
-    let Some(expected_alias) = conventions.get(qualified_name) else {
+    let Some(expected_alias) = conventions.get(qualified_name.as_str()) else {
         return None;
     };
 

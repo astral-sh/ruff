@@ -214,9 +214,9 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
 }
 
 /// An unused import with its surrounding context.
-struct Import<'a> {
+struct Import {
     /// The qualified name of the import (e.g., `typing.List` for `from typing import List`).
-    qualified_name: &'a str,
+    qualified_name: String,
     /// The trimmed range of the import (e.g., `List` in `from typing import List`).
     range: TextRange,
     /// The range of the import's parent statement.
@@ -230,7 +230,7 @@ fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[Import]) -> Result
     let edit = autofix::edits::remove_unused_imports(
         imports
             .iter()
-            .map(|Import { qualified_name, .. }| *qualified_name),
+            .map(|Import { qualified_name, .. }| qualified_name.as_str()),
         stmt,
         parent,
         checker.locator(),

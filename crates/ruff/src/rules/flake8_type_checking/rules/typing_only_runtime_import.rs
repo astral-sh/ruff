@@ -211,7 +211,7 @@ pub(crate) fn typing_only_runtime_import(
         };
 
         if is_exempt(
-            qualified_name,
+            qualified_name.as_str(),
             &checker
                 .settings
                 .flake8_type_checking
@@ -248,7 +248,7 @@ pub(crate) fn typing_only_runtime_import(
 
             // Categorize the import, using coarse-grained categorization.
             let import_type = match categorize(
-                qualified_name,
+                qualified_name.as_str(),
                 Some(level),
                 &checker.settings.src,
                 checker.package(),
@@ -353,9 +353,9 @@ pub(crate) fn typing_only_runtime_import(
 }
 
 /// A runtime-required import with its surrounding context.
-struct Import<'a> {
+struct Import {
     /// The qualified name of the import (e.g., `typing.List` for `from typing import List`).
-    qualified_name: &'a str,
+    qualified_name: String,
     /// The first reference to the imported symbol.
     reference_id: ResolvedReferenceId,
     /// The trimmed range of the import (e.g., `List` in `from typing import List`).
@@ -417,7 +417,7 @@ fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[Import]) -> Result
     let parent = checker.semantic().stmts.parent(stmt);
     let qualified_names: Vec<&str> = imports
         .iter()
-        .map(|Import { qualified_name, .. }| *qualified_name)
+        .map(|Import { qualified_name, .. }| qualified_name.as_str())
         .collect();
 
     // Find the first reference across all imports.
