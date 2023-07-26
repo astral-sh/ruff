@@ -135,6 +135,8 @@ pub(crate) fn complex_raises(
                 | Stmt::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
                     is_non_trivial_with_body(body)
                 }
+                // Allow function and class definitions to test decorators
+                Stmt::ClassDef(_) | Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) => false,
                 stmt => is_compound_statement(stmt),
             }
         } else {

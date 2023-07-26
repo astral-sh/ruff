@@ -28,6 +28,16 @@ def test_ok_complex_single_call():
         )
 
 
+def test_ok_func_and_class():
+    with pytest.raises(AttributeError):
+        class A:
+            pass
+
+    with pytest.raises(AttributeError):
+        def f():
+            pass
+
+
 def test_error_multiple_statements():
     with pytest.raises(AttributeError):
         len([])
