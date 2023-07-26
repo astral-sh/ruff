@@ -94,6 +94,12 @@ impl<'a> Binding<'a> {
         )
     }
 
+    /// Return `true` if this [`Binding`] represents an private variable
+    /// (e.g., `_x` in `_x = "private variable"`)
+    pub const fn is_private_variable(&self) -> bool {
+        self.flags.contains(BindingFlags::PRIVATE_DECLARATION)
+    }
+
     /// Return `true` if this binding redefines the given binding.
     pub fn redefines(&self, existing: &'a Binding) -> bool {
         match &self.kind {
@@ -264,6 +270,14 @@ bitflags! {
         /// __all__ = [1]
         /// ```
         const INVALID_ALL_OBJECT = 1 << 6;
+
+        /// The binding represents a private declaration.
+        ///
+        /// For example, the binding could be `_T` in:
+        /// ```python
+        /// _T = "This is a private variable"
+        /// ```
+        const PRIVATE_DECLARATION = 1 << 7;
     }
 }
 

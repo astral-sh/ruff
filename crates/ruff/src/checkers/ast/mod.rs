@@ -1474,6 +1474,11 @@ impl<'a> Checker<'a> {
         // Create the `Binding`.
         let binding_id = self.semantic.push_binding(range, kind, flags);
 
+        // If the name is private, mark is as such.
+        if name.starts_with('_') {
+            self.semantic.bindings[binding_id].flags |= BindingFlags::PRIVATE_DECLARATION;
+        }
+
         // If there's an existing binding in this scope, copy its references.
         if let Some(shadowed_id) = self.semantic.scopes[scope_id].get(name) {
             // If this is an annotation, and we already have an existing value in the same scope,
