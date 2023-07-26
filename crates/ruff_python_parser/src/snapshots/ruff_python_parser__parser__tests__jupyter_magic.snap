@@ -1,0 +1,352 @@
+---
+source: ruff_python_parser/src/parser.rs
+expression: parse_ast
+---
+Module(
+    ModModule {
+        range: 0..803,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 21..42,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 27..40,
+                            left: Name(
+                                ExprName {
+                                    range: 27..28,
+                                    id: "a",
+                                    ctx: Load,
+                                },
+                            ),
+                            op: Mod,
+                            right: Name(
+                                ExprName {
+                                    range: 39..40,
+                                    id: "b",
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 66..73,
+                    kind: Help2,
+                    value: "a.foo",
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 74..80,
+                    kind: Help,
+                    value: "a.foo",
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 81..88,
+                    kind: Help,
+                    value: "a.foo?",
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 89..100,
+                    kind: Help2,
+                    value: "a.foo()??",
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 115..128,
+                    kind: Magic,
+                    value: "timeit a = b",
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 129..147,
+                    kind: Magic,
+                    value: "timeit foo(b) % 3",
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 148..176,
+                    kind: Magic,
+                    value: "alias showPath pwd && ls -a",
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 177..205,
+                    kind: Magic,
+                    value: "timeit a =  foo(b); b = 2",
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 206..226,
+                    kind: Magic,
+                    value: "matplotlib --inline",
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 227..253,
+                    kind: Magic,
+                    value: "matplotlib     --inline",
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 277..309,
+                    kind: Shell,
+                    value: "pwd && ls -a | sed 's/^/\\    /'",
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 310..347,
+                    kind: Shell,
+                    value: "pwd   && ls -a | sed 's/^/\\\\    /'",
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 348..393,
+                    kind: ShCap,
+                    value: "cd /Users/foo/Library/Application\\ Support/",
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 566..626,
+                    name: Identifier {
+                        id: "foo",
+                        range: 570..573,
+                    },
+                    args: Arguments {
+                        range: 573..575,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    body: [
+                        Return(
+                            StmtReturn {
+                                range: 581..626,
+                                value: Some(
+                                    Compare(
+                                        ExprCompare {
+                                            range: 598..620,
+                                            left: Name(
+                                                ExprName {
+                                                    range: 598..599,
+                                                    id: "a",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            ops: [
+                                                NotEq,
+                                            ],
+                                            comparators: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 619..620,
+                                                        id: "b",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                        },
+                                    ),
+                                ),
+                            },
+                        ),
+                    ],
+                    decorator_list: [],
+                    returns: None,
+                    type_params: [],
+                    type_comment: None,
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 656..664,
+                    kind: Paren,
+                    value: "foo 1 2",
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 665..673,
+                    kind: Quote2,
+                    value: "foo 1 2",
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 674..682,
+                    kind: Quote,
+                    value: "foo 1 2",
+                },
+            ),
+            For(
+                StmtFor {
+                    range: 701..727,
+                    target: Name(
+                        ExprName {
+                            range: 705..706,
+                            id: "a",
+                            ctx: Store,
+                        },
+                    ),
+                    iter: Call(
+                        ExprCall {
+                            range: 710..718,
+                            func: Name(
+                                ExprName {
+                                    range: 710..715,
+                                    id: "range",
+                                    ctx: Load,
+                                },
+                            ),
+                            args: [
+                                Constant(
+                                    ExprConstant {
+                                        range: 716..717,
+                                        value: Int(
+                                            5,
+                                        ),
+                                        kind: None,
+                                    },
+                                ),
+                            ],
+                            keywords: [],
+                        },
+                    ),
+                    body: [
+                        LineMagic(
+                            StmtLineMagic {
+                                range: 724..727,
+                                kind: Shell,
+                                value: "ls",
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                    type_comment: None,
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 729..738,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 729..731,
+                                id: "p1",
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: LineMagic(
+                        ExprLineMagic {
+                            range: 734..738,
+                            kind: Shell,
+                            value: "pwd",
+                        },
+                    ),
+                    type_comment: None,
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 739..753,
+                    target: Name(
+                        ExprName {
+                            range: 739..741,
+                            id: "p2",
+                            ctx: Store,
+                        },
+                    ),
+                    annotation: Name(
+                        ExprName {
+                            range: 743..746,
+                            id: "str",
+                            ctx: Load,
+                        },
+                    ),
+                    value: Some(
+                        LineMagic(
+                            ExprLineMagic {
+                                range: 749..753,
+                                kind: Shell,
+                                value: "pwd",
+                            },
+                        ),
+                    ),
+                    simple: true,
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 754..774,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 754..757,
+                                id: "foo",
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: LineMagic(
+                        ExprLineMagic {
+                            range: 760..774,
+                            kind: Magic,
+                            value: "foo     bar",
+                        },
+                    ),
+                    type_comment: None,
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 776..781,
+                    kind: Magic,
+                    value: " foo",
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 782..803,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 782..785,
+                                id: "foo",
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: LineMagic(
+                        ExprLineMagic {
+                            range: 788..803,
+                            kind: Magic,
+                            value: "foo  # comment",
+                        },
+                    ),
+                    type_comment: None,
+                },
+            ),
+        ],
+        type_ignores: [],
+    },
+)

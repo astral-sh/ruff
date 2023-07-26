@@ -1,0 +1,55 @@
+---
+source: ruff_python_parser/src/string.rs
+expression: parse_ast
+---
+[
+    Constant(
+        ExprConstant {
+            range: 2..13,
+            value: Str(
+                "user=",
+            ),
+            kind: None,
+        },
+    ),
+    Constant(
+        ExprConstant {
+            range: 2..13,
+            value: Str(
+                "",
+            ),
+            kind: None,
+        },
+    ),
+    FormattedValue(
+        ExprFormattedValue {
+            range: 2..13,
+            value: Name(
+                ExprName {
+                    range: 3..7,
+                    id: "user",
+                    ctx: Load,
+                },
+            ),
+            conversion: None,
+            format_spec: Some(
+                JoinedStr(
+                    ExprJoinedStr {
+                        range: 9..12,
+                        values: [
+                            Constant(
+                                ExprConstant {
+                                    range: 9..12,
+                                    value: Str(
+                                        ">10",
+                                    ),
+                                    kind: None,
+                                },
+                            ),
+                        ],
+                    },
+                ),
+            ),
+        },
+    ),
+]
