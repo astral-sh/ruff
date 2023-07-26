@@ -9,21 +9,14 @@ use crate::checkers::ast::Checker;
 /// Checks for the presence of unused private `TypeVar` declarations.
 ///
 /// ## Why is this bad?
-/// A private `TypeVar` that is defined but not used is likely a mistake, and should
-/// be removed to avoid confusion.
+/// A private `TypeVar` that is defined but not used is likely a mistake, and
+/// should be removed to avoid confusion.
 ///
 /// ## Example
 /// ```python
 /// import typing
-/// _T = typing.TypeVar("_T")
-/// ```
 ///
-/// Use instead:
-/// ```python
-/// import typing
 /// _T = typing.TypeVar("_T")
-///
-/// def func(arg: _T) -> _T: ...
 /// ```
 #[violation]
 pub struct UnusedPrivateTypeVar {
@@ -40,7 +33,7 @@ impl Violation for UnusedPrivateTypeVar {
 
 /// PYI018
 pub(crate) fn unused_private_type_var(checker: &Checker, binding: &Binding) -> Option<Diagnostic> {
-    if !binding.kind.is_assignment() && !binding.is_private_variable() {
+    if !(binding.kind.is_assignment() && binding.is_private_variable()) {
         return None;
     }
     if binding.is_used() {
@@ -50,13 +43,14 @@ pub(crate) fn unused_private_type_var(checker: &Checker, binding: &Binding) -> O
     let Some(source) = binding.source else {
         return None;
     };
-    let Stmt::Assign(ast::StmtAssign {targets, value, ..}) = checker.semantic().stmts[source] else {
+    let Stmt::Assign(ast::StmtAssign { targets, value, .. }) = checker.semantic().stmts[source]
+    else {
         return None;
     };
-    let [Expr::Name(ast::ExprName {id, ..})] = &targets[..] else {
+    let [Expr::Name(ast::ExprName { id, .. })] = &targets[..] else {
         return None;
     };
-    let Expr::Call(ast::ExprCall {func, ..}) = value.as_ref() else {
+    let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
         return None;
     };
     if !checker.semantic().match_typing_expr(func, "TypeVar") {

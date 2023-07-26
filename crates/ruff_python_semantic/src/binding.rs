@@ -273,11 +273,10 @@ bitflags! {
 
         /// The binding represents a private variable declaration.
         ///
-        /// For example, the binding could be `_x` in:
+        /// For example, the binding could be `_T` in:
         /// ```python
-        /// _x = "This is a private variable"
+        /// _T = "This is a private variable"
         /// ```
-        // const PRIVATE_TYPE_VAR = 1 << 7;
         const PRIVATE_VARIABLE = 1 << 7;
     }
 }
