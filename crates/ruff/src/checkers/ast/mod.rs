@@ -586,6 +586,20 @@ where
 
                 self.visit_body(body);
             }
+            Stmt::TypeAlias(ast::StmtTypeAlias {
+                range: _range,
+                name,
+                type_params,
+                value,
+            }) => {
+                self.semantic.push_scope(ScopeKind::Type);
+                for type_param in type_params {
+                    self.visit_type_param(type_param);
+                }
+                self.visit_expr(value);
+                self.semantic.pop_scope();
+                self.visit_expr(name);
+            }
             Stmt::Try(ast::StmtTry {
                 body,
                 handlers,
