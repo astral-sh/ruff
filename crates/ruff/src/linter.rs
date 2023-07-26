@@ -6,9 +6,9 @@ use anyhow::{anyhow, Result};
 use colored::Colorize;
 use itertools::Itertools;
 use log::error;
+use ruff_python_parser::lexer::LexResult;
+use ruff_python_parser::ParseError;
 use rustc_hash::FxHashMap;
-use rustpython_parser::lexer::LexResult;
-use rustpython_parser::ParseError;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::imports::ImportMap;

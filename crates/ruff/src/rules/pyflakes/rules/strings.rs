@@ -1,8 +1,8 @@
 use std::string::ToString;
 
+use ruff_python_ast::{self as ast, Constant, Expr, Identifier, Keyword};
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
-use rustpython_ast::{self as ast, Constant, Expr, Identifier, Keyword};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};

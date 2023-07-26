@@ -1,5 +1,5 @@
+use ruff_python_ast::{self as ast, ElifElseClause, Expr, Identifier, Stmt};
 use rustc_hash::FxHashSet;
-use rustpython_ast::{self as ast, ElifElseClause, Expr, Identifier, Stmt};
 
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;

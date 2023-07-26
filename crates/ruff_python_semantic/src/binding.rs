@@ -1,8 +1,8 @@
 use std::ops::{Deref, DerefMut};
 
 use bitflags::bitflags;
+use ruff_python_ast::Ranged;
 use ruff_text_size::TextRange;
-use rustpython_ast::Ranged;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
 use ruff_source_file::Locator;

@@ -3,7 +3,7 @@ use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
 use crate::FormatNodeRule;
 use ruff_formatter::write;
-use rustpython_ast::StmtAnnAssign;
+use ruff_python_ast::StmtAnnAssign;
 
 #[derive(Default)]
 pub struct FormatStmtAnnAssign;

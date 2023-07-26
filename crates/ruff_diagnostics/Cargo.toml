@@ -13,7 +13,7 @@ license = { workspace = true }
 [lib]
 
 [dependencies]
-ruff_text_size = { workspace = true }
+ruff_text_size = { path = "../ruff_text_size" }
 
 anyhow = { workspace = true }
 log = { workspace = true }

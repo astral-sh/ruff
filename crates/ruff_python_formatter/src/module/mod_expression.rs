@@ -1,6 +1,6 @@
 use crate::{AsFormat, FormatNodeRule, PyFormatter};
 use ruff_formatter::{Format, FormatResult};
-use rustpython_ast::ModExpression;
+use ruff_python_ast::ModExpression;
 
 #[derive(Default)]
 pub struct FormatModExpression;

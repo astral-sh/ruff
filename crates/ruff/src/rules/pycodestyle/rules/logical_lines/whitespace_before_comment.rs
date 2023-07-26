@@ -2,7 +2,7 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_parser::token_kind::TokenKind;
+use ruff_python_parser::TokenKind;
 use ruff_python_trivia::PythonWhitespace;
 use ruff_source_file::Locator;
 

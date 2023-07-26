@@ -10,8 +10,8 @@
 //!
 //! This module can be used to identify the [`TextRange`] of the `except` token.
 
+use crate::{self as ast, Alias, Arg, ArgWithDefault, ExceptHandler, Ranged, Stmt};
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_ast::{self as ast, Alias, Arg, ArgWithDefault, ExceptHandler, Ranged, Stmt};
 
 use ruff_python_trivia::{is_python_whitespace, Cursor};
 
@@ -200,38 +200,18 @@ impl Iterator for IdentifierTokenizer<'_> {
 
 #[cfg(test)]
 mod tests {
-    use ruff_text_size::{TextRange, TextSize};
-    use rustpython_ast::{Ranged, Stmt};
-    use rustpython_parser::{Parse, ParseError};
-
-    use crate::identifier;
-    use crate::identifier::IdentifierTokenizer;
-
-    #[test]
-    fn extract_else_range() -> Result<(), ParseError> {
-        let contents = r#"
-for x in y:
-    pass
-else:
-    pass
-"#
-        .trim();
-        let stmt = Stmt::parse(contents, "<filename>")?;
-        let range = identifier::else_(&stmt, contents).unwrap();
-        assert_eq!(&contents[range], "else");
-        assert_eq!(
-            range,
-            TextRange::new(TextSize::from(21), TextSize::from(25))
-        );
-        Ok(())
-    }
+    use super::IdentifierTokenizer;
+    use ruff_python_parser::ParseError;
+    use ruff_text_size::{TextLen, TextRange, TextSize};
 
     #[test]
     fn extract_global_names() -> Result<(), ParseError> {
         let contents = r#"global X,Y, Z"#.trim();
-        let stmt = Stmt::parse(contents, "<filename>")?;
 
-        let mut names = IdentifierTokenizer::new(contents, stmt.range());
+        let mut names = IdentifierTokenizer::new(
+            contents,
+            TextRange::new(TextSize::new(0), contents.text_len()),
+        );
 
         let range = names.next_token().unwrap();
         assert_eq!(&contents[range], "global");

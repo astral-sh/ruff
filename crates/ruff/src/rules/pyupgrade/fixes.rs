@@ -1,8 +1,8 @@
 use anyhow::Result;
 use libcst_native::ParenthesizableWhitespace;
+use ruff_python_ast::{Expr, Ranged};
+use ruff_python_parser::{lexer, Mode, Tok};
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_ast::{Expr, Ranged};
-use rustpython_parser::{lexer, Mode, Tok};
 
 use crate::autofix::codemods::CodegenStylist;
 use ruff_diagnostics::Edit;

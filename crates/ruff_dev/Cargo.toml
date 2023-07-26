@@ -15,8 +15,11 @@ ruff = { path = "../ruff", features = ["schemars"] }
 ruff_cli = { path = "../ruff_cli" }
 ruff_diagnostics = { path = "../ruff_diagnostics" }
 ruff_formatter = { path = "../ruff_formatter" }
+ruff_python_ast = { path = "../ruff_python_ast" }
 ruff_python_codegen = { path = "../ruff_python_codegen" }
 ruff_python_formatter = { path = "../ruff_python_formatter" }
+ruff_python_literal = { path = "../ruff_python_literal" }
+ruff_python_parser = { path = "../ruff_python_parser" }
 ruff_python_stdlib = { path = "../ruff_python_stdlib" }
 ruff_python_trivia = { path = "../ruff_python_trivia" }
 
@@ -31,9 +34,6 @@ once_cell = { workspace = true }
 pretty_assertions = { version = "1.3.0" }
 rayon = "1.7.0"
 regex = { workspace = true }
-rustpython-ast = { workspace = true }
-rustpython-format = { workspace = true }
-rustpython-parser = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }

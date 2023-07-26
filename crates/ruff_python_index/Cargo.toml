@@ -14,11 +14,13 @@ license = { workspace = true }
 
 [dependencies]
 ruff_python_trivia = { path = "../ruff_python_trivia" }
-rustpython-parser = { workspace = true }
-ruff_text_size = { workspace = true }
+
+ruff_python_ast = { path = "../ruff_python_ast" }
+ruff_python_parser = { path = "../ruff_python_parser" }
 ruff_source_file = { path = "../ruff_source_file" }
+ruff_text_size = { path = "../ruff_text_size" }
 
 itertools = { workspace = true }
-rustpython-ast = { workspace = true }
+
 
 [dev-dependencies]

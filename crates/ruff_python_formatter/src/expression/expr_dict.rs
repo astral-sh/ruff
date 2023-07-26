@@ -5,9 +5,9 @@ use crate::prelude::*;
 use crate::FormatNodeRule;
 use ruff_formatter::{format_args, write};
 use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::Ranged;
+use ruff_python_ast::{Expr, ExprDict};
 use ruff_text_size::TextRange;
-use rustpython_ast::Ranged;
-use rustpython_ast::{Expr, ExprDict};
 
 #[derive(Default)]
 pub struct FormatExprDict;

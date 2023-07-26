@@ -6,8 +6,6 @@ use ruff_text_size::{TextRange, TextSize};
 use std::fmt;
 use std::fmt::Debug;
 
-// TODO rename to nodes
-
 /// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum Mod {
@@ -2490,22 +2488,22 @@ impl std::fmt::Display for Constant {
     }
 }
 
-impl Ranged for crate::ast::ModModule {
+impl Ranged for crate::nodes::ModModule {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::ModInteractive {
+impl Ranged for crate::nodes::ModInteractive {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::ModExpression {
+impl Ranged for crate::nodes::ModExpression {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::ModFunctionType {
+impl Ranged for crate::nodes::ModFunctionType {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -2521,147 +2519,147 @@ impl Ranged for crate::Mod {
     }
 }
 
-impl Ranged for crate::ast::StmtFunctionDef {
+impl Ranged for crate::nodes::StmtFunctionDef {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::StmtAsyncFunctionDef {
+impl Ranged for crate::nodes::StmtAsyncFunctionDef {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::StmtClassDef {
+impl Ranged for crate::nodes::StmtClassDef {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::StmtReturn {
+impl Ranged for crate::nodes::StmtReturn {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::StmtDelete {
+impl Ranged for crate::nodes::StmtDelete {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::StmtTypeAlias {
+impl Ranged for crate::nodes::StmtTypeAlias {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::StmtAssign {
+impl Ranged for crate::nodes::StmtAssign {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::StmtAugAssign {
+impl Ranged for crate::nodes::StmtAugAssign {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::StmtAnnAssign {
+impl Ranged for crate::nodes::StmtAnnAssign {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::StmtFor {
+impl Ranged for crate::nodes::StmtFor {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::StmtAsyncFor {
+impl Ranged for crate::nodes::StmtAsyncFor {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::StmtWhile {
+impl Ranged for crate::nodes::StmtWhile {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::StmtIf {
+impl Ranged for crate::nodes::StmtIf {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::ElifElseClause {
+impl Ranged for crate::nodes::ElifElseClause {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::StmtWith {
+impl Ranged for crate::nodes::StmtWith {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::StmtAsyncWith {
+impl Ranged for crate::nodes::StmtAsyncWith {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::StmtMatch {
+impl Ranged for crate::nodes::StmtMatch {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::StmtRaise {
+impl Ranged for crate::nodes::StmtRaise {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::StmtTry {
+impl Ranged for crate::nodes::StmtTry {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::StmtTryStar {
+impl Ranged for crate::nodes::StmtTryStar {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::StmtAssert {
+impl Ranged for crate::nodes::StmtAssert {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::StmtImport {
+impl Ranged for crate::nodes::StmtImport {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::StmtImportFrom {
+impl Ranged for crate::nodes::StmtImportFrom {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::StmtGlobal {
+impl Ranged for crate::nodes::StmtGlobal {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::StmtNonlocal {
+impl Ranged for crate::nodes::StmtNonlocal {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::StmtExpr {
+impl Ranged for crate::nodes::StmtExpr {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::StmtPass {
+impl Ranged for crate::nodes::StmtPass {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::StmtBreak {
+impl Ranged for crate::nodes::StmtBreak {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::StmtContinue {
+impl Ranged for crate::nodes::StmtContinue {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -2707,137 +2705,137 @@ impl Ranged for crate::Stmt {
     }
 }
 
-impl Ranged for crate::ast::ExprBoolOp {
+impl Ranged for crate::nodes::ExprBoolOp {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::ExprNamedExpr {
+impl Ranged for crate::nodes::ExprNamedExpr {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::ExprBinOp {
+impl Ranged for crate::nodes::ExprBinOp {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::ExprUnaryOp {
+impl Ranged for crate::nodes::ExprUnaryOp {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::ExprLambda {
+impl Ranged for crate::nodes::ExprLambda {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::ExprIfExp {
+impl Ranged for crate::nodes::ExprIfExp {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::ExprDict {
+impl Ranged for crate::nodes::ExprDict {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::ExprSet {
+impl Ranged for crate::nodes::ExprSet {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::ExprListComp {
+impl Ranged for crate::nodes::ExprListComp {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::ExprSetComp {
+impl Ranged for crate::nodes::ExprSetComp {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::ExprDictComp {
+impl Ranged for crate::nodes::ExprDictComp {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::ExprGeneratorExp {
+impl Ranged for crate::nodes::ExprGeneratorExp {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::ExprAwait {
+impl Ranged for crate::nodes::ExprAwait {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::ExprYield {
+impl Ranged for crate::nodes::ExprYield {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::ExprYieldFrom {
+impl Ranged for crate::nodes::ExprYieldFrom {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::ExprCompare {
+impl Ranged for crate::nodes::ExprCompare {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::ExprCall {
+impl Ranged for crate::nodes::ExprCall {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::ExprFormattedValue {
+impl Ranged for crate::nodes::ExprFormattedValue {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::ExprJoinedStr {
+impl Ranged for crate::nodes::ExprJoinedStr {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::ExprConstant {
+impl Ranged for crate::nodes::ExprConstant {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::ExprAttribute {
+impl Ranged for crate::nodes::ExprAttribute {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::ExprSubscript {
+impl Ranged for crate::nodes::ExprSubscript {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::ExprStarred {
+impl Ranged for crate::nodes::ExprStarred {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::ExprName {
+impl Ranged for crate::nodes::ExprName {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::ExprList {
+impl Ranged for crate::nodes::ExprList {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::ExprTuple {
+impl Ranged for crate::nodes::ExprTuple {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::ExprSlice {
+impl Ranged for crate::nodes::ExprSlice {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -2882,12 +2880,12 @@ impl Ranged for crate::Expr {
     }
 }
 
-impl Ranged for crate::ast::Comprehension {
+impl Ranged for crate::nodes::Comprehension {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::ExceptHandlerExceptHandler {
+impl Ranged for crate::nodes::ExceptHandlerExceptHandler {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -2900,72 +2898,72 @@ impl Ranged for crate::ExceptHandler {
     }
 }
 
-impl Ranged for crate::ast::PythonArguments {
+impl Ranged for crate::nodes::PythonArguments {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::Arg {
+impl Ranged for crate::nodes::Arg {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::Keyword {
+impl Ranged for crate::nodes::Keyword {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::Alias {
+impl Ranged for crate::nodes::Alias {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::WithItem {
+impl Ranged for crate::nodes::WithItem {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::MatchCase {
+impl Ranged for crate::nodes::MatchCase {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::PatternMatchValue {
+impl Ranged for crate::nodes::PatternMatchValue {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::PatternMatchSingleton {
+impl Ranged for crate::nodes::PatternMatchSingleton {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::PatternMatchSequence {
+impl Ranged for crate::nodes::PatternMatchSequence {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::PatternMatchMapping {
+impl Ranged for crate::nodes::PatternMatchMapping {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::PatternMatchClass {
+impl Ranged for crate::nodes::PatternMatchClass {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::PatternMatchStar {
+impl Ranged for crate::nodes::PatternMatchStar {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::PatternMatchAs {
+impl Ranged for crate::nodes::PatternMatchAs {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::PatternMatchOr {
+impl Ranged for crate::nodes::PatternMatchOr {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -2985,7 +2983,7 @@ impl Ranged for crate::Pattern {
     }
 }
 
-impl Ranged for crate::ast::TypeIgnoreTypeIgnore {
+impl Ranged for crate::nodes::TypeIgnoreTypeIgnore {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -2997,17 +2995,17 @@ impl Ranged for crate::TypeIgnore {
         }
     }
 }
-impl Ranged for crate::ast::TypeParamTypeVar {
+impl Ranged for crate::nodes::TypeParamTypeVar {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::TypeParamTypeVarTuple {
+impl Ranged for crate::nodes::TypeParamTypeVarTuple {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::TypeParamParamSpec {
+impl Ranged for crate::nodes::TypeParamParamSpec {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -3021,17 +3019,17 @@ impl Ranged for crate::TypeParam {
         }
     }
 }
-impl Ranged for crate::ast::Decorator {
+impl Ranged for crate::nodes::Decorator {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::Arguments {
+impl Ranged for crate::nodes::Arguments {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::ast::ArgWithDefault {
+impl Ranged for crate::nodes::ArgWithDefault {
     fn range(&self) -> TextRange {
         self.range
     }

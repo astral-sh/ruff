@@ -11,8 +11,9 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 // we have to do the parsing here, manually.
 use crate::{
     lexer::{LexicalError, LexicalErrorType},
-    parser::{LalrpopError, Parse, ParseError, ParseErrorType},
+    parser::{ParseError, ParseErrorType},
     token::{StringKind, Tok},
+    Parse,
 };
 
 // unicode_name2 does not expose `MAX_NAME_LENGTH`, so we replicate that constant here, fix #3798
@@ -380,7 +381,9 @@ impl<'a> StringParser<'a> {
                     expression.push(ch);
                     loop {
                         let Some(c) = self.next_char() else {
-                            return Err(FStringError::new(UnterminatedString, self.get_pos()).into());
+                            return Err(
+                                FStringError::new(UnterminatedString, self.get_pos()).into()
+                            );
                         };
                         expression.push(c);
                         if c == ch {
@@ -820,7 +823,7 @@ impl std::fmt::Display for FStringErrorType {
     }
 }
 
-impl From<FStringError> for LalrpopError<TextSize, Tok, LexicalError> {
+impl From<FStringError> for crate::parser::LalrpopError<TextSize, Tok, LexicalError> {
     fn from(err: FStringError) -> Self {
         lalrpop_util::ParseError::User {
             error: LexicalError {

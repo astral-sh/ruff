@@ -31,7 +31,7 @@ ruff_python_ast = { path = "../ruff_python_ast" }
 ruff_python_formatter = { path = "../ruff_python_formatter" }
 ruff_source_file = { path = "../ruff_source_file" }
 ruff_python_trivia = { path = "../ruff_python_trivia" }
-ruff_text_size = { workspace = true }
+ruff_text_size = { path = "../ruff_text_size" }
 
 annotate-snippets = { version = "0.9.1", features = ["color"] }
 anyhow = { workspace = true }

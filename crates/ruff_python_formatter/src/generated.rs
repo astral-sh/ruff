@@ -5,7 +5,7 @@ use crate::context::PyFormatContext;
 use crate::{AsFormat, FormatNodeRule, IntoFormat};
 use ruff_formatter::formatter::Formatter;
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule, FormatResult, FormatRule};
-use rustpython_parser::ast;
+use ruff_python_ast as ast;
 
 impl FormatRule<ast::ModModule, PyFormatContext<'_>>
     for crate::module::mod_module::FormatModModule

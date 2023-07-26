@@ -1,4 +1,4 @@
-use rustpython_ast::{self as ast, Expr, ExprLambda, Ranged};
+use ruff_python_ast::{self as ast, Expr, ExprLambda, Ranged};
 
 use ruff_diagnostics::{AutofixKind, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};

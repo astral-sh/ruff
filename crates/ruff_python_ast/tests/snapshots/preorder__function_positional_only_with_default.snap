@@ -1,5 +1,5 @@
 ---
-source: crates/ruff_python_ast/src/visitor/preorder.rs
+source: crates/ruff_python_ast/tests/preorder.rs
 expression: trace
 ---
 - ModModule
@@ -7,14 +7,8 @@ expression: trace
     - Arguments
       - Arg
       - Arg
-      - Arg
-      - Arg
       - ExprConstant
-        - Int(20)
-      - Arg
-      - Arg
-      - ExprConstant
-        - Int(5)
+        - Int(34)
       - Arg
       - ExprConstant
         - Int(20)

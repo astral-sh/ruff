@@ -2,7 +2,7 @@
 use std::borrow::Cow;
 use std::path::Path;
 
-use rustpython_ast::{self as ast, Ranged, Stmt, Suite};
+use ruff_python_ast::{self as ast, Ranged, Stmt, Suite};
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::helpers::to_module_path;

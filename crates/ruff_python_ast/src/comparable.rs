@@ -1,8 +1,8 @@
 //! An equivalent object hierarchy to the `RustPython` AST hierarchy, but with the
 //! ability to compare expressions for equality (via [`Eq`] and [`Hash`]).
 
+use crate as ast;
 use num_bigint::BigInt;
-use rustpython_ast as ast;
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub enum ComparableExprContext {

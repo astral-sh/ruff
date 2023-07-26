@@ -1,5 +1,5 @@
+use crate::{self as ast, Constant, Expr, Stmt};
 use bitflags::bitflags;
-use rustpython_ast::{self as ast, Constant, Expr, Stmt};
 
 bitflags! {
     #[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]

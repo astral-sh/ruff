@@ -1,10 +1,10 @@
 use log::error;
-use ruff_text_size::TextRange;
-use rustc_hash::FxHashSet;
-use rustpython_ast::{
+use ruff_python_ast::{
     self as ast, CmpOp, Constant, ElifElseClause, Expr, ExprContext, Identifier, Ranged, Stmt,
     StmtIf,
 };
+use ruff_text_size::TextRange;
+use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};

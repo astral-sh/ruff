@@ -1,6 +1,6 @@
 use anyhow::Result;
 use libcst_native::CompOp;
-use rustpython_ast::{self as ast, CmpOp, Expr, Ranged, UnaryOp};
+use ruff_python_ast::{self as ast, CmpOp, Expr, Ranged, UnaryOp};
 
 use crate::autofix::codemods::CodegenStylist;
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};

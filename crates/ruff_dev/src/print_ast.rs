@@ -5,8 +5,8 @@ use std::fs;
 use std::path::PathBuf;
 
 use anyhow::Result;
-use rustpython_ast::Suite;
-use rustpython_parser::Parse;
+use ruff_python_ast::Suite;
+use ruff_python_parser::Parse;
 
 #[derive(clap::Args)]
 pub(crate) struct Args {

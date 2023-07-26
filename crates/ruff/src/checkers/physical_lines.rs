@@ -99,8 +99,8 @@ pub(crate) fn check_physical_lines(
 
 #[cfg(test)]
 mod tests {
-    use rustpython_parser::lexer::lex;
-    use rustpython_parser::Mode;
+    use ruff_python_parser::lexer::lex;
+    use ruff_python_parser::Mode;
 
     use ruff_python_codegen::Stylist;
     use ruff_python_index::Indexer;

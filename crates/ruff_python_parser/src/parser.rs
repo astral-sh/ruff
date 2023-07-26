@@ -18,208 +18,13 @@ use itertools::Itertools;
 pub(super) use lalrpop_util::ParseError as LalrpopError;
 use ruff_text_size::TextSize;
 
-use crate::lexer::{lex, lex_starts_at};
 use crate::{
     lexer::{self, LexResult, LexicalError, LexicalErrorType},
     python,
     token::Tok,
-    Mode,
+    Mode, Parse,
 };
-use ruff_python_ast::{self as ast, Ranged};
-
-/// Parse Python code string to implementor's type.
-///
-/// # Example
-///
-/// For example, parsing a simple function definition and a call to that function:
-///
-/// ```
-/// use ruff_python_parser::{self as parser, Parse};
-/// use ruff_python_ast as ast;
-/// let source = r#"
-/// def foo():
-///    return 42
-///
-/// print(foo())
-/// "#;
-/// let program = ast::Suite::parse(source, "<embedded>");
-/// assert!(program.is_ok());
-/// ```
-///
-/// Parsing a single expression denoting the addition of two numbers, but this time specifying a different,
-/// somewhat silly, location:
-///
-/// ```
-/// # use ruff_text_size::TextSize;
-/// # use ruff_python_ast as ast;
-/// # use ruff_python_parser::{self as parser, Parse};
-///
-/// let expr = ast::Expr::parse_starts_at("1 + 2", "<embedded>", TextSize::from(400));
-/// assert!(expr.is_ok());
-pub trait Parse
-where
-    Self: Sized,
-{
-    const MODE: Mode;
-
-    fn parse(source: &str, source_path: &str) -> Result<Self, ParseError> {
-        let tokens = lex(source, Self::MODE);
-
-        Self::parse_tokens(tokens, source_path)
-    }
-
-    fn parse_without_path(source: &str) -> Result<Self, ParseError> {
-        Self::parse(source, "<unknown>")
-    }
-
-    fn parse_starts_at(
-        source: &str,
-        source_path: &str,
-        offset: TextSize,
-    ) -> Result<Self, ParseError> {
-        let tokens = lex_starts_at(source, Self::MODE, offset);
-
-        Self::parse_tokens(tokens, source_path)
-    }
-
-    fn parse_tokens(
-        lxr: impl IntoIterator<Item = LexResult>,
-        source_path: &str,
-    ) -> Result<Self, ParseError>;
-}
-
-impl Parse for ast::ModModule {
-    const MODE: Mode = Mode::Module;
-
-    fn parse_tokens(
-        lxr: impl IntoIterator<Item = LexResult>,
-        source_path: &str,
-    ) -> Result<Self, ParseError> {
-        match parse_tokens(lxr, Mode::Module, source_path)? {
-            ast::Mod::Module(m) => Ok(m),
-            _ => unreachable!("Mode::Module doesn't return other variant"),
-        }
-    }
-}
-
-impl Parse for ast::ModExpression {
-    const MODE: Mode = Mode::Expression;
-
-    fn parse_tokens(
-        lxr: impl IntoIterator<Item = LexResult>,
-        source_path: &str,
-    ) -> Result<Self, ParseError> {
-        match parse_tokens(lxr, Mode::Expression, source_path)? {
-            ast::Mod::Expression(m) => Ok(m),
-            _ => unreachable!("Mode::Module doesn't return other variant"),
-        }
-    }
-}
-
-impl Parse for ast::ModInteractive {
-    const MODE: Mode = Mode::Interactive;
-    fn parse_tokens(
-        lxr: impl IntoIterator<Item = LexResult>,
-        source_path: &str,
-    ) -> Result<Self, ParseError> {
-        match parse_tokens(lxr, Mode::Interactive, source_path)? {
-            ast::Mod::Interactive(m) => Ok(m),
-            _ => unreachable!("Mode::Module doesn't return other variant"),
-        }
-    }
-}
-
-impl Parse for ast::Suite {
-    const MODE: Mode = Mode::Module;
-
-    fn parse_tokens(
-        lxr: impl IntoIterator<Item = LexResult>,
-        source_path: &str,
-    ) -> Result<Self, ParseError> {
-        Ok(ast::ModModule::parse_tokens(lxr, source_path)?.body)
-    }
-}
-
-impl Parse for ast::Stmt {
-    const MODE: Mode = Mode::Module;
-
-    fn parse_tokens(
-        lxr: impl IntoIterator<Item = LexResult>,
-        source_path: &str,
-    ) -> Result<Self, ParseError> {
-        let mut statements = ast::ModModule::parse_tokens(lxr, source_path)?.body;
-        let statement = match statements.len() {
-            0 => {
-                return Err(ParseError {
-                    error: ParseErrorType::Eof,
-                    offset: TextSize::default(),
-                    source_path: source_path.to_owned(),
-                })
-            }
-            1 => statements.pop().unwrap(),
-            _ => {
-                return Err(ParseError {
-                    error: ParseErrorType::InvalidToken,
-                    offset: statements[1].range().start(),
-                    source_path: source_path.to_owned(),
-                })
-            }
-        };
-        Ok(statement)
-    }
-}
-
-impl Parse for ast::Expr {
-    const MODE: Mode = Mode::Expression;
-
-    fn parse_tokens(
-        lxr: impl IntoIterator<Item = LexResult>,
-        source_path: &str,
-    ) -> Result<Self, ParseError> {
-        Ok(*ast::ModExpression::parse_tokens(lxr, source_path)?.body)
-    }
-}
-
-impl Parse for ast::Identifier {
-    const MODE: Mode = Mode::Expression;
-
-    fn parse_tokens(
-        lxr: impl IntoIterator<Item = LexResult>,
-        source_path: &str,
-    ) -> Result<Self, ParseError> {
-        let expr = ast::Expr::parse_tokens(lxr, source_path)?;
-        match expr {
-            ast::Expr::Name(name) => {
-                let range = name.range();
-                Ok(ast::Identifier::new(name.id, range))
-            }
-            expr => Err(ParseError {
-                error: ParseErrorType::InvalidToken,
-                offset: expr.range().start(),
-                source_path: source_path.to_owned(),
-            }),
-        }
-    }
-}
-
-impl Parse for ast::Constant {
-    const MODE: Mode = Mode::Expression;
-
-    fn parse_tokens(
-        lxr: impl IntoIterator<Item = LexResult>,
-        source_path: &str,
-    ) -> Result<Self, ParseError> {
-        let expr = ast::Expr::parse_tokens(lxr, source_path)?;
-        match expr {
-            ast::Expr::Constant(c) => Ok(c.value),
-            expr => Err(ParseError {
-                error: ParseErrorType::InvalidToken,
-                offset: expr.range().start(),
-                source_path: source_path.to_owned(),
-            }),
-        }
-    }
-}
+use ruff_python_ast as ast;
 
 /// Parse a full Python program usually consisting of multiple lines.
 ///
@@ -241,7 +46,7 @@ impl Parse for ast::Constant {
 /// let program = parser::parse_program(source, "<embedded>");
 /// assert!(program.is_ok());
 /// ```
-#[deprecated = "Use ruff_python_ast::Suite::parse from rustpython_parser::Parse trait."]
+#[deprecated = "Use ruff_python_ast::Suite::parse from ruff_python_parser::Parse trait."]
 pub fn parse_program(source: &str, source_path: &str) -> Result<ast::Suite, ParseError> {
     parse(source, Mode::Module, source_path).map(|top| match top {
         ast::Mod::Module(ast::ModModule { body, .. }) => body,
@@ -265,7 +70,7 @@ pub fn parse_program(source: &str, source_path: &str) -> Result<ast::Suite, Pars
 /// assert!(expr.is_ok());
 ///
 /// ```
-#[deprecated = "Use ruff_python_ast::Expr::parse from rustpython_parser::Parse trait."]
+#[deprecated = "Use ruff_python_ast::Expr::parse from ruff_python_parser::Parse trait."]
 pub fn parse_expression(source: &str, path: &str) -> Result<ast::Expr, ParseError> {
     ast::Expr::parse(source, path)
 }
@@ -287,7 +92,7 @@ pub fn parse_expression(source: &str, path: &str) -> Result<ast::Expr, ParseErro
 /// let expr = parse_expression_starts_at("1 + 2", "<embedded>", TextSize::from(400));
 /// assert!(expr.is_ok());
 /// ```
-#[deprecated = "Use ruff_python_ast::Expr::parse_starts_at from rustpython_parser::Parse trait."]
+#[deprecated = "Use ruff_python_ast::Expr::parse_starts_at from ruff_python_parser::Parse trait."]
 pub fn parse_expression_starts_at(
     source: &str,
     path: &str,
@@ -579,8 +384,6 @@ impl ParseErrorType {
         )
     }
 }
-
-include!("gen/parse.rs");
 
 #[cfg(test)]
 mod tests {
@@ -933,7 +736,7 @@ type X[T: int, *Ts, **P] = (T, Ts, P)
 type X[T: (int, str), *Ts, **P] = (T, Ts, P)
 
 # soft keyword as alias name
-type type = int  
+type type = int
 type match = int
 type case = int
 

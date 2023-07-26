@@ -38,8 +38,6 @@ ruff.path = "../ruff"
 ruff_python_ast.path = "../ruff_python_ast"
 ruff_python_formatter = { path = "../ruff_python_formatter" }
 criterion = { version = "0.5.1"}
-rustpython-ast = { workspace = true }
-rustpython-parser.workspace = true
 
 [target.'cfg(target_os = "windows")'.dev-dependencies]
 mimalloc = "0.1.34"

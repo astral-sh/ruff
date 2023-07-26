@@ -1,5 +1,5 @@
+use ruff_python_ast::{self as ast, Constant, ExceptHandler, Expr, Ranged, Stmt};
 use ruff_text_size::{TextLen, TextRange};
-use rustpython_ast::{self as ast, Constant, ExceptHandler, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};

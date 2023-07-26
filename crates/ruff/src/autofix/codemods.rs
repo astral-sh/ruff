@@ -4,7 +4,7 @@ use anyhow::{bail, Result};
 use libcst_native::{
     Codegen, CodegenState, ImportNames, ParenthesizableWhitespace, SmallStatement, Statement,
 };
-use rustpython_ast::{Ranged, Stmt};
+use ruff_python_ast::{Ranged, Stmt};
 
 use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;

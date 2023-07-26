@@ -1,4 +1,4 @@
-use rustpython_ast::Constant;
+use ruff_python_ast::Constant;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]

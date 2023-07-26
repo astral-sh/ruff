@@ -1,5 +1,5 @@
+use ruff_python_ast::Expr;
 use ruff_text_size::TextRange;
-use rustpython_ast::Expr;
 
 use ruff_python_semantic::{ScopeId, Snapshot};
 

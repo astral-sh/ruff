@@ -1,4 +1,4 @@
-use rustpython_ast::{self as ast, Arguments, Expr, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 
 use ruff_python_ast::cast;
 use ruff_python_semantic::analyze::visibility;

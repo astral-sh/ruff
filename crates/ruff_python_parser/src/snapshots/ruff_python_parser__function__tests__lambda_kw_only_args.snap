@@ -1,5 +1,5 @@
 ---
-source: ruff_python_parser/src/function.rs
+source: crates/ruff_python_parser/src/function.rs
 expression: parse_ast
 ---
 Ok(

@@ -1,4 +1,4 @@
-use rustpython_ast::{Ranged, Stmt};
+use ruff_python_ast::{Ranged, Stmt};
 
 use ruff_diagnostics::AlwaysAutofixableViolation;
 use ruff_diagnostics::{Diagnostic, Edit, Fix};

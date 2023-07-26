@@ -1,5 +1,5 @@
 [package]
-name = "rustpython-literal"
+name = "ruff_python_literal"
 version = "0.2.0"
 description = "Common literal handling utilities mostly useful for unparse and repr."
 authors = ["RustPython Team"]
@@ -18,4 +18,4 @@ num-traits = { workspace = true }
 unic-ucd-category = "0.9"
 
 [dev-dependencies]
-rand = { workspace = true }
+rand = "0.8.5"

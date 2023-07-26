@@ -6,7 +6,7 @@ use crate::expression::parentheses::{
 use crate::prelude::*;
 use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
 use ruff_python_ast::node::AnyNodeRef;
-use rustpython_ast::{BoolOp, ExprBoolOp};
+use ruff_python_ast::{BoolOp, ExprBoolOp};
 
 #[derive(Default)]
 pub struct FormatExprBoolOp {

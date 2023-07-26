@@ -1,6 +1,6 @@
 use crate::{not_yet_implemented, FormatNodeRule, PyFormatter};
 use ruff_formatter::{write, Buffer, FormatResult};
-use rustpython_ast::StmtGlobal;
+use ruff_python_ast::StmtGlobal;
 
 #[derive(Default)]
 pub struct FormatStmtGlobal;

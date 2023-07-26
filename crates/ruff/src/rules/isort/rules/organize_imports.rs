@@ -1,8 +1,8 @@
 use std::path::Path;
 
 use itertools::{EitherOrBoth, Itertools};
+use ruff_python_ast::{Ranged, Stmt};
 use ruff_text_size::TextRange;
-use rustpython_ast::{Ranged, Stmt};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};

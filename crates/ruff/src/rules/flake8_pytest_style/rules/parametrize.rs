@@ -1,6 +1,6 @@
+use ruff_python_ast::{self as ast, Constant, Decorator, Expr, ExprContext, Ranged};
+use ruff_python_parser::{lexer, Mode, Tok};
 use ruff_text_size::TextRange;
-use rustpython_ast::{self as ast, Constant, Decorator, Expr, ExprContext, Ranged};
-use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};

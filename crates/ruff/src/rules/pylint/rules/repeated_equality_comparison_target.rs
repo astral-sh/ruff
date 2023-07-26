@@ -2,8 +2,8 @@ use std::hash::BuildHasherDefault;
 use std::ops::Deref;
 
 use itertools::{any, Itertools};
+use ruff_python_ast::{BoolOp, CmpOp, Expr, ExprBoolOp, ExprCompare, Ranged};
 use rustc_hash::FxHashMap;
-use rustpython_ast::{BoolOp, CmpOp, Expr, ExprBoolOp, ExprCompare, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};

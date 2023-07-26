@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use rustpython_ast::{Alias, Ranged, Stmt};
+use ruff_python_ast::{Alias, Ranged, Stmt};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};

@@ -1,5 +1,5 @@
+use ruff_python_ast::{self as ast, Expr, Ranged, Stmt};
 use rustc_hash::FxHashSet;
-use rustpython_ast::{self as ast, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Fix};

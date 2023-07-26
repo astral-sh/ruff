@@ -1,14 +1,14 @@
 //! Generate Python source code from an abstract syntax tree (AST).
 
-use rustpython_ast::ArgWithDefault;
+use ruff_python_ast::ArgWithDefault;
 use std::ops::Deref;
 
-use rustpython_ast::{
+use ruff_python_ast::{
     self as ast, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Constant, ConversionFlag,
     ExceptHandler, Expr, Identifier, MatchCase, Operator, Pattern, Stmt, Suite, TypeParam,
     TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
 };
-use rustpython_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
+use ruff_python_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
 
 use ruff_source_file::LineEnding;
 
@@ -972,7 +972,7 @@ impl<'a> Generator<'a> {
                 let (op, prec) = opprec!(
                     un,
                     op,
-                    rustpython_ast::UnaryOp,
+                    ruff_python_ast::UnaryOp,
                     Invert("~", INVERT),
                     Not("not ", NOT),
                     UAdd("+", UADD),
@@ -1298,7 +1298,7 @@ impl<'a> Generator<'a> {
                 if fp.is_infinite() {
                     self.p(inf_str);
                 } else {
-                    self.p(&rustpython_literal::float::to_string(*fp));
+                    self.p(&ruff_python_literal::float::to_string(*fp));
                 }
             }
             Constant::Complex { real, imag } => {
@@ -1475,8 +1475,8 @@ impl<'a> Generator<'a> {
 
 #[cfg(test)]
 mod tests {
-    use rustpython_ast::{Mod, ModModule, Stmt};
-    use rustpython_parser::{self, Mode, Parse};
+    use ruff_python_ast::{Mod, ModModule, Stmt};
+    use ruff_python_parser::{self, Mode, Parse};
 
     use ruff_source_file::LineEnding;
 
@@ -1509,7 +1509,7 @@ mod tests {
         let indentation = Indentation::default();
         let quote = Quote::default();
         let line_ending = LineEnding::default();
-        let ast = rustpython_parser::parse(contents, Mode::Jupyter, "<filename>").unwrap();
+        let ast = ruff_python_parser::parse(contents, Mode::Jupyter, "<filename>").unwrap();
         let Mod::Module(ModModule { body, .. }) = ast else {
             panic!("Source code didn't return ModModule")
         };

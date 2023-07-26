@@ -4,10 +4,10 @@ use std::fmt;
 use std::ops::Deref;
 
 use once_cell::unsync::OnceCell;
+use ruff_python_literal::escape::Quote as StrQuote;
+use ruff_python_parser::lexer::LexResult;
+use ruff_python_parser::Tok;
 use ruff_source_file::{find_newline, LineEnding};
-use rustpython_literal::escape::Quote as StrQuote;
-use rustpython_parser::lexer::LexResult;
-use rustpython_parser::Tok;
 
 use ruff_python_ast::str::leading_quote;
 use ruff_source_file::Locator;
@@ -163,8 +163,8 @@ impl Deref for Indentation {
 
 #[cfg(test)]
 mod tests {
-    use rustpython_parser::lexer::lex;
-    use rustpython_parser::Mode;
+    use ruff_python_parser::lexer::lex;
+    use ruff_python_parser::Mode;
 
     use ruff_source_file::{find_newline, LineEnding};
 

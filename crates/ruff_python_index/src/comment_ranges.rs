@@ -2,8 +2,8 @@ use itertools::Itertools;
 use std::fmt::{Debug, Formatter};
 use std::ops::Deref;
 
+use ruff_python_parser::Tok;
 use ruff_text_size::TextRange;
-use rustpython_parser::Tok;
 
 /// Stores the ranges of comments sorted by [`TextRange::start`] in increasing order. No two ranges are overlapping.
 #[derive(Clone)]

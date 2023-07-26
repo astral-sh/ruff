@@ -1,4 +1,4 @@
-use rustpython_ast::{Arg, Ranged};
+use ruff_python_ast::{Arg, Ranged};
 
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;

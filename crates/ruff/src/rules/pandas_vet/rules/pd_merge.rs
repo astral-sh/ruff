@@ -1,4 +1,4 @@
-use rustpython_ast::{self as ast, Expr, Ranged};
+use ruff_python_ast::{self as ast, Expr, Ranged};
 
 use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
