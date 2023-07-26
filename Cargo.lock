@@ -2242,6 +2242,7 @@ dependencies = [
  "ruff_python_ast",
  "ruff_python_parser",
  "rustpython-ast",
+ "rustpython-parser",
  "shlex",
  "tracing",
  "tracing-subscriber",

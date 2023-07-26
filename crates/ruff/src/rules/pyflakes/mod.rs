@@ -12,6 +12,7 @@ mod tests {
     use anyhow::Result;
     use regex::Regex;
     use rustpython_parser::lexer::LexResult;
+    use rustpython_parser::Mode;
     use test_case::test_case;
 
     use ruff_diagnostics::Diagnostic;
@@ -504,7 +505,7 @@ mod tests {
     fn flakes(contents: &str, expected: &[Rule]) {
         let contents = dedent(contents);
         let settings = Settings::for_rules(Linter::Pyflakes.rules());
-        let tokens: Vec<LexResult> = ruff_python_parser::tokenize(&contents);
+        let tokens: Vec<LexResult> = ruff_python_parser::tokenize(&contents, Mode::Module);
         let locator = Locator::new(&contents);
         let stylist = Stylist::from_tokens(&tokens, &locator);
         let indexer = Indexer::from_tokens(&tokens, &locator);

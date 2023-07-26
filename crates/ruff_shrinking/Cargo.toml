@@ -13,6 +13,7 @@ regex = { workspace = true }
 ruff_python_ast = { path = "../ruff_python_ast" }
 ruff_python_parser = { path = "../ruff_python_parser" }
 rustpython-ast = { workspace = true }
+rustpython-parser = { workspace = true }
 shlex = "1.1.0"
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }

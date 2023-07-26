@@ -302,7 +302,7 @@ mod tests {
     use ruff_text_size::TextSize;
     use rustpython_ast::Suite;
     use rustpython_parser::lexer::LexResult;
-    use rustpython_parser::Parse;
+    use rustpython_parser::{Mode, Parse};
 
     use ruff_python_codegen::Stylist;
     use ruff_source_file::{LineEnding, Locator};
@@ -313,7 +313,7 @@ mod tests {
     fn start_of_file() -> Result<()> {
         fn insert(contents: &str) -> Result<Insertion> {
             let program = Suite::parse(contents, "<filename>")?;
-            let tokens: Vec<LexResult> = ruff_python_parser::tokenize(contents);
+            let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents, Mode::Module);
             let locator = Locator::new(contents);
             let stylist = Stylist::from_tokens(&tokens, &locator);
             Ok(Insertion::start_of_file(&program, &locator, &stylist))
@@ -424,7 +424,7 @@ x = 1
     #[test]
     fn start_of_block() {
         fn insert(contents: &str, offset: TextSize) -> Insertion {
-            let tokens: Vec<LexResult> = ruff_python_parser::tokenize(contents);
+            let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents, Mode::Module);
             let locator = Locator::new(contents);
             let stylist = Stylist::from_tokens(&tokens, &locator);
             Insertion::start_of_block(offset, &locator, &stylist)
