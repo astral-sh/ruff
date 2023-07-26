@@ -8,7 +8,7 @@ use crate::checkers::logical_lines::LogicalLinesContext;
 use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 
 /// ## What it does
-/// Checks for extraneous whitespace immediately before an open parenthesis
+/// Checks for extraneous whitespace immediately after an open parenthesis
 /// or bracket.
 ///
 /// ## Why is this bad?
