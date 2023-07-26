@@ -9,6 +9,26 @@ use crate::checkers::ast::Checker;
 
 use super::helpers;
 
+/// ## What it does
+/// Checks for use of a datetime without use of the `tzinfo` argument
+///
+/// ## Why is this bad?
+/// Naive timestamps lack explicit information about time zone or daylight
+/// saving time rules.  This amibiguity can make naive datetimes difficult to
+/// interpret.  Providing timezone information allows easier reference and
+/// comparison of timestamps.
+///
+/// ## Example
+/// ```python
+/// import datetime
+/// datetime.datetime(2000, 1, 1, 0, 0, 0)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import datetime
+/// datetime.datetime(2000, 1, 1, 0, 0, 0, tzinfo=datetime.timezone.utc)
+/// ```
 #[violation]
 pub struct CallDatetimeWithoutTzinfo;
 
