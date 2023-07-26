@@ -6,6 +6,7 @@ use std::path::Path;
 
 use itertools::Itertools;
 use once_cell::sync::OnceCell;
+use rustpython_parser::lexer::lex;
 use rustpython_parser::Mode;
 use serde::Serialize;
 use serde_json::error::Category;
@@ -13,8 +14,6 @@ use serde_json::error::Category;
 use ruff_diagnostics::Diagnostic;
 use ruff_source_file::{NewlineWithTrailingNewline, UniversalNewlineIterator};
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::lexer::lex;
-use rustpython_parser::Mode;
 
 use crate::autofix::source_map::{SourceMap, SourceMarker};
 use crate::jupyter::index::JupyterIndex;
