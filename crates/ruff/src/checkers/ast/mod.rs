@@ -4419,6 +4419,10 @@ impl<'a> Checker<'a> {
                 .insert(binding_id, shadowed_id);
         }
 
+        if name.starts_with('_') {
+            self.semantic.bindings[binding_id].flags |= BindingFlags::PRIVATE_VARIABLE;
+        }
+
         // Add the binding to the scope.
         let scope = &mut self.semantic.scopes[scope_id];
         scope.add(name, binding_id);
@@ -4481,24 +4485,6 @@ impl<'a> Checker<'a> {
                 BindingFlags::empty(),
             );
             return;
-        }
-
-        if let Stmt::Assign(ast::StmtAssign { targets, value, .. }) = parent {
-            if let [Expr::Name(ast::ExprName { id, range, .. })] = &targets[..] {
-                if id.starts_with('_') {
-                    if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
-                        if self.semantic.match_typing_expr(func, "TypeVar") {
-                            self.add_binding(
-                                id,
-                                *range,
-                                BindingKind::Assignment,
-                                BindingFlags::PRIVATE_TYPE_VAR,
-                            );
-                            return;
-                        }
-                    }
-                }
-            }
         }
 
         let scope = self.semantic.scope();

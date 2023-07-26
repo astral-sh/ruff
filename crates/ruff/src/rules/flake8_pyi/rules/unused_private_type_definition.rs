@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::Locator;
 use ruff_python_semantic::Binding;
+use rustpython_parser::ast::{self, Expr, Stmt};
 
 use crate::checkers::ast::Checker;
 
@@ -34,25 +34,38 @@ impl Violation for UnusedPrivateTypeVar {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnusedPrivateTypeVar { name } = self;
-        format!("TypeVar `{name}` is never used")
+        format!("Private TypeVar `{name}` is never used")
     }
 }
 
 /// PYI018
 pub(crate) fn unused_private_type_var(checker: &Checker, binding: &Binding) -> Option<Diagnostic> {
-    if !binding.kind.is_assignment() {
-        return None;
-    }
-    if !binding.is_private_type_var() {
+    if !binding.kind.is_assignment() && !binding.is_private_variable() {
         return None;
     }
     if binding.is_used() {
         return None;
     }
 
+    let Some(source) = binding.source else {
+        return None;
+    };
+    let Stmt::Assign(ast::StmtAssign {targets, value, ..}) = checker.semantic().stmts[source] else {
+        return None;
+    };
+    let [Expr::Name(ast::ExprName {id, ..})] = &targets[..] else {
+        return None;
+    };
+    let Expr::Call(ast::ExprCall {func, ..}) = value.as_ref() else {
+        return None;
+    };
+    if !checker.semantic().match_typing_expr(func, "TypeVar") {
+        return None;
+    }
+
     Some(Diagnostic::new(
         UnusedPrivateTypeVar {
-            name: binding.name(checker.locator()).to_string(),
+            name: id.to_string(),
         },
         binding.range,
     ))

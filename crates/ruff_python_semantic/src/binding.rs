@@ -94,9 +94,10 @@ impl<'a> Binding<'a> {
         )
     }
 
-    /// Return `true` if this [`Binding`] is a private `typing.TypeVar`.
-    pub const fn is_private_type_var(&self) -> bool {
-        self.flags.contains(BindingFlags::PRIVATE_TYPE_VAR)
+    /// Return `true` if this [`Binding`] represents an private variable
+    /// (e.g., `_x` in `_x = "private variable"`)
+    pub const fn is_private_variable(&self) -> bool {
+        self.flags.contains(BindingFlags::PRIVATE_VARIABLE)
     }
 
     /// Return `true` if this binding redefines the given binding.
@@ -270,14 +271,14 @@ bitflags! {
         /// ```
         const INVALID_ALL_OBJECT = 1 << 6;
 
-        /// The binding represents a private `typing.TypeVar` declaration.
+        /// The binding represents a private variable declaration.
         ///
-        /// For example, the binding could be `_T` in:
+        /// For example, the binding could be `_x` in:
         /// ```python
-        /// import typing
-        /// _T = typing.TypeVar("_T")
+        /// _x = "This is a private variable"
         /// ```
-        const PRIVATE_TYPE_VAR = 1 << 7;
+        // const PRIVATE_TYPE_VAR = 1 << 7;
+        const PRIVATE_VARIABLE = 1 << 7;
     }
 }
 
