@@ -123,6 +123,9 @@ impl Violation for MultipleSpacesAfterOperator {
 /// ## What it does
 /// Checks for extraneous tabs after a comma.
 ///
+/// ## Why is this bad?
+/// Commas should be followed by one space, never tabs.
+///
 /// ## Example
 /// ```python
 /// a = 4,\t5
