@@ -1349,6 +1349,7 @@ where
     }
 
     fn visit_type_param(&mut self, type_param: &'b ast::TypeParam) {
+        // Step 1: Binding
         match type_param {
             ast::TypeParam::TypeVar(ast::TypeParamTypeVar { name, range, .. })
             | ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { name, range, .. })
@@ -1361,6 +1362,7 @@ where
                 );
             }
         }
+        // Step 2: Traversal
         self.deferred
             .type_param_definitions
             .push((type_param, self.semantic.snapshot()));
