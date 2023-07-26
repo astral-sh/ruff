@@ -1,9 +1,9 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: 44f1432ea449af8f70398fcbc3e641e2fd720734693a493e635795dd681954e0
+// sha3: bfe8038efa3e290b9841ea2f84a2278ded65476a00892aa448e9708655ccb86d
 use num_bigint::BigInt;
 use ruff_text_size::TextSize;
+use ruff_python_ast::{self as ast, Ranged, MagicKind};
 use crate::{
-    ast::{self as ast, Ranged, MagicKind},
     Mode,
     lexer::{LexicalError, LexicalErrorType},
     function::{ArgumentList, parse_args, validate_pos_params, validate_arguments},
@@ -24,8 +24,8 @@ mod __parse__Top {
 
     use num_bigint::BigInt;
     use ruff_text_size::TextSize;
+    use ruff_python_ast::{self as ast, Ranged, MagicKind};
     use crate::{
-    ast::{self as ast, Ranged, MagicKind},
     Mode,
     lexer::{LexicalError, LexicalErrorType},
     function::{ArgumentList, parse_args, validate_pos_params, validate_arguments},

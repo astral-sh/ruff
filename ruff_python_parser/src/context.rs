@@ -1,4 +1,4 @@
-use crate::ast::{self, Expr, ExprContext};
+use ruff_python_ast::{self as ast, Expr, ExprContext};
 
 pub(crate) fn set_context(expr: Expr, ctx: ExprContext) -> Expr {
     match expr {
@@ -49,7 +49,8 @@ pub(crate) fn set_context(expr: Expr, ctx: ExprContext) -> Expr {
 
 #[cfg(test)]
 mod tests {
-    use crate::{ast, Parse};
+    use crate::Parse;
+    use ruff_python_ast as ast;
 
     #[test]
     fn test_assign_name() {

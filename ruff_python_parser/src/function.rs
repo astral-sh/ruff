@@ -1,10 +1,7 @@
 // Contains functions that perform validation and parsing of arguments and parameters.
 // Checks apply both to functions and to lambdas.
-use crate::{
-    ast,
-    lexer::{LexicalError, LexicalErrorType},
-};
-use ruff_python_ast::Ranged;
+use crate::lexer::{LexicalError, LexicalErrorType};
+use ruff_python_ast::{self as ast, Ranged};
 use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::FxHashSet;
 
@@ -138,7 +135,8 @@ const fn is_starred(exp: &ast::Expr) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ast, parser::ParseErrorType, Parse};
+    use crate::{Parse, ParseErrorType};
+    use ruff_python_ast::{self as ast};
 
     macro_rules! function_and_lambda {
         ($($name:ident: $code:expr,)*) => {

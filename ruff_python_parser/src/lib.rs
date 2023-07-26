@@ -94,7 +94,8 @@
 //! mode or tokenizing the source beforehand:
 //!
 //! ```
-//! use ruff_python_parser::{Parse, ast};
+//! use ruff_python_parser::{Parse};
+//! use ruff_python_ast as ast;
 //!
 //! let python_source = r#"
 //! def is_odd(i):
@@ -112,7 +113,6 @@
 pub use parser::{parse, parse_starts_at, parse_tokens, Parse, ParseError, ParseErrorType};
 #[allow(deprecated)]
 pub use parser::{parse_expression, parse_expression_starts_at, parse_program};
-pub use ruff_python_ast as ast;
 pub use string::FStringErrorType;
 pub use token::{StringKind, Tok};
 

@@ -1,17 +1,19 @@
+use itertools::Itertools;
+
+use ruff_python_ast::{self as ast, Constant, Expr};
+use ruff_python_ast::{ConversionFlag, Ranged};
+use ruff_text_size::{TextLen, TextRange, TextSize};
+
 // Contains the logic for parsing string literals (mostly concerned with f-strings.)
 //
 // The lexer doesn't do any special handling of f-strings, it just treats them as
 // regular strings. Since the ruff_python_parser has no definition of f-string formats (Pending PEP 701)
 // we have to do the parsing here, manually.
 use crate::{
-    ast::{self, Constant, Expr},
     lexer::{LexicalError, LexicalErrorType},
     parser::{LalrpopError, Parse, ParseError, ParseErrorType},
     token::{StringKind, Tok},
 };
-use itertools::Itertools;
-use ruff_python_ast::{ConversionFlag, Ranged};
-use ruff_text_size::{TextLen, TextRange, TextSize};
 
 // unicode_name2 does not expose `MAX_NAME_LENGTH`, so we replicate that constant here, fix #3798
 const MAX_UNICODE_NAME: usize = 88;
@@ -831,8 +833,10 @@ impl From<FStringError> for LalrpopError<TextSize, Tok, LexicalError> {
 
 #[cfg(test)]
 mod tests {
+    use crate::Parse;
+    use ruff_python_ast as ast;
+
     use super::*;
-    use crate::{ast, Parse};
 
     fn parse_fstring(source: &str) -> Result<Vec<Expr>, LexicalError> {
         StringParser::new(source, StringKind::FString, false, TextSize::default()).parse()

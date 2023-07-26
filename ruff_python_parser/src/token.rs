@@ -4,9 +4,9 @@
 //! loosely based on the token definitions found in the [CPython source].
 //!
 //! [CPython source]: https://github.com/python/cpython/blob/dfc2e065a2e71011017077e549cd2f9bf4944c54/Include/internal/pycore_token.h;
-use crate::ast::MagicKind;
 use crate::Mode;
 use num_bigint::BigInt;
+use ruff_python_ast::MagicKind;
 use ruff_text_size::TextSize;
 use std::fmt;
 

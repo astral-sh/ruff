@@ -20,12 +20,12 @@ use ruff_text_size::TextSize;
 
 use crate::lexer::{lex, lex_starts_at};
 use crate::{
-    ast::{self, Ranged},
     lexer::{self, LexResult, LexicalError, LexicalErrorType},
     python,
     token::Tok,
     Mode,
 };
+use ruff_python_ast::{self as ast, Ranged};
 
 /// Parse Python code string to implementor's type.
 ///
@@ -34,7 +34,8 @@ use crate::{
 /// For example, parsing a simple function definition and a call to that function:
 ///
 /// ```
-/// use ruff_python_parser::{self as parser, ast, Parse};
+/// use ruff_python_parser::{self as parser, Parse};
+/// use ruff_python_ast as ast;
 /// let source = r#"
 /// def foo():
 ///    return 42
@@ -50,7 +51,8 @@ use crate::{
 ///
 /// ```
 /// # use ruff_text_size::TextSize;
-/// # use ruff_python_parser::{self as parser, ast, Parse};
+/// # use ruff_python_ast as ast;
+/// # use ruff_python_parser::{self as parser, Parse};
 ///
 /// let expr = ast::Expr::parse_starts_at("1 + 2", "<embedded>", TextSize::from(400));
 /// assert!(expr.is_ok());
@@ -582,8 +584,9 @@ include!("gen/parse.rs");
 
 #[cfg(test)]
 mod tests {
-    use crate::{ast, Parse};
+    use crate::Parse;
     use insta::assert_debug_snapshot;
+    use ruff_python_ast as ast;
 
     use super::*;
 
