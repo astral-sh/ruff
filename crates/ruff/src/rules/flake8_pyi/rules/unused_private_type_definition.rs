@@ -3,6 +3,8 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_semantic::Binding;
 
+use crate::checkers::ast::Checker;
+
 /// ## What it does
 /// Checks for the presence of unused private `TypeVar` declarations.
 ///
@@ -37,7 +39,7 @@ impl Violation for UnusedPrivateTypeVar {
 }
 
 /// PYI018
-pub(crate) fn unused_private_type_var(binding: &Binding, locator: &Locator) -> Option<Diagnostic> {
+pub(crate) fn unused_private_type_var(checker: &Checker, binding: &Binding) -> Option<Diagnostic> {
     if !binding.kind.is_assignment() {
         return None;
     }
@@ -50,7 +52,7 @@ pub(crate) fn unused_private_type_var(binding: &Binding, locator: &Locator) -> O
 
     Some(Diagnostic::new(
         UnusedPrivateTypeVar {
-            name: binding.name(locator).to_string(),
+            name: binding.name(checker.locator()).to_string(),
         },
         binding.range,
     ))

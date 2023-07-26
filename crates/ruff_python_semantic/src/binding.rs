@@ -270,7 +270,7 @@ bitflags! {
         /// ```
         const INVALID_ALL_OBJECT = 1 << 6;
 
-        /// The binding represents and private `TypeVar` declaration.
+        /// The binding represents a private `typing.TypeVar` declaration.
         ///
         /// For example, the binding could be `_T` in:
         /// ```python

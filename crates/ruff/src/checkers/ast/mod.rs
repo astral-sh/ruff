@@ -4822,7 +4822,7 @@ impl<'a> Checker<'a> {
                 }
                 if self.enabled(Rule::UnusedPrivateTypeVar) {
                     if let Some(diagnostic) =
-                        flake8_pyi::rules::unused_private_type_var(binding, self.locator)
+                        flake8_pyi::rules::unused_private_type_var(self, binding)
                     {
                         self.diagnostics.push(diagnostic);
                     }
