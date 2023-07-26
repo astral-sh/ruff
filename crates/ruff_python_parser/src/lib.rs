@@ -130,9 +130,9 @@ mod token;
 pub mod typing;
 
 /// Collect tokens up to and including the first error.
-pub fn tokenize(contents: &str) -> Vec<LexResult> {
+pub fn tokenize(contents: &str, mode: Mode) -> Vec<LexResult> {
     let mut tokens: Vec<LexResult> = vec![];
-    for tok in lexer::lex(contents, Mode::Module) {
+    for tok in lexer::lex(contents, mode) {
         let is_err = tok.is_err();
         tokens.push(tok);
         if is_err {
@@ -146,8 +146,14 @@ pub fn tokenize(contents: &str) -> Vec<LexResult> {
 pub fn parse_program_tokens(
     lxr: Vec<LexResult>,
     source_path: &str,
+    is_jupyter_notebook: bool,
 ) -> anyhow::Result<Suite, ParseError> {
-    match parse_tokens(lxr, Mode::Module, source_path)? {
+    let mode = if is_jupyter_notebook {
+        Mode::Jupyter
+    } else {
+        Mode::Module
+    };
+    match parse_tokens(lxr, mode, source_path)? {
         Mod::Module(m) => Ok(m.body),
         Mod::Expression(_) => unreachable!("Mode::Module doesn't return other variant"),
     }

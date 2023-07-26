@@ -7,7 +7,7 @@ use colored::Colorize;
 use itertools::Itertools;
 use log::error;
 use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::ParseError;
+use ruff_python_parser::{Mode, ParseError};
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
@@ -138,7 +138,11 @@ pub fn check_path(
             .iter_enabled()
             .any(|rule_code| rule_code.lint_source().is_imports());
     if use_ast || use_imports || use_doc_lines {
-        match ruff_python_parser::parse_program_tokens(tokens, &path.to_string_lossy()) {
+        match ruff_python_parser::parse_program_tokens(
+            tokens,
+            &path.to_string_lossy(),
+            source_kind.map_or(false, SourceKind::is_jupyter),
+        ) {
             Ok(python_ast) => {
                 if use_ast {
                     diagnostics.extend(check_ast(
@@ -260,7 +264,7 @@ pub fn add_noqa_to_path(path: &Path, package: Option<&Path>, settings: &Settings
     let contents = std::fs::read_to_string(path)?;
 
     // Tokenize once.
-    let tokens: Vec<LexResult> = ruff_python_parser::tokenize(&contents);
+    let tokens: Vec<LexResult> = ruff_python_parser::tokenize(&contents, Mode::Module);
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(&contents);
@@ -327,8 +331,14 @@ pub fn lint_only(
     noqa: flags::Noqa,
     source_kind: Option<&SourceKind>,
 ) -> LinterResult<(Vec<Message>, Option<ImportMap>)> {
+    let mode = if source_kind.map_or(false, SourceKind::is_jupyter) {
+        Mode::Jupyter
+    } else {
+        Mode::Module
+    };
+
     // Tokenize once.
-    let tokens: Vec<LexResult> = ruff_python_parser::tokenize(contents);
+    let tokens: Vec<LexResult> = ruff_python_parser::tokenize(contents, mode);
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(contents);
@@ -417,10 +427,16 @@ pub fn lint_fix<'a>(
     // Track whether the _initial_ source code was parseable.
     let mut parseable = false;
 
+    let mode = if source_kind.is_jupyter() {
+        Mode::Jupyter
+    } else {
+        Mode::Module
+    };
+
     // Continuously autofix until the source code stabilizes.
     loop {
         // Tokenize once.
-        let tokens: Vec<LexResult> = ruff_python_parser::tokenize(&transformed);
+        let tokens: Vec<LexResult> = ruff_python_parser::tokenize(&transformed, mode);
 
         // Map row and column locations to byte slices (lazily).
         let locator = Locator::new(&transformed);

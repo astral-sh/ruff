@@ -197,7 +197,7 @@ impl Workspace {
 
     pub fn check(&self, contents: &str) -> Result<JsValue, Error> {
         // Tokenize once.
-        let tokens: Vec<LexResult> = ruff_python_parser::tokenize(contents);
+        let tokens: Vec<LexResult> = ruff_python_parser::tokenize(contents, Mode::Module);
 
         // Map row and column locations to byte slices (lazily).
         let locator = Locator::new(contents);
