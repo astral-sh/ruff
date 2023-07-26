@@ -1,4 +1,4 @@
-use crate::format::Case;
+use crate::Case;
 use num_traits::{Float, Zero};
 use std::f64;
 

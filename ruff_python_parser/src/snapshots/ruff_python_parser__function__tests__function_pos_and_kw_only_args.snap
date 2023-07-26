@@ -1,0 +1,116 @@
+---
+source: ruff_python_parser/src/function.rs
+expression: parse_ast
+---
+Ok(
+    [
+        FunctionDef(
+            StmtFunctionDef {
+                range: 0..32,
+                name: Identifier {
+                    id: "f",
+                    range: 4..5,
+                },
+                args: Arguments {
+                    range: 5..26,
+                    posonlyargs: [],
+                    args: [
+                        ArgWithDefault {
+                            range: 6..7,
+                            def: Arg {
+                                range: 6..7,
+                                arg: Identifier {
+                                    id: "a",
+                                    range: 6..7,
+                                },
+                                annotation: None,
+                                type_comment: None,
+                            },
+                            default: None,
+                        },
+                        ArgWithDefault {
+                            range: 9..10,
+                            def: Arg {
+                                range: 9..10,
+                                arg: Identifier {
+                                    id: "b",
+                                    range: 9..10,
+                                },
+                                annotation: None,
+                                type_comment: None,
+                            },
+                            default: None,
+                        },
+                        ArgWithDefault {
+                            range: 12..13,
+                            def: Arg {
+                                range: 12..13,
+                                arg: Identifier {
+                                    id: "c",
+                                    range: 12..13,
+                                },
+                                annotation: None,
+                                type_comment: None,
+                            },
+                            default: None,
+                        },
+                    ],
+                    vararg: None,
+                    kwonlyargs: [
+                        ArgWithDefault {
+                            range: 18..19,
+                            def: Arg {
+                                range: 18..19,
+                                arg: Identifier {
+                                    id: "d",
+                                    range: 18..19,
+                                },
+                                annotation: None,
+                                type_comment: None,
+                            },
+                            default: None,
+                        },
+                        ArgWithDefault {
+                            range: 21..22,
+                            def: Arg {
+                                range: 21..22,
+                                arg: Identifier {
+                                    id: "e",
+                                    range: 21..22,
+                                },
+                                annotation: None,
+                                type_comment: None,
+                            },
+                            default: None,
+                        },
+                        ArgWithDefault {
+                            range: 24..25,
+                            def: Arg {
+                                range: 24..25,
+                                arg: Identifier {
+                                    id: "f",
+                                    range: 24..25,
+                                },
+                                annotation: None,
+                                type_comment: None,
+                            },
+                            default: None,
+                        },
+                    ],
+                    kwarg: None,
+                },
+                body: [
+                    Pass(
+                        StmtPass {
+                            range: 28..32,
+                        },
+                    ),
+                ],
+                decorator_list: [],
+                returns: None,
+                type_params: [],
+                type_comment: None,
+            },
+        ),
+    ],
+)

@@ -1,6 +1,6 @@
 [workspace.package]
 version = "0.2.0"
-authors = ["RustPython Team"]
+authors = ["RustPython Team", "Charlie Marsh <charlie.r.marsh@gmail.com>"]
 edition = "2021"
 rust-version = "1.67.1"
 description = "Python parser and its dependencies."
@@ -11,17 +11,16 @@ include = ["LICENSE", "Cargo.toml", "src/**/*.rs"]
 [workspace]
 resolver = "2"
 members = [
-    "ast", "core", "format", "literal", "parser", "ruff_text_size",
+    "ruff_python_ast", "literal", "ruff_python_parser", "ruff_text_size",
 ]
 
 [workspace.dependencies]
-rustpython-ast = { path = "ast", default-features = false }
-rustpython-parser-core = { path = "core", features = [] }
+ruff_python_ast = { path = "ruff_python_ast" }
 rustpython-literal = { path = "literal" }
-rustpython-format = { path = "format" }
-rustpython-parser = { path = "parser", default-features = false }
+ruff_text_size = { path = "ruff_text_size" }
 
 anyhow = "1.0.45"
+bitflags = "2.3.3"
 cfg-if = "1.0"
 insta = "1.14.0"
 itertools = "0.10.3"

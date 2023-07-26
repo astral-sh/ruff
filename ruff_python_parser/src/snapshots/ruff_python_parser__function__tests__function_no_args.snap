@@ -1,0 +1,36 @@
+---
+source: ruff_python_parser/src/function.rs
+expression: parse_ast
+---
+Ok(
+    [
+        FunctionDef(
+            StmtFunctionDef {
+                range: 0..13,
+                name: Identifier {
+                    id: "f",
+                    range: 4..5,
+                },
+                args: Arguments {
+                    range: 5..7,
+                    posonlyargs: [],
+                    args: [],
+                    vararg: None,
+                    kwonlyargs: [],
+                    kwarg: None,
+                },
+                body: [
+                    Pass(
+                        StmtPass {
+                            range: 9..13,
+                        },
+                    ),
+                ],
+                decorator_list: [],
+                returns: None,
+                type_params: [],
+                type_comment: None,
+            },
+        ),
+    ],
+)

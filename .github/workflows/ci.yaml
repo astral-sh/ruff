@@ -59,7 +59,7 @@ jobs:
       - name: install ruff
         run: python -m pip install ruff
       - name: run python lint
-        run: ruff --ignore=E501 ast --show-source
+        run: ruff --ignore=E501 ruff_python_ast --show-source
 
       - name: spell checker
         uses: streetsidesoftware/cspell-action@v2

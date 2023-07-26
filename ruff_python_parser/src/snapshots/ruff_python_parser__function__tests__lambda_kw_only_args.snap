@@ -1,0 +1,75 @@
+---
+source: ruff_python_parser/src/function.rs
+expression: parse_ast
+---
+Ok(
+    [
+        Expr(
+            StmtExpr {
+                range: 0..20,
+                value: Lambda(
+                    ExprLambda {
+                        range: 0..20,
+                        args: Arguments {
+                            range: 7..17,
+                            posonlyargs: [],
+                            args: [],
+                            vararg: None,
+                            kwonlyargs: [
+                                ArgWithDefault {
+                                    range: 10..11,
+                                    def: Arg {
+                                        range: 10..11,
+                                        arg: Identifier {
+                                            id: "a",
+                                            range: 10..11,
+                                        },
+                                        annotation: None,
+                                        type_comment: None,
+                                    },
+                                    default: None,
+                                },
+                                ArgWithDefault {
+                                    range: 13..14,
+                                    def: Arg {
+                                        range: 13..14,
+                                        arg: Identifier {
+                                            id: "b",
+                                            range: 13..14,
+                                        },
+                                        annotation: None,
+                                        type_comment: None,
+                                    },
+                                    default: None,
+                                },
+                                ArgWithDefault {
+                                    range: 16..17,
+                                    def: Arg {
+                                        range: 16..17,
+                                        arg: Identifier {
+                                            id: "c",
+                                            range: 16..17,
+                                        },
+                                        annotation: None,
+                                        type_comment: None,
+                                    },
+                                    default: None,
+                                },
+                            ],
+                            kwarg: None,
+                        },
+                        body: Constant(
+                            ExprConstant {
+                                range: 19..20,
+                                value: Int(
+                                    1,
+                                ),
+                                kind: None,
+                            },
+                        ),
+                    },
+                ),
+            },
+        ),
+    ],
+)

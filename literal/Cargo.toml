@@ -8,9 +8,12 @@ repository = "https://github.com/RustPython/Parser/"
 license = "MIT"
 
 [dependencies]
+bitflags = { workspace = true }
 hexf-parse = "0.2.1"
 is-macro.workspace = true
+itertools = { workspace = true }
 lexical-parse-float = { version = "0.8.0", features = ["format"] }
+num-bigint = { workspace = true }
 num-traits = { workspace = true }
 unic-ucd-category = "0.9"
 
