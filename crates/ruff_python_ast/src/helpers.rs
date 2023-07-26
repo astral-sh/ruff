@@ -828,6 +828,36 @@ pub fn from_relative_import<'a>(module: &'a [String], name: &'a str) -> CallPath
     call_path
 }
 
+pub fn from_relative_import_parts<'a>(
+    module_path: &'a [String],
+    level: Option<u32>,
+    module: Option<&'a str>,
+    member: &'a str,
+) -> CallPath<'a> {
+    let mut call_path: CallPath = SmallVec::with_capacity(module_path.len() + 1);
+
+    // Start with the module path.
+    call_path.extend(module_path.iter().map(String::as_str));
+
+    // Remove segments based on the number of dots.
+    for _ in 0..level.unwrap_or(0) {
+        if call_path.is_empty() {
+            return SmallVec::new();
+        }
+        call_path.pop();
+    }
+
+    // Add the remaining segments.
+    if let Some(module) = module {
+        call_path.extend(module.split('.'));
+    }
+
+    // Add the member.
+    call_path.push(member);
+
+    call_path
+}
+
 /// Given an imported module (based on its relative import level and module name), return the
 /// fully-qualified module path.
 pub fn resolve_imported_module_path<'a>(

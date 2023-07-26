@@ -40,7 +40,9 @@ use ruff_text_size::{TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, IsolationLevel};
 use ruff_python_ast::all::{extract_all_names, DunderAllFlags};
-use ruff_python_ast::helpers::{extract_handled_exceptions, to_module_path};
+use ruff_python_ast::helpers::{
+    extract_handled_exceptions, from_relative_import, from_relative_import_parts, to_module_path,
+};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::str::trailing_quote;
 use ruff_python_ast::visitor::{walk_except_handler, walk_pattern, Visitor};
@@ -398,11 +400,16 @@ where
                         // be "foo.bar". Given `from foo import bar as baz`, `name` would be "baz"
                         // and `qualified_name` would be "foo.bar".
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
+
                         let qualified_name =
                             helpers::format_import_from_member(level, module, &alias.name);
-                        let module = module.unwrap();
-                        let call_path: Box<[&str]> =
-                            module.split('.').chain(once(alias.name.as_str())).collect();
+                        let call_path = from_relative_import_parts(
+                            self.module_path.unwrap_or_default(),
+                            level,
+                            module,
+                            &alias.name,
+                        );
+                        let call_path: Box<[&str]> = call_path.into_boxed_slice();
                         self.add_binding(
                             name,
                             alias.identifier(),
