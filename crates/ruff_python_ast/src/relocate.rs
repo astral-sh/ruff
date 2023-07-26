@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Expr, Keyword};
+use rustpython_ast::{self as ast, Expr, Keyword};
 
 fn relocate_keyword(keyword: &mut Keyword, location: TextRange) {
     relocate_expr(&mut keyword.value, location);
@@ -199,6 +199,9 @@ pub fn relocate_expr(expr: &mut Expr, location: TextRange) {
             if let Some(expr) = step {
                 relocate_expr(expr, location);
             }
+        }
+        Expr::LineMagic(ast::ExprLineMagic { range, .. }) => {
+            *range = location;
         }
     }
 }

@@ -1,5 +1,5 @@
 use ruff_formatter::write;
-use rustpython_parser::ast::ArgWithDefault;
+use rustpython_ast::ArgWithDefault;
 
 use crate::prelude::*;
 use crate::FormatNodeRule;

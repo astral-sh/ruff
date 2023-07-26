@@ -107,6 +107,12 @@ x53 = (
     a.askjdfahdlskjflsajfadhsaf.akjdsf.aksjdlfadhaljsashdfljaf.askjdflhasfdlashdlfaskjfd.asdkjfksahdfkjafs
 )
 
+x6 = (
+    # Check assumption with enclosing nodes
+    a.b
+)
+
+
 ```
 
 ## Output
@@ -189,6 +195,11 @@ x8 = (a + a).b
 x51 = a.b.c
 x52 = a.askjdfahdlskjflsajfadhsaf.akjdsf.aksjdlfadhaljsashdfljaf.askjdflhasfdlashdlfaskjfd.asdkjfksahdfkjafs
 x53 = a.askjdfahdlskjflsajfadhsaf.akjdsf.aksjdlfadhaljsashdfljaf.askjdflhasfdlashdlfaskjfd.asdkjfksahdfkjafs
+
+x6 = (
+    # Check assumption with enclosing nodes
+    a.b
+)
 ```
 
 

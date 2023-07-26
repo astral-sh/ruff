@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, ExceptHandler, Ranged, Stmt};
+use rustpython_ast::{self as ast, ExceptHandler, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};

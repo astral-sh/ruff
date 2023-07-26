@@ -1,14 +1,14 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{
-    self, Arg, ArgWithDefault, Arguments, Constant, Expr, Identifier, Ranged, Stmt,
+use rustpython_ast::{
+    self as ast, Arg, ArgWithDefault, Arguments, Constant, Expr, Identifier, Ranged, Stmt,
 };
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{has_leading_content, has_trailing_content};
-use ruff_python_ast::source_code::Generator;
+use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
-use ruff_python_trivia::{leading_indentation, UniversalNewlines};
+use ruff_python_trivia::{has_leading_content, has_trailing_content, leading_indentation};
+use ruff_source_file::UniversalNewlines;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -113,7 +113,11 @@ pub(crate) fn lambda_assignment(
             // See: https://github.com/astral-sh/ruff/issues/3046
             // See: https://github.com/astral-sh/ruff/issues/5421
             if (annotation.is_some() && checker.semantic().scope().kind.is_class())
-                || checker.semantic().scope().has(id)
+                || checker
+                    .semantic()
+                    .scope()
+                    .get_all(id)
+                    .any(|binding_id| checker.semantic().binding(binding_id).kind.is_annotation())
             {
                 diagnostic.set_fix(Fix::manual(Edit::range_replacement(indented, stmt.range())));
             } else {
@@ -139,9 +143,9 @@ fn extract_types(annotation: &Expr, semantic: &SemanticModel) -> Option<(Vec<Exp
     let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() else {
         return None;
     };
-    if elts.len() != 2 {
+    let [param_types, return_type] = elts.as_slice() else {
         return None;
-    }
+    };
 
     if !semantic
         .resolve_call_path(value)
@@ -155,7 +159,7 @@ fn extract_types(annotation: &Expr, semantic: &SemanticModel) -> Option<(Vec<Exp
 
     // The first argument to `Callable` must be a list of types, parameter
     // specification, or ellipsis.
-    let args = match &elts[0] {
+    let params = match param_types {
         Expr::List(ast::ExprList { elts, .. }) => elts.clone(),
         Expr::Constant(ast::ExprConstant {
             value: Constant::Ellipsis,
@@ -165,9 +169,9 @@ fn extract_types(annotation: &Expr, semantic: &SemanticModel) -> Option<(Vec<Exp
     };
 
     // The second argument to `Callable` must be a type.
-    let return_type = elts[1].clone();
+    let return_type = return_type.clone();
 
-    Some((args, return_type))
+    Some((params, return_type))
 }
 
 fn function(

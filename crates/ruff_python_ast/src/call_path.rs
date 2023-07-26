@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr};
+use rustpython_ast::{self as ast, Expr};
 use smallvec::{smallvec, SmallVec};
 
 /// A representation of a qualified name, like `typing.List`.

@@ -1,7 +1,7 @@
-use rustpython_ast::{ArgWithDefault, ElifElseClause, Mod, TypeIgnore};
-use rustpython_parser::ast::{
-    self, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Constant, Decorator, ExceptHandler,
-    Expr, Keyword, MatchCase, Operator, Pattern, Stmt, UnaryOp, WithItem,
+use rustpython_ast::{
+    self as ast, Alias, Arg, ArgWithDefault, Arguments, BoolOp, CmpOp, Comprehension, Constant,
+    Decorator, ElifElseClause, ExceptHandler, Expr, Keyword, MatchCase, Mod, Operator, Pattern,
+    Stmt, TypeIgnore, TypeParam, TypeParamTypeVar, UnaryOp, WithItem,
 };
 
 /// Visitor that traverses all nodes recursively in pre-order.
@@ -80,6 +80,10 @@ pub trait PreorderVisitor<'a> {
         walk_with_item(self, with_item);
     }
 
+    fn visit_type_param(&mut self, type_param: &'a TypeParam) {
+        walk_type_param(self, type_param);
+    }
+
     fn visit_match_case(&mut self, match_case: &'a MatchCase) {
         walk_match_case(self, match_case);
     }
@@ -156,6 +160,7 @@ where
             body,
             decorator_list,
             returns,
+            type_params,
             ..
         })
         | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
@@ -163,10 +168,15 @@ where
             body,
             decorator_list,
             returns,
+            type_params,
             ..
         }) => {
             for decorator in decorator_list {
                 visitor.visit_decorator(decorator);
+            }
+
+            for type_param in type_params {
+                visitor.visit_type_param(type_param);
             }
 
             visitor.visit_arguments(args);
@@ -183,10 +193,15 @@ where
             keywords,
             body,
             decorator_list,
+            type_params,
             ..
         }) => {
             for decorator in decorator_list {
                 visitor.visit_decorator(decorator);
+            }
+
+            for type_param in type_params {
+                visitor.visit_type_param(type_param);
             }
 
             for expr in bases {
@@ -216,6 +231,19 @@ where
             for expr in targets {
                 visitor.visit_expr(expr);
             }
+        }
+
+        Stmt::TypeAlias(ast::StmtTypeAlias {
+            range: _range,
+            name,
+            type_params,
+            value,
+        }) => {
+            visitor.visit_expr(name);
+            for type_param in type_params {
+                visitor.visit_type_param(type_param);
+            }
+            visitor.visit_expr(value);
         }
 
         Stmt::Assign(ast::StmtAssign {
@@ -399,8 +427,8 @@ where
         | Stmt::Break(_)
         | Stmt::Continue(_)
         | Stmt::Global(_)
-        | Stmt::Nonlocal(_) => {}
-        Stmt::TypeAlias(_) => todo!(),
+        | Stmt::Nonlocal(_)
+        | Stmt::LineMagic(_) => {}
     }
 }
 
@@ -695,6 +723,7 @@ where
                 visitor.visit_expr(expr);
             }
         }
+        Expr::LineMagic(_) => (),
     }
 }
 
@@ -802,6 +831,24 @@ where
 
     if let Some(expr) = &with_item.optional_vars {
         visitor.visit_expr(expr);
+    }
+}
+
+pub fn walk_type_param<'a, V>(visitor: &mut V, type_param: &'a TypeParam)
+where
+    V: PreorderVisitor<'a> + ?Sized,
+{
+    match type_param {
+        TypeParam::TypeVar(TypeParamTypeVar {
+            bound,
+            name: _,
+            range: _,
+        }) => {
+            if let Some(expr) = bound {
+                visitor.visit_expr(expr);
+            }
+        }
+        TypeParam::TypeVarTuple(_) | TypeParam::ParamSpec(_) => {}
     }
 }
 
@@ -947,9 +994,9 @@ mod tests {
     use crate::visitor::preorder::{
         walk_alias, walk_arg, walk_arguments, walk_comprehension, walk_except_handler, walk_expr,
         walk_keyword, walk_match_case, walk_module, walk_pattern, walk_stmt, walk_type_ignore,
-        walk_with_item, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Constant,
-        ExceptHandler, Expr, Keyword, MatchCase, Mod, Operator, Pattern, PreorderVisitor, Stmt,
-        TypeIgnore, UnaryOp, WithItem,
+        walk_type_param, walk_with_item, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension,
+        Constant, ExceptHandler, Expr, Keyword, MatchCase, Mod, Operator, Pattern, PreorderVisitor,
+        Stmt, TypeIgnore, TypeParam, UnaryOp, WithItem,
     };
 
     #[test]
@@ -1032,6 +1079,33 @@ def a():
 class A:
     pass
 "#;
+
+        let trace = trace_preorder_visitation(source);
+
+        assert_snapshot!(trace);
+    }
+
+    #[test]
+    fn type_aliases() {
+        let source = r#"type X[T: str, U, *Ts, **P] = list[T]"#;
+
+        let trace = trace_preorder_visitation(source);
+
+        assert_snapshot!(trace);
+    }
+
+    #[test]
+    fn class_type_parameters() {
+        let source = r#"class X[T: str, U, *Ts, **P]: ..."#;
+
+        let trace = trace_preorder_visitation(source);
+
+        assert_snapshot!(trace);
+    }
+
+    #[test]
+    fn function_type_parameters() {
+        let source = r#"def X[T: str, U, *Ts, **P](): ..."#;
 
         let trace = trace_preorder_visitation(source);
 
@@ -1186,6 +1260,12 @@ class A:
         fn visit_type_ignore(&mut self, type_ignore: &TypeIgnore) {
             self.enter_node(type_ignore);
             walk_type_ignore(self, type_ignore);
+            self.exit_node();
+        }
+
+        fn visit_type_param(&mut self, type_param: &TypeParam) {
+            self.enter_node(type_param);
+            walk_type_param(self, type_param);
             self.exit_node();
         }
     }

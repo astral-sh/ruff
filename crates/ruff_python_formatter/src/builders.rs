@@ -1,5 +1,5 @@
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::Ranged;
+use rustpython_ast::Ranged;
 
 use crate::comments::{dangling_comments, SourceComment};
 use ruff_formatter::{format_args, write, Argument, Arguments};
@@ -377,7 +377,7 @@ impl<'ast> Format<PyFormatContext<'ast>> for EmptyWithDanglingComments<'_> {
 
 #[cfg(test)]
 mod tests {
-    use rustpython_parser::ast::ModModule;
+    use rustpython_ast::ModModule;
     use rustpython_parser::Parse;
 
     use ruff_formatter::format;

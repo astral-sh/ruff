@@ -8,7 +8,7 @@ use bitflags::bitflags;
 use colored::Colorize;
 use ruff_text_size::{TextRange, TextSize};
 
-use ruff_python_ast::source_code::{OneIndexed, SourceLocation};
+use ruff_source_file::{OneIndexed, SourceLocation};
 
 use crate::fs::relativize_path;
 use crate::jupyter::{JupyterIndex, Notebook};

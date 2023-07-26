@@ -1,7 +1,8 @@
-use rustpython_parser::ast::{self, Constant, Expr, Operator, Ranged};
+use rustpython_ast::{self as ast, Constant, Expr, Operator, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_source_file::Locator;
 
 /// ## What it does
 /// Checks for string literals that are explicitly concatenated (using the
@@ -38,12 +39,12 @@ impl Violation for ExplicitStringConcatenation {
 }
 
 /// ISC003
-pub(crate) fn explicit(expr: &Expr) -> Option<Diagnostic> {
+pub(crate) fn explicit(expr: &Expr, locator: &Locator) -> Option<Diagnostic> {
     if let Expr::BinOp(ast::ExprBinOp {
         left,
         op,
         right,
-        range: _,
+        range,
     }) = expr
     {
         if matches!(op, Operator::Add) {
@@ -61,7 +62,8 @@ pub(crate) fn explicit(expr: &Expr) -> Option<Diagnostic> {
                         value: Constant::Str(..) | Constant::Bytes(..),
                         ..
                     })
-            ) {
+            ) && locator.contains_line_break(*range)
+            {
                 return Some(Diagnostic::new(ExplicitStringConcatenation, expr.range()));
             }
         }

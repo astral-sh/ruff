@@ -1,5 +1,6 @@
 use rustpython_parser::Tok;
 
+// TODO move to ruff_python_parser?
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub enum TokenKind {
     /// Token value for a name, commonly known as an identifier.
@@ -12,6 +13,8 @@ pub enum TokenKind {
     Complex,
     /// Token value for a string.
     String,
+    /// Token value for a Jupyter magic command.
+    MagicCommand,
     /// Token value for a comment. These are filtered out of the token stream prior to parsing.
     Comment,
     /// Token value for a newline.
@@ -339,6 +342,7 @@ impl TokenKind {
             Tok::Float { .. } => TokenKind::Float,
             Tok::Complex { .. } => TokenKind::Complex,
             Tok::String { .. } => TokenKind::String,
+            Tok::MagicCommand { .. } => TokenKind::MagicCommand,
             Tok::Comment(_) => TokenKind::Comment,
             Tok::Newline => TokenKind::Newline,
             Tok::NonLogicalNewline => TokenKind::NonLogicalNewline,
@@ -433,7 +437,6 @@ impl TokenKind {
             Tok::StartModule => TokenKind::StartModule,
             Tok::StartInteractive => TokenKind::StartInteractive,
             Tok::StartExpression => TokenKind::StartExpression,
-            Tok::MagicCommand { .. } => todo!(),
         }
     }
 }

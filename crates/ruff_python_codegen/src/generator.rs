@@ -3,16 +3,16 @@
 use rustpython_ast::ArgWithDefault;
 use std::ops::Deref;
 
-use rustpython_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
-use rustpython_parser::ast::{
-    self, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Constant, ConversionFlag,
+use rustpython_ast::{
+    self as ast, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Constant, ConversionFlag,
     ExceptHandler, Expr, Identifier, MatchCase, Operator, Pattern, Stmt, Suite, TypeParam,
     TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
 };
+use rustpython_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
 
-use ruff_python_trivia::LineEnding;
+use ruff_source_file::LineEnding;
 
-use crate::source_code::stylist::{Indentation, Quote, Stylist};
+use super::stylist::{Indentation, Quote, Stylist};
 
 mod precedence {
     pub(crate) const ASSIGN: u8 = 3;
@@ -720,6 +720,11 @@ impl<'a> Generator<'a> {
                     self.p("continue");
                 });
             }
+            Stmt::LineMagic(ast::StmtLineMagic { kind, value, .. }) => {
+                statement!({
+                    self.p(&format!("{kind}{value}"));
+                });
+            }
         }
     }
 
@@ -967,7 +972,7 @@ impl<'a> Generator<'a> {
                 let (op, prec) = opprec!(
                     un,
                     op,
-                    rustpython_parser::ast::UnaryOp,
+                    rustpython_ast::UnaryOp,
                     Invert("~", INVERT),
                     Not("not ", NOT),
                     UAdd("+", UADD),
@@ -1270,6 +1275,9 @@ impl<'a> Generator<'a> {
                     self.unparse_expr(step, precedence::SLICE);
                 }
             }
+            Expr::LineMagic(ast::ExprLineMagic { kind, value, .. }) => {
+                self.p(&format!("{kind}{value}"));
+            }
         }
     }
 
@@ -1467,13 +1475,13 @@ impl<'a> Generator<'a> {
 
 #[cfg(test)]
 mod tests {
-    use rustpython_ast::Stmt;
-    use rustpython_parser::Parse;
+    use rustpython_ast::{Mod, ModModule, Stmt};
+    use rustpython_parser::{self, Mode, Parse};
 
-    use ruff_python_trivia::LineEnding;
+    use ruff_source_file::LineEnding;
 
-    use crate::source_code::stylist::{Indentation, Quote};
-    use crate::source_code::Generator;
+    use super::Generator;
+    use crate::stylist::{Indentation, Quote};
 
     fn round_trip(contents: &str) -> String {
         let indentation = Indentation::default();
@@ -1497,6 +1505,22 @@ mod tests {
         generator.generate()
     }
 
+    fn jupyter_round_trip(contents: &str) -> String {
+        let indentation = Indentation::default();
+        let quote = Quote::default();
+        let line_ending = LineEnding::default();
+        let ast = rustpython_parser::parse(contents, Mode::Jupyter, "<filename>").unwrap();
+        let Mod::Module(ModModule { body, .. }) = ast else {
+            panic!("Source code didn't return ModModule")
+        };
+        let [stmt] = body.as_slice() else {
+            panic!("Expected only one statement in source code")
+        };
+        let mut generator = Generator::new(&indentation, quote, line_ending);
+        generator.unparse_stmt(stmt);
+        generator.generate()
+    }
+
     macro_rules! assert_round_trip {
         ($contents:expr) => {
             assert_eq!(
@@ -1504,6 +1528,19 @@ mod tests {
                 $contents.replace('\n', LineEnding::default().as_str())
             );
         };
+    }
+
+    #[test]
+    fn unparse_magic_commands() {
+        assert_eq!(
+            jupyter_round_trip("%matplotlib inline"),
+            "%matplotlib inline"
+        );
+        assert_eq!(
+            jupyter_round_trip("%matplotlib \\\n  inline"),
+            "%matplotlib   inline"
+        );
+        assert_eq!(jupyter_round_trip("dir = !pwd"), "dir = !pwd");
     }
 
     #[test]

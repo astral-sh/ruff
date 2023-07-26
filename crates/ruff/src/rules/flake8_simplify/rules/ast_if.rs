@@ -1,18 +1,19 @@
 use log::error;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
-use rustpython_parser::ast::{
-    self, CmpOp, Constant, ElifElseClause, Expr, ExprContext, Identifier, Ranged, Stmt, StmtIf,
+use rustpython_ast::{
+    self as ast, CmpOp, Constant, ElifElseClause, Expr, ExprContext, Identifier, Ranged, Stmt,
+    StmtIf,
 };
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::{ComparableConstant, ComparableExpr, ComparableStmt};
-use ruff_python_ast::helpers::{any_over_expr, contains_effect, first_colon_range, has_comments};
-use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::helpers::{any_over_expr, contains_effect};
 use ruff_python_ast::stmt_if::{if_elif_branches, IfElifBranch};
+use ruff_python_parser::first_colon_range;
 use ruff_python_semantic::SemanticModel;
-use ruff_python_trivia::UniversalNewlines;
+use ruff_source_file::{Locator, UniversalNewlines};
 
 use crate::checkers::ast::Checker;
 use crate::line_width::LineWidth;
@@ -312,7 +313,8 @@ fn find_last_nested_if(body: &[Stmt]) -> Option<(&Expr, &Stmt)> {
     })
 }
 
-fn nested_if_body(stmt_if: &StmtIf) -> Option<(&[Stmt], TextRange)> {
+/// Returns the body, the range of the `if` or `elif` and whether the range is for an `if` or `elif`
+fn nested_if_body(stmt_if: &StmtIf) -> Option<(&[Stmt], TextRange, bool)> {
     let StmtIf {
         test,
         body,
@@ -322,15 +324,15 @@ fn nested_if_body(stmt_if: &StmtIf) -> Option<(&[Stmt], TextRange)> {
 
     // It must be the last condition, otherwise there could be another `elif` or `else` that only
     // depends on the outer of the two conditions
-    let (test, body, range) = if let Some(clause) = elif_else_clauses.last() {
+    let (test, body, range, is_elif) = if let Some(clause) = elif_else_clauses.last() {
         if let Some(test) = &clause.test {
-            (test, &clause.body, clause.range())
+            (test, &clause.body, clause.range(), true)
         } else {
             // The last condition is an `else` (different rule)
             return None;
         }
     } else {
-        (test.as_ref(), body, stmt_if.range())
+        (test.as_ref(), body, stmt_if.range(), false)
     };
 
     // The nested if must be the only child, otherwise there is at least one more statement that
@@ -355,12 +357,12 @@ fn nested_if_body(stmt_if: &StmtIf) -> Option<(&[Stmt], TextRange)> {
         return None;
     }
 
-    Some((body, range))
+    Some((body, range, is_elif))
 }
 
 /// SIM102
 pub(crate) fn nested_if_statements(checker: &mut Checker, stmt_if: &StmtIf, parent: Option<&Stmt>) {
-    let Some((body, range)) = nested_if_body(stmt_if) else {
+    let Some((body, range, is_elif)) = nested_if_body(stmt_if) else {
         return;
     };
 
@@ -371,12 +373,12 @@ pub(crate) fn nested_if_statements(checker: &mut Checker, stmt_if: &StmtIf, pare
 
     let colon = first_colon_range(
         TextRange::new(test.end(), first_stmt.start()),
-        checker.locator(),
+        checker.locator().contents(),
     );
 
     // Check if the parent is already emitting a larger diagnostic including this if statement
     if let Some(Stmt::If(stmt_if)) = parent {
-        if let Some((body, _range)) = nested_if_body(stmt_if) {
+        if let Some((body, _range, _is_elif)) = nested_if_body(stmt_if) {
             // In addition to repeating the `nested_if_body` and `find_last_nested_if` check, we
             // also need to be the first child in the parent
             if matches!(&body[0], Stmt::If(inner) if inner == stmt_if)
@@ -400,7 +402,12 @@ pub(crate) fn nested_if_statements(checker: &mut Checker, stmt_if: &StmtIf, pare
             .comment_ranges()
             .intersects(TextRange::new(range.start(), nested_if.start()))
         {
-            match fix_if::fix_nested_if_statements(checker.locator(), checker.stylist(), range) {
+            match fix_if::fix_nested_if_statements(
+                checker.locator(),
+                checker.stylist(),
+                range,
+                is_elif,
+            ) {
                 Ok(edit) => {
                     if edit
                         .content()
@@ -508,7 +515,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
     if checker.patch(diagnostic.kind.rule()) {
         if matches!(if_return, Bool::True)
             && matches!(else_return, Bool::False)
-            && !has_comments(&range, checker.locator(), checker.indexer())
+            && !checker.indexer().has_comments(&range, checker.locator())
             && (if_test.is_compare_expr() || checker.semantic().is_builtin("bool"))
         {
             if if_test.is_compare_expr() {
@@ -666,7 +673,7 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt) {
         stmt.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        if !has_comments(stmt, checker.locator(), checker.indexer()) {
+        if !checker.indexer().has_comments(stmt, checker.locator()) {
             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                 contents,
                 stmt.range(),
@@ -972,7 +979,7 @@ pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &StmtIf)
         stmt_if.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        if !has_comments(stmt_if, checker.locator(), checker.indexer()) {
+        if !checker.indexer().has_comments(stmt_if, checker.locator()) {
             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                 contents,
                 stmt_if.range(),

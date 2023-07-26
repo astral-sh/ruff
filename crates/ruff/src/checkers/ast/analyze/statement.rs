@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
+use rustpython_ast::{self as ast, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::helpers;
@@ -34,7 +34,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     pycodestyle::rules::ambiguous_variable_name(name, name.range())
                 }));
             }
-
             if checker.enabled(Rule::NonlocalWithoutBinding) {
                 if !checker.semantic.scope_id.is_global() {
                     for name in names {
@@ -333,10 +332,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if let ScopeKind::Class(class_def) = checker.semantic.scope().kind {
                 if checker.enabled(Rule::BuiltinAttributeShadowing) {
-                    flake8_builtins::rules::builtin_attribute_shadowing(
+                    flake8_builtins::rules::builtin_method_shadowing(
                         checker,
                         class_def,
                         name,
+                        decorator_list,
                         name.range(),
                     );
                 }

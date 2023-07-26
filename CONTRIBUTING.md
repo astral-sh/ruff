@@ -71,7 +71,7 @@ pipx install pre-commit  # or `pip install pre-commit` if you have a virtualenv
 
 ### Development
 
-After cloning the repository, run Ruff locally with:
+After cloning the repository, run Ruff locally from the repository root with:
 
 ```shell
 cargo run -p ruff_cli -- check /path/to/file.py --no-cache

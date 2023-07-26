@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Stmt};
+use rustpython_ast::{self as ast, Stmt};
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
@@ -8,7 +8,6 @@ use crate::rules::{flake8_bugbear, perflint};
 pub(crate) fn deferred_for_loops(checker: &mut Checker) {
     while !checker.deferred.for_loops.is_empty() {
         let for_loops = std::mem::take(&mut checker.deferred.for_loops);
-
         for snapshot in for_loops {
             checker.semantic.restore(snapshot);
 

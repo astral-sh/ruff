@@ -1,6 +1,6 @@
 use ruff_python_ast::str::raw_contents_range;
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::Ranged;
+use rustpython_ast::Ranged;
 
 use ruff_python_semantic::{BindingKind, ContextualizedDefinition, Export};
 

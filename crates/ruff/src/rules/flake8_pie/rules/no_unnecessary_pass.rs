@@ -1,9 +1,10 @@
-use rustpython_parser::ast::{Ranged, Stmt};
+use rustpython_ast::{Ranged, Stmt};
 
 use ruff_diagnostics::AlwaysAutofixableViolation;
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{is_docstring_stmt, trailing_comment_start_offset};
+use ruff_python_ast::helpers::is_docstring_stmt;
+use ruff_python_ast::whitespace::trailing_comment_start_offset;
 
 use crate::autofix;
 use crate::checkers::ast::Checker;

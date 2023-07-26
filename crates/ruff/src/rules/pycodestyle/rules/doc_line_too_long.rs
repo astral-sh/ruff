@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_trivia::Line;
+use ruff_source_file::Line;
 
 use crate::rules::pycodestyle::helpers::is_overlong;
 use crate::settings::Settings;
@@ -21,6 +21,11 @@ use crate::settings::Settings;
 /// consist of a single "word" (i.e., without any whitespace between its
 /// characters), and lines that end with a URL (as long as the URL starts
 /// before the line-length threshold).
+///
+/// Note that this rule will only be enforced after providing a value for
+/// [`pycodestyle.max-doc-length`] in your Ruff configuration file. If no
+/// value is provided, this rule will be ignored, even if it's added to your
+/// `--select` list.
 ///
 /// If [`pycodestyle.ignore-overlong-task-comments`] is `true`, this rule will
 /// also ignore comments that start with any of the specified [`task-tags`]
@@ -43,6 +48,7 @@ use crate::settings::Settings;
 ///
 /// ## Options
 /// - `task-tags`
+/// - `pycodestyle.max-doc-length`
 /// - `pycodestyle.ignore-overlong-task-comments`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#maximum-line-length

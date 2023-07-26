@@ -15,32 +15,32 @@ export default function SecondarySideBar({
     <SideBar position="right">
       <SideBarEntry
         title="Format (alpha)"
-        selected={selected === "Format"}
-        onClick={() => onSelected("Format")}
+        selected={selected === SecondaryTool.Format}
+        onClick={() => onSelected(SecondaryTool.Format)}
       >
         <FormatIcon />
       </SideBarEntry>
 
       <SideBarEntry
         title="AST"
-        selected={selected === "AST"}
-        onClick={() => onSelected("AST")}
+        selected={selected === SecondaryTool.AST}
+        onClick={() => onSelected(SecondaryTool.AST)}
       >
         <StructureIcon />
       </SideBarEntry>
 
       <SideBarEntry
         title="Tokens"
-        selected={selected === "Tokens"}
-        onClick={() => onSelected("Tokens")}
+        selected={selected === SecondaryTool.Tokens}
+        onClick={() => onSelected(SecondaryTool.Tokens)}
       >
         <TokensIcon />
       </SideBarEntry>
 
       <SideBarEntry
         title="Formatter IR"
-        selected={selected === "FIR"}
-        onClick={() => onSelected("FIR")}
+        selected={selected === SecondaryTool.FIR}
+        onClick={() => onSelected(SecondaryTool.FIR)}
       >
         FIR
       </SideBarEntry>

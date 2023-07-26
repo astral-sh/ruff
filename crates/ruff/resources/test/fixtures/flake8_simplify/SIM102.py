@@ -156,3 +156,12 @@ if False:
 if True:
     if a:
         pass
+
+
+# SIM102
+def f():
+    if a:
+        pass
+    elif b:
+        if c:
+            d

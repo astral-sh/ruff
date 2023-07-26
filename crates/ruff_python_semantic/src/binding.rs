@@ -2,10 +2,10 @@ use std::ops::{Deref, DerefMut};
 
 use bitflags::bitflags;
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::Ranged;
+use rustpython_ast::Ranged;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
-use ruff_python_ast::source_code::Locator;
+use ruff_source_file::Locator;
 
 use crate::context::ExecutionContext;
 use crate::model::SemanticModel;
@@ -274,8 +274,6 @@ bitflags! {
 /// bindings because bindings must be separated by whitespace (and have an assignment).
 #[newtype_index]
 pub struct BindingId;
-
-impl nohash_hasher::IsEnabled for BindingId {}
 
 /// The bindings in a program.
 ///

@@ -1,6 +1,6 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::ExprTuple;
-use rustpython_parser::ast::{Expr, Ranged};
+use rustpython_ast::ExprTuple;
+use rustpython_ast::{Expr, Ranged};
 
 use ruff_formatter::{format_args, write, FormatRuleWithOptions};
 use ruff_python_ast::node::AnyNodeRef;

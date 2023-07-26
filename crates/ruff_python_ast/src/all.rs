@@ -1,5 +1,5 @@
 use bitflags::bitflags;
-use rustpython_parser::ast::{self, Constant, Expr, Stmt};
+use rustpython_ast::{self as ast, Constant, Expr, Stmt};
 
 bitflags! {
     #[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]

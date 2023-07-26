@@ -1,10 +1,11 @@
 use itertools::Itertools;
-use rustpython_parser::ast::{Alias, Ranged, Stmt};
+use rustpython_ast::{Alias, Ranged, Stmt};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::whitespace::indentation;
+use ruff_python_codegen::Stylist;
+use ruff_source_file::Locator;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;

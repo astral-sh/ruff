@@ -1,12 +1,13 @@
 use anyhow::Result;
 use libcst_native::ParenthesizableWhitespace;
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{Expr, Ranged};
+use rustpython_ast::{Expr, Ranged};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use crate::autofix::codemods::CodegenStylist;
 use ruff_diagnostics::Edit;
-use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python_codegen::Stylist;
+use ruff_source_file::Locator;
 
 use crate::cst::matchers::{
     match_call_mut, match_expression, match_function_def, match_indented_block, match_statement,

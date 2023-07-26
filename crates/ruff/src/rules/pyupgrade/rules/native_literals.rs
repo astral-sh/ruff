@@ -2,7 +2,7 @@ use std::fmt;
 use std::str::FromStr;
 
 use num_bigint::BigInt;
-use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
+use rustpython_ast::{self as ast, Constant, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};

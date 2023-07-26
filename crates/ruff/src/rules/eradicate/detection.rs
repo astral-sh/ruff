@@ -1,7 +1,7 @@
 /// See: [eradicate.py](https://github.com/myint/eradicate/blob/98f199940979c94447a461d50d27862b118b282d/eradicate.py)
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustpython_parser::ast::Suite;
+use rustpython_ast::Suite;
 use rustpython_parser::Parse;
 
 static ALLOWLIST_REGEX: Lazy<Regex> = Lazy::new(|| {

@@ -1,5 +1,5 @@
 use num_bigint::BigInt;
-use rustpython_parser::ast::{self, CmpOp, Constant, Expr, Ranged};
+use rustpython_ast::{self as ast, CmpOp, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};

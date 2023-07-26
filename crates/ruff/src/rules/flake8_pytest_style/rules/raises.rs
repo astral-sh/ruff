@@ -1,5 +1,5 @@
-use ruff_python_ast::helpers::find_keyword;
-use rustpython_parser::ast::{self, Expr, Keyword, Ranged, Stmt, WithItem};
+use ruff_python_ast::helpers::{find_keyword, is_compound_statement};
+use rustpython_ast::{self as ast, Expr, Keyword, Ranged, Stmt, WithItem};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -84,12 +84,10 @@ fn is_pytest_raises(func: &Expr, semantic: &SemanticModel) -> bool {
 }
 
 const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
-    if body.len() > 1 {
-        true
-    } else if let Some(first_body_stmt) = body.first() {
-        !first_body_stmt.is_pass_stmt()
+    if let [stmt] = body {
+        is_compound_statement(stmt)
     } else {
-        false
+        true
     }
 }
 
@@ -124,8 +122,6 @@ pub(crate) fn complex_raises(
     items: &[WithItem],
     body: &[Stmt],
 ) {
-    let mut is_too_complex = false;
-
     let raises_called = items.iter().any(|item| match &item.context_expr {
         Expr::Call(ast::ExprCall { func, .. }) => is_pytest_raises(func, checker.semantic()),
         _ => false,
@@ -133,28 +129,19 @@ pub(crate) fn complex_raises(
 
     // Check body for `pytest.raises` context manager
     if raises_called {
-        if body.len() > 1 {
-            is_too_complex = true;
-        } else if let Some(first_stmt) = body.first() {
-            match first_stmt {
+        let is_too_complex = if let [stmt] = body {
+            match stmt {
                 Stmt::With(ast::StmtWith { body, .. })
                 | Stmt::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
-                    if is_non_trivial_with_body(body) {
-                        is_too_complex = true;
-                    }
+                    is_non_trivial_with_body(body)
                 }
-                Stmt::If(_)
-                | Stmt::For(_)
-                | Stmt::Match(_)
-                | Stmt::AsyncFor(_)
-                | Stmt::While(_)
-                | Stmt::Try(_)
-                | Stmt::TryStar(_) => {
-                    is_too_complex = true;
-                }
-                _ => {}
+                // Allow function and class definitions to test decorators
+                Stmt::ClassDef(_) | Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) => false,
+                stmt => is_compound_statement(stmt),
             }
-        }
+        } else {
+            true
+        };
 
         if is_too_complex {
             checker.diagnostics.push(Diagnostic::new(

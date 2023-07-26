@@ -32,14 +32,12 @@ def h():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,18 +1,26 @@
+@@ -1,18 +1,25 @@
  def f():  # type: ignore
      ...
  
--class x:  # some comment
 +
-+class x:
-+    # some comment
+ class x:  # some comment
      ...
  
 -class y: ...  # comment
@@ -71,8 +69,7 @@ def f():  # type: ignore
     ...
 
 
-class x:
-    # some comment
+class x:  # some comment
     ...
 
 

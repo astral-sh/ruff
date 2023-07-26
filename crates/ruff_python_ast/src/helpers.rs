@@ -1,22 +1,35 @@
 use std::borrow::Cow;
-use std::ops::Sub;
 use std::path::Path;
 
 use num_traits::Zero;
-use ruff_text_size::{TextRange, TextSize};
-use rustpython_ast::CmpOp;
-use rustpython_parser::ast::{
-    self, Arguments, Constant, ExceptHandler, Expr, Keyword, MatchCase, Pattern, Ranged, Stmt,
-    TypeParam,
+use ruff_text_size::TextRange;
+use rustpython_ast::{
+    self as ast, Arguments, Constant, ExceptHandler, Expr, Keyword, MatchCase, Pattern, Ranged,
+    Stmt, TypeParam,
 };
-use rustpython_parser::{lexer, Mode, Tok};
 use smallvec::SmallVec;
 
-use ruff_python_trivia::{is_python_whitespace, PythonWhitespace, UniversalNewlineIterator};
-
 use crate::call_path::CallPath;
-use crate::source_code::{Indexer, Locator};
 use crate::statement_visitor::{walk_body, walk_stmt, StatementVisitor};
+
+/// Return `true` if the `Stmt` is a compound statement (as opposed to a simple statement).
+pub const fn is_compound_statement(stmt: &Stmt) -> bool {
+    matches!(
+        stmt,
+        Stmt::FunctionDef(_)
+            | Stmt::AsyncFunctionDef(_)
+            | Stmt::ClassDef(_)
+            | Stmt::While(_)
+            | Stmt::For(_)
+            | Stmt::AsyncFor(_)
+            | Stmt::Match(_)
+            | Stmt::With(_)
+            | Stmt::AsyncWith(_)
+            | Stmt::If(_)
+            | Stmt::Try(_)
+            | Stmt::TryStar(_)
+    )
+}
 
 fn is_iterable_initializer<F>(id: &str, is_builtin: F) -> bool
 where
@@ -262,6 +275,7 @@ where
                     .map_or(false, |value| any_over_expr(value, func))
         }
         Expr::Name(_) | Expr::Constant(_) => false,
+        Expr::LineMagic(_) => false,
     }
 }
 
@@ -564,6 +578,7 @@ where
             range: _range,
         }) => any_over_expr(value, func),
         Stmt::Pass(_) | Stmt::Break(_) | Stmt::Continue(_) => false,
+        Stmt::LineMagic(_) => false,
     }
 }
 
@@ -749,27 +764,6 @@ pub fn map_subscript(expr: &Expr) -> &Expr {
         // Ex) `Iterable`
         expr
     }
-}
-
-/// Returns `true` if a statement or expression includes at least one comment.
-pub fn has_comments<T>(node: &T, locator: &Locator, indexer: &Indexer) -> bool
-where
-    T: Ranged,
-{
-    let start = if has_leading_content(node.start(), locator) {
-        node.start()
-    } else {
-        locator.line_start(node.start())
-    };
-    let end = if has_trailing_content(node.end(), locator) {
-        node.end()
-    } else {
-        locator.line_end(node.end())
-    };
-
-    indexer
-        .comment_ranges()
-        .intersects(TextRange::new(start, end))
 }
 
 /// Return `true` if the body uses `locals()`, `globals()`, `vars()`, `eval()`.
@@ -1004,197 +998,6 @@ where
             _ => {}
         }
     }
-}
-
-/// Return `true` if the node starting the given [`TextSize`] has leading content.
-pub fn has_leading_content(offset: TextSize, locator: &Locator) -> bool {
-    let line_start = locator.line_start(offset);
-    let leading = &locator.contents()[TextRange::new(line_start, offset)];
-    leading.chars().any(|char| !is_python_whitespace(char))
-}
-
-/// Return `true` if the node ending at the given [`TextSize`] has trailing content.
-pub fn has_trailing_content(offset: TextSize, locator: &Locator) -> bool {
-    let line_end = locator.line_end(offset);
-    let trailing = &locator.contents()[TextRange::new(offset, line_end)];
-
-    for char in trailing.chars() {
-        if char == '#' {
-            return false;
-        }
-        if !is_python_whitespace(char) {
-            return true;
-        }
-    }
-    false
-}
-
-/// If a [`Ranged`] has a trailing comment, return the index of the hash.
-pub fn trailing_comment_start_offset<T>(located: &T, locator: &Locator) -> Option<TextSize>
-where
-    T: Ranged,
-{
-    let line_end = locator.line_end(located.end());
-
-    let trailing = &locator.contents()[TextRange::new(located.end(), line_end)];
-
-    for (index, char) in trailing.char_indices() {
-        if char == '#' {
-            return TextSize::try_from(index).ok();
-        }
-        if !is_python_whitespace(char) {
-            return None;
-        }
-    }
-
-    None
-}
-
-/// Return the end offset at which the empty lines following a statement.
-pub fn trailing_lines_end(stmt: &Stmt, locator: &Locator) -> TextSize {
-    let line_end = locator.full_line_end(stmt.end());
-    let rest = &locator.contents()[usize::from(line_end)..];
-
-    UniversalNewlineIterator::with_offset(rest, line_end)
-        .take_while(|line| line.trim_whitespace().is_empty())
-        .last()
-        .map_or(line_end, |line| line.full_end())
-}
-
-/// Return the range of the first parenthesis pair after a given [`TextSize`].
-pub fn match_parens(start: TextSize, locator: &Locator) -> Option<TextRange> {
-    let contents = &locator.contents()[usize::from(start)..];
-
-    let mut fix_start = None;
-    let mut fix_end = None;
-    let mut count = 0u32;
-
-    for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, start).flatten() {
-        match tok {
-            Tok::Lpar => {
-                if count == 0 {
-                    fix_start = Some(range.start());
-                }
-                count = count.saturating_add(1);
-            }
-            Tok::Rpar => {
-                count = count.saturating_sub(1);
-                if count == 0 {
-                    fix_end = Some(range.end());
-                    break;
-                }
-            }
-            _ => {}
-        }
-    }
-
-    match (fix_start, fix_end) {
-        (Some(start), Some(end)) => Some(TextRange::new(start, end)),
-        _ => None,
-    }
-}
-
-/// Return the `Range` of the first `Tok::Colon` token in a `Range`.
-pub fn first_colon_range(range: TextRange, locator: &Locator) -> Option<TextRange> {
-    let contents = &locator.contents()[range];
-    let range = lexer::lex_starts_at(contents, Mode::Module, range.start())
-        .flatten()
-        .find(|(tok, _)| tok.is_colon())
-        .map(|(_, range)| range);
-    range
-}
-
-/// Given an offset at the end of a line (including newlines), return the offset of the
-/// continuation at the end of that line.
-fn find_continuation(offset: TextSize, locator: &Locator, indexer: &Indexer) -> Option<TextSize> {
-    let newline_pos = usize::from(offset).saturating_sub(1);
-
-    // Skip the newline.
-    let newline_len = match locator.contents().as_bytes()[newline_pos] {
-        b'\n' => {
-            if locator
-                .contents()
-                .as_bytes()
-                .get(newline_pos.saturating_sub(1))
-                == Some(&b'\r')
-            {
-                2
-            } else {
-                1
-            }
-        }
-        b'\r' => 1,
-        // No preceding line.
-        _ => return None,
-    };
-
-    indexer
-        .is_continuation(offset - TextSize::from(newline_len), locator)
-        .then(|| offset - TextSize::from(newline_len) - TextSize::from(1))
-}
-
-/// If the node starting at the given [`TextSize`] is preceded by at least one continuation line
-/// (i.e., a line ending in a backslash), return the starting offset of the first such continuation
-/// character.
-///
-/// For example, given:
-/// ```python
-/// x = 1; \
-///    y = 2
-/// ```
-///
-/// When passed the offset of `y`, this function will return the offset of the backslash at the end
-/// of the first line.
-///
-/// Similarly, given:
-/// ```python
-/// x = 1; \
-///        \
-///   y = 2;
-/// ```
-///
-/// When passed the offset of `y`, this function will again return the offset of the backslash at
-/// the end of the first line.
-pub fn preceded_by_continuations(
-    offset: TextSize,
-    locator: &Locator,
-    indexer: &Indexer,
-) -> Option<TextSize> {
-    // Find the first preceding continuation.
-    let mut continuation = find_continuation(locator.line_start(offset), locator, indexer)?;
-
-    // Continue searching for continuations, in the unlikely event that we have multiple
-    // continuations in a row.
-    loop {
-        let previous_line_end = locator.line_start(continuation);
-        if locator
-            .slice(TextRange::new(previous_line_end, continuation))
-            .chars()
-            .all(is_python_whitespace)
-        {
-            if let Some(next_continuation) = find_continuation(previous_line_end, locator, indexer)
-            {
-                continuation = next_continuation;
-                continue;
-            }
-        }
-        break;
-    }
-
-    Some(continuation)
-}
-
-/// Return `true` if a `Stmt` appears to be part of a multi-statement line, with
-/// other statements preceding it.
-pub fn preceded_by_multi_statement_line(stmt: &Stmt, locator: &Locator, indexer: &Indexer) -> bool {
-    has_leading_content(stmt.start(), locator)
-        || preceded_by_continuations(stmt.start(), locator, indexer).is_some()
-}
-
-/// Return `true` if a `Stmt` appears to be part of a multi-statement line, with
-/// other statements following it.
-pub fn followed_by_multi_statement_line(stmt: &Stmt, locator: &Locator) -> bool {
-    has_trailing_content(stmt.end(), locator)
 }
 
 /// Return `true` if a `Stmt` is a docstring.
@@ -1479,166 +1282,19 @@ impl Truthiness {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LocatedCmpOp {
-    pub range: TextRange,
-    pub op: CmpOp,
-}
-
-impl LocatedCmpOp {
-    fn new<T: Into<TextRange>>(range: T, op: CmpOp) -> Self {
-        Self {
-            range: range.into(),
-            op,
-        }
-    }
-}
-
-/// Extract all [`CmpOp`] operators from an expression snippet, with appropriate
-/// ranges.
-///
-/// `RustPython` doesn't include line and column information on [`CmpOp`] nodes.
-/// `CPython` doesn't either. This method iterates over the token stream and
-/// re-identifies [`CmpOp`] nodes, annotating them with valid ranges.
-pub fn locate_cmp_ops(expr: &Expr, locator: &Locator) -> Vec<LocatedCmpOp> {
-    // If `Expr` is a multi-line expression, we need to parenthesize it to
-    // ensure that it's lexed correctly.
-    let contents = locator.slice(expr.range());
-    let parenthesized_contents = format!("({contents})");
-    let mut tok_iter = lexer::lex(&parenthesized_contents, Mode::Expression)
-        .flatten()
-        .skip(1)
-        .map(|(tok, range)| (tok, range.sub(TextSize::from(1))))
-        .filter(|(tok, _)| !matches!(tok, Tok::NonLogicalNewline | Tok::Comment(_)))
-        .peekable();
-
-    let mut ops: Vec<LocatedCmpOp> = vec![];
-    let mut count = 0u32;
-    loop {
-        let Some((tok, range)) = tok_iter.next() else {
-            break;
-        };
-        if matches!(tok, Tok::Lpar) {
-            count = count.saturating_add(1);
-            continue;
-        } else if matches!(tok, Tok::Rpar) {
-            count = count.saturating_sub(1);
-            continue;
-        }
-        if count == 0 {
-            match tok {
-                Tok::Not => {
-                    if let Some((_, next_range)) =
-                        tok_iter.next_if(|(tok, _)| matches!(tok, Tok::In))
-                    {
-                        ops.push(LocatedCmpOp::new(
-                            TextRange::new(range.start(), next_range.end()),
-                            CmpOp::NotIn,
-                        ));
-                    }
-                }
-                Tok::In => {
-                    ops.push(LocatedCmpOp::new(range, CmpOp::In));
-                }
-                Tok::Is => {
-                    let op = if let Some((_, next_range)) =
-                        tok_iter.next_if(|(tok, _)| matches!(tok, Tok::Not))
-                    {
-                        LocatedCmpOp::new(
-                            TextRange::new(range.start(), next_range.end()),
-                            CmpOp::IsNot,
-                        )
-                    } else {
-                        LocatedCmpOp::new(range, CmpOp::Is)
-                    };
-                    ops.push(op);
-                }
-                Tok::NotEqual => {
-                    ops.push(LocatedCmpOp::new(range, CmpOp::NotEq));
-                }
-                Tok::EqEqual => {
-                    ops.push(LocatedCmpOp::new(range, CmpOp::Eq));
-                }
-                Tok::GreaterEqual => {
-                    ops.push(LocatedCmpOp::new(range, CmpOp::GtE));
-                }
-                Tok::Greater => {
-                    ops.push(LocatedCmpOp::new(range, CmpOp::Gt));
-                }
-                Tok::LessEqual => {
-                    ops.push(LocatedCmpOp::new(range, CmpOp::LtE));
-                }
-                Tok::Less => {
-                    ops.push(LocatedCmpOp::new(range, CmpOp::Lt));
-                }
-                _ => {}
-            }
-        }
-    }
-    ops
-}
-
 #[cfg(test)]
 mod tests {
     use std::borrow::Cow;
-
     use std::cell::RefCell;
-
     use std::vec;
 
-    use anyhow::Result;
-    use ruff_text_size::{TextLen, TextRange, TextSize};
+    use ruff_text_size::TextRange;
     use rustpython_ast::{
-        self, CmpOp, Constant, Expr, ExprConstant, ExprContext, ExprName, Identifier, Ranged, Stmt,
-        StmtTypeAlias, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
+        self, Constant, Expr, ExprConstant, ExprContext, ExprName, Identifier, Stmt, StmtTypeAlias,
+        TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
     };
-    use rustpython_parser::ast::Suite;
-    use rustpython_parser::Parse;
 
-    use crate::helpers::{
-        any_over_stmt, any_over_type_param, first_colon_range, has_trailing_content,
-        locate_cmp_ops, resolve_imported_module_path, LocatedCmpOp,
-    };
-    use crate::source_code::Locator;
-
-    #[test]
-    fn trailing_content() -> Result<()> {
-        let contents = "x = 1";
-        let program = Suite::parse(contents, "<filename>")?;
-        let stmt = program.first().unwrap();
-        let locator = Locator::new(contents);
-        assert!(!has_trailing_content(stmt.end(), &locator));
-
-        let contents = "x = 1; y = 2";
-        let program = Suite::parse(contents, "<filename>")?;
-        let stmt = program.first().unwrap();
-        let locator = Locator::new(contents);
-        assert!(has_trailing_content(stmt.end(), &locator));
-
-        let contents = "x = 1  ";
-        let program = Suite::parse(contents, "<filename>")?;
-        let stmt = program.first().unwrap();
-        let locator = Locator::new(contents);
-        assert!(!has_trailing_content(stmt.end(), &locator));
-
-        let contents = "x = 1  # Comment";
-        let program = Suite::parse(contents, "<filename>")?;
-        let stmt = program.first().unwrap();
-        let locator = Locator::new(contents);
-        assert!(!has_trailing_content(stmt.end(), &locator));
-
-        let contents = r#"
-x = 1
-y = 2
-"#
-        .trim();
-        let program = Suite::parse(contents, "<filename>")?;
-        let stmt = program.first().unwrap();
-        let locator = Locator::new(contents);
-        assert!(!has_trailing_content(stmt.end(), &locator));
-
-        Ok(())
-    }
+    use crate::helpers::{any_over_stmt, any_over_type_param, resolve_imported_module_path};
 
     #[test]
     fn resolve_import() {
@@ -1675,101 +1331,6 @@ y = 2
             resolve_imported_module_path(Some(2), Some("foo"), Some(&["bar".to_string()])),
             None
         );
-    }
-
-    #[test]
-    fn extract_first_colon_range() {
-        let contents = "with a: pass";
-        let locator = Locator::new(contents);
-        let range = first_colon_range(
-            TextRange::new(TextSize::from(0), contents.text_len()),
-            &locator,
-        )
-        .unwrap();
-        assert_eq!(&contents[range], ":");
-        assert_eq!(range, TextRange::new(TextSize::from(6), TextSize::from(7)));
-    }
-
-    #[test]
-    fn extract_cmp_op_location() -> Result<()> {
-        let contents = "x == 1";
-        let expr = Expr::parse(contents, "<filename>")?;
-        let locator = Locator::new(contents);
-        assert_eq!(
-            locate_cmp_ops(&expr, &locator),
-            vec![LocatedCmpOp::new(
-                TextSize::from(2)..TextSize::from(4),
-                CmpOp::Eq
-            )]
-        );
-
-        let contents = "x != 1";
-        let expr = Expr::parse(contents, "<filename>")?;
-        let locator = Locator::new(contents);
-        assert_eq!(
-            locate_cmp_ops(&expr, &locator),
-            vec![LocatedCmpOp::new(
-                TextSize::from(2)..TextSize::from(4),
-                CmpOp::NotEq
-            )]
-        );
-
-        let contents = "x is 1";
-        let expr = Expr::parse(contents, "<filename>")?;
-        let locator = Locator::new(contents);
-        assert_eq!(
-            locate_cmp_ops(&expr, &locator),
-            vec![LocatedCmpOp::new(
-                TextSize::from(2)..TextSize::from(4),
-                CmpOp::Is
-            )]
-        );
-
-        let contents = "x is not 1";
-        let expr = Expr::parse(contents, "<filename>")?;
-        let locator = Locator::new(contents);
-        assert_eq!(
-            locate_cmp_ops(&expr, &locator),
-            vec![LocatedCmpOp::new(
-                TextSize::from(2)..TextSize::from(8),
-                CmpOp::IsNot
-            )]
-        );
-
-        let contents = "x in 1";
-        let expr = Expr::parse(contents, "<filename>")?;
-        let locator = Locator::new(contents);
-        assert_eq!(
-            locate_cmp_ops(&expr, &locator),
-            vec![LocatedCmpOp::new(
-                TextSize::from(2)..TextSize::from(4),
-                CmpOp::In
-            )]
-        );
-
-        let contents = "x not in 1";
-        let expr = Expr::parse(contents, "<filename>")?;
-        let locator = Locator::new(contents);
-        assert_eq!(
-            locate_cmp_ops(&expr, &locator),
-            vec![LocatedCmpOp::new(
-                TextSize::from(2)..TextSize::from(8),
-                CmpOp::NotIn
-            )]
-        );
-
-        let contents = "x != (1 is not 2)";
-        let expr = Expr::parse(contents, "<filename>")?;
-        let locator = Locator::new(contents);
-        assert_eq!(
-            locate_cmp_ops(&expr, &locator),
-            vec![LocatedCmpOp::new(
-                TextSize::from(2)..TextSize::from(4),
-                CmpOp::NotEq
-            )]
-        );
-
-        Ok(())
     }
 
     #[test]

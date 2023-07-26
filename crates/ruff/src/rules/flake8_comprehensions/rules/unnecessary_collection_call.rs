@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, Keyword, Ranged};
+use rustpython_ast::{Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};

@@ -1,10 +1,9 @@
-use std::collections::HashMap;
 use std::path::Path;
 
 use bitflags::bitflags;
-use nohash_hasher::{BuildNoHashHasher, IntMap};
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{Expr, Ranged, Stmt};
+use rustc_hash::FxHashMap;
+use rustpython_ast::{Expr, Ranged, Stmt};
 use smallvec::SmallVec;
 
 use ruff_python_ast::call_path::{collect_call_path, from_unqualified_name, CallPath};
@@ -74,7 +73,7 @@ pub struct SemanticModel<'a> {
     ///
     /// In this case, the binding created by `x = 1` shadows the binding created by `import x`,
     /// despite the fact that they're in different scopes.
-    pub shadowed_bindings: HashMap<BindingId, BindingId, BuildNoHashHasher<BindingId>>,
+    pub shadowed_bindings: FxHashMap<BindingId, BindingId>,
 
     /// Map from binding index to indexes of bindings that annotate it (in the same scope).
     ///
@@ -97,7 +96,7 @@ pub struct SemanticModel<'a> {
     /// In this case, we _do_ store the binding created by `x: int` directly on the scope, and not
     /// as a delayed annotation. Annotations are thus treated as bindings only when they are the
     /// first binding in a scope; any annotations that follow are treated as "delayed" annotations.
-    delayed_annotations: HashMap<BindingId, Vec<BindingId>, BuildNoHashHasher<BindingId>>,
+    delayed_annotations: FxHashMap<BindingId, Vec<BindingId>>,
 
     /// Map from binding ID to the IDs of all scopes in which it is declared a `global` or
     /// `nonlocal`.
@@ -112,7 +111,7 @@ pub struct SemanticModel<'a> {
     ///
     /// In this case, the binding created by `x = 1` is rebound within the scope created by `f`
     /// by way of the `global x` statement.
-    rebinding_scopes: HashMap<BindingId, Vec<ScopeId>, BuildNoHashHasher<BindingId>>,
+    rebinding_scopes: FxHashMap<BindingId, Vec<ScopeId>>,
 
     /// Flags for the semantic model.
     pub flags: SemanticModelFlags,
@@ -137,9 +136,9 @@ impl<'a> SemanticModel<'a> {
             resolved_references: ResolvedReferences::default(),
             unresolved_references: UnresolvedReferences::default(),
             globals: GlobalsArena::default(),
-            shadowed_bindings: IntMap::default(),
-            delayed_annotations: IntMap::default(),
-            rebinding_scopes: IntMap::default(),
+            shadowed_bindings: FxHashMap::default(),
+            delayed_annotations: FxHashMap::default(),
+            rebinding_scopes: FxHashMap::default(),
             flags: SemanticModelFlags::new(path),
             handled_exceptions: Vec::default(),
         }
@@ -314,6 +313,20 @@ impl<'a> SemanticModel<'a> {
                 if seen_function && matches!(symbol, "__class__") {
                     return ReadResult::ImplicitGlobal;
                 }
+                // Do not allow usages of class symbols unless it is the immediate parent, e.g.:
+                //
+                // ```python
+                // class Foo:
+                //      a = 0
+                //
+                //      b = a  # allowed
+                //      def c(self, arg=a):  # allowed
+                //          print(arg)
+                //
+                //      def d(self):
+                //          print(a)  # not allowed
+                // ```
+                //
                 if index > 0 {
                     continue;
                 }
@@ -579,19 +592,9 @@ impl<'a> SemanticModel<'a> {
             BindingKind::Import(Import {
                 qualified_name: name,
             }) => {
-                if name.starts_with('.') {
-                    let mut source_path = from_relative_import(self.module_path?, name);
-                    if source_path.is_empty() {
-                        None
-                    } else {
-                        source_path.extend_from_slice(tail);
-                        Some(source_path)
-                    }
-                } else {
-                    let mut source_path: CallPath = from_unqualified_name(name);
-                    source_path.extend_from_slice(tail);
-                    Some(source_path)
-                }
+                let mut source_path: CallPath = from_unqualified_name(name);
+                source_path.extend_from_slice(tail);
+                Some(source_path)
             }
             BindingKind::SubmoduleImport(SubmoduleImport {
                 qualified_name: name,
