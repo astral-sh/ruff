@@ -5,6 +5,142 @@ use smallvec::{smallvec, SmallVec};
 pub type CallPath<'a> = SmallVec<[&'a str; 8]>;
 
 /// Convert an `Expr` to its [`CallPath`] segments (like `["typing", "List"]`).
+pub fn collect_head_path(expr: &Expr) -> Option<(&ast::ExprName, CallPath)> {
+    // Unroll the loop up to eight times, to match the maximum number of expected attributes.
+    // In practice, unrolling appears to give about a 4x speed-up on this hot path.
+    let attr1 = match expr {
+        Expr::Attribute(attr1) => attr1,
+        // Ex) `foo`
+        Expr::Name(name) => return Some((name, CallPath::new())),
+        _ => return None,
+    };
+
+    let attr2 = match attr1.value.as_ref() {
+        Expr::Attribute(attr2) => attr2,
+        // Ex) `foo.bar`
+        Expr::Name(name) => {
+            return Some((name, CallPath::from_slice(&[attr1.attr.as_str()])));
+        }
+        _ => return None,
+    };
+
+    let attr3 = match attr2.value.as_ref() {
+        Expr::Attribute(attr3) => attr3,
+        // Ex) `foo.bar.baz`
+        Expr::Name(name) => {
+            return Some((
+                name,
+                CallPath::from_slice(&[attr2.attr.as_str(), attr1.attr.as_str()]),
+            ));
+        }
+        _ => return None,
+    };
+
+    let attr4 = match attr3.value.as_ref() {
+        Expr::Attribute(attr4) => attr4,
+        // Ex) `foo.bar.baz.bop`
+        Expr::Name(name) => {
+            return Some((
+                name,
+                CallPath::from_slice(&[
+                    attr3.attr.as_str(),
+                    attr2.attr.as_str(),
+                    attr1.attr.as_str(),
+                ]),
+            ));
+        }
+        _ => return None,
+    };
+
+    let attr5 = match attr4.value.as_ref() {
+        Expr::Attribute(attr5) => attr5,
+        // Ex) `foo.bar.baz.bop.bap`
+        Expr::Name(name) => {
+            return Some((
+                name,
+                CallPath::from_slice(&[
+                    attr4.attr.as_str(),
+                    attr3.attr.as_str(),
+                    attr2.attr.as_str(),
+                    attr1.attr.as_str(),
+                ]),
+            ));
+        }
+        _ => return None,
+    };
+
+    let attr6 = match attr5.value.as_ref() {
+        Expr::Attribute(attr6) => attr6,
+        // Ex) `foo.bar.baz.bop.bap.bab`
+        Expr::Name(name) => {
+            return Some((
+                name,
+                CallPath::from_slice(&[
+                    attr5.attr.as_str(),
+                    attr4.attr.as_str(),
+                    attr3.attr.as_str(),
+                    attr2.attr.as_str(),
+                    attr1.attr.as_str(),
+                ]),
+            ));
+        }
+        _ => return None,
+    };
+
+    let attr7 = match attr6.value.as_ref() {
+        Expr::Attribute(attr7) => attr7,
+        // Ex) `foo.bar.baz.bop.bap.bab.bob`
+        Expr::Name(name) => {
+            return Some((
+                name,
+                CallPath::from_slice(&[
+                    attr6.attr.as_str(),
+                    attr5.attr.as_str(),
+                    attr4.attr.as_str(),
+                    attr3.attr.as_str(),
+                    attr2.attr.as_str(),
+                    attr1.attr.as_str(),
+                ]),
+            ));
+        }
+        _ => return None,
+    };
+
+    let attr8 = match attr7.value.as_ref() {
+        Expr::Attribute(attr8) => attr8,
+        // Ex) `foo.bar.baz.bop.bap.bab.bob.bib`
+        Expr::Name(name) => {
+            return Some((
+                name,
+                CallPath::from_slice(&[
+                    attr7.attr.as_str(),
+                    attr6.attr.as_str(),
+                    attr5.attr.as_str(),
+                    attr4.attr.as_str(),
+                    attr3.attr.as_str(),
+                    attr2.attr.as_str(),
+                    attr1.attr.as_str(),
+                ]),
+            ));
+        }
+        _ => return None,
+    };
+
+    let (name, mut call_path) = collect_head_path(&attr8.value)?;
+    call_path.extend([
+        attr8.attr.as_str(),
+        attr7.attr.as_str(),
+        attr6.attr.as_str(),
+        attr5.attr.as_str(),
+        attr4.attr.as_str(),
+        attr3.attr.as_str(),
+        attr2.attr.as_str(),
+        attr1.attr.as_str(),
+    ]);
+    Some((name, call_path))
+}
+
+/// Convert an `Expr` to its [`CallPath`] segments (like `["typing", "List"]`).
 pub fn collect_call_path(expr: &Expr) -> Option<CallPath> {
     // Unroll the loop up to eight times, to match the maximum number of expected attributes.
     // In practice, unrolling appears to give about a 4x speed-up on this hot path.

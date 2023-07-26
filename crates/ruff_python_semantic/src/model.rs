@@ -2,9 +2,11 @@ use std::path::Path;
 
 use bitflags::bitflags;
 use rustc_hash::FxHashMap;
-use smallvec::{smallvec, SmallVec};
+use smallvec::smallvec;
 
-use ruff_python_ast::call_path::{collect_call_path, from_unqualified_name, CallPath};
+use ruff_python_ast::call_path::{
+    collect_call_path, collect_head_path, from_unqualified_name, CallPath,
+};
 use ruff_python_ast::{self as ast, Expr, Ranged, Stmt};
 use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_python_stdlib::typing::is_typing_extension;
@@ -623,40 +625,33 @@ impl<'a> SemanticModel<'a> {
             }
         }
 
+        let (head, tail) = collect_head_path(value)?;
+
         // If the name was already resolved, look it up; otherwise, search for the symbol.
-        let head = match_head(value)?;
-        let binding = self
-            .resolved_names
-            .get(&head.into())
-            .map(|id| self.binding(*id))
-            .or_else(|| self.find_binding(&head.id))?;
+        let binding = if let Some(id) = self.resolved_names.get(&head.into()) {
+            self.binding(*id)
+        } else {
+            self.find_binding(&head.id)?
+        };
 
         match &binding.kind {
             BindingKind::Import(Import { call_path, .. }) => {
-                let x = collect_call_path(value)?;
-                let (_, tail) = x.split_first()?;
-
-                let mut resolved = SmallVec::with_capacity(call_path.len() + tail.len());
-                resolved.extend_from_slice(call_path);
-                resolved.extend_from_slice(tail);
+                let resolved: CallPath = call_path.iter().chain(tail.iter()).copied().collect();
+                // resolved.extend_from_slice(call_path);
+                // resolved.extend_from_slice(tail);
                 Some(resolved)
             }
             BindingKind::SubmoduleImport(SubmoduleImport { qualified_name, .. }) => {
-                let x = collect_call_path(value)?;
-                let (_, tail) = x.split_first()?;
-
                 let name = qualified_name.split('.').next().unwrap_or(qualified_name);
                 let mut source_path: CallPath = from_unqualified_name(name);
-                source_path.extend_from_slice(tail);
+                source_path.extend_from_slice(tail.as_slice());
                 Some(source_path)
             }
             BindingKind::FromImport(FromImport { call_path, .. }) => {
-                let x = collect_call_path(value)?;
-                let (_, tail) = x.split_first()?;
-
-                let mut resolved = SmallVec::with_capacity(call_path.len() + tail.len());
-                resolved.extend_from_slice(call_path);
-                resolved.extend_from_slice(tail);
+                let resolved: CallPath = call_path.iter().chain(tail.iter()).copied().collect();
+                // let mut resolved = SmallVec::with_capacity(call_path.len() + tail.len());
+                // resolved.extend_from_slice(call_path);
+                // resolved.extend_from_slice(tail);
                 Some(resolved)
             }
             BindingKind::Builtin => Some(smallvec!["", head.id.as_str()]),
