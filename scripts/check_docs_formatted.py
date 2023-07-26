@@ -32,7 +32,6 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "bad-quotes-docstring",
     "bad-quotes-inline-string",
     "bad-quotes-multiline-string",
-    "call-datetime-without-tzinfo",
     "explicit-string-concatenation",
     "indent-with-spaces",
     "indentation-with-invalid-multiple",
