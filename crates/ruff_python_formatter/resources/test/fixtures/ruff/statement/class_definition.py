@@ -35,5 +35,11 @@ class Test(aaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbb + cccccccccccccccccccccccc +
 class Test(aaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbb * cccccccccccccccccccccccc + dddddddddddddddddddddd + eeeeeeeee, ffffffffffffffffff, gggggggggggggggggg):
     pass
 
-class Test(Aaaa): # trailing comment
+class TestTrailingComment1(Aaaa): # trailing comment
     pass
+
+
+class TestTrailingComment2: # trailing comment
+    pass
+
+

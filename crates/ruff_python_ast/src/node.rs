@@ -4648,6 +4648,8 @@ impl AnyNodeRef<'_> {
                 | AnyNodeRef::StmtClassDef(_)
                 | AnyNodeRef::StmtTry(_)
                 | AnyNodeRef::StmtTryStar(_)
+                | AnyNodeRef::ExceptHandlerExceptHandler(_)
+                | AnyNodeRef::ElifElseClause(_)
         )
     }
 

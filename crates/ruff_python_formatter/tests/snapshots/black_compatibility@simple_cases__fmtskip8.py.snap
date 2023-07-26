@@ -74,7 +74,7 @@ async def test_async_with():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,62 +1,63 @@
+@@ -1,62 +1,62 @@
  # Make sure a leading comment is not removed.
 -def some_func(  unformatted,  args  ):  # fmt: skip
 +def some_func(unformatted, args):  # fmt: skip
@@ -134,15 +134,13 @@ async def test_async_with():
  
  
 -try  :  # fmt: skip
-+try:
-+    # fmt: skip
++try:  # fmt: skip
      some_call()
 -except  UnformattedError  as  ex:  # fmt: skip
--    handle_exception()
--finally  :  # fmt: skip
 +except UnformattedError as ex:  # fmt: skip
-+    handle_exception()  # fmt: skip
-+finally:
+     handle_exception()
+-finally  :  # fmt: skip
++finally:  # fmt: skip
      finally_call()
  
  
@@ -207,12 +205,11 @@ async def test_async_for():
         print("Do something")
 
 
-try:
-    # fmt: skip
+try:  # fmt: skip
     some_call()
 except UnformattedError as ex:  # fmt: skip
-    handle_exception()  # fmt: skip
-finally:
+    handle_exception()
+finally:  # fmt: skip
     finally_call()
 
 
