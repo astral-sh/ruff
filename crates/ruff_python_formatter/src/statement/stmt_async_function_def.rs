@@ -1,4 +1,4 @@
-use rustpython_parser::ast::StmtAsyncFunctionDef;
+use rustpython_ast::StmtAsyncFunctionDef;
 
 use ruff_python_ast::function::AnyFunctionDefinition;
 

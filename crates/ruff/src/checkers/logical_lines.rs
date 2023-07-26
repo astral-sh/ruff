@@ -2,8 +2,9 @@ use ruff_text_size::TextRange;
 use rustpython_parser::lexer::LexResult;
 
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
-use ruff_python_ast::source_code::{Locator, Stylist};
-use ruff_python_ast::token_kind::TokenKind;
+use ruff_python_codegen::Stylist;
+use ruff_python_parser::token_kind::TokenKind;
+use ruff_source_file::Locator;
 
 use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle::rules::logical_lines::{

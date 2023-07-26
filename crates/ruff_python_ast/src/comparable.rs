@@ -2,7 +2,7 @@
 //! ability to compare expressions for equality (via [`Eq`] and [`Hash`]).
 
 use num_bigint::BigInt;
-use rustpython_parser::ast;
+use rustpython_ast as ast;
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub enum ComparableExprContext {

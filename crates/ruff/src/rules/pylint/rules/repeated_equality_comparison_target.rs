@@ -3,12 +3,12 @@ use std::ops::Deref;
 
 use itertools::{any, Itertools};
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{BoolOp, CmpOp, Expr, ExprBoolOp, ExprCompare, Ranged};
+use rustpython_ast::{BoolOp, CmpOp, Expr, ExprBoolOp, ExprCompare, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::hashable::HashableExpr;
-use ruff_python_ast::source_code::Locator;
+use ruff_source_file::Locator;
 
 use crate::checkers::ast::Checker;
 

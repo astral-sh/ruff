@@ -1,9 +1,9 @@
-use rustpython_parser::ast::{self, ExceptHandler, Expr, Stmt};
+use rustpython_ast::{self as ast, ExceptHandler, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::identifier::except;
-use ruff_python_ast::source_code::Locator;
+use ruff_source_file::Locator;
 
 /// ## What it does
 /// Checks for bare `except` catches in `try`-`except` statements.
@@ -66,7 +66,10 @@ pub(crate) fn bare_except(
             .iter()
             .any(|stmt| matches!(stmt, Stmt::Raise(ast::StmtRaise { exc: None, .. })))
     {
-        Some(Diagnostic::new(BareExcept, except(handler, locator)))
+        Some(Diagnostic::new(
+            BareExcept,
+            except(handler, locator.contents()),
+        ))
     } else {
         None
     }

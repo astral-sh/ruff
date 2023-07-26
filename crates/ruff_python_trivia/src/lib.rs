@@ -1,9 +1,8 @@
 mod cursor;
-mod newlines;
+pub mod textwrap;
 mod tokenizer;
 mod whitespace;
 
 pub use cursor::*;
-pub use newlines::*;
 pub use tokenizer::*;
 pub use whitespace::*;

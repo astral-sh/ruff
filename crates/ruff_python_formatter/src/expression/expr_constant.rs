@@ -1,5 +1,5 @@
 use ruff_text_size::{TextLen, TextRange};
-use rustpython_parser::ast::{Constant, ExprConstant, Ranged};
+use rustpython_ast::{Constant, ExprConstant, Ranged};
 
 use ruff_formatter::FormatRuleWithOptions;
 use ruff_python_ast::node::AnyNodeRef;

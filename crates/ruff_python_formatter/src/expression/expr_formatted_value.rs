@@ -3,7 +3,7 @@ use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::{not_yet_implemented, FormatNodeRule, PyFormatter};
 use ruff_formatter::{write, Buffer, FormatResult};
 use ruff_python_ast::node::AnyNodeRef;
-use rustpython_parser::ast::ExprFormattedValue;
+use rustpython_ast::ExprFormattedValue;
 
 #[derive(Default)]
 pub struct FormatExprFormattedValue;

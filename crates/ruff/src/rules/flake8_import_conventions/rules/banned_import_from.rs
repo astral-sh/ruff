@@ -1,5 +1,5 @@
 use rustc_hash::FxHashSet;
-use rustpython_parser::ast::{Ranged, Stmt};
+use rustpython_ast::{Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};

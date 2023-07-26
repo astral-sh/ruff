@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Constant, Expr, ExprCall, ExprConstant};
+use rustpython_ast::{Constant, Expr, ExprCall, ExprConstant};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};

@@ -2,7 +2,7 @@ use crate::statement::stmt_try::AnyStatementTry;
 use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::Format;
 use ruff_formatter::FormatResult;
-use rustpython_parser::ast::StmtTryStar;
+use rustpython_ast::StmtTryStar;
 
 #[derive(Default)]
 pub struct FormatStmtTryStar;

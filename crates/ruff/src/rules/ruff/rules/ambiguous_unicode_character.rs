@@ -4,7 +4,7 @@ use std::fmt;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, DiagnosticKind, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::Locator;
+use ruff_source_file::Locator;
 
 use crate::registry::AsRule;
 use crate::rules::ruff::rules::confusables::confusable;

@@ -31,20 +31,21 @@ use std::path::Path;
 use itertools::Itertools;
 use log::error;
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{
-    self, Arg, ArgWithDefault, Arguments, Comprehension, Constant, ElifElseClause, ExceptHandler,
-    Expr, ExprContext, Keyword, Pattern, Ranged, Stmt, Suite, UnaryOp,
+use rustpython_ast::{
+    self as ast, Arg, ArgWithDefault, Arguments, Comprehension, Constant, ElifElseClause,
+    ExceptHandler, Expr, ExprContext, Keyword, Pattern, Ranged, Stmt, Suite, UnaryOp,
 };
 
 use ruff_diagnostics::{Diagnostic, IsolationLevel};
 use ruff_python_ast::all::{extract_all_names, DunderAllFlags};
 use ruff_python_ast::helpers::{extract_handled_exceptions, to_module_path};
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::source_code::{Generator, Indexer, Locator, Quote, Stylist};
 use ruff_python_ast::str::trailing_quote;
-use ruff_python_ast::typing::{parse_type_annotation, AnnotationKind};
 use ruff_python_ast::visitor::{walk_except_handler, walk_pattern, Visitor};
 use ruff_python_ast::{helpers, str, visitor};
+use ruff_python_codegen::{Generator, Quote, Stylist};
+use ruff_python_index::Indexer;
+use ruff_python_parser::typing::{parse_type_annotation, AnnotationKind};
 use ruff_python_semantic::analyze::{typing, visibility};
 use ruff_python_semantic::{
     BindingFlags, BindingId, BindingKind, Exceptions, Export, FromImport, Globals, Import, Module,
@@ -52,6 +53,7 @@ use ruff_python_semantic::{
 };
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
 use ruff_python_stdlib::path::is_python_stub_file;
+use ruff_source_file::Locator;
 
 use crate::checkers::ast::deferred::Deferred;
 use crate::docstrings::extraction::ExtractionTarget;
@@ -1690,7 +1692,9 @@ impl<'a> Checker<'a> {
         while !self.deferred.string_type_definitions.is_empty() {
             let type_definitions = std::mem::take(&mut self.deferred.string_type_definitions);
             for (range, value, snapshot) in type_definitions {
-                if let Ok((expr, kind)) = parse_type_annotation(value, range, self.locator) {
+                if let Ok((expr, kind)) =
+                    parse_type_annotation(value, range, self.locator.contents())
+                {
                     let expr = allocator.alloc(expr);
 
                     self.semantic.restore(snapshot);

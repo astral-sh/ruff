@@ -5,7 +5,7 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, IsolationLevel};
-use ruff_python_ast::source_code::Locator;
+use ruff_source_file::Locator;
 
 use crate::autofix::source_map::SourceMap;
 use crate::linter::FixTable;
@@ -146,7 +146,7 @@ mod tests {
     use ruff_diagnostics::Diagnostic;
     use ruff_diagnostics::Edit;
     use ruff_diagnostics::Fix;
-    use ruff_python_ast::source_code::Locator;
+    use ruff_source_file::Locator;
 
     use crate::autofix::source_map::SourceMarker;
     use crate::autofix::{apply_fixes, FixResult};

@@ -10,7 +10,7 @@ use ruff_formatter::FormatRuleWithOptions;
 use ruff_formatter::{write, Buffer, FormatResult};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{ExceptHandler, Ranged, StmtTry, StmtTryStar, Suite};
+use rustpython_ast::{ExceptHandler, Ranged, StmtTry, StmtTryStar, Suite};
 
 pub(super) enum AnyStatementTry<'a> {
     Try(&'a StmtTry),

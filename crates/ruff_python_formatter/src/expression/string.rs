@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use bitflags::bitflags;
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_parser::ast::{ExprConstant, Ranged};
+use rustpython_ast::{ExprConstant, Ranged};
 use rustpython_parser::lexer::{lex_starts_at, LexicalError, LexicalErrorType};
 use rustpython_parser::{Mode, Tok};
 

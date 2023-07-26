@@ -1,11 +1,9 @@
 use anyhow::Result;
+use ruff_python_ast::relocate::relocate_expr;
+use ruff_python_ast::str;
 use ruff_text_size::{TextLen, TextRange};
-use rustpython_parser::ast::Expr;
+use rustpython_ast::Expr;
 use rustpython_parser::Parse;
-
-use crate::relocate::relocate_expr;
-use crate::source_code::Locator;
-use crate::str;
 
 #[derive(is_macro::Is, Copy, Clone)]
 pub enum AnnotationKind {
@@ -25,9 +23,9 @@ pub enum AnnotationKind {
 pub fn parse_type_annotation(
     value: &str,
     range: TextRange,
-    locator: &Locator,
+    source: &str,
 ) -> Result<(Expr, AnnotationKind)> {
-    let expression = &locator.contents()[range];
+    let expression = &source[range];
 
     if str::raw_contents(expression).map_or(false, |body| body == value) {
         // The annotation is considered "simple" if and only if the raw representation (e.g.,

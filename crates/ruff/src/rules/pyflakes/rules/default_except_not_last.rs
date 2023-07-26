@@ -1,9 +1,9 @@
-use rustpython_parser::ast::{self, ExceptHandler};
+use rustpython_ast::{self as ast, ExceptHandler};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::identifier::except;
-use ruff_python_ast::source_code::Locator;
+use ruff_source_file::Locator;
 
 /// ## What it does
 /// Checks for `except` blocks that handle all exceptions, but are not the last
@@ -63,7 +63,7 @@ pub(crate) fn default_except_not_last(
         if type_.is_none() && idx < handlers.len() - 1 {
             return Some(Diagnostic::new(
                 DefaultExceptNotLast,
-                except(handler, locator),
+                except(handler, locator.contents()),
             ));
         }
     }

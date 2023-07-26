@@ -5,7 +5,7 @@ use crate::AsFormat;
 use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::{format_args, write, Buffer, FormatResult};
 use ruff_python_ast::node::AnyNodeRef;
-use rustpython_parser::ast::ExprSetComp;
+use rustpython_ast::ExprSetComp;
 
 #[derive(Default)]
 pub struct FormatExprSetComp;

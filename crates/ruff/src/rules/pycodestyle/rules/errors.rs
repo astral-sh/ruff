@@ -3,7 +3,7 @@ use rustpython_parser::ParseError;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::Locator;
+use ruff_source_file::Locator;
 
 use crate::logging::DisplayParseErrorType;
 

@@ -1,7 +1,7 @@
 use crate::comments::Comments;
 use crate::PyFormatOptions;
 use ruff_formatter::{FormatContext, GroupId, SourceCode};
-use ruff_python_ast::source_code::Locator;
+use ruff_source_file::Locator;
 use std::fmt::{Debug, Formatter};
 
 #[derive(Clone)]

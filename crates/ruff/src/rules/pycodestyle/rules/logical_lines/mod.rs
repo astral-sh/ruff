@@ -16,9 +16,9 @@ use bitflags::bitflags;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustpython_parser::lexer::LexResult;
 
-use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::token_kind::TokenKind;
+use ruff_python_parser::token_kind::TokenKind;
 use ruff_python_trivia::is_python_whitespace;
+use ruff_source_file::Locator;
 
 mod extraneous_whitespace;
 mod indentation;
@@ -524,7 +524,7 @@ mod tests {
     use rustpython_parser::lexer::LexResult;
     use rustpython_parser::{lexer, Mode};
 
-    use ruff_python_ast::source_code::Locator;
+    use ruff_source_file::Locator;
 
     use super::LogicalLines;
 

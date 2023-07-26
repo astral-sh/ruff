@@ -7,7 +7,7 @@ use ruff_text_size::{TextRange, TextSize};
 use similar::{ChangeTag, TextDiff};
 
 use ruff_diagnostics::{Applicability, Fix};
-use ruff_python_ast::source_code::{OneIndexed, SourceFile};
+use ruff_source_file::{OneIndexed, SourceFile};
 
 use crate::message::Message;
 

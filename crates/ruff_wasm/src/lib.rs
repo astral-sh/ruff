@@ -21,10 +21,10 @@ use ruff::rules::{
 use ruff::settings::configuration::Configuration;
 use ruff::settings::options::Options;
 use ruff::settings::{defaults, flags, Settings};
-use ruff_python_ast::source_code::{
-    CommentRangesBuilder, Indexer, Locator, SourceLocation, Stylist,
-};
+use ruff_python_codegen::Stylist;
 use ruff_python_formatter::{format_module, format_node, PyFormatOptions};
+use ruff_python_index::{CommentRangesBuilder, Indexer};
+use ruff_source_file::{Locator, SourceLocation};
 
 #[wasm_bindgen(typescript_custom_section)]
 const TYPES: &'static str = r#"
@@ -197,7 +197,7 @@ impl Workspace {
 
     pub fn check(&self, contents: &str) -> Result<JsValue, Error> {
         // Tokenize once.
-        let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents);
+        let tokens: Vec<LexResult> = ruff_python_parser::tokenize(contents);
 
         // Map row and column locations to byte slices (lazily).
         let locator = Locator::new(contents);

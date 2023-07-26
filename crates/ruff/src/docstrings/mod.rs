@@ -2,7 +2,7 @@ use std::fmt::{Debug, Formatter};
 use std::ops::Deref;
 
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{Expr, Ranged};
+use rustpython_ast::{Expr, Ranged};
 
 use ruff_python_semantic::Definition;
 

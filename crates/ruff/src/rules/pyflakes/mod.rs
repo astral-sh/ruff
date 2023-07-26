@@ -15,8 +15,10 @@ mod tests {
     use test_case::test_case;
 
     use ruff_diagnostics::Diagnostic;
-    use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
-    use ruff_textwrap::dedent;
+    use ruff_python_codegen::Stylist;
+    use ruff_python_index::Indexer;
+    use ruff_python_trivia::textwrap::dedent;
+    use ruff_source_file::Locator;
 
     use crate::linter::{check_path, LinterResult};
     use crate::registry::{AsRule, Linter, Rule};
@@ -502,7 +504,7 @@ mod tests {
     fn flakes(contents: &str, expected: &[Rule]) {
         let contents = dedent(contents);
         let settings = Settings::for_rules(Linter::Pyflakes.rules());
-        let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&contents);
+        let tokens: Vec<LexResult> = ruff_python_parser::tokenize(&contents);
         let locator = Locator::new(&contents);
         let stylist = Stylist::from_tokens(&tokens, &locator);
         let indexer = Indexer::from_tokens(&tokens, &locator);

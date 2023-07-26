@@ -6,9 +6,8 @@ use memchr::{memchr2, memrchr2};
 use once_cell::unsync::OnceCell;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
-use ruff_python_trivia::find_newline;
-
-use crate::source_code::{LineIndex, OneIndexed, SourceCode, SourceLocation};
+use crate::newlines::find_newline;
+use crate::{LineIndex, OneIndexed, SourceCode, SourceLocation};
 
 pub struct Locator<'a> {
     contents: &'a str,
@@ -59,7 +58,7 @@ impl<'a> Locator<'a> {
     ///
     /// ```
     /// # use ruff_text_size::TextSize;
-    /// # use ruff_python_ast::source_code::Locator;
+    /// # use ruff_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\rthird line");
     ///
@@ -93,7 +92,7 @@ impl<'a> Locator<'a> {
     ///
     /// ```
     /// # use ruff_text_size::{TextRange, TextSize};
-    /// # use ruff_python_ast::source_code::Locator;
+    /// # use ruff_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
     ///
@@ -120,7 +119,7 @@ impl<'a> Locator<'a> {
     ///
     /// ```
     /// # use ruff_text_size::{TextRange, TextSize};
-    /// # use ruff_python_ast::source_code::Locator;
+    /// # use ruff_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
     ///
@@ -150,7 +149,7 @@ impl<'a> Locator<'a> {
     ///
     /// ```
     /// # use ruff_text_size::{TextRange, TextSize};
-    /// # use ruff_python_ast::source_code::Locator;
+    /// # use ruff_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
     ///
@@ -174,7 +173,7 @@ impl<'a> Locator<'a> {
     ///
     /// ```
     /// # use ruff_text_size::{TextRange, TextSize};
-    /// # use ruff_python_ast::source_code::Locator;
+    /// # use ruff_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
     ///
@@ -197,7 +196,7 @@ impl<'a> Locator<'a> {
     ///
     /// ```
     /// # use ruff_text_size::{TextRange, TextSize};
-    /// # use ruff_python_ast::source_code::Locator;
+    /// # use ruff_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
     ///
@@ -220,7 +219,7 @@ impl<'a> Locator<'a> {
     ///
     /// ```
     /// # use ruff_text_size::{TextRange, TextSize};
-    /// # use ruff_python_ast::source_code::Locator;
+    /// # use ruff_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
     ///
@@ -244,7 +243,7 @@ impl<'a> Locator<'a> {
     ///
     /// ```
     /// # use ruff_text_size::{TextRange, TextSize};
-    /// # use ruff_python_ast::source_code::Locator;
+    /// # use ruff_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
     ///
@@ -276,7 +275,7 @@ impl<'a> Locator<'a> {
     ///
     /// ```
     /// # use ruff_text_size::{TextRange, TextSize};
-    /// # use ruff_python_ast::source_code::Locator;
+    /// # use ruff_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
     ///
@@ -300,7 +299,7 @@ impl<'a> Locator<'a> {
     ///
     /// ```
     /// # use ruff_text_size::{TextRange, TextSize};
-    /// # use ruff_python_ast::source_code::Locator;
+    /// # use ruff_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
     ///
@@ -325,7 +324,7 @@ impl<'a> Locator<'a> {
     ///
     /// ```
     /// # use ruff_text_size::{TextRange, TextSize};
-    /// # use ruff_python_ast::source_code::Locator;
+    /// # use ruff_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
     ///
@@ -353,7 +352,7 @@ impl<'a> Locator<'a> {
     ///
     /// ```
     /// # use ruff_text_size::{TextRange, TextSize};
-    /// # use ruff_python_ast::source_code::Locator;
+    /// # use ruff_source_file::Locator;
     ///
     /// let locator = Locator::new("First line\nsecond line\r\nthird line");
     ///

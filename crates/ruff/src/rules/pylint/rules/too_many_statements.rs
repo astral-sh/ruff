@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, ExceptHandler, Stmt};
+use rustpython_ast::{self as ast, ExceptHandler, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -166,7 +166,7 @@ pub(crate) fn too_many_statements(
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use rustpython_parser::ast::Suite;
+    use rustpython_ast::Suite;
     use rustpython_parser::Parse;
 
     use super::num_statements;

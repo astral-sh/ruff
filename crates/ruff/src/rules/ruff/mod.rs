@@ -12,7 +12,7 @@ mod tests {
     use rustc_hash::FxHashSet;
     use test_case::test_case;
 
-    use ruff_python_ast::source_code::SourceFileBuilder;
+    use ruff_source_file::SourceFileBuilder;
 
     use crate::pyproject_toml::lint_pyproject_toml;
     use crate::registry::Rule;

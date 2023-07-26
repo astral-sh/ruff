@@ -1,8 +1,7 @@
-use rustpython_ast::{ArgWithDefault, ElifElseClause, Mod, TypeIgnore};
-use rustpython_parser::ast::{
-    self, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Constant, Decorator, ExceptHandler,
-    Expr, Keyword, MatchCase, Operator, Pattern, Stmt, TypeParam, TypeParamTypeVar, UnaryOp,
-    WithItem,
+use rustpython_ast::{
+    self as ast, Alias, Arg, ArgWithDefault, Arguments, BoolOp, CmpOp, Comprehension, Constant,
+    Decorator, ElifElseClause, ExceptHandler, Expr, Keyword, MatchCase, Mod, Operator, Pattern,
+    Stmt, TypeIgnore, TypeParam, TypeParamTypeVar, UnaryOp, WithItem,
 };
 
 /// Visitor that traverses all nodes recursively in pre-order.
