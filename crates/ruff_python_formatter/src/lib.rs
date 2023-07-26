@@ -12,8 +12,8 @@ use ruff_formatter::{
     PrintError,
 };
 use ruff_formatter::{Formatted, Printed, SourceCode};
-use ruff_python::index::{CommentRanges, CommentRangesBuilder};
 use ruff_python_ast::node::{AnyNodeRef, AstNode, NodeKind};
+use ruff_python_index::{CommentRanges, CommentRangesBuilder};
 use ruff_source_file::Locator;
 use ruff_text_size::{TextLen, TextRange};
 use rustpython_ast::{Mod, Ranged};
@@ -250,7 +250,7 @@ mod tests {
     use crate::{format_module, format_node, PyFormatOptions};
     use anyhow::Result;
     use insta::assert_snapshot;
-    use ruff_python::index::CommentRangesBuilder;
+    use ruff_python_index::CommentRangesBuilder;
     use rustpython_parser::lexer::lex;
     use rustpython_parser::{parse_tokens, Mode};
 

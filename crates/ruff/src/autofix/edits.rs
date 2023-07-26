@@ -5,8 +5,8 @@ use rustpython_ast::{self as ast, ExceptHandler, Expr, Keyword, Ranged, Stmt};
 use rustpython_parser::{lexer, Mode};
 
 use ruff_diagnostics::Edit;
-use ruff_python::index::Indexer;
 use ruff_python_codegen::Stylist;
+use ruff_python_index::Indexer;
 use ruff_python_trivia::{has_leading_content, is_python_whitespace, PythonWhitespace};
 use ruff_source_file::{Locator, NewlineWithTrailingNewline};
 

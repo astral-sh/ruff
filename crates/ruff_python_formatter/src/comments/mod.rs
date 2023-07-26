@@ -99,8 +99,8 @@ pub(crate) use format::{
     leading_node_comments, trailing_comments, trailing_node_comments,
 };
 use ruff_formatter::{SourceCode, SourceCodeSlice};
-use ruff_python::index::CommentRanges;
 use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_index::CommentRanges;
 
 use crate::comments::debug::{DebugComment, DebugComments};
 use crate::comments::map::MultiMap;
@@ -419,7 +419,7 @@ mod tests {
     use rustpython_parser::{parse_tokens, Mode};
 
     use ruff_formatter::SourceCode;
-    use ruff_python::index::{CommentRanges, CommentRangesBuilder};
+    use ruff_python_index::{CommentRanges, CommentRangesBuilder};
 
     use crate::comments::Comments;
 

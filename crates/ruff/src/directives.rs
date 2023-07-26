@@ -7,7 +7,7 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
-use ruff_python::index::Indexer;
+use ruff_python_index::Indexer;
 use ruff_source_file::Locator;
 
 use crate::noqa::NoqaMapping;
@@ -353,7 +353,7 @@ mod tests {
     use rustpython_parser::lexer::LexResult;
     use rustpython_parser::{lexer, Mode};
 
-    use ruff_python::index::Indexer;
+    use ruff_python_index::Indexer;
     use ruff_source_file::Locator;
 
     use crate::directives::{

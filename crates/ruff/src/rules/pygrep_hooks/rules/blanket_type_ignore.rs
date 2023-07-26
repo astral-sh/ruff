@@ -6,7 +6,7 @@ use ruff_text_size::TextSize;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python::index::Indexer;
+use ruff_python_index::Indexer;
 use ruff_source_file::Locator;
 
 /// ## What it does

@@ -7,8 +7,8 @@ use rustpython_ast::{
 };
 
 use ruff_formatter::{SourceCode, SourceCodeSlice};
-use ruff_python::index::CommentRanges;
 use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_index::CommentRanges;
 use ruff_source_file::Locator;
 // The interface is designed to only export the members relevant for iterating nodes in
 // pre-order.

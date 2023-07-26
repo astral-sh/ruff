@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python::index::Indexer;
+use ruff_python_index::Indexer;
 use ruff_source_file::Locator;
 
 use crate::registry::Rule;

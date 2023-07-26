@@ -1904,9 +1904,9 @@ dependencies = [
  "ruff_diagnostics",
  "ruff_index",
  "ruff_macros",
- "ruff_python",
  "ruff_python_ast",
  "ruff_python_codegen",
+ "ruff_python_index",
  "ruff_python_parser",
  "ruff_python_semantic",
  "ruff_python_stdlib",
@@ -2000,7 +2000,6 @@ dependencies = [
  "ruff_cache",
  "ruff_diagnostics",
  "ruff_macros",
- "ruff_python",
  "ruff_python_ast",
  "ruff_python_formatter",
  "ruff_python_stdlib",
@@ -2040,7 +2039,6 @@ dependencies = [
  "ruff_cli",
  "ruff_diagnostics",
  "ruff_formatter",
- "ruff_python",
  "ruff_python_codegen",
  "ruff_python_formatter",
  "ruff_python_stdlib",
@@ -2103,27 +2101,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ruff_python"
-version = "0.0.0"
-dependencies = [
- "insta",
- "is-macro",
- "itertools",
- "memchr",
- "num-bigint",
- "num-traits",
- "once_cell",
- "ruff_python_trivia",
- "ruff_source_file",
- "ruff_text_size",
- "rustc-hash",
- "rustpython-ast",
- "rustpython-parser",
- "serde",
- "smallvec",
-]
-
-[[package]]
 name = "ruff_python_ast"
 version = "0.0.0"
 dependencies = [
@@ -2169,8 +2146,8 @@ dependencies = [
  "itertools",
  "once_cell",
  "ruff_formatter",
- "ruff_python",
  "ruff_python_ast",
+ "ruff_python_index",
  "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
@@ -2182,6 +2159,18 @@ dependencies = [
  "similar",
  "smallvec",
  "thiserror",
+]
+
+[[package]]
+name = "ruff_python_index"
+version = "0.0.0"
+dependencies = [
+ "itertools",
+ "ruff_python_trivia",
+ "ruff_source_file",
+ "ruff_text_size",
+ "rustpython-ast",
+ "rustpython-parser",
 ]
 
 [[package]]
@@ -2288,10 +2277,10 @@ dependencies = [
  "log",
  "ruff",
  "ruff_diagnostics",
- "ruff_python",
  "ruff_python_ast",
  "ruff_python_codegen",
  "ruff_python_formatter",
+ "ruff_python_index",
  "ruff_python_parser",
  "ruff_source_file",
  "rustpython-parser",

@@ -268,7 +268,7 @@ mod tests {
     use rustpython_parser::lexer::LexResult;
     use rustpython_parser::{lexer, Mode};
 
-    use crate::index::Indexer;
+    use crate::Indexer;
     use ruff_source_file::Locator;
 
     #[test]

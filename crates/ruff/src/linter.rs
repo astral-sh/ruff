@@ -11,9 +11,9 @@ use rustpython_parser::lexer::LexResult;
 use rustpython_parser::ParseError;
 
 use ruff_diagnostics::Diagnostic;
-use ruff_python::index::Indexer;
 use ruff_python_ast::imports::ImportMap;
 use ruff_python_codegen::Stylist;
+use ruff_python_index::Indexer;
 use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_source_file::{Locator, SourceFileBuilder};
 
