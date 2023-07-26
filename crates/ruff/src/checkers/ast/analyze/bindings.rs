@@ -11,6 +11,7 @@ pub(crate) fn bindings(checker: &mut Checker) {
         Rule::UnaliasedCollectionsAbcSetImport,
         Rule::UnconventionalImportAlias,
         Rule::UnusedVariable,
+        Rule::UnusedPrivateProtocol,
     ]) {
         return;
     }
@@ -59,6 +60,13 @@ pub(crate) fn bindings(checker: &mut Checker) {
             if checker.enabled(Rule::UnaliasedCollectionsAbcSetImport) {
                 if let Some(diagnostic) =
                     flake8_pyi::rules::unaliased_collections_abc_set_import(checker, binding)
+                {
+                    checker.diagnostics.push(diagnostic);
+                }
+            }
+            if checker.enabled(Rule::UnusedPrivateProtocol) {
+                if let Some(diagnostic) =
+                    flake8_pyi::rules::unused_private_protocol(checker, binding)
                 {
                     checker.diagnostics.push(diagnostic);
                 }

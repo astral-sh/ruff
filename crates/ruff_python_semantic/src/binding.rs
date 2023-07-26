@@ -94,6 +94,11 @@ impl<'a> Binding<'a> {
         )
     }
 
+    /// Return `true` if this [`Binding`] represents a `typing.Protocol` definition.
+    pub const fn is_private_protocol(&self) -> bool {
+        self.flags.intersects(BindingFlags::PRIVATE_TYPE_PROTOCOL)
+    }
+
     /// Return `true` if this binding redefines the given binding.
     pub fn redefines(&self, existing: &'a Binding) -> bool {
         match &self.kind {
@@ -264,6 +269,17 @@ bitflags! {
         /// __all__ = [1]
         /// ```
         const INVALID_ALL_OBJECT = 1 << 6;
+
+        /// The binding represents a private `typing.Protocol`.
+        ///
+        /// For example, the binding could be `_PrivateProtocol` in:
+        /// ```python
+        /// import typing
+        ///
+        /// class _PrivateProtocol(typing.Protocol):
+        ///     foo: int
+        /// ```
+        const PRIVATE_TYPE_PROTOCOL = 1 << 7;
     }
 }
 
