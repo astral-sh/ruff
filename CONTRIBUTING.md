@@ -224,8 +224,11 @@ Once you've completed the code for the rule itself, you can define tests with th
     For example, if you're adding a new rule named `E402`, you would run:
 
     ```shell
-    cargo run -p ruff_cli -- check crates/ruff/resources/test/fixtures/pycodestyle/E402.py --no-cache
+    cargo run -p ruff_cli -- check crates/ruff/resources/test/fixtures/pycodestyle/E402.py --no-cache --select E402
     ```
+
+    **Note:** Only a subset of rules are enabled by default. When testing a new rule, ensure that
+    you activate it by adding `--select ${rule_code}` to the command.
 
 1. Add the test to the relevant `crates/ruff/src/rules/[linter]/mod.rs` file. If you're contributing
     a rule to a pre-existing set, you should be able to find a similar example to pattern-match
