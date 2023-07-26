@@ -8,12 +8,13 @@ use crate::checkers::ast::Checker;
 /// Checks for the presence of unused private `typing.Protocol` definitions.
 ///
 /// ## Why is this bad?
-/// A private `typing.Protocol` that is defined but not used is likely a mistake, and should
-/// be removed to avoid confusion.
+/// A private `typing.Protocol` that is defined but not used is likely a mistake, consider
+/// making it public.
 ///
 /// ## Example
 /// ```python
 /// import typing
+///
 ///
 /// class _PrivateProtocol(typing.Protocol):
 ///     foo: int
@@ -23,10 +24,13 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// import typing
 ///
+///
 /// class _PrivateProtocol(typing.Protocol):
 ///     foo: int
 ///
-/// def func(arg: _PrivateProtocol) -> None: ...
+///
+/// def func(arg: _PrivateProtocol) -> None:
+///     ...
 /// ```
 #[violation]
 pub struct UnusedPrivateProtocol {
@@ -37,7 +41,7 @@ impl Violation for UnusedPrivateProtocol {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnusedPrivateProtocol { name } = self;
-        format!("Protocol `{name}` is never used")
+        format!("Private protocol `{name}` is never used")
     }
 }
 
