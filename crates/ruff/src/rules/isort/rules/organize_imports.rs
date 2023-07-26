@@ -87,6 +87,7 @@ pub(crate) fn organize_imports(
     indexer: &Indexer,
     settings: &Settings,
     package: Option<&Path>,
+    is_jupyter_notebook: bool,
 ) -> Option<Diagnostic> {
     let indentation = locator.slice(extract_indentation_range(&block.imports, locator));
     let indentation = leading_indentation(indentation);
@@ -105,6 +106,7 @@ pub(crate) fn organize_imports(
     let comments = comments::collect_comments(
         TextRange::new(range.start(), locator.full_line_end(range.end())),
         locator,
+        is_jupyter_notebook,
     );
 
     let trailing_line_end = if block.trailer.is_none() {
@@ -123,6 +125,7 @@ pub(crate) fn organize_imports(
         stylist,
         &settings.src,
         package,
+        is_jupyter_notebook,
         settings.isort.combine_as_imports,
         settings.isort.force_single_line,
         settings.isort.force_sort_within_sections,

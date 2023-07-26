@@ -59,6 +59,7 @@ fn generate_fix(
     keywords: &[Keyword],
     stdout: &Keyword,
     stderr: &Keyword,
+    is_jupyter_notebook: bool,
 ) -> Result<Fix> {
     let (first, second) = if stdout.start() < stderr.start() {
         (stdout, stderr)
@@ -74,6 +75,7 @@ fn generate_fix(
             args,
             keywords,
             false,
+            is_jupyter_notebook,
         )?],
     ))
 }
@@ -121,7 +123,15 @@ pub(crate) fn replace_stdout_stderr(
         let mut diagnostic = Diagnostic::new(ReplaceStdoutStderr, expr.range());
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.try_set_fix(|| {
-                generate_fix(checker.locator(), func, args, keywords, stdout, stderr)
+                generate_fix(
+                    checker.locator(),
+                    func,
+                    args,
+                    keywords,
+                    stdout,
+                    stderr,
+                    checker.is_jupyter_notebook,
+                )
             });
         }
         checker.diagnostics.push(diagnostic);

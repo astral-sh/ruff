@@ -81,9 +81,15 @@ pub(crate) fn remove_argument(
     args: &[Expr],
     keywords: &[Keyword],
     remove_parentheses: bool,
+    is_jupyter_notebook: bool,
 ) -> Result<Edit> {
     // TODO(sbrugman): Preserve trailing comments.
     let contents = locator.after(call_at);
+    let mode = if is_jupyter_notebook {
+        Mode::Jupyter
+    } else {
+        Mode::Module
+    };
 
     let mut fix_start = None;
     let mut fix_end = None;
@@ -96,7 +102,7 @@ pub(crate) fn remove_argument(
     if n_arguments == 1 {
         // Case 1: there is only one argument.
         let mut count = 0u32;
-        for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, call_at).flatten() {
+        for (tok, range) in lexer::lex_starts_at(contents, mode, call_at).flatten() {
             if tok.is_lpar() {
                 if count == 0 {
                     fix_start = Some(if remove_parentheses {
@@ -128,7 +134,7 @@ pub(crate) fn remove_argument(
     {
         // Case 2: argument or keyword is _not_ the last node.
         let mut seen_comma = false;
-        for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, call_at).flatten() {
+        for (tok, range) in lexer::lex_starts_at(contents, mode, call_at).flatten() {
             if seen_comma {
                 if tok.is_non_logical_newline() {
                     // Also delete any non-logical newlines after the comma.
@@ -151,7 +157,7 @@ pub(crate) fn remove_argument(
     } else {
         // Case 3: argument or keyword is the last node, so we have to find the last
         // comma in the stmt.
-        for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, call_at).flatten() {
+        for (tok, range) in lexer::lex_starts_at(contents, mode, call_at).flatten() {
             if range.start() == expr_range.start() {
                 fix_end = Some(expr_range.end());
                 break;

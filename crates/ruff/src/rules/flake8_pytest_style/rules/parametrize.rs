@@ -95,18 +95,19 @@ fn elts_to_csv(elts: &[Expr], generator: Generator) -> Option<String> {
 /// ```
 ///
 /// This method assumes that the first argument is a string.
-fn get_parametrize_name_range(decorator: &Decorator, expr: &Expr, locator: &Locator) -> TextRange {
+fn get_parametrize_name_range(
+    decorator: &Decorator,
+    expr: &Expr,
+    locator: &Locator,
+    mode: Mode,
+) -> TextRange {
     let mut locations = Vec::new();
     let mut implicit_concat = None;
 
     // The parenthesis are not part of the AST, so we need to tokenize the
     // decorator to find them.
-    for (tok, range) in lexer::lex_starts_at(
-        locator.slice(decorator.range()),
-        Mode::Module,
-        decorator.start(),
-    )
-    .flatten()
+    for (tok, range) in
+        lexer::lex_starts_at(locator.slice(decorator.range()), mode, decorator.start()).flatten()
     {
         match tok {
             Tok::Lpar => locations.push(range.start()),
@@ -131,6 +132,11 @@ fn get_parametrize_name_range(decorator: &Decorator, expr: &Expr, locator: &Loca
 /// PT006
 fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
     let names_type = checker.settings.flake8_pytest_style.parametrize_names_type;
+    let mode = if checker.is_jupyter_notebook {
+        Mode::Jupyter
+    } else {
+        Mode::Module
+    };
 
     match expr {
         Expr::Constant(ast::ExprConstant {
@@ -142,7 +148,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                 match names_type {
                     types::ParametrizeNameType::Tuple => {
                         let name_range =
-                            get_parametrize_name_range(decorator, expr, checker.locator());
+                            get_parametrize_name_range(decorator, expr, checker.locator(), mode);
                         let mut diagnostic = Diagnostic::new(
                             PytestParametrizeNamesWrongType {
                                 expected: names_type,
@@ -173,7 +179,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                     }
                     types::ParametrizeNameType::List => {
                         let name_range =
-                            get_parametrize_name_range(decorator, expr, checker.locator());
+                            get_parametrize_name_range(decorator, expr, checker.locator(), mode);
                         let mut diagnostic = Diagnostic::new(
                             PytestParametrizeNamesWrongType {
                                 expected: names_type,

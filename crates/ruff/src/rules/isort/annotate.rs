@@ -13,6 +13,7 @@ pub(crate) fn annotate_imports<'a>(
     comments: Vec<Comment<'a>>,
     locator: &Locator,
     split_on_trailing_comma: bool,
+    is_jupyter_notebook: bool,
 ) -> Vec<AnnotatedImport<'a>> {
     let mut comments_iter = comments.into_iter().peekable();
 
@@ -119,7 +120,7 @@ pub(crate) fn annotate_imports<'a>(
                         names: aliases,
                         level: level.map(|level| level.to_u32()),
                         trailing_comma: if split_on_trailing_comma {
-                            trailing_comma(import, locator)
+                            trailing_comma(import, locator, is_jupyter_notebook)
                         } else {
                             TrailingComma::default()
                         },

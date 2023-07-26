@@ -84,6 +84,7 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
                                 mode.replacement_value(),
                                 checker.locator(),
                                 checker.patch(Rule::RedundantOpenModes),
+                                checker.is_jupyter_notebook,
                             ));
                         }
                     }
@@ -103,6 +104,7 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
                         mode.replacement_value(),
                         checker.locator(),
                         checker.patch(Rule::RedundantOpenModes),
+                        checker.is_jupyter_notebook,
                     ));
                 }
             }
@@ -182,6 +184,7 @@ fn create_check(
     replacement_value: Option<&str>,
     locator: &Locator,
     patch: bool,
+    is_jupyter_notebook: bool,
 ) -> Diagnostic {
     let mut diagnostic = Diagnostic::new(
         RedundantOpenModes {
@@ -197,14 +200,20 @@ fn create_check(
             )));
         } else {
             diagnostic.try_set_fix(|| {
-                create_remove_param_fix(locator, expr, mode_param).map(Fix::automatic)
+                create_remove_param_fix(locator, expr, mode_param, is_jupyter_notebook)
+                    .map(Fix::automatic)
             });
         }
     }
     diagnostic
 }
 
-fn create_remove_param_fix(locator: &Locator, expr: &Expr, mode_param: &Expr) -> Result<Edit> {
+fn create_remove_param_fix(
+    locator: &Locator,
+    expr: &Expr,
+    mode_param: &Expr,
+    is_jupyter_notebook: bool,
+) -> Result<Edit> {
     let content = locator.slice(expr.range());
     // Find the last comma before mode_param and create a deletion fix
     // starting from the comma and ending after mode_param.
@@ -212,7 +221,12 @@ fn create_remove_param_fix(locator: &Locator, expr: &Expr, mode_param: &Expr) ->
     let mut fix_end: Option<TextSize> = None;
     let mut is_first_arg: bool = false;
     let mut delete_first_arg: bool = false;
-    for (tok, range) in lexer::lex_starts_at(content, Mode::Module, expr.start()).flatten() {
+    let mode = if is_jupyter_notebook {
+        Mode::Jupyter
+    } else {
+        Mode::Module
+    };
+    for (tok, range) in lexer::lex_starts_at(content, mode, expr.start()).flatten() {
         if range.start() == mode_param.start() {
             if is_first_arg {
                 delete_first_arg = true;
