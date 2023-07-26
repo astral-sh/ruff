@@ -13,7 +13,6 @@ use crate::rules::pycodestyle::rules::{
     tab_indentation, trailing_whitespace,
 };
 use crate::rules::pylint;
-use crate::rules::pyupgrade::rules::unnecessary_coding_comment;
 use crate::settings::Settings;
 
 pub(crate) fn check_physical_lines(
@@ -28,7 +27,6 @@ pub(crate) fn check_physical_lines(
     let enforce_doc_line_too_long = settings.rules.enabled(Rule::DocLineTooLong);
     let enforce_line_too_long = settings.rules.enabled(Rule::LineTooLong);
     let enforce_no_newline_at_end_of_file = settings.rules.enabled(Rule::MissingNewlineAtEndOfFile);
-    let enforce_unnecessary_coding_comment = settings.rules.enabled(Rule::UTF8EncodingDeclaration);
     let enforce_mixed_spaces_and_tabs = settings.rules.enabled(Rule::MixedSpacesAndTabs);
     let enforce_bidirectional_unicode = settings.rules.enabled(Rule::BidirectionalUnicode);
     let enforce_trailing_whitespace = settings.rules.enabled(Rule::TrailingWhitespace);
@@ -37,27 +35,9 @@ pub(crate) fn check_physical_lines(
     let enforce_tab_indentation = settings.rules.enabled(Rule::TabIndentation);
     let enforce_copyright_notice = settings.rules.enabled(Rule::MissingCopyrightNotice);
 
-    let fix_unnecessary_coding_comment = settings.rules.should_fix(Rule::UTF8EncodingDeclaration);
-
-    let mut commented_lines_iter = indexer.comment_ranges().iter().peekable();
     let mut doc_lines_iter = doc_lines.iter().peekable();
 
-    for (index, line) in locator.contents().universal_newlines().enumerate() {
-        while commented_lines_iter
-            .next_if(|comment_range| line.range().contains_range(**comment_range))
-            .is_some()
-        {
-            if enforce_unnecessary_coding_comment {
-                if index < 2 {
-                    if let Some(diagnostic) =
-                        unnecessary_coding_comment(&line, fix_unnecessary_coding_comment)
-                    {
-                        diagnostics.push(diagnostic);
-                    }
-                }
-            }
-        }
-
+    for line in locator.contents().universal_newlines() {
         while doc_lines_iter
             .next_if(|doc_line_start| line.range().contains_inclusive(**doc_line_start))
             .is_some()

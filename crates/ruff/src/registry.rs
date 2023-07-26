@@ -246,8 +246,7 @@ impl Rule {
             | Rule::MissingNewlineAtEndOfFile
             | Rule::MixedSpacesAndTabs
             | Rule::TabIndentation
-            | Rule::TrailingWhitespace
-            | Rule::UTF8EncodingDeclaration => LintSource::PhysicalLines,
+            | Rule::TrailingWhitespace => LintSource::PhysicalLines,
             Rule::AmbiguousUnicodeCharacterComment
             | Rule::AmbiguousUnicodeCharacterDocstring
             | Rule::AmbiguousUnicodeCharacterString
@@ -289,7 +288,8 @@ impl Rule {
             | Rule::SingleLineImplicitStringConcatenation
             | Rule::TrailingCommaOnBareTuple
             | Rule::TypeCommentInStub
-            | Rule::UselessSemicolon => LintSource::Tokens,
+            | Rule::UselessSemicolon
+            | Rule::UTF8EncodingDeclaration => LintSource::Tokens,
             Rule::IOError => LintSource::Io,
             Rule::UnsortedImports | Rule::MissingRequiredImport => LintSource::Imports,
             Rule::ImplicitNamespacePackage | Rule::InvalidModuleName => LintSource::Filesystem,
