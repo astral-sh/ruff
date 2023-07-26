@@ -1750,10 +1750,10 @@ impl<'a> Checker<'a> {
                 self.semantic.restore(snapshot);
 
                 match type_param {
-                    ast::TypeParam::TypeVar(ast::TypeParamTypeVar { bound, .. }) => {
-                        if let Some(bound) = bound {
-                            self.visit_expr(bound);
-                        }
+                    ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
+                        bound: Some(bound), ..
+                    }) => {
+                        self.visit_expr(bound);
                     }
                     _ => {}
                 }
