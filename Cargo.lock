@@ -1912,7 +1912,6 @@ dependencies = [
  "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
- "ruff_textwrap",
  "rustc-hash",
  "rustpython-ast",
  "rustpython-format",
@@ -2004,9 +2003,9 @@ dependencies = [
  "ruff_python_ast",
  "ruff_python_formatter",
  "ruff_python_stdlib",
+ "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
- "ruff_textwrap",
  "rustc-hash",
  "serde",
  "serde_json",
@@ -2043,7 +2042,7 @@ dependencies = [
  "ruff_python",
  "ruff_python_formatter",
  "ruff_python_stdlib",
- "ruff_textwrap",
+ "ruff_python_trivia",
  "rustpython-ast",
  "rustpython-format",
  "rustpython-parser",
@@ -2097,7 +2096,7 @@ dependencies = [
  "itertools",
  "proc-macro2",
  "quote",
- "ruff_textwrap",
+ "ruff_python_trivia",
  "syn 2.0.23",
 ]
 
@@ -2266,14 +2265,6 @@ source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=593b46be5e0
 dependencies = [
  "schemars",
  "serde",
-]
-
-[[package]]
-name = "ruff_textwrap"
-version = "0.0.0"
-dependencies = [
- "ruff_python_trivia",
- "ruff_text_size",
 ]
 
 [[package]]

@@ -16,8 +16,8 @@ mod tests {
 
     use ruff_diagnostics::Diagnostic;
     use ruff_python::{codegen::Stylist, index::Indexer};
+    use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::Locator;
-    use ruff_textwrap::dedent;
 
     use crate::linter::{check_path, LinterResult};
     use crate::registry::{AsRule, Linter, Rule};

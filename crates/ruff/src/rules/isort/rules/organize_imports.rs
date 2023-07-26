@@ -9,9 +9,8 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python::codegen::Stylist;
 use ruff_python::index::Indexer;
 use ruff_python_ast::whitespace::{followed_by_multi_statement_line, trailing_lines_end};
-use ruff_python_trivia::{leading_indentation, PythonWhitespace, UniversalNewlines};
-use ruff_source_file::Locator;
-use ruff_textwrap::indent;
+use ruff_python_trivia::{leading_indentation, textwrap::indent, PythonWhitespace};
+use ruff_source_file::{Locator, UniversalNewlines};
 
 use crate::line_width::LineWidth;
 use crate::registry::AsRule;

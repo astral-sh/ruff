@@ -14,8 +14,8 @@ use ruff_diagnostics::Edit;
 use ruff_python::codegen::Stylist;
 use ruff_python_ast::imports::{AnyImport, Import, ImportFrom};
 use ruff_python_semantic::SemanticModel;
+use ruff_python_trivia::textwrap::indent;
 use ruff_source_file::Locator;
-use ruff_textwrap::indent;
 
 use crate::autofix;
 use crate::autofix::codemods::CodegenStylist;

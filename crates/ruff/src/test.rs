@@ -6,12 +6,12 @@ use std::path::Path;
 #[cfg(not(fuzzing))]
 use anyhow::Result;
 use itertools::Itertools;
-use ruff_textwrap::dedent;
 use rustc_hash::FxHashMap;
 use rustpython_parser::lexer::LexResult;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic};
 use ruff_python::{codegen::Stylist, index::Indexer};
+use ruff_python_trivia::textwrap::dedent;
 use ruff_source_file::{Locator, SourceFileBuilder};
 
 use crate::autofix::{fix_file, FixResult};

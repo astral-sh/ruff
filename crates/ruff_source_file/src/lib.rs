@@ -8,8 +8,14 @@ use serde::{Deserialize, Serialize};
 
 pub mod line_index;
 mod locator;
+pub mod newlines;
+
 pub use crate::line_index::{LineIndex, OneIndexed};
 pub use locator::Locator;
+pub use newlines::{
+    find_newline, Line, LineEnding, NewlineWithTrailingNewline, UniversalNewlineIterator,
+    UniversalNewlines,
+};
 
 /// Gives access to the source code of a file and allows mapping between [`TextSize`] and [`SourceLocation`].
 #[derive(Debug)]

@@ -4,8 +4,7 @@ use ruff_text_size::TextSize;
 use ruff_diagnostics::Diagnostic;
 use ruff_python::codegen::Stylist;
 use ruff_python::index::Indexer;
-use ruff_python_trivia::UniversalNewlines;
-use ruff_source_file::Locator;
+use ruff_source_file::{Locator, UniversalNewlines};
 
 use crate::registry::Rule;
 use crate::rules::flake8_copyright::rules::missing_copyright_notice;

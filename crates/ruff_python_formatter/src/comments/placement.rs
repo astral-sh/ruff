@@ -8,9 +8,8 @@ use ruff_python_ast::node::{AnyNodeRef, AstNode};
 use ruff_python_ast::whitespace;
 use ruff_python_trivia::{
     indentation_at_offset, PythonWhitespace, SimpleToken, SimpleTokenKind, SimpleTokenizer,
-    UniversalNewlines,
 };
-use ruff_source_file::Locator;
+use ruff_source_file::{Locator, UniversalNewlines};
 
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
 use crate::expression::expr_slice::{assign_comment_in_slice, ExprSliceCommentSection};

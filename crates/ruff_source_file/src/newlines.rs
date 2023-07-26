@@ -22,7 +22,7 @@ impl UniversalNewlines for str {
 ///
 /// ```rust
 /// # use ruff_text_size::TextSize;
-/// # use ruff_python_trivia::{Line, UniversalNewlineIterator};
+/// # use ruff_source_file::{Line, UniversalNewlineIterator};
 /// let mut lines = UniversalNewlineIterator::from("foo\nbar\n\r\nbaz\rbop");
 ///
 /// assert_eq!(lines.next_back(), Some(Line::new("bop", TextSize::from(14))));

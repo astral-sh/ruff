@@ -4,7 +4,7 @@
 #![no_main]
 
 use libfuzzer_sys::{fuzz_target, Corpus};
-use ruff_source_file::round_trip;
+use ruff_python::codegen::round_trip;
 use similar::TextDiff;
 
 fn do_fuzz(case: &[u8]) -> Corpus {

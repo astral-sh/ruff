@@ -7,10 +7,8 @@ use rustpython_parser::{lexer, Mode};
 use ruff_diagnostics::Edit;
 use ruff_python::codegen::Stylist;
 use ruff_python::index::Indexer;
-use ruff_python_trivia::{
-    has_leading_content, is_python_whitespace, NewlineWithTrailingNewline, PythonWhitespace,
-};
-use ruff_source_file::Locator;
+use ruff_python_trivia::{has_leading_content, is_python_whitespace, PythonWhitespace};
+use ruff_source_file::{Locator, NewlineWithTrailingNewline};
 
 use crate::autofix::codemods;
 

@@ -3,8 +3,7 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python::index::Indexer;
-use ruff_python_trivia::Line;
-use ruff_source_file::Locator;
+use ruff_source_file::{Line, Locator};
 
 use crate::registry::Rule;
 use crate::settings::Settings;

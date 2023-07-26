@@ -3,9 +3,8 @@ use rustpython_ast::{Ranged, Stmt};
 
 use ruff_python_trivia::{
     has_trailing_content, indentation_at_offset, is_python_whitespace, PythonWhitespace,
-    UniversalNewlineIterator,
 };
-use ruff_source_file::Locator;
+use ruff_source_file::{newlines::UniversalNewlineIterator, Locator};
 
 /// Extract the leading indentation from a line.
 #[inline]

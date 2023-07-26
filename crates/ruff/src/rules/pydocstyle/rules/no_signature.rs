@@ -3,7 +3,7 @@ use rustpython_ast::{self as ast, Stmt};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::{Definition, Member, MemberKind};
-use ruff_python_trivia::UniversalNewlines;
+use ruff_source_file::UniversalNewlines;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;

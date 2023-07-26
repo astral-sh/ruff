@@ -13,8 +13,7 @@ use ruff_python_ast::helpers::{any_over_expr, contains_effect};
 use ruff_python_ast::stmt_if::{if_elif_branches, IfElifBranch};
 use ruff_python_parser::first_colon_range;
 use ruff_python_semantic::SemanticModel;
-use ruff_python_trivia::UniversalNewlines;
-use ruff_source_file::Locator;
+use ruff_source_file::{Locator, UniversalNewlines};
 
 use crate::checkers::ast::Checker;
 use crate::line_width::LineWidth;

@@ -8,9 +8,8 @@ use rustpython_parser::{lexer, Mode, Tok};
 use ruff_diagnostics::Edit;
 use ruff_python::codegen::Stylist;
 use ruff_python_ast::helpers::is_docstring_stmt;
-use ruff_python_trivia::{PythonWhitespace, UniversalNewlineIterator};
-use ruff_source_file::Locator;
-use ruff_textwrap::indent;
+use ruff_python_trivia::{textwrap::indent, PythonWhitespace};
+use ruff_source_file::{Locator, UniversalNewlineIterator};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum Placement<'a> {
@@ -306,8 +305,7 @@ mod tests {
     use rustpython_parser::Parse;
 
     use ruff_python::codegen::Stylist;
-    use ruff_python_trivia::LineEnding;
-    use ruff_source_file::Locator;
+    use ruff_source_file::{LineEnding, Locator};
 
     use super::Insertion;
 

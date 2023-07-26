@@ -10,7 +10,7 @@ use rustpython_ast::{
 };
 use rustpython_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
 
-use ruff_python_trivia::LineEnding;
+use ruff_source_file::LineEnding;
 
 use super::stylist::{Indentation, Quote, Stylist};
 
@@ -1478,7 +1478,7 @@ mod tests {
     use rustpython_ast::{Mod, ModModule, Stmt};
     use rustpython_parser::{self, Mode, Parse};
 
-    use ruff_python_trivia::LineEnding;
+    use ruff_source_file::LineEnding;
 
     use super::Generator;
     use crate::codegen::stylist::{Indentation, Quote};

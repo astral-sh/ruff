@@ -7,9 +7,8 @@ use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python::codegen::Generator;
 use ruff_python_semantic::SemanticModel;
-use ruff_python_trivia::{
-    has_leading_content, has_trailing_content, leading_indentation, UniversalNewlines,
-};
+use ruff_python_trivia::{has_leading_content, has_trailing_content, leading_indentation};
+use ruff_source_file::UniversalNewlines;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;

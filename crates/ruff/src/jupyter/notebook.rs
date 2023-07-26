@@ -10,7 +10,7 @@ use serde::Serialize;
 use serde_json::error::Category;
 
 use ruff_diagnostics::Diagnostic;
-use ruff_python_trivia::{NewlineWithTrailingNewline, UniversalNewlineIterator};
+use ruff_source_file::{NewlineWithTrailingNewline, UniversalNewlineIterator};
 use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::lexer::lex;
 use rustpython_parser::Mode;

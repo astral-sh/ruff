@@ -6,7 +6,7 @@ use ruff_diagnostics::{AutofixKind, Violation};
 use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_parser::first_colon_range;
-use ruff_python_trivia::UniversalNewlines;
+use ruff_source_file::UniversalNewlines;
 
 use crate::checkers::ast::Checker;
 use crate::line_width::LineWidth;

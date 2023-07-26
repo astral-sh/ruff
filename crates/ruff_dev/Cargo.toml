@@ -18,7 +18,7 @@ ruff_formatter = { path = "../ruff_formatter" }
 ruff_python = { path = "../ruff_python" }
 ruff_python_formatter = { path = "../ruff_python_formatter" }
 ruff_python_stdlib = { path = "../ruff_python_stdlib" }
-ruff_textwrap = { path = "../ruff_textwrap" }
+ruff_python_trivia = { path = "../ruff_python_trivia" }
 
 anyhow = { workspace = true }
 clap = { workspace = true }

@@ -27,7 +27,6 @@ ruff_python_stdlib = { path = "../ruff_python_stdlib" }
 ruff_source_file = { path = "../ruff_source_file" }
 ruff_python_parser = { path = "../ruff_python_parser" }
 ruff_text_size = { workspace = true }
-ruff_textwrap = { path = "../ruff_textwrap" }
 
 annotate-snippets = { version = "0.9.1", features = ["color"] }
 anyhow = { workspace = true }
