@@ -1,3 +1,4 @@
+use ast::{TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple};
 use ruff_text_size::TextRange;
 use rustpython_ast::{
     Alias, Arg, ArgWithDefault, Arguments, Comprehension, Decorator, ExceptHandler, Keyword,
@@ -100,6 +101,9 @@ pub enum AnyNode {
     MatchCase(MatchCase),
     Decorator(Decorator),
     ElifElseClause(ast::ElifElseClause),
+    TypeParamTypeVar(ast::TypeParamTypeVar),
+    TypeParamTypeVarTuple(ast::TypeParamTypeVarTuple),
+    TypeParamParamSpec(ast::TypeParamParamSpec),
 }
 
 impl AnyNode {
@@ -184,6 +188,9 @@ impl AnyNode {
             | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
             | AnyNode::Decorator(_)
+            | AnyNode::TypeParamTypeVar(_)
+            | AnyNode::TypeParamTypeVarTuple(_)
+            | AnyNode::TypeParamParamSpec(_)
             | AnyNode::ElifElseClause(_) => None,
         }
     }
@@ -269,6 +276,9 @@ impl AnyNode {
             | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
             | AnyNode::Decorator(_)
+            | AnyNode::TypeParamTypeVar(_)
+            | AnyNode::TypeParamTypeVarTuple(_)
+            | AnyNode::TypeParamParamSpec(_)
             | AnyNode::ElifElseClause(_) => None,
         }
     }
@@ -354,6 +364,9 @@ impl AnyNode {
             | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
             | AnyNode::Decorator(_)
+            | AnyNode::TypeParamTypeVar(_)
+            | AnyNode::TypeParamTypeVarTuple(_)
+            | AnyNode::TypeParamParamSpec(_)
             | AnyNode::ElifElseClause(_) => None,
         }
     }
@@ -439,6 +452,9 @@ impl AnyNode {
             | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
             | AnyNode::Decorator(_)
+            | AnyNode::TypeParamTypeVar(_)
+            | AnyNode::TypeParamTypeVarTuple(_)
+            | AnyNode::TypeParamParamSpec(_)
             | AnyNode::ElifElseClause(_) => None,
         }
     }
@@ -524,6 +540,9 @@ impl AnyNode {
             | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
             | AnyNode::Decorator(_)
+            | AnyNode::TypeParamTypeVar(_)
+            | AnyNode::TypeParamTypeVarTuple(_)
+            | AnyNode::TypeParamParamSpec(_)
             | AnyNode::ElifElseClause(_) => None,
         }
     }
@@ -609,6 +628,9 @@ impl AnyNode {
             | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
             | AnyNode::Decorator(_)
+            | AnyNode::TypeParamTypeVar(_)
+            | AnyNode::TypeParamTypeVarTuple(_)
+            | AnyNode::TypeParamParamSpec(_)
             | AnyNode::ElifElseClause(_) => None,
         }
     }
@@ -717,6 +739,9 @@ impl AnyNode {
             Self::WithItem(node) => AnyNodeRef::WithItem(node),
             Self::MatchCase(node) => AnyNodeRef::MatchCase(node),
             Self::Decorator(node) => AnyNodeRef::Decorator(node),
+            Self::TypeParamTypeVar(node) => AnyNodeRef::TypeParamTypeVar(node),
+            Self::TypeParamTypeVarTuple(node) => AnyNodeRef::TypeParamTypeVarTuple(node),
+            Self::TypeParamParamSpec(node) => AnyNodeRef::TypeParamParamSpec(node),
             Self::ElifElseClause(node) => AnyNodeRef::ElifElseClause(node),
         }
     }
@@ -2941,7 +2966,90 @@ impl AstNode for Decorator {
         AnyNode::from(self)
     }
 }
+impl AstNode for ast::TypeParamTypeVar {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::TypeParamTypeVar(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
 
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::TypeParamTypeVar(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+impl AstNode for ast::TypeParamTypeVarTuple {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::TypeParamTypeVarTuple(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::TypeParamTypeVarTuple(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+impl AstNode for ast::TypeParamParamSpec {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::TypeParamParamSpec(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::TypeParamParamSpec(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
 impl From<Stmt> for AnyNode {
     fn from(stmt: Stmt) -> Self {
         match stmt {
@@ -3518,6 +3626,23 @@ impl From<Decorator> for AnyNode {
         AnyNode::Decorator(node)
     }
 }
+impl From<TypeParamTypeVar> for AnyNode {
+    fn from(node: TypeParamTypeVar) -> Self {
+        AnyNode::TypeParamTypeVar(node)
+    }
+}
+
+impl From<TypeParamTypeVarTuple> for AnyNode {
+    fn from(node: TypeParamTypeVarTuple) -> Self {
+        AnyNode::TypeParamTypeVarTuple(node)
+    }
+}
+
+impl From<TypeParamParamSpec> for AnyNode {
+    fn from(node: TypeParamParamSpec) -> Self {
+        AnyNode::TypeParamParamSpec(node)
+    }
+}
 
 impl Ranged for AnyNode {
     fn range(&self) -> TextRange {
@@ -3600,6 +3725,9 @@ impl Ranged for AnyNode {
             AnyNode::WithItem(node) => node.range(),
             AnyNode::MatchCase(node) => node.range(),
             AnyNode::Decorator(node) => node.range(),
+            AnyNode::TypeParamTypeVar(node) => node.range(),
+            AnyNode::TypeParamTypeVarTuple(node) => node.range(),
+            AnyNode::TypeParamParamSpec(node) => node.range(),
             AnyNode::ElifElseClause(node) => node.range(),
         }
     }
@@ -3685,6 +3813,9 @@ pub enum AnyNodeRef<'a> {
     WithItem(&'a WithItem),
     MatchCase(&'a MatchCase),
     Decorator(&'a Decorator),
+    TypeParamTypeVar(&'a ast::TypeParamTypeVar),
+    TypeParamTypeVarTuple(&'a ast::TypeParamTypeVarTuple),
+    TypeParamParamSpec(&'a ast::TypeParamParamSpec),
     ElifElseClause(&'a ast::ElifElseClause),
 }
 
@@ -3769,6 +3900,9 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::WithItem(node) => NonNull::from(*node).cast(),
             AnyNodeRef::MatchCase(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Decorator(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::TypeParamTypeVar(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::TypeParamTypeVarTuple(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::TypeParamParamSpec(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ElifElseClause(node) => NonNull::from(*node).cast(),
         }
     }
@@ -3859,6 +3993,9 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::WithItem(_) => NodeKind::WithItem,
             AnyNodeRef::MatchCase(_) => NodeKind::MatchCase,
             AnyNodeRef::Decorator(_) => NodeKind::Decorator,
+            AnyNodeRef::TypeParamTypeVar(_) => NodeKind::TypeParamTypeVar,
+            AnyNodeRef::TypeParamTypeVarTuple(_) => NodeKind::TypeParamTypeVarTuple,
+            AnyNodeRef::TypeParamParamSpec(_) => NodeKind::TypeParamParamSpec,
             AnyNodeRef::ElifElseClause(_) => NodeKind::ElifElseClause,
         }
     }
@@ -3944,6 +4081,9 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
             | AnyNodeRef::Decorator(_)
+            | AnyNodeRef::TypeParamTypeVar(_)
+            | AnyNodeRef::TypeParamTypeVarTuple(_)
+            | AnyNodeRef::TypeParamParamSpec(_)
             | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
@@ -4029,6 +4169,9 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
             | AnyNodeRef::Decorator(_)
+            | AnyNodeRef::TypeParamTypeVar(_)
+            | AnyNodeRef::TypeParamTypeVarTuple(_)
+            | AnyNodeRef::TypeParamParamSpec(_)
             | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
@@ -4114,6 +4257,9 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
             | AnyNodeRef::Decorator(_)
+            | AnyNodeRef::TypeParamTypeVar(_)
+            | AnyNodeRef::TypeParamTypeVarTuple(_)
+            | AnyNodeRef::TypeParamParamSpec(_)
             | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
@@ -4199,6 +4345,9 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
             | AnyNodeRef::Decorator(_)
+            | AnyNodeRef::TypeParamTypeVar(_)
+            | AnyNodeRef::TypeParamTypeVarTuple(_)
+            | AnyNodeRef::TypeParamParamSpec(_)
             | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
@@ -4284,6 +4433,9 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
             | AnyNodeRef::Decorator(_)
+            | AnyNodeRef::TypeParamTypeVar(_)
+            | AnyNodeRef::TypeParamTypeVarTuple(_)
+            | AnyNodeRef::TypeParamParamSpec(_)
             | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
@@ -4369,6 +4521,9 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
             | AnyNodeRef::Decorator(_)
+            | AnyNodeRef::TypeParamTypeVar(_)
+            | AnyNodeRef::TypeParamTypeVarTuple(_)
+            | AnyNodeRef::TypeParamParamSpec(_)
             | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
@@ -4828,6 +4983,24 @@ impl<'a> From<&'a Decorator> for AnyNodeRef<'a> {
     }
 }
 
+impl<'a> From<&'a TypeParamTypeVar> for AnyNodeRef<'a> {
+    fn from(node: &'a TypeParamTypeVar) -> Self {
+        AnyNodeRef::TypeParamTypeVar(node)
+    }
+}
+
+impl<'a> From<&'a TypeParamTypeVarTuple> for AnyNodeRef<'a> {
+    fn from(node: &'a TypeParamTypeVarTuple) -> Self {
+        AnyNodeRef::TypeParamTypeVarTuple(node)
+    }
+}
+
+impl<'a> From<&'a TypeParamParamSpec> for AnyNodeRef<'a> {
+    fn from(node: &'a TypeParamParamSpec) -> Self {
+        AnyNodeRef::TypeParamParamSpec(node)
+    }
+}
+
 impl<'a> From<&'a Stmt> for AnyNodeRef<'a> {
     fn from(stmt: &'a Stmt) -> Self {
         match stmt {
@@ -4919,6 +5092,16 @@ impl<'a> From<&'a Pattern> for AnyNodeRef<'a> {
             Pattern::MatchStar(node) => AnyNodeRef::PatternMatchStar(node),
             Pattern::MatchAs(node) => AnyNodeRef::PatternMatchAs(node),
             Pattern::MatchOr(node) => AnyNodeRef::PatternMatchOr(node),
+        }
+    }
+}
+
+impl<'a> From<&'a TypeParam> for AnyNodeRef<'a> {
+    fn from(type_param: &'a TypeParam) -> Self {
+        match type_param {
+            TypeParam::TypeVar(node) => AnyNodeRef::TypeParamTypeVar(node),
+            TypeParam::TypeVarTuple(node) => AnyNodeRef::TypeParamTypeVarTuple(node),
+            TypeParam::ParamSpec(node) => AnyNodeRef::TypeParamParamSpec(node),
         }
     }
 }
@@ -5064,6 +5247,9 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::MatchCase(node) => node.range(),
             AnyNodeRef::Decorator(node) => node.range(),
             AnyNodeRef::ElifElseClause(node) => node.range(),
+            AnyNodeRef::TypeParamTypeVar(node) => node.range(),
+            AnyNodeRef::TypeParamTypeVarTuple(node) => node.range(),
+            AnyNodeRef::TypeParamParamSpec(node) => node.range(),
         }
     }
 }
@@ -5149,4 +5335,7 @@ pub enum NodeKind {
     MatchCase,
     Decorator,
     ElifElseClause,
+    TypeParamTypeVar,
+    TypeParamTypeVarTuple,
+    TypeParamParamSpec,
 }

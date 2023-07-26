@@ -17,14 +17,14 @@
 //! The individual [`Visitor`] implementations within the [`Checker`] typically proceed in four
 //! steps:
 //!
-//! 1. Analysis: Run any relevant lint rules on the current node.
-//! 2. Binding: Bind any names introduced by the current node.
-//! 3. Recursion: Recurse into the children of the current node.
-//! 4. Clean-up: Perform any necessary clean-up after the current node has been fully traversed.
+//! 1. Binding: Bind any names introduced by the current node.
+//! 2. Traversal: Recurse into the children of the current node.
+//! 3. Clean-up: Perform any necessary clean-up after the current node has been fully traversed.
+//! 4. Analysis: Run any relevant lint rules on the current node.
 //!
-//! The first step represents the lint-rule analysis phase, while the remaining steps together
-//! compose the semantic analysis phase. In the future, these phases may be separated into distinct
-//! passes over the AST.
+//! The first three steps together compose the semantic analysis phase, while the last step
+//! represents the lint-rule analysis phase. In the future, these steps may be separated into
+//! distinct passes over the AST.
 
 use std::path::Path;
 
@@ -301,10 +301,7 @@ where
         // the node.
         let flags_snapshot = self.semantic.flags;
 
-        // Step 1: Analysis
-        analyze::statement(stmt, self);
-
-        // Step 2: Binding
+        // Step 1: Binding
         match stmt {
             Stmt::AugAssign(ast::StmtAugAssign {
                 target,
@@ -447,7 +444,7 @@ where
             _ => {}
         }
 
-        // Step 3: Traversal
+        // Step 2: Traversal
         match stmt {
             Stmt::FunctionDef(ast::StmtFunctionDef {
                 body,
@@ -710,7 +707,7 @@ where
             _ => visitor::walk_stmt(self, stmt),
         };
 
-        // Step 4: Clean-up
+        // Step 3: Clean-up
         match stmt {
             Stmt::FunctionDef(ast::StmtFunctionDef { name, .. })
             | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { name, .. }) => {
@@ -739,6 +736,9 @@ where
             }
             _ => {}
         }
+
+        // Step 4: Analysis
+        analyze::statement(stmt, self);
 
         self.semantic.flags = flags_snapshot;
         self.semantic.pop_stmt();
@@ -796,10 +796,7 @@ where
             self.semantic.flags -= SemanticModelFlags::BOOLEAN_TEST;
         }
 
-        // Step 1: Analysis
-        analyze::expression(expr, self);
-
-        // Step 2: Binding
+        // Step 1: Binding
         match expr {
             Expr::Call(ast::ExprCall {
                 func,
@@ -822,7 +819,7 @@ where
             _ => {}
         }
 
-        // Step 3: Traversal
+        // Step 2: Traversal
         match expr {
             Expr::ListComp(ast::ExprListComp {
                 elt,
@@ -1178,7 +1175,7 @@ where
             _ => visitor::walk_expr(self, expr),
         }
 
-        // Step 4: Clean-up
+        // Step 3: Clean-up
         match expr {
             Expr::Lambda(_)
             | Expr::GeneratorExp(_)
@@ -1191,6 +1188,9 @@ where
             _ => {}
         };
 
+        // Step 4: Analysis
+        analyze::expression(expr, self);
+
         self.semantic.flags = flags_snapshot;
         self.semantic.pop_expr();
     }
@@ -1199,10 +1199,7 @@ where
         let flags_snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::EXCEPTION_HANDLER;
 
-        // Step 1: Analysis
-        analyze::except_handler(except_handler, self);
-
-        // Step 2: Binding
+        // Step 1: Binding
         let binding = match except_handler {
             ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                 type_: _,
@@ -1229,10 +1226,10 @@ where
             }
         };
 
-        // Step 3: Traversal
+        // Step 2: Traversal
         walk_except_handler(self, except_handler);
 
-        // Step 4: Clean-up
+        // Step 3: Clean-up
         if let Some((name, binding_id)) = binding {
             self.add_binding(
                 name.as_str(),
@@ -1241,6 +1238,9 @@ where
                 BindingFlags::empty(),
             );
         }
+
+        // Step 4: Analysis
+        analyze::except_handler(except_handler, self);
 
         self.semantic.flags = flags_snapshot;
     }
@@ -1257,10 +1257,7 @@ where
     }
 
     fn visit_arguments(&mut self, arguments: &'b Arguments) {
-        // Step 1: Analysis
-        analyze::arguments(arguments, self);
-
-        // Step 2: Binding.
+        // Step 1: Binding.
         // Bind, but intentionally avoid walking default expressions, as we handle them
         // upstream.
         for arg_with_default in &arguments.posonlyargs {
@@ -1278,13 +1275,13 @@ where
         if let Some(arg) = &arguments.kwarg {
             self.visit_arg(arg);
         }
+
+        // Step 4: Analysis
+        analyze::arguments(arguments, self);
     }
 
     fn visit_arg(&mut self, arg: &'b Arg) {
-        // Step 1: Analysis
-        analyze::argument(arg, self);
-
-        // Step 2: Binding.
+        // Step 1: Binding.
         // Bind, but intentionally avoid walking the annotation, as we handle it
         // upstream.
         self.add_binding(
@@ -1293,10 +1290,13 @@ where
             BindingKind::Argument,
             BindingFlags::empty(),
         );
+
+        // Step 4: Analysis
+        analyze::argument(arg, self);
     }
 
     fn visit_pattern(&mut self, pattern: &'b Pattern) {
-        // Step 2: Binding
+        // Step 1: Binding
         if let Pattern::MatchAs(ast::PatternMatchAs {
             name: Some(name), ..
         })
@@ -1316,15 +1316,15 @@ where
             );
         }
 
-        // Step 3: Traversal
+        // Step 2: Traversal
         walk_pattern(self, pattern);
     }
 
     fn visit_body(&mut self, body: &'b [Stmt]) {
-        // Step 1: Analysis
+        // Step 4: Analysis
         analyze::suite(body, self);
 
-        // Step 3: Traversal
+        // Step 2: Traversal
         for stmt in body {
             self.visit_stmt(stmt);
         }
@@ -1343,13 +1343,9 @@ impl<'a> Checker<'a> {
     /// Visit a list of [`Comprehension`] nodes, assumed to be the comprehensions that compose a
     /// generator expression, like a list or set comprehension.
     fn visit_generators(&mut self, generators: &'a [Comprehension]) {
-        for generator in generators {
-            analyze::comprehension(generator, self);
-        }
+        let mut iterator = generators.iter();
 
-        let mut generators = generators.iter();
-
-        let Some(generator) = generators.next() else {
+        let Some(generator) = iterator.next() else {
             unreachable!("Generator expression must contain at least one generator");
         };
 
@@ -1387,12 +1383,17 @@ impl<'a> Checker<'a> {
             self.visit_boolean_test(expr);
         }
 
-        for generator in generators {
+        for generator in iterator {
             self.visit_expr(&generator.iter);
             self.visit_expr(&generator.target);
             for expr in &generator.ifs {
                 self.visit_boolean_test(expr);
             }
+        }
+
+        // Step 4: Analysis
+        for generator in generators {
+            analyze::comprehension(generator, self);
         }
     }
 

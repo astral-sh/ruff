@@ -117,8 +117,8 @@ impl AlwaysAutofixableViolation for SectionNotOverIndented {
 /// Avoid over-indenting the section underlines, as this can cause syntax
 /// errors in reStructuredText.
 ///
-/// By default, this rule is enabled when using the `numpy` convention, and
-/// disabled when using the `google` or `pep257` conventions.
+/// This rule is enabled when using the `numpy` convention, and disabled when
+/// using the `google` or `pep257` conventions.
 ///
 /// ## Example
 /// ```python
@@ -870,11 +870,12 @@ impl AlwaysAutofixableViolation for NoBlankLineBeforeSection {
 /// a blank line, followed by a series of sections, each with a section header
 /// and a section body.
 ///
-/// The last section in a docstring should be separated by a blank line, for
-/// consistency and compatibility with documentation tooling.
+/// In some projects, the last section of a docstring is followed by a blank line,
+/// for consistency and compatibility.
 ///
-/// This rule is enabled when using the `numpy` convention, and disabled when
-/// using the `pep257` and `google` conventions.
+/// This rule may not apply to all projects; its applicability is a matter of
+/// convention. By default, this rule is disabled when using the `google`,
+/// `numpy`, and `pep257` conventions.
 ///
 /// ## Example
 /// ```python
@@ -894,7 +895,8 @@ impl AlwaysAutofixableViolation for NoBlankLineBeforeSection {
 ///     Raises
 ///     ------
 ///     FasterThanLightError
-///         If speed is greater than the speed of light."""
+///         If speed is greater than the speed of light.
+///     """
 ///     try:
 ///         return distance / time
 ///     except ZeroDivisionError as exc:
@@ -922,6 +924,7 @@ impl AlwaysAutofixableViolation for NoBlankLineBeforeSection {
 ///     ------
 ///     FasterThanLightError
 ///         If speed is greater than the speed of light.
+///
 ///     """
 ///     try:
 ///         return distance / time

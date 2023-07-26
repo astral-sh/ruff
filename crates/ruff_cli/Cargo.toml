@@ -30,6 +30,7 @@ ruff_python_ast = { path = "../ruff_python_ast" }
 ruff_python_formatter = { path = "../ruff_python_formatter" }
 ruff_text_size = { workspace = true }
 ruff_textwrap = { path = "../ruff_textwrap" }
+ruff_macros = { path = "../ruff_macros" }
 
 annotate-snippets = { version = "0.9.1", features = ["color"] }
 anyhow = { workspace = true }

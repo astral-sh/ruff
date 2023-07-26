@@ -6,13 +6,17 @@ use std::io::Write;
 use std::ops::AddAssign;
 use std::path::Path;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use colored::Colorize;
+use filetime::FileTime;
 use log::{debug, error, warn};
 use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::FxHashMap;
 use similar::TextDiff;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 
+use crate::cache::Cache;
 use ruff::jupyter::Notebook;
 use ruff::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult};
 use ruff::logging::DisplayParseError;
@@ -23,11 +27,35 @@ use ruff::settings::{flags, AllSettings, Settings};
 use ruff::source_kind::SourceKind;
 use ruff::{fs, IOError};
 use ruff_diagnostics::Diagnostic;
+use ruff_macros::CacheKey;
 use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::source_code::{LineIndex, SourceCode, SourceFileBuilder};
 use ruff_python_stdlib::path::{is_jupyter_notebook, is_project_toml};
 
-use crate::cache::Cache;
+#[derive(CacheKey)]
+pub(crate) struct FileCacheKey {
+    /// Timestamp when the file was last modified before the (cached) check.
+    file_last_modified: FileTime,
+    /// Permissions of the file before the (cached) check.
+    file_permissions_mode: u32,
+}
+
+impl FileCacheKey {
+    fn from_path(path: &Path) -> io::Result<FileCacheKey> {
+        // Construct a cache key for the file
+        let metadata = path.metadata()?;
+
+        #[cfg(unix)]
+        let permissions = metadata.permissions().mode();
+        #[cfg(windows)]
+        let permissions: u32 = metadata.permissions().readonly().into();
+
+        Ok(FileCacheKey {
+            file_last_modified: FileTime::from_last_modification_time(&metadata),
+            file_permissions_mode: permissions,
+        })
+    }
+}
 
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Diagnostics {
@@ -117,12 +145,16 @@ pub(crate) fn lint_path(
             let relative_path = cache
                 .relative_path(path)
                 .expect("wrong package cache for file");
-            let last_modified = path.metadata()?.modified()?;
-            if let Some(cache) = cache.get(relative_path, last_modified) {
+
+            let cache_key = FileCacheKey::from_path(path).context("Failed to create cache key")?;
+
+            if let Some(cache) = cache.get(relative_path, &cache_key) {
                 return Ok(cache.as_diagnostics(path));
             }
 
-            Some((cache, relative_path, last_modified))
+            // Stash the file metadata for later so when we update the cache it reflects the prerun
+            // information
+            Some((cache, relative_path, cache_key))
         }
         _ => None,
     };
@@ -269,15 +301,10 @@ pub(crate) fn lint_path(
 
     let imports = imports.unwrap_or_default();
 
-    if let Some((cache, relative_path, file_last_modified)) = caching {
+    if let Some((cache, relative_path, key)) = caching {
         // We don't cache parsing errors.
         if parse_error.is_none() {
-            cache.update(
-                relative_path.to_owned(),
-                file_last_modified,
-                &messages,
-                &imports,
-            );
+            cache.update(relative_path.to_owned(), key, &messages, &imports);
         }
     }
 
