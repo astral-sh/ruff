@@ -186,10 +186,10 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             type_params,
             value,
         }) => {
-            visitor.visit_expr(value);
             for type_param in type_params {
                 visitor.visit_type_param(type_param);
             }
+            visitor.visit_expr(value);
             visitor.visit_expr(name);
         }
         Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
