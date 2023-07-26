@@ -276,11 +276,7 @@ impl Strategy for StrategyRemoveToken {
         input: &'a str,
         _ast: &'a Suite,
     ) -> Result<Box<dyn ExactSizeStringIter + 'a>> {
-<<<<<<< HEAD
-        let token_ranges: Vec<_> = ruff_python_parser::tokenize(input)
-=======
-        let token_ranges: Vec<_> = ruff_rustpython::tokenize(input, Mode::Module)
->>>>>>> 023d1dc72 (Use Jupyter mode for the parser with Notebook files)
+        let token_ranges: Vec<_> = ruff_python_parser::tokenize(input, Mode::Module)
             .into_iter()
             // At this point we know we have valid python code
             .map(Result::unwrap)
