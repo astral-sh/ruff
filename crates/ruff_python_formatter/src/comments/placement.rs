@@ -26,21 +26,21 @@ pub(super) fn place_comment<'a>(
     locator: &Locator,
 ) -> CommentPlacement<'a> {
     // Handle comments before and after bodies such as the different branches of an if statement
-    if comment.line_position().is_own_line() {
-        match handle_own_line_comment_after_body(comment.clone(), locator) {
-            CommentPlacement::Default(_) => {}
+    let comment = if comment.line_position().is_own_line() {
+        match handle_own_line_comment_after_body(comment, locator) {
+            CommentPlacement::Default(comment) => comment,
             placement => {
                 return placement;
             }
         }
     } else {
-        match handle_end_of_line_comment_around_body(comment.clone(), locator) {
-            CommentPlacement::Default(_) => {}
+        match handle_end_of_line_comment_around_body(comment, locator) {
+            CommentPlacement::Default(comment) => comment,
             placement => {
                 return placement;
             }
         }
-    }
+    };
 
     // Change comment placement depending on the node type. These can be seen as node-specific
     // fixups.
