@@ -10,14 +10,20 @@ pub(crate) fn add_return_annotation(
     locator: &Locator,
     stmt: &Stmt,
     annotation: &str,
+    is_jupyter_notebook: bool,
 ) -> Result<Edit> {
     let contents = &locator.contents()[stmt.range()];
+    let mode = if is_jupyter_notebook {
+        Mode::Jupyter
+    } else {
+        Mode::Module
+    };
 
     // Find the colon (following the `def` keyword).
     let mut seen_lpar = false;
     let mut seen_rpar = false;
     let mut count = 0u32;
-    for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, stmt.start()).flatten() {
+    for (tok, range) in lexer::lex_starts_at(contents, mode, stmt.start()).flatten() {
         if seen_lpar && seen_rpar {
             if matches!(tok, Tok::Colon) {
                 return Ok(Edit::insertion(format!(" -> {annotation}"), range.start()));

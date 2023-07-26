@@ -72,6 +72,7 @@ pub(crate) fn format_imports(
     stylist: &Stylist,
     src: &[PathBuf],
     package: Option<&Path>,
+    is_jupyter_notebook: bool,
     combine_as_imports: bool,
     force_single_line: bool,
     force_sort_within_sections: bool,
@@ -94,7 +95,13 @@ pub(crate) fn format_imports(
     section_order: &[ImportSection],
 ) -> String {
     let trailer = &block.trailer;
-    let block = annotate_imports(&block.imports, comments, locator, split_on_trailing_comma);
+    let block = annotate_imports(
+        &block.imports,
+        comments,
+        locator,
+        split_on_trailing_comma,
+        is_jupyter_notebook,
+    );
 
     // Normalize imports (i.e., deduplicate, aggregate `from` imports).
     let block = normalize_imports(

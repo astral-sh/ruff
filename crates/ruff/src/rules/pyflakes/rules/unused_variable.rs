@@ -62,12 +62,17 @@ impl Violation for UnusedVariable {
 }
 
 /// Return the [`TextRange`] of the token before the next match of the predicate
-fn match_token_before<F>(location: TextSize, locator: &Locator, f: F) -> Option<TextRange>
+fn match_token_before<F>(
+    location: TextSize,
+    locator: &Locator,
+    mode: Mode,
+    f: F,
+) -> Option<TextRange>
 where
     F: Fn(Tok) -> bool,
 {
     let contents = locator.after(location);
-    for ((_, range), (tok, _)) in lexer::lex_starts_at(contents, Mode::Module, location)
+    for ((_, range), (tok, _)) in lexer::lex_starts_at(contents, mode, location)
         .flatten()
         .tuple_windows()
     {
@@ -80,7 +85,12 @@ where
 
 /// Return the [`TextRange`] of the token after the next match of the predicate, skipping over
 /// any bracketed expressions.
-fn match_token_after<F>(location: TextSize, locator: &Locator, f: F) -> Option<TextRange>
+fn match_token_after<F>(
+    location: TextSize,
+    locator: &Locator,
+    mode: Mode,
+    f: F,
+) -> Option<TextRange>
 where
     F: Fn(Tok) -> bool,
 {
@@ -91,7 +101,7 @@ where
     let mut sqb_count = 0u32;
     let mut brace_count = 0u32;
 
-    for ((tok, _), (_, range)) in lexer::lex_starts_at(contents, Mode::Module, location)
+    for ((tok, _), (_, range)) in lexer::lex_starts_at(contents, mode, location)
         .flatten()
         .tuple_windows()
     {
@@ -131,7 +141,12 @@ where
 
 /// Return the [`TextRange`] of the token matching the predicate or the first mismatched
 /// bracket, skipping over any bracketed expressions.
-fn match_token_or_closing_brace<F>(location: TextSize, locator: &Locator, f: F) -> Option<TextRange>
+fn match_token_or_closing_brace<F>(
+    location: TextSize,
+    locator: &Locator,
+    mode: Mode,
+    f: F,
+) -> Option<TextRange>
 where
     F: Fn(Tok) -> bool,
 {
@@ -142,7 +157,7 @@ where
     let mut sqb_count = 0u32;
     let mut brace_count = 0u32;
 
-    for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, location).flatten() {
+    for (tok, range) in lexer::lex_starts_at(contents, mode, location).flatten() {
         match tok {
             Tok::Lpar => {
                 par_count = par_count.saturating_add(1);
@@ -194,6 +209,12 @@ fn remove_unused_variable(
     range: TextRange,
     checker: &Checker,
 ) -> Option<Fix> {
+    let mode = if checker.is_jupyter_notebook {
+        Mode::Jupyter
+    } else {
+        Mode::Module
+    };
+
     // First case: simple assignment (`x = 1`)
     if let Stmt::Assign(ast::StmtAssign { targets, value, .. }) = stmt {
         if let Some(target) = targets.iter().find(|target| range == target.range()) {
@@ -204,8 +225,9 @@ fn remove_unused_variable(
                     // If the expression is complex (`x = foo()`), remove the assignment,
                     // but preserve the right-hand side.
                     let start = target.start();
-                    let end = match_token_after(start, checker.locator(), |tok| tok == Tok::Equal)?
-                        .start();
+                    let end =
+                        match_token_after(start, checker.locator(), mode, |tok| tok == Tok::Equal)?
+                            .start();
                     let edit = Edit::deletion(start, end);
                     Some(Fix::suggested(edit))
                 } else {
@@ -230,7 +252,8 @@ fn remove_unused_variable(
                 // but preserve the right-hand side.
                 let start = stmt.start();
                 let end =
-                    match_token_after(start, checker.locator(), |tok| tok == Tok::Equal)?.start();
+                    match_token_after(start, checker.locator(), mode, |tok| tok == Tok::Equal)?
+                        .start();
                 let edit = Edit::deletion(start, end);
                 Some(Fix::suggested(edit))
             } else {
@@ -249,17 +272,20 @@ fn remove_unused_variable(
             if let Some(optional_vars) = &item.optional_vars {
                 if optional_vars.range() == range {
                     // Find the first token before the `as` keyword.
-                    let start =
-                        match_token_before(item.context_expr.start(), checker.locator(), |tok| {
-                            tok == Tok::As
-                        })?
-                        .end();
+                    let start = match_token_before(
+                        item.context_expr.start(),
+                        checker.locator(),
+                        mode,
+                        |tok| tok == Tok::As,
+                    )?
+                    .end();
 
                     // Find the first colon, comma, or closing bracket after the `as` keyword.
-                    let end = match_token_or_closing_brace(start, checker.locator(), |tok| {
-                        tok == Tok::Colon || tok == Tok::Comma
-                    })?
-                    .start();
+                    let end =
+                        match_token_or_closing_brace(start, checker.locator(), mode, |tok| {
+                            tok == Tok::Colon || tok == Tok::Comma
+                        })?
+                        .start();
 
                     let edit = Edit::deletion(start, end);
                     return Some(Fix::suggested(edit));

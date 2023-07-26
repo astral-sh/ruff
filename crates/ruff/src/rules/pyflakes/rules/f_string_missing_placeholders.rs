@@ -52,9 +52,10 @@ impl AlwaysAutofixableViolation for FStringMissingPlaceholders {
 fn find_useless_f_strings<'a>(
     expr: &'a Expr,
     locator: &'a Locator,
+    mode: Mode,
 ) -> impl Iterator<Item = (TextRange, TextRange)> + 'a {
     let contents = locator.slice(expr.range());
-    lexer::lex_starts_at(contents, Mode::Module, expr.start())
+    lexer::lex_starts_at(contents, mode, expr.start())
         .flatten()
         .filter_map(|(tok, range)| match tok {
             Tok::String {
@@ -81,11 +82,16 @@ fn find_useless_f_strings<'a>(
 
 /// F541
 pub(crate) fn f_string_missing_placeholders(expr: &Expr, values: &[Expr], checker: &mut Checker) {
+    let mode = if checker.is_jupyter_notebook {
+        Mode::Jupyter
+    } else {
+        Mode::Module
+    };
     if !values
         .iter()
         .any(|value| matches!(value, Expr::FormattedValue(_)))
     {
-        for (prefix_range, tok_range) in find_useless_f_strings(expr, checker.locator()) {
+        for (prefix_range, tok_range) in find_useless_f_strings(expr, checker.locator(), mode) {
             let mut diagnostic = Diagnostic::new(FStringMissingPlaceholders, tok_range);
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.set_fix(convert_f_string_to_regular_string(

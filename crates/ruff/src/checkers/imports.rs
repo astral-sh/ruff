@@ -104,7 +104,13 @@ pub(crate) fn check_imports(
         for block in &blocks {
             if !block.imports.is_empty() {
                 if let Some(diagnostic) = isort::rules::organize_imports(
-                    block, locator, stylist, indexer, settings, package,
+                    block,
+                    locator,
+                    stylist,
+                    indexer,
+                    settings,
+                    package,
+                    source_kind.map_or(false, SourceKind::is_jupyter),
                 ) {
                     diagnostics.push(diagnostic);
                 }

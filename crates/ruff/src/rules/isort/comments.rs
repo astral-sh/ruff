@@ -22,9 +22,18 @@ impl Comment<'_> {
 }
 
 /// Collect all comments in an import block.
-pub(crate) fn collect_comments<'a>(range: TextRange, locator: &'a Locator) -> Vec<Comment<'a>> {
+pub(crate) fn collect_comments<'a>(
+    range: TextRange,
+    locator: &'a Locator,
+    is_jupyter_notebook: bool,
+) -> Vec<Comment<'a>> {
     let contents = locator.slice(range);
-    lexer::lex_starts_at(contents, Mode::Module, range.start())
+    let mode = if is_jupyter_notebook {
+        Mode::Jupyter
+    } else {
+        Mode::Module
+    };
+    lexer::lex_starts_at(contents, mode, range.start())
         .flatten()
         .filter_map(|(tok, range)| {
             if let Tok::Comment(value) = tok {

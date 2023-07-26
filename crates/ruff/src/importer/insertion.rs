@@ -137,6 +137,7 @@ impl<'a> Insertion<'a> {
         mut location: TextSize,
         locator: &Locator<'a>,
         stylist: &Stylist,
+        is_jupyter_notebook: bool,
     ) -> Insertion<'a> {
         enum Awaiting {
             Colon(u32),
@@ -144,9 +145,14 @@ impl<'a> Insertion<'a> {
             Indent,
         }
 
+        let mode = if is_jupyter_notebook {
+            Mode::Jupyter
+        } else {
+            Mode::Module
+        };
+
         let mut state = Awaiting::Colon(0);
-        for (tok, range) in
-            lexer::lex_starts_at(locator.after(location), Mode::Module, location).flatten()
+        for (tok, range) in lexer::lex_starts_at(locator.after(location), mode, location).flatten()
         {
             match state {
                 // Iterate until we find the colon indicating the start of the block body.
@@ -426,7 +432,7 @@ x = 1
             let tokens: Vec<LexResult> = ruff_python_parser::tokenize(contents, Mode::Module);
             let locator = Locator::new(contents);
             let stylist = Stylist::from_tokens(&tokens, &locator);
-            Insertion::start_of_block(offset, &locator, &stylist)
+            Insertion::start_of_block(offset, &locator, &stylist, false)
         }
 
         let contents = "if True: pass";

@@ -709,8 +709,13 @@ pub(crate) fn definition(
                     );
                     if checker.patch(diagnostic.kind.rule()) {
                         diagnostic.try_set_fix(|| {
-                            fixes::add_return_annotation(checker.locator(), stmt, "None")
-                                .map(Fix::suggested)
+                            fixes::add_return_annotation(
+                                checker.locator(),
+                                stmt,
+                                "None",
+                                checker.is_jupyter_notebook,
+                            )
+                            .map(Fix::suggested)
                         });
                     }
                     diagnostics.push(diagnostic);
@@ -727,8 +732,13 @@ pub(crate) fn definition(
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(return_type) = simple_magic_return_type(name) {
                         diagnostic.try_set_fix(|| {
-                            fixes::add_return_annotation(checker.locator(), stmt, return_type)
-                                .map(Fix::suggested)
+                            fixes::add_return_annotation(
+                                checker.locator(),
+                                stmt,
+                                return_type,
+                                checker.is_jupyter_notebook,
+                            )
+                            .map(Fix::suggested)
                         });
                     }
                 }

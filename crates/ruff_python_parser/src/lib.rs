@@ -160,9 +160,18 @@ pub fn parse_program_tokens(
 }
 
 /// Return the `Range` of the first `Tok::Colon` token in a `Range`.
-pub fn first_colon_range(range: TextRange, source: &str) -> Option<TextRange> {
+pub fn first_colon_range(
+    range: TextRange,
+    source: &str,
+    is_jupyter_notebook: bool,
+) -> Option<TextRange> {
     let contents = &source[range];
-    let range = lexer::lex_starts_at(contents, Mode::Module, range.start())
+    let mode = if is_jupyter_notebook {
+        Mode::Jupyter
+    } else {
+        Mode::Module
+    };
+    let range = lexer::lex_starts_at(contents, mode, range.start())
         .flatten()
         .find(|(tok, _)| tok.is_colon())
         .map(|(_, range)| range);
@@ -363,6 +372,7 @@ mod tests {
         let range = first_colon_range(
             TextRange::new(TextSize::from(0), contents.text_len()),
             contents,
+            false,
         )
         .unwrap();
         assert_eq!(&contents[range], ":");

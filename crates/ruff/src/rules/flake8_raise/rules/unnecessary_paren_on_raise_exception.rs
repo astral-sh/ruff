@@ -64,7 +64,7 @@ pub(crate) fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: 
                 return;
             }
 
-            let range = match_parens(func.end(), checker.locator())
+            let range = match_parens(func.end(), checker.locator(), checker.is_jupyter_notebook)
                 .expect("Expected call to include parentheses");
             let mut diagnostic = Diagnostic::new(UnnecessaryParenOnRaiseException, range);
             if checker.patch(diagnostic.kind.rule()) {
@@ -76,14 +76,24 @@ pub(crate) fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: 
 }
 
 /// Return the range of the first parenthesis pair after a given [`TextSize`].
-fn match_parens(start: TextSize, locator: &Locator) -> Option<TextRange> {
+fn match_parens(
+    start: TextSize,
+    locator: &Locator,
+    is_jupyter_notebook: bool,
+) -> Option<TextRange> {
     let contents = &locator.contents()[usize::from(start)..];
 
     let mut fix_start = None;
     let mut fix_end = None;
     let mut count = 0u32;
 
-    for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, start).flatten() {
+    let mode = if is_jupyter_notebook {
+        Mode::Jupyter
+    } else {
+        Mode::Module
+    };
+
+    for (tok, range) in lexer::lex_starts_at(contents, mode, start).flatten() {
         match tok {
             Tok::Lpar => {
                 if count == 0 {

@@ -8,11 +8,20 @@ use crate::rules::isort::types::TrailingComma;
 
 /// Return `true` if a `Stmt::ImportFrom` statement ends with a magic
 /// trailing comma.
-pub(super) fn trailing_comma(stmt: &Stmt, locator: &Locator) -> TrailingComma {
+pub(super) fn trailing_comma(
+    stmt: &Stmt,
+    locator: &Locator,
+    is_jupyter_notebook: bool,
+) -> TrailingComma {
     let contents = locator.slice(stmt.range());
     let mut count = 0u32;
     let mut trailing_comma = TrailingComma::Absent;
-    for (tok, _) in lexer::lex_starts_at(contents, Mode::Module, stmt.start()).flatten() {
+    let mode = if is_jupyter_notebook {
+        Mode::Jupyter
+    } else {
+        Mode::Module
+    };
+    for (tok, _) in lexer::lex_starts_at(contents, mode, stmt.start()).flatten() {
         if matches!(tok, Tok::Lpar) {
             count = count.saturating_add(1);
         }

@@ -337,12 +337,13 @@ pub(crate) fn printf_string_formatting(
     // Grab each string segment (in case there's an implicit concatenation).
     let mut strings: Vec<TextRange> = vec![];
     let mut extension = None;
-    for (tok, range) in lexer::lex_starts_at(
-        checker.locator().slice(expr.range()),
-        Mode::Module,
-        expr.start(),
-    )
-    .flatten()
+    let mode = if checker.is_jupyter_notebook {
+        Mode::Jupyter
+    } else {
+        Mode::Module
+    };
+    for (tok, range) in
+        lexer::lex_starts_at(checker.locator().slice(expr.range()), mode, expr.start()).flatten()
     {
         if tok.is_string() {
             strings.push(range);

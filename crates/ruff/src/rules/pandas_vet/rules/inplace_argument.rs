@@ -107,6 +107,7 @@ pub(crate) fn inplace_argument(
                             keyword.range(),
                             args,
                             keywords,
+                            checker.is_jupyter_notebook,
                         ) {
                             diagnostic.set_fix(fix);
                         }
@@ -130,6 +131,7 @@ fn convert_inplace_argument_to_assignment(
     expr_range: TextRange,
     args: &[Expr],
     keywords: &[Keyword],
+    is_jupyter_notebook: bool,
 ) -> Option<Fix> {
     // Add the assignment.
     let call = expr.as_call_expr()?;
@@ -140,8 +142,16 @@ fn convert_inplace_argument_to_assignment(
     );
 
     // Remove the `inplace` argument.
-    let remove_argument =
-        remove_argument(locator, call.func.end(), expr_range, args, keywords, false).ok()?;
+    let remove_argument = remove_argument(
+        locator,
+        call.func.end(),
+        expr_range,
+        args,
+        keywords,
+        false,
+        is_jupyter_notebook,
+    )
+    .ok()?;
 
     Some(Fix::suggested_edits(insert_assignment, [remove_argument]))
 }

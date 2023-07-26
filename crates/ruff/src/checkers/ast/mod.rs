@@ -52,7 +52,7 @@ use ruff_python_semantic::{
     ModuleKind, ScopeId, ScopeKind, SemanticModel, SemanticModelFlags, StarImport, SubmoduleImport,
 };
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
-use ruff_python_stdlib::path::is_python_stub_file;
+use ruff_python_stdlib::path::{is_jupyter_notebook, is_python_stub_file};
 use ruff_source_file::Locator;
 
 use crate::checkers::ast::deferred::Deferred;
@@ -76,6 +76,8 @@ pub(crate) struct Checker<'a> {
     module_path: Option<&'a [String]>,
     /// Whether the current file is a stub (`.pyi`) file.
     is_stub: bool,
+    /// Whether the current file is a Jupyter notebook (`.ipynb`) file.
+    pub(crate) is_jupyter_notebook: bool,
     /// The [`flags::Noqa`] for the current analysis (i.e., whether to respect suppression
     /// comments).
     noqa: flags::Noqa,
@@ -126,6 +128,7 @@ impl<'a> Checker<'a> {
             package,
             module_path: module.path(),
             is_stub: is_python_stub_file(path),
+            is_jupyter_notebook: is_jupyter_notebook(path),
             locator,
             stylist,
             indexer,
