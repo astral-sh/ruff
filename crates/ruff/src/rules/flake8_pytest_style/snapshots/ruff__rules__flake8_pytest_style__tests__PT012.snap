@@ -1,88 +1,88 @@
 ---
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 ---
-PT012.py:32:5: PT012 `pytest.raises()` block should contain a single simple statement
+PT012.py:42:5: PT012 `pytest.raises()` block should contain a single simple statement
    |
-31 |   def test_error_multiple_statements():
-32 |       with pytest.raises(AttributeError):
+41 |   def test_error_multiple_statements():
+42 |       with pytest.raises(AttributeError):
    |  _____^
-33 | |         len([])
-34 | |         [].size
+43 | |         len([])
+44 | |         [].size
    | |_______________^ PT012
    |
 
-PT012.py:38:5: PT012 `pytest.raises()` block should contain a single simple statement
+PT012.py:48:5: PT012 `pytest.raises()` block should contain a single simple statement
    |
-37 |   async def test_error_complex_statement():
-38 |       with pytest.raises(AttributeError):
+47 |   async def test_error_complex_statement():
+48 |       with pytest.raises(AttributeError):
    |  _____^
-39 | |         if True:
-40 | |             [].size
+49 | |         if True:
+50 | |             [].size
    | |___________________^ PT012
-41 |   
-42 |       with pytest.raises(AttributeError):
+51 |   
+52 |       with pytest.raises(AttributeError):
    |
 
-PT012.py:42:5: PT012 `pytest.raises()` block should contain a single simple statement
+PT012.py:52:5: PT012 `pytest.raises()` block should contain a single simple statement
    |
-40 |               [].size
-41 |   
-42 |       with pytest.raises(AttributeError):
+50 |               [].size
+51 |   
+52 |       with pytest.raises(AttributeError):
    |  _____^
-43 | |         for i in []:
-44 | |             [].size
+53 | |         for i in []:
+54 | |             [].size
    | |___________________^ PT012
-45 |   
-46 |       with pytest.raises(AttributeError):
+55 |   
+56 |       with pytest.raises(AttributeError):
    |
 
-PT012.py:46:5: PT012 `pytest.raises()` block should contain a single simple statement
+PT012.py:56:5: PT012 `pytest.raises()` block should contain a single simple statement
    |
-44 |               [].size
-45 |   
-46 |       with pytest.raises(AttributeError):
+54 |               [].size
+55 |   
+56 |       with pytest.raises(AttributeError):
    |  _____^
-47 | |         async for i in []:
-48 | |             [].size
+57 | |         async for i in []:
+58 | |             [].size
    | |___________________^ PT012
-49 |   
-50 |       with pytest.raises(AttributeError):
+59 |   
+60 |       with pytest.raises(AttributeError):
    |
 
-PT012.py:50:5: PT012 `pytest.raises()` block should contain a single simple statement
+PT012.py:60:5: PT012 `pytest.raises()` block should contain a single simple statement
    |
-48 |               [].size
-49 |   
-50 |       with pytest.raises(AttributeError):
+58 |               [].size
+59 |   
+60 |       with pytest.raises(AttributeError):
    |  _____^
-51 | |         while True:
-52 | |             [].size
+61 | |         while True:
+62 | |             [].size
    | |___________________^ PT012
-53 |   
-54 |       with pytest.raises(AttributeError):
+63 |   
+64 |       with pytest.raises(AttributeError):
    |
 
-PT012.py:54:5: PT012 `pytest.raises()` block should contain a single simple statement
+PT012.py:64:5: PT012 `pytest.raises()` block should contain a single simple statement
    |
-52 |               [].size
-53 |   
-54 |       with pytest.raises(AttributeError):
+62 |               [].size
+63 |   
+64 |       with pytest.raises(AttributeError):
    |  _____^
-55 | |         async with context_manager_under_test():
-56 | |             if True:
-57 | |                 raise Exception
+65 | |         async with context_manager_under_test():
+66 | |             if True:
+67 | |                 raise Exception
    | |_______________________________^ PT012
    |
 
-PT012.py:61:5: PT012 `pytest.raises()` block should contain a single simple statement
+PT012.py:71:5: PT012 `pytest.raises()` block should contain a single simple statement
    |
-60 |   def test_error_try():
-61 |       with pytest.raises(AttributeError):
+70 |   def test_error_try():
+71 |       with pytest.raises(AttributeError):
    |  _____^
-62 | |         try:
-63 | |             [].size
-64 | |         except:
-65 | |             raise
+72 | |         try:
+73 | |             [].size
+74 | |         except:
+75 | |             raise
    | |_________________^ PT012
    |
 
