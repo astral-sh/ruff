@@ -6,20 +6,22 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
     FunctionDef(
         StmtFunctionDef {
             range: 0..20,
-            name: Identifier(
-                "func",
-            ),
+            name: Identifier {
+                id: "func",
+                range: 4..8,
+            },
             args: Arguments {
-                range: 9..10,
+                range: 8..11,
                 posonlyargs: [],
                 args: [
                     ArgWithDefault {
                         range: 9..10,
                         def: Arg {
                             range: 9..10,
-                            arg: Identifier(
-                                "a",
-                            ),
+                            arg: Identifier {
+                                id: "a",
+                                range: 9..10,
+                            },
                             annotation: None,
                             type_comment: None,
                         },
@@ -46,34 +48,34 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
             ],
             decorator_list: [],
             returns: None,
-            type_comment: None,
             type_params: [],
+            type_comment: None,
         },
     ),
     FunctionDef(
         StmtFunctionDef {
             range: 22..53,
-            name: Identifier(
-                "func",
-            ),
+            name: Identifier {
+                id: "func",
+                range: 26..30,
+            },
             args: Arguments {
-                range: 34..38,
+                range: 33..39,
                 posonlyargs: [],
                 args: [
                     ArgWithDefault {
                         range: 34..38,
                         def: Arg {
                             range: 34..38,
-                            arg: Identifier(
-                                "a",
-                            ),
+                            arg: Identifier {
+                                id: "a",
+                                range: 34..35,
+                            },
                             annotation: Some(
                                 Name(
                                     ExprName {
                                         range: 37..38,
-                                        id: Identifier(
-                                            "T",
-                                        ),
+                                        id: "T",
                                         ctx: Load,
                                     },
                                 ),
@@ -106,51 +108,50 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 Name(
                     ExprName {
                         range: 43..44,
-                        id: Identifier(
-                            "T",
-                        ),
+                        id: "T",
                         ctx: Load,
                     },
                 ),
             ),
-            type_comment: None,
             type_params: [
                 TypeVar(
                     TypeParamTypeVar {
                         range: 31..32,
-                        name: Identifier(
-                            "T",
-                        ),
+                        name: Identifier {
+                            id: "T",
+                            range: 31..32,
+                        },
                         bound: None,
                     },
                 ),
             ],
+            type_comment: None,
         },
     ),
     FunctionDef(
         StmtFunctionDef {
             range: 55..91,
-            name: Identifier(
-                "func",
-            ),
+            name: Identifier {
+                id: "func",
+                range: 59..63,
+            },
             args: Arguments {
-                range: 72..76,
+                range: 71..77,
                 posonlyargs: [],
                 args: [
                     ArgWithDefault {
                         range: 72..76,
                         def: Arg {
                             range: 72..76,
-                            arg: Identifier(
-                                "a",
-                            ),
+                            arg: Identifier {
+                                id: "a",
+                                range: 72..73,
+                            },
                             annotation: Some(
                                 Name(
                                     ExprName {
                                         range: 75..76,
-                                        id: Identifier(
-                                            "T",
-                                        ),
+                                        id: "T",
                                         ctx: Load,
                                     },
                                 ),
@@ -183,28 +184,24 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 Name(
                     ExprName {
                         range: 81..82,
-                        id: Identifier(
-                            "T",
-                        ),
+                        id: "T",
                         ctx: Load,
                     },
                 ),
             ),
-            type_comment: None,
             type_params: [
                 TypeVar(
                     TypeParamTypeVar {
                         range: 64..70,
-                        name: Identifier(
-                            "T",
-                        ),
+                        name: Identifier {
+                            id: "T",
+                            range: 64..65,
+                        },
                         bound: Some(
                             Name(
                                 ExprName {
                                     range: 67..70,
-                                    id: Identifier(
-                                        "str",
-                                    ),
+                                    id: "str",
                                     ctx: Load,
                                 },
                             ),
@@ -212,32 +209,33 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
+            type_comment: None,
         },
     ),
     FunctionDef(
         StmtFunctionDef {
             range: 93..138,
-            name: Identifier(
-                "func",
-            ),
+            name: Identifier {
+                id: "func",
+                range: 97..101,
+            },
             args: Arguments {
-                range: 119..123,
+                range: 118..124,
                 posonlyargs: [],
                 args: [
                     ArgWithDefault {
                         range: 119..123,
                         def: Arg {
                             range: 119..123,
-                            arg: Identifier(
-                                "a",
-                            ),
+                            arg: Identifier {
+                                id: "a",
+                                range: 119..120,
+                            },
                             annotation: Some(
                                 Name(
                                     ExprName {
                                         range: 122..123,
-                                        id: Identifier(
-                                            "T",
-                                        ),
+                                        id: "T",
                                         ctx: Load,
                                     },
                                 ),
@@ -270,21 +268,19 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 Name(
                     ExprName {
                         range: 128..129,
-                        id: Identifier(
-                            "T",
-                        ),
+                        id: "T",
                         ctx: Load,
                     },
                 ),
             ),
-            type_comment: None,
             type_params: [
                 TypeVar(
                     TypeParamTypeVar {
                         range: 102..117,
-                        name: Identifier(
-                            "T",
-                        ),
+                        name: Identifier {
+                            id: "T",
+                            range: 102..103,
+                        },
                         bound: Some(
                             Tuple(
                                 ExprTuple {
@@ -293,18 +289,14 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                                         Name(
                                             ExprName {
                                                 range: 106..109,
-                                                id: Identifier(
-                                                    "str",
-                                                ),
+                                                id: "str",
                                                 ctx: Load,
                                             },
                                         ),
                                         Name(
                                             ExprName {
                                                 range: 111..116,
-                                                id: Identifier(
-                                                    "bytes",
-                                                ),
+                                                id: "bytes",
                                                 ctx: Load,
                                             },
                                         ),
@@ -316,24 +308,27 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
+            type_comment: None,
         },
     ),
     FunctionDef(
         StmtFunctionDef {
             range: 140..171,
-            name: Identifier(
-                "func",
-            ),
+            name: Identifier {
+                id: "func",
+                range: 144..148,
+            },
             args: Arguments {
-                range: 154..161,
+                range: 153..162,
                 posonlyargs: [],
                 args: [],
                 vararg: Some(
                     Arg {
                         range: 155..161,
-                        arg: Identifier(
-                            "a",
-                        ),
+                        arg: Identifier {
+                            id: "a",
+                            range: 155..156,
+                        },
                         annotation: Some(
                             Starred(
                                 ExprStarred {
@@ -341,9 +336,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                                     value: Name(
                                         ExprName {
                                             range: 159..161,
-                                            id: Identifier(
-                                                "Ts",
-                                            ),
+                                            id: "Ts",
                                             ctx: Load,
                                         },
                                     ),
@@ -373,35 +366,38 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
             ],
             decorator_list: [],
             returns: None,
-            type_comment: None,
             type_params: [
                 TypeVarTuple(
                     TypeParamTypeVarTuple {
                         range: 149..152,
-                        name: Identifier(
-                            "Ts",
-                        ),
+                        name: Identifier {
+                            id: "Ts",
+                            range: 150..152,
+                        },
                     },
                 ),
             ],
+            type_comment: None,
         },
     ),
     FunctionDef(
         StmtFunctionDef {
             range: 173..230,
-            name: Identifier(
-                "func",
-            ),
+            name: Identifier {
+                id: "func",
+                range: 177..181,
+            },
             args: Arguments {
-                range: 187..220,
+                range: 186..221,
                 posonlyargs: [],
                 args: [],
                 vararg: Some(
                     Arg {
                         range: 188..200,
-                        arg: Identifier(
-                            "args",
-                        ),
+                        arg: Identifier {
+                            id: "args",
+                            range: 188..192,
+                        },
                         annotation: Some(
                             Attribute(
                                 ExprAttribute {
@@ -409,15 +405,14 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                                     value: Name(
                                         ExprName {
                                             range: 194..195,
-                                            id: Identifier(
-                                                "P",
-                                            ),
+                                            id: "P",
                                             ctx: Load,
                                         },
                                     ),
-                                    attr: Identifier(
-                                        "args",
-                                    ),
+                                    attr: Identifier {
+                                        id: "args",
+                                        range: 196..200,
+                                    },
                                     ctx: Load,
                                 },
                             ),
@@ -429,9 +424,10 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 kwarg: Some(
                     Arg {
                         range: 204..220,
-                        arg: Identifier(
-                            "kwargs",
-                        ),
+                        arg: Identifier {
+                            id: "kwargs",
+                            range: 204..210,
+                        },
                         annotation: Some(
                             Attribute(
                                 ExprAttribute {
@@ -439,15 +435,14 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                                     value: Name(
                                         ExprName {
                                             range: 212..213,
-                                            id: Identifier(
-                                                "P",
-                                            ),
+                                            id: "P",
                                             ctx: Load,
                                         },
                                     ),
-                                    attr: Identifier(
-                                        "kwargs",
-                                    ),
+                                    attr: Identifier {
+                                        id: "kwargs",
+                                        range: 214..220,
+                                    },
                                     ctx: Load,
                                 },
                             ),
@@ -472,25 +467,27 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
             ],
             decorator_list: [],
             returns: None,
-            type_comment: None,
             type_params: [
                 ParamSpec(
                     TypeParamParamSpec {
                         range: 182..185,
-                        name: Identifier(
-                            "P",
-                        ),
+                        name: Identifier {
+                            id: "P",
+                            range: 184..185,
+                        },
                     },
                 ),
             ],
+            type_comment: None,
         },
     ),
     FunctionDef(
         StmtFunctionDef {
             range: 232..273,
-            name: Identifier(
-                "func",
-            ),
+            name: Identifier {
+                id: "func",
+                range: 236..240,
+            },
             args: Arguments {
                 range: 261..263,
                 posonlyargs: [],
@@ -508,30 +505,29 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
             ],
             decorator_list: [],
             returns: None,
-            type_comment: None,
             type_params: [
                 TypeVar(
                     TypeParamTypeVar {
                         range: 241..242,
-                        name: Identifier(
-                            "T",
-                        ),
+                        name: Identifier {
+                            id: "T",
+                            range: 241..242,
+                        },
                         bound: None,
                     },
                 ),
                 TypeVar(
                     TypeParamTypeVar {
                         range: 244..250,
-                        name: Identifier(
-                            "U",
-                        ),
+                        name: Identifier {
+                            id: "U",
+                            range: 244..245,
+                        },
                         bound: Some(
                             Name(
                                 ExprName {
                                     range: 247..250,
-                                    id: Identifier(
-                                        "str",
-                                    ),
+                                    id: "str",
                                     ctx: Load,
                                 },
                             ),
@@ -541,20 +537,23 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 TypeVarTuple(
                     TypeParamTypeVarTuple {
                         range: 252..255,
-                        name: Identifier(
-                            "Ts",
-                        ),
+                        name: Identifier {
+                            id: "Ts",
+                            range: 253..255,
+                        },
                     },
                 ),
                 ParamSpec(
                     TypeParamParamSpec {
                         range: 257..260,
-                        name: Identifier(
-                            "P",
-                        ),
+                        name: Identifier {
+                            id: "P",
+                            range: 259..260,
+                        },
                     },
                 ),
             ],
+            type_comment: None,
         },
     ),
 ]

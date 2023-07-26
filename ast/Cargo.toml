@@ -7,14 +7,10 @@ edition = "2021"
 repository = "https://github.com/RustPython/Parser/"
 license = "MIT"
 
-[features]
-default = ["malachite-bigint"]
-
 [dependencies]
 rustpython-parser-core = { workspace = true }
 rustpython-literal = { workspace = true, optional = true }
 
 is-macro = { workspace = true }
-num-bigint = { workspace = true, optional = true }
-malachite-bigint = { workspace = true, optional = true }
+num-bigint = { workspace = true }
 static_assertions = "1.1.0"

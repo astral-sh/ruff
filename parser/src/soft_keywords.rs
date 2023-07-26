@@ -134,7 +134,6 @@ where
 
         self.start_of_line = next.as_ref().map_or(false, |lex_result| {
             lex_result.as_ref().map_or(false, |(tok, _)| {
-                #[cfg(feature = "full-lexer")]
                 if matches!(tok, Tok::NonLogicalNewline | Tok::Comment { .. }) {
                     return self.start_of_line;
                 }

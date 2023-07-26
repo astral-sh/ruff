@@ -12,6 +12,12 @@
 //! [Abstract Syntax Tree]: https://en.wikipedia.org/wiki/Abstract_syntax_tree
 //! [`Mode`]: crate::mode
 
+use std::iter;
+
+use itertools::Itertools;
+pub(super) use lalrpop_util::ParseError as LalrpopError;
+
+use crate::lexer::{lex, lex_starts_at};
 use crate::{
     ast::{self, Ranged},
     lexer::{self, LexResult, LexicalError, LexicalErrorType},
@@ -20,11 +26,6 @@ use crate::{
     token::Tok,
     Mode,
 };
-use itertools::Itertools;
-use std::iter;
-
-use crate::{lexer::Lexer, soft_keywords::SoftKeywordTransformer};
-pub(super) use lalrpop_util::ParseError as LalrpopError;
 
 /// Parse Python code string to implementor's type.
 ///
@@ -56,27 +57,28 @@ pub trait Parse
 where
     Self: Sized,
 {
+    const MODE: Mode;
+
     fn parse(source: &str, source_path: &str) -> Result<Self, ParseError> {
-        Self::parse_starts_at(source, source_path, TextSize::default())
+        let tokens = lex(source, Self::MODE);
+
+        Self::parse_tokens(tokens, source_path)
     }
+
     fn parse_without_path(source: &str) -> Result<Self, ParseError> {
         Self::parse(source, "<unknown>")
     }
+
     fn parse_starts_at(
         source: &str,
         source_path: &str,
         offset: TextSize,
     ) -> Result<Self, ParseError> {
-        let lxr = Self::lex_starts_at(source, offset);
-        #[cfg(feature = "full-lexer")]
-        let lxr =
-            lxr.filter_ok(|(tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline));
-        Self::parse_tokens(lxr, source_path)
+        let tokens = lex_starts_at(source, Self::MODE, offset);
+
+        Self::parse_tokens(tokens, source_path)
     }
-    fn lex_starts_at(
-        source: &str,
-        offset: TextSize,
-    ) -> SoftKeywordTransformer<Lexer<std::str::Chars>>;
+
     fn parse_tokens(
         lxr: impl IntoIterator<Item = LexResult>,
         source_path: &str,
@@ -84,17 +86,13 @@ where
 }
 
 impl Parse for ast::ModModule {
-    fn lex_starts_at(
-        source: &str,
-        offset: TextSize,
-    ) -> SoftKeywordTransformer<Lexer<std::str::Chars>> {
-        lexer::lex_starts_at(source, Mode::Module, offset)
-    }
+    const MODE: Mode = Mode::Module;
+
     fn parse_tokens(
         lxr: impl IntoIterator<Item = LexResult>,
         source_path: &str,
     ) -> Result<Self, ParseError> {
-        match parse_filtered_tokens(lxr, Mode::Module, source_path)? {
+        match parse_tokens(lxr, Mode::Module, source_path)? {
             ast::Mod::Module(m) => Ok(m),
             _ => unreachable!("Mode::Module doesn't return other variant"),
         }
@@ -102,17 +100,13 @@ impl Parse for ast::ModModule {
 }
 
 impl Parse for ast::ModExpression {
-    fn lex_starts_at(
-        source: &str,
-        offset: TextSize,
-    ) -> SoftKeywordTransformer<Lexer<std::str::Chars>> {
-        lexer::lex_starts_at(source, Mode::Expression, offset)
-    }
+    const MODE: Mode = Mode::Expression;
+
     fn parse_tokens(
         lxr: impl IntoIterator<Item = LexResult>,
         source_path: &str,
     ) -> Result<Self, ParseError> {
-        match parse_filtered_tokens(lxr, Mode::Expression, source_path)? {
+        match parse_tokens(lxr, Mode::Expression, source_path)? {
             ast::Mod::Expression(m) => Ok(m),
             _ => unreachable!("Mode::Module doesn't return other variant"),
         }
@@ -120,17 +114,12 @@ impl Parse for ast::ModExpression {
 }
 
 impl Parse for ast::ModInteractive {
-    fn lex_starts_at(
-        source: &str,
-        offset: TextSize,
-    ) -> SoftKeywordTransformer<Lexer<std::str::Chars>> {
-        lexer::lex_starts_at(source, Mode::Interactive, offset)
-    }
+    const MODE: Mode = Mode::Interactive;
     fn parse_tokens(
         lxr: impl IntoIterator<Item = LexResult>,
         source_path: &str,
     ) -> Result<Self, ParseError> {
-        match parse_filtered_tokens(lxr, Mode::Interactive, source_path)? {
+        match parse_tokens(lxr, Mode::Interactive, source_path)? {
             ast::Mod::Interactive(m) => Ok(m),
             _ => unreachable!("Mode::Module doesn't return other variant"),
         }
@@ -138,12 +127,8 @@ impl Parse for ast::ModInteractive {
 }
 
 impl Parse for ast::Suite {
-    fn lex_starts_at(
-        source: &str,
-        offset: TextSize,
-    ) -> SoftKeywordTransformer<Lexer<std::str::Chars>> {
-        ast::ModModule::lex_starts_at(source, offset)
-    }
+    const MODE: Mode = Mode::Module;
+
     fn parse_tokens(
         lxr: impl IntoIterator<Item = LexResult>,
         source_path: &str,
@@ -153,12 +138,8 @@ impl Parse for ast::Suite {
 }
 
 impl Parse for ast::Stmt {
-    fn lex_starts_at(
-        source: &str,
-        offset: TextSize,
-    ) -> SoftKeywordTransformer<Lexer<std::str::Chars>> {
-        ast::ModModule::lex_starts_at(source, offset)
-    }
+    const MODE: Mode = Mode::Module;
+
     fn parse_tokens(
         lxr: impl IntoIterator<Item = LexResult>,
         source_path: &str,
@@ -186,12 +167,8 @@ impl Parse for ast::Stmt {
 }
 
 impl Parse for ast::Expr {
-    fn lex_starts_at(
-        source: &str,
-        offset: TextSize,
-    ) -> SoftKeywordTransformer<Lexer<std::str::Chars>> {
-        ast::ModExpression::lex_starts_at(source, offset)
-    }
+    const MODE: Mode = Mode::Expression;
+
     fn parse_tokens(
         lxr: impl IntoIterator<Item = LexResult>,
         source_path: &str,
@@ -201,12 +178,8 @@ impl Parse for ast::Expr {
 }
 
 impl Parse for ast::Identifier {
-    fn lex_starts_at(
-        source: &str,
-        offset: TextSize,
-    ) -> SoftKeywordTransformer<Lexer<std::str::Chars>> {
-        ast::Expr::lex_starts_at(source, offset)
-    }
+    const MODE: Mode = Mode::Expression;
+
     fn parse_tokens(
         lxr: impl IntoIterator<Item = LexResult>,
         source_path: &str,
@@ -227,12 +200,8 @@ impl Parse for ast::Identifier {
 }
 
 impl Parse for ast::Constant {
-    fn lex_starts_at(
-        source: &str,
-        offset: TextSize,
-    ) -> SoftKeywordTransformer<Lexer<std::str::Chars>> {
-        ast::Expr::lex_starts_at(source, offset)
-    }
+    const MODE: Mode = Mode::Expression;
+
     fn parse_tokens(
         lxr: impl IntoIterator<Item = LexResult>,
         source_path: &str,
@@ -426,10 +395,12 @@ pub fn parse_tokens(
     source_path: &str,
 ) -> Result<ast::Mod, ParseError> {
     let lxr = lxr.into_iter();
-    #[cfg(feature = "full-lexer")]
-    let lxr =
-        lxr.filter_ok(|(tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline));
-    parse_filtered_tokens(lxr, mode, source_path)
+
+    parse_filtered_tokens(
+        lxr.filter_ok(|(tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline)),
+        mode,
+        source_path,
+    )
 }
 
 fn parse_filtered_tokens(
@@ -571,8 +542,10 @@ include!("gen/parse.rs");
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::{ast, Parse};
+    use insta::assert_debug_snapshot;
+
+    use super::*;
 
     #[test]
     fn test_parse_empty() {
@@ -656,7 +629,6 @@ class Foo(A, B):
     }
 
     #[test]
-    #[cfg(feature = "all-nodes-with-ranges")]
     fn test_parse_class_generic_types() {
         let source = "\
 # TypeVar
@@ -687,7 +659,6 @@ class Foo[X, Y: str, *U, **P]():
         insta::assert_debug_snapshot!(ast::Suite::parse(source, "<test>").unwrap());
     }
     #[test]
-    #[cfg(feature = "all-nodes-with-ranges")]
     fn test_parse_function_definition() {
         let source = "\
 def func(a):
@@ -983,6 +954,57 @@ type = x = 1
 x = type = 1
 "#;
         insta::assert_debug_snapshot!(ast::Suite::parse(source, "<test>").unwrap());
+    }
+
+    #[test]
+    fn numeric_literals() {
+        let source = r#"x = 123456789
+x = 123456
+x = .1
+x = 1.
+x = 1E+1
+x = 1E-1
+x = 1.000_000_01
+x = 123456789.123456789
+x = 123456789.123456789E123456789
+x = 123456789E123456789
+x = 123456789J
+x = 123456789.123456789J
+x = 0XB1ACC
+x = 0B1011
+x = 0O777
+x = 0.000000006
+x = 10000
+x = 133333
+"#;
+
+        insta::assert_debug_snapshot!(ast::Suite::parse(source, "<test>").unwrap());
+    }
+
+    #[test]
+    fn numeric_literals_attribute_access() {
+        let source = r#"x = .1.is_integer()
+x = 1. .imag
+x = 1E+1.imag
+x = 1E-1.real
+x = 123456789.123456789.hex()
+x = 123456789.123456789E123456789 .real
+x = 123456789E123456789 .conjugate()
+x = 123456789J.real
+x = 123456789.123456789J.__add__(0b1011.bit_length())
+x = 0XB1ACC.conjugate()
+x = 0B1011 .conjugate()
+x = 0O777 .real
+x = 0.000000006  .hex()
+x = -100.0000J
+
+if 10 .real:
+    ...
+
+y = 100[no]
+y = 100(no)
+"#;
+        assert_debug_snapshot!(ast::Suite::parse(source, "<test>").unwrap())
     }
 
     #[test]

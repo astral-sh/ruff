@@ -10,8 +10,8 @@ use rustc_hash::FxHashSet;
 use rustpython_ast::Ranged;
 
 pub(crate) struct ArgumentList {
-    pub args: Vec<ast::Expr>,
-    pub keywords: Vec<ast::Keyword>,
+    pub(crate) args: Vec<ast::Expr>,
+    pub(crate) keywords: Vec<ast::Keyword>,
 }
 
 // Perform validation of function/lambda arguments in a function definition.

@@ -3,8 +3,9 @@
 // See also: file:///usr/share/doc/python/html/reference/compound_stmts.html#function-definitions
 // See also: https://greentreesnakes.readthedocs.io/en/latest/nodes.html#keyword
 
+use num_bigint::BigInt;
 use crate::{
-    ast::{self as ast, Ranged, bigint::BigInt, MagicKind},
+    ast::{self as ast, Ranged, MagicKind},
     Mode,
     lexer::{LexicalError, LexicalErrorType},
     function::{ArgumentList, parse_args, validate_pos_params, validate_arguments},
@@ -19,7 +20,7 @@ grammar(mode: Mode);
 // This is a hack to reduce the amount of lalrpop tables generated:
 // For each public entry point, a full parse table is generated.
 // By having only a single pub function, we reduce this to one.
-pub Top: ast::Mod = {
+pub(crate) Top: ast::Mod = {
     <start:@L> StartModule <body:Program> <end:@R> => ast::ModModule { body, type_ignores: vec![], range: (start..end).into() }.into(),
     <start:@L> StartInteractive <body:Program> <end:@R> => ast::ModInteractive { body, range: (start..end).into() }.into(),
     <start:@L> StartExpression <body:TestList> ("\n")* <end:@R> => ast::ModExpression { body: Box::new(body), range: (start..end).into() }.into()

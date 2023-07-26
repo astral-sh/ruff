@@ -9,7 +9,7 @@ use std::{
     str::FromStr,
 };
 
-use crate::bigint::{BigInt, Sign};
+use num_bigint::{BigInt, Sign};
 
 #[derive(Debug, PartialEq)]
 pub enum CFormatErrorType {

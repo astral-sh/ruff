@@ -9,16 +9,11 @@ license = "MIT"
 edition = "2021"
 
 [features]
-default = ["malachite-bigint"]
 serde = ["dep:serde", "rustpython-parser-core/serde"]
-full-lexer = []
-malachite-bigint = ["dep:malachite-bigint", "rustpython-ast/malachite-bigint"]
-num-bigint = ["dep:num-bigint", "rustpython-ast/num-bigint"]
 
 [build-dependencies]
 anyhow = { workspace = true }
 lalrpop = { version = "0.20.0", default-features = false, optional = true }
-phf_codegen = "0.11.1"
 tiny-keccak = { version = "2", features = ["sha3"] }
 
 [dependencies]
@@ -27,18 +22,16 @@ rustpython-parser-core = { workspace = true }
 
 itertools = { workspace = true }
 is-macro = { workspace = true }
-log = { workspace = true }
-malachite-bigint = { workspace = true, optional = true }
-num-bigint = { workspace = true, optional = true }
+num-bigint = { workspace = true }
 num-traits = { workspace = true }
 unicode_names2 = { workspace = true }
 
 unic-emoji-char = "0.9.0"
 unic-ucd-ident  = "0.9.0"
 lalrpop-util = { version = "0.20.0", default-features = false }
-phf = "0.11.1"
 rustc-hash = "1.1.0"
 serde = { version = "1.0.133", optional = true, default-features = false, features = ["derive"] }
+static_assertions = "1.1.0"
 
 [dev-dependencies]
 insta = { workspace = true }

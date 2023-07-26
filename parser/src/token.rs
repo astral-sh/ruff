@@ -3,10 +3,10 @@
 //! This module defines the tokens that the lexer recognizes. The tokens are
 //! loosely based on the token definitions found in the [CPython source].
 //!
-//! [CPython source]: https://github.com/python/cpython/blob/dfc2e065a2e71011017077e549cd2f9bf4944c54/Include/internal/pycore_token.h
-use crate::ast::bigint::BigInt;
+//! [CPython source]: https://github.com/python/cpython/blob/dfc2e065a2e71011017077e549cd2f9bf4944c54/Include/internal/pycore_token.h;
 use crate::ast::MagicKind;
 use crate::{text_size::TextSize, Mode};
+use num_bigint::BigInt;
 use std::fmt;
 
 /// The set of tokens the Python source code can be tokenized in.
@@ -52,13 +52,11 @@ pub enum Tok {
         kind: MagicKind,
     },
     /// Token value for a comment. These are filtered out of the token stream prior to parsing.
-    #[cfg(feature = "full-lexer")]
     Comment(String),
     /// Token value for a newline.
     Newline,
     /// Token value for a newline that is not a logical line break. These are filtered out of
     /// the token stream prior to parsing.
-    #[cfg(feature = "full-lexer")]
     NonLogicalNewline,
     /// Token value for an indent.
     Indent,
@@ -236,7 +234,6 @@ impl fmt::Display for Tok {
             }
             MagicCommand { kind, value } => write!(f, "{kind}{value}"),
             Newline => f.write_str("Newline"),
-            #[cfg(feature = "full-lexer")]
             NonLogicalNewline => f.write_str("NonLogicalNewline"),
             Indent => f.write_str("Indent"),
             Dedent => f.write_str("Dedent"),
@@ -250,7 +247,6 @@ impl fmt::Display for Tok {
             Rsqb => f.write_str("']'"),
             Colon => f.write_str("':'"),
             Comma => f.write_str("','"),
-            #[cfg(feature = "full-lexer")]
             Comment(value) => f.write_str(value),
             Semi => f.write_str("';'"),
             Plus => f.write_str("'+'"),

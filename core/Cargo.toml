@@ -13,7 +13,6 @@ ruff_text_size = { path = "../ruff_text_size" }
 
 serde = { version = "1.0.133", optional = true, default-features = false, features = ["derive"] }
 is-macro.workspace = true
-memchr.workspace = true
 
 [features]
 default = []

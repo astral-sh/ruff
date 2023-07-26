@@ -1,7 +1,8 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: fa57e02e9e5bfceb811748310e8d17940d15b6c6e2d6191d9ae71b2e4dc435d8
+// sha3: 263bb187f0a83dfe2a024fa0eed0ad8cb855da5991584b5040fa7d870fdb84af
+use num_bigint::BigInt;
 use crate::{
-    ast::{self as ast, Ranged, bigint::BigInt, MagicKind},
+    ast::{self as ast, Ranged, MagicKind},
     Mode,
     lexer::{LexicalError, LexicalErrorType},
     function::{ArgumentList, parse_args, validate_pos_params, validate_arguments},
@@ -21,8 +22,9 @@ extern crate alloc;
 #[allow(non_snake_case, non_camel_case_types, unused_mut, unused_variables, unused_imports, unused_parens, clippy::all)]
 mod __parse__Top {
 
+    use num_bigint::BigInt;
     use crate::{
-    ast::{self as ast, Ranged, bigint::BigInt, MagicKind},
+    ast::{self as ast, Ranged, MagicKind},
     Mode,
     lexer::{LexicalError, LexicalErrorType},
     function::{ArgumentList, parse_args, validate_pos_params, validate_arguments},
@@ -11488,19 +11490,19 @@ mod __parse__Top {
             _ => panic!("invalid reduction index {}", __reduce_index)
         }
     }
-    pub struct TopParser {
+    pub(crate) struct TopParser {
         _priv: (),
     }
 
     impl TopParser {
-        pub fn new() -> TopParser {
+        pub(crate) fn new() -> TopParser {
             TopParser {
                 _priv: (),
             }
         }
 
         #[allow(dead_code)]
-        pub fn parse<
+        pub(crate) fn parse<
             __TOKEN: __ToTriple<>,
             __TOKENS: IntoIterator<Item=__TOKEN>,
         >(
@@ -30744,7 +30746,7 @@ mod __parse__Top {
         (3, 276)
     }
 }
-pub use self::__parse__Top::TopParser;
+pub(crate) use self::__parse__Top::TopParser;
 
 #[allow(unused_variables)]
 #[allow(clippy::too_many_arguments)]

@@ -37,10 +37,8 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: run tests with num-bigint
-        run: cargo test --all --no-default-features --features num-bigint
-      - name: run tests with malachite-bigint and all features
-        run: cargo test --all --features malachite-bigint,full-lexer,serde
+      - name: run tests
+        run: cargo test --all --all-features
 
   lint:
     name: Check Rust code with rustfmt and clippy
@@ -53,9 +51,7 @@ jobs:
       - name: run rustfmt
         run: cargo fmt --all -- --check
       - name: run clippy
-        run: cargo clippy --all --no-default-features --features num-bigint
-      - name: run clippy
-        run: cargo clippy --all --features malachite-bigint,full-lexer,serde -- -Dwarnings
+        run: cargo clippy --all --all-features -- -Dwarnings
 
       - uses: actions/setup-python@v4
         with:

@@ -1,6 +1,6 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
-use crate::text_size::TextRange;
-pub use crate::{builtin::*, text_size::TextSize, ConversionFlag, Node};
+use crate::text_size::{TextRange, TextSize};
+pub(crate) use crate::{builtin::*, ConversionFlag, Node};
 use std::fmt::{self, Debug};
 
 // This file was originally generated from asdl by a python script, but we now edit it manually

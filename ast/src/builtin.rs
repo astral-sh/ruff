@@ -2,8 +2,8 @@
 
 use rustpython_parser_core::text_size::TextRange;
 
-use crate::bigint::BigInt;
 use crate::Ranged;
+use num_bigint::BigInt;
 
 pub type String = std::string::String;
 

@@ -27,165 +27,46 @@
 //! ```
 //!
 //! [Lexical analysis]: https://docs.python.org/3/reference/lexical_analysis.html
-use crate::{
-    ast::bigint::BigInt,
-    ast::MagicKind,
-    soft_keywords::SoftKeywordTransformer,
-    string::FStringErrorType,
-    text_size::{TextLen, TextRange, TextSize},
-    token::{StringKind, Tok},
-    Mode,
-};
-use log::trace;
+
+use std::borrow::Cow;
+use std::iter::FusedIterator;
+use std::{char, cmp::Ordering, str::FromStr};
+
+use num_bigint::BigInt;
 use num_traits::{Num, Zero};
-use std::{char, cmp::Ordering, ops::Index, slice::SliceIndex, str::FromStr};
+use rustpython_ast::MagicKind;
 use unic_emoji_char::is_emoji_presentation;
 use unic_ucd_ident::{is_xid_continue, is_xid_start};
 
-// Indentations are tracked by a stack of indentation levels. IndentationLevel keeps
-// track of the number of tabs and spaces at the current level.
-#[derive(Clone, Copy, PartialEq, Debug, Default)]
-struct IndentationLevel {
-    tabs: u32,
-    spaces: u32,
-}
+use crate::lexer::cursor::{Cursor, EOF_CHAR};
+use crate::lexer::indentation::{Indentation, Indentations};
+use crate::text_size::TextLen;
+use crate::{
+    soft_keywords::SoftKeywordTransformer,
+    string::FStringErrorType,
+    text_size::{TextRange, TextSize},
+    token::{StringKind, Tok},
+    Mode,
+};
 
-impl IndentationLevel {
-    fn compare_strict(
-        &self,
-        other: &IndentationLevel,
-        location: TextSize,
-    ) -> Result<Ordering, LexicalError> {
-        // We only know for sure that we're smaller or bigger if tabs
-        // and spaces both differ in the same direction. Otherwise we're
-        // dependent on the size of tabs.
-        match self.tabs.cmp(&other.tabs) {
-            Ordering::Less => {
-                if self.spaces <= other.spaces {
-                    Ok(Ordering::Less)
-                } else {
-                    Err(LexicalError {
-                        location,
-                        error: LexicalErrorType::TabError,
-                    })
-                }
-            }
-            Ordering::Greater => {
-                if self.spaces >= other.spaces {
-                    Ok(Ordering::Greater)
-                } else {
-                    Err(LexicalError {
-                        location,
-                        error: LexicalErrorType::TabError,
-                    })
-                }
-            }
-            Ordering::Equal => Ok(self.spaces.cmp(&other.spaces)),
-        }
-    }
-}
-
-// The indentations stack is used to keep track of the current indentation level.
-// Similar to the CPython implementation, the Indentations stack always has at
-// least one level which is never popped. See Reference 2.1.8.
-#[derive(Debug)]
-struct Indentations {
-    indent_stack: Vec<IndentationLevel>,
-}
-
-impl Indentations {
-    fn is_empty(&self) -> bool {
-        self.indent_stack.len() == 1
-    }
-
-    fn push(&mut self, indent: IndentationLevel) {
-        self.indent_stack.push(indent);
-    }
-
-    fn pop(&mut self) -> Option<IndentationLevel> {
-        if self.is_empty() {
-            return None;
-        }
-        self.indent_stack.pop()
-    }
-
-    fn current(&self) -> &IndentationLevel {
-        self.indent_stack
-            .last()
-            .expect("Indentations must have at least one level")
-    }
-}
-
-impl Default for Indentations {
-    fn default() -> Self {
-        Self {
-            indent_stack: vec![IndentationLevel::default()],
-        }
-    }
-}
-
-// A CharWindow is a sliding window over an iterator of chars. It is used to
-// allow for look-ahead when scanning tokens from the source code.
-struct CharWindow<T: Iterator<Item = char>, const N: usize> {
-    source: T,
-    window: [Option<char>; N],
-}
-
-impl<T, const N: usize> CharWindow<T, N>
-where
-    T: Iterator<Item = char>,
-{
-    fn new(source: T) -> Self {
-        Self {
-            source,
-            window: [None; N],
-        }
-    }
-
-    fn slide(&mut self) -> Option<char> {
-        self.window.rotate_left(1);
-        let next = self.source.next();
-        *self.window.last_mut().expect("never empty") = next;
-        next
-    }
-}
-
-impl<T, const N: usize, Idx> Index<Idx> for CharWindow<T, N>
-where
-    T: Iterator<Item = char>,
-    Idx: SliceIndex<[Option<char>]>,
-{
-    type Output = Idx::Output;
-
-    fn index(&self, index: Idx) -> &Self::Output {
-        &self.window[index]
-    }
-}
+mod cursor;
+mod indentation;
 
 /// A lexer for Python source code.
-pub struct Lexer<T: Iterator<Item = char>> {
+pub struct Lexer<'source> {
     // Contains the source code to be lexed.
-    window: CharWindow<T, 3>,
-    // Are we at the beginning of a line?
-    at_begin_of_line: bool,
+    cursor: Cursor<'source>,
+    source: &'source str,
+
+    state: State,
     // Amount of parenthesis.
-    nesting: usize,
+    nesting: u32,
     // Indentation levels.
     indentations: Indentations,
-    // Pending list of tokens to be returned.
-    pending: Vec<Spanned>,
-    // The current location.
-    location: TextSize,
-    // Is the last token an equal sign?
-    last_token_is_equal: bool,
+    pending_indentation: Option<Indentation>,
     // Lexer mode.
     mode: Mode,
 }
-
-// generated in build.rs, in gen_phf()
-/// A map of keywords to their tokens.
-pub static KEYWORDS: phf::Map<&'static str, Tok> =
-    include!(concat!(env!("OUT_DIR"), "/keywords.rs"));
 
 /// Contains a Token along with its `range`.
 pub type Spanned = (Tok, TextRange);
@@ -207,8 +88,43 @@ pub type LexResult = Result<Spanned, LexicalError>;
 /// }
 /// ```
 #[inline]
-pub fn lex(source: &str, mode: Mode) -> impl Iterator<Item = LexResult> + '_ {
-    lex_starts_at(source, mode, TextSize::default())
+pub fn lex(source: &str, mode: Mode) -> SoftKeywordTransformer<Lexer> {
+    SoftKeywordTransformer::new(Lexer::new(source, mode), mode)
+}
+
+pub struct LexStartsAtIterator<I> {
+    start_offset: TextSize,
+    inner: I,
+}
+
+impl<I> Iterator for LexStartsAtIterator<I>
+where
+    I: Iterator<Item = LexResult>,
+{
+    type Item = LexResult;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let result = match self.inner.next()? {
+            Ok((tok, range)) => Ok((tok, range + self.start_offset)),
+            Err(error) => Err(LexicalError {
+                location: error.location + self.start_offset,
+                ..error
+            }),
+        };
+
+        Some(result)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.inner.size_hint()
+    }
+}
+
+impl<I> FusedIterator for LexStartsAtIterator<I> where I: Iterator<Item = LexResult> + FusedIterator {}
+impl<I> ExactSizeIterator for LexStartsAtIterator<I> where
+    I: Iterator<Item = LexResult> + ExactSizeIterator
+{
 }
 
 /// Create a new lexer from a source string, starting at a given location.
@@ -217,194 +133,219 @@ pub fn lex_starts_at(
     source: &str,
     mode: Mode,
     start_offset: TextSize,
-) -> SoftKeywordTransformer<Lexer<std::str::Chars<'_>>> {
-    SoftKeywordTransformer::new(Lexer::new(source.chars(), mode, start_offset), mode)
+) -> LexStartsAtIterator<SoftKeywordTransformer<Lexer>> {
+    LexStartsAtIterator {
+        start_offset,
+        inner: lex(source, mode),
+    }
 }
 
-impl<T> Lexer<T>
-where
-    T: Iterator<Item = char>,
-{
+impl<'source> Lexer<'source> {
     /// Create a new lexer from T and a starting location. You probably want to use
     /// [`lex`] instead.
-    pub fn new(input: T, mode: Mode, start: TextSize) -> Self {
+    pub fn new(input: &'source str, mode: Mode) -> Self {
         let mut lxr = Lexer {
-            at_begin_of_line: true,
+            state: State::AfterNewline,
             nesting: 0,
             indentations: Indentations::default(),
-            // Usually we have less than 5 tokens pending.
-            pending: Vec::with_capacity(5),
-            location: start,
-            window: CharWindow::new(input),
-            last_token_is_equal: false,
+            pending_indentation: None,
+
+            source: input,
+            cursor: Cursor::new(input),
             mode,
         };
-        // Fill the window.
-        lxr.window.slide();
-        lxr.window.slide();
-        lxr.window.slide();
         // TODO: Handle possible mismatch between BOM and explicit encoding declaration.
         // spell-checker:ignore feff
-        if let Some('\u{feff}') = lxr.window[0] {
-            lxr.window.slide();
-            lxr.location += '\u{feff}'.text_len();
-        }
+        lxr.cursor.eat_char('\u{feff}');
+
         lxr
     }
 
     /// Lex an identifier. Also used for keywords and string/bytes literals with a prefix.
-    fn lex_identifier(&mut self) -> LexResult {
+    fn lex_identifier(&mut self, first: char) -> Result<Tok, LexicalError> {
         // Detect potential string like rb'' b'' f'' u'' r''
-        match self.window[..3] {
-            [Some(c), Some('"' | '\''), ..] => {
-                if let Ok(kind) = StringKind::try_from(c) {
-                    return self.lex_string(kind);
+        match self.cursor.first() {
+            quote @ ('\'' | '"') => {
+                if let Ok(string_kind) = StringKind::try_from(first) {
+                    self.cursor.bump();
+                    return self.lex_string(string_kind, quote);
                 }
             }
-            [Some(c1), Some(c2), Some('"' | '\'')] => {
-                if let Ok(kind) = StringKind::try_from([c1, c2]) {
-                    return self.lex_string(kind);
+            second @ ('f' | 'F' | 'r' | 'R' | 'b' | 'B') if is_quote(self.cursor.second()) => {
+                self.cursor.bump();
+
+                if let Ok(string_kind) = StringKind::try_from([first, second]) {
+                    let quote = self.cursor.bump().unwrap();
+                    return self.lex_string(string_kind, quote);
                 }
             }
             _ => {}
+        }
+
+        self.cursor.eat_while(is_identifier_continuation);
+
+        let text = self.token_text();
+
+        let keyword = match text {
+            "False" => Tok::False,
+            "None" => Tok::None,
+            "True" => Tok::True,
+            "and" => Tok::And,
+            "as" => Tok::As,
+            "assert" => Tok::Assert,
+            "async" => Tok::Async,
+            "await" => Tok::Await,
+            "break" => Tok::Break,
+            "case" => Tok::Case,
+            "class" => Tok::Class,
+            "continue" => Tok::Continue,
+            "def" => Tok::Def,
+            "del" => Tok::Del,
+            "elif" => Tok::Elif,
+            "else" => Tok::Else,
+            "except" => Tok::Except,
+            "finally" => Tok::Finally,
+            "for" => Tok::For,
+            "from" => Tok::From,
+            "global" => Tok::Global,
+            "if" => Tok::If,
+            "import" => Tok::Import,
+            "in" => Tok::In,
+            "is" => Tok::Is,
+            "lambda" => Tok::Lambda,
+            "match" => Tok::Match,
+            "nonlocal" => Tok::Nonlocal,
+            "not" => Tok::Not,
+            "or" => Tok::Or,
+            "pass" => Tok::Pass,
+            "raise" => Tok::Raise,
+            "return" => Tok::Return,
+            "try" => Tok::Try,
+            "type" => Tok::Type,
+            "while" => Tok::While,
+            "with" => Tok::With,
+            "yield" => Tok::Yield,
+            _ => {
+                return Ok(Tok::Name {
+                    name: text.to_string(),
+                })
+            }
         };
 
-        let start_pos = self.get_pos();
-        let mut name = String::with_capacity(8);
-        while self.is_identifier_continuation() {
-            name.push(self.next_char().unwrap());
-        }
-        let end_pos = self.get_pos();
-
-        if let Some(tok) = KEYWORDS.get(&name) {
-            Ok((tok.clone(), TextRange::new(start_pos, end_pos)))
-        } else {
-            Ok((Tok::Name { name }, TextRange::new(start_pos, end_pos)))
-        }
+        Ok(keyword)
     }
 
     /// Numeric lexing. The feast can start!
-    fn lex_number(&mut self) -> LexResult {
-        let start_pos = self.get_pos();
-        match self.window[..2] {
-            [Some('0'), Some('x' | 'X')] => {
-                // Hex! (0xdeadbeef)
-                self.next_char();
-                self.next_char();
-                self.lex_number_radix(start_pos, 16)
+    fn lex_number(&mut self, first: char) -> Result<Tok, LexicalError> {
+        if first == '0' {
+            if self.cursor.eat_if(|c| matches!(c, 'x' | 'X')).is_some() {
+                self.lex_number_radix(Radix::Hex)
+            } else if self.cursor.eat_if(|c| matches!(c, 'o' | 'O')).is_some() {
+                self.lex_number_radix(Radix::Octal)
+            } else if self.cursor.eat_if(|c| matches!(c, 'b' | 'B')).is_some() {
+                self.lex_number_radix(Radix::Binary)
+            } else {
+                self.lex_decimal_number(first)
             }
-            [Some('0'), Some('o' | 'O')] => {
-                // Octal style! (0o377)
-                self.next_char();
-                self.next_char();
-                self.lex_number_radix(start_pos, 8)
-            }
-            [Some('0'), Some('b' | 'B')] => {
-                // Binary! (0b_1110_0101)
-                self.next_char();
-                self.next_char();
-                self.lex_number_radix(start_pos, 2)
-            }
-            _ => self.lex_normal_number(),
+        } else {
+            self.lex_decimal_number(first)
         }
     }
 
     /// Lex a hex/octal/decimal/binary number without a decimal point.
-    fn lex_number_radix(&mut self, start_pos: TextSize, radix: u32) -> LexResult {
-        let value_text = self.radix_run(radix);
-        let end_pos = self.get_pos();
-        let value = BigInt::from_str_radix(&value_text, radix).map_err(|e| LexicalError {
-            error: LexicalErrorType::OtherError(format!("{e:?}")),
-            location: start_pos,
-        })?;
-        Ok((Tok::Int { value }, TextRange::new(start_pos, end_pos)))
+    fn lex_number_radix(&mut self, radix: Radix) -> Result<Tok, LexicalError> {
+        #[cfg(debug_assertions)]
+        debug_assert!(matches!(
+            self.cursor.previous().to_ascii_lowercase(),
+            'x' | 'o' | 'b'
+        ));
+
+        let value_text = self.radix_run(None, radix);
+        let value =
+            BigInt::from_str_radix(&value_text, radix.as_u32()).map_err(|e| LexicalError {
+                error: LexicalErrorType::OtherError(format!("{e:?}")),
+                location: self.token_range().start(),
+            })?;
+        Ok(Tok::Int { value })
     }
 
     /// Lex a normal number, that is, no octal, hex or binary number.
-    fn lex_normal_number(&mut self) -> LexResult {
-        let start_pos = self.get_pos();
-        let start_is_zero = self.window[0] == Some('0');
-        // Normal number:
-        let mut value_text = self.radix_run(10);
+    fn lex_decimal_number(&mut self, first_digit_or_dot: char) -> Result<Tok, LexicalError> {
+        #[cfg(debug_assertions)]
+        debug_assert!(self.cursor.previous().is_ascii_digit() || self.cursor.previous() == '.');
+        let start_is_zero = first_digit_or_dot == '0';
 
-        // If float:
-        if self.window[0] == Some('.') || self.at_exponent() {
-            // Take '.':
-            if self.window[0] == Some('.') {
-                if self.window[1] == Some('_') {
-                    return Err(LexicalError {
-                        error: LexicalErrorType::OtherError("Invalid Syntax".to_owned()),
-                        location: self.get_pos(),
-                    });
-                }
-                value_text.push(self.next_char().unwrap());
-                value_text.push_str(&self.radix_run(10));
+        let mut value_text = if first_digit_or_dot == '.' {
+            String::new()
+        } else {
+            self.radix_run(Some(first_digit_or_dot), Radix::Decimal)
+                .into_owned()
+        };
+
+        let is_float = if first_digit_or_dot == '.' || self.cursor.eat_char('.') {
+            value_text.push('.');
+
+            if self.cursor.eat_char('_') {
+                return Err(LexicalError {
+                    error: LexicalErrorType::OtherError("Invalid Syntax".to_owned()),
+                    location: self.offset() - TextSize::new(1),
+                });
             }
 
-            // 1e6 for example:
-            if let Some('e' | 'E') = self.window[0] {
-                if self.window[1] == Some('_') {
-                    return Err(LexicalError {
-                        error: LexicalErrorType::OtherError("Invalid Syntax".to_owned()),
-                        location: self.get_pos(),
-                    });
-                }
-                value_text.push(self.next_char().unwrap().to_ascii_lowercase());
-                // Optional +/-
-                if matches!(self.window[0], Some('-' | '+')) {
-                    if self.window[1] == Some('_') {
-                        return Err(LexicalError {
-                            error: LexicalErrorType::OtherError("Invalid Syntax".to_owned()),
-                            location: self.get_pos(),
-                        });
-                    }
-                    value_text.push(self.next_char().unwrap());
+            value_text.push_str(&self.radix_run(None, Radix::Decimal));
+            true
+        } else {
+            // Normal number:
+            false
+        };
+
+        let is_float = match self.cursor.rest().as_bytes() {
+            [b'e' | b'E', b'0'..=b'9', ..] | [b'e' | b'E', b'-' | b'+', b'0'..=b'9', ..] => {
+                value_text.push('e');
+                self.cursor.bump(); // e | E
+
+                if let Some(sign) = self.cursor.eat_if(|c| matches!(c, '+' | '-')) {
+                    value_text.push(sign);
                 }
 
-                value_text.push_str(&self.radix_run(10));
+                value_text.push_str(&self.radix_run(None, Radix::Decimal));
+
+                true
             }
+            _ => is_float,
+        };
 
+        if is_float {
+            // Improvement: Use `Cow` instead of pushing to value text
             let value = f64::from_str(&value_text).map_err(|_| LexicalError {
                 error: LexicalErrorType::OtherError("Invalid decimal literal".to_owned()),
-                location: self.get_pos(),
+                location: self.token_start(),
             })?;
 
             // Parse trailing 'j':
-            if matches!(self.window[0], Some('j' | 'J')) {
-                self.next_char();
-                let end_pos = self.get_pos();
-                Ok((
-                    Tok::Complex {
-                        real: 0.0,
-                        imag: value,
-                    },
-                    TextRange::new(start_pos, end_pos),
-                ))
+            if self.cursor.eat_if(|c| matches!(c, 'j' | 'J')).is_some() {
+                Ok(Tok::Complex {
+                    real: 0.0,
+                    imag: value,
+                })
             } else {
-                let end_pos = self.get_pos();
-                Ok((Tok::Float { value }, TextRange::new(start_pos, end_pos)))
+                Ok(Tok::Float { value })
             }
         } else {
             // Parse trailing 'j':
-            if matches!(self.window[0], Some('j' | 'J')) {
-                self.next_char();
-                let end_pos = self.get_pos();
+            if self.cursor.eat_if(|c| matches!(c, 'j' | 'J')).is_some() {
                 let imag = f64::from_str(&value_text).unwrap();
-                Ok((
-                    Tok::Complex { real: 0.0, imag },
-                    TextRange::new(start_pos, end_pos),
-                ))
+                Ok(Tok::Complex { real: 0.0, imag })
             } else {
-                let end_pos = self.get_pos();
                 let value = value_text.parse::<BigInt>().unwrap();
                 if start_is_zero && !value.is_zero() {
                     // leading zeros in decimal integer literals are not permitted
                     return Err(LexicalError {
                         error: LexicalErrorType::OtherError("Invalid Token".to_owned()),
-                        location: self.get_pos(),
+                        location: self.token_range().start(),
                     });
                 }
-                Ok((Tok::Int { value }, TextRange::new(start_pos, end_pos)))
+                Ok(Tok::Int { value })
             }
         }
     }
@@ -412,105 +353,54 @@ where
     /// Consume a sequence of numbers with the given radix,
     /// the digits can be decorated with underscores
     /// like this: '1_2_3_4' == '1234'
-    fn radix_run(&mut self, radix: u32) -> String {
-        let mut value_text = String::new();
+    fn radix_run(&mut self, first: Option<char>, radix: Radix) -> Cow<'source, str> {
+        let start = if let Some(first) = first {
+            self.offset() - first.text_len()
+        } else {
+            self.offset()
+        };
+        self.cursor.eat_while(|c| radix.is_digit(c));
 
-        loop {
-            if let Some(c) = self.take_number(radix) {
-                value_text.push(c);
-            } else if self.window[0] == Some('_')
-                && Lexer::<T>::is_digit_of_radix(self.window[1], radix)
-            {
-                self.next_char();
-            } else {
-                break;
+        let number = &self.source[TextRange::new(start, self.offset())];
+
+        // Number that contains `_` separators. Remove them from the parsed text.
+        if radix.is_digit(self.cursor.second()) && self.cursor.eat_char('_') {
+            let mut value_text = number.to_string();
+
+            loop {
+                if let Some(c) = self.cursor.eat_if(|c| radix.is_digit(c)) {
+                    value_text.push(c);
+                } else if self.cursor.first() == '_' && radix.is_digit(self.cursor.second()) {
+                    // Skip over `_`
+                    self.cursor.bump();
+                } else {
+                    break;
+                }
             }
-        }
-        value_text
-    }
 
-    /// Consume a single character with the given radix.
-    fn take_number(&mut self, radix: u32) -> Option<char> {
-        let take_char = Lexer::<T>::is_digit_of_radix(self.window[0], radix);
-
-        take_char.then(|| self.next_char().unwrap())
-    }
-
-    /// Test if a digit is of a certain radix.
-    fn is_digit_of_radix(c: Option<char>, radix: u32) -> bool {
-        match radix {
-            2 => matches!(c, Some('0'..='1')),
-            8 => matches!(c, Some('0'..='7')),
-            10 => matches!(c, Some('0'..='9')),
-            16 => matches!(c, Some('0'..='9') | Some('a'..='f') | Some('A'..='F')),
-            other => unimplemented!("Radix not implemented: {}", other),
-        }
-    }
-
-    /// Test if we face '[eE][-+]?[0-9]+'
-    fn at_exponent(&self) -> bool {
-        match self.window[..2] {
-            [Some('e' | 'E'), Some('+' | '-')] => matches!(self.window[2], Some('0'..='9')),
-            [Some('e' | 'E'), Some('0'..='9')] => true,
-            _ => false,
+            Cow::Owned(value_text)
+        } else {
+            Cow::Borrowed(number)
         }
     }
 
     /// Lex a single comment.
-    #[cfg(feature = "full-lexer")]
-    fn lex_comment(&mut self) -> LexResult {
-        let start_pos = self.get_pos();
-        let mut value = String::new();
-        loop {
-            match self.window[0] {
-                Some('\n' | '\r') | None => {
-                    let end_pos = self.get_pos();
-                    return Ok((Tok::Comment(value), TextRange::new(start_pos, end_pos)));
-                }
-                Some(_) => {}
-            }
-            value.push(self.next_char().unwrap());
-        }
-    }
+    fn lex_comment(&mut self) -> Result<Tok, LexicalError> {
+        #[cfg(debug_assertions)]
+        debug_assert_eq!(self.cursor.previous(), '#');
 
-    #[cfg(feature = "full-lexer")]
-    fn lex_and_emit_comment(&mut self) -> Result<(), LexicalError> {
-        let comment = self.lex_comment()?;
-        self.emit(comment);
-        Ok(())
-    }
+        self.cursor.eat_while(|c| !matches!(c, '\n' | '\r'));
 
-    /// Discard comment if full-lexer is not enabled.
-    #[cfg(not(feature = "full-lexer"))]
-    fn lex_comment(&mut self) {
-        loop {
-            match self.window[0] {
-                Some('\n' | '\r') | None => {
-                    return;
-                }
-                Some(_) => {}
-            }
-            self.next_char().unwrap();
-        }
-    }
-
-    #[cfg(not(feature = "full-lexer"))]
-    #[inline]
-    fn lex_and_emit_comment(&mut self) -> Result<(), LexicalError> {
-        self.lex_comment();
-        Ok(())
+        return Ok(Tok::Comment(self.token_text().to_string()));
     }
 
     /// Lex a single magic command.
-    fn lex_magic_command(&mut self, kind: MagicKind) -> (Tok, TextRange) {
-        let start_pos = self.get_pos();
-        for _ in 0..u32::from(kind.prefix_len()) {
-            self.next_char();
-        }
+    fn lex_magic_command(&mut self, kind: MagicKind) -> Tok {
         let mut value = String::new();
+
         loop {
-            match self.window[0] {
-                Some('\\') => {
+            match self.cursor.first() {
+                '\\' => {
                     // Only skip the line continuation if it is followed by a newline
                     // otherwise it is a normal backslash which is part of the magic command:
                     //
@@ -520,94 +410,78 @@ where
                     //      && ls -a | sed 's/^/\\    /'
                     //                          ^^
                     //                          Don't skip these backslashes
-                    if matches!(self.window[1], Some('\n' | '\r')) {
-                        self.next_char();
-                        self.next_char();
+                    if self.cursor.second() == '\r' {
+                        self.cursor.bump();
+                        self.cursor.bump();
+                        self.cursor.eat_char('\n');
                         continue;
+                    } else if self.cursor.second() == '\n' {
+                        self.cursor.bump();
+                        self.cursor.bump();
+                        continue;
+                    } else {
+                        self.cursor.bump();
+                        value.push('\\');
                     }
                 }
-                Some('\n' | '\r') | None => {
-                    let end_pos = self.get_pos();
-                    return (
-                        Tok::MagicCommand { kind, value },
-                        TextRange::new(start_pos, end_pos),
-                    );
+                '\n' | '\r' | EOF_CHAR => {
+                    return Tok::MagicCommand { kind, value };
                 }
-                Some(_) => {}
+                c => {
+                    self.cursor.bump();
+                    value.push(c);
+                }
             }
-            value.push(self.next_char().unwrap());
-        }
-    }
-
-    fn lex_and_emit_magic_command(&mut self) {
-        let kind = match self.window[..2] {
-            [Some(c1), Some(c2)] => {
-                MagicKind::try_from([c1, c2]).map_or_else(|_| MagicKind::try_from(c1), Ok)
-            }
-            // When the escape character is the last character of the file.
-            [Some(c), None] => MagicKind::try_from(c),
-            _ => return,
-        };
-        if let Ok(kind) = kind {
-            let magic_command = self.lex_magic_command(kind);
-            self.emit(magic_command);
         }
     }
 
     /// Lex a string literal.
-    fn lex_string(&mut self, kind: StringKind) -> LexResult {
-        let start_pos = self.get_pos();
-        for _ in 0..u32::from(kind.prefix_len()) {
-            self.next_char();
-        }
-        let quote_char = self.next_char().unwrap();
-        let mut string_content = String::with_capacity(5);
+    fn lex_string(&mut self, kind: StringKind, quote: char) -> Result<Tok, LexicalError> {
+        #[cfg(debug_assertions)]
+        debug_assert_eq!(self.cursor.previous(), quote);
 
         // If the next two characters are also the quote character, then we have a triple-quoted
         // string; consume those two characters and ensure that we require a triple-quote to close
-        let triple_quoted = if self.window[..2] == [Some(quote_char); 2] {
-            self.next_char();
-            self.next_char();
+        let triple_quoted = if self.cursor.first() == quote && self.cursor.second() == quote {
+            self.cursor.bump();
+            self.cursor.bump();
             true
         } else {
             false
         };
 
-        loop {
-            match self.next_char() {
-                Some(c) => {
-                    if c == '\\' {
-                        if let Some(next_c) = self.next_char() {
-                            string_content.push('\\');
-                            string_content.push(next_c);
-                            continue;
-                        }
-                    }
-                    if c == '\n' && !triple_quoted {
-                        return Err(LexicalError {
-                            error: LexicalErrorType::OtherError(
-                                "EOL while scanning string literal".to_owned(),
-                            ),
-                            location: self.get_pos(),
-                        });
-                    }
+        let value_start = self.offset();
 
-                    if c == quote_char {
-                        if triple_quoted {
-                            // Look ahead at the next two characters; if we have two more
-                            // quote_chars, it's the end of the string; consume the remaining
-                            // closing quotes and break the loop
-                            if self.window[..2] == [Some(quote_char); 2] {
-                                self.next_char();
-                                self.next_char();
-                                break;
-                            }
-                        } else {
-                            break;
-                        }
+        let value_end = loop {
+            match self.cursor.bump() {
+                Some('\\') => {
+                    if self.cursor.eat_char('\r') {
+                        self.cursor.eat_char('\n');
+                    } else {
+                        self.cursor.bump();
                     }
-                    string_content.push(c);
                 }
+                Some('\r' | '\n') if !triple_quoted => {
+                    return Err(LexicalError {
+                        error: LexicalErrorType::OtherError(
+                            "EOL while scanning string literal".to_owned(),
+                        ),
+                        location: self.offset() - TextSize::new(1),
+                    });
+                }
+                Some(c) if c == quote => {
+                    if triple_quoted {
+                        if self.cursor.first() == quote && self.cursor.second() == quote {
+                            self.cursor.bump();
+                            self.cursor.bump();
+                            break self.offset() - TextSize::new(3);
+                        }
+                    } else {
+                        break self.offset() - TextSize::new(1);
+                    }
+                }
+
+                Some(_) => {}
                 None => {
                     return Err(LexicalError {
                         error: if triple_quoted {
@@ -615,719 +489,437 @@ where
                         } else {
                             LexicalErrorType::StringError
                         },
-                        location: self.get_pos(),
+                        location: self.offset(),
                     });
                 }
             }
-        }
-        let end_pos = self.get_pos();
+        };
+
         let tok = Tok::String {
-            value: string_content,
+            value: self.source[TextRange::new(value_start, value_end)].to_string(),
             kind,
             triple_quoted,
         };
-        Ok((tok, TextRange::new(start_pos, end_pos)))
-    }
-
-    // Checks if the character c is a valid starting character as described
-    // in https://docs.python.org/3/reference/lexical_analysis.html#identifiers
-    fn is_identifier_start(&self, c: char) -> bool {
-        match c {
-            'a'..='z' | 'A'..='Z' | '_' => true,
-            _ => is_xid_start(c),
-        }
-    }
-
-    // Checks if the character c is a valid continuation character as described
-    // in https://docs.python.org/3/reference/lexical_analysis.html#identifiers
-    fn is_identifier_continuation(&self) -> bool {
-        match self.window[0] {
-            Some('a'..='z' | 'A'..='Z' | '_' | '0'..='9') => true,
-            Some(c) => is_xid_continue(c),
-            _ => false,
-        }
+        Ok(tok)
     }
 
     // This is the main entry point. Call this function to retrieve the next token.
     // This function is used by the iterator implementation.
-    fn inner_next(&mut self) -> LexResult {
-        // top loop, keep on processing, until we have something pending.
-        while self.pending.is_empty() {
-            // Detect indentation levels
-            if self.at_begin_of_line {
-                self.handle_indentations()?;
-                if self.mode == Mode::Jupyter
-                    // https://github.com/ipython/ipython/blob/635815e8f1ded5b764d66cacc80bbe25e9e2587f/IPython/core/inputtransformer2.py#L345
-                    && matches!(self.window[0], Some('%' | '!' | '?' | '/' | ';' | ','))
-                {
-                    self.lex_and_emit_magic_command();
-                }
+    pub fn next_token(&mut self) -> LexResult {
+        // Return dedent tokens until the current indentation level matches the indentation of the next token.
+        if let Some(indentation) = self.pending_indentation.take() {
+            if let Ok(Ordering::Greater) = self.indentations.current().try_compare(&indentation) {
+                self.pending_indentation = Some(indentation);
+                self.indentations.pop();
+                return Ok((Tok::Dedent, TextRange::empty(self.offset())));
             }
-
-            self.consume_normal()?;
         }
 
-        Ok(self.pending.remove(0))
-    }
+        let mut indentation = Indentation::root();
+        self.cursor.start_token();
 
-    // Given we are at the start of a line, count the number of spaces and/or tabs until the first character.
-    fn eat_indentation(&mut self) -> Result<IndentationLevel, LexicalError> {
-        // Determine indentation:
-        let mut spaces: u32 = 0;
-        let mut tabs: u32 = 0;
         loop {
-            match self.window[0] {
-                Some(' ') => {
-                    /*
-                    if tabs != 0 {
-                        // Don't allow spaces after tabs as part of indentation.
-                        // This is technically stricter than python3 but spaces after
-                        // tabs is even more insane than mixing spaces and tabs.
-                        return Some(Err(LexicalError {
-                            error: LexicalErrorType::OtherError("Spaces not allowed as part of indentation after tabs".to_owned()),
-                            location: self.get_pos(),
-                        }));
-                    }
-                    */
-                    self.next_char();
-                    spaces += 1;
+            match self.cursor.first() {
+                ' ' => {
+                    self.cursor.bump();
+                    indentation = indentation.add_space();
                 }
-                Some('\t') => {
-                    if spaces != 0 {
-                        // Don't allow tabs after spaces as part of indentation.
-                        // This is technically stricter than python3 but spaces before
-                        // tabs is even more insane than mixing spaces and tabs.
+                '\t' => {
+                    self.cursor.bump();
+                    indentation = indentation.add_tab();
+                }
+                '\\' => {
+                    self.cursor.bump();
+                    if self.cursor.eat_char('\r') {
+                        self.cursor.eat_char('\n');
+                    } else if self.cursor.is_eof() {
                         return Err(LexicalError {
-                            error: LexicalErrorType::TabsAfterSpaces,
-                            location: self.get_pos(),
+                            error: LexicalErrorType::Eof,
+                            location: self.token_start(),
+                        });
+                    } else if !self.cursor.eat_char('\n') {
+                        return Err(LexicalError {
+                            error: LexicalErrorType::LineContinuationError,
+                            location: self.token_start(),
                         });
                     }
-                    self.next_char();
-                    tabs += 1;
+                    indentation = Indentation::root();
                 }
-                Some('#') => {
-                    self.lex_and_emit_comment()?;
-                    spaces = 0;
-                    tabs = 0;
+                // Form feed
+                '\x0C' => {
+                    self.cursor.bump();
+                    indentation = Indentation::root();
                 }
-                Some('\x0C') => {
-                    // Form feed character!
-                    // Reset indentation for the Emacs user.
-                    self.next_char();
-                    spaces = 0;
-                    tabs = 0;
-                }
-                Some('\n' | '\r') => {
-                    // Empty line!
-                    #[cfg(feature = "full-lexer")]
-                    let tok_start = self.get_pos();
-                    self.next_char();
-                    #[cfg(feature = "full-lexer")]
-                    let tok_end = self.get_pos();
-                    #[cfg(feature = "full-lexer")]
-                    self.emit((Tok::NonLogicalNewline, TextRange::new(tok_start, tok_end)));
-                    spaces = 0;
-                    tabs = 0;
-                }
-                None => {
-                    spaces = 0;
-                    tabs = 0;
-                    break;
-                }
-                _ => {
-                    self.at_begin_of_line = false;
-                    break;
+                _ => break,
+            }
+        }
+
+        if self.state.is_after_newline() {
+            // Handle indentation if this is a new, not all empty, logical line
+            if !matches!(self.cursor.first(), '\n' | '\r' | '#' | EOF_CHAR) {
+                self.state = State::NonEmptyLogicalLine;
+
+                if let Some(spanned) = self.handle_indentation(indentation)? {
+                    // Set to false so that we don't handle indentation on the next call.
+
+                    return Ok(spanned);
                 }
             }
         }
 
-        Ok(IndentationLevel { tabs, spaces })
-    }
+        self.cursor.start_token();
+        if let Some(c) = self.cursor.bump() {
+            if c.is_ascii() {
+                self.consume_ascii_character(c)
+            } else if is_unicode_identifier_start(c) {
+                let identifier = self.lex_identifier(c)?;
+                self.state = State::Other;
 
-    // Push/pop indents/dedents based on the current indentation level.
-    fn handle_indentations(&mut self) -> Result<(), LexicalError> {
-        let indentation_level = self.eat_indentation()?;
+                Ok((identifier, self.token_range()))
+            } else if is_emoji_presentation(c) {
+                self.state = State::Other;
 
-        if self.nesting != 0 {
-            return Ok(());
-        }
-
-        // Determine indent or dedent:
-        let current_indentation = self.indentations.current();
-        let ordering = indentation_level.compare_strict(current_indentation, self.get_pos())?;
-        match ordering {
-            Ordering::Equal => {
-                // Same same
-            }
-            Ordering::Greater => {
-                // New indentation level:
-                self.indentations.push(indentation_level);
-                let tok_pos = self.get_pos();
-                self.emit((
-                    Tok::Indent,
-                    TextRange::new(
-                        tok_pos
-                            - TextSize::new(indentation_level.spaces)
-                            - TextSize::new(indentation_level.tabs),
-                        tok_pos,
-                    ),
-                ));
-            }
-            Ordering::Less => {
-                // One or more dedentations
-                // Pop off other levels until col is found:
-
-                loop {
-                    let current_indentation = self.indentations.current();
-                    let ordering =
-                        indentation_level.compare_strict(current_indentation, self.get_pos())?;
-                    match ordering {
-                        Ordering::Less => {
-                            self.indentations.pop();
-                            let tok_pos = self.get_pos();
-                            self.emit((Tok::Dedent, TextRange::empty(tok_pos)));
-                        }
-                        Ordering::Equal => {
-                            // We arrived at proper level of indentation.
-                            break;
-                        }
-                        Ordering::Greater => {
-                            return Err(LexicalError {
-                                error: LexicalErrorType::IndentationError,
-                                location: self.get_pos(),
-                            });
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    // Take a look at the next character, if any, and decide upon the next steps.
-    fn consume_normal(&mut self) -> Result<(), LexicalError> {
-        if let Some(c) = self.window[0] {
-            // Identifiers are the most common case.
-            if self.is_identifier_start(c) {
-                let identifier = self.lex_identifier()?;
-                self.emit(identifier);
+                Ok((
+                    Tok::Name {
+                        name: c.to_string(),
+                    },
+                    self.token_range(),
+                ))
             } else {
-                self.consume_character(c)?;
+                Err(LexicalError {
+                    error: LexicalErrorType::UnrecognizedToken { tok: c },
+                    location: self.token_start(),
+                })
             }
         } else {
-            // We reached end of file.
-            let tok_pos = self.get_pos();
+            // Reached the end of the file. Emit a trailing newline token if not at the beginning of a logical line,
+            // empty the dedent stack, and finally, return the EndOfFile token.
+            self.consume_end()
+        }
+    }
 
-            // First of all, we need all nestings to be finished.
-            if self.nesting > 0 {
+    fn handle_indentation(
+        &mut self,
+        indentation: Indentation,
+    ) -> Result<Option<Spanned>, LexicalError> {
+        let token = match self.indentations.current().try_compare(&indentation) {
+            // Dedent
+            Ok(Ordering::Greater) => {
+                self.indentations.pop();
+                self.pending_indentation = Some(indentation);
+
+                Some((Tok::Dedent, TextRange::empty(self.offset())))
+            }
+
+            Ok(Ordering::Equal) => None,
+
+            // Indent
+            Ok(Ordering::Less) => {
+                self.indentations.push(indentation);
+                Some((Tok::Indent, self.token_range()))
+            }
+            Err(_) => {
                 return Err(LexicalError {
-                    error: LexicalErrorType::Eof,
-                    location: tok_pos,
+                    error: LexicalErrorType::IndentationError,
+                    location: self.offset(),
                 });
             }
+        };
 
-            // Next, insert a trailing newline, if required.
-            if !self.at_begin_of_line {
-                self.at_begin_of_line = true;
-                self.emit((Tok::Newline, TextRange::empty(tok_pos)));
-            }
+        Ok(token)
+    }
 
-            // Next, flush the indentation stack to zero.
-            while !self.indentations.is_empty() {
-                self.indentations.pop();
-                self.emit((Tok::Dedent, TextRange::empty(tok_pos)));
-            }
-
-            self.emit((Tok::EndOfFile, TextRange::empty(tok_pos)));
+    fn consume_end(&mut self) -> Result<Spanned, LexicalError> {
+        // We reached end of file.
+        // First of all, we need all nestings to be finished.
+        if self.nesting > 0 {
+            return Err(LexicalError {
+                error: LexicalErrorType::Eof,
+                location: self.offset(),
+            });
         }
 
-        Ok(())
+        // Next, insert a trailing newline, if required.
+        if !self.state.is_new_logical_line() {
+            self.state = State::AfterNewline;
+            Ok((Tok::Newline, TextRange::empty(self.offset())))
+        }
+        // Next, flush the indentation stack to zero.
+        else if self.indentations.pop().is_some() {
+            Ok((Tok::Dedent, TextRange::empty(self.offset())))
+        } else {
+            Ok((Tok::EndOfFile, TextRange::empty(self.offset())))
+        }
     }
 
     // Dispatch based on the given character.
-    fn consume_character(&mut self, c: char) -> Result<(), LexicalError> {
-        match c {
-            '0'..='9' => {
-                let number = self.lex_number()?;
-                self.emit(number);
-            }
-            '#' => {
-                self.lex_and_emit_comment()?;
-            }
-            '"' | '\'' => {
-                let string = self.lex_string(StringKind::String)?;
-                self.emit(string);
-            }
+    fn consume_ascii_character(&mut self, c: char) -> Result<Spanned, LexicalError> {
+        let token = match c {
+            c if is_ascii_identifier_start(c) => self.lex_identifier(c)?,
+            '0'..='9' => self.lex_number(c)?,
+            '#' => return self.lex_comment().map(|token| (token, self.token_range())),
+            '"' | '\'' => self.lex_string(StringKind::String, c)?,
             '=' => {
-                let tok_start = self.get_pos();
-                self.next_char();
-                match self.window[0] {
-                    Some('=') => {
-                        self.next_char();
-                        let tok_end = self.get_pos();
-                        self.emit((Tok::EqEqual, TextRange::new(tok_start, tok_end)));
-                    }
-                    _ => {
-                        let tok_end = self.get_pos();
-                        self.emit((Tok::Equal, TextRange::new(tok_start, tok_end)));
-                    }
+                if self.cursor.eat_char('=') {
+                    Tok::EqEqual
+                } else {
+                    self.state = State::AfterEqual;
+                    return Ok((Tok::Equal, self.token_range()));
                 }
             }
             '+' => {
-                let tok_start = self.get_pos();
-                self.next_char();
-                if let Some('=') = self.window[0] {
-                    self.next_char();
-                    let tok_end = self.get_pos();
-                    self.emit((Tok::PlusEqual, TextRange::new(tok_start, tok_end)));
+                if self.cursor.eat_char('=') {
+                    Tok::PlusEqual
                 } else {
-                    let tok_end = self.get_pos();
-                    self.emit((Tok::Plus, TextRange::new(tok_start, tok_end)));
+                    Tok::Plus
                 }
             }
             '*' => {
-                let tok_start = self.get_pos();
-                self.next_char();
-                match self.window[0] {
-                    Some('=') => {
-                        self.next_char();
-                        let tok_end = self.get_pos();
-                        self.emit((Tok::StarEqual, TextRange::new(tok_start, tok_end)));
+                if self.cursor.eat_char('=') {
+                    Tok::StarEqual
+                } else if self.cursor.eat_char('*') {
+                    if self.cursor.eat_char('=') {
+                        Tok::DoubleStarEqual
+                    } else {
+                        Tok::DoubleStar
                     }
-                    Some('*') => {
-                        self.next_char();
-                        match self.window[0] {
-                            Some('=') => {
-                                self.next_char();
-                                let tok_end = self.get_pos();
-                                self.emit((
-                                    Tok::DoubleStarEqual,
-                                    TextRange::new(tok_start, tok_end),
-                                ));
-                            }
-                            _ => {
-                                let tok_end = self.get_pos();
-                                self.emit((Tok::DoubleStar, TextRange::new(tok_start, tok_end)));
-                            }
-                        }
-                    }
-                    _ => {
-                        let tok_end = self.get_pos();
-                        self.emit((Tok::Star, TextRange::new(tok_start, tok_end)));
-                    }
+                } else {
+                    Tok::Star
                 }
             }
+
+            c @ ('%' | '!')
+                if self.mode == Mode::Jupyter
+                    && self.state.is_after_equal()
+                    && self.nesting == 0 =>
+            {
+                // SAFETY: Safe because `c` has been matched against one of the possible magic command prefix
+                self.lex_magic_command(MagicKind::try_from(c).unwrap())
+            }
+
+            c @ ('%' | '!' | '?' | '/' | ';' | ',')
+                if self.mode == Mode::Jupyter && self.state.is_new_logical_line() =>
+            {
+                let kind = if let Ok(kind) = MagicKind::try_from([c, self.cursor.first()]) {
+                    self.cursor.bump();
+                    kind
+                } else {
+                    // SAFETY: Safe because `c` has been matched against one of the possible magic command prefix
+                    MagicKind::try_from(c).unwrap()
+                };
+
+                self.lex_magic_command(kind)
+            }
             '/' => {
-                let tok_start = self.get_pos();
-                self.next_char();
-                match self.window[0] {
-                    Some('=') => {
-                        self.next_char();
-                        let tok_end = self.get_pos();
-                        self.emit((Tok::SlashEqual, TextRange::new(tok_start, tok_end)));
+                if self.cursor.eat_char('=') {
+                    Tok::SlashEqual
+                } else if self.cursor.eat_char('/') {
+                    if self.cursor.eat_char('=') {
+                        Tok::DoubleSlashEqual
+                    } else {
+                        Tok::DoubleSlash
                     }
-                    Some('/') => {
-                        self.next_char();
-                        match self.window[0] {
-                            Some('=') => {
-                                self.next_char();
-                                let tok_end = self.get_pos();
-                                self.emit((
-                                    Tok::DoubleSlashEqual,
-                                    TextRange::new(tok_start, tok_end),
-                                ));
-                            }
-                            _ => {
-                                let tok_end = self.get_pos();
-                                self.emit((Tok::DoubleSlash, TextRange::new(tok_start, tok_end)));
-                            }
-                        }
-                    }
-                    _ => {
-                        let tok_end = self.get_pos();
-                        self.emit((Tok::Slash, TextRange::new(tok_start, tok_end)));
-                    }
+                } else {
+                    Tok::Slash
                 }
             }
             '%' => {
-                if self.mode == Mode::Jupyter && self.nesting == 0 && self.last_token_is_equal {
-                    self.lex_and_emit_magic_command();
+                if self.cursor.eat_char('=') {
+                    Tok::PercentEqual
                 } else {
-                    let tok_start = self.get_pos();
-                    self.next_char();
-                    if let Some('=') = self.window[0] {
-                        self.next_char();
-                        let tok_end = self.get_pos();
-                        self.emit((Tok::PercentEqual, TextRange::new(tok_start, tok_end)));
-                    } else {
-                        let tok_end = self.get_pos();
-                        self.emit((Tok::Percent, TextRange::new(tok_start, tok_end)));
-                    }
+                    Tok::Percent
                 }
             }
             '|' => {
-                let tok_start = self.get_pos();
-                self.next_char();
-                if let Some('=') = self.window[0] {
-                    self.next_char();
-                    let tok_end = self.get_pos();
-                    self.emit((Tok::VbarEqual, TextRange::new(tok_start, tok_end)));
+                if self.cursor.eat_char('=') {
+                    Tok::VbarEqual
                 } else {
-                    let tok_end = self.get_pos();
-                    self.emit((Tok::Vbar, TextRange::new(tok_start, tok_end)));
+                    Tok::Vbar
                 }
             }
             '^' => {
-                let tok_start = self.get_pos();
-                self.next_char();
-                if let Some('=') = self.window[0] {
-                    self.next_char();
-                    let tok_end = self.get_pos();
-                    self.emit((Tok::CircumflexEqual, TextRange::new(tok_start, tok_end)));
+                if self.cursor.eat_char('=') {
+                    Tok::CircumflexEqual
                 } else {
-                    let tok_end = self.get_pos();
-                    self.emit((Tok::CircumFlex, TextRange::new(tok_start, tok_end)));
+                    Tok::CircumFlex
                 }
             }
             '&' => {
-                let tok_start = self.get_pos();
-                self.next_char();
-                if let Some('=') = self.window[0] {
-                    self.next_char();
-                    let tok_end = self.get_pos();
-                    self.emit((Tok::AmperEqual, TextRange::new(tok_start, tok_end)));
+                if self.cursor.eat_char('=') {
+                    Tok::AmperEqual
                 } else {
-                    let tok_end = self.get_pos();
-                    self.emit((Tok::Amper, TextRange::new(tok_start, tok_end)));
+                    Tok::Amper
                 }
             }
             '-' => {
-                let tok_start = self.get_pos();
-                self.next_char();
-                match self.window[0] {
-                    Some('=') => {
-                        self.next_char();
-                        let tok_end = self.get_pos();
-                        self.emit((Tok::MinusEqual, TextRange::new(tok_start, tok_end)));
-                    }
-                    Some('>') => {
-                        self.next_char();
-                        let tok_end = self.get_pos();
-                        self.emit((Tok::Rarrow, TextRange::new(tok_start, tok_end)));
-                    }
-                    _ => {
-                        let tok_end = self.get_pos();
-                        self.emit((Tok::Minus, TextRange::new(tok_start, tok_end)));
-                    }
+                if self.cursor.eat_char('=') {
+                    Tok::MinusEqual
+                } else if self.cursor.eat_char('>') {
+                    Tok::Rarrow
+                } else {
+                    Tok::Minus
                 }
             }
             '@' => {
-                let tok_start = self.get_pos();
-                self.next_char();
-                if let Some('=') = self.window[0] {
-                    self.next_char();
-                    let tok_end = self.get_pos();
-                    self.emit((Tok::AtEqual, TextRange::new(tok_start, tok_end)));
+                if self.cursor.eat_char('=') {
+                    Tok::AtEqual
                 } else {
-                    let tok_end = self.get_pos();
-                    self.emit((Tok::At, TextRange::new(tok_start, tok_end)));
+                    Tok::At
                 }
             }
             '!' => {
-                if self.mode == Mode::Jupyter && self.nesting == 0 && self.last_token_is_equal {
-                    self.lex_and_emit_magic_command();
+                if self.cursor.eat_char('=') {
+                    Tok::NotEqual
                 } else {
-                    let tok_start = self.get_pos();
-                    self.next_char();
-                    if let Some('=') = self.window[0] {
-                        self.next_char();
-                        let tok_end = self.get_pos();
-                        self.emit((Tok::NotEqual, TextRange::new(tok_start, tok_end)));
-                    } else {
-                        return Err(LexicalError {
-                            error: LexicalErrorType::UnrecognizedToken { tok: '!' },
-                            location: tok_start,
-                        });
-                    }
+                    return Err(LexicalError {
+                        error: LexicalErrorType::UnrecognizedToken { tok: '!' },
+                        location: self.token_start(),
+                    });
                 }
             }
-            '~' => {
-                self.eat_single_char(Tok::Tilde);
-            }
+            '~' => Tok::Tilde,
             '(' => {
-                self.eat_single_char(Tok::Lpar);
                 self.nesting += 1;
+                Tok::Lpar
             }
             ')' => {
-                self.eat_single_char(Tok::Rpar);
-                if self.nesting == 0 {
-                    return Err(LexicalError {
-                        error: LexicalErrorType::NestingError,
-                        location: self.get_pos(),
-                    });
-                }
-                self.nesting -= 1;
+                self.nesting = self.nesting.saturating_sub(1);
+                Tok::Rpar
             }
             '[' => {
-                self.eat_single_char(Tok::Lsqb);
                 self.nesting += 1;
+                Tok::Lsqb
             }
             ']' => {
-                self.eat_single_char(Tok::Rsqb);
-                if self.nesting == 0 {
-                    return Err(LexicalError {
-                        error: LexicalErrorType::NestingError,
-                        location: self.get_pos(),
-                    });
-                }
-                self.nesting -= 1;
+                self.nesting = self.nesting.saturating_sub(1);
+                Tok::Rsqb
             }
             '{' => {
-                self.eat_single_char(Tok::Lbrace);
                 self.nesting += 1;
+                Tok::Lbrace
             }
             '}' => {
-                self.eat_single_char(Tok::Rbrace);
-                if self.nesting == 0 {
-                    return Err(LexicalError {
-                        error: LexicalErrorType::NestingError,
-                        location: self.get_pos(),
-                    });
-                }
-                self.nesting -= 1;
+                self.nesting = self.nesting.saturating_sub(1);
+                Tok::Rbrace
             }
             ':' => {
-                let tok_start = self.get_pos();
-                self.next_char();
-                if let Some('=') = self.window[0] {
-                    self.next_char();
-                    let tok_end = self.get_pos();
-                    self.emit((Tok::ColonEqual, TextRange::new(tok_start, tok_end)));
+                if self.cursor.eat_char('=') {
+                    Tok::ColonEqual
                 } else {
-                    let tok_end = self.get_pos();
-                    self.emit((Tok::Colon, TextRange::new(tok_start, tok_end)));
+                    Tok::Colon
                 }
             }
-            ';' => {
-                self.eat_single_char(Tok::Semi);
-            }
+            ';' => Tok::Semi,
             '<' => {
-                let tok_start = self.get_pos();
-                self.next_char();
-                match self.window[0] {
-                    Some('<') => {
-                        self.next_char();
-                        match self.window[0] {
-                            Some('=') => {
-                                self.next_char();
-                                let tok_end = self.get_pos();
-                                self.emit((
-                                    Tok::LeftShiftEqual,
-                                    TextRange::new(tok_start, tok_end),
-                                ));
-                            }
-                            _ => {
-                                let tok_end = self.get_pos();
-                                self.emit((Tok::LeftShift, TextRange::new(tok_start, tok_end)));
-                            }
-                        }
+                if self.cursor.eat_char('<') {
+                    if self.cursor.eat_char('=') {
+                        Tok::LeftShiftEqual
+                    } else {
+                        Tok::LeftShift
                     }
-                    Some('=') => {
-                        self.next_char();
-                        let tok_end = self.get_pos();
-                        self.emit((Tok::LessEqual, TextRange::new(tok_start, tok_end)));
-                    }
-                    _ => {
-                        let tok_end = self.get_pos();
-                        self.emit((Tok::Less, TextRange::new(tok_start, tok_end)));
-                    }
+                } else if self.cursor.eat_char('=') {
+                    Tok::LessEqual
+                } else {
+                    Tok::Less
                 }
             }
             '>' => {
-                let tok_start = self.get_pos();
-                self.next_char();
-                match self.window[0] {
-                    Some('>') => {
-                        self.next_char();
-                        match self.window[0] {
-                            Some('=') => {
-                                self.next_char();
-                                let tok_end = self.get_pos();
-                                self.emit((
-                                    Tok::RightShiftEqual,
-                                    TextRange::new(tok_start, tok_end),
-                                ));
-                            }
-                            _ => {
-                                let tok_end = self.get_pos();
-                                self.emit((Tok::RightShift, TextRange::new(tok_start, tok_end)));
-                            }
-                        }
-                    }
-                    Some('=') => {
-                        self.next_char();
-                        let tok_end = self.get_pos();
-                        self.emit((Tok::GreaterEqual, TextRange::new(tok_start, tok_end)));
-                    }
-                    _ => {
-                        let tok_end = self.get_pos();
-                        self.emit((Tok::Greater, TextRange::new(tok_start, tok_end)));
-                    }
-                }
-            }
-            ',' => {
-                self.eat_single_char(Tok::Comma);
-            }
-            '.' => {
-                if let Some('0'..='9') = self.window[1] {
-                    let number = self.lex_number()?;
-                    self.emit(number);
-                } else {
-                    let tok_start = self.get_pos();
-                    self.next_char();
-                    if self.window[..2] == [Some('.'); 2] {
-                        self.next_char();
-                        self.next_char();
-                        let tok_end = self.get_pos();
-                        self.emit((Tok::Ellipsis, TextRange::new(tok_start, tok_end)));
+                if self.cursor.eat_char('>') {
+                    if self.cursor.eat_char('=') {
+                        Tok::RightShiftEqual
                     } else {
-                        let tok_end = self.get_pos();
-                        self.emit((Tok::Dot, TextRange::new(tok_start, tok_end)));
+                        Tok::RightShift
                     }
-                }
-            }
-            '\n' | '\r' => {
-                let tok_start = self.get_pos();
-                self.next_char();
-                let tok_end = self.get_pos();
-
-                // Depending on the nesting level, we emit a logical or
-                // non-logical newline:
-                if self.nesting == 0 {
-                    self.at_begin_of_line = true;
-                    self.emit((Tok::Newline, TextRange::new(tok_start, tok_end)));
+                } else if self.cursor.eat_char('=') {
+                    Tok::GreaterEqual
                 } else {
-                    #[cfg(feature = "full-lexer")]
-                    self.emit((Tok::NonLogicalNewline, TextRange::new(tok_start, tok_end)));
+                    Tok::Greater
                 }
             }
-            ' ' | '\t' | '\x0C' => {
-                // Skip white-spaces
-                self.next_char();
-                while let Some(' ' | '\t' | '\x0C') = self.window[0] {
-                    self.next_char();
+            ',' => Tok::Comma,
+            '.' => {
+                if self.cursor.first().is_ascii_digit() {
+                    self.lex_decimal_number('.')?
+                } else if self.cursor.first() == '.' && self.cursor.second() == '.' {
+                    self.cursor.bump();
+                    self.cursor.bump();
+                    Tok::Ellipsis
+                } else {
+                    Tok::Dot
                 }
             }
-            '\\' => {
-                self.next_char();
-                match self.window[0] {
-                    Some('\n' | '\r') => {
-                        self.next_char();
-                    }
-                    _ => {
-                        return Err(LexicalError {
-                            error: LexicalErrorType::LineContinuationError,
-                            location: self.get_pos(),
-                        });
-                    }
-                }
+            '\n' => {
+                return Ok((
+                    if self.nesting == 0 && !self.state.is_new_logical_line() {
+                        self.state = State::AfterNewline;
+                        Tok::Newline
+                    } else {
+                        Tok::NonLogicalNewline
+                    },
+                    self.token_range(),
+                ))
+            }
+            '\r' => {
+                self.cursor.eat_char('\n');
 
-                if self.window[0].is_none() {
-                    return Err(LexicalError {
-                        error: LexicalErrorType::Eof,
-                        location: self.get_pos(),
-                    });
-                }
+                return Ok((
+                    if self.nesting == 0 && !self.state.is_new_logical_line() {
+                        self.state = State::AfterNewline;
+                        Tok::Newline
+                    } else {
+                        Tok::NonLogicalNewline
+                    },
+                    self.token_range(),
+                ));
             }
+
             _ => {
-                if is_emoji_presentation(c) {
-                    let tok_start = self.get_pos();
-                    self.next_char();
-                    let tok_end = self.get_pos();
-                    self.emit((
-                        Tok::Name {
-                            name: c.to_string(),
-                        },
-                        TextRange::new(tok_start, tok_end),
-                    ));
-                } else {
-                    let c = self.next_char();
-                    return Err(LexicalError {
-                        error: LexicalErrorType::UnrecognizedToken { tok: c.unwrap() },
-                        location: self.get_pos(),
-                    });
-                }
+                self.state = State::Other;
+
+                return Err(LexicalError {
+                    error: LexicalErrorType::UnrecognizedToken { tok: c },
+                    location: self.token_start(),
+                });
             }
-        }
+        };
 
-        Ok(())
+        self.state = State::Other;
+
+        Ok((token, self.token_range()))
     }
 
-    // Used by single character tokens to advance the window and emit the correct token.
-    fn eat_single_char(&mut self, ty: Tok) {
-        let tok_start = self.get_pos();
-        self.next_char().unwrap_or_else(|| unsafe {
-            // SAFETY: eat_single_char has been called only after a character has been read
-            // from the window, so the window is guaranteed to be non-empty.
-            std::hint::unreachable_unchecked()
-        });
-        let tok_end = self.get_pos();
-        self.emit((ty, TextRange::new(tok_start, tok_end)));
+    #[inline]
+    fn token_range(&self) -> TextRange {
+        let end = self.offset();
+        let len = self.cursor.token_len();
+
+        TextRange::at(end - len, len)
     }
 
-    // Helper function to go to the next character coming up.
-    fn next_char(&mut self) -> Option<char> {
-        let mut c = self.window[0];
-        self.window.slide();
-        match c {
-            Some('\r') => {
-                if self.window[0] == Some('\n') {
-                    self.location += TextSize::from(1);
-                    self.window.slide();
-                }
-
-                self.location += TextSize::from(1);
-                c = Some('\n');
-            }
-            #[allow(unused_variables)]
-            Some(c) => {
-                self.location += c.text_len();
-            }
-            _ => {}
-        }
-        c
+    #[inline]
+    fn token_text(&self) -> &'source str {
+        &self.source[self.token_range()]
     }
 
-    // Helper function to retrieve the current position.
-    fn get_pos(&self) -> TextSize {
-        self.location
+    #[inline]
+    fn offset(&self) -> TextSize {
+        TextSize::new(self.source.len() as u32) - self.cursor.text_len()
     }
 
-    // Helper function to emit a lexed token to the queue of tokens.
-    fn emit(&mut self, spanned: Spanned) {
-        self.last_token_is_equal = matches!(spanned.0, Tok::Equal);
-        self.pending.push(spanned);
+    #[inline]
+    fn token_start(&self) -> TextSize {
+        self.token_range().start()
     }
 }
 
 // Implement iterator pattern for Lexer.
 // Calling the next element in the iterator will yield the next lexical
 // token.
-impl<T> Iterator for Lexer<T>
-where
-    T: Iterator<Item = char>,
-{
+impl Iterator for Lexer<'_> {
     type Item = LexResult;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let token = self.inner_next();
-        trace!(
-            "Lex token {:?}, nesting={:?}, indent stack: {:?}",
-            token,
-            self.nesting,
-            self.indentations,
-        );
+        let token = self.next_token();
 
         match token {
             Ok((Tok::EndOfFile, _)) => None,
@@ -1335,6 +927,8 @@ where
         }
     }
 }
+
+impl FusedIterator for Lexer<'_> {}
 
 /// Represents an error that occur during lexing and are
 /// returned by the `parse_*` functions in the iterator in the
@@ -1442,21 +1036,103 @@ impl std::fmt::Display for LexicalErrorType {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
+enum State {
+    /// Lexer is right at the beginning of the file or after a `Newline` token.
+    AfterNewline,
+
+    /// The lexer is at the start of a new logical line but **after** the indentation
+    NonEmptyLogicalLine,
+
+    /// Lexer is right after an equal token
+    AfterEqual,
+
+    /// Inside of a logical line
+    Other,
+}
+
+impl State {
+    const fn is_after_newline(self) -> bool {
+        matches!(self, State::AfterNewline)
+    }
+
+    const fn is_new_logical_line(self) -> bool {
+        matches!(self, State::AfterNewline | State::NonEmptyLogicalLine)
+    }
+
+    const fn is_after_equal(self) -> bool {
+        matches!(self, State::AfterEqual)
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+enum Radix {
+    Binary,
+    Octal,
+    Decimal,
+    Hex,
+}
+
+impl Radix {
+    const fn as_u32(self) -> u32 {
+        match self {
+            Radix::Binary => 2,
+            Radix::Octal => 8,
+            Radix::Decimal => 10,
+            Radix::Hex => 16,
+        }
+    }
+
+    const fn is_digit(self, c: char) -> bool {
+        match self {
+            Radix::Binary => matches!(c, '0'..='1'),
+            Radix::Octal => matches!(c, '0'..='7'),
+            Radix::Decimal => c.is_ascii_digit(),
+            Radix::Hex => matches!(c, '0'..='9' | 'a'..='f' | 'A'..='F'),
+        }
+    }
+}
+
+const fn is_quote(c: char) -> bool {
+    matches!(c, '\'' | '"')
+}
+
+const fn is_ascii_identifier_start(c: char) -> bool {
+    matches!(c, 'a'..='z' | 'A'..='Z' | '_')
+}
+
+// Checks if the character c is a valid starting character as described
+// in https://docs.python.org/3/reference/lexical_analysis.html#identifiers
+fn is_unicode_identifier_start(c: char) -> bool {
+    is_xid_start(c)
+}
+
+// Checks if the character c is a valid continuation character as described
+// in https://docs.python.org/3/reference/lexical_analysis.html#identifiers
+fn is_identifier_continuation(c: char) -> bool {
+    match c {
+        'a'..='z' | 'A'..='Z' | '_' | '0'..='9' => true,
+        c => is_xid_continue(c),
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use num_bigint::BigInt;
+    use rustpython_ast::MagicKind;
+
     use super::*;
-    use crate::ast::bigint::BigInt;
 
     const WINDOWS_EOL: &str = "\r\n";
     const MAC_EOL: &str = "\r";
     const UNIX_EOL: &str = "\n";
 
-    pub fn lex_source(source: &str) -> Vec<Tok> {
+    pub(crate) fn lex_source(source: &str) -> Vec<Tok> {
         let lexer = lex(source, Mode::Module);
         lexer.map(|x| x.unwrap().0).collect()
     }
 
-    pub fn lex_jupyter_source(source: &str) -> Vec<Tok> {
+    pub(crate) fn lex_jupyter_source(source: &str) -> Vec<Tok> {
         let lexer = lex(source, Mode::Jupyter);
         lexer.map(|x| x.unwrap().0).collect()
     }
@@ -1607,8 +1283,10 @@ mod tests {
 !!cd /Users/foo/Library/Application\ Support/
 /foo 1 2
 ,foo 1 2
-;foo 1 2"
-            .trim();
+;foo 1 2
+!ls
+"
+        .trim();
         let tokens = lex_jupyter_source(source);
         assert_eq!(
             tokens,
@@ -1663,10 +1341,14 @@ mod tests {
                     kind: MagicKind::Quote2,
                 },
                 Tok::Newline,
+                Tok::MagicCommand {
+                    value: "ls".to_string(),
+                    kind: MagicKind::Shell,
+                },
+                Tok::Newline,
             ]
         )
     }
-
     #[test]
     fn test_jupyter_magic_indentation() {
         let source = r"
@@ -1816,7 +1498,7 @@ def f(arg=%timeit a = b):
         ($($name:ident: $eol:expr,)*) => {
             $(
             #[test]
-            #[cfg(feature = "full-lexer")]
+
             fn $name() {
                 let source = format!(r"99232  # {}", $eol);
                 let tokens = lex_source(&source);
@@ -1837,7 +1519,7 @@ def f(arg=%timeit a = b):
         ($($name:ident: $eol:expr,)*) => {
             $(
             #[test]
-            #[cfg(feature = "full-lexer")]
+
             fn $name() {
                 let source = format!("123  # Foo{}456", $eol);
                 let tokens = lex_source(&source);
@@ -1893,7 +1575,7 @@ def f(arg=%timeit a = b):
         ($($name:ident: $eol:expr,)*) => {
             $(
             #[test]
-            #[cfg(feature = "full-lexer")]
+
             fn $name() {
                 let source = format!("def foo():{}   return 99{}{}", $eol, $eol, $eol);
                 let tokens = lex_source(&source);
@@ -1931,7 +1613,7 @@ def f(arg=%timeit a = b):
         ($($name:ident: $eol:expr,)*) => {
         $(
             #[test]
-            #[cfg(feature = "full-lexer")]
+
             fn $name() {
                 let source = format!("def foo():{} if x:{}{}  return 99{}{}", $eol, $eol, $eol, $eol, $eol);
                 let tokens = lex_source(&source);
@@ -1972,7 +1654,7 @@ def f(arg=%timeit a = b):
         ($($name:ident: $eol:expr,)*) => {
         $(
             #[test]
-            #[cfg(feature = "full-lexer")]
+
             fn $name() {
                 let source = format!("def foo():{}\tif x:{}{}\t return 99{}{}", $eol, $eol, $eol, $eol, $eol);
                 let tokens = lex_source(&source);
@@ -2025,7 +1707,7 @@ def f(arg=%timeit a = b):
         ($($name:ident: $eol:expr,)*) => {
         $(
             #[test]
-            #[cfg(feature = "full-lexer")]
+
             fn $name() {
                 let source = r"x = [
 
@@ -2088,7 +1770,6 @@ def f(arg=%timeit a = b):
     }
 
     #[test]
-    #[cfg(feature = "full-lexer")]
     fn test_non_logical_newline_in_string_continuation() {
         let source = r"(
     'a'
@@ -2118,7 +1799,6 @@ def f(arg=%timeit a = b):
     }
 
     #[test]
-    #[cfg(feature = "full-lexer")]
     fn test_logical_newline_line_comment() {
         let source = "#Hello\n#World\n";
         let tokens = lex_source(source);
@@ -2171,29 +1851,29 @@ def f(arg=%timeit a = b):
         );
     }
 
-    macro_rules! test_string_continuation {
-        ($($name:ident: $eol:expr,)*) => {
-        $(
-            #[test]
-            fn $name() {
-                let source = format!("\"abc\\{}def\"", $eol);
-                let tokens = lex_source(&source);
-                assert_eq!(
-                    tokens,
-                    vec![
-                        str_tok("abc\\\ndef"),
-                        Tok::Newline,
-                    ]
-                )
-            }
-        )*
-        }
+    fn assert_string_continuation_with_eol(eol: &str) {
+        let source = format!("\"abc\\{}def\"", eol);
+        let tokens = lex_source(&source);
+
+        assert_eq!(
+            tokens,
+            vec![str_tok(&format!("abc\\{}def", eol)), Tok::Newline]
+        )
     }
 
-    test_string_continuation! {
-        test_string_continuation_windows_eol: WINDOWS_EOL,
-        test_string_continuation_mac_eol: MAC_EOL,
-        test_string_continuation_unix_eol: UNIX_EOL,
+    #[test]
+    fn test_string_continuation_windows_eol() {
+        assert_string_continuation_with_eol(WINDOWS_EOL);
+    }
+
+    #[test]
+    fn test_string_continuation_mac_eol() {
+        assert_string_continuation_with_eol(MAC_EOL);
+    }
+
+    #[test]
+    fn test_string_continuation_unix_eol() {
+        assert_string_continuation_with_eol(UNIX_EOL);
     }
 
     #[test]
@@ -2203,32 +1883,34 @@ def f(arg=%timeit a = b):
         assert_eq!(tokens, vec![str_tok(r"\N{EN SPACE}"), Tok::Newline])
     }
 
-    macro_rules! test_triple_quoted {
-        ($($name:ident: $eol:expr,)*) => {
-        $(
-            #[test]
-            fn $name() {
-                let source = format!("\"\"\"{0} test string{0} \"\"\"", $eol);
-                let tokens = lex_source(&source);
-                assert_eq!(
-                    tokens,
-                    vec![
-                        Tok::String {
-                            value: "\n test string\n ".to_owned(),
-                            kind: StringKind::String,
-                            triple_quoted: true,
-                        },
-                        Tok::Newline,
-                    ]
-                )
-            }
-        )*
-        }
+    fn assert_triple_quoted(eol: &str) {
+        let source = format!("\"\"\"{0} test string{0} \"\"\"", eol);
+        let tokens = lex_source(&source);
+        assert_eq!(
+            tokens,
+            vec![
+                Tok::String {
+                    value: format!("{0} test string{0} ", eol),
+                    kind: StringKind::String,
+                    triple_quoted: true,
+                },
+                Tok::Newline,
+            ]
+        )
     }
 
-    test_triple_quoted! {
-        test_triple_quoted_windows_eol: WINDOWS_EOL,
-        test_triple_quoted_mac_eol: MAC_EOL,
-        test_triple_quoted_unix_eol: UNIX_EOL,
+    #[test]
+    fn triple_quoted_windows_eol() {
+        assert_triple_quoted(WINDOWS_EOL);
+    }
+
+    #[test]
+    fn triple_quoted_unix_eol() {
+        assert_triple_quoted(UNIX_EOL);
+    }
+
+    #[test]
+    fn triple_quoted_macos_eol() {
+        assert_triple_quoted(MAC_EOL);
     }
 }

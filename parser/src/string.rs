@@ -736,14 +736,14 @@ pub(crate) fn parse_strings(
 #[derive(Debug, PartialEq)]
 struct FStringError {
     /// The type of error that occurred.
-    pub error: FStringErrorType,
+    pub(crate) error: FStringErrorType,
     /// The location of the error.
-    pub location: TextSize,
+    pub(crate) location: TextSize,
 }
 
 impl FStringError {
     /// Creates a new `FStringError` with the given error type and location.
-    pub fn new(error: FStringErrorType, location: TextSize) -> Self {
+    pub(crate) fn new(error: FStringErrorType, location: TextSize) -> Self {
         Self { error, location }
     }
 }

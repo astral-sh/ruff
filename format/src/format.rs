@@ -6,7 +6,7 @@ use rustpython_literal::format::Case;
 use std::ops::Deref;
 use std::{cmp, str::FromStr};
 
-use crate::bigint::{BigInt, Sign};
+use num_bigint::{BigInt, Sign};
 
 trait FormatParse {
     fn parse(text: &str) -> (Option<Self>, &str)
