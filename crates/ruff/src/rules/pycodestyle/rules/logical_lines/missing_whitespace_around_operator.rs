@@ -5,6 +5,26 @@ use ruff_python_parser::token_kind::TokenKind;
 use crate::checkers::logical_lines::LogicalLinesContext;
 use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 
+/// ## What it does
+/// Checks for missing whitespace around all operators.
+///
+/// ## Why is this bad?
+/// According to [PEP 8], there should be one space before and after all
+/// operators.
+///
+/// ## Example
+/// ```python
+/// if number==42:
+///     print('you have found the meaning of life')
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if number == 42:
+///     print('you have found the meaning of life')
+/// ```
+///
+/// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
 // E225
 #[violation]
 pub struct MissingWhitespaceAroundOperator;
@@ -16,6 +36,24 @@ impl Violation for MissingWhitespaceAroundOperator {
     }
 }
 
+/// ## What it does
+/// Checks for missing whitespace arithmetic operators.
+///
+/// ## Why is this bad?
+/// According to [PEP 8], there should be one space before and after an
+/// arithmetic operator (+, -, /, and *).
+///
+/// ## Example
+/// ```python
+/// number = 40+2
+/// ```
+///
+/// Use instead:
+/// ```python
+/// number = 40 + 2
+/// ```
+///
+/// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
 // E226
 #[violation]
 pub struct MissingWhitespaceAroundArithmeticOperator;
@@ -27,6 +65,24 @@ impl Violation for MissingWhitespaceAroundArithmeticOperator {
     }
 }
 
+/// ## What it does
+/// Checks for missing whitespace around bitwise and shift operators.
+///
+/// ## Why is this bad?
+/// According to [PEP 8], there should be one space before and after bitwise and
+/// shift operators (<<, >>, &, |, ^).
+///
+/// ## Example
+/// ```python
+/// x = 128<<1
+/// ```
+///
+/// Use instead:
+/// ```python
+/// x = 128 << 1
+/// ```
+///
+/// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
 // E227
 #[violation]
 pub struct MissingWhitespaceAroundBitwiseOrShiftOperator;
@@ -38,6 +94,24 @@ impl Violation for MissingWhitespaceAroundBitwiseOrShiftOperator {
     }
 }
 
+/// ## What it does
+/// Checks for missing whitespace around the modulo operator.
+///
+/// ## Why is this bad?
+/// According to [PEP 8], the modulo operator (%) should have whitespace on
+/// either side of it.
+///
+/// ## Example
+/// ```python
+/// remainder = 10%2
+/// ```
+///
+/// Use instead:
+/// ```python
+/// remainder = 10 % 2
+/// ```
+///
+/// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 // E228
 #[violation]
 pub struct MissingWhitespaceAroundModuloOperator;
