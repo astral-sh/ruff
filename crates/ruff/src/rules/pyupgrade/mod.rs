@@ -68,6 +68,7 @@ mod tests {
     #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_2.py"))]
     #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_3.py"))]
     #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_4.py"))]
+    #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_5.py"))]
     #[test_case(Rule::UnicodeKindPrefix, Path::new("UP025.py"))]
     #[test_case(Rule::UnnecessaryBuiltinImport, Path::new("UP029.py"))]
     #[test_case(Rule::UnnecessaryClassParentheses, Path::new("UP039.py"))]

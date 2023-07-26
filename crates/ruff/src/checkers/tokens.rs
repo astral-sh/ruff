@@ -69,6 +69,10 @@ pub(crate) fn check_tokens(
         eradicate::rules::commented_out_code(&mut diagnostics, locator, indexer, settings);
     }
 
+    if settings.rules.enabled(Rule::UTF8EncodingDeclaration) {
+        pyupgrade::rules::unnecessary_coding_comment(&mut diagnostics, locator, indexer, settings);
+    }
+
     if settings.rules.enabled(Rule::InvalidEscapeSequence) {
         for (tok, range) in tokens.iter().flatten() {
             if tok.is_string() {
