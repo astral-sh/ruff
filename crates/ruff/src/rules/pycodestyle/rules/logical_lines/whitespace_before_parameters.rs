@@ -8,12 +8,12 @@ use crate::checkers::logical_lines::LogicalLinesContext;
 use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 
 /// ## What it does
-/// Checks for extraneous whitespace immediately before the open parenthesis
-/// that starts the argument list of a function call
+/// Checks for extraneous whitespace immediately before an open parenthesis
+/// or bracket.
 ///
 /// ## Why is this bad?
-/// According to [PEP 8], open parentheses should not have any space before or
-/// after them.
+/// According to [PEP 8], open parentheses and brackets should not be followed
+/// by any trailing whitespace.
 ///
 /// ## Example
 /// ```python
