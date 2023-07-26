@@ -21,12 +21,14 @@ use super::helpers;
 /// ## Example
 /// ```python
 /// import datetime
+///
 /// datetime.datetime(2000, 1, 1, 0, 0, 0)
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// import datetime
+///
 /// datetime.datetime(2000, 1, 1, 0, 0, 0, tzinfo=datetime.UTC)
 /// ```
 #[violation]
