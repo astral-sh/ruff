@@ -102,12 +102,10 @@ const fn is_compound_statement(stmt: &Stmt) -> bool {
 }
 
 const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
-    if body.len() > 1 {
-        true
-    } else if let Some(first_body_stmt) = body.first() {
-        is_compound_statement(first_body_stmt)
+    if let [stmt] = body {
+        is_compound_statement(stmt)
     } else {
-        false
+        true
     }
 }
 
@@ -149,10 +147,8 @@ pub(crate) fn complex_raises(
 
     // Check body for `pytest.raises` context manager
     if raises_called {
-        let is_too_complex = if body.len() > 1 {
-            true
-        } else if let Some(first_stmt) = body.first() {
-            match first_stmt {
+        let is_too_complex = if let [stmt] = body {
+            match stmt {
                 Stmt::With(ast::StmtWith { body, .. })
                 | Stmt::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
                     is_non_trivial_with_body(body)
@@ -160,7 +156,7 @@ pub(crate) fn complex_raises(
                 stmt => is_compound_statement(stmt),
             }
         } else {
-            false
+            true
         };
 
         if is_too_complex {
