@@ -304,6 +304,7 @@ impl Rule {
             | Rule::MissingWhitespaceAroundOperator
             | Rule::MissingWhitespaceAroundParameterEquals
             | Rule::MultipleLeadingHashesForBlockComment
+            | Rule::MultipleSpacesAfterComma
             | Rule::MultipleSpacesAfterKeyword
             | Rule::MultipleSpacesAfterOperator
             | Rule::MultipleSpacesBeforeKeyword
@@ -313,6 +314,7 @@ impl Rule {
             | Rule::NoSpaceAfterBlockComment
             | Rule::NoSpaceAfterInlineComment
             | Rule::OverIndented
+            | Rule::TabAfterComma
             | Rule::TabAfterKeyword
             | Rule::TabAfterOperator
             | Rule::TabBeforeKeyword
