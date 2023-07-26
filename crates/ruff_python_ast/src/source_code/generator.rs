@@ -1510,15 +1510,14 @@ mod tests {
         let quote = Quote::default();
         let line_ending = LineEnding::default();
         let ast = rustpython_parser::parse(contents, Mode::Jupyter, "<filename>").unwrap();
-        let body = match ast {
-            Mod::Module(ModModule { body, .. }) => body,
-            _ => panic!("Source code didn't return ModModule"),
+        let Mod::Module(ModModule { body, .. }) = ast else {
+            panic!("Source code didn't return ModModule")
         };
         let [stmt] = body.as_slice() else {
             panic!("Expected only one statement in source code")
         };
         let mut generator = Generator::new(&indentation, quote, line_ending);
-        generator.unparse_stmt(&stmt);
+        generator.unparse_stmt(stmt);
         generator.generate()
     }
 
