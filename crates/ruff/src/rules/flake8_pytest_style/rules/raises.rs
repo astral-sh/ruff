@@ -83,11 +83,29 @@ fn is_pytest_raises(func: &Expr, semantic: &SemanticModel) -> bool {
     })
 }
 
+const fn is_compound_statement(stmt: &Stmt) -> bool {
+    matches!(
+        stmt,
+        Stmt::FunctionDef(_)
+            | Stmt::AsyncFunctionDef(_)
+            | Stmt::ClassDef(_)
+            | Stmt::While(_)
+            | Stmt::For(_)
+            | Stmt::AsyncFor(_)
+            | Stmt::Match(_)
+            | Stmt::With(_)
+            | Stmt::AsyncWith(_)
+            | Stmt::If(_)
+            | Stmt::Try(_)
+            | Stmt::TryStar(_)
+    )
+}
+
 const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
     if body.len() > 1 {
         true
     } else if let Some(first_body_stmt) = body.first() {
-        !first_body_stmt.is_pass_stmt()
+        is_compound_statement(first_body_stmt)
     } else {
         false
     }
@@ -124,8 +142,6 @@ pub(crate) fn complex_raises(
     items: &[WithItem],
     body: &[Stmt],
 ) {
-    let mut is_too_complex = false;
-
     let raises_called = items.iter().any(|item| match &item.context_expr {
         Expr::Call(ast::ExprCall { func, .. }) => is_pytest_raises(func, checker.semantic()),
         _ => false,
@@ -133,28 +149,19 @@ pub(crate) fn complex_raises(
 
     // Check body for `pytest.raises` context manager
     if raises_called {
-        if body.len() > 1 {
-            is_too_complex = true;
+        let is_too_complex = if body.len() > 1 {
+            true
         } else if let Some(first_stmt) = body.first() {
             match first_stmt {
                 Stmt::With(ast::StmtWith { body, .. })
                 | Stmt::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
-                    if is_non_trivial_with_body(body) {
-                        is_too_complex = true;
-                    }
+                    is_non_trivial_with_body(body)
                 }
-                Stmt::If(_)
-                | Stmt::For(_)
-                | Stmt::Match(_)
-                | Stmt::AsyncFor(_)
-                | Stmt::While(_)
-                | Stmt::Try(_)
-                | Stmt::TryStar(_) => {
-                    is_too_complex = true;
-                }
-                _ => {}
+                stmt => is_compound_statement(stmt),
             }
-        }
+        } else {
+            false
+        };
 
         if is_too_complex {
             checker.diagnostics.push(Diagnostic::new(

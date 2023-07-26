@@ -11,6 +11,10 @@ async def test_ok_trivial_with():
         with context_manager_under_test():
             pass
 
+    with pytest.raises(ValueError):
+        with context_manager_under_test():
+            raise ValueError
+
     with pytest.raises(AttributeError):
         async with context_manager_under_test():
             pass
@@ -48,12 +52,9 @@ async def test_error_complex_statement():
             [].size
 
     with pytest.raises(AttributeError):
-        with context_manager_under_test():
-            [].size
-
-    with pytest.raises(AttributeError):
         async with context_manager_under_test():
-            [].size
+            if True:
+                raise Exception
 
 
 def test_error_try():
