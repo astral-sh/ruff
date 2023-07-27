@@ -146,15 +146,19 @@ def format_file(
     if errors and not args.skip_errors and not error_known:
         for error in errors:
             rule_name = file.name.split(".")[0]
-            print(f"Docs parse error for `{rule_name}` docs: {error}")
+            print(
+                f"Docs parse error for `{rule_name}` docs. Either fix or add to "
+                f"`KNOWN_PARSE_ERRORS`. {error}"
+            )
 
         return 2
 
     if contents != new_contents:
         rule_name = file.name.split(".")[0]
         print(
-            f"Rule `{rule_name}` docs are not formatted. The example section "
-            f"should be rewritten to:",
+            f"Rule `{rule_name}` docs are not formatted. Either format the rule or add "
+            f"to `KNOWN_FORMATTING_VIOLATIONS`. The example section should be "
+            f"rewritten to:",
         )
 
         # Add indentation so that snipped can be copied directly to docs
