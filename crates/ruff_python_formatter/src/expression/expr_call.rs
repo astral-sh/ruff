@@ -119,10 +119,10 @@ impl FormatNodeRule<ExprCall> for FormatExprCall {
 impl NeedsParentheses for ExprCall {
     fn needs_parentheses(
         &self,
-        parent: AnyNodeRef,
+        _parent: AnyNodeRef,
         context: &PyFormatContext,
     ) -> OptionalParentheses {
-        self.func.needs_parentheses(parent, context)
+        self.func.needs_parentheses(self.into(), context)
     }
 }
 

@@ -116,7 +116,6 @@ impl<'a> Printer<'a> {
                         self.print_str("\n");
                     }
 
-                    self.state.pending_space = false;
                     self.state.pending_indent = args.indention();
                 }
             }
@@ -744,7 +743,6 @@ struct PrinterState<'a> {
     source_markers: Vec<SourceMarker>,
     source_position: TextSize,
     pending_indent: Indention,
-    pending_space: bool,
     measured_group_fits: bool,
     generated_line: usize,
     generated_column: usize,
@@ -1009,12 +1007,12 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
         let args = self.stack.top();
 
         match element {
-            FormatElement::Space => return Ok(self.fits_text(" ")),
+            FormatElement::Space => return Ok(self.fits_text(" ", args)),
 
             FormatElement::Line(line_mode) => {
                 match args.mode() {
                     PrintMode::Flat => match line_mode {
-                        LineMode::SoftOrSpace => return Ok(self.fits_text(" ")),
+                        LineMode::SoftOrSpace => return Ok(self.fits_text(" ", args)),
                         LineMode::Soft => {}
                         LineMode::Hard | LineMode::Empty => {
                             return Ok(if self.must_be_flat {
@@ -1036,17 +1034,18 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                             MeasureMode::AllLines => {
                                 // Continue measuring on the next line
                                 self.state.line_width = 0;
+                                self.state.pending_indent = args.indention();
                             }
                         }
                     }
                 }
             }
 
-            FormatElement::StaticText { text } => return Ok(self.fits_text(text)),
-            FormatElement::DynamicText { text, .. } => return Ok(self.fits_text(text)),
+            FormatElement::StaticText { text } => return Ok(self.fits_text(text, args)),
+            FormatElement::DynamicText { text, .. } => return Ok(self.fits_text(text, args)),
             FormatElement::SourceCodeSlice { slice, .. } => {
                 let text = slice.text(self.printer.source_code);
-                return Ok(self.fits_text(text));
+                return Ok(self.fits_text(text, args));
             }
             FormatElement::LineSuffixBoundary => {
                 if self.state.has_line_suffix {
@@ -1255,7 +1254,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
         Ok(Fits::Maybe)
     }
 
-    fn fits_text(&mut self, text: &str) -> Fits {
+    fn fits_text(&mut self, text: &str, args: PrintElementArgs) -> Fits {
         let indent = std::mem::take(&mut self.state.pending_indent);
         self.state.line_width += indent.level() as usize * self.options().indent_width() as usize
             + indent.align() as usize;
@@ -1264,10 +1263,17 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
             let char_width = match c {
                 '\t' => self.options().tab_width as usize,
                 '\n' => {
-                    return if self.must_be_flat {
-                        Fits::No
+                    if self.must_be_flat {
+                        return Fits::No;
                     } else {
-                        Fits::Yes
+                        match args.measure_mode() {
+                            MeasureMode::FirstLine => return Fits::Yes,
+                            MeasureMode::AllLines => {
+                                self.state.line_width = 0;
+                                self.state.pending_indent = args.indention();
+                                continue;
+                            }
+                        }
                     };
                 }
                 c => c.width().unwrap_or(0),
