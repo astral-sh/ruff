@@ -148,7 +148,7 @@ def format_file(
             rule_name = file.name.split(".")[0]
             print(
                 f"Docs parse error for `{rule_name}` docs. Either fix or add to "
-                f"`KNOWN_PARSE_ERRORS`. {error}"
+                f"`KNOWN_PARSE_ERRORS`. {error}",
             )
 
         return 2
