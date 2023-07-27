@@ -172,7 +172,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
             // # Never expands, the comma is always preserved
             // x2 = lambda y,: 1
             // ```
-            if self.parentheses == ArgumentsParentheses::SkipInsideLambda {
+            if self.parentheses == ArgumentsParentheses::Never {
                 // For lambdas (no parentheses), preserve the trailing comma. It doesn't
                 // behave like a magic trailing comma, it's just preserved
                 if has_trailing_comma(item, last_node, f.context().source()) {
