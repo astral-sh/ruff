@@ -83,7 +83,7 @@ impl<'a> From<&AnyExpressionYield<'a>> for AnyNodeRef<'a> {
 
 impl Format<PyFormatContext<'_>> for AnyExpressionYield<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
-        let expr = if self.is_yield_from() {
+        let keyword = if self.is_yield_from() {
             "yield from"
         } else {
             "yield"
@@ -93,14 +93,14 @@ impl Format<PyFormatContext<'_>> for AnyExpressionYield<'_> {
             write!(
                 f,
                 [
-                    text(expr),
+                    text(keyword),
                     space(),
                     maybe_parenthesize_expression(val, self, Parenthesize::IfRequired)
                 ]
             )?;
         } else {
             // ExprYieldFrom always has Some(value) so we should never get a bare `yield from`
-            write!(f, [&text(expr)])?;
+            write!(f, [&text(keyword)])?;
         }
         Ok(())
     }
