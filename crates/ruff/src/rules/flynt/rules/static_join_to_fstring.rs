@@ -9,6 +9,24 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 use crate::rules::flynt::helpers;
 
+/// ## What it does
+/// Checks for `str#join` calls that can be replaced with f-strings.
+///
+/// ## Why is this bad?
+/// f-strings are more readable and generally preferred over `str#join` calls.
+///
+/// ## Example
+/// ```python
+/// " ".join((foo, bar))
+/// ```
+///
+/// Use instead:
+/// ```python
+/// f"{foo} {bar}"
+/// ```
+///
+/// ## References
+/// - [Python documentation: f-strings](https://docs.python.org/3/reference/lexical_analysis.html#f-strings)
 #[violation]
 pub struct StaticJoinToFString {
     expr: String,
