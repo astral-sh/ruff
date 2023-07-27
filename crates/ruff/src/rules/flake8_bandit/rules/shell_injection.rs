@@ -75,6 +75,31 @@ impl Violation for StartProcessWithNoShell {
     }
 }
 
+/// ## What it does
+/// Checks for the starting of a process with a partial executable path.
+///
+/// ## Why is this bad?
+/// Starting a process with a partial executable path can allow attackers to
+/// execute arbitrary executable by adjusting the `PATH` environment variable.
+/// Consider using a full path to the executable instead.
+///
+/// ## Example
+/// ```python
+/// import subprocess
+///
+/// subprocess.Popen(["ruff", "check", "file.py"])
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import subprocess
+///
+/// subprocess.Popen(["/usr/bin/ruff", "check", "file.py"])
+/// ```
+///
+/// ## References
+/// - [Python documentation: `subprocess.Popen()`](https://docs.python.org/3/library/subprocess.html#subprocess.Popen)
+/// - [Common Weakness Enumeration: CWE-78](https://cwe.mitre.org/data/definitions/78.html)
 #[violation]
 pub struct StartProcessWithPartialPath;
 
@@ -85,6 +110,29 @@ impl Violation for StartProcessWithPartialPath {
     }
 }
 
+/// ## What it does
+/// Checks for possible wildcard injections in calls to `subprocess.Popen()`.
+///
+/// ## Why is this bad?
+/// Wildcard injections can lead to unexpected behavior if unintended files are
+/// matched by the wildcard. Consider using a more specific path instead.
+///
+/// ## Example
+/// ```python
+/// import subprocess
+///
+/// subprocess.Popen(["chmod", "777", "*.py"])
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import subprocess
+///
+/// subprocess.Popen(["chmod", "777", "main.py"])
+/// ```
+///
+/// ## References
+/// - [Common Weakness Enumeration: CWE-78](https://cwe.mitre.org/data/definitions/78.html)
 #[violation]
 pub struct UnixCommandWildcardInjection;
 
