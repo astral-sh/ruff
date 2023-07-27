@@ -1547,10 +1547,10 @@ impl<'a> Checker<'a> {
     }
 
     fn handle_node_load(&mut self, expr: &Expr) {
-        let Expr::Name(ast::ExprName { id, .. }) = expr else {
+        let Expr::Name(expr) = expr else {
             return;
         };
-        self.semantic.resolve_load(id, expr.range());
+        self.semantic.resolve_load(expr);
     }
 
     fn handle_node_store(&mut self, id: &'a str, expr: &Expr) {
