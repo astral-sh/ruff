@@ -1,6 +1,5 @@
 use std::path::Path;
 
-use ast::all;
 use bitflags::bitflags;
 use ruff_python_ast::{self as ast, Expr, Ranged, Stmt};
 use ruff_text_size::{TextRange, TextSize};
@@ -342,14 +341,10 @@ impl<'a> SemanticModel<'a> {
                 }
             }
 
-            if scope.kind.is_type() && index == 0 {
-                // Allow class variables to be visible for an additional scope level
-                // when a type scope is seen — this covers the type scope present between
-                // function and class definitions and their parent class scope.
-                class_variables_visible = true;
-            } else {
-                class_variables_visible = false;
-            }
+            // Allow class variables to be visible for an additional scope level
+            // when a type scope is seen — this covers the type scope present between
+            // function and class definitions and their parent class scope.
+            class_variables_visible = scope.kind.is_type() && index == 0;
 
             if let Some(binding_id) = scope.get(name.id.as_str()) {
                 // Mark the binding as used.
@@ -511,16 +506,19 @@ impl<'a> SemanticModel<'a> {
         }
 
         let mut seen_function = false;
+        let mut class_variables_visible = true;
         for (index, scope_id) in self.scopes.ancestor_ids(self.scope_id).enumerate() {
             let scope = &self.scopes[scope_id];
             if scope.kind.is_class() {
                 if seen_function && matches!(symbol, "__class__") {
                     return None;
                 }
-                if index > 0 {
+                if !class_variables_visible {
                     continue;
                 }
             }
+
+            class_variables_visible = scope.kind.is_type() && index == 0;
 
             if let Some(binding_id) = scope.get(symbol) {
                 match self.bindings[binding_id].kind {
@@ -876,11 +874,11 @@ impl<'a> SemanticModel<'a> {
     pub fn scope_parent_skip_types(&self, scope: &Scope) -> Option<&Scope<'a>> {
         let mut current_scope = scope;
         loop {
-            if let Some(parent) = self.scope_parent(&current_scope) {
-                if !parent.kind.is_type() {
-                    return Some(parent);
-                } else {
+            if let Some(parent) = self.scope_parent(current_scope) {
+                if parent.kind.is_type() {
                     current_scope = parent;
+                } else {
+                    return Some(parent);
                 }
             } else {
                 return None;
