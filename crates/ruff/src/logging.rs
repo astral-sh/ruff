@@ -7,9 +7,9 @@ use colored::Colorize;
 use fern;
 use log::Level;
 use once_cell::sync::Lazy;
-use rustpython_parser::{ParseError, ParseErrorType};
+use ruff_python_parser::{ParseError, ParseErrorType};
 
-use ruff_python_ast::source_code::{OneIndexed, SourceCode, SourceLocation};
+use ruff_source_file::{OneIndexed, SourceCode, SourceLocation};
 
 use crate::fs;
 use crate::jupyter::Notebook;

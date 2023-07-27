@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, ArgWithDefault, Constant, Expr, Ranged, Stmt};
+use ruff_python_ast::{self as ast, ArgWithDefault, Constant, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -6,7 +6,7 @@ use ruff_python_ast::cast;
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::statement_visitor::StatementVisitor;
-use ruff_python_ast::typing::parse_type_annotation;
+use ruff_python_parser::typing::parse_type_annotation;
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{Definition, Member, MemberKind};
 use ruff_python_stdlib::typing::simple_magic_return_type;
@@ -462,7 +462,8 @@ fn check_dynamically_typed<F>(
     }) = annotation
     {
         // Quoted annotations
-        if let Ok((parsed_annotation, _)) = parse_type_annotation(string, *range, checker.locator())
+        if let Ok((parsed_annotation, _)) =
+            parse_type_annotation(string, *range, checker.locator().contents())
         {
             if type_hint_resolves_to_any(
                 &parsed_annotation,

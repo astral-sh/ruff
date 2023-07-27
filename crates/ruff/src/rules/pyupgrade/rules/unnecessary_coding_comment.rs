@@ -3,7 +3,11 @@ use regex::Regex;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_trivia::Line;
+use ruff_python_index::Indexer;
+use ruff_source_file::Locator;
+
+use crate::registry::AsRule;
+use crate::settings::Settings;
 
 /// ## What it does
 /// Checks for unnecessary UTF-8 encoding declarations.
@@ -43,18 +47,31 @@ static CODING_COMMENT_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^[ \t\f]*#.*?coding[:=][ \t]*utf-?8").unwrap());
 
 /// UP009
-pub(crate) fn unnecessary_coding_comment(line: &Line, autofix: bool) -> Option<Diagnostic> {
-    // PEP3120 makes utf-8 the default encoding.
-    if CODING_COMMENT_REGEX.is_match(line.as_str()) {
-        let mut diagnostic = Diagnostic::new(UTF8EncodingDeclaration, line.full_range());
-        if autofix {
-            diagnostic.set_fix(Fix::automatic(Edit::deletion(
-                line.start(),
-                line.full_end(),
-            )));
+pub(crate) fn unnecessary_coding_comment(
+    diagnostics: &mut Vec<Diagnostic>,
+    locator: &Locator,
+    indexer: &Indexer,
+    settings: &Settings,
+) {
+    // The coding comment must be on one of the first two lines. Since each comment spans at least
+    // one line, we only need to check the first two comments at most.
+    for range in indexer.comment_ranges().iter().take(2) {
+        let line = locator.slice(*range);
+        if CODING_COMMENT_REGEX.is_match(line) {
+            #[allow(deprecated)]
+            let line = locator.compute_line_index(range.start());
+            if line.to_zero_indexed() > 1 {
+                continue;
+            }
+
+            let mut diagnostic = Diagnostic::new(UTF8EncodingDeclaration, *range);
+            if settings.rules.should_fix(diagnostic.kind.rule()) {
+                diagnostic.set_fix(Fix::automatic(Edit::deletion(
+                    range.start(),
+                    locator.full_line_end(range.end()),
+                )));
+            }
+            diagnostics.push(diagnostic);
         }
-        Some(diagnostic)
-    } else {
-        None
     }
 }

@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule};
-use rustpython_parser::ast::Stmt;
+use ruff_python_ast::Stmt;
 
 pub(crate) mod stmt_ann_assign;
 pub(crate) mod stmt_assert;
@@ -66,6 +66,7 @@ impl FormatRule<Stmt, PyFormatContext<'_>> for FormatStmt {
             Stmt::Break(x) => x.format().fmt(f),
             Stmt::Continue(x) => x.format().fmt(f),
             Stmt::TypeAlias(x) => x.format().fmt(f),
+            Stmt::LineMagic(_) => todo!(),
         }
     }
 }

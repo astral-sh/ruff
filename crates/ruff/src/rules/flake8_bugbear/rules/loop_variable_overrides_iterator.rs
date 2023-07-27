@@ -1,5 +1,5 @@
+use ruff_python_ast::{self as ast, ArgWithDefault, Expr, Ranged};
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{self, ArgWithDefault, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};

@@ -1,7 +1,7 @@
 //! Settings for the `pylint` plugin.
 
 use anyhow::anyhow;
-use rustpython_parser::ast::Constant;
+use ruff_python_ast::Constant;
 use serde::{Deserialize, Serialize};
 
 use ruff_macros::{CacheKey, CombineOptions, ConfigurationOptions};

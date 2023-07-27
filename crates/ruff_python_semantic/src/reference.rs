@@ -3,7 +3,7 @@ use ruff_text_size::TextRange;
 use std::ops::Deref;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
-use ruff_python_ast::source_code::Locator;
+use ruff_source_file::Locator;
 
 use crate::context::ExecutionContext;
 use crate::scope::ScopeId;

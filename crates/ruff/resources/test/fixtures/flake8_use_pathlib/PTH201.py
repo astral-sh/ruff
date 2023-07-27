@@ -5,6 +5,7 @@ from pathlib import Path as pth
 _ = Path(".")
 _ = pth(".")
 _ = PurePath(".")
+_ = Path("")
 
 # no match
 _ = Path()

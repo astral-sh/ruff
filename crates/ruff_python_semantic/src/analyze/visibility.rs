@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use rustpython_parser::ast::{self, Decorator, Stmt};
+use ruff_python_ast::{self as ast, Decorator, Stmt};
 
 use ruff_python_ast::call_path::{collect_call_path, CallPath};
 use ruff_python_ast::helpers::map_callable;

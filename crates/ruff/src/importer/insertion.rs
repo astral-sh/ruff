@@ -1,15 +1,15 @@
 //! Insert statements into Python code.
 use std::ops::Add;
 
+use ruff_python_ast::{Ranged, Stmt};
+use ruff_python_parser::{lexer, Mode, Tok};
 use ruff_text_size::TextSize;
-use rustpython_parser::ast::{Ranged, Stmt};
-use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::helpers::is_docstring_stmt;
-use ruff_python_ast::source_code::{Locator, Stylist};
-use ruff_python_trivia::{PythonWhitespace, UniversalNewlineIterator};
-use ruff_textwrap::indent;
+use ruff_python_codegen::Stylist;
+use ruff_python_trivia::{textwrap::indent, PythonWhitespace};
+use ruff_source_file::{Locator, UniversalNewlineIterator};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum Placement<'a> {
@@ -299,13 +299,13 @@ fn match_leading_semicolon(s: &str) -> Option<TextSize> {
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
+    use ruff_python_ast::Suite;
+    use ruff_python_parser::lexer::LexResult;
+    use ruff_python_parser::Parse;
     use ruff_text_size::TextSize;
-    use rustpython_parser::ast::Suite;
-    use rustpython_parser::lexer::LexResult;
-    use rustpython_parser::Parse;
 
-    use ruff_python_ast::source_code::{Locator, Stylist};
-    use ruff_python_trivia::LineEnding;
+    use ruff_python_codegen::Stylist;
+    use ruff_source_file::{LineEnding, Locator};
 
     use super::Insertion;
 
@@ -313,7 +313,7 @@ mod tests {
     fn start_of_file() -> Result<()> {
         fn insert(contents: &str) -> Result<Insertion> {
             let program = Suite::parse(contents, "<filename>")?;
-            let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents);
+            let tokens: Vec<LexResult> = ruff_python_parser::tokenize(contents);
             let locator = Locator::new(contents);
             let stylist = Stylist::from_tokens(&tokens, &locator);
             Ok(Insertion::start_of_file(&program, &locator, &stylist))
@@ -424,7 +424,7 @@ x = 1
     #[test]
     fn start_of_block() {
         fn insert(contents: &str, offset: TextSize) -> Insertion {
-            let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents);
+            let tokens: Vec<LexResult> = ruff_python_parser::tokenize(contents);
             let locator = Locator::new(contents);
             let stylist = Stylist::from_tokens(&tokens, &locator);
             Insertion::start_of_block(offset, &locator, &stylist)

@@ -2,11 +2,12 @@
 
 use std::path::Path;
 
-use rustpython_parser::lexer::LexResult;
-use rustpython_parser::Tok;
+use ruff_python_parser::lexer::LexResult;
+use ruff_python_parser::Tok;
 
 use ruff_diagnostics::Diagnostic;
-use ruff_python_ast::source_code::{Indexer, Locator};
+use ruff_python_index::Indexer;
+use ruff_source_file::Locator;
 
 use crate::directives::TodoComment;
 use crate::lex::docstring_detection::StateMachine;
@@ -66,6 +67,10 @@ pub(crate) fn check_tokens(
 
     if settings.rules.enabled(Rule::CommentedOutCode) {
         eradicate::rules::commented_out_code(&mut diagnostics, locator, indexer, settings);
+    }
+
+    if settings.rules.enabled(Rule::UTF8EncodingDeclaration) {
+        pyupgrade::rules::unnecessary_coding_comment(&mut diagnostics, locator, indexer, settings);
     }
 
     if settings.rules.enabled(Rule::InvalidEscapeSequence) {

@@ -3,7 +3,7 @@ use crate::prelude::*;
 use crate::FormatNodeRule;
 use ruff_formatter::{write, FormatContext};
 use ruff_python_ast::node::AnyNodeRef;
-use rustpython_parser::ast::ExprName;
+use ruff_python_ast::ExprName;
 
 #[derive(Default)]
 pub struct FormatExprName;
@@ -36,9 +36,9 @@ impl NeedsParentheses for ExprName {
 
 #[cfg(test)]
 mod tests {
+    use ruff_python_ast::{ModModule, Ranged};
+    use ruff_python_parser::Parse;
     use ruff_text_size::{TextRange, TextSize};
-    use rustpython_parser::ast::{ModModule, Ranged};
-    use rustpython_parser::Parse;
 
     #[test]
     fn name_range_with_comments() {

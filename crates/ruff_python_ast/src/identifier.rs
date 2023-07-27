@@ -10,13 +10,10 @@
 //!
 //! This module can be used to identify the [`TextRange`] of the `except` token.
 
+use crate::{self as ast, Alias, Arg, ArgWithDefault, ExceptHandler, Ranged, Stmt};
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_ast::{Alias, Arg, ArgWithDefault};
-use rustpython_parser::ast::{self, ExceptHandler, Ranged, Stmt};
 
 use ruff_python_trivia::{is_python_whitespace, Cursor};
-
-use crate::source_code::Locator;
 
 pub trait Identifier {
     /// Return the [`TextRange`] of the identifier in the given AST node.
@@ -82,14 +79,14 @@ impl Identifier for Alias {
 }
 
 /// Return the [`TextRange`] of the `except` token in an [`ExceptHandler`].
-pub fn except(handler: &ExceptHandler, locator: &Locator) -> TextRange {
-    IdentifierTokenizer::new(locator.contents(), handler.range())
+pub fn except(handler: &ExceptHandler, source: &str) -> TextRange {
+    IdentifierTokenizer::new(source, handler.range())
         .next()
         .expect("Failed to find `except` token in `ExceptHandler`")
 }
 
 /// Return the [`TextRange`] of the `else` token in a `For`, `AsyncFor`, or `While` statement.
-pub fn else_(stmt: &Stmt, locator: &Locator) -> Option<TextRange> {
+pub fn else_(stmt: &Stmt, source: &str) -> Option<TextRange> {
     let (Stmt::For(ast::StmtFor { body, orelse, .. })
     | Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. })
     | Stmt::While(ast::StmtWhile { body, orelse, .. })) = stmt
@@ -103,7 +100,7 @@ pub fn else_(stmt: &Stmt, locator: &Locator) -> Option<TextRange> {
 
     IdentifierTokenizer::starts_at(
         body.last().expect("Expected body to be non-empty").end(),
-        locator.contents(),
+        source,
     )
     .next()
 }
@@ -203,42 +200,17 @@ impl Iterator for IdentifierTokenizer<'_> {
 
 #[cfg(test)]
 mod tests {
-    use anyhow::Result;
-    use ruff_text_size::{TextRange, TextSize};
-    use rustpython_ast::{Ranged, Stmt};
-    use rustpython_parser::Parse;
-
-    use crate::identifier;
-    use crate::identifier::IdentifierTokenizer;
-    use crate::source_code::Locator;
+    use super::IdentifierTokenizer;
+    use ruff_text_size::{TextLen, TextRange, TextSize};
 
     #[test]
-    fn extract_else_range() -> Result<()> {
-        let contents = r#"
-for x in y:
-    pass
-else:
-    pass
-"#
-        .trim();
-        let stmt = Stmt::parse(contents, "<filename>")?;
-        let locator = Locator::new(contents);
-        let range = identifier::else_(&stmt, &locator).unwrap();
-        assert_eq!(&contents[range], "else");
-        assert_eq!(
-            range,
-            TextRange::new(TextSize::from(21), TextSize::from(25))
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn extract_global_names() -> Result<()> {
+    fn extract_global_names() {
         let contents = r#"global X,Y, Z"#.trim();
-        let stmt = Stmt::parse(contents, "<filename>")?;
-        let locator = Locator::new(contents);
 
-        let mut names = IdentifierTokenizer::new(locator.contents(), stmt.range());
+        let mut names = IdentifierTokenizer::new(
+            contents,
+            TextRange::new(TextSize::new(0), contents.text_len()),
+        );
 
         let range = names.next_token().unwrap();
         assert_eq!(&contents[range], "global");
@@ -258,6 +230,5 @@ else:
             range,
             TextRange::new(TextSize::from(12), TextSize::from(13))
         );
-        Ok(())
     }
 }

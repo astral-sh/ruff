@@ -5,7 +5,7 @@ use ruff_text_size::{TextRange, TextSize};
 use serde::{Deserialize, Serialize};
 
 use ruff_diagnostics::Diagnostic;
-use ruff_python_ast::source_code::SourceFile;
+use ruff_source_file::SourceFile;
 
 use crate::message::Message;
 use crate::registry::Rule;

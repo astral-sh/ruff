@@ -1,10 +1,10 @@
 use std::str::FromStr;
 
+use ruff_python_ast::{self as ast, Constant, Expr, Ranged};
+use ruff_python_literal::cformat::{CFormatPart, CFormatSpec, CFormatStrOrBytes, CFormatString};
+use ruff_python_parser::{lexer, Mode};
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
-use rustpython_format::cformat::{CFormatPart, CFormatSpec, CFormatStrOrBytes, CFormatString};
-use rustpython_parser::ast::{self, Constant, Expr, Ranged};
-use rustpython_parser::{lexer, Mode};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};

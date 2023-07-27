@@ -1,6 +1,6 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustpython_parser::ast::{self, Constant, Expr};
+use ruff_python_ast::{self as ast, Constant, Expr};
 
 use ruff_python_semantic::SemanticModel;
 

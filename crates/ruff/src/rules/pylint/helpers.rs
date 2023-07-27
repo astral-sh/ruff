@@ -1,8 +1,8 @@
 use std::fmt;
 
+use ruff_python_ast as ast;
 use ruff_python_ast::helpers::find_keyword;
-use rustpython_parser::ast;
-use rustpython_parser::ast::{CmpOp, Constant, Expr, Keyword};
+use ruff_python_ast::{CmpOp, Constant, Expr, Keyword};
 
 use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::{ScopeKind, SemanticModel};

@@ -92,7 +92,7 @@ use std::cell::Cell;
 use std::fmt::Debug;
 use std::rc::Rc;
 
-use rustpython_parser::ast::{Mod, Ranged};
+use ruff_python_ast::{Mod, Ranged};
 
 pub(crate) use format::{
     dangling_comments, dangling_node_comments, leading_alternate_branch_comments, leading_comments,
@@ -100,7 +100,7 @@ pub(crate) use format::{
 };
 use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::source_code::CommentRanges;
+use ruff_python_index::CommentRanges;
 
 use crate::comments::debug::{DebugComment, DebugComments};
 use crate::comments::map::MultiMap;
@@ -414,12 +414,12 @@ struct CommentsData<'a> {
 #[cfg(test)]
 mod tests {
     use insta::assert_debug_snapshot;
-    use rustpython_parser::ast::Mod;
-    use rustpython_parser::lexer::lex;
-    use rustpython_parser::{parse_tokens, Mode};
+    use ruff_python_ast::Mod;
+    use ruff_python_parser::lexer::lex;
+    use ruff_python_parser::{parse_tokens, Mode};
 
     use ruff_formatter::SourceCode;
-    use ruff_python_ast::source_code::{CommentRanges, CommentRangesBuilder};
+    use ruff_python_index::{CommentRanges, CommentRangesBuilder};
 
     use crate::comments::Comments;
 

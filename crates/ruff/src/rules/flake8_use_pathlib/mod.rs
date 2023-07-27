@@ -62,6 +62,7 @@ mod tests {
     #[test_case(Rule::OsPathGetmtime, Path::new("PTH204.py"))]
     #[test_case(Rule::OsPathGetctime, Path::new("PTH205.py"))]
     #[test_case(Rule::OsSepSplit, Path::new("PTH206.py"))]
+    #[test_case(Rule::Glob, Path::new("PTH207.py"))]
     fn rules_pypath(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

@@ -1,11 +1,11 @@
 use std::{fmt, iter, usize};
 
 use log::error;
-use rustpython_parser::ast::{
+use ruff_python_ast::{
     Expr, Identifier, MatchCase, Pattern, PatternMatchAs, Ranged, Stmt, StmtAsyncFor,
     StmtAsyncWith, StmtFor, StmtMatch, StmtReturn, StmtTry, StmtTryStar, StmtWhile, StmtWith,
 };
-use rustpython_parser::text_size::{TextRange, TextSize};
+use ruff_text_size::{TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_index::{IndexSlice, IndexVec};
@@ -671,11 +671,13 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                         | Expr::Await(_)
                         | Expr::Yield(_)
                         | Expr::YieldFrom(_) => self.unconditional_next_block(after),
+                        Expr::LineMagic(_) => todo!(),
                     }
                 }
                 // The tough branches are done, here is an easy one.
                 Stmt::Return(_) => NextBlock::Terminate,
                 Stmt::TypeAlias(_) => todo!(),
+                Stmt::LineMagic(_) => todo!(),
             };
 
             // Include any statements in the block that don't divert the control flow.
@@ -922,6 +924,7 @@ fn needs_next_block(stmts: &[Stmt]) -> bool {
         | Stmt::TryStar(_)
         | Stmt::Assert(_) => true,
         Stmt::TypeAlias(_) => todo!(),
+        Stmt::LineMagic(_) => todo!(),
     }
 }
 
@@ -957,6 +960,7 @@ fn is_control_flow_stmt(stmt: &Stmt) -> bool {
         | Stmt::Break(_)
         | Stmt::Continue(_) => true,
         Stmt::TypeAlias(_) => todo!(),
+        Stmt::LineMagic(_) => todo!(),
     }
 }
 
@@ -1049,8 +1053,8 @@ mod tests {
     use std::fs;
     use std::path::PathBuf;
 
-    use rustpython_parser::ast::Ranged;
-    use rustpython_parser::{parse, Mode};
+    use ruff_python_ast::Ranged;
+    use ruff_python_parser::{parse, Mode};
     use std::fmt::Write;
     use test_case::test_case;
 

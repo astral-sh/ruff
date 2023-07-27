@@ -1,10 +1,10 @@
 use std::path::Path;
 
-use rustpython_parser::lexer::LexResult;
-use rustpython_parser::Tok;
+use ruff_python_parser::lexer::LexResult;
+use ruff_python_parser::Tok;
 
 use ruff_diagnostics::Diagnostic;
-use ruff_python_ast::source_code::Locator;
+use ruff_source_file::Locator;
 pub(crate) use shebang_leading_whitespace::*;
 pub(crate) use shebang_missing_executable_file::*;
 pub(crate) use shebang_missing_python::*;

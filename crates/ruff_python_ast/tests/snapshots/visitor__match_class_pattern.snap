@@ -1,0 +1,27 @@
+---
+source: crates/ruff_python_ast/tests/visitor.rs
+expression: trace
+---
+- StmtMatch
+  - ExprName
+  - MatchCase
+    - PatternMatchClass
+      - ExprName
+      - PatternMatchValue
+        - ExprConstant
+      - PatternMatchValue
+        - ExprConstant
+    - StmtExpr
+      - ExprConstant
+  - MatchCase
+    - PatternMatchClass
+      - ExprName
+      - PatternMatchValue
+        - ExprConstant
+      - PatternMatchValue
+        - ExprConstant
+      - PatternMatchValue
+        - ExprConstant
+    - StmtExpr
+      - ExprConstant
+

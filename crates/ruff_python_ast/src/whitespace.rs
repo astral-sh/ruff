@@ -1,9 +1,10 @@
+use crate::{Ranged, Stmt};
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::Ranged;
 
-use ruff_python_trivia::is_python_whitespace;
-
-use crate::source_code::Locator;
+use ruff_python_trivia::{
+    has_trailing_content, indentation_at_offset, is_python_whitespace, PythonWhitespace,
+};
+use ruff_source_file::{newlines::UniversalNewlineIterator, Locator};
 
 /// Extract the leading indentation from a line.
 #[inline]
@@ -14,14 +15,40 @@ where
     indentation_at_offset(locator, located.start())
 }
 
-/// Extract the leading indentation from a line.
-pub fn indentation_at_offset<'a>(locator: &'a Locator, offset: TextSize) -> Option<&'a str> {
-    let line_start = locator.line_start(offset);
-    let indentation = &locator.contents()[TextRange::new(line_start, offset)];
+/// Return the end offset at which the empty lines following a statement.
+pub fn trailing_lines_end(stmt: &Stmt, locator: &Locator) -> TextSize {
+    let line_end = locator.full_line_end(stmt.end());
+    let rest = &locator.contents()[usize::from(line_end)..];
 
-    if indentation.chars().all(is_python_whitespace) {
-        Some(indentation)
-    } else {
-        None
+    UniversalNewlineIterator::with_offset(rest, line_end)
+        .take_while(|line| line.trim_whitespace().is_empty())
+        .last()
+        .map_or(line_end, |line| line.full_end())
+}
+
+/// Return `true` if a `Stmt` appears to be part of a multi-statement line, with
+/// other statements following it.
+pub fn followed_by_multi_statement_line(stmt: &Stmt, locator: &Locator) -> bool {
+    has_trailing_content(stmt.end(), locator)
+}
+
+/// If a [`Ranged`] has a trailing comment, return the index of the hash.
+pub fn trailing_comment_start_offset<T>(located: &T, locator: &Locator) -> Option<TextSize>
+where
+    T: Ranged,
+{
+    let line_end = locator.line_end(located.end());
+
+    let trailing = &locator.contents()[TextRange::new(located.end(), line_end)];
+
+    for (index, char) in trailing.char_indices() {
+        if char == '#' {
+            return TextSize::try_from(index).ok();
+        }
+        if !is_python_whitespace(char) {
+            return None;
+        }
     }
+
+    None
 }

@@ -3,7 +3,7 @@
 use wasm_bindgen_test::wasm_bindgen_test;
 
 use ruff::registry::Rule;
-use ruff_python_ast::source_code::{OneIndexed, SourceLocation};
+use ruff_source_file::{OneIndexed, SourceLocation};
 use ruff_wasm::{ExpandedMessage, Workspace};
 
 macro_rules! check {

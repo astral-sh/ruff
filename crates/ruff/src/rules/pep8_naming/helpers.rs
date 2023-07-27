@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use rustpython_parser::ast::{self, Expr, Stmt};
+use ruff_python_ast::{self as ast, Expr, Stmt};
 
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::str::{is_cased_lowercase, is_cased_uppercase};

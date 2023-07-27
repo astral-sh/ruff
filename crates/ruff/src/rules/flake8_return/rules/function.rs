@@ -1,7 +1,7 @@
 use std::ops::Add;
 
+use ruff_python_ast::{self as ast, ElifElseClause, Expr, Ranged, Stmt};
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{self, ElifElseClause, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
@@ -591,7 +591,8 @@ fn superfluous_else_node(
         if child.is_return_stmt() {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseReturn { branch },
-                elif_else_range(elif_else, checker.locator()).unwrap_or_else(|| elif_else.range()),
+                elif_else_range(elif_else, checker.locator().contents())
+                    .unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
@@ -600,7 +601,8 @@ fn superfluous_else_node(
         } else if child.is_break_stmt() {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseBreak { branch },
-                elif_else_range(elif_else, checker.locator()).unwrap_or_else(|| elif_else.range()),
+                elif_else_range(elif_else, checker.locator().contents())
+                    .unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
@@ -609,7 +611,8 @@ fn superfluous_else_node(
         } else if child.is_raise_stmt() {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseRaise { branch },
-                elif_else_range(elif_else, checker.locator()).unwrap_or_else(|| elif_else.range()),
+                elif_else_range(elif_else, checker.locator().contents())
+                    .unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
@@ -618,7 +621,8 @@ fn superfluous_else_node(
         } else if child.is_continue_stmt() {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseContinue { branch },
-                elif_else_range(elif_else, checker.locator()).unwrap_or_else(|| elif_else.range()),
+                elif_else_range(elif_else, checker.locator().contents())
+                    .unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);

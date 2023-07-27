@@ -1,5 +1,5 @@
-use rustpython_parser::ast;
-use rustpython_parser::ast::Ranged;
+use ruff_python_ast as ast;
+use ruff_python_ast::Ranged;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};

@@ -21,7 +21,9 @@ use path_absolutize::path_dedot;
 #[cfg(unix)]
 use tempfile::TempDir;
 
+#[cfg(unix)]
 use ruff_cli::args::Args;
+#[cfg(unix)]
 use ruff_cli::run;
 
 const BIN_NAME: &str = "ruff";

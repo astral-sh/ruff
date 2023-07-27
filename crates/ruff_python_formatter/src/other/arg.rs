@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use crate::FormatNodeRule;
 use ruff_formatter::write;
-use rustpython_parser::ast::Arg;
+use ruff_python_ast::Arg;
 
 #[derive(Default)]
 pub struct FormatArg;

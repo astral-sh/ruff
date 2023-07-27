@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{ExprSet, Ranged};
+use ruff_python_ast::{ExprSet, Ranged};
 
 use ruff_python_ast::node::AnyNodeRef;
 

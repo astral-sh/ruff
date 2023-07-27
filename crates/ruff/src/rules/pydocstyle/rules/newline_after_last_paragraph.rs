@@ -1,10 +1,10 @@
+use ruff_python_ast::Ranged;
 use ruff_text_size::{TextLen, TextSize};
-use rustpython_parser::ast::Ranged;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::docstrings::clean_space;
-use ruff_python_trivia::{NewlineWithTrailingNewline, UniversalNewlines};
+use ruff_source_file::{NewlineWithTrailingNewline, UniversalNewlines};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;

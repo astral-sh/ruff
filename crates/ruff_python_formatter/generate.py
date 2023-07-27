@@ -90,7 +90,7 @@ for group, group_nodes in nodes_grouped.items():
         code = f"""
             use crate::{{verbatim_text, FormatNodeRule, PyFormatter}};
             use ruff_formatter::{{write, Buffer, FormatResult}};
-            use rustpython_parser::ast::{node};
+            use ruff_python_ast::{node};
 
             #[derive(Default)]
             pub struct Format{node};
@@ -114,7 +114,7 @@ use crate::context::PyFormatContext;
 use crate::{AsFormat, FormatNodeRule, IntoFormat};
 use ruff_formatter::formatter::Formatter;
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule, FormatResult, FormatRule};
-use rustpython_parser::ast;
+use ruff_python_ast as ast;
 
 """  # noqa: E501
 for node in nodes:

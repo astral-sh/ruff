@@ -1,6 +1,5 @@
 //! Utilities for manually traversing a Python AST.
-use rustpython_ast::{ExceptHandler, Stmt, Suite};
-use rustpython_parser::ast;
+use crate::{self as ast, ExceptHandler, Stmt, Suite};
 
 /// Given a [`Stmt`] and its parent, return the [`Suite`] that contains the [`Stmt`].
 pub fn suite<'a>(stmt: &'a Stmt, parent: &'a Stmt) -> Option<&'a Suite> {

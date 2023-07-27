@@ -26,7 +26,6 @@ is-macro = { version = "0.2.2" }
 itertools = { version = "0.10.5" }
 log = { version = "0.4.17" }
 memchr = "2.5.0"
-nohash-hasher = { version = "0.2.0" }
 num-bigint = { version = "0.4.3" }
 num-traits = { version = "0.2.15" }
 once_cell = { version = "1.17.1" }
@@ -52,12 +51,6 @@ wsl = { version = "0.1.0" }
 # v1.0.1
 libcst = { git = "https://github.com/Instagram/LibCST.git", rev = "3cacca1a1029f05707e50703b49fe3dd860aa839", default-features = false }
 
-ruff_text_size = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "4d03b9b5b212fc869e4cfda151414438186a7779" }
-rustpython-ast = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "4d03b9b5b212fc869e4cfda151414438186a7779" , default-features = false, features = ["num-bigint"]}
-rustpython-format = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "4d03b9b5b212fc869e4cfda151414438186a7779", default-features = false, features = ["num-bigint"] }
-rustpython-literal = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "4d03b9b5b212fc869e4cfda151414438186a7779", default-features = false }
-rustpython-parser = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "4d03b9b5b212fc869e4cfda151414438186a7779" , default-features = false, features = ["full-lexer", "num-bigint"] }
-
 [profile.release]
 lto = "fat"
 codegen-units = 1
@@ -70,7 +63,7 @@ opt-level = 3
 
 # Reduce complexity of a parser function that would trigger a locals limit in a wasm tool.
 # https://github.com/bytecodealliance/wasm-tools/blob/b5c3d98e40590512a3b12470ef358d5c7b983b15/crates/wasmparser/src/limits.rs#L29
-[profile.dev.package.rustpython-parser]
+[profile.dev.package.ruff_python_parser]
 opt-level = 1
 
 # Use the `--profile release-debug` flag to show symbols in release mode.

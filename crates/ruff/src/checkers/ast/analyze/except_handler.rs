@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, ExceptHandler, Ranged};
+use ruff_python_ast::{self as ast, ExceptHandler, Ranged};
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;

@@ -1,4 +1,4 @@
-use rustpython_parser::ast;
+use ruff_python_ast as ast;
 
 use ruff_python_ast::call_path::from_qualified_name;
 use ruff_python_ast::helpers::map_callable;

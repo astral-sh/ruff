@@ -1,8 +1,8 @@
 use std::fmt;
 
+use ruff_python_ast::Decorator;
+use ruff_python_ast::{self as ast, ArgWithDefault, Arguments, Expr, Ranged, Stmt};
 use ruff_text_size::{TextLen, TextRange};
-use rustpython_parser::ast::Decorator;
-use rustpython_parser::ast::{self, ArgWithDefault, Arguments, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
@@ -23,6 +23,37 @@ use super::helpers::{
     get_mark_decorators, is_pytest_fixture, is_pytest_yield_fixture, keyword_is_literal,
 };
 
+/// ## What it does
+/// Checks for parameter-free `@pytest.fixture()` decorators with or without
+/// parentheses, depending on the `flake8-pytest-style.fixture-parentheses`
+/// setting.
+///
+/// ## Why is this bad?
+/// If a `@pytext.fixture()` doesn't take any arguments, the parentheses are
+/// optional.
+///
+/// Either removing those unnecessary parentheses _or_ requiring them for all
+/// fixtures is fine, but it's best to be consistent.
+///
+/// ## Example
+/// ```python
+/// @pytest.fixture
+/// def my_fixture():
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// @pytest.fixture()
+/// def my_fixture():
+///     ...
+/// ```
+///
+/// ## Options
+/// - `flake8-pytest-style.fixture-parentheses`
+///
+/// ## References
+/// - [API Reference: Fixtures](https://docs.pytest.org/en/latest/reference/reference.html#fixtures-api)
 #[violation]
 pub struct PytestFixtureIncorrectParenthesesStyle {
     expected: Parentheses,
@@ -197,6 +228,29 @@ impl AlwaysAutofixableViolation for PytestErroneousUseFixturesOnFixture {
     }
 }
 
+/// ## What it does
+/// Checks for unnecessary `@pytest.mark.asyncio` decorators applied to fixtures.
+///
+/// ## Why is this bad?
+/// `pytest.mark.asyncio` is unnecessary for fixtures.
+///
+/// ## Example
+/// ```python
+/// @pytest.mark.asyncio()
+/// @pytest.fixture()
+/// async def my_fixture():
+///     return 0
+/// ```
+///
+/// Use instead:
+/// ```python
+/// @pytest.fixture()
+/// async def my_fixture():
+///     return 0
+/// ```
+///
+/// ## References
+/// - [`pytest-asyncio`](https://pypi.org/project/pytest-asyncio/)
 #[violation]
 pub struct PytestUnnecessaryAsyncioMarkOnFixture;
 

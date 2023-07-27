@@ -2,10 +2,10 @@
 use std::convert::TryFrom;
 use std::str::FromStr;
 
-use rustc_hash::FxHashSet;
-use rustpython_format::cformat::{
+use ruff_python_literal::cformat::{
     CFormatError, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatSpec, CFormatString,
 };
+use rustc_hash::FxHashSet;
 
 pub(crate) struct CFormatSummary {
     pub(crate) starred: bool,

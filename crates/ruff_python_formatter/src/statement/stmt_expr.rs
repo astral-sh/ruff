@@ -1,5 +1,5 @@
-use rustpython_parser::ast;
-use rustpython_parser::ast::{Expr, Operator, StmtExpr};
+use ruff_python_ast as ast;
+use ruff_python_ast::{Expr, Operator, StmtExpr};
 
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;

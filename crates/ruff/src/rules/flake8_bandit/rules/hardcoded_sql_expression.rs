@@ -1,6 +1,6 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustpython_parser::ast::{self, Expr, Operator, Ranged};
+use ruff_python_ast::{self as ast, Expr, Operator, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};

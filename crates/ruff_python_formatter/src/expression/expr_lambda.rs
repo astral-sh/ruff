@@ -7,7 +7,7 @@ use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::prelude::{space, text};
 use ruff_formatter::{write, Buffer, FormatResult};
 use ruff_python_ast::node::AnyNodeRef;
-use rustpython_parser::ast::ExprLambda;
+use ruff_python_ast::ExprLambda;
 
 #[derive(Default)]
 pub struct FormatExprLambda;
@@ -27,8 +27,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                 f,
                 [
                     space(),
-                    args.format()
-                        .with_options(ArgumentsParentheses::SkipInsideLambda),
+                    args.format().with_options(ArgumentsParentheses::Never),
                 ]
             )?;
         }

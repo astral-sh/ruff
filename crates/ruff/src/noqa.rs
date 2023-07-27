@@ -8,12 +8,11 @@ use std::path::Path;
 use anyhow::Result;
 use itertools::Itertools;
 use log::warn;
+use ruff_python_ast::Ranged;
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_parser::ast::Ranged;
 
 use ruff_diagnostics::Diagnostic;
-use ruff_python_ast::source_code::Locator;
-use ruff_python_trivia::LineEnding;
+use ruff_source_file::{LineEnding, Locator};
 
 use crate::codes::NoqaCode;
 use crate::fs::relativize_path;
@@ -782,8 +781,7 @@ mod tests {
     use ruff_text_size::{TextRange, TextSize};
 
     use ruff_diagnostics::Diagnostic;
-    use ruff_python_ast::source_code::Locator;
-    use ruff_python_trivia::LineEnding;
+    use ruff_source_file::{LineEnding, Locator};
 
     use crate::noqa::{add_noqa_inner, Directive, NoqaMapping, ParsedFileExemption};
     use crate::rules::pycodestyle::rules::AmbiguousVariableName;

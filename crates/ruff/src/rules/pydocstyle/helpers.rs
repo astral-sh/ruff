@@ -5,7 +5,7 @@ use ruff_python_ast::cast;
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::str::is_implicit_concatenation;
 use ruff_python_semantic::{Definition, Member, MemberKind, SemanticModel};
-use ruff_python_trivia::UniversalNewlines;
+use ruff_source_file::UniversalNewlines;
 
 /// Return the index of the first logical line in a string.
 pub(super) fn logical_line(content: &str) -> Option<usize> {

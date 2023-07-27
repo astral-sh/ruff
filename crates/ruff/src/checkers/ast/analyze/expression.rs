@@ -1,5 +1,5 @@
-use rustpython_format::cformat::{CFormatError, CFormatErrorType};
-use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Operator, Ranged};
+use ruff_python_ast::{self as ast, Constant, Expr, ExprContext, Operator, Ranged};
+use ruff_python_literal::cformat::{CFormatError, CFormatErrorType};
 
 use ruff_diagnostics::Diagnostic;
 
@@ -849,6 +849,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 Rule::OsPathGetatime,
                 Rule::OsPathGetmtime,
                 Rule::OsPathGetctime,
+                Rule::Glob,
             ]) {
                 flake8_use_pathlib::rules::replaceable_by_pathlib(checker, func);
             }
@@ -1056,7 +1057,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             op: Operator::Add, ..
         }) => {
             if checker.enabled(Rule::ExplicitStringConcatenation) {
-                if let Some(diagnostic) = flake8_implicit_str_concat::rules::explicit(expr) {
+                if let Some(diagnostic) =
+                    flake8_implicit_str_concat::rules::explicit(expr, checker.locator)
+                {
                     checker.diagnostics.push(diagnostic);
                 }
             }
@@ -1305,15 +1308,6 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::FunctionUsesLoopVariable) {
                 flake8_bugbear::rules::function_uses_loop_variable(checker, &Node::Expr(expr));
             }
-            if checker.enabled(Rule::InDictKeys) {
-                for generator in generators {
-                    flake8_simplify::rules::key_in_dict_for(
-                        checker,
-                        &generator.target,
-                        &generator.iter,
-                    );
-                }
-            }
             if checker.enabled(Rule::IterationOverSet) {
                 for generator in generators {
                     pylint::rules::iteration_over_set(checker, &generator.iter);
@@ -1334,15 +1328,6 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::FunctionUsesLoopVariable) {
                 flake8_bugbear::rules::function_uses_loop_variable(checker, &Node::Expr(expr));
             }
-            if checker.enabled(Rule::InDictKeys) {
-                for generator in generators {
-                    flake8_simplify::rules::key_in_dict_for(
-                        checker,
-                        &generator.target,
-                        &generator.iter,
-                    );
-                }
-            }
             if checker.enabled(Rule::IterationOverSet) {
                 for generator in generators {
                     pylint::rules::iteration_over_set(checker, &generator.iter);
@@ -1359,15 +1344,6 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
         }) => {
             if checker.enabled(Rule::FunctionUsesLoopVariable) {
                 flake8_bugbear::rules::function_uses_loop_variable(checker, &Node::Expr(expr));
-            }
-            if checker.enabled(Rule::InDictKeys) {
-                for generator in generators {
-                    flake8_simplify::rules::key_in_dict_for(
-                        checker,
-                        &generator.target,
-                        &generator.iter,
-                    );
-                }
             }
             if checker.enabled(Rule::IterationOverSet) {
                 for generator in generators {

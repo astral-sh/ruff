@@ -4,7 +4,7 @@ use crate::prelude::*;
 use crate::AsFormat;
 use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::{format_args, write, Buffer, FormatResult};
-use rustpython_parser::ast::{Comprehension, Expr, Ranged};
+use ruff_python_ast::{Comprehension, Expr, Ranged};
 
 #[derive(Default)]
 pub struct FormatComprehension;

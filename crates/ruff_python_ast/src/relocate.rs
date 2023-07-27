@@ -1,5 +1,5 @@
+use crate::{nodes, Expr, Keyword};
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Expr, Keyword};
 
 fn relocate_keyword(keyword: &mut Keyword, location: TextRange) {
     relocate_expr(&mut keyword.value, location);
@@ -9,13 +9,13 @@ fn relocate_keyword(keyword: &mut Keyword, location: TextRange) {
 /// location.
 pub fn relocate_expr(expr: &mut Expr, location: TextRange) {
     match expr {
-        Expr::BoolOp(ast::ExprBoolOp { values, range, .. }) => {
+        Expr::BoolOp(nodes::ExprBoolOp { values, range, .. }) => {
             *range = location;
             for expr in values {
                 relocate_expr(expr, location);
             }
         }
-        Expr::NamedExpr(ast::ExprNamedExpr {
+        Expr::NamedExpr(nodes::ExprNamedExpr {
             target,
             value,
             range,
@@ -24,22 +24,22 @@ pub fn relocate_expr(expr: &mut Expr, location: TextRange) {
             relocate_expr(target, location);
             relocate_expr(value, location);
         }
-        Expr::BinOp(ast::ExprBinOp {
+        Expr::BinOp(nodes::ExprBinOp {
             left, right, range, ..
         }) => {
             *range = location;
             relocate_expr(left, location);
             relocate_expr(right, location);
         }
-        Expr::UnaryOp(ast::ExprUnaryOp { operand, range, .. }) => {
+        Expr::UnaryOp(nodes::ExprUnaryOp { operand, range, .. }) => {
             *range = location;
             relocate_expr(operand, location);
         }
-        Expr::Lambda(ast::ExprLambda { body, range, .. }) => {
+        Expr::Lambda(nodes::ExprLambda { body, range, .. }) => {
             *range = location;
             relocate_expr(body, location);
         }
-        Expr::IfExp(ast::ExprIfExp {
+        Expr::IfExp(nodes::ExprIfExp {
             test,
             body,
             orelse,
@@ -50,7 +50,7 @@ pub fn relocate_expr(expr: &mut Expr, location: TextRange) {
             relocate_expr(body, location);
             relocate_expr(orelse, location);
         }
-        Expr::Dict(ast::ExprDict {
+        Expr::Dict(nodes::ExprDict {
             keys,
             values,
             range,
@@ -63,46 +63,46 @@ pub fn relocate_expr(expr: &mut Expr, location: TextRange) {
                 relocate_expr(expr, location);
             }
         }
-        Expr::Set(ast::ExprSet { elts, range }) => {
+        Expr::Set(nodes::ExprSet { elts, range }) => {
             *range = location;
             for expr in elts {
                 relocate_expr(expr, location);
             }
         }
-        Expr::ListComp(ast::ExprListComp { elt, range, .. }) => {
+        Expr::ListComp(nodes::ExprListComp { elt, range, .. }) => {
             *range = location;
             relocate_expr(elt, location);
         }
-        Expr::SetComp(ast::ExprSetComp { elt, range, .. }) => {
+        Expr::SetComp(nodes::ExprSetComp { elt, range, .. }) => {
             *range = location;
             relocate_expr(elt, location);
         }
-        Expr::DictComp(ast::ExprDictComp {
+        Expr::DictComp(nodes::ExprDictComp {
             key, value, range, ..
         }) => {
             *range = location;
             relocate_expr(key, location);
             relocate_expr(value, location);
         }
-        Expr::GeneratorExp(ast::ExprGeneratorExp { elt, range, .. }) => {
+        Expr::GeneratorExp(nodes::ExprGeneratorExp { elt, range, .. }) => {
             *range = location;
             relocate_expr(elt, location);
         }
-        Expr::Await(ast::ExprAwait { value, range }) => {
+        Expr::Await(nodes::ExprAwait { value, range }) => {
             *range = location;
             relocate_expr(value, location);
         }
-        Expr::Yield(ast::ExprYield { value, range }) => {
+        Expr::Yield(nodes::ExprYield { value, range }) => {
             *range = location;
             if let Some(expr) = value {
                 relocate_expr(expr, location);
             }
         }
-        Expr::YieldFrom(ast::ExprYieldFrom { value, range }) => {
+        Expr::YieldFrom(nodes::ExprYieldFrom { value, range }) => {
             *range = location;
             relocate_expr(value, location);
         }
-        Expr::Compare(ast::ExprCompare {
+        Expr::Compare(nodes::ExprCompare {
             left,
             comparators,
             range,
@@ -114,7 +114,7 @@ pub fn relocate_expr(expr: &mut Expr, location: TextRange) {
                 relocate_expr(expr, location);
             }
         }
-        Expr::Call(ast::ExprCall {
+        Expr::Call(nodes::ExprCall {
             func,
             args,
             keywords,
@@ -129,7 +129,7 @@ pub fn relocate_expr(expr: &mut Expr, location: TextRange) {
                 relocate_keyword(keyword, location);
             }
         }
-        Expr::FormattedValue(ast::ExprFormattedValue {
+        Expr::FormattedValue(nodes::ExprFormattedValue {
             value,
             format_spec,
             range,
@@ -141,20 +141,20 @@ pub fn relocate_expr(expr: &mut Expr, location: TextRange) {
                 relocate_expr(expr, location);
             }
         }
-        Expr::JoinedStr(ast::ExprJoinedStr { values, range }) => {
+        Expr::JoinedStr(nodes::ExprJoinedStr { values, range }) => {
             *range = location;
             for expr in values {
                 relocate_expr(expr, location);
             }
         }
-        Expr::Constant(ast::ExprConstant { range, .. }) => {
+        Expr::Constant(nodes::ExprConstant { range, .. }) => {
             *range = location;
         }
-        Expr::Attribute(ast::ExprAttribute { value, range, .. }) => {
+        Expr::Attribute(nodes::ExprAttribute { value, range, .. }) => {
             *range = location;
             relocate_expr(value, location);
         }
-        Expr::Subscript(ast::ExprSubscript {
+        Expr::Subscript(nodes::ExprSubscript {
             value,
             slice,
             range,
@@ -164,26 +164,26 @@ pub fn relocate_expr(expr: &mut Expr, location: TextRange) {
             relocate_expr(value, location);
             relocate_expr(slice, location);
         }
-        Expr::Starred(ast::ExprStarred { value, range, .. }) => {
+        Expr::Starred(nodes::ExprStarred { value, range, .. }) => {
             *range = location;
             relocate_expr(value, location);
         }
-        Expr::Name(ast::ExprName { range, .. }) => {
+        Expr::Name(nodes::ExprName { range, .. }) => {
             *range = location;
         }
-        Expr::List(ast::ExprList { elts, range, .. }) => {
-            *range = location;
-            for expr in elts {
-                relocate_expr(expr, location);
-            }
-        }
-        Expr::Tuple(ast::ExprTuple { elts, range, .. }) => {
+        Expr::List(nodes::ExprList { elts, range, .. }) => {
             *range = location;
             for expr in elts {
                 relocate_expr(expr, location);
             }
         }
-        Expr::Slice(ast::ExprSlice {
+        Expr::Tuple(nodes::ExprTuple { elts, range, .. }) => {
+            *range = location;
+            for expr in elts {
+                relocate_expr(expr, location);
+            }
+        }
+        Expr::Slice(nodes::ExprSlice {
             lower,
             upper,
             step,
@@ -199,6 +199,9 @@ pub fn relocate_expr(expr: &mut Expr, location: TextRange) {
             if let Some(expr) = step {
                 relocate_expr(expr, location);
             }
+        }
+        Expr::LineMagic(nodes::ExprLineMagic { range, .. }) => {
+            *range = location;
         }
     }
 }

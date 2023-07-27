@@ -1,7 +1,7 @@
 //! Analysis rules to perform basic type inference on individual expressions.
 
-use rustpython_parser::ast;
-use rustpython_parser::ast::{Constant, Expr};
+use ruff_python_ast as ast;
+use ruff_python_ast::{Constant, Expr};
 
 /// An extremely simple type inference system for individual expressions.
 ///

@@ -1,12 +1,12 @@
-use rustpython_parser::ast::{
-    self, ArgWithDefault, Arguments, Constant, Expr, Operator, Ranged, Stmt, UnaryOp,
+use ruff_python_ast::{
+    self as ast, ArgWithDefault, Arguments, Constant, Expr, Operator, Ranged, Stmt, UnaryOp,
 };
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::CallPath;
-use ruff_python_ast::source_code::Locator;
 use ruff_python_semantic::{ScopeKind, SemanticModel};
+use ruff_source_file::Locator;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;

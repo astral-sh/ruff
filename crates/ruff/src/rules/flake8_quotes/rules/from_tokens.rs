@@ -1,10 +1,10 @@
+use ruff_python_parser::lexer::LexResult;
+use ruff_python_parser::Tok;
 use ruff_text_size::TextRange;
-use rustpython_parser::lexer::LexResult;
-use rustpython_parser::Tok;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::Locator;
+use ruff_source_file::Locator;
 
 use crate::lex::docstring_detection::StateMachine;
 use crate::registry::Rule;

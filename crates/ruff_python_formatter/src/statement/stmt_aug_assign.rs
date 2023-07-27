@@ -3,7 +3,7 @@ use crate::expression::parentheses::Parenthesize;
 use crate::{AsFormat, FormatNodeRule, PyFormatter};
 use ruff_formatter::prelude::{space, text};
 use ruff_formatter::{write, Buffer, FormatResult};
-use rustpython_parser::ast::StmtAugAssign;
+use ruff_python_ast::StmtAugAssign;
 
 #[derive(Default)]
 pub struct FormatStmtAugAssign;

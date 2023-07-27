@@ -2,8 +2,8 @@ use std::path::Path;
 
 use js_sys::Error;
 
-use rustpython_parser::lexer::LexResult;
-use rustpython_parser::{parse_tokens, Mode};
+use ruff_python_parser::lexer::LexResult;
+use ruff_python_parser::{parse_tokens, Mode};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -21,10 +21,10 @@ use ruff::rules::{
 use ruff::settings::configuration::Configuration;
 use ruff::settings::options::Options;
 use ruff::settings::{defaults, flags, Settings};
-use ruff_python_ast::source_code::{
-    CommentRangesBuilder, Indexer, Locator, SourceLocation, Stylist,
-};
+use ruff_python_codegen::Stylist;
 use ruff_python_formatter::{format_module, format_node, PyFormatOptions};
+use ruff_python_index::{CommentRangesBuilder, Indexer};
+use ruff_source_file::{Locator, SourceLocation};
 
 #[wasm_bindgen(typescript_custom_section)]
 const TYPES: &'static str = r#"
@@ -197,7 +197,7 @@ impl Workspace {
 
     pub fn check(&self, contents: &str) -> Result<JsValue, Error> {
         // Tokenize once.
-        let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents);
+        let tokens: Vec<LexResult> = ruff_python_parser::tokenize(contents);
 
         // Map row and column locations to byte slices (lazily).
         let locator = Locator::new(contents);
@@ -268,7 +268,7 @@ impl Workspace {
     }
 
     pub fn format_ir(&self, contents: &str) -> Result<String, Error> {
-        let tokens: Vec<_> = rustpython_parser::lexer::lex(contents, Mode::Module).collect();
+        let tokens: Vec<_> = ruff_python_parser::lexer::lex(contents, Mode::Module).collect();
         let mut comment_ranges = CommentRangesBuilder::default();
 
         for (token, range) in tokens.iter().flatten() {
@@ -291,13 +291,13 @@ impl Workspace {
 
     /// Parses the content and returns its AST
     pub fn parse(&self, contents: &str) -> Result<String, Error> {
-        let parsed = rustpython_parser::parse(contents, Mode::Module, ".").map_err(into_error)?;
+        let parsed = ruff_python_parser::parse(contents, Mode::Module, ".").map_err(into_error)?;
 
         Ok(format!("{parsed:#?}"))
     }
 
     pub fn tokens(&self, contents: &str) -> Result<String, Error> {
-        let tokens: Vec<_> = rustpython_parser::lexer::lex(contents, Mode::Module).collect();
+        let tokens: Vec<_> = ruff_python_parser::lexer::lex(contents, Mode::Module).collect();
 
         Ok(format!("{tokens:#?}"))
     }

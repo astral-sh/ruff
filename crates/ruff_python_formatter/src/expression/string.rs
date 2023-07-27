@@ -1,10 +1,10 @@
 use std::borrow::Cow;
 
 use bitflags::bitflags;
+use ruff_python_ast::{ExprConstant, Ranged};
+use ruff_python_parser::lexer::{lex_starts_at, LexicalError, LexicalErrorType};
+use ruff_python_parser::{Mode, Tok};
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_parser::ast::{ExprConstant, Ranged};
-use rustpython_parser::lexer::{lex_starts_at, LexicalError, LexicalErrorType};
-use rustpython_parser::{Mode, Tok};
 
 use ruff_formatter::{format_args, write, FormatError};
 use ruff_python_ast::str::is_implicit_concatenation;

@@ -1,5 +1,5 @@
+use ruff_python_ast::{self as ast, ArgWithDefault, Arguments, Expr, Ranged};
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, ArgWithDefault, Arguments, Expr, Ranged};
 
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};

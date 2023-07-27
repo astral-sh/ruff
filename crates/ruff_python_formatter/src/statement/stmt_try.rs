@@ -1,6 +1,6 @@
 use crate::comments;
-use crate::comments::leading_alternate_branch_comments;
 use crate::comments::SourceComment;
+use crate::comments::{leading_alternate_branch_comments, trailing_comments};
 use crate::other::except_handler_except_handler::ExceptHandlerKind;
 use crate::prelude::*;
 use crate::statement::FormatRefWithRule;
@@ -9,8 +9,8 @@ use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::FormatRuleWithOptions;
 use ruff_formatter::{write, Buffer, FormatResult};
 use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::{ExceptHandler, Ranged, StmtTry, StmtTryStar, Suite};
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{ExceptHandler, Ranged, StmtTry, StmtTryStar, Suite};
 
 pub(super) enum AnyStatementTry<'a> {
     Try(&'a StmtTry),
@@ -134,8 +134,7 @@ impl Format<PyFormatContext<'_>> for AnyStatementTry<'_> {
         let orelse = self.orelse();
         let finalbody = self.finalbody();
 
-        write!(f, [text("try:"), block_indent(&body.format())])?;
-
+        (_, dangling_comments) = format_case("try", body, None, dangling_comments, f)?;
         let mut previous_node = body.last();
 
         for handler in handlers {
@@ -183,15 +182,18 @@ fn format_case<'a>(
         let case_comments_start =
             dangling_comments.partition_point(|comment| comment.slice().end() <= last.end());
         let (case_comments, rest) = dangling_comments.split_at(case_comments_start);
+        let partition_point =
+            case_comments.partition_point(|comment| comment.line_position().is_own_line());
         write!(
             f,
-            [leading_alternate_branch_comments(
-                case_comments,
-                previous_node
-            )]
+            [
+                leading_alternate_branch_comments(&case_comments[..partition_point], previous_node),
+                text(name),
+                text(":"),
+                trailing_comments(&case_comments[partition_point..]),
+                block_indent(&body.format())
+            ]
         )?;
-
-        write!(f, [text(name), text(":"), block_indent(&body.format())])?;
         (None, rest)
     } else {
         (None, dangling_comments)

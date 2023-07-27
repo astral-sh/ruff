@@ -1,11 +1,11 @@
 use itertools::Either::{Left, Right};
-use rustpython_parser::ast::{self, Constant, Expr, Operator};
+use ruff_python_ast::{self as ast, Constant, Expr, Operator};
 
 use ruff_python_ast::call_path::CallPath;
-use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::typing::parse_type_annotation;
+use ruff_python_parser::typing::parse_type_annotation;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::sys::is_known_standard_library;
+use ruff_source_file::Locator;
 
 /// Returns `true` if the given call path is a known type.
 ///
@@ -115,7 +115,7 @@ impl<'a> TypingTarget<'a> {
                 value: Constant::Str(string),
                 range,
                 ..
-            }) => parse_type_annotation(string, *range, locator)
+            }) => parse_type_annotation(string, *range, locator.contents())
                 .map_or(None, |(expr, _)| Some(TypingTarget::ForwardReference(expr))),
             _ => semantic.resolve_call_path(expr).map_or(
                 // If we can't resolve the call path, it must be defined in the

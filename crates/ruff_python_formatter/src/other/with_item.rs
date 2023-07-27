@@ -1,4 +1,4 @@
-use rustpython_parser::ast::WithItem;
+use ruff_python_ast::WithItem;
 
 use ruff_formatter::{write, Buffer, FormatResult};
 

@@ -1,6 +1,6 @@
 use crate::{not_yet_implemented, FormatNodeRule, PyFormatter};
 use ruff_formatter::{write, Buffer, FormatResult};
-use rustpython_parser::ast::PatternMatchOr;
+use ruff_python_ast::PatternMatchOr;
 
 #[derive(Default)]
 pub struct FormatPatternMatchOr;

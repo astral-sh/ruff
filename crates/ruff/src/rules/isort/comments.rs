@@ -1,9 +1,9 @@
 use std::borrow::Cow;
 
+use ruff_python_parser::{lexer, Mode, Tok};
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::{lexer, Mode, Tok};
 
-use ruff_python_ast::source_code::Locator;
+use ruff_source_file::Locator;
 
 #[derive(Debug)]
 pub(crate) struct Comment<'a> {

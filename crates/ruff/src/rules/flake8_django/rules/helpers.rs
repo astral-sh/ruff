@@ -1,4 +1,4 @@
-use rustpython_parser::ast::Expr;
+use ruff_python_ast::Expr;
 
 use ruff_python_semantic::SemanticModel;
 

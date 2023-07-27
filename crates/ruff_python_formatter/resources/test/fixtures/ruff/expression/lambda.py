@@ -66,3 +66,12 @@ a = (
 # formatting
 (lambda:(#
 ),)
+
+# lambda arguments don't have parentheses, so we never add a magic trailing comma ...
+def f(
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb = lambda x: y,
+):
+    pass
+
+# ...but we do preserve a trailing comma after the arguments
+a = lambda b,: 0

@@ -2,11 +2,30 @@ use ruff_text_size::{TextRange, TextSize};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::token_kind::TokenKind;
+use ruff_python_parser::TokenKind;
 
 use crate::checkers::logical_lines::LogicalLinesContext;
 use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 
+/// ## What it does
+/// Checks for extraneous whitespace immediately after an open parenthesis
+/// or bracket.
+///
+/// ## Why is this bad?
+/// According to [PEP 8], open parentheses and brackets should not be followed
+/// by any trailing whitespace.
+///
+/// ## Example
+/// ```python
+/// spam (1)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// spam(1)
+/// ```
+///
+/// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
 #[violation]
 pub struct WhitespaceBeforeParameters {
     bracket: TokenKind,

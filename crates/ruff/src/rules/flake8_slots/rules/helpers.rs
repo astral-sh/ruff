@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, Stmt};
+use ruff_python_ast::{self as ast, Expr, Stmt};
 
 /// Return `true` if the given body contains a `__slots__` assignment.
 pub(super) fn has_slots(body: &[Stmt]) -> bool {

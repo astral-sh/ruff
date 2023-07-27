@@ -1,9 +1,9 @@
-use ruff_text_size::TextRange;
-use rustpython_ast::{
-    Alias, Arg, ArgWithDefault, Arguments, Comprehension, Decorator, ExceptHandler, Keyword,
-    MatchCase, Mod, Pattern, Stmt, TypeIgnore, WithItem,
+use crate::{
+    self as ast, Alias, Arg, ArgWithDefault, Arguments, Comprehension, Decorator, ExceptHandler,
+    Expr, Keyword, MatchCase, Mod, Pattern, Ranged, Stmt, TypeIgnore, TypeParam,
+    TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
 };
-use rustpython_parser::ast::{self, Expr, Ranged};
+use ruff_text_size::TextRange;
 use std::ptr::NonNull;
 
 pub trait AstNode: Ranged {
@@ -53,6 +53,7 @@ pub enum AnyNode {
     StmtPass(ast::StmtPass),
     StmtBreak(ast::StmtBreak),
     StmtContinue(ast::StmtContinue),
+    StmtLineMagic(ast::StmtLineMagic),
     ExprBoolOp(ast::ExprBoolOp),
     ExprNamedExpr(ast::ExprNamedExpr),
     ExprBinOp(ast::ExprBinOp),
@@ -80,6 +81,7 @@ pub enum AnyNode {
     ExprList(ast::ExprList),
     ExprTuple(ast::ExprTuple),
     ExprSlice(ast::ExprSlice),
+    ExprLineMagic(ast::ExprLineMagic),
     ExceptHandlerExceptHandler(ast::ExceptHandlerExceptHandler),
     PatternMatchValue(ast::PatternMatchValue),
     PatternMatchSingleton(ast::PatternMatchSingleton),
@@ -100,6 +102,9 @@ pub enum AnyNode {
     MatchCase(MatchCase),
     Decorator(Decorator),
     ElifElseClause(ast::ElifElseClause),
+    TypeParamTypeVar(ast::TypeParamTypeVar),
+    TypeParamTypeVarTuple(ast::TypeParamTypeVarTuple),
+    TypeParamParamSpec(ast::TypeParamParamSpec),
 }
 
 impl AnyNode {
@@ -133,6 +138,7 @@ impl AnyNode {
             AnyNode::StmtPass(node) => Some(Stmt::Pass(node)),
             AnyNode::StmtBreak(node) => Some(Stmt::Break(node)),
             AnyNode::StmtContinue(node) => Some(Stmt::Continue(node)),
+            AnyNode::StmtLineMagic(node) => Some(Stmt::LineMagic(node)),
 
             AnyNode::ModModule(_)
             | AnyNode::ModInteractive(_)
@@ -165,6 +171,7 @@ impl AnyNode {
             | AnyNode::ExprList(_)
             | AnyNode::ExprTuple(_)
             | AnyNode::ExprSlice(_)
+            | AnyNode::ExprLineMagic(_)
             | AnyNode::ExceptHandlerExceptHandler(_)
             | AnyNode::PatternMatchValue(_)
             | AnyNode::PatternMatchSingleton(_)
@@ -184,6 +191,9 @@ impl AnyNode {
             | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
             | AnyNode::Decorator(_)
+            | AnyNode::TypeParamTypeVar(_)
+            | AnyNode::TypeParamTypeVarTuple(_)
+            | AnyNode::TypeParamParamSpec(_)
             | AnyNode::ElifElseClause(_) => None,
         }
     }
@@ -217,6 +227,7 @@ impl AnyNode {
             AnyNode::ExprList(node) => Some(Expr::List(node)),
             AnyNode::ExprTuple(node) => Some(Expr::Tuple(node)),
             AnyNode::ExprSlice(node) => Some(Expr::Slice(node)),
+            AnyNode::ExprLineMagic(node) => Some(Expr::LineMagic(node)),
 
             AnyNode::ModModule(_)
             | AnyNode::ModInteractive(_)
@@ -250,6 +261,7 @@ impl AnyNode {
             | AnyNode::StmtPass(_)
             | AnyNode::StmtBreak(_)
             | AnyNode::StmtContinue(_)
+            | AnyNode::StmtLineMagic(_)
             | AnyNode::ExceptHandlerExceptHandler(_)
             | AnyNode::PatternMatchValue(_)
             | AnyNode::PatternMatchSingleton(_)
@@ -269,6 +281,9 @@ impl AnyNode {
             | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
             | AnyNode::Decorator(_)
+            | AnyNode::TypeParamTypeVar(_)
+            | AnyNode::TypeParamTypeVarTuple(_)
+            | AnyNode::TypeParamParamSpec(_)
             | AnyNode::ElifElseClause(_) => None,
         }
     }
@@ -308,6 +323,7 @@ impl AnyNode {
             | AnyNode::StmtPass(_)
             | AnyNode::StmtBreak(_)
             | AnyNode::StmtContinue(_)
+            | AnyNode::StmtLineMagic(_)
             | AnyNode::ExprBoolOp(_)
             | AnyNode::ExprNamedExpr(_)
             | AnyNode::ExprBinOp(_)
@@ -335,6 +351,7 @@ impl AnyNode {
             | AnyNode::ExprList(_)
             | AnyNode::ExprTuple(_)
             | AnyNode::ExprSlice(_)
+            | AnyNode::ExprLineMagic(_)
             | AnyNode::ExceptHandlerExceptHandler(_)
             | AnyNode::PatternMatchValue(_)
             | AnyNode::PatternMatchSingleton(_)
@@ -354,6 +371,9 @@ impl AnyNode {
             | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
             | AnyNode::Decorator(_)
+            | AnyNode::TypeParamTypeVar(_)
+            | AnyNode::TypeParamTypeVarTuple(_)
+            | AnyNode::TypeParamParamSpec(_)
             | AnyNode::ElifElseClause(_) => None,
         }
     }
@@ -401,6 +421,7 @@ impl AnyNode {
             | AnyNode::StmtPass(_)
             | AnyNode::StmtBreak(_)
             | AnyNode::StmtContinue(_)
+            | AnyNode::StmtLineMagic(_)
             | AnyNode::ExprBoolOp(_)
             | AnyNode::ExprNamedExpr(_)
             | AnyNode::ExprBinOp(_)
@@ -428,6 +449,7 @@ impl AnyNode {
             | AnyNode::ExprList(_)
             | AnyNode::ExprTuple(_)
             | AnyNode::ExprSlice(_)
+            | AnyNode::ExprLineMagic(_)
             | AnyNode::ExceptHandlerExceptHandler(_)
             | AnyNode::TypeIgnoreTypeIgnore(_)
             | AnyNode::Comprehension(_)
@@ -439,6 +461,9 @@ impl AnyNode {
             | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
             | AnyNode::Decorator(_)
+            | AnyNode::TypeParamTypeVar(_)
+            | AnyNode::TypeParamTypeVarTuple(_)
+            | AnyNode::TypeParamParamSpec(_)
             | AnyNode::ElifElseClause(_) => None,
         }
     }
@@ -479,6 +504,7 @@ impl AnyNode {
             | AnyNode::StmtPass(_)
             | AnyNode::StmtBreak(_)
             | AnyNode::StmtContinue(_)
+            | AnyNode::StmtLineMagic(_)
             | AnyNode::ExprBoolOp(_)
             | AnyNode::ExprNamedExpr(_)
             | AnyNode::ExprBinOp(_)
@@ -506,6 +532,7 @@ impl AnyNode {
             | AnyNode::ExprList(_)
             | AnyNode::ExprTuple(_)
             | AnyNode::ExprSlice(_)
+            | AnyNode::ExprLineMagic(_)
             | AnyNode::PatternMatchValue(_)
             | AnyNode::PatternMatchSingleton(_)
             | AnyNode::PatternMatchSequence(_)
@@ -524,6 +551,9 @@ impl AnyNode {
             | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
             | AnyNode::Decorator(_)
+            | AnyNode::TypeParamTypeVar(_)
+            | AnyNode::TypeParamTypeVarTuple(_)
+            | AnyNode::TypeParamParamSpec(_)
             | AnyNode::ElifElseClause(_) => None,
         }
     }
@@ -564,6 +594,7 @@ impl AnyNode {
             | AnyNode::StmtPass(_)
             | AnyNode::StmtBreak(_)
             | AnyNode::StmtContinue(_)
+            | AnyNode::StmtLineMagic(_)
             | AnyNode::ExprBoolOp(_)
             | AnyNode::ExprNamedExpr(_)
             | AnyNode::ExprBinOp(_)
@@ -591,6 +622,7 @@ impl AnyNode {
             | AnyNode::ExprList(_)
             | AnyNode::ExprTuple(_)
             | AnyNode::ExprSlice(_)
+            | AnyNode::ExprLineMagic(_)
             | AnyNode::PatternMatchValue(_)
             | AnyNode::PatternMatchSingleton(_)
             | AnyNode::PatternMatchSequence(_)
@@ -609,6 +641,9 @@ impl AnyNode {
             | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
             | AnyNode::Decorator(_)
+            | AnyNode::TypeParamTypeVar(_)
+            | AnyNode::TypeParamTypeVarTuple(_)
+            | AnyNode::TypeParamParamSpec(_)
             | AnyNode::ElifElseClause(_) => None,
         }
     }
@@ -671,6 +706,7 @@ impl AnyNode {
             Self::StmtPass(node) => AnyNodeRef::StmtPass(node),
             Self::StmtBreak(node) => AnyNodeRef::StmtBreak(node),
             Self::StmtContinue(node) => AnyNodeRef::StmtContinue(node),
+            Self::StmtLineMagic(node) => AnyNodeRef::StmtLineMagic(node),
             Self::ExprBoolOp(node) => AnyNodeRef::ExprBoolOp(node),
             Self::ExprNamedExpr(node) => AnyNodeRef::ExprNamedExpr(node),
             Self::ExprBinOp(node) => AnyNodeRef::ExprBinOp(node),
@@ -698,6 +734,7 @@ impl AnyNode {
             Self::ExprList(node) => AnyNodeRef::ExprList(node),
             Self::ExprTuple(node) => AnyNodeRef::ExprTuple(node),
             Self::ExprSlice(node) => AnyNodeRef::ExprSlice(node),
+            Self::ExprLineMagic(node) => AnyNodeRef::ExprLineMagic(node),
             Self::ExceptHandlerExceptHandler(node) => AnyNodeRef::ExceptHandlerExceptHandler(node),
             Self::PatternMatchValue(node) => AnyNodeRef::PatternMatchValue(node),
             Self::PatternMatchSingleton(node) => AnyNodeRef::PatternMatchSingleton(node),
@@ -717,6 +754,9 @@ impl AnyNode {
             Self::WithItem(node) => AnyNodeRef::WithItem(node),
             Self::MatchCase(node) => AnyNodeRef::MatchCase(node),
             Self::Decorator(node) => AnyNodeRef::Decorator(node),
+            Self::TypeParamTypeVar(node) => AnyNodeRef::TypeParamTypeVar(node),
+            Self::TypeParamTypeVarTuple(node) => AnyNodeRef::TypeParamTypeVarTuple(node),
+            Self::TypeParamParamSpec(node) => AnyNodeRef::TypeParamParamSpec(node),
             Self::ElifElseClause(node) => AnyNodeRef::ElifElseClause(node),
         }
     }
@@ -1651,6 +1691,34 @@ impl AstNode for ast::StmtContinue {
         AnyNode::from(self)
     }
 }
+impl AstNode for ast::StmtLineMagic {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::StmtLineMagic(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::StmtLineMagic(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
 impl AstNode for ast::ExprBoolOp {
     fn cast(kind: AnyNode) -> Option<Self>
     where
@@ -2407,6 +2475,34 @@ impl AstNode for ast::ExprSlice {
         AnyNode::from(self)
     }
 }
+impl AstNode for ast::ExprLineMagic {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExprLineMagic(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExprLineMagic(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
 impl AstNode for ast::ExceptHandlerExceptHandler {
     fn cast(kind: AnyNode) -> Option<Self>
     where
@@ -2941,7 +3037,90 @@ impl AstNode for Decorator {
         AnyNode::from(self)
     }
 }
+impl AstNode for ast::TypeParamTypeVar {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::TypeParamTypeVar(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
 
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::TypeParamTypeVar(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+impl AstNode for ast::TypeParamTypeVarTuple {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::TypeParamTypeVarTuple(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::TypeParamTypeVarTuple(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+impl AstNode for ast::TypeParamParamSpec {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::TypeParamParamSpec(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::TypeParamParamSpec(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
 impl From<Stmt> for AnyNode {
     fn from(stmt: Stmt) -> Self {
         match stmt {
@@ -2973,6 +3152,7 @@ impl From<Stmt> for AnyNode {
             Stmt::Pass(node) => AnyNode::StmtPass(node),
             Stmt::Break(node) => AnyNode::StmtBreak(node),
             Stmt::Continue(node) => AnyNode::StmtContinue(node),
+            Stmt::LineMagic(node) => AnyNode::StmtLineMagic(node),
         }
     }
 }
@@ -3007,6 +3187,7 @@ impl From<Expr> for AnyNode {
             Expr::List(node) => AnyNode::ExprList(node),
             Expr::Tuple(node) => AnyNode::ExprTuple(node),
             Expr::Slice(node) => AnyNode::ExprSlice(node),
+            Expr::LineMagic(node) => AnyNode::ExprLineMagic(node),
         }
     }
 }
@@ -3251,6 +3432,12 @@ impl From<ast::StmtContinue> for AnyNode {
     }
 }
 
+impl From<ast::StmtLineMagic> for AnyNode {
+    fn from(node: ast::StmtLineMagic) -> Self {
+        AnyNode::StmtLineMagic(node)
+    }
+}
+
 impl From<ast::ExprBoolOp> for AnyNode {
     fn from(node: ast::ExprBoolOp) -> Self {
         AnyNode::ExprBoolOp(node)
@@ -3413,6 +3600,12 @@ impl From<ast::ExprSlice> for AnyNode {
     }
 }
 
+impl From<ast::ExprLineMagic> for AnyNode {
+    fn from(node: ast::ExprLineMagic) -> Self {
+        AnyNode::ExprLineMagic(node)
+    }
+}
+
 impl From<ast::ExceptHandlerExceptHandler> for AnyNode {
     fn from(node: ast::ExceptHandlerExceptHandler) -> Self {
         AnyNode::ExceptHandlerExceptHandler(node)
@@ -3518,6 +3711,23 @@ impl From<Decorator> for AnyNode {
         AnyNode::Decorator(node)
     }
 }
+impl From<TypeParamTypeVar> for AnyNode {
+    fn from(node: TypeParamTypeVar) -> Self {
+        AnyNode::TypeParamTypeVar(node)
+    }
+}
+
+impl From<TypeParamTypeVarTuple> for AnyNode {
+    fn from(node: TypeParamTypeVarTuple) -> Self {
+        AnyNode::TypeParamTypeVarTuple(node)
+    }
+}
+
+impl From<TypeParamParamSpec> for AnyNode {
+    fn from(node: TypeParamParamSpec) -> Self {
+        AnyNode::TypeParamParamSpec(node)
+    }
+}
 
 impl Ranged for AnyNode {
     fn range(&self) -> TextRange {
@@ -3554,6 +3764,7 @@ impl Ranged for AnyNode {
             AnyNode::StmtPass(node) => node.range(),
             AnyNode::StmtBreak(node) => node.range(),
             AnyNode::StmtContinue(node) => node.range(),
+            AnyNode::StmtLineMagic(node) => node.range(),
             AnyNode::ExprBoolOp(node) => node.range(),
             AnyNode::ExprNamedExpr(node) => node.range(),
             AnyNode::ExprBinOp(node) => node.range(),
@@ -3581,6 +3792,7 @@ impl Ranged for AnyNode {
             AnyNode::ExprList(node) => node.range(),
             AnyNode::ExprTuple(node) => node.range(),
             AnyNode::ExprSlice(node) => node.range(),
+            AnyNode::ExprLineMagic(node) => node.range(),
             AnyNode::ExceptHandlerExceptHandler(node) => node.range(),
             AnyNode::PatternMatchValue(node) => node.range(),
             AnyNode::PatternMatchSingleton(node) => node.range(),
@@ -3600,6 +3812,9 @@ impl Ranged for AnyNode {
             AnyNode::WithItem(node) => node.range(),
             AnyNode::MatchCase(node) => node.range(),
             AnyNode::Decorator(node) => node.range(),
+            AnyNode::TypeParamTypeVar(node) => node.range(),
+            AnyNode::TypeParamTypeVarTuple(node) => node.range(),
+            AnyNode::TypeParamParamSpec(node) => node.range(),
             AnyNode::ElifElseClause(node) => node.range(),
         }
     }
@@ -3639,6 +3854,7 @@ pub enum AnyNodeRef<'a> {
     StmtPass(&'a ast::StmtPass),
     StmtBreak(&'a ast::StmtBreak),
     StmtContinue(&'a ast::StmtContinue),
+    StmtLineMagic(&'a ast::StmtLineMagic),
     ExprBoolOp(&'a ast::ExprBoolOp),
     ExprNamedExpr(&'a ast::ExprNamedExpr),
     ExprBinOp(&'a ast::ExprBinOp),
@@ -3666,6 +3882,7 @@ pub enum AnyNodeRef<'a> {
     ExprList(&'a ast::ExprList),
     ExprTuple(&'a ast::ExprTuple),
     ExprSlice(&'a ast::ExprSlice),
+    ExprLineMagic(&'a ast::ExprLineMagic),
     ExceptHandlerExceptHandler(&'a ast::ExceptHandlerExceptHandler),
     PatternMatchValue(&'a ast::PatternMatchValue),
     PatternMatchSingleton(&'a ast::PatternMatchSingleton),
@@ -3685,6 +3902,9 @@ pub enum AnyNodeRef<'a> {
     WithItem(&'a WithItem),
     MatchCase(&'a MatchCase),
     Decorator(&'a Decorator),
+    TypeParamTypeVar(&'a ast::TypeParamTypeVar),
+    TypeParamTypeVarTuple(&'a ast::TypeParamTypeVarTuple),
+    TypeParamParamSpec(&'a ast::TypeParamParamSpec),
     ElifElseClause(&'a ast::ElifElseClause),
 }
 
@@ -3723,6 +3943,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::StmtPass(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtBreak(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtContinue(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::StmtLineMagic(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprBoolOp(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprNamedExpr(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprBinOp(node) => NonNull::from(*node).cast(),
@@ -3750,6 +3971,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::ExprList(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprTuple(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprSlice(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprLineMagic(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExceptHandlerExceptHandler(node) => NonNull::from(*node).cast(),
             AnyNodeRef::PatternMatchValue(node) => NonNull::from(*node).cast(),
             AnyNodeRef::PatternMatchSingleton(node) => NonNull::from(*node).cast(),
@@ -3769,6 +3991,9 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::WithItem(node) => NonNull::from(*node).cast(),
             AnyNodeRef::MatchCase(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Decorator(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::TypeParamTypeVar(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::TypeParamTypeVarTuple(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::TypeParamParamSpec(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ElifElseClause(node) => NonNull::from(*node).cast(),
         }
     }
@@ -3813,6 +4038,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::StmtPass(_) => NodeKind::StmtPass,
             AnyNodeRef::StmtBreak(_) => NodeKind::StmtBreak,
             AnyNodeRef::StmtContinue(_) => NodeKind::StmtContinue,
+            AnyNodeRef::StmtLineMagic(_) => NodeKind::StmtLineMagic,
             AnyNodeRef::ExprBoolOp(_) => NodeKind::ExprBoolOp,
             AnyNodeRef::ExprNamedExpr(_) => NodeKind::ExprNamedExpr,
             AnyNodeRef::ExprBinOp(_) => NodeKind::ExprBinOp,
@@ -3840,6 +4066,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::ExprList(_) => NodeKind::ExprList,
             AnyNodeRef::ExprTuple(_) => NodeKind::ExprTuple,
             AnyNodeRef::ExprSlice(_) => NodeKind::ExprSlice,
+            AnyNodeRef::ExprLineMagic(_) => NodeKind::ExprLineMagic,
             AnyNodeRef::ExceptHandlerExceptHandler(_) => NodeKind::ExceptHandlerExceptHandler,
             AnyNodeRef::PatternMatchValue(_) => NodeKind::PatternMatchValue,
             AnyNodeRef::PatternMatchSingleton(_) => NodeKind::PatternMatchSingleton,
@@ -3859,6 +4086,9 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::WithItem(_) => NodeKind::WithItem,
             AnyNodeRef::MatchCase(_) => NodeKind::MatchCase,
             AnyNodeRef::Decorator(_) => NodeKind::Decorator,
+            AnyNodeRef::TypeParamTypeVar(_) => NodeKind::TypeParamTypeVar,
+            AnyNodeRef::TypeParamTypeVarTuple(_) => NodeKind::TypeParamTypeVarTuple,
+            AnyNodeRef::TypeParamParamSpec(_) => NodeKind::TypeParamParamSpec,
             AnyNodeRef::ElifElseClause(_) => NodeKind::ElifElseClause,
         }
     }
@@ -3892,7 +4122,8 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtExpr(_)
             | AnyNodeRef::StmtPass(_)
             | AnyNodeRef::StmtBreak(_)
-            | AnyNodeRef::StmtContinue(_) => true,
+            | AnyNodeRef::StmtContinue(_)
+            | AnyNodeRef::StmtLineMagic(_) => true,
 
             AnyNodeRef::ModModule(_)
             | AnyNodeRef::ModInteractive(_)
@@ -3925,6 +4156,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprList(_)
             | AnyNodeRef::ExprTuple(_)
             | AnyNodeRef::ExprSlice(_)
+            | AnyNodeRef::ExprLineMagic(_)
             | AnyNodeRef::ExceptHandlerExceptHandler(_)
             | AnyNodeRef::PatternMatchValue(_)
             | AnyNodeRef::PatternMatchSingleton(_)
@@ -3944,6 +4176,9 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
             | AnyNodeRef::Decorator(_)
+            | AnyNodeRef::TypeParamTypeVar(_)
+            | AnyNodeRef::TypeParamTypeVarTuple(_)
+            | AnyNodeRef::TypeParamParamSpec(_)
             | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
@@ -3976,7 +4211,8 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprName(_)
             | AnyNodeRef::ExprList(_)
             | AnyNodeRef::ExprTuple(_)
-            | AnyNodeRef::ExprSlice(_) => true,
+            | AnyNodeRef::ExprSlice(_)
+            | AnyNodeRef::ExprLineMagic(_) => true,
 
             AnyNodeRef::ModModule(_)
             | AnyNodeRef::ModInteractive(_)
@@ -4010,6 +4246,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtPass(_)
             | AnyNodeRef::StmtBreak(_)
             | AnyNodeRef::StmtContinue(_)
+            | AnyNodeRef::StmtLineMagic(_)
             | AnyNodeRef::ExceptHandlerExceptHandler(_)
             | AnyNodeRef::PatternMatchValue(_)
             | AnyNodeRef::PatternMatchSingleton(_)
@@ -4029,6 +4266,9 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
             | AnyNodeRef::Decorator(_)
+            | AnyNodeRef::TypeParamTypeVar(_)
+            | AnyNodeRef::TypeParamTypeVarTuple(_)
+            | AnyNodeRef::TypeParamParamSpec(_)
             | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
@@ -4068,6 +4308,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtPass(_)
             | AnyNodeRef::StmtBreak(_)
             | AnyNodeRef::StmtContinue(_)
+            | AnyNodeRef::StmtLineMagic(_)
             | AnyNodeRef::ExprBoolOp(_)
             | AnyNodeRef::ExprNamedExpr(_)
             | AnyNodeRef::ExprBinOp(_)
@@ -4095,6 +4336,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprList(_)
             | AnyNodeRef::ExprTuple(_)
             | AnyNodeRef::ExprSlice(_)
+            | AnyNodeRef::ExprLineMagic(_)
             | AnyNodeRef::ExceptHandlerExceptHandler(_)
             | AnyNodeRef::PatternMatchValue(_)
             | AnyNodeRef::PatternMatchSingleton(_)
@@ -4114,6 +4356,9 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
             | AnyNodeRef::Decorator(_)
+            | AnyNodeRef::TypeParamTypeVar(_)
+            | AnyNodeRef::TypeParamTypeVarTuple(_)
+            | AnyNodeRef::TypeParamParamSpec(_)
             | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
@@ -4161,6 +4406,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtPass(_)
             | AnyNodeRef::StmtBreak(_)
             | AnyNodeRef::StmtContinue(_)
+            | AnyNodeRef::StmtLineMagic(_)
             | AnyNodeRef::ExprBoolOp(_)
             | AnyNodeRef::ExprNamedExpr(_)
             | AnyNodeRef::ExprBinOp(_)
@@ -4188,6 +4434,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprList(_)
             | AnyNodeRef::ExprTuple(_)
             | AnyNodeRef::ExprSlice(_)
+            | AnyNodeRef::ExprLineMagic(_)
             | AnyNodeRef::ExceptHandlerExceptHandler(_)
             | AnyNodeRef::TypeIgnoreTypeIgnore(_)
             | AnyNodeRef::Comprehension(_)
@@ -4199,6 +4446,9 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
             | AnyNodeRef::Decorator(_)
+            | AnyNodeRef::TypeParamTypeVar(_)
+            | AnyNodeRef::TypeParamTypeVarTuple(_)
+            | AnyNodeRef::TypeParamParamSpec(_)
             | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
@@ -4239,6 +4489,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtPass(_)
             | AnyNodeRef::StmtBreak(_)
             | AnyNodeRef::StmtContinue(_)
+            | AnyNodeRef::StmtLineMagic(_)
             | AnyNodeRef::ExprBoolOp(_)
             | AnyNodeRef::ExprNamedExpr(_)
             | AnyNodeRef::ExprBinOp(_)
@@ -4266,6 +4517,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprList(_)
             | AnyNodeRef::ExprTuple(_)
             | AnyNodeRef::ExprSlice(_)
+            | AnyNodeRef::ExprLineMagic(_)
             | AnyNodeRef::PatternMatchValue(_)
             | AnyNodeRef::PatternMatchSingleton(_)
             | AnyNodeRef::PatternMatchSequence(_)
@@ -4284,6 +4536,9 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
             | AnyNodeRef::Decorator(_)
+            | AnyNodeRef::TypeParamTypeVar(_)
+            | AnyNodeRef::TypeParamTypeVarTuple(_)
+            | AnyNodeRef::TypeParamParamSpec(_)
             | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
@@ -4324,6 +4579,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtPass(_)
             | AnyNodeRef::StmtBreak(_)
             | AnyNodeRef::StmtContinue(_)
+            | AnyNodeRef::StmtLineMagic(_)
             | AnyNodeRef::ExprBoolOp(_)
             | AnyNodeRef::ExprNamedExpr(_)
             | AnyNodeRef::ExprBinOp(_)
@@ -4351,6 +4607,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprList(_)
             | AnyNodeRef::ExprTuple(_)
             | AnyNodeRef::ExprSlice(_)
+            | AnyNodeRef::ExprLineMagic(_)
             | AnyNodeRef::PatternMatchValue(_)
             | AnyNodeRef::PatternMatchSingleton(_)
             | AnyNodeRef::PatternMatchSequence(_)
@@ -4369,6 +4626,9 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
             | AnyNodeRef::Decorator(_)
+            | AnyNodeRef::TypeParamTypeVar(_)
+            | AnyNodeRef::TypeParamTypeVarTuple(_)
+            | AnyNodeRef::TypeParamParamSpec(_)
             | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
@@ -4388,6 +4648,18 @@ impl AnyNodeRef<'_> {
                 | AnyNodeRef::StmtClassDef(_)
                 | AnyNodeRef::StmtTry(_)
                 | AnyNodeRef::StmtTryStar(_)
+                | AnyNodeRef::ExceptHandlerExceptHandler(_)
+                | AnyNodeRef::ElifElseClause(_)
+        )
+    }
+
+    /// In our AST, only some alternative branches are represented as a node. This has historical
+    /// reasons, e.g. we added a node for elif/else in if statements which was not originally
+    /// present in the parser.
+    pub const fn is_alternative_branch_with_node(self) -> bool {
+        matches!(
+            self,
+            AnyNodeRef::ExceptHandlerExceptHandler(_) | AnyNodeRef::ElifElseClause(_)
         )
     }
 }
@@ -4590,6 +4862,12 @@ impl<'a> From<&'a ast::StmtContinue> for AnyNodeRef<'a> {
     }
 }
 
+impl<'a> From<&'a ast::StmtLineMagic> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::StmtLineMagic) -> Self {
+        AnyNodeRef::StmtLineMagic(node)
+    }
+}
+
 impl<'a> From<&'a ast::ExprBoolOp> for AnyNodeRef<'a> {
     fn from(node: &'a ast::ExprBoolOp) -> Self {
         AnyNodeRef::ExprBoolOp(node)
@@ -4752,6 +5030,12 @@ impl<'a> From<&'a ast::ExprSlice> for AnyNodeRef<'a> {
     }
 }
 
+impl<'a> From<&'a ast::ExprLineMagic> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::ExprLineMagic) -> Self {
+        AnyNodeRef::ExprLineMagic(node)
+    }
+}
+
 impl<'a> From<&'a ast::ExceptHandlerExceptHandler> for AnyNodeRef<'a> {
     fn from(node: &'a ast::ExceptHandlerExceptHandler) -> Self {
         AnyNodeRef::ExceptHandlerExceptHandler(node)
@@ -4818,6 +5102,24 @@ impl<'a> From<&'a Decorator> for AnyNodeRef<'a> {
     }
 }
 
+impl<'a> From<&'a TypeParamTypeVar> for AnyNodeRef<'a> {
+    fn from(node: &'a TypeParamTypeVar) -> Self {
+        AnyNodeRef::TypeParamTypeVar(node)
+    }
+}
+
+impl<'a> From<&'a TypeParamTypeVarTuple> for AnyNodeRef<'a> {
+    fn from(node: &'a TypeParamTypeVarTuple) -> Self {
+        AnyNodeRef::TypeParamTypeVarTuple(node)
+    }
+}
+
+impl<'a> From<&'a TypeParamParamSpec> for AnyNodeRef<'a> {
+    fn from(node: &'a TypeParamParamSpec) -> Self {
+        AnyNodeRef::TypeParamParamSpec(node)
+    }
+}
+
 impl<'a> From<&'a Stmt> for AnyNodeRef<'a> {
     fn from(stmt: &'a Stmt) -> Self {
         match stmt {
@@ -4849,6 +5151,7 @@ impl<'a> From<&'a Stmt> for AnyNodeRef<'a> {
             Stmt::Pass(node) => AnyNodeRef::StmtPass(node),
             Stmt::Break(node) => AnyNodeRef::StmtBreak(node),
             Stmt::Continue(node) => AnyNodeRef::StmtContinue(node),
+            Stmt::LineMagic(node) => AnyNodeRef::StmtLineMagic(node),
         }
     }
 }
@@ -4883,6 +5186,7 @@ impl<'a> From<&'a Expr> for AnyNodeRef<'a> {
             Expr::List(node) => AnyNodeRef::ExprList(node),
             Expr::Tuple(node) => AnyNodeRef::ExprTuple(node),
             Expr::Slice(node) => AnyNodeRef::ExprSlice(node),
+            Expr::LineMagic(node) => AnyNodeRef::ExprLineMagic(node),
         }
     }
 }
@@ -4909,6 +5213,16 @@ impl<'a> From<&'a Pattern> for AnyNodeRef<'a> {
             Pattern::MatchStar(node) => AnyNodeRef::PatternMatchStar(node),
             Pattern::MatchAs(node) => AnyNodeRef::PatternMatchAs(node),
             Pattern::MatchOr(node) => AnyNodeRef::PatternMatchOr(node),
+        }
+    }
+}
+
+impl<'a> From<&'a TypeParam> for AnyNodeRef<'a> {
+    fn from(type_param: &'a TypeParam) -> Self {
+        match type_param {
+            TypeParam::TypeVar(node) => AnyNodeRef::TypeParamTypeVar(node),
+            TypeParam::TypeVarTuple(node) => AnyNodeRef::TypeParamTypeVarTuple(node),
+            TypeParam::ParamSpec(node) => AnyNodeRef::TypeParamParamSpec(node),
         }
     }
 }
@@ -5007,6 +5321,7 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::StmtPass(node) => node.range(),
             AnyNodeRef::StmtBreak(node) => node.range(),
             AnyNodeRef::StmtContinue(node) => node.range(),
+            AnyNodeRef::StmtLineMagic(node) => node.range(),
             AnyNodeRef::ExprBoolOp(node) => node.range(),
             AnyNodeRef::ExprNamedExpr(node) => node.range(),
             AnyNodeRef::ExprBinOp(node) => node.range(),
@@ -5034,6 +5349,7 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::ExprList(node) => node.range(),
             AnyNodeRef::ExprTuple(node) => node.range(),
             AnyNodeRef::ExprSlice(node) => node.range(),
+            AnyNodeRef::ExprLineMagic(node) => node.range(),
             AnyNodeRef::ExceptHandlerExceptHandler(node) => node.range(),
             AnyNodeRef::PatternMatchValue(node) => node.range(),
             AnyNodeRef::PatternMatchSingleton(node) => node.range(),
@@ -5054,6 +5370,9 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::MatchCase(node) => node.range(),
             AnyNodeRef::Decorator(node) => node.range(),
             AnyNodeRef::ElifElseClause(node) => node.range(),
+            AnyNodeRef::TypeParamTypeVar(node) => node.range(),
+            AnyNodeRef::TypeParamTypeVarTuple(node) => node.range(),
+            AnyNodeRef::TypeParamParamSpec(node) => node.range(),
         }
     }
 }
@@ -5088,6 +5407,7 @@ pub enum NodeKind {
     StmtImportFrom,
     StmtGlobal,
     StmtNonlocal,
+    StmtLineMagic,
     StmtExpr,
     StmtPass,
     StmtBreak,
@@ -5119,6 +5439,7 @@ pub enum NodeKind {
     ExprList,
     ExprTuple,
     ExprSlice,
+    ExprLineMagic,
     ExceptHandlerExceptHandler,
     PatternMatchValue,
     PatternMatchSingleton,
@@ -5139,4 +5460,7 @@ pub enum NodeKind {
     MatchCase,
     Decorator,
     ElifElseClause,
+    TypeParamTypeVar,
+    TypeParamTypeVarTuple,
+    TypeParamParamSpec,
 }

@@ -13,11 +13,12 @@ use ruff_formatter::{
 };
 use ruff_formatter::{Formatted, Printed, SourceCode};
 use ruff_python_ast::node::{AnyNodeRef, AstNode, NodeKind};
-use ruff_python_ast::source_code::{CommentRanges, CommentRangesBuilder, Locator};
+use ruff_python_ast::{Mod, Ranged};
+use ruff_python_index::{CommentRanges, CommentRangesBuilder};
+use ruff_python_parser::lexer::{lex, LexicalError};
+use ruff_python_parser::{parse_tokens, Mode, ParseError};
+use ruff_source_file::Locator;
 use ruff_text_size::{TextLen, TextRange};
-use rustpython_parser::ast::{Mod, Ranged};
-use rustpython_parser::lexer::{lex, LexicalError};
-use rustpython_parser::{parse_tokens, Mode, ParseError};
 use std::borrow::Cow;
 use thiserror::Error;
 
@@ -249,9 +250,9 @@ mod tests {
     use crate::{format_module, format_node, PyFormatOptions};
     use anyhow::Result;
     use insta::assert_snapshot;
-    use ruff_python_ast::source_code::CommentRangesBuilder;
-    use rustpython_parser::lexer::lex;
-    use rustpython_parser::{parse_tokens, Mode};
+    use ruff_python_index::CommentRangesBuilder;
+    use ruff_python_parser::lexer::lex;
+    use ruff_python_parser::{parse_tokens, Mode};
 
     /// Very basic test intentionally kept very similar to the CLI
     #[test]

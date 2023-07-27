@@ -1,11 +1,11 @@
 use std::ops::{Deref, DerefMut};
 
 use bitflags::bitflags;
+use ruff_python_ast::Ranged;
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::Ranged;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
-use ruff_python_ast::source_code::Locator;
+use ruff_source_file::Locator;
 
 use crate::context::ExecutionContext;
 use crate::model::SemanticModel;
@@ -92,6 +92,12 @@ impl<'a> Binding<'a> {
             self.kind,
             BindingKind::Annotation | BindingKind::Deletion | BindingKind::UnboundException(_)
         )
+    }
+
+    /// Return `true` if this [`Binding`] represents an private declaration
+    /// (e.g., `_x` in `_x = "private variable"`)
+    pub const fn is_private_declaration(&self) -> bool {
+        self.flags.contains(BindingFlags::PRIVATE_DECLARATION)
     }
 
     /// Return `true` if this binding redefines the given binding.
@@ -264,6 +270,14 @@ bitflags! {
         /// __all__ = [1]
         /// ```
         const INVALID_ALL_OBJECT = 1 << 6;
+
+        /// The binding represents a private declaration.
+        ///
+        /// For example, the binding could be `_T` in:
+        /// ```python
+        /// _T = "This is a private variable"
+        /// ```
+        const PRIVATE_DECLARATION = 1 << 7;
     }
 }
 
@@ -274,8 +288,6 @@ bitflags! {
 /// bindings because bindings must be separated by whitespace (and have an assignment).
 #[newtype_index]
 pub struct BindingId;
-
-impl nohash_hasher::IsEnabled for BindingId {}
 
 /// The bindings in a program.
 ///

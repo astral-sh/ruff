@@ -6,8 +6,8 @@ use crate::prelude::*;
 use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::{format_args, write, Buffer, FormatResult};
 use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::{Expr, Ranged, Stmt, StmtAsyncFor, StmtFor, Suite};
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{Expr, Ranged, Stmt, StmtAsyncFor, StmtFor, Suite};
 
 #[derive(Debug)]
 struct ExprTupleWithoutParentheses<'a>(&'a Expr);

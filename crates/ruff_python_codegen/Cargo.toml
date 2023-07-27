@@ -1,0 +1,22 @@
+[package]
+name = "ruff_python_codegen"
+version = "0.0.0"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[lib]
+
+[dependencies]
+ruff_python_ast = { path = "../ruff_python_ast" }
+ruff_python_literal = { path = "../ruff_python_literal" }
+ruff_python_parser = { path = "../ruff_python_parser" }
+ruff_source_file = { path = "../ruff_source_file" }
+
+once_cell = { workspace = true }
+

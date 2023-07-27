@@ -4,10 +4,10 @@
 
 use std::ops::Index;
 
+use ruff_python_ast as ast;
+use ruff_python_ast::Stmt;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast;
-use rustpython_parser::ast::Stmt;
 
 use ruff_index::{newtype_index, IndexVec};
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};

@@ -7,7 +7,7 @@ use crate::prelude::*;
 use crate::FormatNodeRule;
 use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
 use ruff_python_ast::node::AnyNodeRef;
-use rustpython_parser::ast::{CmpOp, ExprCompare};
+use ruff_python_ast::{CmpOp, ExprCompare};
 
 #[derive(Default)]
 pub struct FormatExprCompare {

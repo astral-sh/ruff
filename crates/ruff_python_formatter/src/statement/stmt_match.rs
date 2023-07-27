@@ -1,6 +1,6 @@
 use crate::{not_yet_implemented, FormatNodeRule, PyFormatter};
 use ruff_formatter::{write, Buffer, FormatResult};
-use rustpython_parser::ast::StmtMatch;
+use ruff_python_ast::StmtMatch;
 
 #[derive(Default)]
 pub struct FormatStmtMatch;

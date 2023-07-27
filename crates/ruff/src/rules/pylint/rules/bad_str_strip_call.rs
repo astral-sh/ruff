@@ -1,7 +1,7 @@
 use std::fmt;
 
+use ruff_python_ast::{self as ast, Constant, Expr, Ranged};
 use rustc_hash::FxHashSet;
-use rustpython_parser::ast::{self, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
