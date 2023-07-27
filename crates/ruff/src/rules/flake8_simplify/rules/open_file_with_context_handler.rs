@@ -108,7 +108,7 @@ fn match_exit_stack(semantic: &SemanticModel) -> bool {
 /// Return `true` if `func` is the builtin `open` or `pathlib.Path(...).open`.
 fn is_open(checker: &mut Checker, func: &Expr) -> bool {
     match func {
-        // Path(...).open()
+        // pathlib.Path(...).open()
         Expr::Attribute(ast::ExprAttribute { attr, value, .. }) if attr.as_str() == "open" => {
             match value.as_ref() {
                 Expr::Call(ast::ExprCall { func, .. }) => checker
