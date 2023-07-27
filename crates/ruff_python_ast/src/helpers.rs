@@ -111,6 +111,7 @@ where
                 | Expr::Subscript(_)
                 | Expr::Yield(_)
                 | Expr::YieldFrom(_)
+                | Expr::LineMagic(_)
         )
     })
 }
