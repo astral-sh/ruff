@@ -9,9 +9,9 @@ use ruff_source_file::Locator;
 use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle::rules::logical_lines::{
     extraneous_whitespace, indentation, missing_whitespace, missing_whitespace_after_keyword,
-    missing_whitespace_around_operator, space_around_operator, whitespace_around_keywords,
-    whitespace_around_named_parameter_equals, whitespace_before_comment,
-    whitespace_before_parameters, LogicalLines, TokenFlags,
+    missing_whitespace_around_operator, space_after_comma, space_around_operator,
+    whitespace_around_keywords, whitespace_around_named_parameter_equals,
+    whitespace_before_comment, whitespace_before_parameters, LogicalLines, TokenFlags,
 };
 use crate::settings::Settings;
 
@@ -60,6 +60,9 @@ pub(crate) fn check_logical_lines(
             whitespace_around_named_parameter_equals(&line, &mut context);
             missing_whitespace_around_operator(&line, &mut context);
             missing_whitespace(&line, should_fix_missing_whitespace, &mut context);
+        }
+        if line.flags().contains(TokenFlags::PUNCTUATION) {
+            space_after_comma(&line, &mut context);
         }
 
         if line
