@@ -901,6 +901,7 @@ impl From<ExprFormattedValue> for Expr {
 /// Transforms a value prior to formatting it.
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, is_macro::Is)]
 #[repr(i8)]
+#[allow(clippy::cast_possible_wrap)]
 pub enum ConversionFlag {
     /// No conversion
     None = -1, // CPython uses -1
@@ -1138,7 +1139,7 @@ impl BoolOp {
     pub const fn and(&self) -> Option<BoolOpAnd> {
         match self {
             BoolOp::And => Some(BoolOpAnd),
-            _ => None,
+            BoolOp::Or => None,
         }
     }
 
@@ -1146,7 +1147,7 @@ impl BoolOp {
     pub const fn or(&self) -> Option<BoolOpOr> {
         match self {
             BoolOp::Or => Some(BoolOpOr),
-            _ => None,
+            BoolOp::And => None,
         }
     }
 }
@@ -2107,7 +2108,7 @@ pub struct Decorator {
 /// `defaults` and `kw_defaults` fields are removed and the default values are placed under each `arg_with_default` typed argument.
 /// `vararg` and `kwarg` are still typed as `arg` because they never can have a default value.
 ///
-/// The matching Python style AST type is [PythonArguments]. While [PythonArguments] has ordered `kwonlyargs` fields by
+/// The matching Python style AST type is [`PythonArguments`]. While [`PythonArguments`] has ordered `kwonlyargs` fields by
 /// default existence, [Arguments] has location-ordered kwonlyargs fields.
 ///
 /// NOTE: This type is different from original Python AST.
@@ -2200,14 +2201,14 @@ impl Arguments {
         self.posonlyargs
             .iter()
             .chain(self.args.iter())
-            .filter_map(|arg| arg.default.as_ref().map(|e| e.as_ref()))
+            .filter_map(|arg| arg.default.as_ref().map(std::convert::AsRef::as_ref))
     }
 
     #[allow(clippy::type_complexity)]
     pub fn split_kwonlyargs(&self) -> (Vec<&Arg>, Vec<(&Arg, &Expr)>) {
         let mut args = Vec::new();
         let mut with_defaults = Vec::new();
-        for arg in self.kwonlyargs.iter() {
+        for arg in &self.kwonlyargs {
             if let Some(ref default) = arg.default {
                 with_defaults.push((arg.as_arg(), &**default));
             } else {

@@ -28,13 +28,13 @@ impl<'a> Cursor<'a> {
     }
 
     /// Peeks the next character from the input stream without consuming it.
-    /// Returns [EOF_CHAR] if the file is at the end of the file.
+    /// Returns [`EOF_CHAR`] if the file is at the end of the file.
     pub(super) fn first(&self) -> char {
         self.chars.clone().next().unwrap_or(EOF_CHAR)
     }
 
     /// Peeks the second character from the input stream without consuming it.
-    /// Returns [EOF_CHAR] if the position is past the end of the file.
+    /// Returns [`EOF_CHAR`] if the position is past the end of the file.
     pub(super) fn second(&self) -> char {
         let mut chars = self.chars.clone();
         chars.next();
@@ -57,7 +57,7 @@ impl<'a> Cursor<'a> {
     }
 
     pub(super) fn start_token(&mut self) {
-        self.source_length = self.text_len()
+        self.source_length = self.text_len();
     }
 
     pub(super) fn is_eof(&self) -> bool {

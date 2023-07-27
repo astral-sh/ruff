@@ -32,7 +32,9 @@ pub struct CFormatError {
 
 impl fmt::Display for CFormatError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use CFormatErrorType::*;
+        use CFormatErrorType::{
+            IncompleteFormat, IntTooBig, UnmatchedKeyParentheses, UnsupportedFormatChar,
+        };
         match self.typ {
             UnmatchedKeyParentheses => write!(f, "incomplete format key"),
             IncompleteFormat => write!(f, "incomplete format"),
@@ -42,7 +44,9 @@ impl fmt::Display for CFormatError {
                 c, c as u32, self.index
             ),
             IntTooBig => write!(f, "width/precision too big"),
-            _ => write!(f, "unexpected error parsing format string"),
+            CFormatErrorType::MissingModuloSign => {
+                write!(f, "unexpected error parsing format string")
+            }
         }
     }
 }
@@ -187,14 +191,14 @@ impl CFormatSpec {
         let fill_chars_needed = width.saturating_sub(num_chars);
         let fill_string = CFormatSpec::compute_fill_string(fill_char, fill_chars_needed);
 
-        if !fill_string.is_empty() {
+        if fill_string.is_empty() {
+            string
+        } else {
             if self.flags.contains(CConversionFlags::LEFT_ADJUST) {
                 format!("{string}{fill_string}")
             } else {
                 format!("{fill_string}{string}")
             }
-        } else {
-            string
         }
     }
 
@@ -210,13 +214,13 @@ impl CFormatSpec {
         let fill_chars_needed = width.saturating_sub(num_chars);
         let fill_string = CFormatSpec::compute_fill_string(fill_char, fill_chars_needed);
 
-        if !fill_string.is_empty() {
+        if fill_string.is_empty() {
+            string
+        } else {
             // Don't left-adjust if precision-filling: that will always be prepending 0s to %d
             // arguments, the LEFT_ADJUST flag will be used by a later call to fill_string with
             // the 0-filled string as the string param.
             format!("{fill_string}{string}")
-        } else {
-            string
         }
     }
 
@@ -279,7 +283,7 @@ impl CFormatSpec {
     }
 
     pub fn format_number(&self, num: &BigInt) -> String {
-        use CNumberType::*;
+        use CNumberType::{Decimal, Hex, Octal};
         let magnitude = num.abs();
         let prefix = if self.flags.contains(CConversionFlags::ALTERNATE_FORM) {
             match self.format_type {
@@ -312,10 +316,10 @@ impl CFormatSpec {
         let padded_magnitude_string = self.fill_string_with_precision(magnitude_string, '0');
 
         if self.flags.contains(CConversionFlags::ZERO_PAD) {
-            let fill_char = if !self.flags.contains(CConversionFlags::LEFT_ADJUST) {
-                '0'
-            } else {
+            let fill_char = if self.flags.contains(CConversionFlags::LEFT_ADJUST) {
                 ' ' // '-' overrides the '0' conversion if both are given
+            } else {
+                '0'
             };
             let signed_prefix = format!("{sign_string}{prefix}");
             format!(
@@ -386,10 +390,10 @@ impl CFormatSpec {
         };
 
         if self.flags.contains(CConversionFlags::ZERO_PAD) {
-            let fill_char = if !self.flags.contains(CConversionFlags::LEFT_ADJUST) {
-                '0'
-            } else {
+            let fill_char = if self.flags.contains(CConversionFlags::LEFT_ADJUST) {
                 ' '
+            } else {
+                '0'
             };
             format!(
                 "{}{}",
@@ -462,14 +466,14 @@ where
     T: Into<char>,
     I: Iterator<Item = T>,
 {
-    use CFloatType::*;
-    use CNumberType::*;
+    use CFloatType::{Exponent, General, PointDecimal};
+    use CNumberType::{Decimal, Hex, Octal};
     let (index, c) = match iter.next() {
         Some((index, c)) => (index, c.into()),
         None => {
             return Err((
                 CFormatErrorType::IncompleteFormat,
-                iter.peek().map(|x| x.0).unwrap_or(0),
+                iter.peek().map_or(0, |x| x.0),
             ));
         }
     };
@@ -494,6 +498,7 @@ where
     Ok((format_type, c))
 }
 
+#[allow(clippy::cast_possible_wrap)]
 fn parse_quantity<T, I>(iter: &mut ParseIter<I>) -> Result<Option<CFormatQuantity>, ParsingError>
 where
     T: Into<char> + Copy,
@@ -587,7 +592,7 @@ impl<T> CFormatPart<T> {
     pub fn has_key(&self) -> bool {
         match self {
             CFormatPart::Spec(s) => s.mapping_key.is_some(),
-            _ => false,
+            CFormatPart::Literal(_) => false,
         }
     }
 }
@@ -640,21 +645,20 @@ impl CFormatBytes {
                         iter.next().unwrap();
                         literal.push(b'%');
                         continue;
-                    } else {
-                        if !literal.is_empty() {
-                            parts.push((
-                                part_index,
-                                CFormatPart::Literal(std::mem::take(&mut literal)),
-                            ));
-                        }
-                        let spec = CFormatSpec::parse(iter).map_err(|err| CFormatError {
-                            typ: err.0,
-                            index: err.1,
-                        })?;
-                        parts.push((index, CFormatPart::Spec(spec)));
-                        if let Some(&(index, _)) = iter.peek() {
-                            part_index = index;
-                        }
+                    }
+                    if !literal.is_empty() {
+                        parts.push((
+                            part_index,
+                            CFormatPart::Literal(std::mem::take(&mut literal)),
+                        ));
+                    }
+                    let spec = CFormatSpec::parse(iter).map_err(|err| CFormatError {
+                        typ: err.0,
+                        index: err.1,
+                    })?;
+                    parts.push((index, CFormatPart::Spec(spec)));
+                    if let Some(&(index, _)) = iter.peek() {
+                        part_index = index;
                     }
                 } else {
                     return Err(CFormatError {
@@ -673,7 +677,7 @@ impl CFormatBytes {
     }
 
     pub fn parse_from_bytes(bytes: &[u8]) -> Result<Self, CFormatError> {
-        let mut iter = bytes.iter().cloned().enumerate().peekable();
+        let mut iter = bytes.iter().copied().enumerate().peekable();
         Self::parse(&mut iter)
     }
 }
@@ -701,21 +705,20 @@ impl CFormatString {
                         iter.next().unwrap();
                         literal.push('%');
                         continue;
-                    } else {
-                        if !literal.is_empty() {
-                            parts.push((
-                                part_index,
-                                CFormatPart::Literal(std::mem::take(&mut literal)),
-                            ));
-                        }
-                        let spec = CFormatSpec::parse(iter).map_err(|err| CFormatError {
-                            typ: err.0,
-                            index: err.1,
-                        })?;
-                        parts.push((index, CFormatPart::Spec(spec)));
-                        if let Some(&(index, _)) = iter.peek() {
-                            part_index = index;
-                        }
+                    }
+                    if !literal.is_empty() {
+                        parts.push((
+                            part_index,
+                            CFormatPart::Literal(std::mem::take(&mut literal)),
+                        ));
+                    }
+                    let spec = CFormatSpec::parse(iter).map_err(|err| CFormatError {
+                        typ: err.0,
+                        index: err.1,
+                    })?;
+                    parts.push((index, CFormatPart::Spec(spec)));
+                    if let Some(&(index, _)) = iter.peek() {
+                        part_index = index;
                     }
                 } else {
                     return Err(CFormatError {
@@ -868,7 +871,7 @@ mod tests {
                 .parse::<CFormatSpec>()
                 .unwrap()
                 .format_string("Hello, World!".to_owned()),
-            "".to_owned()
+            String::new()
         );
         assert_eq!(
             "%5.s"
@@ -997,7 +1000,7 @@ mod tests {
         assert_eq!(
             "%f".parse::<CFormatSpec>()
                 .unwrap()
-                .format_float(1.2345678901),
+                .format_float(1.234_567_890_1),
             "1.234568"
         );
     }

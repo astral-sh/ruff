@@ -44,7 +44,7 @@ impl Indentation {
 
     #[cfg(test)]
     pub(super) const fn new(column: Column, character: Character) -> Self {
-        Self { character, column }
+        Self { column, character }
     }
 
     #[must_use]
@@ -67,10 +67,7 @@ impl Indentation {
         }
     }
 
-    pub(super) fn try_compare(
-        &self,
-        other: &Indentation,
-    ) -> Result<Ordering, UnexpectedIndentation> {
+    pub(super) fn try_compare(self, other: Indentation) -> Result<Ordering, UnexpectedIndentation> {
         let column_ordering = self.column.cmp(&other.column);
         let character_ordering = self.character.cmp(&other.character);
 
@@ -94,7 +91,7 @@ pub(super) struct Indentations {
 
 impl Indentations {
     pub(super) fn push(&mut self, indent: Indentation) {
-        debug_assert_eq!(self.current().try_compare(&indent), Ok(Ordering::Less));
+        debug_assert_eq!(self.current().try_compare(indent), Ok(Ordering::Less));
 
         self.stack.push(indent);
     }
@@ -120,10 +117,10 @@ mod tests {
     fn indentation_try_compare() {
         let tab = Indentation::new(Column::new(8), Character::new(1));
 
-        assert_eq!(tab.try_compare(&tab), Ok(Ordering::Equal));
+        assert_eq!(tab.try_compare(tab), Ok(Ordering::Equal));
 
         let two_tabs = Indentation::new(Column::new(16), Character::new(2));
-        assert_eq!(two_tabs.try_compare(&tab), Ok(Ordering::Greater));
-        assert_eq!(tab.try_compare(&two_tabs), Ok(Ordering::Less));
+        assert_eq!(two_tabs.try_compare(tab), Ok(Ordering::Greater));
+        assert_eq!(tab.try_compare(two_tabs), Ok(Ordering::Less));
     }
 }

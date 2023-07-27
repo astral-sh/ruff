@@ -228,7 +228,7 @@ RaiseStatement: ast::Stmt = {
     },
     <location:@L> "raise" <t:Test<"all">> <c:("from" <Test<"all">>)?> <end_location:@R> => {
         ast::Stmt::Raise(
-            ast::StmtRaise { exc: Some(Box::new(t)), cause: c.map(|x| Box::new(x)), range: (location..end_location).into() }
+            ast::StmtRaise { exc: Some(Box::new(t)), cause: c.map(Box::new), range: (location..end_location).into() }
         )
     },
 };
@@ -285,7 +285,7 @@ ImportAsAlias<I>: ast::Alias = {
 DottedName: ast::Identifier = {
     <location:@L> <n:name> <end_location:@R> => ast::Identifier::new(n, (location..end_location).into()),
     <location:@L> <n:name> <n2: ("." Identifier)+> <end_location:@R> => {
-        let mut r = n.to_string();
+        let mut r = n;
         for x in n2 {
             r.push('.');
             r.push_str(x.1.as_str());
@@ -315,7 +315,7 @@ AssertStatement: ast::Stmt = {
         ast::Stmt::Assert(
             ast::StmtAssert {
                 test: Box::new(test),
-                msg: msg.map(|e| Box::new(e)),
+                msg: msg.map(Box::new),
                 range: (location..end_location).into()
             }
         )
@@ -346,10 +346,10 @@ LineMagicExpr: ast::Expr = {
         if mode == Mode::Jupyter {
             // This should never occur as the lexer won't allow it.
             if !matches!(m.0, MagicKind::Magic | MagicKind::Shell) {
-                Err(LexicalError {
+                return Err(LexicalError {
                     error: LexicalErrorType::OtherError("expr line magics are only allowed for % and !".to_string()),
                     location,
-                })?
+                })?;
             }
             Ok(ast::Expr::LineMagic(
                 ast::ExprLineMagic {
@@ -678,42 +678,42 @@ MatchMappingEntry: (ast::Expr, ast::Pattern) = {
 
 MappingPattern: ast::Pattern = {
     <location:@L> "{" "}" <end_location:@R> => {
-        return ast::PatternMatchMapping {
+        ast::PatternMatchMapping {
             keys: vec![],
             patterns: vec![],
             rest: None,
             range: (location..end_location).into()
-        }.into();
+        }.into()
     },
     <location:@L> "{" <e:OneOrMore<MatchMappingEntry>> ","? "}" <end_location:@R> => {
         let (keys, patterns) = e
             .into_iter()
             .unzip();
-        return ast::PatternMatchMapping {
+        ast::PatternMatchMapping {
             keys,
             patterns,
             rest: None,
             range: (location..end_location).into()
-        }.into();
+        }.into()
     },
     <location:@L> "{" "**" <rest:Identifier> ","? "}" <end_location:@R> => {
-        return ast::PatternMatchMapping {
+        ast::PatternMatchMapping {
             keys: vec![],
             patterns: vec![],
             rest: Some(rest),
             range: (location..end_location).into()
-        }.into();
+        }.into()
     },
     <location:@L> "{" <e:OneOrMore<MatchMappingEntry>> ","  "**" <rest:Identifier> ","? "}" <end_location:@R> => {
         let (keys, patterns) = e
             .into_iter()
             .unzip();
-        return ast::PatternMatchMapping {
+        ast::PatternMatchMapping {
             keys,
             patterns,
             rest: Some(rest),
             range: (location..end_location).into()
-        }.into();
+        }.into()
     },
 }
 
@@ -822,8 +822,7 @@ IfStatement: ast::Stmt = {
 
         let end_location = elif_else_clauses
             .last()
-            .map(|last| last.end())
-            .unwrap_or_else(|| body.last().unwrap().end());
+            .map_or_else(|| body.last().unwrap().end(), Ranged::end);
 
         ast::Stmt::If(
             ast::StmtIf { test: Box::new(test), body, elif_else_clauses, range: (location..end_location).into() }
@@ -875,9 +874,9 @@ TryStatement: ast::Stmt = {
         let finalbody = finalbody.unwrap_or_default();
         let end_location = finalbody
             .last()
-            .map(|last| last.end())
-            .or_else(|| orelse.last().map(|last| last.end()))
-            .or_else(|| handlers.last().map(|last| last.end()))
+            .map(Ranged::end)
+            .or_else(|| orelse.last().map(Ranged::end))
+            .or_else(|| handlers.last().map(Ranged::end))
             .unwrap();
         ast::Stmt::Try(
             ast::StmtTry {
@@ -895,8 +894,8 @@ TryStatement: ast::Stmt = {
         let end_location = finalbody
             .last()
             .or_else(|| orelse.last())
-            .map(|last| last.end())
-            .or_else(|| handlers.last().map(|last| last.end()))
+            .map(Ranged::end)
+            .or_else(|| handlers.last().map(Ranged::end))
             .unwrap();
         ast::Stmt::TryStar(
             ast::StmtTryStar {
@@ -1016,7 +1015,7 @@ WithItem<Goal>: ast::WithItem = {
 FuncDef: ast::Stmt = {
      <location:@L> <decorator_list:Decorator*> <is_async:"async"?> "def" <name:Identifier> <type_params:TypeParamList?> <args:Parameters> <r:("->" <Test<"all">>)?> ":" <body:Suite> => {
         let args = Box::new(args);
-        let returns = r.map(|x| Box::new(x));
+        let returns = r.map(Box::new);
         let end_location = body.last().unwrap().end();
         let type_comment = None;
         if is_async.is_some() {
@@ -1052,11 +1051,10 @@ Parameters: ast::Arguments = {
 
         let range = (location..end_location).into();
         let args = a
-            .map(|mut arguments| {
+            .map_or_else(|| ast::Arguments::empty(range), |mut arguments| {
                 arguments.range = range;
                 arguments
-            })
-            .unwrap_or_else(|| ast::Arguments::empty(range));
+            });
 
         Ok(args)
     }
@@ -1180,10 +1178,10 @@ DoubleStarTypedParameter: ast::Arg = {
 ParameterListStarArgs<ArgType, StarArgType, DoubleStarArgType>: (Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>) = {
     <location:@L> "*" <va:StarArgType?> <kwonlyargs:("," <ParameterDef<ArgType>>)*> <kwarg:("," <KwargParameter<DoubleStarArgType>>)?> =>? {
         if va.is_none() && kwonlyargs.is_empty() && kwarg.is_none() {
-            Err(LexicalError {
+            return Err(LexicalError {
                 error: LexicalErrorType::OtherError("named arguments must follow bare *".to_string()),
                 location,
-            })?
+            })?;
         }
 
         let kwarg = kwarg.flatten();
@@ -1526,10 +1524,10 @@ Atom<Goal>: ast::Expr = {
     <location:@L> "(" <left:(<OneOrMore<Test<"all">>> ",")?> <mid:NamedOrStarExpr> <right:("," <TestOrStarNamedExpr>)*> <trailing_comma:","?> ")" <end_location:@R> =>? {
         if left.is_none() && right.is_empty() && trailing_comma.is_none() {
             if mid.is_starred_expr() {
-                Err(LexicalError{
+                return Err(LexicalError{
                     error: LexicalErrorType::OtherError("cannot use starred expression here".to_string()),
                     location: mid.start(),
-                })?
+                })?;
             }
             Ok(mid)
         } else {
@@ -1720,7 +1718,7 @@ OneOrMore<T>: Vec<T> = {
     }
 };
 
-/// Two or more items that are separted by `Sep`
+/// Two or more items that are separated by `Sep`
 TwoOrMore<T, Sep>: Vec<T> = {
     <e1:T> Sep <e2:T> => vec![e1, e2],
     <mut v: TwoOrMore<T, Sep>> Sep <e:T> => {

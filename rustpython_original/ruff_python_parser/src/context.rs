@@ -2,7 +2,7 @@ use ruff_python_ast::{self as ast, Expr, ExprContext};
 
 pub(crate) fn set_context(expr: Expr, ctx: ExprContext) -> Expr {
     match expr {
-        Expr::Name(ast::ExprName { id, range, .. }) => ast::ExprName { id, ctx, range }.into(),
+        Expr::Name(ast::ExprName { id, range, .. }) => ast::ExprName { range, id, ctx }.into(),
         Expr::Tuple(ast::ExprTuple { elts, range, .. }) => ast::ExprTuple {
             elts: elts.into_iter().map(|elt| set_context(elt, ctx)).collect(),
             range,
@@ -19,9 +19,9 @@ pub(crate) fn set_context(expr: Expr, ctx: ExprContext) -> Expr {
         Expr::Attribute(ast::ExprAttribute {
             value, attr, range, ..
         }) => ast::ExprAttribute {
+            range,
             value,
             attr,
-            range,
             ctx,
         }
         .into(),
@@ -31,9 +31,9 @@ pub(crate) fn set_context(expr: Expr, ctx: ExprContext) -> Expr {
             range,
             ..
         }) => ast::ExprSubscript {
+            range,
             value,
             slice,
-            range,
             ctx,
         }
         .into(),
