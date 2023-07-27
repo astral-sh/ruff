@@ -6,6 +6,35 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for `jinja2` templates that use `autoescape=False`.
+///
+/// ## Why is this bad?
+/// `jinja2` templates that use `autoescape=False` are vulnerable to cross-site
+/// scripting (XSS) attacks that allow attackers to execute arbitrary
+/// JavaScript.
+///
+/// By default, `jinja2` sets `autoescape` to `False`, so it is important to
+/// set `autoescape=True` or use the `select_autoescape` function to mitigate
+/// XSS vulnerabilities.
+///
+/// ## Example
+/// ```python
+/// import jinja2
+///
+/// jinja2.Environment(loader=jinja2.FileSystemLoader("."))
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import jinja2
+///
+/// jinja2.Environment(loader=jinja2.FileSystemLoader("."), autoescape=True)
+/// ```
+///
+/// ## References
+/// - [Jinja documentation: API](https://jinja.palletsprojects.com/en/latest/api/#autoescaping)
+/// - [Common Weakness Enumeration: CWE-94](https://cwe.mitre.org/data/definitions/94.html)
 #[violation]
 pub struct Jinja2AutoescapeFalse {
     value: bool,
