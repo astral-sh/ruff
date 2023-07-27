@@ -74,3 +74,29 @@ class Foo[T: DoesNotExist](list[T]): ...  # F821: Undefined name `DoesNotExist`
 type Foo[T: (DoesNotExist1, DoesNotExist2)] = T  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
 def foo[T: (DoesNotExist1, DoesNotExist2)](t: T) -> T: return t  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
 class Foo[T: (DoesNotExist1, DoesNotExist2)](list[T]): ...  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
+
+# Type parameters in nested classes
+
+class Parent[T]:
+    t = T   # OK
+
+    def can_use_class_variable(self, x: t) -> t:  # OK
+        return x
+    
+    class Child:
+        def can_access_parent_type_parameter(self, x: T) -> T:  # OK
+            T  # OK
+            return x
+        
+        def cannot_access_parent_variable(self, x: t) -> t:  # F821: Undefined name `T`
+                t # F821: Undefined name `t`
+                return x
+            
+# Type parameters in nested functions
+
+def can_access_inside_nested[T](t: T) -> T:  # OK
+    def bar(x: T) -> T:  # OK
+        T # OK
+        return x
+    
+    bar(t)

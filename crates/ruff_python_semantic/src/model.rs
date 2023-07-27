@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use ast::all;
 use bitflags::bitflags;
 use ruff_python_ast::{self as ast, Expr, Ranged, Stmt};
 use ruff_text_size::{TextRange, TextSize};
@@ -308,6 +309,7 @@ impl<'a> SemanticModel<'a> {
 
         let mut seen_function = false;
         let mut import_starred = false;
+        let mut class_variables_visible = true;
         for (index, scope_id) in self.scopes.ancestor_ids(self.scope_id).enumerate() {
             let scope = &self.scopes[scope_id];
             if scope.kind.is_class() {
@@ -321,7 +323,8 @@ impl<'a> SemanticModel<'a> {
                 if seen_function && matches!(name.id.as_str(), "__class__") {
                     return ReadResult::ImplicitGlobal;
                 }
-                // Do not allow usages of class symbols unless it is the immediate parent, e.g.:
+                // Do not allow usages of class symbols unless it is the immediate parent
+                // (excluding type scopes), e.g.:
                 //
                 // ```python
                 // class Foo:
@@ -334,9 +337,18 @@ impl<'a> SemanticModel<'a> {
                 //      def d(self):
                 //          print(a)  # not allowed
                 // ```
-                if index > 0 {
+                if !class_variables_visible {
                     continue;
                 }
+            }
+
+            if scope.kind.is_type() && index == 0 {
+                // Allow class variables to be visible for an additional scope level
+                // when a type scope is seen — this covers the type scope present between
+                // function and class definitions and their parent class scope.
+                class_variables_visible = true;
+            } else {
+                class_variables_visible = false;
             }
 
             if let Some(binding_id) = scope.get(name.id.as_str()) {
