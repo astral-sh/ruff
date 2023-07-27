@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, Stmt};
+use ruff_python_ast::{self as ast, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -43,7 +43,7 @@ impl Violation for ManualDictComprehension {
     }
 }
 
-/// PERF404
+/// PERF403
 pub(crate) fn manual_dict_comprehension(checker: &mut Checker, target: &Expr, body: &[Stmt]) {
     let [stmt] = body else {
         return;
