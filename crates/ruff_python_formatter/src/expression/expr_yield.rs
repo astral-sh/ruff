@@ -23,10 +23,10 @@ impl<'a> AnyExpressionYield<'a> {
         matches!(self, AnyExpressionYield::YieldFrom(_))
     }
 
-    fn value(&self) -> Option<Box<Expr>> {
+    fn value(&self) -> Option<&Expr> {
         match self {
-            AnyExpressionYield::Yield(yld) => &yld.value,
-            AnyExpressionYield::YieldFrom(yld) => &Some(yld.value),
+            AnyExpressionYield::Yield(yld) => yld.value.as_deref(),
+            AnyExpressionYield::YieldFrom(yld) => Some(&yld.value),
         }
     }
 }
