@@ -1,4 +1,4 @@
-//! Contains the interface to the Python ruff_python_parser.
+//! Contains the interface to the Python `ruff_python_parser`.
 //!
 //! Functions in this module can be used to parse Python code into an [Abstract Syntax Tree]
 //! (AST) that is then transformed into bytecode.
@@ -16,7 +16,7 @@ use std::{fmt, iter};
 
 use itertools::Itertools;
 pub(super) use lalrpop_util::ParseError as LalrpopError;
-use ruff_text_size::TextSize;
+use ruff_text_size::{TextRange, TextSize};
 
 use crate::{
     lexer::{self, LexResult, LexicalError, LexicalErrorType},
@@ -151,7 +151,7 @@ pub fn parse(source: &str, mode: Mode, source_path: &str) -> Result<ast::Mod, Pa
     parse_starts_at(source, mode, source_path, TextSize::default())
 }
 
-/// Parse the given Python source code using the specified [`Mode`] and [`Location`].
+/// Parse the given Python source code using the specified [`Mode`] and [`TextSize`].
 ///
 /// This function allows to specify the location of the the source code, other than
 /// that, it behaves exactly like [`parse`].
@@ -218,7 +218,7 @@ fn parse_filtered_tokens(
     mode: Mode,
     source_path: &str,
 ) -> Result<ast::Mod, ParseError> {
-    let marker_token = (Tok::start_marker(mode), Default::default());
+    let marker_token = (Tok::start_marker(mode), TextRange::default());
     let lexer = iter::once(Ok(marker_token)).chain(lxr);
     python::TopParser::new()
         .parse(
@@ -379,8 +379,7 @@ impl ParseErrorType {
     pub fn is_tab_error(&self) -> bool {
         matches!(
             self,
-            ParseErrorType::Lexical(LexicalErrorType::TabError)
-                | ParseErrorType::Lexical(LexicalErrorType::TabsAfterSpaces)
+            ParseErrorType::Lexical(LexicalErrorType::TabError | LexicalErrorType::TabsAfterSpaces)
         )
     }
 }
@@ -850,7 +849,7 @@ if 10 .real:
 y = 100[no]
 y = 100(no)
 "#;
-        assert_debug_snapshot!(ast::Suite::parse(source, "<test>").unwrap())
+        assert_debug_snapshot!(ast::Suite::parse(source, "<test>").unwrap());
     }
 
     #[test]

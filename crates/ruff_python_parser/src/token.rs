@@ -1,4 +1,4 @@
-//! Token type for Python source code created by the lexer and consumed by the ruff_python_parser.
+//! Token type for Python source code created by the lexer and consumed by the `ruff_python_parser`.
 //!
 //! This module defines the tokens that the lexer recognizes. The tokens are
 //! loosely based on the token definitions found in the [CPython source].
@@ -219,6 +219,7 @@ impl Tok {
 
 impl fmt::Display for Tok {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        #[allow(clippy::enum_glob_use)]
         use Tok::*;
         match self {
             Name { name } => write!(f, "'{name}'"),
@@ -384,7 +385,7 @@ impl TryFrom<[char; 2]> for StringKind {
 
 impl fmt::Display for StringKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use StringKind::*;
+        use StringKind::{Bytes, FString, RawBytes, RawFString, RawString, String, Unicode};
         match self {
             String => f.write_str(""),
             FString => f.write_str("f"),
@@ -426,7 +427,7 @@ impl StringKind {
 
     /// Returns the number of characters in the prefix.
     pub fn prefix_len(&self) -> TextSize {
-        use StringKind::*;
+        use StringKind::{Bytes, FString, RawBytes, RawFString, RawString, String, Unicode};
         let len = match self {
             String => 0,
             RawString | FString | Unicode | Bytes => 1,

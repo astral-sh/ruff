@@ -2112,6 +2112,7 @@ dependencies = [
  "ruff",
  "ruff_python_ast",
  "ruff_python_formatter",
+ "ruff_python_parser",
  "serde",
  "serde_json",
  "tikv-jemallocator",

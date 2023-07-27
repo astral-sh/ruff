@@ -4,7 +4,7 @@ use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use tiny_keccak::{Hasher, Sha3};
 
-fn main() -> anyhow::Result<()> {
+fn main() {
     const SOURCE: &str = "src/python.lalrpop";
     println!("cargo:rerun-if-changed={SOURCE}");
 
@@ -23,13 +23,13 @@ fn main() -> anyhow::Result<()> {
     }
 
     let Some(message) = requires_lalrpop(SOURCE, &target) else {
-        return Ok(());
+        return;
     };
 
     #[cfg(feature = "lalrpop")]
     {
         let Err(e) = try_lalrpop() else {
-            return Ok(());
+            return;
         };
         error = e;
     }
@@ -44,15 +44,13 @@ fn requires_lalrpop(source: &str, target: &Path) -> Option<String> {
     };
 
     let sha_prefix = "// sha3: ";
-    let sha3_line = if let Some(sha3_line) =
-        BufReader::with_capacity(128, target)
-            .lines()
-            .find_map(|line| {
-                let line = line.unwrap();
-                line.starts_with(sha_prefix).then_some(line)
-            }) {
-        sha3_line
-    } else {
+    let Some(sha3_line) = BufReader::with_capacity(128, target)
+        .lines()
+        .find_map(|line| {
+            let line = line.unwrap();
+            line.starts_with(sha_prefix).then_some(line)
+        })
+    else {
         // no sha3 line - maybe old version of lalrpop installed
         return Some("python.rs doesn't include sha3 hash. regenerate.".to_owned());
     };
@@ -101,9 +99,10 @@ fn try_lalrpop() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn sha_equal(expected_sha3_str: &str, actual_sha3: &[u8; 32]) -> bool {
-    if expected_sha3_str.len() != 64 {
-        panic!("lalrpop version? hash bug is fixed in 0.19.8");
-    }
+    assert!(
+        expected_sha3_str.len() == 64,
+        "lalrpop version? hash bug is fixed in 0.19.8"
+    );
 
     let mut expected_sha3 = [0u8; 32];
     for (i, b) in expected_sha3.iter_mut().enumerate() {

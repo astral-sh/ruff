@@ -143,6 +143,11 @@ impl<'source> Lexer<'source> {
     /// Create a new lexer from T and a starting location. You probably want to use
     /// [`lex`] instead.
     pub fn new(input: &'source str, mode: Mode) -> Self {
+        assert!(
+            u32::try_from(input.len()).is_ok(),
+            "Lexer only supports files with a size up to 4GB"
+        );
+
         let mut lxr = Lexer {
             state: State::AfterNewline,
             nesting: 0,
@@ -351,7 +356,7 @@ impl<'source> Lexer<'source> {
 
     /// Consume a sequence of numbers with the given radix,
     /// the digits can be decorated with underscores
-    /// like this: '1_2_3_4' == '1234'
+    /// like this: '`1_2_3_4`' == '1234'
     fn radix_run(&mut self, first: Option<char>, radix: Radix) -> Cow<'source, str> {
         let start = if let Some(first) = first {
             self.offset() - first.text_len()
@@ -384,13 +389,13 @@ impl<'source> Lexer<'source> {
     }
 
     /// Lex a single comment.
-    fn lex_comment(&mut self) -> Result<Tok, LexicalError> {
+    fn lex_comment(&mut self) -> Tok {
         #[cfg(debug_assertions)]
         debug_assert_eq!(self.cursor.previous(), '#');
 
         self.cursor.eat_while(|c| !matches!(c, '\n' | '\r'));
 
-        return Ok(Tok::Comment(self.token_text().to_string()));
+        Tok::Comment(self.token_text().to_string())
     }
 
     /// Lex a single magic command.
@@ -418,10 +423,10 @@ impl<'source> Lexer<'source> {
                         self.cursor.bump();
                         self.cursor.bump();
                         continue;
-                    } else {
-                        self.cursor.bump();
-                        value.push('\\');
                     }
+
+                    self.cursor.bump();
+                    value.push('\\');
                 }
                 '\n' | '\r' | EOF_CHAR => {
                     return Tok::MagicCommand { kind, value };
@@ -507,7 +512,7 @@ impl<'source> Lexer<'source> {
     pub fn next_token(&mut self) -> LexResult {
         // Return dedent tokens until the current indentation level matches the indentation of the next token.
         if let Some(indentation) = self.pending_indentation.take() {
-            if let Ok(Ordering::Greater) = self.indentations.current().try_compare(&indentation) {
+            if let Ok(Ordering::Greater) = self.indentations.current().try_compare(indentation) {
                 self.pending_indentation = Some(indentation);
                 self.indentations.pop();
                 return Ok((Tok::Dedent, TextRange::empty(self.offset())));
@@ -601,7 +606,7 @@ impl<'source> Lexer<'source> {
         &mut self,
         indentation: Indentation,
     ) -> Result<Option<Spanned>, LexicalError> {
-        let token = match self.indentations.current().try_compare(&indentation) {
+        let token = match self.indentations.current().try_compare(indentation) {
             // Dedent
             Ok(Ordering::Greater) => {
                 self.indentations.pop();
@@ -656,7 +661,7 @@ impl<'source> Lexer<'source> {
         let token = match c {
             c if is_ascii_identifier_start(c) => self.lex_identifier(c)?,
             '0'..='9' => self.lex_number(c)?,
-            '#' => return self.lex_comment().map(|token| (token, self.token_range())),
+            '#' => return Ok((self.lex_comment(), self.token_range())),
             '"' | '\'' => self.lex_string(StringKind::String, c)?,
             '=' => {
                 if self.cursor.eat_char('=') {
@@ -900,6 +905,8 @@ impl<'source> Lexer<'source> {
         &self.source[self.token_range()]
     }
 
+    // Lexer doesn't allow files larger than 4GB
+    #[allow(clippy::cast_possible_truncation)]
     #[inline]
     fn offset(&self) -> TextSize {
         TextSize::new(self.source.len() as u32) - self.cursor.text_len()
@@ -1153,7 +1160,7 @@ mod tests {
     }
 
     fn assert_jupyter_magic_line_continuation_with_eol(eol: &str) {
-        let source = format!("%matplotlib \\{}  --inline", eol);
+        let source = format!("%matplotlib \\{eol}  --inline");
         let tokens = lex_jupyter_source(&source);
         assert_eq!(
             tokens,
@@ -1164,7 +1171,7 @@ mod tests {
                 },
                 Tok::Newline
             ]
-        )
+        );
     }
 
     #[test]
@@ -1183,7 +1190,7 @@ mod tests {
     }
 
     fn assert_jupyter_magic_line_continuation_with_eol_and_eof(eol: &str) {
-        let source = format!("%matplotlib \\{}", eol);
+        let source = format!("%matplotlib \\{eol}");
         let tokens = lex_jupyter_source(&source);
         assert_eq!(
             tokens,
@@ -1194,7 +1201,7 @@ mod tests {
                 },
                 Tok::Newline
             ]
-        )
+        );
     }
 
     #[test]
@@ -1220,52 +1227,52 @@ mod tests {
             tokens,
             vec![
                 Tok::MagicCommand {
-                    value: "".to_string(),
+                    value: String::new(),
                     kind: MagicKind::Magic,
                 },
                 Tok::Newline,
                 Tok::MagicCommand {
-                    value: "".to_string(),
+                    value: String::new(),
                     kind: MagicKind::Magic2,
                 },
                 Tok::Newline,
                 Tok::MagicCommand {
-                    value: "".to_string(),
+                    value: String::new(),
                     kind: MagicKind::Shell,
                 },
                 Tok::Newline,
                 Tok::MagicCommand {
-                    value: "".to_string(),
+                    value: String::new(),
                     kind: MagicKind::ShCap,
                 },
                 Tok::Newline,
                 Tok::MagicCommand {
-                    value: "".to_string(),
+                    value: String::new(),
                     kind: MagicKind::Help,
                 },
                 Tok::Newline,
                 Tok::MagicCommand {
-                    value: "".to_string(),
+                    value: String::new(),
                     kind: MagicKind::Help2,
                 },
                 Tok::Newline,
                 Tok::MagicCommand {
-                    value: "".to_string(),
+                    value: String::new(),
                     kind: MagicKind::Paren,
                 },
                 Tok::Newline,
                 Tok::MagicCommand {
-                    value: "".to_string(),
+                    value: String::new(),
                     kind: MagicKind::Quote,
                 },
                 Tok::Newline,
                 Tok::MagicCommand {
-                    value: "".to_string(),
+                    value: String::new(),
                     kind: MagicKind::Quote2,
                 },
                 Tok::Newline,
             ]
-        )
+        );
     }
 
     #[test]
@@ -1346,7 +1353,7 @@ mod tests {
                 },
                 Tok::Newline,
             ]
-        )
+        );
     }
     #[test]
     fn test_jupyter_magic_indentation() {
@@ -1371,7 +1378,7 @@ if True:
                 Tok::Newline,
                 Tok::Dedent,
             ]
-        )
+        );
     }
 
     #[test]
@@ -1424,13 +1431,13 @@ baz = %matplotlib \
                 },
                 Tok::Newline,
             ]
-        )
+        );
     }
 
     fn assert_no_jupyter_magic(tokens: &[Tok]) {
         for tok in tokens {
             if let Tok::MagicCommand { .. } = tok {
-                panic!("Unexpected magic command token: {:?}", tok)
+                panic!("Unexpected magic command token: {tok:?}")
             }
         }
     }
@@ -1475,7 +1482,7 @@ def f(arg=%timeit a = b):
                     value: BigInt::from(123),
                 },
                 Tok::Int {
-                    value: BigInt::from(1234567890),
+                    value: BigInt::from(1_234_567_890),
                 },
                 Tok::Float { value: 0.2 },
                 Tok::Float { value: 100.0 },
@@ -1851,13 +1858,13 @@ def f(arg=%timeit a = b):
     }
 
     fn assert_string_continuation_with_eol(eol: &str) {
-        let source = format!("\"abc\\{}def\"", eol);
+        let source = format!("\"abc\\{eol}def\"");
         let tokens = lex_source(&source);
 
         assert_eq!(
             tokens,
-            vec![str_tok(&format!("abc\\{}def", eol)), Tok::Newline]
-        )
+            vec![str_tok(&format!("abc\\{eol}def")), Tok::Newline]
+        );
     }
 
     #[test]
@@ -1879,23 +1886,23 @@ def f(arg=%timeit a = b):
     fn test_escape_unicode_name() {
         let source = r#""\N{EN SPACE}""#;
         let tokens = lex_source(source);
-        assert_eq!(tokens, vec![str_tok(r"\N{EN SPACE}"), Tok::Newline])
+        assert_eq!(tokens, vec![str_tok(r"\N{EN SPACE}"), Tok::Newline]);
     }
 
     fn assert_triple_quoted(eol: &str) {
-        let source = format!("\"\"\"{0} test string{0} \"\"\"", eol);
+        let source = format!("\"\"\"{eol} test string{eol} \"\"\"");
         let tokens = lex_source(&source);
         assert_eq!(
             tokens,
             vec![
                 Tok::String {
-                    value: format!("{0} test string{0} ", eol),
+                    value: format!("{eol} test string{eol} "),
                     kind: StringKind::String,
                     triple_quoted: true,
                 },
                 Tok::Newline,
             ]
-        )
+        );
     }
 
     #[test]

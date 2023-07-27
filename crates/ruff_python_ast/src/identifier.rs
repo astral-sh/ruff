@@ -201,11 +201,10 @@ impl Iterator for IdentifierTokenizer<'_> {
 #[cfg(test)]
 mod tests {
     use super::IdentifierTokenizer;
-    use ruff_python_parser::ParseError;
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
     #[test]
-    fn extract_global_names() -> Result<(), ParseError> {
+    fn extract_global_names() {
         let contents = r#"global X,Y, Z"#.trim();
 
         let mut names = IdentifierTokenizer::new(
@@ -231,6 +230,5 @@ mod tests {
             range,
             TextRange::new(TextSize::from(12), TextSize::from(13))
         );
-        Ok(())
     }
 }

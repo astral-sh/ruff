@@ -27,8 +27,6 @@ is-macro = { workspace = true }
 itertools = { workspace = true }
 once_cell = { workspace = true }
 rustc-hash = { workspace = true }
-
-
 serde = { workspace = true, optional = true }
 smallvec = { workspace = true }
 thiserror = { workspace = true }

@@ -1,3 +1,4 @@
+use std::hash::BuildHasherDefault;
 // Contains functions that perform validation and parsing of arguments and parameters.
 // Checks apply both to functions and to lambdas.
 use crate::lexer::{LexicalError, LexicalErrorType};
@@ -15,10 +16,10 @@ pub(crate) fn validate_arguments(arguments: &ast::Arguments) -> Result<(), Lexic
     let mut all_arg_names = FxHashSet::with_capacity_and_hasher(
         arguments.posonlyargs.len()
             + arguments.args.len()
-            + arguments.vararg.is_some() as usize
+            + usize::from(arguments.vararg.is_some())
             + arguments.kwonlyargs.len()
-            + arguments.kwarg.is_some() as usize,
-        Default::default(),
+            + usize::from(arguments.kwarg.is_some()),
+        BuildHasherDefault::default(),
     );
 
     let posonlyargs = arguments.posonlyargs.iter();
@@ -79,49 +80,46 @@ pub(crate) fn parse_args(func_args: Vec<FunctionArgument>) -> Result<ArgumentLis
     let mut keywords = vec![];
 
     let mut keyword_names =
-        FxHashSet::with_capacity_and_hasher(func_args.len(), Default::default());
+        FxHashSet::with_capacity_and_hasher(func_args.len(), BuildHasherDefault::default());
     let mut double_starred = false;
     for (name, value) in func_args {
-        match name {
-            Some((start, end, name)) => {
-                // Check for duplicate keyword arguments in the call.
-                if let Some(keyword_name) = &name {
-                    if !keyword_names.insert(keyword_name.to_string()) {
-                        return Err(LexicalError {
-                            error: LexicalErrorType::DuplicateKeywordArgumentError(
-                                keyword_name.to_string(),
-                            ),
-                            location: start,
-                        });
-                    }
-                } else {
-                    double_starred = true;
-                }
-
-                keywords.push(ast::Keyword {
-                    arg: name,
-                    value,
-                    range: TextRange::new(start, end),
-                });
-            }
-            None => {
-                // Positional arguments mustn't follow keyword arguments.
-                if !keywords.is_empty() && !is_starred(&value) {
+        if let Some((start, end, name)) = name {
+            // Check for duplicate keyword arguments in the call.
+            if let Some(keyword_name) = &name {
+                if !keyword_names.insert(keyword_name.to_string()) {
                     return Err(LexicalError {
-                        error: LexicalErrorType::PositionalArgumentError,
-                        location: value.start(),
+                        error: LexicalErrorType::DuplicateKeywordArgumentError(
+                            keyword_name.to_string(),
+                        ),
+                        location: start,
                     });
+                }
+            } else {
+                double_starred = true;
+            }
+
+            keywords.push(ast::Keyword {
+                arg: name,
+                value,
+                range: TextRange::new(start, end),
+            });
+        } else {
+            // Positional arguments mustn't follow keyword arguments.
+            if !keywords.is_empty() && !is_starred(&value) {
+                return Err(LexicalError {
+                    error: LexicalErrorType::PositionalArgumentError,
+                    location: value.start(),
+                });
                 // Allow starred arguments after keyword arguments but
                 // not after double-starred arguments.
-                } else if double_starred {
-                    return Err(LexicalError {
-                        error: LexicalErrorType::UnpackedArgumentError,
-                        location: value.start(),
-                    });
-                }
-
-                args.push(value);
+            } else if double_starred {
+                return Err(LexicalError {
+                    error: LexicalErrorType::UnpackedArgumentError,
+                    location: value.start(),
+                });
             }
+
+            args.push(value);
         }
     }
     Ok(ArgumentList { args, keywords })

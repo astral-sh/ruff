@@ -15,7 +15,7 @@ use itertools::{Itertools, MultiPeek};
 /// soft keyword tokens with `identifier` tokens if they are used as identifiers.
 ///
 /// Handling soft keywords in this intermediary pass allows us to simplify both the lexer and
-/// ruff_python_parser, as neither of them need to be aware of soft keywords.
+/// `ruff_python_parser`, as neither of them need to be aware of soft keywords.
 pub struct SoftKeywordTransformer<I>
 where
     I: Iterator<Item = LexResult>,
@@ -59,9 +59,7 @@ where
                 //    (This is to avoid treating `match` or `case` as identifiers when annotated with
                 //    type hints.)   type hints.)
                 Tok::Match | Tok::Case => {
-                    if !self.start_of_line {
-                        next = Some(Ok((soft_to_name(tok), *range)));
-                    } else {
+                    if self.start_of_line {
                         let mut nesting = 0;
                         let mut first = true;
                         let mut seen_colon = false;
@@ -86,6 +84,8 @@ where
                         if !seen_colon {
                             next = Some(Ok((soft_to_name(tok), *range)));
                         }
+                    } else {
+                        next = Some(Ok((soft_to_name(tok), *range)));
                     }
                 }
                 // For `type` all of the following conditions must be met:
@@ -93,9 +93,7 @@ where
                 // 2. The type token is immediately followed by a name token.
                 // 3. The name token is eventually followed by an equality token.
                 Tok::Type => {
-                    if !self.start_of_line {
-                        next = Some(Ok((soft_to_name(tok), *range)));
-                    } else {
+                    if self.start_of_line {
                         let mut is_type_alias = false;
                         if let Some(Ok((tok, _))) = self.underlying.peek() {
                             if matches!(
@@ -126,6 +124,8 @@ where
                         if !is_type_alias {
                             next = Some(Ok((soft_to_name(tok), *range)));
                         }
+                    } else {
+                        next = Some(Ok((soft_to_name(tok), *range)));
                     }
                 }
                 _ => (), // Not a soft keyword token

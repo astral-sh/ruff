@@ -69,11 +69,6 @@ impl<'a> StringParser<'a> {
         TextRange::new(start_location, self.location)
     }
 
-    #[inline]
-    fn expr(&self, node: Expr) -> Expr {
-        node
-    }
-
     fn parse_unicode_literal(&mut self, literal_number: usize) -> Result<char, LexicalError> {
         let mut p: u32 = 0u32;
         let unicode_error = LexicalError::new(LexicalErrorType::UnicodeError, self.get_pos());
@@ -97,7 +92,7 @@ impl<'a> StringParser<'a> {
         octet_content.push(first);
         while octet_content.len() < 3 {
             if let Some('0'..='7') = self.peek() {
-                octet_content.push(self.next_char().unwrap())
+                octet_content.push(self.next_char().unwrap());
             } else {
                 break;
             }
@@ -158,7 +153,7 @@ impl<'a> StringParser<'a> {
                     'U' if !self.kind.is_any_bytes() => self.parse_unicode_literal(8)?,
                     'N' if !self.kind.is_any_bytes() => self.parse_unicode_name()?,
                     // Special cases where the escape sequence is not a single character
-                    '\n' => return Ok("".to_string()),
+                    '\n' => return Ok(String::new()),
                     c => {
                         if self.kind.is_any_bytes() && !c.is_ascii() {
                             return Err(LexicalError {
@@ -181,7 +176,10 @@ impl<'a> StringParser<'a> {
     }
 
     fn parse_formatted_value(&mut self, nested: u8) -> Result<Vec<Expr>, LexicalError> {
-        use FStringErrorType::*;
+        use FStringErrorType::{
+            EmptyExpression, InvalidConversionFlag, InvalidExpression, MismatchedDelimiter,
+            UnclosedLbrace, Unmatched, UnterminatedString,
+        };
 
         let mut expression = String::new();
         let mut spec = None;
@@ -239,15 +237,10 @@ impl<'a> StringParser<'a> {
                     let start_location = self.get_pos();
                     let parsed_spec = self.parse_spec(nested)?;
 
-                    spec = Some(Box::new(
-                        self.expr(
-                            ast::ExprJoinedStr {
-                                values: parsed_spec,
-                                range: self.range(start_location),
-                            }
-                            .into(),
-                        ),
-                    ));
+                    spec = Some(Box::new(Expr::from(ast::ExprJoinedStr {
+                        values: parsed_spec,
+                        range: self.range(start_location),
+                    })));
                 }
                 '(' | '{' | '[' => {
                     expression.push(ch);
@@ -310,9 +303,21 @@ impl<'a> StringParser<'a> {
                         return Err(FStringError::new(EmptyExpression, self.get_pos()).into());
                     }
 
-                    let ret = if !self_documenting {
-                        vec![self.expr(
-                            ast::ExprFormattedValue {
+                    let ret = if self_documenting {
+                        // TODO: range is wrong but `self_documenting` needs revisiting beyond
+                        // ranges: https://github.com/astral-sh/ruff/issues/5970
+                        vec![
+                            Expr::from(ast::ExprConstant {
+                                value: Constant::Str(expression.clone() + "="),
+                                kind: None,
+                                range: self.range(start_location),
+                            }),
+                            Expr::from(ast::ExprConstant {
+                                value: trailing_seq.into(),
+                                kind: None,
+                                range: self.range(start_location),
+                            }),
+                            Expr::from(ast::ExprFormattedValue {
                                 value: Box::new(
                                     parse_fstring_expr(&expression, start_location).map_err(
                                         |e| {
@@ -323,57 +328,30 @@ impl<'a> StringParser<'a> {
                                         },
                                     )?,
                                 ),
-                                conversion,
+                                conversion: if conversion == ConversionFlag::None && spec.is_none()
+                                {
+                                    ConversionFlag::Repr
+                                } else {
+                                    conversion
+                                },
                                 format_spec: spec,
                                 range: self.range(start_location),
-                            }
-                            .into(),
-                        )]
-                    } else {
-                        // TODO: range is wrong but `self_documenting` needs revisiting beyond
-                        // ranges: https://github.com/astral-sh/ruff/issues/5970
-                        vec![
-                            self.expr(
-                                ast::ExprConstant {
-                                    value: Constant::Str(expression.to_owned() + "="),
-                                    kind: None,
-                                    range: self.range(start_location),
-                                }
-                                .into(),
-                            ),
-                            self.expr(
-                                ast::ExprConstant {
-                                    value: trailing_seq.into(),
-                                    kind: None,
-                                    range: self.range(start_location),
-                                }
-                                .into(),
-                            ),
-                            self.expr(
-                                ast::ExprFormattedValue {
-                                    value: Box::new(
-                                        parse_fstring_expr(&expression, start_location).map_err(
-                                            |e| {
-                                                FStringError::new(
-                                                    InvalidExpression(Box::new(e.error)),
-                                                    start_location,
-                                                )
-                                            },
-                                        )?,
-                                    ),
-                                    conversion: if conversion == ConversionFlag::None
-                                        && spec.is_none()
-                                    {
-                                        ConversionFlag::Repr
-                                    } else {
-                                        conversion
-                                    },
-                                    format_spec: spec,
-                                    range: self.range(start_location),
-                                }
-                                .into(),
-                            ),
+                            }),
                         ]
+                    } else {
+                        vec![Expr::from(ast::ExprFormattedValue {
+                            value: Box::new(
+                                parse_fstring_expr(&expression, start_location).map_err(|e| {
+                                    FStringError::new(
+                                        InvalidExpression(Box::new(e.error)),
+                                        start_location,
+                                    )
+                                })?,
+                            ),
+                            conversion,
+                            format_spec: spec,
+                            range: self.range(start_location),
+                        })]
                     };
                     return Ok(ret);
                 }
@@ -415,16 +393,11 @@ impl<'a> StringParser<'a> {
             match next {
                 '{' => {
                     if !constant_piece.is_empty() {
-                        spec_constructor.push(
-                            self.expr(
-                                ast::ExprConstant {
-                                    value: constant_piece.drain(..).collect::<String>().into(),
-                                    kind: None,
-                                    range: self.range(start_location),
-                                }
-                                .into(),
-                            ),
-                        );
+                        spec_constructor.push(Expr::from(ast::ExprConstant {
+                            value: constant_piece.drain(..).collect::<String>().into(),
+                            kind: None,
+                            range: self.range(start_location),
+                        }));
                     }
                     let parsed_expr = self.parse_fstring(nested + 1)?;
                     spec_constructor.extend(parsed_expr);
@@ -441,22 +414,17 @@ impl<'a> StringParser<'a> {
             self.next_char();
         }
         if !constant_piece.is_empty() {
-            spec_constructor.push(
-                self.expr(
-                    ast::ExprConstant {
-                        value: constant_piece.drain(..).collect::<String>().into(),
-                        kind: None,
-                        range: self.range(start_location),
-                    }
-                    .into(),
-                ),
-            );
+            spec_constructor.push(Expr::from(ast::ExprConstant {
+                value: constant_piece.drain(..).collect::<String>().into(),
+                kind: None,
+                range: self.range(start_location),
+            }));
         }
         Ok(spec_constructor)
     }
 
     fn parse_fstring(&mut self, nested: u8) -> Result<Vec<Expr>, LexicalError> {
-        use FStringErrorType::*;
+        use FStringErrorType::{ExpressionNestedTooDeeply, SingleRbrace, UnclosedLbrace};
 
         if nested >= 2 {
             return Err(FStringError::new(ExpressionNestedTooDeeply, self.get_pos()).into());
@@ -484,16 +452,11 @@ impl<'a> StringParser<'a> {
                         }
                     }
                     if !content.is_empty() {
-                        values.push(
-                            self.expr(
-                                ast::ExprConstant {
-                                    value: content.drain(..).collect::<String>().into(),
-                                    kind: None,
-                                    range: self.range(start_location),
-                                }
-                                .into(),
-                            ),
-                        );
+                        values.push(Expr::from(ast::ExprConstant {
+                            value: content.drain(..).collect::<String>().into(),
+                            kind: None,
+                            range: self.range(start_location),
+                        }));
                     }
 
                     let parsed_values = self.parse_formatted_value(nested)?;
@@ -524,16 +487,11 @@ impl<'a> StringParser<'a> {
         }
 
         if !content.is_empty() {
-            values.push(
-                self.expr(
-                    ast::ExprConstant {
-                        value: content.into(),
-                        kind: None,
-                        range: self.range(start_location),
-                    }
-                    .into(),
-                ),
-            )
+            values.push(Expr::from(ast::ExprConstant {
+                value: content.into(),
+                kind: None,
+                range: self.range(start_location),
+            }));
         }
 
         Ok(values)
@@ -561,14 +519,11 @@ impl<'a> StringParser<'a> {
             }
         }
 
-        Ok(self.expr(
-            ast::ExprConstant {
-                value: Constant::Bytes(content.chars().map(|c| c as u8).collect()),
-                kind: None,
-                range: self.range(start_location),
-            }
-            .into(),
-        ))
+        Ok(Expr::from(ast::ExprConstant {
+            value: Constant::Bytes(content.chars().map(|c| c as u8).collect()),
+            kind: None,
+            range: self.range(start_location),
+        }))
     }
 
     fn parse_string(&mut self) -> Result<Expr, LexicalError> {
@@ -582,14 +537,11 @@ impl<'a> StringParser<'a> {
                 ch => content.push(ch),
             }
         }
-        Ok(self.expr(
-            ast::ExprConstant {
-                value: Constant::Str(content),
-                kind: self.kind.is_unicode().then(|| "u".to_string()),
-                range: self.range(start_location),
-            }
-            .into(),
-        ))
+        Ok(Expr::from(ast::ExprConstant {
+            value: Constant::Str(content),
+            kind: self.kind.is_unicode().then(|| "u".to_string()),
+            range: self.range(start_location),
+        }))
     }
 
     fn parse(&mut self) -> Result<Vec<Expr>, LexicalError> {
@@ -706,7 +658,7 @@ pub(crate) fn parse_strings(
                     if !current.is_empty() {
                         deduped.push(take_current(&mut current, current_start, current_end));
                     }
-                    deduped.push(value)
+                    deduped.push(value);
                 }
                 Expr::Constant(ast::ExprConstant {
                     value: Constant::Str(inner),
@@ -790,7 +742,11 @@ pub enum FStringErrorType {
 
 impl std::fmt::Display for FStringErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        use FStringErrorType::*;
+        use FStringErrorType::{
+            EmptyExpression, ExpectedRbrace, ExpressionCannotInclude, ExpressionNestedTooDeeply,
+            InvalidConversionFlag, InvalidExpression, MismatchedDelimiter, SingleRbrace,
+            UnclosedLbrace, Unmatched, UnopenedRbrace, UnterminatedString,
+        };
         match self {
             UnclosedLbrace => write!(f, "expecting '}}'"),
             UnopenedRbrace => write!(f, "Unopened '}}'"),
@@ -909,7 +865,10 @@ mod tests {
 
     #[test]
     fn test_parse_invalid_fstring() {
-        use FStringErrorType::*;
+        use FStringErrorType::{
+            EmptyExpression, ExpressionNestedTooDeeply, InvalidConversionFlag, SingleRbrace,
+            UnclosedLbrace,
+        };
         assert_eq!(parse_fstring_error("{5!a"), UnclosedLbrace);
         assert_eq!(parse_fstring_error("{5!a1}"), UnclosedLbrace);
         assert_eq!(parse_fstring_error("{5!"), UnclosedLbrace);

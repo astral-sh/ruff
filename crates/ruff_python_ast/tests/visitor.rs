@@ -1,5 +1,3 @@
-#[cfg(test)]
-mod tests {}
 use std::fmt::{Debug, Write};
 
 use insta::assert_snapshot;

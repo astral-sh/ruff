@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: 9c49dc85355275f274dcc32e163c443c0dc567214c9725547e2218e9acd22577
+// sha3: bf0ea34f78939474a89bc0d4b6e7c14f370a2d2cd2ca8b98bd5aefdae0e1d5f1
 use num_bigint::BigInt;
 use ruff_text_size::TextSize;
 use ruff_python_ast::{self as ast, Ranged, MagicKind};
@@ -31555,7 +31555,7 @@ fn __action59<
 {
     {
         ast::Stmt::Raise(
-            ast::StmtRaise { exc: Some(Box::new(t)), cause: c.map(|x| Box::new(x)), range: (location..end_location).into() }
+            ast::StmtRaise { exc: Some(Box::new(t)), cause: c.map(Box::new), range: (location..end_location).into() }
         )
     }
 }
@@ -31723,7 +31723,7 @@ fn __action70<
 ) -> ast::Identifier
 {
     {
-        let mut r = n.to_string();
+        let mut r = n;
         for x in n2 {
             r.push('.');
             r.push_str(x.1.as_str());
@@ -31784,7 +31784,7 @@ fn __action73<
         ast::Stmt::Assert(
             ast::StmtAssert {
                 test: Box::new(test),
-                msg: msg.map(|e| Box::new(e)),
+                msg: msg.map(Box::new),
                 range: (location..end_location).into()
             }
         )
@@ -31833,10 +31833,10 @@ fn __action75<
         if mode == Mode::Jupyter {
             // This should never occur as the lexer won't allow it.
             if !matches!(m.0, MagicKind::Magic | MagicKind::Shell) {
-                Err(LexicalError {
+                return Err(LexicalError {
                     error: LexicalErrorType::OtherError("expr line magics are only allowed for % and !".to_string()),
                     location,
-                })?
+                })?;
             }
             Ok(ast::Expr::LineMagic(
                 ast::ExprLineMagic {
@@ -32791,12 +32791,12 @@ fn __action133<
 ) -> ast::Pattern
 {
     {
-        return ast::PatternMatchMapping {
+        ast::PatternMatchMapping {
             keys: vec![],
             patterns: vec![],
             rest: None,
             range: (location..end_location).into()
-        }.into();
+        }.into()
     }
 }
 
@@ -32817,12 +32817,12 @@ fn __action134<
         let (keys, patterns) = e
             .into_iter()
             .unzip();
-        return ast::PatternMatchMapping {
+        ast::PatternMatchMapping {
             keys,
             patterns,
             rest: None,
             range: (location..end_location).into()
-        }.into();
+        }.into()
     }
 }
 
@@ -32841,12 +32841,12 @@ fn __action135<
 ) -> ast::Pattern
 {
     {
-        return ast::PatternMatchMapping {
+        ast::PatternMatchMapping {
             keys: vec![],
             patterns: vec![],
             rest: Some(rest),
             range: (location..end_location).into()
-        }.into();
+        }.into()
     }
 }
 
@@ -32870,12 +32870,12 @@ fn __action136<
         let (keys, patterns) = e
             .into_iter()
             .unzip();
-        return ast::PatternMatchMapping {
+        ast::PatternMatchMapping {
             keys,
             patterns,
             rest: Some(rest),
             range: (location..end_location).into()
-        }.into();
+        }.into()
     }
 }
 
@@ -33131,8 +33131,7 @@ fn __action146<
 
         let end_location = elif_else_clauses
             .last()
-            .map(|last| last.end())
-            .unwrap_or_else(|| body.last().unwrap().end());
+            .map_or_else(|| body.last().unwrap().end(), Ranged::end);
 
         ast::Stmt::If(
             ast::StmtIf { test: Box::new(test), body, elif_else_clauses, range: (location..end_location).into() }
@@ -33225,9 +33224,9 @@ fn __action149<
         let finalbody = finalbody.unwrap_or_default();
         let end_location = finalbody
             .last()
-            .map(|last| last.end())
-            .or_else(|| orelse.last().map(|last| last.end()))
-            .or_else(|| handlers.last().map(|last| last.end()))
+            .map(Ranged::end)
+            .or_else(|| orelse.last().map(Ranged::end))
+            .or_else(|| handlers.last().map(Ranged::end))
             .unwrap();
         ast::Stmt::Try(
             ast::StmtTry {
@@ -33262,8 +33261,8 @@ fn __action150<
         let end_location = finalbody
             .last()
             .or_else(|| orelse.last())
-            .map(|last| last.end())
-            .or_else(|| handlers.last().map(|last| last.end()))
+            .map(Ranged::end)
+            .or_else(|| handlers.last().map(Ranged::end))
             .unwrap();
         ast::Stmt::TryStar(
             ast::StmtTryStar {
@@ -33522,7 +33521,7 @@ fn __action162<
 {
     {
         let args = Box::new(args);
-        let returns = r.map(|x| Box::new(x));
+        let returns = r.map(Box::new);
         let end_location = body.last().unwrap().end();
         let type_comment = None;
         if is_async.is_some() {
@@ -33591,11 +33590,10 @@ fn __action165<
 
         let range = (location..end_location).into();
         let args = a
-            .map(|mut arguments| {
+            .map_or_else(|| ast::Arguments::empty(range), |mut arguments| {
                 arguments.range = range;
                 arguments
-            })
-            .unwrap_or_else(|| ast::Arguments::empty(range));
+            });
 
         Ok(args)
     }
@@ -37001,10 +36999,10 @@ fn __action417<
 {
     {
         if va.is_none() && kwonlyargs.is_empty() && kwarg.is_none() {
-            Err(LexicalError {
+            return Err(LexicalError {
                 error: LexicalErrorType::OtherError("named arguments must follow bare *".to_string()),
                 location,
-            })?
+            })?;
         }
 
         let kwarg = kwarg.flatten();
@@ -37118,10 +37116,10 @@ fn __action425<
 {
     {
         if va.is_none() && kwonlyargs.is_empty() && kwarg.is_none() {
-            Err(LexicalError {
+            return Err(LexicalError {
                 error: LexicalErrorType::OtherError("named arguments must follow bare *".to_string()),
                 location,
-            })?
+            })?;
         }
 
         let kwarg = kwarg.flatten();
@@ -38469,10 +38467,10 @@ fn __action524<
     {
         if left.is_none() && right.is_empty() && trailing_comma.is_none() {
             if mid.is_starred_expr() {
-                Err(LexicalError{
+                return Err(LexicalError{
                     error: LexicalErrorType::OtherError("cannot use starred expression here".to_string()),
                     location: mid.start(),
-                })?
+                })?;
             }
             Ok(mid)
         } else {
@@ -39137,10 +39135,10 @@ fn __action568<
     {
         if left.is_none() && right.is_empty() && trailing_comma.is_none() {
             if mid.is_starred_expr() {
-                Err(LexicalError{
+                return Err(LexicalError{
                     error: LexicalErrorType::OtherError("cannot use starred expression here".to_string()),
                     location: mid.start(),
-                })?
+                })?;
             }
             Ok(mid)
         } else {

@@ -383,7 +383,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 }
             }
 
-            // `[a, b].test[300].dot`
+            // `[a, b].test.test[300].dot`
             Expr::Attribute(ast::ExprAttribute {
                 range: _,
                 value,

@@ -37,6 +37,7 @@ ureq = "2.6.2"
 ruff.path = "../ruff"
 ruff_python_ast.path = "../ruff_python_ast"
 ruff_python_formatter = { path = "../ruff_python_formatter" }
+ruff_python_parser = { path = "../ruff_python_parser" }
 criterion = { version = "0.5.1"}
 
 [target.'cfg(target_os = "windows")'.dev-dependencies]

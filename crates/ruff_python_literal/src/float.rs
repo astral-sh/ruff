@@ -7,7 +7,7 @@ pub fn parse_str(literal: &str) -> Option<f64> {
 }
 
 pub fn parse_bytes(literal: &[u8]) -> Option<f64> {
-    parse_inner(trim_slice(literal, |b| b.is_ascii_whitespace()))
+    parse_inner(trim_slice(literal, u8::is_ascii_whitespace))
 }
 
 fn trim_slice<T>(v: &[T], mut trim: impl FnMut(&T) -> bool) -> &[T] {
@@ -72,7 +72,7 @@ pub fn format_fixed(precision: usize, magnitude: f64, case: Case, alternate_form
         }
         magnitude if magnitude.is_nan() => format_nan(case),
         magnitude if magnitude.is_infinite() => format_inf(case),
-        _ => "".to_string(),
+        _ => String::new(),
     }
 }
 
@@ -99,7 +99,7 @@ pub fn format_exponent(
         }
         magnitude if magnitude.is_nan() => format_nan(case),
         magnitude if magnitude.is_infinite() => format_inf(case),
-        _ => "".to_string(),
+        _ => String::new(),
     }
 }
 
@@ -132,6 +132,11 @@ fn remove_trailing_decimal_point(s: String) -> String {
     s
 }
 
+#[allow(
+    clippy::cast_sign_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap
+)]
 pub fn format_general(
     precision: usize,
     magnitude: f64,
@@ -145,7 +150,7 @@ pub fn format_general(
             let mut parts = r_exp.splitn(2, 'e');
             let base = parts.next().unwrap();
             let exponent = parts.next().unwrap().parse::<i64>().unwrap();
-            if exponent < -4 || exponent + (always_shows_fract as i64) >= (precision as i64) {
+            if exponent < -4 || exponent + i64::from(always_shows_fract) >= (precision as i64) {
                 let e = match case {
                     Case::Lower => 'e',
                     Case::Upper => 'E',
@@ -164,7 +169,7 @@ pub fn format_general(
         }
         magnitude if magnitude.is_nan() => format_nan(case),
         magnitude if magnitude.is_infinite() => format_inf(case),
-        _ => "".to_string(),
+        _ => String::new(),
     }
 }
 
@@ -231,7 +236,7 @@ pub fn from_hex(s: &str) -> Option<f64> {
             if !has_p && has_dot {
                 hex.push_str("p0");
             } else if !has_p && !has_dot {
-                hex.push_str(".p0")
+                hex.push_str(".p0");
             }
 
             hexf_parse::parse_hexf64(hex.as_str(), false).ok()
@@ -261,6 +266,7 @@ pub fn to_hex(value: f64) -> String {
 }
 
 #[test]
+#[allow(clippy::float_cmp)]
 fn test_to_hex() {
     use rand::Rng;
     for _ in 0..20000 {
@@ -273,7 +279,8 @@ fn test_to_hex() {
         // println!("{} -> {}", f, hex);
         let roundtrip = hexf_parse::parse_hexf64(&hex, false).unwrap();
         // println!("  -> {}", roundtrip);
-        assert!(f == roundtrip, "{} {} {}", f, hex, roundtrip);
+
+        assert_eq!(f, roundtrip, "{f} {hex} {roundtrip}");
     }
 }
 

@@ -6,7 +6,8 @@ pub enum Quote {
 
 impl Quote {
     #[inline]
-    pub const fn swap(self) -> Quote {
+    #[must_use]
+    pub const fn swap(self) -> Self {
         match self {
             Quote::Single => Quote::Double,
             Quote::Double => Quote::Single,
@@ -126,6 +127,11 @@ impl std::fmt::Display for StrRepr<'_, '_> {
 impl UnicodeEscape<'_> {
     const REPR_RESERVED_LEN: usize = 2; // for quotes
 
+    #[allow(
+        clippy::cast_possible_wrap,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss
+    )]
     pub fn repr_layout(source: &str, preferred_quote: Quote) -> EscapeLayout {
         Self::output_layout_with_checker(source, preferred_quote, |a, b| {
             Some((a as isize).checked_add(b as isize)? as usize)
@@ -155,8 +161,15 @@ impl UnicodeEscape<'_> {
             };
             let Some(new_len) = length_add(out_len, incr) else {
                 #[cold]
-                fn stop(single_count: usize, double_count: usize, preferred_quote: Quote) -> EscapeLayout {
-                    EscapeLayout { quote: choose_quote(single_count, double_count, preferred_quote).0, len: None }
+                fn stop(
+                    single_count: usize,
+                    double_count: usize,
+                    preferred_quote: Quote,
+                ) -> EscapeLayout {
+                    EscapeLayout {
+                        quote: choose_quote(single_count, double_count, preferred_quote).0,
+                        len: None,
+                    }
                 }
                 return stop(single_count, double_count, preferred_quote);
             };
@@ -296,12 +309,22 @@ impl<'a> AsciiEscape<'a> {
 }
 
 impl AsciiEscape<'_> {
+    #[allow(
+        clippy::cast_possible_wrap,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss
+    )]
     pub fn repr_layout(source: &[u8], preferred_quote: Quote) -> EscapeLayout {
         Self::output_layout_with_checker(source, preferred_quote, 3, |a, b| {
             Some((a as isize).checked_add(b as isize)? as usize)
         })
     }
 
+    #[allow(
+        clippy::cast_possible_wrap,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss
+    )]
     pub fn named_repr_layout(source: &[u8], name: &str) -> EscapeLayout {
         Self::output_layout_with_checker(source, Quote::Single, name.len() + 2 + 3, |a, b| {
             Some((a as isize).checked_add(b as isize)? as usize)
@@ -332,8 +355,15 @@ impl AsciiEscape<'_> {
             };
             let Some(new_len) = length_add(out_len, incr) else {
                 #[cold]
-                fn stop(single_count: usize, double_count: usize, preferred_quote: Quote) -> EscapeLayout {
-                    EscapeLayout { quote: choose_quote(single_count, double_count, preferred_quote).0, len: None }
+                fn stop(
+                    single_count: usize,
+                    double_count: usize,
+                    preferred_quote: Quote,
+                ) -> EscapeLayout {
+                    EscapeLayout {
+                        quote: choose_quote(single_count, double_count, preferred_quote).0,
+                        len: None,
+                    }
                 }
                 return stop(single_count, double_count, preferred_quote);
             };

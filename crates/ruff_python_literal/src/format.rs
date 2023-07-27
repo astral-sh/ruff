@@ -121,7 +121,7 @@ impl FormatParse for FormatGrouping {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum FormatType {
     String,
     Binary,
@@ -311,8 +311,13 @@ impl FormatSpec {
             .collect::<String>()
     }
 
+    #[allow(
+        clippy::cast_possible_wrap,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss
+    )]
     fn add_magnitude_separators_for_char(
-        magnitude_str: String,
+        magnitude_str: &str,
         inter: i32,
         sep: char,
         disp_digit_cnt: i32,
@@ -324,11 +329,16 @@ impl FormatSpec {
         let int_digit_cnt = disp_digit_cnt - dec_digit_cnt;
         let mut result = FormatSpec::separate_integer(magnitude_int_str, inter, sep, int_digit_cnt);
         if let Some(part) = parts.next() {
-            result.push_str(&format!(".{part}"))
+            result.push_str(&format!(".{part}"));
         }
         result
     }
 
+    #[allow(
+        clippy::cast_sign_loss,
+        clippy::cast_possible_wrap,
+        clippy::cast_possible_truncation
+    )]
     fn separate_integer(
         magnitude_str: String,
         inter: i32,
@@ -336,7 +346,7 @@ impl FormatSpec {
         disp_digit_cnt: i32,
     ) -> String {
         let magnitude_len = magnitude_str.len() as i32;
-        let offset = (disp_digit_cnt % (inter + 1) == 0) as i32;
+        let offset = i32::from(disp_digit_cnt % (inter + 1) == 0);
         let disp_digit_cnt = disp_digit_cnt + offset;
         let pad_cnt = disp_digit_cnt - magnitude_len;
         let sep_cnt = disp_digit_cnt / (inter + 1);
@@ -353,9 +363,14 @@ impl FormatSpec {
         }
     }
 
+    #[allow(
+        clippy::cast_sign_loss,
+        clippy::cast_possible_truncation,
+        clippy::cast_possible_wrap
+    )]
     fn insert_separator(mut magnitude_str: String, inter: i32, sep: char, sep_cnt: i32) -> String {
         let magnitude_len = magnitude_str.len() as i32;
-        for i in 1..sep_cnt + 1 {
+        for i in 1..=sep_cnt {
             magnitude_str.insert((magnitude_len - inter * i) as usize, sep);
         }
         magnitude_str
@@ -396,6 +411,7 @@ impl FormatSpec {
         }
     }
 
+    #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
     fn add_magnitude_separators(&self, magnitude_str: String, prefix: &str) -> String {
         match &self.grouping_option {
             Some(fg) => {
@@ -408,7 +424,7 @@ impl FormatSpec {
                 let width = self.width.unwrap_or(magnitude_len) as i32 - prefix.len() as i32;
                 let disp_digit_cnt = cmp::max(width, magnitude_len as i32);
                 FormatSpec::add_magnitude_separators_for_char(
-                    magnitude_str,
+                    &magnitude_str,
                     inter,
                     sep,
                     disp_digit_cnt,
@@ -431,7 +447,7 @@ impl FormatSpec {
                 | FormatType::Character,
             ) => self.format_int(&BigInt::from_u8(x).unwrap()),
             Some(FormatType::Exponent(_) | FormatType::FixedPoint(_) | FormatType::Percentage) => {
-                self.format_float(x as f64)
+                self.format_float(f64::from(x))
             }
             None => {
                 let first_letter = (input.to_string().as_bytes()[0] as char).to_uppercase();
@@ -452,17 +468,19 @@ impl FormatSpec {
                 *case,
                 self.alternate_form,
             )),
-            Some(FormatType::Decimal)
-            | Some(FormatType::Binary)
-            | Some(FormatType::Octal)
-            | Some(FormatType::Hex(_))
-            | Some(FormatType::String)
-            | Some(FormatType::Character)
-            | Some(FormatType::Number(Case::Upper)) => {
+            Some(
+                FormatType::Decimal
+                | FormatType::Binary
+                | FormatType::Octal
+                | FormatType::Hex(_)
+                | FormatType::String
+                | FormatType::Character
+                | FormatType::Number(Case::Upper),
+            ) => {
                 let ch = char::from(self.format_type.as_ref().unwrap());
                 Err(FormatSpecError::UnknownFormatCode(ch, "float"))
             }
-            Some(FormatType::GeneralFormat(case)) | Some(FormatType::Number(case)) => {
+            Some(FormatType::GeneralFormat(case) | FormatType::Number(case)) => {
                 let precision = if precision == 0 { 1 } else { precision };
                 Ok(float::format_general(
                     precision,
@@ -513,11 +531,17 @@ impl FormatSpec {
             }
         };
         let magnitude_str = self.add_magnitude_separators(raw_magnitude_str?, sign_str);
-        self.format_sign_and_align(&AsciiStr::new(&magnitude_str), sign_str, FormatAlign::Right)
+        Ok(
+            self.format_sign_and_align(
+                &AsciiStr::new(&magnitude_str),
+                sign_str,
+                FormatAlign::Right,
+            ),
+        )
     }
 
     #[inline]
-    fn format_int_radix(&self, magnitude: BigInt, radix: u32) -> Result<String, FormatSpecError> {
+    fn format_int_radix(&self, magnitude: &BigInt, radix: u32) -> Result<String, FormatSpecError> {
         match self.precision {
             Some(_) => Err(FormatSpecError::PrecisionNotAllowed),
             None => Ok(magnitude.to_str_radix(radix)),
@@ -539,19 +563,21 @@ impl FormatSpec {
             ""
         };
         let raw_magnitude_str = match self.format_type {
-            Some(FormatType::Binary) => self.format_int_radix(magnitude, 2),
-            Some(FormatType::Decimal) => self.format_int_radix(magnitude, 10),
-            Some(FormatType::Octal) => self.format_int_radix(magnitude, 8),
-            Some(FormatType::Hex(Case::Lower)) => self.format_int_radix(magnitude, 16),
-            Some(FormatType::Hex(Case::Upper)) => match self.precision {
-                Some(_) => Err(FormatSpecError::PrecisionNotAllowed),
-                None => {
+            Some(FormatType::Binary) => self.format_int_radix(&magnitude, 2),
+            Some(FormatType::Decimal) => self.format_int_radix(&magnitude, 10),
+            Some(FormatType::Octal) => self.format_int_radix(&magnitude, 8),
+            Some(FormatType::Hex(Case::Lower)) => self.format_int_radix(&magnitude, 16),
+            Some(FormatType::Hex(Case::Upper)) => {
+                if self.precision.is_some() {
+                    Err(FormatSpecError::PrecisionNotAllowed)
+                } else {
                     let mut result = magnitude.to_str_radix(16);
                     result.make_ascii_uppercase();
                     Ok(result)
                 }
-            },
-            Some(FormatType::Number(Case::Lower)) => self.format_int_radix(magnitude, 10),
+            }
+
+            Some(FormatType::Number(Case::Lower)) => self.format_int_radix(&magnitude, 10),
             Some(FormatType::Number(Case::Upper)) => {
                 Err(FormatSpecError::UnknownFormatCode('N', "int"))
             }
@@ -560,18 +586,20 @@ impl FormatSpec {
                 (Some(_), _) => Err(FormatSpecError::NotAllowed("Sign")),
                 (_, true) => Err(FormatSpecError::NotAllowed("Alternate form (#)")),
                 (_, _) => match num.to_u32() {
-                    Some(n) if n <= 0x10ffff => Ok(std::char::from_u32(n).unwrap().to_string()),
+                    Some(n) if n <= 0x0010_ffff => Ok(std::char::from_u32(n).unwrap().to_string()),
                     Some(_) | None => Err(FormatSpecError::CodeNotInRange),
                 },
             },
-            Some(FormatType::GeneralFormat(_))
-            | Some(FormatType::FixedPoint(_))
-            | Some(FormatType::Exponent(_))
-            | Some(FormatType::Percentage) => match num.to_f64() {
+            Some(
+                FormatType::GeneralFormat(_)
+                | FormatType::FixedPoint(_)
+                | FormatType::Exponent(_)
+                | FormatType::Percentage,
+            ) => match num.to_f64() {
                 Some(float) => return self.format_float(float),
                 _ => Err(FormatSpecError::UnableToConvert),
             },
-            None => self.format_int_radix(magnitude, 10),
+            None => self.format_int_radix(&magnitude, 10),
         }?;
         let format_sign = self.sign.unwrap_or(FormatSign::Minus);
         let sign_str = match num.sign() {
@@ -584,11 +612,11 @@ impl FormatSpec {
         };
         let sign_prefix = format!("{sign_str}{prefix}");
         let magnitude_str = self.add_magnitude_separators(raw_magnitude_str, &sign_prefix);
-        self.format_sign_and_align(
+        Ok(self.format_sign_and_align(
             &AsciiStr::new(&magnitude_str),
             &sign_prefix,
             FormatAlign::Right,
-        )
+        ))
     }
 
     pub fn format_string<T>(&self, s: &T) -> Result<String, FormatSpecError>
@@ -597,14 +625,13 @@ impl FormatSpec {
     {
         self.validate_format(FormatType::String)?;
         match self.format_type {
-            Some(FormatType::String) | None => self
-                .format_sign_and_align(s, "", FormatAlign::Left)
-                .map(|mut value| {
-                    if let Some(precision) = self.precision {
-                        value.truncate(precision);
-                    }
-                    value
-                }),
+            Some(FormatType::String) | None => {
+                let mut value = self.format_sign_and_align(s, "", FormatAlign::Left);
+                if let Some(precision) = self.precision {
+                    value.truncate(precision);
+                }
+                Ok(value)
+            }
             _ => {
                 let ch = char::from(self.format_type.as_ref().unwrap());
                 Err(FormatSpecError::UnknownFormatCode(ch, "str"))
@@ -612,12 +639,13 @@ impl FormatSpec {
         }
     }
 
+    #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
     fn format_sign_and_align<T>(
         &self,
         magnitude_str: &T,
         sign_str: &str,
         default_align: FormatAlign,
-    ) -> Result<String, FormatSpecError>
+    ) -> String
     where
         T: CharLen + Deref<Target = str>,
     {
@@ -629,8 +657,8 @@ impl FormatSpec {
             cmp::max(0, (w as i32) - (num_chars as i32) - (sign_str.len() as i32))
         });
 
-        let magnitude_str = magnitude_str.deref();
-        Ok(match align {
+        let magnitude_str = &**magnitude_str;
+        match align {
             FormatAlign::Left => format!(
                 "{}{}{}",
                 sign_str,
@@ -658,7 +686,7 @@ impl FormatSpec {
                     FormatSpec::compute_fill_string(fill_char, right_fill_chars_needed);
                 format!("{left_fill_string}{sign_str}{magnitude_str}{right_fill_string}")
             }
-        })
+        }
     }
 }
 
@@ -801,7 +829,7 @@ impl FieldName {
 
         let mut parts = Vec::new();
         while let Some(part) = FieldNamePart::parse_part(&mut chars)? {
-            parts.push(part)
+            parts.push(part);
         }
 
         Ok(FieldName { field_type, parts })
@@ -851,10 +879,10 @@ impl FormatString {
                     cur_text = remaining;
                 }
                 Err(err) => {
-                    return if !result_string.is_empty() {
-                        Ok((FormatPart::Literal(result_string), cur_text))
-                    } else {
+                    return if result_string.is_empty() {
                         Err(err)
+                    } else {
+                        Ok((FormatPart::Literal(result_string), cur_text))
                     };
                 }
             }
@@ -910,20 +938,18 @@ impl FormatString {
             } else if c == '{' {
                 if nested {
                     return Err(FormatParseError::InvalidFormatSpecifier);
-                } else {
-                    nested = true;
-                    left.push(c);
-                    continue;
                 }
+                nested = true;
+                left.push(c);
+                continue;
             } else if c == '}' {
                 if nested {
                     nested = false;
                     left.push(c);
                     continue;
-                } else {
-                    end_bracket_pos = Some(idx);
-                    break;
                 }
+                end_bracket_pos = Some(idx);
+                break;
             } else {
                 left.push(c);
             }
