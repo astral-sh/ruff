@@ -1,4 +1,4 @@
-use rustpython_ast::{Arguments, Stmt};
+use ruff_python_ast::{Arguments, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};

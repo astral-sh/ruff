@@ -1,4 +1,4 @@
-use rustpython_ast::Decorator;
+use ruff_python_ast::Decorator;
 
 use ruff_python_ast::call_path::from_qualified_name;
 use ruff_python_ast::helpers::map_callable;

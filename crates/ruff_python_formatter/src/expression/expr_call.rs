@@ -1,5 +1,5 @@
+use ruff_python_ast::{Expr, ExprCall, Ranged};
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_ast::{Expr, ExprCall, Ranged};
 
 use crate::builders::empty_parenthesized_with_dangling_comments;
 use ruff_formatter::write;
@@ -119,10 +119,10 @@ impl FormatNodeRule<ExprCall> for FormatExprCall {
 impl NeedsParentheses for ExprCall {
     fn needs_parentheses(
         &self,
-        parent: AnyNodeRef,
+        _parent: AnyNodeRef,
         context: &PyFormatContext,
     ) -> OptionalParentheses {
-        self.func.needs_parentheses(parent, context)
+        self.func.needs_parentheses(self.into(), context)
     }
 }
 

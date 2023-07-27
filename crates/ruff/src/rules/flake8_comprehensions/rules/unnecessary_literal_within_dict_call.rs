@@ -1,6 +1,6 @@
 use std::fmt;
 
-use rustpython_ast::{Expr, Keyword, Ranged};
+use ruff_python_ast::{Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};

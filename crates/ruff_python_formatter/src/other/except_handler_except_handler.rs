@@ -5,7 +5,7 @@ use crate::prelude::*;
 use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::FormatRuleWithOptions;
 use ruff_formatter::{write, Buffer, FormatResult};
-use rustpython_ast::ExceptHandlerExceptHandler;
+use ruff_python_ast::ExceptHandlerExceptHandler;
 
 #[derive(Copy, Clone, Default)]
 pub enum ExceptHandlerKind {

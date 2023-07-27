@@ -1,4 +1,4 @@
-use rustpython_ast::{self as ast, Stmt};
+use ruff_python_ast::{self as ast, Stmt};
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;

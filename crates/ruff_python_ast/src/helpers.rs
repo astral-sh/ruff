@@ -1,12 +1,12 @@
 use std::borrow::Cow;
 use std::path::Path;
 
-use num_traits::Zero;
-use ruff_text_size::TextRange;
-use rustpython_ast::{
+use crate::{
     self as ast, Arguments, Constant, ExceptHandler, Expr, Keyword, MatchCase, Pattern, Ranged,
     Stmt, TypeParam,
 };
+use num_traits::Zero;
+use ruff_text_size::TextRange;
 use smallvec::SmallVec;
 
 use crate::call_path::CallPath;
@@ -1288,11 +1288,11 @@ mod tests {
     use std::cell::RefCell;
     use std::vec;
 
-    use ruff_text_size::TextRange;
-    use rustpython_ast::{
-        self, Constant, Expr, ExprConstant, ExprContext, ExprName, Identifier, Stmt, StmtTypeAlias,
+    use crate::{
+        Constant, Expr, ExprConstant, ExprContext, ExprName, Identifier, Stmt, StmtTypeAlias,
         TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
     };
+    use ruff_text_size::TextRange;
 
     use crate::helpers::{any_over_stmt, any_over_type_param, resolve_imported_module_path};
 

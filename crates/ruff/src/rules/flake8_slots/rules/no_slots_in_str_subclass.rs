@@ -1,4 +1,4 @@
-use rustpython_ast::{Expr, Stmt, StmtClassDef};
+use ruff_python_ast::{Expr, Stmt, StmtClassDef};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};

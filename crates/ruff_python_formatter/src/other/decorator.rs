@@ -3,7 +3,7 @@ use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
 use crate::FormatNodeRule;
 use ruff_formatter::write;
-use rustpython_ast::Decorator;
+use ruff_python_ast::Decorator;
 
 #[derive(Default)]
 pub struct FormatDecorator;

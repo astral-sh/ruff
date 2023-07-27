@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::find_keyword;
-use rustpython_ast::{Expr, ExprAttribute, Keyword, Ranged};
+use ruff_python_ast::{Expr, ExprAttribute, Keyword, Ranged};
 
 use crate::checkers::ast::Checker;
 

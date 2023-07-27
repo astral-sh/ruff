@@ -1,0 +1,12 @@
+---
+source: crates/ruff_python_ast/tests/preorder.rs
+expression: trace
+---
+- ModModule
+  - StmtExpr
+    - ExprListComp
+      - ExprName
+      - Comprehension
+        - ExprName
+        - ExprName
+

@@ -5,7 +5,7 @@ use itertools::Either::{Left, Right};
 
 use ruff_text_size::TextRange;
 
-use rustpython_ast::{self as ast, BoolOp, Expr, ExprContext, Identifier, Ranged};
+use ruff_python_ast::{self as ast, BoolOp, Expr, ExprContext, Identifier, Ranged};
 
 use ruff_diagnostics::AlwaysAutofixableViolation;
 use ruff_diagnostics::{Diagnostic, Edit, Fix};

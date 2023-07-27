@@ -1,4 +1,4 @@
-use rustpython_ast::ExprAwait;
+use ruff_python_ast::ExprAwait;
 
 use ruff_formatter::write;
 use ruff_python_ast::node::AnyNodeRef;

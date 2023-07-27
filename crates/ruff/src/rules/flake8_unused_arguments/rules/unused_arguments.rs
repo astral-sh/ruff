@@ -1,8 +1,8 @@
 use std::iter;
 
 use regex::Regex;
-use rustpython_ast::{Arg, Arguments};
-use rustpython_parser::ast;
+use ruff_python_ast as ast;
+use ruff_python_ast::{Arg, Arguments};
 
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::{Diagnostic, Violation};

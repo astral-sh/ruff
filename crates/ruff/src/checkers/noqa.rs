@@ -3,8 +3,8 @@
 use std::path::Path;
 
 use itertools::Itertools;
+use ruff_python_ast::Ranged;
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_ast::Ranged;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_source_file::Locator;

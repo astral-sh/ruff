@@ -30,11 +30,11 @@ use std::path::Path;
 
 use itertools::Itertools;
 use log::error;
-use ruff_text_size::{TextRange, TextSize};
-use rustpython_ast::{
+use ruff_python_ast::{
     self as ast, Arg, ArgWithDefault, Arguments, Comprehension, Constant, ElifElseClause,
     ExceptHandler, Expr, ExprContext, Keyword, Pattern, Ranged, Stmt, Suite, UnaryOp,
 };
+use ruff_text_size::{TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, IsolationLevel};
 use ruff_python_ast::all::{extract_all_names, DunderAllFlags};
@@ -1547,10 +1547,10 @@ impl<'a> Checker<'a> {
     }
 
     fn handle_node_load(&mut self, expr: &Expr) {
-        let Expr::Name(ast::ExprName { id, .. }) = expr else {
+        let Expr::Name(expr) = expr else {
             return;
         };
-        self.semantic.resolve_load(id, expr.range());
+        self.semantic.resolve_load(expr);
     }
 
     fn handle_node_store(&mut self, id: &'a str, expr: &Expr) {

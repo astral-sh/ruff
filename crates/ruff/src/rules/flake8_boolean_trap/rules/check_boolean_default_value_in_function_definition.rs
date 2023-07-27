@@ -1,4 +1,4 @@
-use rustpython_ast::{ArgWithDefault, Arguments, Decorator};
+use ruff_python_ast::{ArgWithDefault, Arguments, Decorator};
 
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};

@@ -1,8 +1,8 @@
 use std::fmt;
 
-use rustpython_ast::Expr;
-use rustpython_ast::Ranged;
-use rustpython_parser::ast;
+use ruff_python_ast as ast;
+use ruff_python_ast::Expr;
+use ruff_python_ast::Ranged;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};

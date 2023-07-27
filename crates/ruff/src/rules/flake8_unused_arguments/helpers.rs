@@ -1,4 +1,4 @@
-use rustpython_ast::{self as ast, Constant, Expr, Stmt};
+use ruff_python_ast::{self as ast, Constant, Expr, Stmt};
 
 use ruff_python_ast::helpers::is_docstring_stmt;
 

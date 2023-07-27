@@ -1,4 +1,4 @@
-use rustpython_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Expr};
 
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_semantic::{BindingKind, SemanticModel};

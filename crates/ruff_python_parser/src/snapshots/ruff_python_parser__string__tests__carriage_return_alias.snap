@@ -1,0 +1,20 @@
+---
+source: crates/ruff_python_parser/src/string.rs
+expression: parse_ast
+---
+[
+    Expr(
+        StmtExpr {
+            range: 0..21,
+            value: Constant(
+                ExprConstant {
+                    range: 0..21,
+                    value: Str(
+                        "\r",
+                    ),
+                    kind: None,
+                },
+            ),
+        },
+    ),
+]

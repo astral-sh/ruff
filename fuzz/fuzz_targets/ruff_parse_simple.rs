@@ -4,10 +4,10 @@
 #![no_main]
 
 use libfuzzer_sys::{fuzz_target, Corpus};
+use ruff_python_ast::Suite;
 use ruff_python_codegen::{Generator, Stylist};
+use ruff_python_parser::{lexer, Mode, Parse, ParseError};
 use ruff_source_file::Locator;
-use rustpython_ast::Suite;
-use rustpython_parser::{lexer, Mode, Parse, ParseError};
 
 fn do_fuzz(case: &[u8]) -> Corpus {
     let Ok(code) = std::str::from_utf8(case) else {

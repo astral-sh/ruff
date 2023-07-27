@@ -1,6 +1,6 @@
+use crate::{ElifElseClause, Expr, Ranged, Stmt, StmtIf};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::TextRange;
-use rustpython_ast::{ElifElseClause, Expr, Ranged, Stmt, StmtIf};
 use std::iter;
 
 /// Return the `Range` of the first `Elif` or `Else` token in an `If` statement.
@@ -42,36 +42,4 @@ pub fn if_elif_branches(stmt_if: &StmtIf) -> impl Iterator<Item = IfElifBranch> 
 }
 
 #[cfg(test)]
-mod test {
-    use crate::stmt_if::elif_else_range;
-    use ruff_text_size::TextSize;
-    use rustpython_ast::Stmt;
-    use rustpython_parser::{Parse, ParseError};
-
-    #[test]
-    fn extract_elif_else_range() -> Result<(), ParseError> {
-        let contents = "if a:
-    ...
-elif b:
-    ...
-";
-        let stmt = Stmt::parse(contents, "<filename>")?;
-        let stmt = Stmt::as_if_stmt(&stmt).unwrap();
-        let range = elif_else_range(&stmt.elif_else_clauses[0], contents).unwrap();
-        assert_eq!(range.start(), TextSize::from(14));
-        assert_eq!(range.end(), TextSize::from(18));
-
-        let contents = "if a:
-    ...
-else:
-    ...
-";
-        let stmt = Stmt::parse(contents, "<filename>")?;
-        let stmt = Stmt::as_if_stmt(&stmt).unwrap();
-        let range = elif_else_range(&stmt.elif_else_clauses[0], contents).unwrap();
-        assert_eq!(range.start(), TextSize::from(14));
-        assert_eq!(range.end(), TextSize::from(18));
-
-        Ok(())
-    }
-}
+mod test {}

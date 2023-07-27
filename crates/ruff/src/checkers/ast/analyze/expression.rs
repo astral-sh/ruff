@@ -1,5 +1,5 @@
-use rustpython_ast::{self as ast, Constant, Expr, ExprContext, Operator, Ranged};
-use rustpython_format::cformat::{CFormatError, CFormatErrorType};
+use ruff_python_ast::{self as ast, Constant, Expr, ExprContext, Operator, Ranged};
+use ruff_python_literal::cformat::{CFormatError, CFormatErrorType};
 
 use ruff_diagnostics::Diagnostic;
 

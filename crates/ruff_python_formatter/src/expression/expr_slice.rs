@@ -1,5 +1,5 @@
+use ruff_python_ast::{Expr, ExprSlice, ExprUnaryOp, Ranged, UnaryOp};
 use ruff_text_size::TextRange;
-use rustpython_ast::{Expr, ExprSlice, ExprUnaryOp, Ranged, UnaryOp};
 
 use ruff_formatter::prelude::{hard_line_break, line_suffix_boundary, space, text};
 use ruff_formatter::{write, Buffer, Format, FormatError, FormatResult};

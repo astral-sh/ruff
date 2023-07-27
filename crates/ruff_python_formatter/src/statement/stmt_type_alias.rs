@@ -1,6 +1,6 @@
 use crate::{not_yet_implemented_custom_text, FormatNodeRule, PyFormatter};
 use ruff_formatter::{write, Buffer, FormatResult};
-use rustpython_ast::StmtTypeAlias;
+use ruff_python_ast::StmtTypeAlias;
 
 #[derive(Default)]
 pub struct FormatStmtTypeAlias;

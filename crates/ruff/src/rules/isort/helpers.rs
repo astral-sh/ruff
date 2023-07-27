@@ -1,5 +1,5 @@
-use rustpython_ast::{Ranged, Stmt};
-use rustpython_parser::{lexer, Mode, Tok};
+use ruff_python_ast::{Ranged, Stmt};
+use ruff_python_parser::{lexer, Mode, Tok};
 
 use ruff_python_trivia::PythonWhitespace;
 use ruff_source_file::{Locator, UniversalNewlines};

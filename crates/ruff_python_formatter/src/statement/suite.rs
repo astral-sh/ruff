@@ -1,4 +1,4 @@
-use rustpython_ast::{Ranged, Stmt, Suite};
+use ruff_python_ast::{Ranged, Stmt, Suite};
 
 use ruff_formatter::{
     format_args, write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions,
@@ -170,8 +170,8 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Suite {
 
 #[cfg(test)]
 mod tests {
-    use rustpython_ast::Suite;
-    use rustpython_parser::Parse;
+    use ruff_python_ast::Suite;
+    use ruff_python_parser::Parse;
 
     use ruff_formatter::format;
 

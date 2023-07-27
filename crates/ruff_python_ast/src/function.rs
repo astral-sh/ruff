@@ -1,8 +1,8 @@
 use crate::node::AnyNodeRef;
-use ruff_text_size::TextRange;
-use rustpython_ast::{
+use crate::{
     Arguments, Decorator, Expr, Identifier, Ranged, StmtAsyncFunctionDef, StmtFunctionDef, Suite,
 };
+use ruff_text_size::TextRange;
 
 /// Enum that represents any python function definition.
 #[derive(Copy, Clone, PartialEq, Debug)]

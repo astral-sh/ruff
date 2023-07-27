@@ -1,5 +1,5 @@
+use ruff_python_parser::ParseError;
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_parser::ParseError;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};

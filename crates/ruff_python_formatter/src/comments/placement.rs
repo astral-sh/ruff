@@ -1,11 +1,10 @@
 use std::cmp::Ordering;
 
-use ruff_text_size::TextRange;
-use rustpython_parser::ast;
-use rustpython_parser::ast::{
-    Arguments, Comprehension, Expr, ExprAttribute, ExprBinOp, ExprIfExp, ExprSlice, ExprStarred,
-    MatchCase, Ranged,
+use ruff_python_ast::{
+    self as ast, Arguments, Comprehension, Expr, ExprAttribute, ExprBinOp, ExprIfExp, ExprSlice,
+    ExprStarred, MatchCase, Ranged,
 };
+use ruff_text_size::TextRange;
 
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
 use ruff_python_ast::whitespace::indentation;

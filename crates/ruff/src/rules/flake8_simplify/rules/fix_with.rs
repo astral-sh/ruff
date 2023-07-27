@@ -1,6 +1,6 @@
 use anyhow::{bail, Result};
 use libcst_native::{CompoundStatement, Statement, Suite, With};
-use rustpython_ast::Ranged;
+use ruff_python_ast::Ranged;
 
 use crate::autofix::codemods::CodegenStylist;
 use ruff_diagnostics::Edit;
@@ -14,7 +14,7 @@ use crate::cst::matchers::{match_function_def, match_indented_block, match_state
 pub(crate) fn fix_multiple_with_statements(
     locator: &Locator,
     stylist: &Stylist,
-    stmt: &rustpython_ast::Stmt,
+    stmt: &ruff_python_ast::Stmt,
 ) -> Result<Edit> {
     // Infer the indentation of the outer block.
     let Some(outer_indent) = whitespace::indentation(locator, stmt) else {

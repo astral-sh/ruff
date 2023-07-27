@@ -4,8 +4,8 @@ use std::path::PathBuf;
 
 use anyhow::{bail, Context, Result};
 use clap::{command, Parser, ValueEnum};
-use rustpython_parser::lexer::lex;
-use rustpython_parser::{parse_tokens, Mode};
+use ruff_python_parser::lexer::lex;
+use ruff_python_parser::{parse_tokens, Mode};
 
 use ruff_formatter::SourceCode;
 use ruff_python_index::CommentRangesBuilder;

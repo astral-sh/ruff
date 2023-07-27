@@ -1,10 +1,10 @@
 use std::iter::Peekable;
 
-use ruff_text_size::{TextRange, TextSize};
-use rustpython_ast::{
+use ruff_python_ast::{
     Alias, Arg, ArgWithDefault, Arguments, Comprehension, Decorator, ElifElseClause, ExceptHandler,
     Expr, Keyword, MatchCase, Mod, Pattern, Ranged, Stmt, TypeParam, WithItem,
 };
+use ruff_text_size::{TextRange, TextSize};
 
 use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::node::AnyNodeRef;

@@ -1,4 +1,4 @@
-use rustpython_ast::{self as ast, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};

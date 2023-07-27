@@ -1,8 +1,8 @@
 use std::ops::{Deref, DerefMut};
 
 use bitflags::bitflags;
+use ruff_python_ast::Ranged;
 use ruff_text_size::TextRange;
-use rustpython_ast::Ranged;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
 use ruff_source_file::Locator;
@@ -94,9 +94,9 @@ impl<'a> Binding<'a> {
         )
     }
 
-    /// Return `true` if this [`Binding`] represents an private variable
+    /// Return `true` if this [`Binding`] represents an private declaration
     /// (e.g., `_x` in `_x = "private variable"`)
-    pub const fn is_private_variable(&self) -> bool {
+    pub const fn is_private_declaration(&self) -> bool {
         self.flags.contains(BindingFlags::PRIVATE_DECLARATION)
     }
 

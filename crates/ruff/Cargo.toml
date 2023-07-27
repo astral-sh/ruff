@@ -22,12 +22,13 @@ ruff_macros = { path = "../ruff_macros" }
 ruff_python_ast = { path = "../ruff_python_ast", features = ["serde"] }
 ruff_python_codegen = { path = "../ruff_python_codegen" }
 ruff_python_index = { path = "../ruff_python_index" }
+ruff_python_literal = { path = "../ruff_python_literal" }
 ruff_python_semantic = { path = "../ruff_python_semantic" }
 ruff_python_stdlib = { path = "../ruff_python_stdlib" }
 ruff_python_trivia = { path = "../ruff_python_trivia" }
 ruff_python_parser = { path = "../ruff_python_parser" }
 ruff_source_file = { path = "../ruff_source_file", features = ["serde"] }
-ruff_text_size = { workspace = true }
+ruff_text_size = { path = "../ruff_text_size" }
 
 annotate-snippets = { version = "0.9.1", features = ["color"] }
 anyhow = { workspace = true }
@@ -61,9 +62,8 @@ quick-junit = { version = "0.3.2" }
 regex = { workspace = true }
 result-like = { version = "0.4.6" }
 rustc-hash = { workspace = true }
-rustpython-format = { workspace = true }
-rustpython-parser = { workspace = true }
-rustpython-ast = { workspace = true }
+
+
 schemars = { workspace = true, optional = true }
 semver = { version = "1.0.16" }
 serde = { workspace = true }

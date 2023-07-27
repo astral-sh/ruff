@@ -6,8 +6,8 @@ use std::path::Path;
 #[cfg(not(fuzzing))]
 use anyhow::Result;
 use itertools::Itertools;
+use ruff_python_parser::lexer::LexResult;
 use rustc_hash::FxHashMap;
-use rustpython_parser::lexer::LexResult;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic};
 use ruff_python_codegen::Stylist;

@@ -1,4 +1,4 @@
-use rustpython_ast::{Ranged, StmtFunctionDef};
+use ruff_python_ast::{Ranged, StmtFunctionDef};
 
 use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule};
 use ruff_python_ast::function::AnyFunctionDefinition;

@@ -2,7 +2,7 @@ use anyhow::{bail, Result};
 use libcst_native::{
     ConcatenatedString, Expression, FormattedStringContent, FormattedStringExpression,
 };
-use rustpython_ast::{self as ast, Expr, Ranged};
+use ruff_python_ast::{self as ast, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};

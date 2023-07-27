@@ -4,7 +4,7 @@ use crate::{AsFormat, FormatNodeRule, PyFormatter};
 use ruff_formatter::prelude::{space, text};
 use ruff_formatter::{write, Buffer, FormatResult};
 use ruff_python_ast::node::AnyNodeRef;
-use rustpython_ast::ExprNamedExpr;
+use ruff_python_ast::ExprNamedExpr;
 
 #[derive(Default)]
 pub struct FormatExprNamedExpr;

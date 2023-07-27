@@ -8,8 +8,8 @@ use std::path::Path;
 use anyhow::Result;
 use itertools::Itertools;
 use log::warn;
+use ruff_python_ast::Ranged;
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_ast::Ranged;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_source_file::{LineEnding, Locator};

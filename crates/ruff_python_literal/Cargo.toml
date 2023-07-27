@@ -1,0 +1,25 @@
+[package]
+name = "ruff_python_literal"
+version = "0.0.0"
+publish = false
+description = "Common literal handling utilities mostly useful for unparse and repr."
+authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>", "RustPython Team"]
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+bitflags = { workspace = true }
+hexf-parse = "0.2.1"
+is-macro.workspace = true
+itertools = { workspace = true }
+lexical-parse-float = { version = "0.8.0", features = ["format"] }
+num-bigint = { workspace = true }
+num-traits = { workspace = true }
+unic-ucd-category = "0.9"
+
+[dev-dependencies]
+rand = "0.8.5"

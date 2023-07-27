@@ -30,7 +30,7 @@ ruff_source_file = { path = "../ruff_source_file" }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 console_log = { version = "1.0.0" }
 log = { workspace = true }
-rustpython-parser = { workspace = true }
+
 serde = { workspace = true }
 serde-wasm-bindgen = { version = "0.5.0" }
 wasm-bindgen = { version = "0.2.84" }

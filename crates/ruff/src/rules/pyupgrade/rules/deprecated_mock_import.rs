@@ -4,7 +4,7 @@ use libcst_native::{
     ImportNames, Name, NameOrAttribute, ParenthesizableWhitespace,
 };
 use log::error;
-use rustpython_ast::{self as ast, Expr, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Expr, Ranged, Stmt};
 
 use crate::autofix::codemods::CodegenStylist;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};

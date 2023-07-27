@@ -1,4 +1,4 @@
-use rustpython_ast::{self as ast, Constant, Expr, Ranged};
+use ruff_python_ast::{self as ast, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 

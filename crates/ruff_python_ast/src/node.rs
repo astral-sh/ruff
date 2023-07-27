@@ -1,9 +1,9 @@
-use ruff_text_size::TextRange;
-use rustpython_ast::{
+use crate::{
     self as ast, Alias, Arg, ArgWithDefault, Arguments, Comprehension, Decorator, ExceptHandler,
     Expr, Keyword, MatchCase, Mod, Pattern, Ranged, Stmt, TypeIgnore, TypeParam,
     TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
 };
+use ruff_text_size::TextRange;
 use std::ptr::NonNull;
 
 pub trait AstNode: Ranged {

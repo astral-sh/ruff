@@ -10,10 +10,10 @@ use serde::Serialize;
 use serde_json::error::Category;
 
 use ruff_diagnostics::Diagnostic;
+use ruff_python_parser::lexer::lex;
+use ruff_python_parser::Mode;
 use ruff_source_file::{NewlineWithTrailingNewline, UniversalNewlineIterator};
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::lexer::lex;
-use rustpython_parser::Mode;
 
 use crate::autofix::source_map::{SourceMap, SourceMarker};
 use crate::jupyter::index::JupyterIndex;

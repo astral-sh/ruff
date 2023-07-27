@@ -1,5 +1,5 @@
-use rustpython_ast::{Constant, Expr, Keyword, Ranged};
-use rustpython_parser::ast;
+use ruff_python_ast as ast;
+use ruff_python_ast::{Constant, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};

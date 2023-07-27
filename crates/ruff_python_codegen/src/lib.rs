@@ -2,9 +2,9 @@ mod generator;
 mod stylist;
 
 pub use generator::Generator;
+use ruff_python_ast::Suite;
+use ruff_python_parser::{lexer, Mode, Parse, ParseError};
 use ruff_source_file::Locator;
-use rustpython_ast::Suite;
-use rustpython_parser::{lexer, Mode, Parse, ParseError};
 pub use stylist::{Quote, Stylist};
 
 /// Run round-trip source code generation on a given Python code.

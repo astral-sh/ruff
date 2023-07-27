@@ -1,11 +1,11 @@
 use std::usize;
 
+use ruff_python_ast::{Arguments, Ranged};
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_ast::{Arguments, Ranged};
 
 use ruff_formatter::{format_args, write, FormatRuleWithOptions};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
-use ruff_python_trivia::{first_non_trivia_token, SimpleToken, SimpleTokenKind, SimpleTokenizer};
+use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 
 use crate::comments::{
     dangling_comments, leading_comments, leading_node_comments, trailing_comments,
@@ -160,34 +160,31 @@ impl FormatNodeRule<Arguments> for FormatArguments {
 
             joiner.finish()?;
 
-            write!(f, [if_group_breaks(&text(","))])?;
+            // Functions use the regular magic trailing comma logic, lambdas may or may not have
+            // a trailing comma but it's just preserved without any magic.
+            // ```python
+            // # Add magic trailing comma if its expands
+            // def f(a): pass
+            // # Expands if magic trailing comma setting is respect, otherwise remove the comma
+            // def g(a,): pass
+            // # Never expands
+            // x1 = lambda y: 1
+            // # Never expands, the comma is always preserved
+            // x2 = lambda y,: 1
+            // ```
+            if self.parentheses == ArgumentsParentheses::Never {
+                // For lambdas (no parentheses), preserve the trailing comma. It doesn't
+                // behave like a magic trailing comma, it's just preserved
+                if has_trailing_comma(item, last_node, f.context().source()) {
+                    write!(f, [text(",")])?;
+                }
+            } else {
+                write!(f, [if_group_breaks(&text(","))])?;
 
-            // Expand the group if the source has a trailing *magic* comma.
-            if let Some(last_node) = last_node {
-                let ends_with_pos_only_argument_separator = !posonlyargs.is_empty()
-                    && args.is_empty()
-                    && vararg.is_none()
-                    && kwonlyargs.is_empty()
-                    && kwarg.is_none();
-
-                let maybe_comma_token = if ends_with_pos_only_argument_separator {
-                    // `def a(b, c, /): ... `
-                    let mut tokens =
-                        SimpleTokenizer::starts_at(last_node.end(), f.context().source())
-                            .skip_trivia();
-
-                    let comma = tokens.next();
-                    assert!(matches!(comma, Some(SimpleToken { kind: SimpleTokenKind::Comma, .. })), "The last positional only argument must be separated by a `,` from the positional only arguments separator `/` but found '{comma:?}'.");
-
-                    let slash = tokens.next();
-                    assert!(matches!(slash, Some(SimpleToken { kind: SimpleTokenKind::Slash, .. })), "The positional argument separator must be present for a function that has positional only arguments but found '{slash:?}'.");
-
-                    tokens.next()
-                } else {
-                    first_non_trivia_token(last_node.end(), f.context().source())
-                };
-
-                if maybe_comma_token.map_or(false, |token| token.kind() == SimpleTokenKind::Comma) {
+                if f.options().magic_trailing_comma().is_respect()
+                    && has_trailing_comma(item, last_node, f.context().source())
+                {
+                    // Make the magic trailing comma expand the group
                     write!(f, [hard_line_break()])?;
                 }
             }
@@ -590,4 +587,34 @@ pub(crate) enum ArgumentSeparatorCommentLocation {
     SlashTrailing,
     StarLeading,
     StarTrailing,
+}
+
+fn has_trailing_comma(arguments: &Arguments, last_node: Option<AnyNodeRef>, source: &str) -> bool {
+    // No nodes, no trailing comma
+    let Some(last_node) = last_node else {
+        return false;
+    };
+
+    let ends_with_pos_only_argument_separator = !arguments.posonlyargs.is_empty()
+        && arguments.args.is_empty()
+        && arguments.vararg.is_none()
+        && arguments.kwonlyargs.is_empty()
+        && arguments.kwarg.is_none();
+
+    let mut tokens = SimpleTokenizer::starts_at(last_node.end(), source).skip_trivia();
+    // `def a(b, c, /): ... `
+    // The slash lacks its own node
+    if ends_with_pos_only_argument_separator {
+        let comma = tokens.next();
+        assert!(matches!(comma, Some(SimpleToken { kind: SimpleTokenKind::Comma, .. })), "The last positional only argument must be separated by a `,` from the positional only arguments separator `/` but found '{comma:?}'.");
+
+        let slash = tokens.next();
+        assert!(matches!(slash, Some(SimpleToken { kind: SimpleTokenKind::Slash, .. })), "The positional argument separator must be present for a function that has positional only arguments but found '{slash:?}'.");
+    }
+
+    tokens
+        .next()
+        .expect("There must be a token after the argument list")
+        .kind()
+        == SimpleTokenKind::Comma
 }

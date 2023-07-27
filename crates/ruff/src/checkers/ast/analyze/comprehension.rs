@@ -1,4 +1,4 @@
-use rustpython_ast::Comprehension;
+use ruff_python_ast::Comprehension;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;

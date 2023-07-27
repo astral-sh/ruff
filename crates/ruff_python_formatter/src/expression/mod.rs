@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 
-use rustpython_ast::{Expr, Operator};
-use rustpython_parser::ast;
+use ruff_python_ast as ast;
+use ruff_python_ast::{Expr, Operator};
 
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions};
 use ruff_python_ast::node::AnyNodeRef;
@@ -383,7 +383,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 }
             }
 
-            // `[a, b].test[300].dot`
+            // `[a, b].test.test[300].dot`
             Expr::Attribute(ast::ExprAttribute {
                 range: _,
                 value,

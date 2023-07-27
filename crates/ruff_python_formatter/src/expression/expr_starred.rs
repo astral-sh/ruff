@@ -1,4 +1,4 @@
-use rustpython_ast::ExprStarred;
+use ruff_python_ast::ExprStarred;
 
 use ruff_formatter::write;
 use ruff_python_ast::node::AnyNodeRef;

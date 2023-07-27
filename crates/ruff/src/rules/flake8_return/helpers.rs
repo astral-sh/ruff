@@ -1,6 +1,6 @@
+use ruff_python_ast as ast;
+use ruff_python_ast::{Expr, Ranged, Stmt};
 use ruff_text_size::TextSize;
-use rustpython_ast::{Expr, Ranged, Stmt};
-use rustpython_parser::ast;
 
 use ruff_source_file::{Locator, UniversalNewlines};
 
