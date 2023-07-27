@@ -35,7 +35,7 @@ impl Ranged for AnyExpressionYield<'_> {
     }
 }
 
-impl NeedsParentheses for ExprYield {
+impl NeedsParentheses for AnyExpressionYield<'_> {
     fn needs_parentheses(
         &self,
         parent: AnyNodeRef,
@@ -107,5 +107,15 @@ pub struct FormatExprYield;
 impl FormatNodeRule<ExprYield> for FormatExprYield {
     fn fmt_fields(&self, item: &ExprYield, f: &mut PyFormatter) -> FormatResult<()> {
         AnyExpressionYield::from(item).fmt(f)
+    }
+}
+
+impl NeedsParentheses for ExprYield {
+    fn needs_parentheses(
+        &self,
+        parent: AnyNodeRef,
+        context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        AnyExpressionYield::from(self).needs_parentheses(parent, context)
     }
 }
