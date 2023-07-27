@@ -1,5 +1,0 @@
-parser/src/python.rs	linguist-generated
-**/*.snap      	linguist-generated -merge
-**/*.lalrpop    text eol=LF
-**/*.py		text working-tree-encoding=UTF-8 eol=LF
-**/*.rs		text working-tree-encoding=UTF-8 eol=LF
