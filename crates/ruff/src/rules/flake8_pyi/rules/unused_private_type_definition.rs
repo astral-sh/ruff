@@ -199,7 +199,7 @@ pub(crate) fn unused_private_protocol(
 /// PYI047
 pub(crate) fn unused_private_type_alias(
     checker: &Checker,
-    binding: &Binding,
+    binding: &Scope,
 ) -> Option<Diagnostic> {
     if !(binding.kind.is_assignment() && binding.is_private_declaration()) {
         return None;
