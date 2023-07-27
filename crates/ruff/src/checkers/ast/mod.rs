@@ -1366,8 +1366,8 @@ where
         // Step 1: Binding
         match type_param {
             ast::TypeParam::TypeVar(ast::TypeParamTypeVar { name, range, .. })
-            | ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { name, range, .. })
-            | ast::TypeParam::ParamSpec(ast::TypeParamParamSpec { name, range, .. }) => {
+            | ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { name, range })
+            | ast::TypeParam::ParamSpec(ast::TypeParamParamSpec { name, range }) => {
                 self.add_binding(
                     name.as_str(),
                     *range,
@@ -1749,13 +1749,11 @@ impl<'a> Checker<'a> {
             for (type_param, snapshot) in type_params {
                 self.semantic.restore(snapshot);
 
-                match type_param {
-                    ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
-                        bound: Some(bound), ..
-                    }) => {
-                        self.visit_expr(bound);
-                    }
-                    _ => {}
+                if let ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
+                    bound: Some(bound), ..
+                }) = type_param
+                {
+                    self.visit_expr(bound);
                 }
             }
         }
