@@ -62,8 +62,9 @@ pub(crate) fn test_notebook_path(
     path: impl AsRef<Path>,
     expected: impl AsRef<Path>,
     settings: &Settings,
-) -> Result<(Vec<Message>, SourceKind)> {
+) -> Result<(Vec<Message>, SourceKind, SourceKind)> {
     let mut source_kind = SourceKind::Jupyter(read_jupyter_notebook(path.as_ref())?);
+    let original_source_kind = source_kind.clone();
     let messages = test_contents(&mut source_kind, path.as_ref(), settings);
     let expected_notebook = read_jupyter_notebook(expected.as_ref())?;
     if let SourceKind::Jupyter(notebook) = &source_kind {
@@ -71,7 +72,7 @@ pub(crate) fn test_notebook_path(
         assert_eq!(notebook.index(), expected_notebook.index());
         assert_eq!(notebook.content(), expected_notebook.content());
     };
-    Ok((messages, source_kind))
+    Ok((messages, original_source_kind, source_kind))
 }
 
 /// Run [`check_path`] on a snippet of Python code.

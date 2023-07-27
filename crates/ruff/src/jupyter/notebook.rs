@@ -563,7 +563,7 @@ print("after empty cells")
     #[test]
     fn test_import_sorting() -> Result<()> {
         let path = "isort.ipynb".to_string();
-        let (diagnostics, source_kind) = test_notebook_path(
+        let (diagnostics, source_kind, _) = test_notebook_path(
             &path,
             Path::new("isort_expected.ipynb"),
             &settings::Settings::for_rule(Rule::UnsortedImports),
@@ -575,7 +575,7 @@ print("after empty cells")
     #[test]
     fn test_line_magics() -> Result<()> {
         let path = "line_magics.ipynb".to_string();
-        let (diagnostics, source_kind) = test_notebook_path(
+        let (diagnostics, source_kind, _) = test_notebook_path(
             &path,
             Path::new("line_magics_expected.ipynb"),
             &settings::Settings::for_rule(Rule::UnusedImport),
@@ -587,7 +587,7 @@ print("after empty cells")
     #[test]
     fn test_json_consistency() -> Result<()> {
         let path = "before_fix.ipynb".to_string();
-        let (_, source_kind) = test_notebook_path(
+        let (_, _, source_kind) = test_notebook_path(
             path,
             Path::new("after_fix.ipynb"),
             &settings::Settings::for_rule(Rule::UnusedImport),

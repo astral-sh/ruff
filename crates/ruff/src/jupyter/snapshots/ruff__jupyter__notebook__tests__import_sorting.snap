@@ -47,18 +47,16 @@ isort.ipynb:cell 2:1:1: I001 [*] Import block is un-sorted or un-formatted
 7 9 | def foo():
 8 10 |     pass
 
-isort.ipynb:cell 2:6:1: I001 [*] Import block is un-sorted or un-formatted
-   |
- 4 |   def foo():
- 5 |       pass
- 6 | / from pathlib import Path
- 7 | | import sys
- 8 | | 
- 9 | | %matplotlib \
-   | |_^ I001
-10 |       --inline
-   |
-   = help: Organize imports
+isort.ipynb:cell 3:1:1: I001 [*] Import block is un-sorted or un-formatted
+  |
+1 | / from pathlib import Path
+2 | | import sys
+3 | | 
+4 | | %matplotlib \
+  | |_^ I001
+5 |       --inline
+  |
+  = help: Organize imports
 
 ℹ Fix
 6  6  | # Newline should be added here
@@ -71,12 +69,12 @@ isort.ipynb:cell 2:6:1: I001 [*] Import block is un-sorted or un-formatted
 12 12 | %matplotlib \
 13 13 |     --inline
 
-isort.ipynb:cell 3:5:1: I001 [*] Import block is un-sorted or un-formatted
+isort.ipynb:cell 3:7:1: I001 [*] Import block is un-sorted or un-formatted
   |
-3 |       --inline
-4 |   
-5 | / import math
-6 | | import abc
+5 |       --inline
+6 |   
+7 | / import math
+8 | | import abc
   |
   = help: Organize imports
 
