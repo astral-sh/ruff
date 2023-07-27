@@ -12,9 +12,11 @@ use crate::checkers::ast::Checker;
 /// ## Why is this bad?
 /// `jinja2` templates that use `autoescape=False` are vulnerable to cross-site
 /// scripting (XSS) attacks that allow attackers to execute arbitrary
-/// JavaScript. By default, `jinja2` sets `autoescape` to `False`, so it is
-/// important to set `autoescape=True` or use the `select_autoescape` function
-/// to mitigate XSS vulnerabilities.
+/// JavaScript.
+///
+/// By default, `jinja2` sets `autoescape` to `False`, so it is important to
+/// set `autoescape=True` or use the `select_autoescape` function to mitigate
+/// XSS vulnerabilities.
 ///
 /// ## Example
 /// ```python

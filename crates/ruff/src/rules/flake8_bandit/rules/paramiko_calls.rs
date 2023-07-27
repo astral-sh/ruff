@@ -11,7 +11,7 @@ use crate::checkers::ast::Checker;
 /// ## Why is this bad?
 /// `paramiko` calls allow users to execute arbitrary shell commands on a
 /// remote machine. If the inputs to these calls are not properly sanitized,
-/// this can lead to shell injection vulnerabilities.
+/// they can be vulnerable to shell injection attacks.
 ///
 /// ## Example
 /// ```python
