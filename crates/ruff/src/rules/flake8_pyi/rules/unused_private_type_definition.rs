@@ -74,7 +74,7 @@ impl Violation for UnusedPrivateProtocol {
 
 /// PYI018
 pub(crate) fn unused_private_type_var(checker: &Checker, binding: &Binding) -> Option<Diagnostic> {
-    if !(binding.kind.is_assignment() && binding.is_private_variable()) {
+    if !(binding.kind.is_assignment() && binding.is_private_declaration()) {
         return None;
     }
     if binding.is_used() {
@@ -99,29 +99,37 @@ pub(crate) fn unused_private_type_var(checker: &Checker, binding: &Binding) -> O
     }
 
     Some(Diagnostic::new(
-        UnusedPrivateTypeVar {
-            name: id.to_string(),
-        },
+        UnusedPrivateTypeVar { name: id.to_string() },
         binding.range,
     ))
 }
 
 /// PYI046
 pub(crate) fn unused_private_protocol(checker: &Checker, binding: &Binding) -> Option<Diagnostic> {
-    if !binding.kind.is_class_definition() {
-        return None;
-    }
-    if !binding.is_private_protocol() {
+    if !(binding.kind.is_class_definition() && binding.is_private_declaration()) {
         return None;
     }
     if binding.is_used() {
         return None;
     }
 
+    let Some(source) = binding.source else {
+        return None;
+    };
+    let Stmt::ClassDef(ast::StmtClassDef {name, bases, ..}) = checker.semantic().stmts[source]
+    else {
+        return None;
+    };
+
+    if !bases
+        .iter()
+        .any(|base| checker.semantic().match_typing_expr(base, "Protocol"))
+    {
+        return None;
+    }
+
     Some(Diagnostic::new(
-        UnusedPrivateProtocol {
-            name: binding.name(checker.locator()).to_string(),
-        },
+        UnusedPrivateProtocol { name: name.to_string() },
         binding.range,
     ))
 }

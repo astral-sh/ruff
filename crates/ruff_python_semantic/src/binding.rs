@@ -94,9 +94,9 @@ impl<'a> Binding<'a> {
         )
     }
 
-    /// Return `true` if this [`Binding`] represents an private variable
+    /// Return `true` if this [`Binding`] represents an private declaration
     /// (e.g., `_x` in `_x = "private variable"`)
-    pub const fn is_private_variable(&self) -> bool {
+    pub const fn is_private_declaration(&self) -> bool {
         self.flags.contains(BindingFlags::PRIVATE_DECLARATION)
     }
 

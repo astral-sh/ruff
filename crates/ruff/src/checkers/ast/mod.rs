@@ -724,27 +724,16 @@ where
                     BindingFlags::empty(),
                 );
             }
-            Stmt::ClassDef(ast::StmtClassDef { name, bases, .. }) => {
-                let mut flags = BindingFlags::empty();
+            Stmt::ClassDef(ast::StmtClassDef { name, .. }) => {
                 let scope_id = self.semantic.scope_id;
                 self.deferred.scopes.push(scope_id);
                 self.semantic.pop_scope();
                 self.semantic.pop_definition();
-
-                if name.starts_with('_') {
-                    if bases
-                        .iter()
-                        .any(|base| self.semantic.match_typing_expr(base, "Protocol"))
-                    {
-                        flags |= BindingFlags::PRIVATE_TYPE_PROTOCOL;
-                    }
-                }
-
                 self.add_binding(
                     name,
                     stmt.identifier(),
                     BindingKind::ClassDefinition(scope_id),
-                    flags,
+                    BindingFlags::empty(),
                 );
             }
             _ => {}
