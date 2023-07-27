@@ -147,14 +147,14 @@ impl Violation for TabAfterComma {
 }
 
 /// ## What it does
-/// Checks for extraneous whitespace after a comma,
+/// Checks for extraneous whitespace after a comma.
 ///
 /// ## Why is this bad?
 /// According to the `black` code style, commas should be followed by a single space.
 ///
 /// ## Example
 /// ```python
-/// a = 4,  5
+/// a = 4,    5
 /// ```
 ///
 /// Use instead:
@@ -215,9 +215,7 @@ pub(crate) fn space_around_operator(line: &LogicalLine, context: &mut LogicalLin
 /// E241, E242
 pub(crate) fn space_after_comma(line: &LogicalLine, context: &mut LogicalLinesContext) {
     for token in line.tokens() {
-        let is_comma = token.kind() == TokenKind::Comma;
-
-        if is_comma {
+        if matches!(token.kind(), TokenKind::Comma) {
             match line.trailing_whitespace(token) {
                 (Whitespace::Tab, len) => {
                     context.push(TabAfterComma, TextRange::at(token.end(), len));
