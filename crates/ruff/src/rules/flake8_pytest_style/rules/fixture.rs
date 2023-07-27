@@ -130,10 +130,20 @@ impl Violation for PytestIncorrectFixtureNameUnderscore {
 }
 
 /// ## What it does
-/// Checks for fixtures without a value being injected as a parameter.
+/// Checks for `pytest` test functions that should be decorated with
+/// `@pytest.mark.usefixtures`.
 ///
 /// ## Why is this bad?
-/// Unused arguments can lead to confusion and should be avoided.
+/// In `pytest`, fixture injection is used to activate fixtures in a test
+/// function.
+///
+/// Fixtures can be injected either by passing them as parameters to the test
+/// function, or by using the `@pytest.mark.usefixtures` decorator.
+///
+/// If the test function depends on the fixture being activated, but does not
+/// use it in the test body or otherwise rely on its return value, prefer
+/// the `@pytest.mark.usefixtures` decorator, to make the dependency explicit
+/// and avoid the confusion caused by unused arguments.
 ///
 /// ## Example
 /// ```python
