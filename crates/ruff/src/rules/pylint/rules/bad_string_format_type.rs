@@ -2,8 +2,8 @@ use std::str::FromStr;
 
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
+use rustpython_ast::{self as ast, Constant, Expr, Ranged};
 use rustpython_format::cformat::{CFormatPart, CFormatSpec, CFormatStrOrBytes, CFormatString};
-use rustpython_parser::ast::{self, Constant, Expr, Ranged};
 use rustpython_parser::{lexer, Mode};
 
 use ruff_diagnostics::{Diagnostic, Violation};

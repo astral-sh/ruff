@@ -415,22 +415,22 @@ pub struct Options {
             src = ["src", "test"]
         "#
     )]
-    /// The source code paths to consider, e.g., when resolving first- vs.
-    /// third-party imports.
+    /// The directories to consider when resolving first- vs. third-party
+    /// imports.
     ///
     /// As an example: given a Python package structure like:
     ///
     /// ```text
-    /// my_package/
-    ///   pyproject.toml
-    ///   src/
-    ///     my_package/
-    ///       __init__.py
-    ///       foo.py
-    ///       bar.py
+    /// my_project
+    /// ├── pyproject.toml
+    /// └── src
+    ///     └── my_package
+    ///         ├── __init__.py
+    ///         ├── foo.py
+    ///         └── bar.py
     /// ```
     ///
-    /// The `src` directory should be included in the `src` option
+    /// The `./src` directory should be included in the `src` option
     /// (e.g., `src = ["src"]`), such that when resolving imports,
     /// `my_package.foo` is considered a first-party import.
     ///

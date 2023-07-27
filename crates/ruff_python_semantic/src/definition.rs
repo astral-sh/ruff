@@ -5,7 +5,7 @@ use std::fmt::Debug;
 use std::ops::Deref;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
-use rustpython_parser::ast::{self, Stmt};
+use rustpython_ast::{self as ast, Stmt};
 
 use crate::analyze::visibility::{
     class_visibility, function_visibility, method_visibility, ModuleSource, Visibility,

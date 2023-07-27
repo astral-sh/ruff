@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule};
-use rustpython_parser::ast::Stmt;
+use rustpython_ast::Stmt;
 
 pub(crate) mod stmt_ann_assign;
 pub(crate) mod stmt_assert;

@@ -1,7 +1,7 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Ranged, Stmt};
+use rustpython_ast::{self as ast, Ranged, Stmt};
 
-use ruff_python_ast::source_code::Locator;
+use ruff_source_file::Locator;
 
 use super::comments::Comment;
 use super::helpers::trailing_comma;

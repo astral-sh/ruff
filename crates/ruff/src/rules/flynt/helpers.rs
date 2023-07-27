@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, ConversionFlag, Expr};
+use rustpython_ast::{self as ast, Constant, ConversionFlag, Expr};
 
 /// Wrap an expression in a `FormattedValue` with no special formatting.
 fn to_formatted_value_expr(inner: &Expr) -> Expr {

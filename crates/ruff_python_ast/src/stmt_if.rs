@@ -1,20 +1,14 @@
-use crate::source_code::Locator;
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::TextRange;
 use rustpython_ast::{ElifElseClause, Expr, Ranged, Stmt, StmtIf};
-use rustpython_parser::{lexer, Mode, Tok};
 use std::iter;
 
 /// Return the `Range` of the first `Elif` or `Else` token in an `If` statement.
-pub fn elif_else_range(clause: &ElifElseClause, locator: &Locator) -> Option<TextRange> {
-    let contents = &locator.contents()[clause.range];
-    let token = lexer::lex_starts_at(contents, Mode::Module, clause.range.start())
-        .flatten()
+pub fn elif_else_range(clause: &ElifElseClause, contents: &str) -> Option<TextRange> {
+    let token = SimpleTokenizer::new(contents, clause.range)
+        .skip_trivia()
         .next()?;
-    if matches!(token.0, Tok::Elif | Tok::Else) {
-        Some(token.1)
-    } else {
-        None
-    }
+    matches!(token.kind, SimpleTokenKind::Elif | SimpleTokenKind::Else).then_some(token.range())
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -49,15 +43,13 @@ pub fn if_elif_branches(stmt_if: &StmtIf) -> impl Iterator<Item = IfElifBranch> 
 
 #[cfg(test)]
 mod test {
-    use crate::source_code::Locator;
     use crate::stmt_if::elif_else_range;
-    use anyhow::Result;
     use ruff_text_size::TextSize;
     use rustpython_ast::Stmt;
-    use rustpython_parser::Parse;
+    use rustpython_parser::{Parse, ParseError};
 
     #[test]
-    fn extract_elif_else_range() -> Result<()> {
+    fn extract_elif_else_range() -> Result<(), ParseError> {
         let contents = "if a:
     ...
 elif b:
@@ -65,8 +57,7 @@ elif b:
 ";
         let stmt = Stmt::parse(contents, "<filename>")?;
         let stmt = Stmt::as_if_stmt(&stmt).unwrap();
-        let locator = Locator::new(contents);
-        let range = elif_else_range(&stmt.elif_else_clauses[0], &locator).unwrap();
+        let range = elif_else_range(&stmt.elif_else_clauses[0], contents).unwrap();
         assert_eq!(range.start(), TextSize::from(14));
         assert_eq!(range.end(), TextSize::from(18));
 
@@ -77,8 +68,7 @@ else:
 ";
         let stmt = Stmt::parse(contents, "<filename>")?;
         let stmt = Stmt::as_if_stmt(&stmt).unwrap();
-        let locator = Locator::new(contents);
-        let range = elif_else_range(&stmt.elif_else_clauses[0], &locator).unwrap();
+        let range = elif_else_range(&stmt.elif_else_clauses[0], contents).unwrap();
         assert_eq!(range.start(), TextSize::from(14));
         assert_eq!(range.end(), TextSize::from(18));
 

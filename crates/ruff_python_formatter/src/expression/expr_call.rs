@@ -1,5 +1,5 @@
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{Expr, ExprCall, Ranged};
+use rustpython_ast::{Expr, ExprCall, Ranged};
 
 use crate::builders::empty_parenthesized_with_dangling_comments;
 use ruff_formatter::write;

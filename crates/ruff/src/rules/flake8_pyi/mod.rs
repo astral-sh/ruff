@@ -93,6 +93,8 @@ mod tests {
     #[test_case(Rule::TypeAliasWithoutAnnotation, Path::new("PYI026.pyi"))]
     #[test_case(Rule::UnsupportedMethodCallOnAll, Path::new("PYI056.py"))]
     #[test_case(Rule::UnsupportedMethodCallOnAll, Path::new("PYI056.pyi"))]
+    #[test_case(Rule::UnusedPrivateTypeVar, Path::new("PYI018.py"))]
+    #[test_case(Rule::UnusedPrivateTypeVar, Path::new("PYI018.pyi"))]
     #[test_case(Rule::UnusedPrivateProtocol, Path::new("PYI046.py"))]
     #[test_case(Rule::UnusedPrivateProtocol, Path::new("PYI046.pyi"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {

@@ -1,10 +1,10 @@
 use std::fmt;
 
-use rustpython_parser::ast::Ranged;
+use rustpython_ast::Ranged;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use rustpython_parser::ast::Arguments;
+use rustpython_ast::Arguments;
 
 use crate::checkers::ast::Checker;
 use crate::settings::types::PythonVersion::Py311;

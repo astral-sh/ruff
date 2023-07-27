@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr};
+use rustpython_ast::{self as ast, Expr};
 
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;

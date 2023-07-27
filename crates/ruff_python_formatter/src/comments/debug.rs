@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Formatter, Write};
 
 use itertools::Itertools;
-use rustpython_parser::ast::Ranged;
+use rustpython_ast::Ranged;
 
 use ruff_formatter::SourceCode;
 
@@ -179,7 +179,7 @@ impl Debug for DebugNodeCommentSlice<'_> {
 mod tests {
     use insta::assert_debug_snapshot;
     use ruff_text_size::{TextRange, TextSize};
-    use rustpython_parser::ast::{StmtBreak, StmtContinue};
+    use rustpython_ast::{StmtBreak, StmtContinue};
 
     use ruff_formatter::SourceCode;
     use ruff_python_ast::node::AnyNode;

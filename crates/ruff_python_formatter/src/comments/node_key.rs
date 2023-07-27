@@ -54,7 +54,7 @@ mod tests {
     use crate::comments::node_key::NodeRefEqualityKey;
     use ruff_python_ast::node::AnyNodeRef;
     use ruff_text_size::TextRange;
-    use rustpython_parser::ast::StmtContinue;
+    use rustpython_ast::StmtContinue;
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
 

@@ -5,7 +5,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use anyhow::Result;
-use rustpython_parser::ast::Suite;
+use rustpython_ast::Suite;
 use rustpython_parser::Parse;
 
 #[derive(clap::Args)]

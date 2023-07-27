@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprSubscript};
+use rustpython_ast::{Expr, ExprSubscript};
 
 use ruff_formatter::{format_args, write};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};

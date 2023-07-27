@@ -2,10 +2,10 @@ use std::ops::{Deref, DerefMut};
 
 use bitflags::bitflags;
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::Ranged;
+use rustpython_ast::Ranged;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
-use ruff_python_ast::source_code::Locator;
+use ruff_source_file::Locator;
 
 use crate::context::ExecutionContext;
 use crate::model::SemanticModel;
@@ -94,9 +94,10 @@ impl<'a> Binding<'a> {
         )
     }
 
-    /// Return `true` if this [`Binding`] represents a `typing.Protocol` definition.
-    pub const fn is_private_protocol(&self) -> bool {
-        self.flags.intersects(BindingFlags::PRIVATE_TYPE_PROTOCOL)
+    /// Return `true` if this [`Binding`] represents an private variable
+    /// (e.g., `_x` in `_x = "private variable"`)
+    pub const fn is_private_variable(&self) -> bool {
+        self.flags.contains(BindingFlags::PRIVATE_DECLARATION)
     }
 
     /// Return `true` if this binding redefines the given binding.
@@ -270,16 +271,13 @@ bitflags! {
         /// ```
         const INVALID_ALL_OBJECT = 1 << 6;
 
-        /// The binding represents a private `typing.Protocol`.
+        /// The binding represents a private declaration.
         ///
-        /// For example, the binding could be `_PrivateProtocol` in:
+        /// For example, the binding could be `_T` in:
         /// ```python
-        /// import typing
-        ///
-        /// class _PrivateProtocol(typing.Protocol):
-        ///     foo: int
+        /// _T = "This is a private variable"
         /// ```
-        const PRIVATE_TYPE_PROTOCOL = 1 << 7;
+        const PRIVATE_DECLARATION = 1 << 7;
     }
 }
 

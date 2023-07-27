@@ -14,6 +14,7 @@ license = { workspace = true }
 
 [dependencies]
 ruff_text_size = { workspace = true }
+ruff_source_file = { path = "../ruff_source_file" }
 
 memchr = { workspace = true }
 smallvec = { workspace = true }
@@ -21,3 +22,5 @@ unic-ucd-ident = "0.9.0"
 
 [dev-dependencies]
 insta = { workspace = true }
+rustpython-parser = { workspace = true }
+rustpython-ast = { workspace = true }

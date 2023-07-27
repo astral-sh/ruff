@@ -1,11 +1,11 @@
-use rustpython_parser::ast::{Expr, Ranged};
+use rustpython_ast::{Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 use crate::rules::flake8_use_pathlib::rules::{
-    OsPathGetatime, OsPathGetctime, OsPathGetmtime, OsPathGetsize,
+    Glob, OsPathGetatime, OsPathGetctime, OsPathGetmtime, OsPathGetsize,
 };
 use crate::rules::flake8_use_pathlib::violations::{
     BuiltinOpen, OsChmod, OsGetcwd, OsMakedirs, OsMkdir, OsPathAbspath, OsPathBasename,
@@ -89,6 +89,19 @@ pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, expr: &Expr) {
                 ["" | "builtin", "open"] => Some(BuiltinOpen.into()),
                 // PTH124
                 ["py", "path", "local"] => Some(PyPath.into()),
+                // PTH207
+                ["glob", "glob"] => Some(
+                    Glob {
+                        function: "glob".to_string(),
+                    }
+                    .into(),
+                ),
+                ["glob", "iglob"] => Some(
+                    Glob {
+                        function: "iglob".to_string(),
+                    }
+                    .into(),
+                ),
                 // PTH115
                 // Python 3.9+
                 ["os", "readlink"] if checker.settings.target_version >= PythonVersion::Py39 => {

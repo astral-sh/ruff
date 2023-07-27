@@ -88,13 +88,17 @@ def f():
         # comment
 
 if True:
-    def f2():
+    def f():
         pass
         # 1
-else:
-    def f2():
+elif True:
+    def f():
         pass
         # 2
+else:
+    def f():
+        pass
+        # 3
 
 if True: print("a") # 1
 elif True: print("b") # 2

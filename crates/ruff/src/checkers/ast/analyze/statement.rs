@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
+use rustpython_ast::{self as ast, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::helpers;

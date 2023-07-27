@@ -1,5 +1,5 @@
+use rustpython_ast::{self as ast, Constant, Expr, ExprContext, Operator, Ranged};
 use rustpython_format::cformat::{CFormatError, CFormatErrorType};
-use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Operator, Ranged};
 
 use ruff_diagnostics::Diagnostic;
 
@@ -849,6 +849,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 Rule::OsPathGetatime,
                 Rule::OsPathGetmtime,
                 Rule::OsPathGetctime,
+                Rule::Glob,
             ]) {
                 flake8_use_pathlib::rules::replaceable_by_pathlib(checker, func);
             }

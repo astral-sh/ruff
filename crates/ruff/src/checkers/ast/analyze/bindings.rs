@@ -10,6 +10,7 @@ pub(crate) fn bindings(checker: &mut Checker) {
         Rule::InvalidAllObject,
         Rule::UnaliasedCollectionsAbcSetImport,
         Rule::UnconventionalImportAlias,
+        Rule::UnusedPrivateTypeVar,
         Rule::UnusedVariable,
         Rule::UnusedPrivateProtocol,
     ]) {
@@ -64,7 +65,14 @@ pub(crate) fn bindings(checker: &mut Checker) {
                     checker.diagnostics.push(diagnostic);
                 }
             }
-            if checker.enabled(Rule::UnusedPrivateProtocol) {
+            if checker.enabled(Rule::UnusedPrivateTypeVar) {
+                if let Some(diagnostic) =
+                    flake8_pyi::rules::unused_private_type_var(checker, binding)
+                {
+                    checker.diagnostics.push(diagnostic);
+                }
+            }
+	    if checker.enabled(Rule::UnusedPrivateProtocol) {
                 if let Some(diagnostic) =
                     flake8_pyi::rules::unused_private_protocol(checker, binding)
                 {

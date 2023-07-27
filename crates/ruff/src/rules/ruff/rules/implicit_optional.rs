@@ -2,12 +2,12 @@ use std::fmt;
 
 use anyhow::Result;
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, ArgWithDefault, Arguments, Constant, Expr, Operator, Ranged};
+use rustpython_ast::{self as ast, ArgWithDefault, Arguments, Constant, Expr, Operator, Ranged};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_none;
-use ruff_python_ast::typing::parse_type_annotation;
+use ruff_python_parser::typing::parse_type_annotation;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
@@ -191,7 +191,8 @@ pub(crate) fn implicit_optional(checker: &mut Checker, arguments: &Arguments) {
         }) = annotation.as_ref()
         {
             // Quoted annotation.
-            if let Ok((annotation, kind)) = parse_type_annotation(string, *range, checker.locator())
+            if let Ok((annotation, kind)) =
+                parse_type_annotation(string, *range, checker.locator().contents())
             {
                 let Some(expr) = type_hint_explicitly_allows_none(
                     &annotation,

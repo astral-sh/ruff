@@ -270,42 +270,54 @@ first-party.
 For example, if you have a project with the following structure:
 
 ```tree
-.
+my_project
 ├── pyproject.toml
-├── src
-│   ├── __init__.py
-│   ├── module1.py
-│   └── module2.py
-└── tests
-    ├── __init__.py
-    ├── test_module1.py
-    └── test_module2.py
+└── src
+    └── foo
+        ├── __init__.py
+        └── bar
+            ├── __init__.py
+            └── baz.py
 ```
 
-When Ruff sees an import like `import module1`, it will then iterate over the `src` directories,
-looking for a corresponding Python module. You can configure Ruff to consider `src` and `tests` as
-first-party sources like so:
-
-```toml
-[tool.ruff]
-src = ["src", "tests"]
-```
+When Ruff sees an import like `import foo`, it will then iterate over the `src` directories,
+looking for a corresponding Python module (in reality, a directory named `foo` or a file named
+`foo.py`).
 
 If the `src` field is omitted, Ruff will default to using the "project root" as the only
 first-party source. The "project root" is typically the directory containing your `pyproject.toml`,
 `ruff.toml`, or `.ruff.toml` file, unless a configuration file is provided on the command-line via
 the `--config` option, in which case, the current working directory is used as the project root.
 
+In this case, Ruff would only check the top-level directory. Instead, we can configure Ruff to
+consider `src` as a first-party source like so:
+
+```toml
+[tool.ruff]
+# All paths are relative to the project root, which is the directory containing the pyproject.toml.
+src = ["src"]
+```
+
 If your `pyproject.toml`, `ruff.toml`, or `.ruff.toml` extends another configuration file, Ruff
-will still use the "extended" configuration file's directory as the project root. For example, if
-you add a `ruff.toml` to the `tests` directory in the above example, you'll want to explicitly
-set the `src` option in the extended configuration file:
+will still use the directory containing your `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file as
+the project root (as opposed to the directory of the file pointed to via the `extends` option).
+
+For example, if you add a `ruff.toml` to the `tests` directory in the above example, you'll want to
+explicitly set the `src` option in the extended configuration file:
 
 ```toml
 # tests/ruff.toml
 extend = "../pyproject.toml"
-src = ["../src", "../test"]
+src = ["../src"]
 ```
+
+Beyond this `src`-based detection, Ruff will also attempt to determine the current Python package
+for a given Python file, and mark imports from within the same package as first-party. For example,
+above, `baz.py` would be identified as part of the Python package beginning at
+`./my_project/src/foo`, and so any imports in `baz.py` that begin with `foo` (like `import foo.bar`)
+would be considered first-party based on this same-package heuristic.
+
+For a detailed explanation, see the [contributing guide](contributing.md).
 
 ## Does Ruff support Jupyter Notebooks?
 

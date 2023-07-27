@@ -4,13 +4,12 @@
 use std::iter::FusedIterator;
 
 use ruff_text_size::TextSize;
-use rustpython_parser::ast::{self, Constant, Expr, Ranged, Stmt, Suite};
+use rustpython_ast::{self as ast, Constant, Expr, Ranged, Stmt, Suite};
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
-use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
-use ruff_python_trivia::UniversalNewlineIterator;
+use ruff_source_file::{Locator, UniversalNewlineIterator};
 
 /// Extract doc lines (standalone comments) from a token sequence.
 pub(crate) fn doc_lines_from_tokens(lxr: &[LexResult]) -> DocLines {

@@ -1,14 +1,12 @@
 use anyhow::{bail, Result};
 use log::debug;
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{
-    self, Constant, Expr, ExprContext, Identifier, Keyword, Ranged, Stmt,
-};
+use rustpython_ast::{self as ast, Constant, Expr, ExprContext, Identifier, Keyword, Ranged, Stmt};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{find_keyword, is_dunder};
-use ruff_python_ast::source_code::Generator;
+use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::identifiers::is_identifier;
 

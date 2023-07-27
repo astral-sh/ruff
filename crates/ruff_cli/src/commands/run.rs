@@ -20,7 +20,7 @@ use ruff::settings::{flags, AllSettings};
 use ruff::{fs, packaging, resolver, warn_user_once, IOError};
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::imports::ImportMap;
-use ruff_python_ast::source_code::SourceFileBuilder;
+use ruff_source_file::SourceFileBuilder;
 
 use crate::args::Overrides;
 use crate::cache::{self, Cache};

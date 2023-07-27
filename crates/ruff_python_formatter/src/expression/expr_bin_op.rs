@@ -1,6 +1,6 @@
 use std::iter;
 
-use rustpython_parser::ast::{
+use rustpython_ast::{
     Constant, Expr, ExprAttribute, ExprBinOp, ExprConstant, ExprUnaryOp, Operator, UnaryOp,
 };
 use smallvec::SmallVec;

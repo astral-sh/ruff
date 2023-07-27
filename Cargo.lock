@@ -1905,13 +1905,16 @@ dependencies = [
  "ruff_index",
  "ruff_macros",
  "ruff_python_ast",
+ "ruff_python_codegen",
+ "ruff_python_index",
+ "ruff_python_parser",
  "ruff_python_semantic",
  "ruff_python_stdlib",
  "ruff_python_trivia",
- "ruff_rustpython",
+ "ruff_source_file",
  "ruff_text_size",
- "ruff_textwrap",
  "rustc-hash",
+ "rustpython-ast",
  "rustpython-format",
  "rustpython-parser",
  "schemars",
@@ -1944,6 +1947,7 @@ dependencies = [
  "ruff",
  "ruff_python_ast",
  "ruff_python_formatter",
+ "rustpython-ast",
  "rustpython-parser",
  "serde",
  "serde_json",
@@ -1999,8 +2003,9 @@ dependencies = [
  "ruff_python_ast",
  "ruff_python_formatter",
  "ruff_python_stdlib",
+ "ruff_python_trivia",
+ "ruff_source_file",
  "ruff_text_size",
- "ruff_textwrap",
  "rustc-hash",
  "serde",
  "serde_json",
@@ -2034,9 +2039,11 @@ dependencies = [
  "ruff_cli",
  "ruff_diagnostics",
  "ruff_formatter",
+ "ruff_python_codegen",
  "ruff_python_formatter",
  "ruff_python_stdlib",
- "ruff_textwrap",
+ "ruff_python_trivia",
+ "rustpython-ast",
  "rustpython-format",
  "rustpython-parser",
  "schemars",
@@ -2089,7 +2096,7 @@ dependencies = [
  "itertools",
  "proc-macro2",
  "quote",
- "ruff_textwrap",
+ "ruff_python_trivia",
  "syn 2.0.23",
 ]
 
@@ -2097,23 +2104,33 @@ dependencies = [
 name = "ruff_python_ast"
 version = "0.0.0"
 dependencies = [
- "anyhow",
  "bitflags 2.3.3",
  "insta",
  "is-macro",
- "itertools",
  "memchr",
  "num-bigint",
  "num-traits",
  "once_cell",
  "ruff_python_trivia",
+ "ruff_source_file",
  "ruff_text_size",
  "rustc-hash",
  "rustpython-ast",
- "rustpython-literal",
  "rustpython-parser",
  "serde",
  "smallvec",
+]
+
+[[package]]
+name = "ruff_python_codegen"
+version = "0.0.0"
+dependencies = [
+ "once_cell",
+ "ruff_python_ast",
+ "ruff_source_file",
+ "rustpython-ast",
+ "rustpython-literal",
+ "rustpython-parser",
 ]
 
 [[package]]
@@ -2130,15 +2147,42 @@ dependencies = [
  "once_cell",
  "ruff_formatter",
  "ruff_python_ast",
+ "ruff_python_index",
  "ruff_python_trivia",
+ "ruff_source_file",
  "ruff_text_size",
  "rustc-hash",
+ "rustpython-ast",
  "rustpython-parser",
  "serde",
  "serde_json",
  "similar",
  "smallvec",
  "thiserror",
+]
+
+[[package]]
+name = "ruff_python_index"
+version = "0.0.0"
+dependencies = [
+ "itertools",
+ "ruff_python_trivia",
+ "ruff_source_file",
+ "ruff_text_size",
+ "rustpython-ast",
+ "rustpython-parser",
+]
+
+[[package]]
+name = "ruff_python_parser"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "is-macro",
+ "ruff_python_ast",
+ "ruff_text_size",
+ "rustpython-ast",
+ "rustpython-parser",
 ]
 
 [[package]]
@@ -2161,8 +2205,10 @@ dependencies = [
  "ruff_index",
  "ruff_python_ast",
  "ruff_python_stdlib",
+ "ruff_source_file",
  "ruff_text_size",
  "rustc-hash",
+ "rustpython-ast",
  "rustpython-parser",
  "smallvec",
 ]
@@ -2177,17 +2223,12 @@ version = "0.0.0"
 dependencies = [
  "insta",
  "memchr",
+ "ruff_source_file",
  "ruff_text_size",
+ "rustpython-ast",
+ "rustpython-parser",
  "smallvec",
  "unic-ucd-ident",
-]
-
-[[package]]
-name = "ruff_rustpython"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "rustpython-parser",
 ]
 
 [[package]]
@@ -2199,11 +2240,22 @@ dependencies = [
  "fs-err",
  "regex",
  "ruff_python_ast",
- "ruff_rustpython",
+ "ruff_python_parser",
  "rustpython-ast",
  "shlex",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "ruff_source_file"
+version = "0.0.0"
+dependencies = [
+ "insta",
+ "memchr",
+ "once_cell",
+ "ruff_text_size",
+ "serde",
 ]
 
 [[package]]
@@ -2213,14 +2265,6 @@ source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=593b46be5e0
 dependencies = [
  "schemars",
  "serde",
-]
-
-[[package]]
-name = "ruff_textwrap"
-version = "0.0.0"
-dependencies = [
- "ruff_python_trivia",
- "ruff_text_size",
 ]
 
 [[package]]
@@ -2234,8 +2278,11 @@ dependencies = [
  "ruff",
  "ruff_diagnostics",
  "ruff_python_ast",
+ "ruff_python_codegen",
  "ruff_python_formatter",
- "ruff_rustpython",
+ "ruff_python_index",
+ "ruff_python_parser",
+ "ruff_source_file",
  "rustpython-parser",
  "serde",
  "serde-wasm-bindgen",

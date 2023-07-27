@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
-use rustpython_parser::ast::{self, Expr, Ranged, Stmt, StmtIf};
+use rustpython_ast::{self as ast, Expr, Ranged, Stmt, StmtIf};
 
 use crate::checkers::ast::Checker;
 

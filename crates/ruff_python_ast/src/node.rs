@@ -1,10 +1,9 @@
-use ast::{TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple};
 use ruff_text_size::TextRange;
 use rustpython_ast::{
-    Alias, Arg, ArgWithDefault, Arguments, Comprehension, Decorator, ExceptHandler, Keyword,
-    MatchCase, Mod, Pattern, Stmt, TypeIgnore, WithItem,
+    self as ast, Alias, Arg, ArgWithDefault, Arguments, Comprehension, Decorator, ExceptHandler,
+    Expr, Keyword, MatchCase, Mod, Pattern, Ranged, Stmt, TypeIgnore, TypeParam,
+    TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
 };
-use rustpython_parser::ast::{self, Expr, Ranged};
 use std::ptr::NonNull;
 
 pub trait AstNode: Ranged {
@@ -4649,6 +4648,8 @@ impl AnyNodeRef<'_> {
                 | AnyNodeRef::StmtClassDef(_)
                 | AnyNodeRef::StmtTry(_)
                 | AnyNodeRef::StmtTryStar(_)
+                | AnyNodeRef::ExceptHandlerExceptHandler(_)
+                | AnyNodeRef::ElifElseClause(_)
         )
     }
 

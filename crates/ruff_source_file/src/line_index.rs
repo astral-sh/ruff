@@ -8,7 +8,7 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::source_code::SourceLocation;
+use crate::SourceLocation;
 
 /// Index for fast [byte offset](TextSize) to [`SourceLocation`] conversions.
 ///
@@ -70,7 +70,7 @@ impl LineIndex {
     ///
     /// ```
     /// # use ruff_text_size::TextSize;
-    /// # use ruff_python_ast::source_code::{LineIndex, OneIndexed, SourceLocation};
+    /// # use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
     /// let source = "def a():\n    pass";
     /// let index = LineIndex::from_source_text(source);
     ///
@@ -124,7 +124,7 @@ impl LineIndex {
     }
 
     /// Return the number of lines in the source code.
-    pub(crate) fn line_count(&self) -> usize {
+    pub fn line_count(&self) -> usize {
         self.line_starts().len()
     }
 
@@ -134,7 +134,7 @@ impl LineIndex {
     ///
     /// ```
     /// # use ruff_text_size::TextSize;
-    /// # use ruff_python_ast::source_code::{LineIndex, OneIndexed, SourceLocation};
+    /// # use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
     /// let source = "def a():\n    pass";
     /// let index = LineIndex::from_source_text(source);
     ///
@@ -158,7 +158,7 @@ impl LineIndex {
     }
 
     /// Returns the [byte offset](TextSize) for the `line` with the given index.
-    pub(crate) fn line_start(&self, line: OneIndexed, contents: &str) -> TextSize {
+    pub fn line_start(&self, line: OneIndexed, contents: &str) -> TextSize {
         let row_index = line.to_zero_indexed();
         let starts = self.line_starts();
 
@@ -172,7 +172,7 @@ impl LineIndex {
 
     /// Returns the [byte offset](TextSize) of the `line`'s end.
     /// The offset is the end of the line, up to and including the newline character ending the line (if any).
-    pub(crate) fn line_end(&self, line: OneIndexed, contents: &str) -> TextSize {
+    pub fn line_end(&self, line: OneIndexed, contents: &str) -> TextSize {
         let row_index = line.to_zero_indexed();
         let starts = self.line_starts();
 
@@ -187,7 +187,7 @@ impl LineIndex {
     /// Returns the [`TextRange`] of the `line` with the given index.
     /// The start points to the first character's [byte offset](TextSize), the end up to, and including
     /// the newline character ending the line (if any).
-    pub(crate) fn line_range(&self, line: OneIndexed, contents: &str) -> TextRange {
+    pub fn line_range(&self, line: OneIndexed, contents: &str) -> TextRange {
         let starts = self.line_starts();
 
         if starts.len() == line.to_zero_indexed() {
@@ -315,8 +315,8 @@ const fn unwrap<T: Copy>(option: Option<T>) -> T {
 mod tests {
     use ruff_text_size::TextSize;
 
-    use crate::source_code::line_index::LineIndex;
-    use crate::source_code::{OneIndexed, SourceLocation};
+    use crate::line_index::LineIndex;
+    use crate::{OneIndexed, SourceLocation};
 
     #[test]
     fn ascii_index() {

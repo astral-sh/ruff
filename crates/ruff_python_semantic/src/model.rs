@@ -3,7 +3,7 @@ use std::path::Path;
 use bitflags::bitflags;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{Expr, Ranged, Stmt};
+use rustpython_ast::{Expr, Ranged, Stmt};
 use smallvec::SmallVec;
 
 use ruff_python_ast::call_path::{collect_call_path, from_unqualified_name, CallPath};
@@ -313,6 +313,20 @@ impl<'a> SemanticModel<'a> {
                 if seen_function && matches!(symbol, "__class__") {
                     return ReadResult::ImplicitGlobal;
                 }
+                // Do not allow usages of class symbols unless it is the immediate parent, e.g.:
+                //
+                // ```python
+                // class Foo:
+                //      a = 0
+                //
+                //      b = a  # allowed
+                //      def c(self, arg=a):  # allowed
+                //          print(arg)
+                //
+                //      def d(self):
+                //          print(a)  # not allowed
+                // ```
+                //
                 if index > 0 {
                     continue;
                 }

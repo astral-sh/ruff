@@ -1,4 +1,4 @@
-use rustpython_parser::ast::Suite;
+use rustpython_ast::Suite;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;

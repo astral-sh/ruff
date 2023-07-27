@@ -4,7 +4,7 @@ use ruff_formatter::prelude::{space, text};
 use ruff_formatter::{write, Buffer, Format, FormatResult};
 
 use crate::expression::maybe_parenthesize_expression;
-use rustpython_parser::ast::StmtRaise;
+use rustpython_ast::StmtRaise;
 
 #[derive(Default)]
 pub struct FormatStmtRaise;

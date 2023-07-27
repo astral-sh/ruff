@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, Keyword};
+use rustpython_ast::{self as ast, Expr, Keyword};
 
 use ruff_python_ast::call_path::{collect_call_path, from_qualified_name};
 use ruff_python_ast::helpers::{find_keyword, is_const_true};

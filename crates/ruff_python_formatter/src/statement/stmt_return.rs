@@ -3,7 +3,7 @@ use crate::expression::parentheses::Parenthesize;
 use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::prelude::{space, text};
 use ruff_formatter::{write, Buffer, Format, FormatResult};
-use rustpython_parser::ast::StmtReturn;
+use rustpython_ast::StmtReturn;
 
 #[derive(Default)]
 pub struct FormatStmtReturn;

@@ -1,9 +1,10 @@
 use log::error;
-use rustpython_parser::ast::{CmpOp, Expr, Ranged};
+use rustpython_ast::{CmpOp, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers;
+use ruff_python_parser::locate_cmp_ops;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -85,7 +86,7 @@ pub(crate) fn invalid_literal_comparison(
             let mut diagnostic = Diagnostic::new(IsLiteral { cmp_op: op.into() }, expr.range());
             if checker.patch(diagnostic.kind.rule()) {
                 if lazy_located.is_none() {
-                    lazy_located = Some(helpers::locate_cmp_ops(expr, checker.locator()));
+                    lazy_located = Some(locate_cmp_ops(expr, checker.locator().contents()));
                 }
                 if let Some(located_op) =
                     lazy_located.as_ref().and_then(|located| located.get(index))

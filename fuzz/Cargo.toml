@@ -21,10 +21,13 @@ arbitrary = { version = "1.3.0", features = ["derive"] }
 libfuzzer-sys = { git = "https://github.com/rust-fuzz/libfuzzer", default-features = false }
 ruff = { path = "../crates/ruff" }
 ruff_python_ast = { path = "../crates/ruff_python_ast" }
+ruff_python_codegen = { path = "../crates/ruff_python_codegen" }
 ruff_python_formatter = { path = "../crates/ruff_python_formatter" }
+ruff_source_file = { path = "../crates/ruff_source_file" }
 similar = { version = "2.2.1" }
 
 rustpython-parser = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "593b46be5e0336fe01917f8ef400bd12d81df8c1" }
+rustpython-ast = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "593b46be5e0336fe01917f8ef400bd12d81df8c1" }
 
 # Prevent this from interfering with workspaces
 [workspace]
