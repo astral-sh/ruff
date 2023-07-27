@@ -715,37 +715,28 @@ pub(crate) fn resolve_import<Host: host::Host>(
     // importing file's directory, then the parent directory, and so on, until the
     // import root is reached.
     let root = execution_environment.root.as_path();
-    if source_file.starts_with(root) {
-        let mut current = source_file;
-        while let Some(parent) = current.parent() {
-            if parent == root {
-                break;
-            }
-
-            debug!("Resolving absolute import in parent: {}", parent.display());
-
-            let mut result = resolve_absolute_import(
-                parent,
-                module_descriptor,
-                false,
-                false,
-                false,
-                true,
-                false,
-            );
-
-            if result.is_import_found {
-                if let Some(implicit_imports) = result
-                    .implicit_imports
-                    .filter(&module_descriptor.imported_symbols)
-                {
-                    result.implicit_imports = implicit_imports;
-                }
-                return result;
-            }
-
-            current = parent;
+    let mut current = source_file;
+    while let Some(parent) = current.parent() {
+        if !parent.starts_with(root) {
+            break;
         }
+
+        debug!("Resolving absolute import in parent: {}", parent.display());
+
+        let mut result =
+            resolve_absolute_import(parent, module_descriptor, false, false, false, true, false);
+
+        if result.is_import_found {
+            if let Some(implicit_imports) = result
+                .implicit_imports
+                .filter(&module_descriptor.imported_symbols)
+            {
+                result.implicit_imports = implicit_imports;
+            }
+            return result;
+        }
+
+        current = parent;
     }
 
     ImportResult::not_found()
