@@ -8,8 +8,9 @@ use libcst_native::{
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::Edit;
-use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::whitespace;
+use ruff_python_codegen::Stylist;
+use ruff_source_file::Locator;
 
 use crate::autofix::codemods::CodegenStylist;
 use crate::cst::matchers::{match_function_def, match_if, match_indented_block, match_statement};
@@ -34,6 +35,7 @@ pub(crate) fn fix_nested_if_statements(
     locator: &Locator,
     stylist: &Stylist,
     range: TextRange,
+    is_elif: bool,
 ) -> Result<Edit> {
     // Infer the indentation of the outer block.
     let Some(outer_indent) = whitespace::indentation(locator, &range) else {
@@ -45,7 +47,6 @@ pub(crate) fn fix_nested_if_statements(
 
     // If this is an `elif`, we have to remove the `elif` keyword for now. (We'll
     // restore the `el` later on.)
-    let is_elif = contents.starts_with("elif");
     let module_text = if is_elif {
         Cow::Owned(contents.replacen("elif", "if", 1))
     } else {

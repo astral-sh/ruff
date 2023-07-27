@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprSubscript};
+use ruff_python_ast::{Expr, ExprSubscript};
 
 use ruff_formatter::{format_args, write};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
@@ -49,7 +49,7 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
             let result = if let Expr::Tuple(tuple) = slice.as_ref() {
                 tuple
                     .format()
-                    .with_options(TupleParentheses::Subscript)
+                    .with_options(TupleParentheses::Preserve)
                     .fmt(f)
             } else {
                 slice.format().fmt(f)

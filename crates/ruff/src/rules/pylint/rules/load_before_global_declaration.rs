@@ -1,8 +1,8 @@
-use rustpython_parser::ast::{Expr, Ranged};
+use ruff_python_ast::{Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::OneIndexed;
+use ruff_source_file::OneIndexed;
 
 use crate::checkers::ast::Checker;
 

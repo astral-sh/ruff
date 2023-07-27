@@ -1,9 +1,9 @@
 use anyhow::{bail, Result};
-use rustpython_parser::ast::{Ranged, Stmt};
-use rustpython_parser::{lexer, Mode, Tok};
+use ruff_python_ast::{Ranged, Stmt};
+use ruff_python_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::Edit;
-use ruff_python_ast::source_code::Locator;
+use ruff_source_file::Locator;
 
 /// ANN204
 pub(crate) fn add_return_annotation(

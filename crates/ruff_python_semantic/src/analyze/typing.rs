@@ -1,7 +1,7 @@
 //! Analysis rules for the `typing` module.
 
 use num_traits::identities::Zero;
-use rustpython_parser::ast::{self, Constant, Expr, Operator};
+use ruff_python_ast::{self as ast, Constant, Expr, Operator};
 
 use ruff_python_ast::call_path::{from_qualified_name, from_unqualified_name, CallPath};
 use ruff_python_ast::helpers::is_const_false;

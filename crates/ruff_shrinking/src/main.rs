@@ -35,8 +35,8 @@ use fs_err as fs;
 use regex::Regex;
 use ruff_python_ast::statement_visitor::{walk_body, walk_stmt, StatementVisitor};
 use ruff_python_ast::visitor::{walk_expr, Visitor};
-use rustpython_ast::text_size::TextRange;
-use rustpython_ast::{Expr, Ranged, Stmt, Suite};
+use ruff_python_ast::{Expr, Ranged, Stmt, Suite};
+use ruff_text_size::TextRange;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
@@ -275,7 +275,7 @@ impl Strategy for StrategyRemoveToken {
         input: &'a str,
         _ast: &'a Suite,
     ) -> Result<Box<dyn ExactSizeStringIter + 'a>> {
-        let token_ranges: Vec<_> = ruff_rustpython::tokenize(input)
+        let token_ranges: Vec<_> = ruff_python_parser::tokenize(input)
             .into_iter()
             // At this point we know we have valid python code
             .map(Result::unwrap)
@@ -320,9 +320,9 @@ fn minimization_step(
     pattern: &Regex,
     last_strategy_and_idx: Option<(&'static dyn Strategy, usize)>,
 ) -> Result<Option<(&'static dyn Strategy, usize, String)>> {
-    let tokens = ruff_rustpython::tokenize(input);
+    let tokens = ruff_python_parser::tokenize(input);
     let ast =
-        ruff_rustpython::parse_program_tokens(tokens, "input.py").context("not valid python")?;
+        ruff_python_parser::parse_program_tokens(tokens, "input.py").context("not valid python")?;
 
     // Try the last succeeding strategy first, skipping all that failed last time
     if let Some((last_strategy, last_idx)) = last_strategy_and_idx {

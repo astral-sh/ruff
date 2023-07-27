@@ -1,6 +1,6 @@
 use std::fmt::{Display, Formatter};
 
-use rustpython_parser::ast::{
+use ruff_python_ast::{
     ArgWithDefault, Arguments, Expr, ExprBinOp, ExprSubscript, ExprTuple, Identifier, Operator,
     Ranged,
 };

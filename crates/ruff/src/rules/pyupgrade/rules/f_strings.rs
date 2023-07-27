@@ -1,16 +1,16 @@
 use std::borrow::Cow;
 
-use ruff_text_size::TextRange;
-use rustc_hash::FxHashMap;
-use rustpython_format::{
+use ruff_python_ast::{self as ast, Constant, Expr, Keyword, Ranged};
+use ruff_python_literal::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
-use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
+use ruff_text_size::TextRange;
+use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::str::{is_implicit_concatenation, leading_quote, trailing_quote};
+use ruff_source_file::Locator;
 
 use crate::checkers::ast::Checker;
 use crate::line_width::LineLength;

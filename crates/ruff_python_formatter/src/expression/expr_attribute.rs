@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Constant, Expr, ExprAttribute, ExprConstant};
+use ruff_python_ast::{Constant, Expr, ExprAttribute, ExprConstant};
 
 use ruff_formatter::write;
 use ruff_python_ast::node::AnyNodeRef;
@@ -75,7 +75,7 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
 impl NeedsParentheses for ExprAttribute {
     fn needs_parentheses(
         &self,
-        parent: AnyNodeRef,
+        _parent: AnyNodeRef,
         context: &PyFormatContext,
     ) -> OptionalParentheses {
         // Checks if there are any own line comments in an attribute chain (a.b.c).
@@ -88,7 +88,7 @@ impl NeedsParentheses for ExprAttribute {
         {
             OptionalParentheses::Always
         } else {
-            self.value.needs_parentheses(parent, context)
+            self.value.needs_parentheses(self.into(), context)
         }
     }
 }

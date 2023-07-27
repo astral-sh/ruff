@@ -1,10 +1,10 @@
-use rustpython_parser::ast;
-use rustpython_parser::ast::{Expr, StmtClassDef};
+use ruff_python_ast as ast;
+use ruff_python_ast::{Expr, StmtClassDef};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::identifier::Identifier;
-use rustpython_parser::ast::Stmt;
+use ruff_python_ast::Stmt;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_slots::rules::helpers::has_slots;

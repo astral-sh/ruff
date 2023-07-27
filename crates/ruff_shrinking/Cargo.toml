@@ -11,8 +11,9 @@ clap = { workspace = true }
 fs-err = "2.9.0"
 regex = { workspace = true }
 ruff_python_ast = { path = "../ruff_python_ast" }
-ruff_rustpython = { path = "../ruff_rustpython" }
-rustpython-ast = { workspace = true }
+ruff_python_parser = { path = "../ruff_python_parser" }
+ruff_text_size = { path = "../ruff_text_size" }
+
 shlex = "1.1.0"
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }

@@ -1,12 +1,13 @@
 use anyhow::Result;
 use libcst_native::CompOp;
-use rustpython_parser::ast::{self, CmpOp, Expr, Ranged, UnaryOp};
+use ruff_python_ast::{self as ast, CmpOp, Expr, Ranged, UnaryOp};
 
 use crate::autofix::codemods::CodegenStylist;
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python_codegen::Stylist;
 use ruff_python_stdlib::str::{self};
+use ruff_source_file::Locator;
 
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_comparison, match_expression};

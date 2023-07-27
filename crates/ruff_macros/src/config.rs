@@ -1,4 +1,4 @@
-use ruff_textwrap::dedent;
+use ruff_python_trivia::textwrap::dedent;
 
 use quote::{quote, quote_spanned};
 use syn::parse::{Parse, ParseStream};

@@ -1,11 +1,11 @@
+use ruff_python_ast::{Expr, Keyword, Ranged};
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_true;
-use ruff_python_ast::source_code::Locator;
 use ruff_python_semantic::{BindingKind, Import};
+use ruff_source_file::Locator;
 
 use crate::autofix::edits::remove_argument;
 use crate::checkers::ast::Checker;

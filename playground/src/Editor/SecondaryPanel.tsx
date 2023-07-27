@@ -1,7 +1,12 @@
 import Editor from "@monaco-editor/react";
 import { Theme } from "./theme";
 
-export type SecondaryTool = "Format" | "AST" | "Tokens" | "FIR";
+export enum SecondaryTool {
+  "Format" = "Format",
+  "AST" = "AST",
+  "Tokens" = "Tokens",
+  "FIR" = "FIR",
+}
 
 export type SecondaryPanelResult =
   | null

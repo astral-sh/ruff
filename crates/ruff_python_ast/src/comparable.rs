@@ -1,8 +1,8 @@
 //! An equivalent object hierarchy to the `RustPython` AST hierarchy, but with the
 //! ability to compare expressions for equality (via [`Eq`] and [`Hash`]).
 
+use crate as ast;
 use num_bigint::BigInt;
-use rustpython_parser::ast;
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub enum ComparableExprContext {
@@ -653,6 +653,12 @@ pub struct ExprSlice<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ExprLineMagic<'a> {
+    kind: ast::MagicKind,
+    value: &'a str,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub enum ComparableExpr<'a> {
     BoolOp(ExprBoolOp<'a>),
     NamedExpr(ExprNamedExpr<'a>),
@@ -681,6 +687,7 @@ pub enum ComparableExpr<'a> {
     List(ExprList<'a>),
     Tuple(ExprTuple<'a>),
     Slice(ExprSlice<'a>),
+    LineMagic(ExprLineMagic<'a>),
 }
 
 impl<'a> From<&'a Box<ast::Expr>> for Box<ComparableExpr<'a>> {
@@ -925,6 +932,14 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 upper: upper.as_ref().map(Into::into),
                 step: step.as_ref().map(Into::into),
             }),
+            ast::Expr::LineMagic(ast::ExprLineMagic {
+                kind,
+                value,
+                range: _range,
+            }) => Self::LineMagic(ExprLineMagic {
+                kind: *kind,
+                value: value.as_str(),
+            }),
         }
     }
 }
@@ -1156,6 +1171,12 @@ pub struct StmtExpr<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
+pub struct StmtLineMagic<'a> {
+    kind: ast::MagicKind,
+    value: &'a str,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub enum ComparableStmt<'a> {
     FunctionDef(StmtFunctionDef<'a>),
     AsyncFunctionDef(StmtAsyncFunctionDef<'a>),
@@ -1181,6 +1202,7 @@ pub enum ComparableStmt<'a> {
     ImportFrom(StmtImportFrom<'a>),
     Global(StmtGlobal<'a>),
     Nonlocal(StmtNonlocal<'a>),
+    LineMagic(StmtLineMagic<'a>),
     Expr(StmtExpr<'a>),
     Pass,
     Break,
@@ -1439,6 +1461,14 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                 range: _range,
             }) => Self::Nonlocal(StmtNonlocal {
                 names: names.iter().map(ast::Identifier::as_str).collect(),
+            }),
+            ast::Stmt::LineMagic(ast::StmtLineMagic {
+                kind,
+                value,
+                range: _range,
+            }) => Self::LineMagic(StmtLineMagic {
+                kind: *kind,
+                value: value.as_str(),
             }),
             ast::Stmt::Expr(ast::StmtExpr {
                 value,

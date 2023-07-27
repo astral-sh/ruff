@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Constant, Expr, Keyword, Operator, Ranged};
+use ruff_python_ast::{self as ast, Constant, Expr, Keyword, Operator, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_python_ast::helpers::{find_keyword, CallArguments};

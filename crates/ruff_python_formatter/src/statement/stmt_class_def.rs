@@ -1,5 +1,5 @@
+use ruff_python_ast::{Ranged, StmtClassDef};
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{Ranged, StmtClassDef};
 
 use ruff_formatter::write;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};

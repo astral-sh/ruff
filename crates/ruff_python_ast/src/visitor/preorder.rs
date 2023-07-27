@@ -1,7 +1,7 @@
-use rustpython_ast::{ArgWithDefault, ElifElseClause, Mod, TypeIgnore};
-use rustpython_parser::ast::{
-    self, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Constant, Decorator, ExceptHandler,
-    Expr, Keyword, MatchCase, Operator, Pattern, Stmt, UnaryOp, WithItem,
+use crate::{
+    self as ast, Alias, Arg, ArgWithDefault, Arguments, BoolOp, CmpOp, Comprehension, Constant,
+    Decorator, ElifElseClause, ExceptHandler, Expr, Keyword, MatchCase, Mod, Operator, Pattern,
+    Stmt, TypeIgnore, TypeParam, TypeParamTypeVar, UnaryOp, WithItem,
 };
 
 /// Visitor that traverses all nodes recursively in pre-order.
@@ -80,6 +80,10 @@ pub trait PreorderVisitor<'a> {
         walk_with_item(self, with_item);
     }
 
+    fn visit_type_param(&mut self, type_param: &'a TypeParam) {
+        walk_type_param(self, type_param);
+    }
+
     fn visit_match_case(&mut self, match_case: &'a MatchCase) {
         walk_match_case(self, match_case);
     }
@@ -156,6 +160,7 @@ where
             body,
             decorator_list,
             returns,
+            type_params,
             ..
         })
         | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
@@ -163,10 +168,15 @@ where
             body,
             decorator_list,
             returns,
+            type_params,
             ..
         }) => {
             for decorator in decorator_list {
                 visitor.visit_decorator(decorator);
+            }
+
+            for type_param in type_params {
+                visitor.visit_type_param(type_param);
             }
 
             visitor.visit_arguments(args);
@@ -183,10 +193,15 @@ where
             keywords,
             body,
             decorator_list,
+            type_params,
             ..
         }) => {
             for decorator in decorator_list {
                 visitor.visit_decorator(decorator);
+            }
+
+            for type_param in type_params {
+                visitor.visit_type_param(type_param);
             }
 
             for expr in bases {
@@ -216,6 +231,19 @@ where
             for expr in targets {
                 visitor.visit_expr(expr);
             }
+        }
+
+        Stmt::TypeAlias(ast::StmtTypeAlias {
+            range: _range,
+            name,
+            type_params,
+            value,
+        }) => {
+            visitor.visit_expr(name);
+            for type_param in type_params {
+                visitor.visit_type_param(type_param);
+            }
+            visitor.visit_expr(value);
         }
 
         Stmt::Assign(ast::StmtAssign {
@@ -399,8 +427,8 @@ where
         | Stmt::Break(_)
         | Stmt::Continue(_)
         | Stmt::Global(_)
-        | Stmt::Nonlocal(_) => {}
-        Stmt::TypeAlias(_) => todo!(),
+        | Stmt::Nonlocal(_)
+        | Stmt::LineMagic(_) => {}
     }
 }
 
@@ -695,6 +723,7 @@ where
                 visitor.visit_expr(expr);
             }
         }
+        Expr::LineMagic(_) => (),
     }
 }
 
@@ -802,6 +831,24 @@ where
 
     if let Some(expr) = &with_item.optional_vars {
         visitor.visit_expr(expr);
+    }
+}
+
+pub fn walk_type_param<'a, V>(visitor: &mut V, type_param: &'a TypeParam)
+where
+    V: PreorderVisitor<'a> + ?Sized,
+{
+    match type_param {
+        TypeParam::TypeVar(TypeParamTypeVar {
+            bound,
+            name: _,
+            range: _,
+        }) => {
+            if let Some(expr) = bound {
+                visitor.visit_expr(expr);
+            }
+        }
+        TypeParam::TypeVarTuple(_) | TypeParam::ParamSpec(_) => {}
     }
 }
 
@@ -933,260 +980,4 @@ pub fn walk_alias<'a, V>(_visitor: &mut V, _alias: &'a Alias)
 where
     V: PreorderVisitor<'a> + ?Sized,
 {
-}
-
-#[cfg(test)]
-mod tests {
-    use std::fmt::{Debug, Write};
-
-    use insta::assert_snapshot;
-    use rustpython_parser::lexer::lex;
-    use rustpython_parser::{parse_tokens, Mode};
-
-    use crate::node::AnyNodeRef;
-    use crate::visitor::preorder::{
-        walk_alias, walk_arg, walk_arguments, walk_comprehension, walk_except_handler, walk_expr,
-        walk_keyword, walk_match_case, walk_module, walk_pattern, walk_stmt, walk_type_ignore,
-        walk_with_item, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Constant,
-        ExceptHandler, Expr, Keyword, MatchCase, Mod, Operator, Pattern, PreorderVisitor, Stmt,
-        TypeIgnore, UnaryOp, WithItem,
-    };
-
-    #[test]
-    fn function_arguments() {
-        let source = r#"def a(b, c,/, d, e = 20, *args, named=5, other=20, **kwargs): pass"#;
-
-        let trace = trace_preorder_visitation(source);
-
-        assert_snapshot!(trace);
-    }
-
-    #[test]
-    fn function_positional_only_with_default() {
-        let source = r#"def a(b, c = 34,/, e = 20, *args): pass"#;
-
-        let trace = trace_preorder_visitation(source);
-
-        assert_snapshot!(trace);
-    }
-
-    #[test]
-    fn compare() {
-        let source = r#"4 < x < 5"#;
-
-        let trace = trace_preorder_visitation(source);
-
-        assert_snapshot!(trace);
-    }
-
-    #[test]
-    fn list_comprehension() {
-        let source = "[x for x in numbers]";
-
-        let trace = trace_preorder_visitation(source);
-
-        assert_snapshot!(trace);
-    }
-
-    #[test]
-    fn dict_comprehension() {
-        let source = "{x: x**2 for x in numbers}";
-
-        let trace = trace_preorder_visitation(source);
-
-        assert_snapshot!(trace);
-    }
-
-    #[test]
-    fn set_comprehension() {
-        let source = "{x for x in numbers}";
-
-        let trace = trace_preorder_visitation(source);
-
-        assert_snapshot!(trace);
-    }
-
-    #[test]
-    fn match_class_pattern() {
-        let source = r#"
-match x:
-    case Point2D(0, 0):
-        ...
-    case Point3D(x=0, y=0, z=0):
-        ...
-"#;
-
-        let trace = trace_preorder_visitation(source);
-
-        assert_snapshot!(trace);
-    }
-
-    #[test]
-    fn decorators() {
-        let source = r#"
-@decorator
-def a():
-    pass
-
-@test
-class A:
-    pass
-"#;
-
-        let trace = trace_preorder_visitation(source);
-
-        assert_snapshot!(trace);
-    }
-
-    fn trace_preorder_visitation(source: &str) -> String {
-        let tokens = lex(source, Mode::Module);
-        let parsed = parse_tokens(tokens, Mode::Module, "test.py").unwrap();
-
-        let mut visitor = RecordVisitor::default();
-        visitor.visit_mod(&parsed);
-
-        visitor.output
-    }
-
-    /// Emits a `tree` with a node for every visited AST node (labelled by the AST node's kind)
-    /// and leafs for attributes.
-    #[derive(Default)]
-    struct RecordVisitor {
-        depth: usize,
-        output: String,
-    }
-
-    impl RecordVisitor {
-        fn enter_node<'a, T>(&mut self, node: T)
-        where
-            T: Into<AnyNodeRef<'a>>,
-        {
-            self.emit(&node.into().kind());
-            self.depth += 1;
-        }
-
-        fn exit_node(&mut self) {
-            self.depth -= 1;
-        }
-
-        fn emit(&mut self, text: &dyn Debug) {
-            for _ in 0..self.depth {
-                self.output.push_str("  ");
-            }
-
-            writeln!(self.output, "- {text:?}").unwrap();
-        }
-    }
-
-    impl PreorderVisitor<'_> for RecordVisitor {
-        fn visit_mod(&mut self, module: &Mod) {
-            self.enter_node(module);
-            walk_module(self, module);
-            self.exit_node();
-        }
-
-        fn visit_stmt(&mut self, stmt: &Stmt) {
-            self.enter_node(stmt);
-            walk_stmt(self, stmt);
-            self.exit_node();
-        }
-
-        fn visit_annotation(&mut self, expr: &Expr) {
-            self.enter_node(expr);
-            walk_expr(self, expr);
-            self.exit_node();
-        }
-
-        fn visit_expr(&mut self, expr: &Expr) {
-            self.enter_node(expr);
-            walk_expr(self, expr);
-            self.exit_node();
-        }
-
-        fn visit_constant(&mut self, constant: &Constant) {
-            self.emit(&constant);
-        }
-
-        fn visit_bool_op(&mut self, bool_op: &BoolOp) {
-            self.emit(&bool_op);
-        }
-
-        fn visit_operator(&mut self, operator: &Operator) {
-            self.emit(&operator);
-        }
-
-        fn visit_unary_op(&mut self, unary_op: &UnaryOp) {
-            self.emit(&unary_op);
-        }
-
-        fn visit_cmp_op(&mut self, cmp_op: &CmpOp) {
-            self.emit(&cmp_op);
-        }
-
-        fn visit_comprehension(&mut self, comprehension: &Comprehension) {
-            self.enter_node(comprehension);
-            walk_comprehension(self, comprehension);
-            self.exit_node();
-        }
-
-        fn visit_except_handler(&mut self, except_handler: &ExceptHandler) {
-            self.enter_node(except_handler);
-            walk_except_handler(self, except_handler);
-            self.exit_node();
-        }
-
-        fn visit_format_spec(&mut self, format_spec: &Expr) {
-            self.enter_node(format_spec);
-            walk_expr(self, format_spec);
-            self.exit_node();
-        }
-
-        fn visit_arguments(&mut self, arguments: &Arguments) {
-            self.enter_node(arguments);
-            walk_arguments(self, arguments);
-            self.exit_node();
-        }
-
-        fn visit_arg(&mut self, arg: &Arg) {
-            self.enter_node(arg);
-            walk_arg(self, arg);
-            self.exit_node();
-        }
-
-        fn visit_keyword(&mut self, keyword: &Keyword) {
-            self.enter_node(keyword);
-            walk_keyword(self, keyword);
-            self.exit_node();
-        }
-
-        fn visit_alias(&mut self, alias: &Alias) {
-            self.enter_node(alias);
-            walk_alias(self, alias);
-            self.exit_node();
-        }
-
-        fn visit_with_item(&mut self, with_item: &WithItem) {
-            self.enter_node(with_item);
-            walk_with_item(self, with_item);
-            self.exit_node();
-        }
-
-        fn visit_match_case(&mut self, match_case: &MatchCase) {
-            self.enter_node(match_case);
-            walk_match_case(self, match_case);
-            self.exit_node();
-        }
-
-        fn visit_pattern(&mut self, pattern: &Pattern) {
-            self.enter_node(pattern);
-            walk_pattern(self, pattern);
-            self.exit_node();
-        }
-
-        fn visit_type_ignore(&mut self, type_ignore: &TypeIgnore) {
-            self.enter_node(type_ignore);
-            walk_type_ignore(self, type_ignore);
-            self.exit_node();
-        }
-    }
 }

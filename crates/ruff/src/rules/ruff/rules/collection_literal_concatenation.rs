@@ -1,9 +1,8 @@
+use ruff_python_ast::{self as ast, Expr, ExprContext, Operator, Ranged};
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Expr, ExprContext, Operator, Ranged};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::has_comments;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -192,7 +191,7 @@ pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Exp
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        if !has_comments(expr, checker.locator(), checker.indexer()) {
+        if !checker.indexer().has_comments(expr, checker.locator()) {
             // This suggestion could be unsafe if the non-literal expression in the
             // expression has overridden the `__add__` (or `__radd__`) magic methods.
             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(

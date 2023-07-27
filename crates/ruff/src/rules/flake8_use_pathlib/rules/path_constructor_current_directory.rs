@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Constant, Expr, ExprCall, ExprConstant};
+use ruff_python_ast::{Constant, Expr, ExprCall, ExprConstant};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -73,13 +73,11 @@ pub(crate) fn path_constructor_current_directory(checker: &mut Checker, expr: &E
         return;
     };
 
-    if value != "." {
-        return;
+    if matches!(value.as_str(), "" | ".") {
+        let mut diagnostic = Diagnostic::new(PathConstructorCurrentDirectory, *range);
+        if checker.patch(diagnostic.kind.rule()) {
+            diagnostic.set_fix(Fix::automatic(Edit::range_deletion(*range)));
+        }
+        checker.diagnostics.push(diagnostic);
     }
-
-    let mut diagnostic = Diagnostic::new(PathConstructorCurrentDirectory, *range);
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::automatic(Edit::range_deletion(*range)));
-    }
-    checker.diagnostics.push(diagnostic);
 }

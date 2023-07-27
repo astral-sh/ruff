@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr};
+use crate::{nodes, Expr};
 use smallvec::{smallvec, SmallVec};
 
 /// A representation of a qualified name, like `typing.List`.
@@ -11,14 +11,16 @@ pub fn collect_call_path(expr: &Expr) -> Option<CallPath> {
     let attr1 = match expr {
         Expr::Attribute(attr1) => attr1,
         // Ex) `foo`
-        Expr::Name(ast::ExprName { id, .. }) => return Some(CallPath::from_slice(&[id.as_str()])),
+        Expr::Name(nodes::ExprName { id, .. }) => {
+            return Some(CallPath::from_slice(&[id.as_str()]))
+        }
         _ => return None,
     };
 
     let attr2 = match attr1.value.as_ref() {
         Expr::Attribute(attr2) => attr2,
         // Ex) `foo.bar`
-        Expr::Name(ast::ExprName { id, .. }) => {
+        Expr::Name(nodes::ExprName { id, .. }) => {
             return Some(CallPath::from_slice(&[id.as_str(), attr1.attr.as_str()]))
         }
         _ => return None,
@@ -27,7 +29,7 @@ pub fn collect_call_path(expr: &Expr) -> Option<CallPath> {
     let attr3 = match attr2.value.as_ref() {
         Expr::Attribute(attr3) => attr3,
         // Ex) `foo.bar.baz`
-        Expr::Name(ast::ExprName { id, .. }) => {
+        Expr::Name(nodes::ExprName { id, .. }) => {
             return Some(CallPath::from_slice(&[
                 id.as_str(),
                 attr2.attr.as_str(),
@@ -40,7 +42,7 @@ pub fn collect_call_path(expr: &Expr) -> Option<CallPath> {
     let attr4 = match attr3.value.as_ref() {
         Expr::Attribute(attr4) => attr4,
         // Ex) `foo.bar.baz.bop`
-        Expr::Name(ast::ExprName { id, .. }) => {
+        Expr::Name(nodes::ExprName { id, .. }) => {
             return Some(CallPath::from_slice(&[
                 id.as_str(),
                 attr3.attr.as_str(),
@@ -54,7 +56,7 @@ pub fn collect_call_path(expr: &Expr) -> Option<CallPath> {
     let attr5 = match attr4.value.as_ref() {
         Expr::Attribute(attr5) => attr5,
         // Ex) `foo.bar.baz.bop.bap`
-        Expr::Name(ast::ExprName { id, .. }) => {
+        Expr::Name(nodes::ExprName { id, .. }) => {
             return Some(CallPath::from_slice(&[
                 id.as_str(),
                 attr4.attr.as_str(),
@@ -69,7 +71,7 @@ pub fn collect_call_path(expr: &Expr) -> Option<CallPath> {
     let attr6 = match attr5.value.as_ref() {
         Expr::Attribute(attr6) => attr6,
         // Ex) `foo.bar.baz.bop.bap.bab`
-        Expr::Name(ast::ExprName { id, .. }) => {
+        Expr::Name(nodes::ExprName { id, .. }) => {
             return Some(CallPath::from_slice(&[
                 id.as_str(),
                 attr5.attr.as_str(),
@@ -85,7 +87,7 @@ pub fn collect_call_path(expr: &Expr) -> Option<CallPath> {
     let attr7 = match attr6.value.as_ref() {
         Expr::Attribute(attr7) => attr7,
         // Ex) `foo.bar.baz.bop.bap.bab.bob`
-        Expr::Name(ast::ExprName { id, .. }) => {
+        Expr::Name(nodes::ExprName { id, .. }) => {
             return Some(CallPath::from_slice(&[
                 id.as_str(),
                 attr6.attr.as_str(),
@@ -102,7 +104,7 @@ pub fn collect_call_path(expr: &Expr) -> Option<CallPath> {
     let attr8 = match attr7.value.as_ref() {
         Expr::Attribute(attr8) => attr8,
         // Ex) `foo.bar.baz.bop.bap.bab.bob.bib`
-        Expr::Name(ast::ExprName { id, .. }) => {
+        Expr::Name(nodes::ExprName { id, .. }) => {
             return Some(CallPath::from_slice(&[
                 id.as_str(),
                 attr7.attr.as_str(),

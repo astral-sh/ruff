@@ -39,10 +39,33 @@ export function restore(): [string, string] | null {
     window.location.hash.slice(1),
   );
 
-  if (value != null) {
+  if (value == null) {
+    return restoreLocal();
+  } else {
     const [settingsSource, pythonSource] = value.split("$$$");
     return [settingsSource.replaceAll("$$$$$$", "$$$"), pythonSource];
-  } else {
-    return null;
   }
+}
+
+function restoreLocal(): [string, string] | null {
+  const source = localStorage.getItem("source");
+
+  if (source == null) {
+    return null;
+  } else {
+    return JSON.parse(source);
+  }
+}
+
+export function persistLocal({
+  settingsSource,
+  pythonSource,
+}: {
+  settingsSource: string;
+  pythonSource: string;
+}) {
+  localStorage.setItem(
+    "source",
+    JSON.stringify([settingsSource, pythonSource]),
+  );
 }

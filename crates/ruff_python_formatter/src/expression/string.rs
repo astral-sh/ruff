@@ -1,10 +1,10 @@
 use std::borrow::Cow;
 
 use bitflags::bitflags;
+use ruff_python_ast::{ExprConstant, Ranged};
+use ruff_python_parser::lexer::{lex_starts_at, LexicalError, LexicalErrorType};
+use ruff_python_parser::{Mode, Tok};
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_parser::ast::{ExprConstant, Ranged};
-use rustpython_parser::lexer::{lex_starts_at, LexicalError, LexicalErrorType};
-use rustpython_parser::{Mode, Tok};
 
 use ruff_formatter::{format_args, write, FormatError};
 use ruff_python_ast::str::is_implicit_concatenation;
@@ -18,24 +18,48 @@ use crate::QuoteStyle;
 
 pub(super) struct FormatString<'a> {
     constant: &'a ExprConstant,
+    layout: StringLayout,
+}
+
+#[derive(Default, Copy, Clone, Debug)]
+pub enum StringLayout {
+    #[default]
+    Default,
+
+    ImplicitConcatenatedBinaryLeftSide,
 }
 
 impl<'a> FormatString<'a> {
     pub(super) fn new(constant: &'a ExprConstant) -> Self {
         debug_assert!(constant.value.is_str());
-        Self { constant }
+        Self {
+            constant,
+            layout: StringLayout::Default,
+        }
+    }
+
+    pub(super) fn with_layout(mut self, layout: StringLayout) -> Self {
+        self.layout = layout;
+        self
     }
 }
 
 impl<'a> Format<PyFormatContext<'_>> for FormatString<'a> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
-        let string_range = self.constant.range();
-        let string_content = f.context().locator().slice(string_range);
+        match self.layout {
+            StringLayout::Default => {
+                let string_range = self.constant.range();
+                let string_content = f.context().locator().slice(string_range);
 
-        if is_implicit_concatenation(string_content) {
-            in_parentheses_only_group(&FormatStringContinuation::new(self.constant)).fmt(f)
-        } else {
-            FormatStringPart::new(string_range).fmt(f)
+                if is_implicit_concatenation(string_content) {
+                    in_parentheses_only_group(&FormatStringContinuation::new(self.constant)).fmt(f)
+                } else {
+                    FormatStringPart::new(string_range).fmt(f)
+                }
+            }
+            StringLayout::ImplicitConcatenatedBinaryLeftSide => {
+                FormatStringContinuation::new(self.constant).fmt(f)
+            }
         }
     }
 }

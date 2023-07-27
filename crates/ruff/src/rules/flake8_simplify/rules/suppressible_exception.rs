@@ -1,11 +1,10 @@
+use ruff_python_ast::{self as ast, Constant, ExceptHandler, Expr, Ranged, Stmt};
 use ruff_text_size::{TextLen, TextRange};
-use rustpython_parser::ast::{self, Constant, ExceptHandler, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::compose_call_path;
 use ruff_python_ast::helpers;
-use ruff_python_ast::helpers::has_comments;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
@@ -134,7 +133,7 @@ pub(crate) fn suppressible_exception(
         stmt.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        if !has_comments(stmt, checker.locator(), checker.indexer()) {
+        if !checker.indexer().has_comments(stmt, checker.locator()) {
             diagnostic.try_set_fix(|| {
                 let (import_edit, binding) = checker.importer().get_or_import_symbol(
                     &ImportRequest::import("contextlib", "suppress"),

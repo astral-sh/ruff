@@ -29,8 +29,8 @@ html,
 @font-face {
   font-family: "Alliance Text";
   src:
-    url("../public/fonts/Alliance-TextRegular.woff2") format("woff2"),
-    url("../public/fonts/Alliance-TextRegular.woff") format("woff");
+    url("../fonts/Alliance-TextRegular.woff2") format("woff2"),
+    url("../fonts/Alliance-TextRegular.woff") format("woff");
   font-weight: normal;
   font-style: normal;
   font-display: block;
@@ -39,8 +39,8 @@ html,
 @font-face {
   font-family: "Alliance Text";
   src:
-    url("../public/fonts/Alliance-TextMedium.woff2") format("woff2"),
-    url("../public/fonts/Alliance-TextMedium.woff") format("woff");
+    url("../fonts/Alliance-TextMedium.woff2") format("woff2"),
+    url("../fonts/Alliance-TextMedium.woff") format("woff");
   font-weight: 500;
   font-style: normal;
   font-display: block;
@@ -49,8 +49,8 @@ html,
 @font-face {
   font-family: "Alliance Platt";
   src:
-    url("../public/fonts/Alliance-PlattMedium.woff2") format("woff2"),
-    url("../public/fonts/Alliance-PlattMedium.woff") format("woff");
+    url("../fonts/Alliance-PlattMedium.woff2") format("woff2"),
+    url("../fonts/Alliance-PlattMedium.woff") format("woff");
   font-weight: 500;
   font-style: normal;
   font-display: block;
@@ -59,8 +59,8 @@ html,
 @font-face {
   font-family: "Alliance Platt";
   src:
-    url("../public/fonts/Alliance-PlattRegular.woff2") format("woff2"),
-    url("../public/fonts/Alliance-PlattRegular.woff") format("woff");
+    url("../fonts/Alliance-PlattRegular.woff2") format("woff2"),
+    url("../fonts/Alliance-PlattRegular.woff") format("woff");
   font-weight: normal;
   font-style: normal;
   font-display: block;

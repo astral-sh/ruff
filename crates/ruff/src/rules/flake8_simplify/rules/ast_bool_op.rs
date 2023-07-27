@@ -3,14 +3,14 @@ use std::iter;
 
 use itertools::Either::{Left, Right};
 use itertools::Itertools;
+use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr, ExprContext, Ranged, UnaryOp};
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{self, BoolOp, CmpOp, Expr, ExprContext, Ranged, UnaryOp};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::helpers::{contains_effect, has_comments, Truthiness};
+use ruff_python_ast::helpers::{contains_effect, Truthiness};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -505,7 +505,7 @@ pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
         }
 
         // Avoid removing comments.
-        if has_comments(expr, checker.locator(), checker.indexer()) {
+        if checker.indexer().has_comments(expr, checker.locator()) {
             continue;
         }
 

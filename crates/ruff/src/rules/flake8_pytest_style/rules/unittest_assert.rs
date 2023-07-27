@@ -1,11 +1,11 @@
 use std::hash::BuildHasherDefault;
 
 use anyhow::{anyhow, bail, Result};
+use ruff_python_ast::{
+    self as ast, CmpOp, Constant, Expr, ExprContext, Identifier, Keyword, Stmt, UnaryOp,
+};
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{
-    self, CmpOp, Constant, Expr, ExprContext, Identifier, Keyword, Stmt, UnaryOp,
-};
 
 /// An enum to represent the different types of assertions present in the
 /// `unittest` module. Note: any variants that can't be replaced with plain

@@ -3,7 +3,7 @@ use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalPa
 use crate::prelude::*;
 use crate::FormatNodeRule;
 use ruff_python_ast::node::AnyNodeRef;
-use rustpython_parser::ast::{ExprList, Ranged};
+use ruff_python_ast::{ExprList, Ranged};
 
 #[derive(Default)]
 pub struct FormatExprList;

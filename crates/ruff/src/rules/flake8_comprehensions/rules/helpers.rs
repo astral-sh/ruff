@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, Keyword};
+use ruff_python_ast::{self as ast, Expr, Keyword};
 
 pub(super) fn expr_name(func: &Expr) -> Option<&str> {
     if let Expr::Name(ast::ExprName { id, .. }) = func {

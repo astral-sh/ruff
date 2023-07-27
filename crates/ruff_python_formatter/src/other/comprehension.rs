@@ -4,7 +4,7 @@ use crate::prelude::*;
 use crate::AsFormat;
 use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::{format_args, write, Buffer, FormatResult};
-use rustpython_parser::ast::{Comprehension, Expr, Ranged};
+use ruff_python_ast::{Comprehension, Expr, Ranged};
 
 #[derive(Default)]
 pub struct FormatComprehension;
@@ -113,7 +113,7 @@ impl Format<PyFormatContext<'_>> for ExprTupleWithoutParentheses<'_> {
         match self.0 {
             Expr::Tuple(expr_tuple) => expr_tuple
                 .format()
-                .with_options(TupleParentheses::Comprehension)
+                .with_options(TupleParentheses::Never)
                 .fmt(f),
             other => other.format().fmt(f),
         }

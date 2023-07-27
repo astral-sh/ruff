@@ -1,6 +1,6 @@
 use std::fmt;
 
-use rustpython_parser::ast::{self, Arguments, Expr, ExprContext, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Ranged, Stmt};
 
 use ruff_diagnostics::{AutofixKind, Violation};
 use ruff_diagnostics::{Diagnostic, Fix};

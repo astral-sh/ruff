@@ -5,7 +5,7 @@ use crate::expression::parentheses::Parenthesize;
 use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::prelude::{block_indent, format_with, space, text};
 use ruff_formatter::{write, Buffer, Format, FormatResult};
-use rustpython_parser::ast::{Ranged, StmtDelete};
+use ruff_python_ast::{Ranged, StmtDelete};
 
 #[derive(Default)]
 pub struct FormatStmtDelete;

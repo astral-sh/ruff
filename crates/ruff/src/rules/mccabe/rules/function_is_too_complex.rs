@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, ExceptHandler, Stmt};
+use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -169,8 +169,8 @@ pub(crate) fn function_is_too_complex(
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use rustpython_parser::ast::Suite;
-    use rustpython_parser::Parse;
+    use ruff_python_ast::Suite;
+    use ruff_python_parser::Parse;
 
     use super::get_complexity_number;
 

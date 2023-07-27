@@ -1,8 +1,8 @@
-use rustpython_parser::ast::Expr;
+use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use rustpython_parser::ast::Ranged;
+use ruff_python_ast::Ranged;
 
 use crate::checkers::ast::Checker;
 

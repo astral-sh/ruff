@@ -1,17 +1,37 @@
+use ruff_python_ast::{Constant, ExprConstant, Ranged};
 use ruff_text_size::{TextLen, TextRange};
-use rustpython_parser::ast::{Constant, ExprConstant, Ranged};
 
+use ruff_formatter::FormatRuleWithOptions;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::str::is_implicit_concatenation;
 
 use crate::expression::number::{FormatComplex, FormatFloat, FormatInt};
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
-use crate::expression::string::{FormatString, StringPrefix, StringQuotes};
+use crate::expression::string::{FormatString, StringLayout, StringPrefix, StringQuotes};
 use crate::prelude::*;
 use crate::{not_yet_implemented_custom_text, FormatNodeRule};
 
 #[derive(Default)]
-pub struct FormatExprConstant;
+pub struct FormatExprConstant {
+    layout: ExprConstantLayout,
+}
+
+#[derive(Copy, Clone, Debug, Default)]
+pub enum ExprConstantLayout {
+    #[default]
+    Default,
+
+    String(StringLayout),
+}
+
+impl FormatRuleWithOptions<ExprConstant, PyFormatContext<'_>> for FormatExprConstant {
+    type Options = ExprConstantLayout;
+
+    fn with_options(mut self, options: Self::Options) -> Self {
+        self.layout = options;
+        self
+    }
+}
 
 impl FormatNodeRule<ExprConstant> for FormatExprConstant {
     fn fmt_fields(&self, item: &ExprConstant, f: &mut PyFormatter) -> FormatResult<()> {
@@ -31,7 +51,13 @@ impl FormatNodeRule<ExprConstant> for FormatExprConstant {
             Constant::Int(_) => FormatInt::new(item).fmt(f),
             Constant::Float(_) => FormatFloat::new(item).fmt(f),
             Constant::Complex { .. } => FormatComplex::new(item).fmt(f),
-            Constant::Str(_) => FormatString::new(item).fmt(f),
+            Constant::Str(_) => {
+                let string_layout = match self.layout {
+                    ExprConstantLayout::Default => StringLayout::Default,
+                    ExprConstantLayout::String(layout) => layout,
+                };
+                FormatString::new(item).with_layout(string_layout).fmt(f)
+            }
             Constant::Bytes(_) => {
                 not_yet_implemented_custom_text(r#"b"NOT_YET_IMPLEMENTED_BYTE_STRING""#).fmt(f)
             }

@@ -29,6 +29,7 @@ pub(crate) use unnecessary_literal_union::*;
 pub(crate) use unrecognized_platform::*;
 pub(crate) use unrecognized_version_info::*;
 pub(crate) use unsupported_method_call_on_all::*;
+pub(crate) use unused_private_type_definition::*;
 
 mod any_eq_ne_annotation;
 mod bad_version_info_comparison;
@@ -61,3 +62,4 @@ mod unnecessary_literal_union;
 mod unrecognized_platform;
 mod unrecognized_version_info;
 mod unsupported_method_call_on_all;
+mod unused_private_type_definition;

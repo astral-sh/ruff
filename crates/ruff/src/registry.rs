@@ -238,22 +238,15 @@ impl Rule {
         match self {
             Rule::InvalidPyprojectToml => LintSource::PyprojectToml,
             Rule::UnusedNOQA => LintSource::Noqa,
-
-            Rule::DocLineTooLong
+            Rule::BidirectionalUnicode
+            | Rule::BlankLineWithWhitespace
+            | Rule::DocLineTooLong
             | Rule::LineTooLong
-            | Rule::MixedSpacesAndTabs
-            | Rule::MissingNewlineAtEndOfFile
-            | Rule::UTF8EncodingDeclaration
-            | Rule::ShebangMissingExecutableFile
-            | Rule::ShebangNotExecutable
-            | Rule::ShebangNotFirstLine
-            | Rule::BidirectionalUnicode
-            | Rule::ShebangMissingPython
-            | Rule::ShebangLeadingWhitespace
-            | Rule::TrailingWhitespace
-            | Rule::TabIndentation
             | Rule::MissingCopyrightNotice
-            | Rule::BlankLineWithWhitespace => LintSource::PhysicalLines,
+            | Rule::MissingNewlineAtEndOfFile
+            | Rule::MixedSpacesAndTabs
+            | Rule::TabIndentation
+            | Rule::TrailingWhitespace => LintSource::PhysicalLines,
             Rule::AmbiguousUnicodeCharacterComment
             | Rule::AmbiguousUnicodeCharacterDocstring
             | Rule::AmbiguousUnicodeCharacterString
@@ -264,33 +257,39 @@ impl Rule {
             | Rule::BlanketNOQA
             | Rule::BlanketTypeIgnore
             | Rule::CommentedOutCode
-            | Rule::MultiLineImplicitStringConcatenation
+            | Rule::ExtraneousParentheses
             | Rule::InvalidCharacterBackspace
-            | Rule::InvalidCharacterSub
             | Rule::InvalidCharacterEsc
             | Rule::InvalidCharacterNul
+            | Rule::InvalidCharacterSub
             | Rule::InvalidCharacterZeroWidthSpace
-            | Rule::ExtraneousParentheses
             | Rule::InvalidEscapeSequence
-            | Rule::SingleLineImplicitStringConcatenation
-            | Rule::MissingTrailingComma
-            | Rule::TrailingCommaOnBareTuple
-            | Rule::MultipleStatementsOnOneLineColon
-            | Rule::UselessSemicolon
-            | Rule::MultipleStatementsOnOneLineSemicolon
-            | Rule::ProhibitedTrailingComma
-            | Rule::TypeCommentInStub
-            | Rule::InvalidTodoTag
-            | Rule::MissingTodoAuthor
-            | Rule::MissingTodoLink
-            | Rule::MissingTodoColon
-            | Rule::MissingTodoDescription
             | Rule::InvalidTodoCapitalization
-            | Rule::MissingSpaceAfterTodoColon
+            | Rule::InvalidTodoTag
             | Rule::LineContainsFixme
             | Rule::LineContainsHack
             | Rule::LineContainsTodo
-            | Rule::LineContainsXxx => LintSource::Tokens,
+            | Rule::LineContainsXxx
+            | Rule::MissingSpaceAfterTodoColon
+            | Rule::MissingTodoAuthor
+            | Rule::MissingTodoColon
+            | Rule::MissingTodoDescription
+            | Rule::MissingTodoLink
+            | Rule::MissingTrailingComma
+            | Rule::MultiLineImplicitStringConcatenation
+            | Rule::MultipleStatementsOnOneLineColon
+            | Rule::MultipleStatementsOnOneLineSemicolon
+            | Rule::ProhibitedTrailingComma
+            | Rule::ShebangLeadingWhitespace
+            | Rule::ShebangMissingExecutableFile
+            | Rule::ShebangMissingPython
+            | Rule::ShebangNotExecutable
+            | Rule::ShebangNotFirstLine
+            | Rule::SingleLineImplicitStringConcatenation
+            | Rule::TrailingCommaOnBareTuple
+            | Rule::TypeCommentInStub
+            | Rule::UselessSemicolon
+            | Rule::UTF8EncodingDeclaration => LintSource::Tokens,
             Rule::IOError => LintSource::Io,
             Rule::UnsortedImports | Rule::MissingRequiredImport => LintSource::Imports,
             Rule::ImplicitNamespacePackage | Rule::InvalidModuleName => LintSource::Filesystem,

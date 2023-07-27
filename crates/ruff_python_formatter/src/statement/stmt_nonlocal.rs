@@ -1,6 +1,6 @@
 use crate::{not_yet_implemented, FormatNodeRule, PyFormatter};
 use ruff_formatter::{write, Buffer, FormatResult};
-use rustpython_parser::ast::StmtNonlocal;
+use ruff_python_ast::StmtNonlocal;
 
 #[derive(Default)]
 pub struct FormatStmtNonlocal;

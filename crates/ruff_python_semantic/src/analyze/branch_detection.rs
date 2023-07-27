@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 use std::iter;
 
-use rustpython_parser::ast::{self, ExceptHandler, Stmt};
+use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
 
 use crate::node::{NodeId, Nodes};
 

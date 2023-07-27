@@ -1,7 +1,7 @@
 use crate::{AsFormat, FormatNodeRule, PyFormatter};
 use ruff_formatter::prelude::{space, text};
 use ruff_formatter::{write, Buffer, Format, FormatResult};
-use rustpython_parser::ast::Alias;
+use ruff_python_ast::Alias;
 
 #[derive(Default)]
 pub struct FormatAlias;

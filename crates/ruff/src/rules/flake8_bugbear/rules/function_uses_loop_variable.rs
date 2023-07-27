@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Comprehension, Expr, ExprContext, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Comprehension, Expr, ExprContext, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -276,7 +276,7 @@ impl<'a> Visitor<'a> for AssignedNamesVisitor<'a> {
 }
 
 /// B023
-pub(crate) fn function_uses_loop_variable<'a>(checker: &mut Checker<'a>, node: &Node<'a>) {
+pub(crate) fn function_uses_loop_variable(checker: &mut Checker, node: &Node) {
     // Identify any "suspicious" variables. These are defined as variables that are
     // referenced in a function or lambda body, but aren't bound as arguments.
     let suspicious_variables = {
@@ -303,8 +303,8 @@ pub(crate) fn function_uses_loop_variable<'a>(checker: &mut Checker<'a>, node: &
         // loop, flag it.
         for name in suspicious_variables {
             if reassigned_in_loop.contains(&name.id.as_str()) {
-                if !checker.flake8_bugbear_seen.contains(&name) {
-                    checker.flake8_bugbear_seen.push(name);
+                if !checker.flake8_bugbear_seen.contains(&name.range()) {
+                    checker.flake8_bugbear_seen.push(name.range());
                     checker.diagnostics.push(Diagnostic::new(
                         FunctionUsesLoopVariable {
                             name: name.id.to_string(),
