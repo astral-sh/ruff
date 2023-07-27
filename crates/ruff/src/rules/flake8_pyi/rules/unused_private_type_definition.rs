@@ -10,7 +10,7 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// A private `TypeVar` that is defined but not used is likely a mistake, and
-/// should be removed to avoid confusion.
+/// should either be used, made public, or removed to avoid confusion.
 ///
 /// ## Example
 /// ```python
@@ -35,8 +35,9 @@ impl Violation for UnusedPrivateTypeVar {
 /// Checks for the presence of unused private `typing.Protocol` definitions.
 ///
 /// ## Why is this bad?
-/// A private `typing.Protocol` that is defined but not used is likely a mistake, consider
-/// making it public.
+/// A private `typing.Protocol` that is defined but not used is likely a
+/// mistake, and should either be used, made public, or removed to avoid
+/// confusion.
 ///
 /// ## Example
 /// ```python
@@ -118,7 +119,7 @@ pub(crate) fn unused_private_protocol(checker: &Checker, binding: &Binding) -> O
     let Some(source) = binding.source else {
         return None;
     };
-    let Stmt::ClassDef(ast::StmtClassDef {name, bases, ..}) = checker.semantic().stmts[source]
+    let Stmt::ClassDef(ast::StmtClassDef { name, bases, .. }) = checker.semantic().stmts[source]
     else {
         return None;
     };
