@@ -1,5 +1,5 @@
 ---
-source: crates/ruff_python_parser/src/parser.rs
+source: ruff_python_parser/src/parser.rs
 expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
 ---
 [

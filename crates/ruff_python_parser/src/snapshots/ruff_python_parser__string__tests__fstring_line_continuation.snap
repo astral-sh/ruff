@@ -1,5 +1,5 @@
 ---
-source: crates/ruff_python_parser/src/string.rs
+source: ruff_python_parser/src/string.rs
 expression: parse_ast
 ---
 [
