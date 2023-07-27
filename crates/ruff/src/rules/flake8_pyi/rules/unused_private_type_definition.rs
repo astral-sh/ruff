@@ -99,7 +99,9 @@ pub(crate) fn unused_private_type_var(checker: &Checker, binding: &Binding) -> O
     }
 
     Some(Diagnostic::new(
-        UnusedPrivateTypeVar { name: id.to_string() },
+        UnusedPrivateTypeVar {
+            name: id.to_string(),
+        },
         binding.range,
     ))
 }
@@ -129,7 +131,9 @@ pub(crate) fn unused_private_protocol(checker: &Checker, binding: &Binding) -> O
     }
 
     Some(Diagnostic::new(
-        UnusedPrivateProtocol { name: name.to_string() },
+        UnusedPrivateProtocol {
+            name: name.to_string(),
+        },
         binding.range,
     ))
 }
