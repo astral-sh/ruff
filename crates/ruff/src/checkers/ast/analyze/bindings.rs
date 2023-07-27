@@ -13,6 +13,7 @@ pub(crate) fn bindings(checker: &mut Checker) {
         Rule::UnusedPrivateTypeVar,
         Rule::UnusedVariable,
         Rule::UnusedPrivateProtocol,
+        Rule::UnusedPrivateTypeAlias,
     ]) {
         return;
     }
@@ -75,6 +76,13 @@ pub(crate) fn bindings(checker: &mut Checker) {
             if checker.enabled(Rule::UnusedPrivateProtocol) {
                 if let Some(diagnostic) =
                     flake8_pyi::rules::unused_private_protocol(checker, binding)
+                {
+                    checker.diagnostics.push(diagnostic);
+                }
+            }
+            if checker.enabled(Rule::UnusedPrivateTypeAlias) {
+                if let Some(diagnostic) =
+                    flake8_pyi::rules::unused_private_type_alias(checker, binding)
                 {
                     checker.diagnostics.push(diagnostic);
                 }

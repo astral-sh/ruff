@@ -1,0 +1,20 @@
+---
+source: crates/ruff/src/rules/flake8_pyi/mod.rs
+---
+PYI047.pyi:5:1: PYI047 Private TypeAlias `_UnusedPrivateTypeAlias` is never used
+  |
+5 | _UnusedPrivateTypeAlias: TypeAlias = int | None
+  | ^^^^^^^^^^^^^^^^^^^^^^^ PYI047
+6 | _T: typing.TypeAlias = str
+  |
+
+PYI047.pyi:6:1: PYI047 Private TypeAlias `_T` is never used
+  |
+5 | _UnusedPrivateTypeAlias: TypeAlias = int | None
+6 | _T: typing.TypeAlias = str
+  | ^^ PYI047
+7 | 
+8 | # OK
+  |
+
+
