@@ -563,6 +563,18 @@ print("after empty cells")
     }
 
     #[test]
+    fn test_unused_variable() -> Result<()> {
+        let path = "unused_variable.ipynb".to_string();
+        let (diagnostics, source_kind, _) = test_notebook_path(
+            &path,
+            Path::new("unused_variable_expected.ipynb"),
+            &settings::Settings::for_rule(Rule::UnusedVariable),
+        )?;
+        assert_messages!(diagnostics, path, source_kind);
+        Ok(())
+    }
+
+    #[test]
     fn test_json_consistency() -> Result<()> {
         let path = "before_fix.ipynb".to_string();
         let (_, _, source_kind) = test_notebook_path(
