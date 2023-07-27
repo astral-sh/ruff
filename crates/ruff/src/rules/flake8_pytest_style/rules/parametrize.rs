@@ -99,10 +99,16 @@ fn get_parametrize_name_range(
     decorator: &Decorator,
     expr: &Expr,
     locator: &Locator,
-    mode: Mode,
+    is_jupyter_notebook: bool,
 ) -> TextRange {
     let mut locations = Vec::new();
     let mut implicit_concat = None;
+
+    let mode = if is_jupyter_notebook {
+        Mode::Jupyter
+    } else {
+        Mode::Module
+    };
 
     // The parenthesis are not part of the AST, so we need to tokenize the
     // decorator to find them.
@@ -132,11 +138,6 @@ fn get_parametrize_name_range(
 /// PT006
 fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
     let names_type = checker.settings.flake8_pytest_style.parametrize_names_type;
-    let mode = if checker.is_jupyter_notebook {
-        Mode::Jupyter
-    } else {
-        Mode::Module
-    };
 
     match expr {
         Expr::Constant(ast::ExprConstant {
@@ -147,8 +148,12 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
             if names.len() > 1 {
                 match names_type {
                     types::ParametrizeNameType::Tuple => {
-                        let name_range =
-                            get_parametrize_name_range(decorator, expr, checker.locator(), mode);
+                        let name_range = get_parametrize_name_range(
+                            decorator,
+                            expr,
+                            checker.locator(),
+                            checker.is_jupyter_notebook,
+                        );
                         let mut diagnostic = Diagnostic::new(
                             PytestParametrizeNamesWrongType {
                                 expected: names_type,
@@ -178,8 +183,12 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                         checker.diagnostics.push(diagnostic);
                     }
                     types::ParametrizeNameType::List => {
-                        let name_range =
-                            get_parametrize_name_range(decorator, expr, checker.locator(), mode);
+                        let name_range = get_parametrize_name_range(
+                            decorator,
+                            expr,
+                            checker.locator(),
+                            checker.is_jupyter_notebook,
+                        );
                         let mut diagnostic = Diagnostic::new(
                             PytestParametrizeNamesWrongType {
                                 expected: names_type,
