@@ -100,43 +100,62 @@ impl<'a> Binding<'a> {
         self.flags.contains(BindingFlags::PRIVATE_DECLARATION)
     }
 
-    /// Return `true` if this binding redefines the given binding.
+    /// Return `true` if this binding "redefines" the given binding, as per Pyflake's definition of
+    /// redefinition.
     pub fn redefines(&self, existing: &'a Binding) -> bool {
         match &self.kind {
-            BindingKind::Import(Import { qualified_name }) => {
+            // Submodule imports are only considered redefinitions if they import the same
+            // submodule. For example, this is a redefinition:
+            // ```python
+            // import foo.bar
+            // import foo.bar
+            // ```
+            //
+            // This, however, is not:
+            // ```python
+            // import foo.bar
+            // import foo.baz
+            // ```
+            BindingKind::Import(Import {
+                qualified_name: redefinition,
+            }) => {
                 if let BindingKind::SubmoduleImport(SubmoduleImport {
-                    qualified_name: existing,
+                    qualified_name: definition,
                 }) = &existing.kind
                 {
-                    return qualified_name == existing;
+                    return redefinition == definition;
                 }
             }
-            BindingKind::FromImport(FromImport { qualified_name }) => {
+            BindingKind::FromImport(FromImport {
+                qualified_name: redefinition,
+            }) => {
                 if let BindingKind::SubmoduleImport(SubmoduleImport {
-                    qualified_name: existing,
+                    qualified_name: definition,
                 }) = &existing.kind
                 {
-                    return qualified_name == existing;
+                    return redefinition == definition;
                 }
             }
-            BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }) => {
-                match &existing.kind {
-                    BindingKind::Import(Import {
-                        qualified_name: existing,
-                    })
-                    | BindingKind::SubmoduleImport(SubmoduleImport {
-                        qualified_name: existing,
-                    }) => {
-                        return qualified_name == existing;
-                    }
-                    BindingKind::FromImport(FromImport {
-                        qualified_name: existing,
-                    }) => {
-                        return qualified_name == existing;
-                    }
-                    _ => {}
+            BindingKind::SubmoduleImport(SubmoduleImport {
+                qualified_name: redefinition,
+            }) => match &existing.kind {
+                BindingKind::Import(Import {
+                    qualified_name: definition,
+                })
+                | BindingKind::SubmoduleImport(SubmoduleImport {
+                    qualified_name: definition,
+                }) => {
+                    return redefinition == definition;
                 }
-            }
+                BindingKind::FromImport(FromImport {
+                    qualified_name: definition,
+                }) => {
+                    return redefinition == definition;
+                }
+                _ => {}
+            },
+            // Deletions, annotations, `__future__` imports, and builtins are never considered
+            // redefinitions.
             BindingKind::Deletion
             | BindingKind::Annotation
             | BindingKind::FutureImport
@@ -145,13 +164,14 @@ impl<'a> Binding<'a> {
             }
             _ => {}
         }
+        // Otherwise, the shadowed binding must be a class definition, function definition, or
+        // import to be considered a redefinition.
         matches!(
             existing.kind,
             BindingKind::ClassDefinition(_)
                 | BindingKind::FunctionDefinition(_)
                 | BindingKind::Import(_)
                 | BindingKind::FromImport(_)
-                | BindingKind::SubmoduleImport(_)
         )
     }
 
