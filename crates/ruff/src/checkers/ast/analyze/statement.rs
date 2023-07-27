@@ -396,6 +396,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     flake8_django::rules::model_without_dunder_str(checker, class_def);
                 }
             }
+            if checker.enabled(Rule::EqWithoutHash) {
+                pylint::rules::object_without_hash_method(checker, class_def);
+            }
             if checker.enabled(Rule::GlobalStatement) {
                 pylint::rules::global_statement(checker, name);
             }
