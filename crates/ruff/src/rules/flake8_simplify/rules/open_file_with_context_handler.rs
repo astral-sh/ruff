@@ -105,22 +105,37 @@ fn match_exit_stack(semantic: &SemanticModel) -> bool {
     false
 }
 
+/// Return `true` if `func` is the builtin `open` or `pathlib.Path(...).open`.
+fn is_open(checker: &mut Checker, func: &Expr) -> bool {
+    match func {
+        // pathlib.Path(...).open()
+        Expr::Attribute(ast::ExprAttribute { attr, value, .. }) if attr.as_str() == "open" => {
+            match value.as_ref() {
+                Expr::Call(ast::ExprCall { func, .. }) => checker
+                    .semantic()
+                    .resolve_call_path(func)
+                    .map_or(false, |call_path| {
+                        matches!(call_path.as_slice(), ["pathlib", "Path"])
+                    }),
+                _ => false,
+            }
+        }
+        // open(...)
+        Expr::Name(ast::ExprName { id, .. }) => {
+            id.as_str() == "open" && checker.semantic().is_builtin("open")
+        }
+        _ => false,
+    }
+}
+
 /// SIM115
 pub(crate) fn open_file_with_context_handler(checker: &mut Checker, func: &Expr) {
-    let Expr::Name(ast::ExprName { id, .. }) = func else {
-        return;
-    };
-
-    if id.as_str() != "open" {
+    if !is_open(checker, func) {
         return;
     }
 
     // Ex) `with open("foo.txt") as f: ...`
     if checker.semantic().stmt().is_with_stmt() {
-        return;
-    }
-
-    if !checker.semantic().is_builtin("open") {
         return;
     }
 
