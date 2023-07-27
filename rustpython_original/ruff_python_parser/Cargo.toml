@@ -1,0 +1,36 @@
+[package]
+name = "ruff_python_parser"
+version = "0.2.0"
+description = "Parser for python code."
+authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>", "RustPython Team"]
+build = "build.rs"
+license = "MIT"
+edition = "2021"
+
+[features]
+serde = ["dep:serde"]
+
+[build-dependencies]
+anyhow = { workspace = true }
+lalrpop = { version = "0.20.0", default-features = false, optional = true }
+tiny-keccak = { version = "2", features = ["sha3"] }
+
+[dependencies]
+ruff_python_ast = { workspace = true }
+ruff_text_size = { workspace = true }
+
+itertools = { workspace = true }
+is-macro = { workspace = true }
+num-bigint = { workspace = true }
+num-traits = { workspace = true }
+unicode_names2 = { workspace = true }
+
+unic-emoji-char = "0.9.0"
+unic-ucd-ident  = "0.9.0"
+lalrpop-util = { version = "0.20.0", default-features = false }
+rustc-hash = "1.1.0"
+serde = { version = "1.0.133", optional = true, default-features = false, features = ["derive"] }
+static_assertions = "1.1.0"
+
+[dev-dependencies]
+insta = { workspace = true }

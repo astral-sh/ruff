@@ -1,0 +1,136 @@
+---
+source: ruff_python_parser/src/function.rs
+expression: parse_ast
+---
+Ok(
+    [
+        FunctionDef(
+            StmtFunctionDef {
+                range: 0..38,
+                name: Identifier {
+                    id: "f",
+                    range: 4..5,
+                },
+                args: Arguments {
+                    range: 5..32,
+                    posonlyargs: [],
+                    args: [
+                        ArgWithDefault {
+                            range: 6..7,
+                            def: Arg {
+                                range: 6..7,
+                                arg: Identifier {
+                                    id: "a",
+                                    range: 6..7,
+                                },
+                                annotation: None,
+                                type_comment: None,
+                            },
+                            default: None,
+                        },
+                        ArgWithDefault {
+                            range: 9..10,
+                            def: Arg {
+                                range: 9..10,
+                                arg: Identifier {
+                                    id: "b",
+                                    range: 9..10,
+                                },
+                                annotation: None,
+                                type_comment: None,
+                            },
+                            default: None,
+                        },
+                        ArgWithDefault {
+                            range: 12..13,
+                            def: Arg {
+                                range: 12..13,
+                                arg: Identifier {
+                                    id: "c",
+                                    range: 12..13,
+                                },
+                                annotation: None,
+                                type_comment: None,
+                            },
+                            default: None,
+                        },
+                    ],
+                    vararg: None,
+                    kwonlyargs: [
+                        ArgWithDefault {
+                            range: 18..19,
+                            def: Arg {
+                                range: 18..19,
+                                arg: Identifier {
+                                    id: "d",
+                                    range: 18..19,
+                                },
+                                annotation: None,
+                                type_comment: None,
+                            },
+                            default: None,
+                        },
+                        ArgWithDefault {
+                            range: 21..25,
+                            def: Arg {
+                                range: 21..22,
+                                arg: Identifier {
+                                    id: "e",
+                                    range: 21..22,
+                                },
+                                annotation: None,
+                                type_comment: None,
+                            },
+                            default: Some(
+                                Constant(
+                                    ExprConstant {
+                                        range: 23..25,
+                                        value: Int(
+                                            20,
+                                        ),
+                                        kind: None,
+                                    },
+                                ),
+                            ),
+                        },
+                        ArgWithDefault {
+                            range: 27..31,
+                            def: Arg {
+                                range: 27..28,
+                                arg: Identifier {
+                                    id: "f",
+                                    range: 27..28,
+                                },
+                                annotation: None,
+                                type_comment: None,
+                            },
+                            default: Some(
+                                Constant(
+                                    ExprConstant {
+                                        range: 29..31,
+                                        value: Int(
+                                            30,
+                                        ),
+                                        kind: None,
+                                    },
+                                ),
+                            ),
+                        },
+                    ],
+                    kwarg: None,
+                },
+                body: [
+                    Pass(
+                        StmtPass {
+                            range: 34..38,
+                        },
+                    ),
+                ],
+                decorator_list: [],
+                returns: None,
+                type_params: [],
+                type_comment: None,
+            },
+        ),
+    ],
+)

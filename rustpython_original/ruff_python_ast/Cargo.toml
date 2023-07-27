@@ -1,0 +1,15 @@
+[package]
+name = "ruff_python_ast"
+version = "0.2.0"
+description = "AST definitions for Ruff"
+authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
+edition = "2021"
+repository = "https://github.com/astral-sh/ruff"
+license = "MIT"
+
+[dependencies]
+ruff_text_size = { workspace = true }
+
+is-macro = { workspace = true }
+num-bigint = { workspace = true }
+static_assertions = { workspace = true }

@@ -1,0 +1,96 @@
+---
+source: ruff_python_parser/src/function.rs
+expression: parse_ast
+---
+Ok(
+    [
+        FunctionDef(
+            StmtFunctionDef {
+                range: 0..26,
+                name: Identifier {
+                    id: "f",
+                    range: 4..5,
+                },
+                args: Arguments {
+                    range: 5..20,
+                    posonlyargs: [],
+                    args: [
+                        ArgWithDefault {
+                            range: 6..7,
+                            def: Arg {
+                                range: 6..7,
+                                arg: Identifier {
+                                    id: "a",
+                                    range: 6..7,
+                                },
+                                annotation: None,
+                                type_comment: None,
+                            },
+                            default: None,
+                        },
+                        ArgWithDefault {
+                            range: 9..13,
+                            def: Arg {
+                                range: 9..10,
+                                arg: Identifier {
+                                    id: "b",
+                                    range: 9..10,
+                                },
+                                annotation: None,
+                                type_comment: None,
+                            },
+                            default: Some(
+                                Constant(
+                                    ExprConstant {
+                                        range: 11..13,
+                                        value: Int(
+                                            20,
+                                        ),
+                                        kind: None,
+                                    },
+                                ),
+                            ),
+                        },
+                        ArgWithDefault {
+                            range: 15..19,
+                            def: Arg {
+                                range: 15..16,
+                                arg: Identifier {
+                                    id: "c",
+                                    range: 15..16,
+                                },
+                                annotation: None,
+                                type_comment: None,
+                            },
+                            default: Some(
+                                Constant(
+                                    ExprConstant {
+                                        range: 17..19,
+                                        value: Int(
+                                            30,
+                                        ),
+                                        kind: None,
+                                    },
+                                ),
+                            ),
+                        },
+                    ],
+                    vararg: None,
+                    kwonlyargs: [],
+                    kwarg: None,
+                },
+                body: [
+                    Pass(
+                        StmtPass {
+                            range: 22..26,
+                        },
+                    ),
+                ],
+                decorator_list: [],
+                returns: None,
+                type_params: [],
+                type_comment: None,
+            },
+        ),
+    ],
+)
