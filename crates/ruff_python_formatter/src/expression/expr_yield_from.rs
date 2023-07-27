@@ -1,7 +1,7 @@
-use rustpython_ast::ExprYieldFrom;
-use ruff_formatter::{Format, FormatResult};
-use crate::{FormatNodeRule, PyFormatter};
 use crate::expression::expr_yield::AnyExpressionYield;
+use crate::{FormatNodeRule, PyFormatter};
+use ruff_formatter::{Format, FormatResult};
+use rustpython_ast::ExprYieldFrom;
 
 #[derive(Default)]
 pub struct FormatExprYieldFrom;
