@@ -1,5 +1,3 @@
-use ruff_diagnostics::{Diagnostic, Fix};
-
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::rules::{flake8_import_conventions, flake8_pyi, pyflakes, pylint};
