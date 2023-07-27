@@ -10,12 +10,14 @@ documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 
+
+
 [lib]
 
 [dependencies]
 ruff_python_trivia = { path = "../ruff_python_trivia" }
 ruff_source_file = { path = "../ruff_source_file" }
-ruff_text_size = { workspace = true }
+ruff_text_size = { path = "../ruff_text_size" }
 
 bitflags = { workspace = true }
 is-macro = { workspace = true }
@@ -24,13 +26,12 @@ num-bigint = { workspace = true }
 num-traits = { workspace = true }
 once_cell = { workspace = true }
 rustc-hash = { workspace = true }
-rustpython-ast = { workspace = true }
 serde = { workspace = true, optional = true }
 smallvec = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }
-rustpython-parser = { workspace = true }
+ruff_python_parser = { path = "../ruff_python_parser" }
 
 [features]
 serde = ["dep:serde", "ruff_text_size/serde"]

@@ -1,4 +1,4 @@
-use rustpython_ast::Ranged;
+use ruff_python_ast::Ranged;
 
 use ruff_formatter::prelude::tag::Condition;
 use ruff_formatter::{format_args, write, Argument, Arguments};

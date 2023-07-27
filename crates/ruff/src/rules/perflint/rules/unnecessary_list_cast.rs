@@ -1,9 +1,9 @@
+use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::TextRange;
-use rustpython_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use rustpython_ast::Stmt;
+use ruff_python_ast::Stmt;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;

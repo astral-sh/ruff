@@ -2,8 +2,8 @@ use std::path::Path;
 
 use js_sys::Error;
 
-use rustpython_parser::lexer::LexResult;
-use rustpython_parser::{parse_tokens, Mode};
+use ruff_python_parser::lexer::LexResult;
+use ruff_python_parser::{parse_tokens, Mode};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -268,7 +268,7 @@ impl Workspace {
     }
 
     pub fn format_ir(&self, contents: &str) -> Result<String, Error> {
-        let tokens: Vec<_> = rustpython_parser::lexer::lex(contents, Mode::Module).collect();
+        let tokens: Vec<_> = ruff_python_parser::lexer::lex(contents, Mode::Module).collect();
         let mut comment_ranges = CommentRangesBuilder::default();
 
         for (token, range) in tokens.iter().flatten() {
@@ -291,13 +291,13 @@ impl Workspace {
 
     /// Parses the content and returns its AST
     pub fn parse(&self, contents: &str) -> Result<String, Error> {
-        let parsed = rustpython_parser::parse(contents, Mode::Module, ".").map_err(into_error)?;
+        let parsed = ruff_python_parser::parse(contents, Mode::Module, ".").map_err(into_error)?;
 
         Ok(format!("{parsed:#?}"))
     }
 
     pub fn tokens(&self, contents: &str) -> Result<String, Error> {
-        let tokens: Vec<_> = rustpython_parser::lexer::lex(contents, Mode::Module).collect();
+        let tokens: Vec<_> = ruff_python_parser::lexer::lex(contents, Mode::Module).collect();
 
         Ok(format!("{tokens:#?}"))
     }

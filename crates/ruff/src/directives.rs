@@ -3,9 +3,9 @@
 use std::str::FromStr;
 
 use bitflags::bitflags;
+use ruff_python_parser::lexer::LexResult;
+use ruff_python_parser::Tok;
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_parser::lexer::LexResult;
-use rustpython_parser::Tok;
 
 use ruff_python_index::Indexer;
 use ruff_source_file::Locator;
@@ -349,9 +349,9 @@ impl TodoDirectiveKind {
 
 #[cfg(test)]
 mod tests {
+    use ruff_python_parser::lexer::LexResult;
+    use ruff_python_parser::{lexer, Mode};
     use ruff_text_size::{TextLen, TextRange, TextSize};
-    use rustpython_parser::lexer::LexResult;
-    use rustpython_parser::{lexer, Mode};
 
     use ruff_python_index::Indexer;
     use ruff_source_file::Locator;

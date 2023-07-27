@@ -1,5 +1,5 @@
 //! Rules from [flake8-gettext](https://pypi.org/project/flake8-gettext/).
-use rustpython_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Expr};
 
 pub(crate) mod rules;
 pub mod settings;

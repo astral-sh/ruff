@@ -1,6 +1,6 @@
+use ruff_python_ast as ast;
+use ruff_python_ast::Decorator;
 use ruff_text_size::TextRange;
-use rustpython_ast::Decorator;
-use rustpython_parser::ast;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;

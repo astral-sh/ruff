@@ -83,9 +83,9 @@ impl PythonWhitespace for str {
 #[cfg(test)]
 mod tests {
     use crate::has_trailing_content;
+    use ruff_python_ast::{Ranged, Suite};
+    use ruff_python_parser::{Parse, ParseError};
     use ruff_source_file::Locator;
-    use rustpython_ast::{Ranged, Suite};
-    use rustpython_parser::{Parse, ParseError};
 
     #[test]
     fn trailing_content() -> Result<(), ParseError> {

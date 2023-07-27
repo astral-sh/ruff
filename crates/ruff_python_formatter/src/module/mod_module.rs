@@ -2,7 +2,7 @@ use crate::statement::suite::SuiteLevel;
 use crate::{AsFormat, FormatNodeRule, PyFormatter};
 use ruff_formatter::prelude::hard_line_break;
 use ruff_formatter::{write, Buffer, FormatResult};
-use rustpython_ast::ModModule;
+use ruff_python_ast::ModModule;
 
 #[derive(Default)]
 pub struct FormatModModule;

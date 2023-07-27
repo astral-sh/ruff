@@ -1,7 +1,7 @@
 use log::error;
+use ruff_python_ast::{self as ast, Stmt, Suite};
+use ruff_python_parser::Parse;
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_ast::{self as ast, Stmt, Suite};
-use rustpython_parser::Parse;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};

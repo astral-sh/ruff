@@ -1,6 +1,6 @@
 use crate::{not_yet_implemented, FormatNodeRule, PyFormatter};
 use ruff_formatter::{write, Buffer, FormatResult};
-use rustpython_ast::PatternMatchSingleton;
+use ruff_python_ast::PatternMatchSingleton;
 
 #[derive(Default)]
 pub struct FormatPatternMatchSingleton;

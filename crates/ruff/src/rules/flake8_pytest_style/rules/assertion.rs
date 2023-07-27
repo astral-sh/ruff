@@ -7,7 +7,7 @@ use libcst_native::{
     ParenthesizedNode, SimpleStatementLine, SimpleWhitespace, SmallStatement, Statement,
     TrailingWhitespace, UnaryOperation,
 };
-use rustpython_ast::{self as ast, BoolOp, ExceptHandler, Expr, Keyword, Ranged, Stmt, UnaryOp};
+use ruff_python_ast::{self as ast, BoolOp, ExceptHandler, Expr, Keyword, Ranged, Stmt, UnaryOp};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};

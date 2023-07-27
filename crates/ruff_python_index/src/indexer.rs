@@ -1,11 +1,11 @@
 //! Struct used to index source code, to enable efficient lookup of tokens that
 //! are omitted from the AST (e.g., commented lines).
 
+use ruff_python_ast::{Ranged, Stmt};
+use ruff_python_parser::lexer::LexResult;
+use ruff_python_parser::{StringKind, Tok};
 use ruff_python_trivia::{has_leading_content, has_trailing_content, is_python_whitespace};
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_ast::{Ranged, Stmt};
-use rustpython_parser::lexer::LexResult;
-use rustpython_parser::{StringKind, Tok};
 
 use super::comment_ranges::{CommentRanges, CommentRangesBuilder};
 use ruff_source_file::Locator;
@@ -264,9 +264,9 @@ impl Indexer {
 
 #[cfg(test)]
 mod tests {
+    use ruff_python_parser::lexer::LexResult;
+    use ruff_python_parser::{lexer, Mode};
     use ruff_text_size::{TextRange, TextSize};
-    use rustpython_parser::lexer::LexResult;
-    use rustpython_parser::{lexer, Mode};
 
     use crate::Indexer;
     use ruff_source_file::Locator;

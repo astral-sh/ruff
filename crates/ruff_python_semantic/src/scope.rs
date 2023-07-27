@@ -1,8 +1,8 @@
 use std::ops::{Deref, DerefMut};
 
 use bitflags::bitflags;
+use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast;
 
 use ruff_index::{newtype_index, Idx, IndexSlice, IndexVec};
 

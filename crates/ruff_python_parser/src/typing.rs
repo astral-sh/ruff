@@ -1,9 +1,9 @@
+use crate::Parse;
 use anyhow::Result;
 use ruff_python_ast::relocate::relocate_expr;
 use ruff_python_ast::str;
+use ruff_python_ast::Expr;
 use ruff_text_size::{TextLen, TextRange};
-use rustpython_ast::Expr;
-use rustpython_parser::Parse;
 
 #[derive(is_macro::Is, Copy, Clone)]
 pub enum AnnotationKind {

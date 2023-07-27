@@ -1,5 +1,5 @@
 use log::error;
-use rustpython_ast::{CmpOp, Expr, Ranged};
+use ruff_python_ast::{CmpOp, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};

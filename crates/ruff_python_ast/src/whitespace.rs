@@ -1,5 +1,5 @@
+use crate::{Ranged, Stmt};
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_ast::{Ranged, Stmt};
 
 use ruff_python_trivia::{
     has_trailing_content, indentation_at_offset, is_python_whitespace, PythonWhitespace,

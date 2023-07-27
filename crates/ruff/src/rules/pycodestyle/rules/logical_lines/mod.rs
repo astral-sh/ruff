@@ -13,10 +13,10 @@ use std::fmt::{Debug, Formatter};
 use std::iter::FusedIterator;
 
 use bitflags::bitflags;
+use ruff_python_parser::lexer::LexResult;
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_parser::lexer::LexResult;
 
-use ruff_python_parser::token_kind::TokenKind;
+use ruff_python_parser::TokenKind;
 use ruff_python_trivia::is_python_whitespace;
 use ruff_source_file::Locator;
 
@@ -521,8 +521,8 @@ struct Line {
 
 #[cfg(test)]
 mod tests {
-    use rustpython_parser::lexer::LexResult;
-    use rustpython_parser::{lexer, Mode};
+    use ruff_python_parser::lexer::LexResult;
+    use ruff_python_parser::{lexer, Mode};
 
     use ruff_source_file::Locator;
 

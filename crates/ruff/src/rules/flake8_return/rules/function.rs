@@ -1,7 +1,7 @@
 use std::ops::Add;
 
+use ruff_python_ast::{self as ast, ElifElseClause, Expr, Ranged, Stmt};
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_ast::{self as ast, ElifElseClause, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};

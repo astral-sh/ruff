@@ -1,5 +1,5 @@
+use ruff_python_ast::{ElifElseClause, Ranged, Stmt};
 use ruff_text_size::TextRange;
-use rustpython_ast::{ElifElseClause, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};

@@ -1,6 +1,6 @@
 //! Specialized AST visitor trait and walk functions that only visit statements.
 
-use rustpython_ast::{self as ast, ElifElseClause, ExceptHandler, MatchCase, Stmt};
+use crate::{self as ast, ElifElseClause, ExceptHandler, MatchCase, Stmt};
 
 /// A trait for AST visitors that only need to visit statements.
 pub trait StatementVisitor<'a> {

@@ -3,10 +3,10 @@
 
 use std::iter::FusedIterator;
 
+use ruff_python_ast::{self as ast, Constant, Expr, Ranged, Stmt, Suite};
+use ruff_python_parser::lexer::LexResult;
+use ruff_python_parser::Tok;
 use ruff_text_size::TextSize;
-use rustpython_ast::{self as ast, Constant, Expr, Ranged, Stmt, Suite};
-use rustpython_parser::lexer::LexResult;
-use rustpython_parser::Tok;
 
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 use ruff_source_file::{Locator, UniversalNewlineIterator};

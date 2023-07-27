@@ -3,9 +3,9 @@ use std::iter;
 
 use itertools::Either::{Left, Right};
 use itertools::Itertools;
+use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr, ExprContext, Ranged, UnaryOp};
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
-use rustpython_ast::{self as ast, BoolOp, CmpOp, Expr, ExprContext, Ranged, UnaryOp};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};

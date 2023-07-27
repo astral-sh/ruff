@@ -1,5 +1,5 @@
 use num_traits::One;
-use rustpython_ast::{self as ast, CmpOp, Constant, Expr, Ranged};
+use ruff_python_ast::{self as ast, CmpOp, Constant, Expr, Ranged};
 
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;

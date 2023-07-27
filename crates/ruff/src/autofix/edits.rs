@@ -1,8 +1,8 @@
 //! Interface for generating autofix edits from higher-level actions (e.g., "remove an argument").
 use anyhow::{bail, Result};
+use ruff_python_ast::{self as ast, ExceptHandler, Expr, Keyword, Ranged, Stmt};
+use ruff_python_parser::{lexer, Mode};
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_ast::{self as ast, ExceptHandler, Expr, Keyword, Ranged, Stmt};
-use rustpython_parser::{lexer, Mode};
 
 use ruff_diagnostics::Edit;
 use ruff_python_codegen::Stylist;
@@ -294,9 +294,9 @@ fn next_stmt_break(semicolon: TextSize, locator: &Locator) -> TextSize {
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
+    use ruff_python_ast::{Ranged, Suite};
+    use ruff_python_parser::Parse;
     use ruff_text_size::TextSize;
-    use rustpython_ast::{Ranged, Suite};
-    use rustpython_parser::Parse;
 
     use ruff_source_file::Locator;
 

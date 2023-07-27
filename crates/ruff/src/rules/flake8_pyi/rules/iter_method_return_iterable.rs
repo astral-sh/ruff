@@ -1,10 +1,10 @@
-use rustpython_ast::{Ranged, Stmt};
-use rustpython_parser::ast;
+use ruff_python_ast as ast;
+use ruff_python_ast::{Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::Expr;
 use ruff_python_semantic::{Definition, Member, MemberKind};
-use rustpython_ast::Expr;
 
 use crate::checkers::ast::Checker;
 

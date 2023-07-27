@@ -15,7 +15,7 @@ license = { workspace = true }
 [dependencies]
 memchr = { workspace = true }
 once_cell = { workspace = true }
-ruff_text_size = { workspace = true }
+ruff_text_size = { path = "../ruff_text_size" }
 serde = { workspace = true, optional = true }
 
 [dev-dependencies]

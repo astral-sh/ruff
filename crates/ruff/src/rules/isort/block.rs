@@ -1,5 +1,5 @@
+use ruff_python_ast::{self as ast, ElifElseClause, ExceptHandler, MatchCase, Ranged, Stmt};
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_ast::{self as ast, ElifElseClause, ExceptHandler, MatchCase, Ranged, Stmt};
 use std::iter::Peekable;
 use std::slice;
 

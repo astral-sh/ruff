@@ -1,6 +1,6 @@
 use log::error;
+use ruff_python_ast::{self as ast, Ranged, Stmt, WithItem};
 use ruff_text_size::TextRange;
-use rustpython_ast::{self as ast, Ranged, Stmt, WithItem};
 
 use ruff_diagnostics::{AutofixKind, Violation};
 use ruff_diagnostics::{Diagnostic, Fix};

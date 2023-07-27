@@ -7,8 +7,8 @@ use std::error::Error;
 
 use anyhow::Result;
 use libcst_native::{ImportAlias, Name, NameOrAttribute};
+use ruff_python_ast::{self as ast, Ranged, Stmt, Suite};
 use ruff_text_size::TextSize;
-use rustpython_ast::{self as ast, Ranged, Stmt, Suite};
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::imports::{AnyImport, Import, ImportFrom};

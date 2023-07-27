@@ -1,5 +1,5 @@
+use ruff_python_ast::{CmpOp, Expr, Ranged};
 use ruff_text_size::{TextLen, TextRange};
-use rustpython_ast::{CmpOp, Expr, Ranged};
 use unicode_width::UnicodeWidthStr;
 
 use ruff_source_file::{Line, Locator};

@@ -1,5 +1,5 @@
+use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_python_semantic::SemanticModel;
-use rustpython_ast::{self as ast, Expr, Operator};
 
 /// Traverse a "union" type annotation, applying `func` to each union member.
 /// Supports traversal of `Union` and `|` union expressions.

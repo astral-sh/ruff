@@ -92,7 +92,7 @@ use std::cell::Cell;
 use std::fmt::Debug;
 use std::rc::Rc;
 
-use rustpython_ast::{Mod, Ranged};
+use ruff_python_ast::{Mod, Ranged};
 
 pub(crate) use format::{
     dangling_comments, dangling_node_comments, leading_alternate_branch_comments, leading_comments,
@@ -414,9 +414,9 @@ struct CommentsData<'a> {
 #[cfg(test)]
 mod tests {
     use insta::assert_debug_snapshot;
-    use rustpython_ast::Mod;
-    use rustpython_parser::lexer::lex;
-    use rustpython_parser::{parse_tokens, Mode};
+    use ruff_python_ast::Mod;
+    use ruff_python_parser::lexer::lex;
+    use ruff_python_parser::{parse_tokens, Mode};
 
     use ruff_formatter::SourceCode;
     use ruff_python_index::{CommentRanges, CommentRangesBuilder};

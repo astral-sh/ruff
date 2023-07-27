@@ -1,6 +1,6 @@
 use anyhow::{Context, Ok, Result};
+use ruff_python_ast::{Expr, Ranged};
 use ruff_text_size::TextRange;
-use rustpython_ast::{Expr, Ranged};
 
 use ruff_diagnostics::Edit;
 use ruff_python_codegen::Stylist;

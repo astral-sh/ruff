@@ -7,7 +7,7 @@ use colored::Colorize;
 use fern;
 use log::Level;
 use once_cell::sync::Lazy;
-use rustpython_parser::{ParseError, ParseErrorType};
+use ruff_python_parser::{ParseError, ParseErrorType};
 
 use ruff_source_file::{OneIndexed, SourceCode, SourceLocation};
 

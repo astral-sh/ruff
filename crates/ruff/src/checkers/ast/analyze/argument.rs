@@ -1,4 +1,4 @@
-use rustpython_ast::{Arg, Ranged};
+use ruff_python_ast::{Arg, Ranged};
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;

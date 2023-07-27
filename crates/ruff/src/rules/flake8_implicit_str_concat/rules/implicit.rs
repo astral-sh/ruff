@@ -1,6 +1,6 @@
 use itertools::Itertools;
+use ruff_python_parser::lexer::LexResult;
 use ruff_text_size::TextRange;
-use rustpython_parser::lexer::LexResult;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};

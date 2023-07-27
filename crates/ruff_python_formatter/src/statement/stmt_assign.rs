@@ -1,4 +1,4 @@
-use rustpython_ast::{Expr, StmtAssign};
+use ruff_python_ast::{Expr, StmtAssign};
 
 use ruff_formatter::{format_args, write, FormatError};
 

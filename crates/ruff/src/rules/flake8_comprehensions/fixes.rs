@@ -7,8 +7,8 @@ use libcst_native::{
     RightParen, RightSquareBracket, Set, SetComp, SimpleString, SimpleWhitespace,
     TrailingWhitespace, Tuple,
 };
+use ruff_python_ast::Ranged;
 use ruff_text_size::TextRange;
-use rustpython_ast::Ranged;
 
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_codegen::Stylist;
@@ -28,7 +28,7 @@ use crate::{
 pub(crate) fn fix_unnecessary_generator_list(
     locator: &Locator,
     stylist: &Stylist,
-    expr: &rustpython_ast::Expr,
+    expr: &ruff_python_ast::Expr,
 ) -> Result<Edit> {
     // Expr(Call(GeneratorExp)))) -> Expr(ListComp)))
     let module_text = locator.slice(expr.range());
@@ -60,7 +60,7 @@ pub(crate) fn fix_unnecessary_generator_list(
 /// (C401) Convert `set(x for x in y)` to `{x for x in y}`.
 pub(crate) fn fix_unnecessary_generator_set(
     checker: &Checker,
-    expr: &rustpython_ast::Expr,
+    expr: &ruff_python_ast::Expr,
 ) -> Result<Edit> {
     let locator = checker.locator();
     let stylist = checker.stylist();
@@ -98,7 +98,7 @@ pub(crate) fn fix_unnecessary_generator_set(
 /// range(3)}`.
 pub(crate) fn fix_unnecessary_generator_dict(
     checker: &Checker,
-    expr: &rustpython_ast::Expr,
+    expr: &ruff_python_ast::Expr,
 ) -> Result<Edit> {
     let locator = checker.locator();
     let stylist = checker.stylist();
@@ -141,7 +141,7 @@ pub(crate) fn fix_unnecessary_generator_dict(
 /// (C403) Convert `set([x for x in y])` to `{x for x in y}`.
 pub(crate) fn fix_unnecessary_list_comprehension_set(
     checker: &Checker,
-    expr: &rustpython_ast::Expr,
+    expr: &ruff_python_ast::Expr,
 ) -> Result<Edit> {
     let locator = checker.locator();
     let stylist = checker.stylist();
@@ -177,7 +177,7 @@ pub(crate) fn fix_unnecessary_list_comprehension_set(
 /// range(3)}`.
 pub(crate) fn fix_unnecessary_list_comprehension_dict(
     checker: &Checker,
-    expr: &rustpython_ast::Expr,
+    expr: &ruff_python_ast::Expr,
 ) -> Result<Edit> {
     let locator = checker.locator();
     let stylist = checker.stylist();
@@ -264,7 +264,7 @@ fn drop_trailing_comma<'a>(
 /// (C405) Convert `set((1, 2))` to `{1, 2}`.
 pub(crate) fn fix_unnecessary_literal_set(
     checker: &Checker,
-    expr: &rustpython_ast::Expr,
+    expr: &ruff_python_ast::Expr,
 ) -> Result<Edit> {
     let locator = checker.locator();
     let stylist = checker.stylist();
@@ -308,7 +308,7 @@ pub(crate) fn fix_unnecessary_literal_set(
 /// (C406) Convert `dict([(1, 2)])` to `{1: 2}`.
 pub(crate) fn fix_unnecessary_literal_dict(
     checker: &Checker,
-    expr: &rustpython_ast::Expr,
+    expr: &ruff_python_ast::Expr,
 ) -> Result<Edit> {
     let locator = checker.locator();
     let stylist = checker.stylist();
@@ -374,7 +374,7 @@ pub(crate) fn fix_unnecessary_literal_dict(
 /// (C408)
 pub(crate) fn fix_unnecessary_collection_call(
     checker: &Checker,
-    expr: &rustpython_ast::Expr,
+    expr: &ruff_python_ast::Expr,
 ) -> Result<Edit> {
     enum Collection {
         Tuple,
@@ -535,7 +535,7 @@ fn pad_expression(content: String, range: TextRange, checker: &Checker) -> Strin
 pub(crate) fn fix_unnecessary_literal_within_tuple_call(
     locator: &Locator,
     stylist: &Stylist,
-    expr: &rustpython_ast::Expr,
+    expr: &ruff_python_ast::Expr,
 ) -> Result<Edit> {
     let module_text = locator.slice(expr.range());
     let mut tree = match_expression(module_text)?;
@@ -585,7 +585,7 @@ pub(crate) fn fix_unnecessary_literal_within_tuple_call(
 pub(crate) fn fix_unnecessary_literal_within_list_call(
     locator: &Locator,
     stylist: &Stylist,
-    expr: &rustpython_ast::Expr,
+    expr: &ruff_python_ast::Expr,
 ) -> Result<Edit> {
     let module_text = locator.slice(expr.range());
     let mut tree = match_expression(module_text)?;
@@ -637,7 +637,7 @@ pub(crate) fn fix_unnecessary_literal_within_list_call(
 pub(crate) fn fix_unnecessary_list_call(
     locator: &Locator,
     stylist: &Stylist,
-    expr: &rustpython_ast::Expr,
+    expr: &ruff_python_ast::Expr,
 ) -> Result<Edit> {
     // Expr(Call(List|Tuple)))) -> Expr(List|Tuple)))
     let module_text = locator.slice(expr.range());
@@ -659,7 +659,7 @@ pub(crate) fn fix_unnecessary_list_call(
 pub(crate) fn fix_unnecessary_call_around_sorted(
     locator: &Locator,
     stylist: &Stylist,
-    expr: &rustpython_ast::Expr,
+    expr: &ruff_python_ast::Expr,
 ) -> Result<Edit> {
     let module_text = locator.slice(expr.range());
     let mut tree = match_expression(module_text)?;
@@ -771,7 +771,7 @@ pub(crate) fn fix_unnecessary_call_around_sorted(
 pub(crate) fn fix_unnecessary_double_cast_or_process(
     locator: &Locator,
     stylist: &Stylist,
-    expr: &rustpython_ast::Expr,
+    expr: &ruff_python_ast::Expr,
 ) -> Result<Edit> {
     let module_text = locator.slice(expr.range());
     let mut tree = match_expression(module_text)?;
@@ -801,7 +801,7 @@ pub(crate) fn fix_unnecessary_double_cast_or_process(
 pub(crate) fn fix_unnecessary_comprehension(
     locator: &Locator,
     stylist: &Stylist,
-    expr: &rustpython_ast::Expr,
+    expr: &ruff_python_ast::Expr,
 ) -> Result<Edit> {
     let module_text = locator.slice(expr.range());
     let mut tree = match_expression(module_text)?;
@@ -888,8 +888,8 @@ pub(crate) fn fix_unnecessary_comprehension(
 pub(crate) fn fix_unnecessary_map(
     locator: &Locator,
     stylist: &Stylist,
-    expr: &rustpython_ast::Expr,
-    parent: Option<&rustpython_ast::Expr>,
+    expr: &ruff_python_ast::Expr,
+    parent: Option<&ruff_python_ast::Expr>,
     object_type: ObjectType,
 ) -> Result<Edit> {
     let module_text = locator.slice(expr.range());
@@ -1018,7 +1018,7 @@ pub(crate) fn fix_unnecessary_map(
         // If the expression is embedded in an f-string, surround it with spaces to avoid
         // syntax errors.
         if matches!(object_type, ObjectType::Set | ObjectType::Dict) {
-            if parent.map_or(false, rustpython_ast::Expr::is_formatted_value_expr) {
+            if parent.map_or(false, ruff_python_ast::Expr::is_formatted_value_expr) {
                 content = format!(" {content} ");
             }
         }
@@ -1033,7 +1033,7 @@ pub(crate) fn fix_unnecessary_map(
 pub(crate) fn fix_unnecessary_literal_within_dict_call(
     locator: &Locator,
     stylist: &Stylist,
-    expr: &rustpython_ast::Expr,
+    expr: &ruff_python_ast::Expr,
 ) -> Result<Edit> {
     let module_text = locator.slice(expr.range());
     let mut tree = match_expression(module_text)?;
@@ -1052,7 +1052,7 @@ pub(crate) fn fix_unnecessary_literal_within_dict_call(
 pub(crate) fn fix_unnecessary_comprehension_any_all(
     locator: &Locator,
     stylist: &Stylist,
-    expr: &rustpython_ast::Expr,
+    expr: &ruff_python_ast::Expr,
 ) -> Result<Fix> {
     // Expr(ListComp) -> Expr(GeneratorExp)
     let module_text = locator.slice(expr.range());

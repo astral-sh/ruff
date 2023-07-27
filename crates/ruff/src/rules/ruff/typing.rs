@@ -1,5 +1,5 @@
 use itertools::Either::{Left, Right};
-use rustpython_ast::{self as ast, Constant, Expr, Operator};
+use ruff_python_ast::{self as ast, Constant, Expr, Operator};
 
 use ruff_python_ast::call_path::CallPath;
 use ruff_python_parser::typing::parse_type_annotation;

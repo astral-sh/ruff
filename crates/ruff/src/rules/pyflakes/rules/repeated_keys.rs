@@ -1,7 +1,7 @@
 use std::hash::BuildHasherDefault;
 
+use ruff_python_ast::{Expr, Ranged};
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_ast::{Expr, Ranged};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};

@@ -1,7 +1,7 @@
 use itertools::Itertools;
+use ruff_python_parser::lexer::{LexResult, Spanned};
+use ruff_python_parser::Tok;
 use ruff_text_size::TextRange;
-use rustpython_parser::lexer::{LexResult, Spanned};
-use rustpython_parser::Tok;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};

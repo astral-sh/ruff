@@ -2,8 +2,8 @@
 
 use std::path::Path;
 
-use rustpython_parser::lexer::LexResult;
-use rustpython_parser::Tok;
+use ruff_python_parser::lexer::LexResult;
+use ruff_python_parser::Tok;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_index::Indexer;

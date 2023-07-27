@@ -1,6 +1,6 @@
 use std::hash::Hash;
 
-use rustpython_ast::Expr;
+use crate::Expr;
 
 use crate::comparable::ComparableExpr;
 

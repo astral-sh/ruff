@@ -11,7 +11,7 @@ mod tests {
 
     use anyhow::Result;
     use regex::Regex;
-    use rustpython_parser::lexer::LexResult;
+    use ruff_python_parser::lexer::LexResult;
     use test_case::test_case;
 
     use ruff_diagnostics::Diagnostic;

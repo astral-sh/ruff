@@ -1,9 +1,9 @@
 //! Insert statements into Python code.
 use std::ops::Add;
 
+use ruff_python_ast::{Ranged, Stmt};
+use ruff_python_parser::{lexer, Mode, Tok};
 use ruff_text_size::TextSize;
-use rustpython_ast::{Ranged, Stmt};
-use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::helpers::is_docstring_stmt;
@@ -299,10 +299,10 @@ fn match_leading_semicolon(s: &str) -> Option<TextSize> {
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
+    use ruff_python_ast::Suite;
+    use ruff_python_parser::lexer::LexResult;
+    use ruff_python_parser::Parse;
     use ruff_text_size::TextSize;
-    use rustpython_ast::Suite;
-    use rustpython_parser::lexer::LexResult;
-    use rustpython_parser::Parse;
 
     use ruff_python_codegen::Stylist;
     use ruff_source_file::{LineEnding, Locator};

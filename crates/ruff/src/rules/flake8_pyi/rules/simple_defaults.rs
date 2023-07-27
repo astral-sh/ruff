@@ -1,4 +1,4 @@
-use rustpython_ast::{
+use ruff_python_ast::{
     self as ast, ArgWithDefault, Arguments, Constant, Expr, Operator, Ranged, Stmt, UnaryOp,
 };
 

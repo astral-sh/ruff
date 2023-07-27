@@ -1,4 +1,4 @@
-use rustpython_ast::{self as ast, Constant, Decorator, Expr, Keyword};
+use ruff_python_ast::{self as ast, Constant, Decorator, Expr, Keyword};
 
 use ruff_python_ast::call_path::{collect_call_path, CallPath};
 use ruff_python_ast::helpers::map_callable;

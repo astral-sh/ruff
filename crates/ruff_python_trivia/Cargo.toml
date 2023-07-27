@@ -13,7 +13,7 @@ license = { workspace = true }
 [lib]
 
 [dependencies]
-ruff_text_size = { workspace = true }
+ruff_text_size = { path = "../ruff_text_size" }
 ruff_source_file = { path = "../ruff_source_file" }
 
 memchr = { workspace = true }
@@ -22,5 +22,6 @@ unic-ucd-ident = "0.9.0"
 
 [dev-dependencies]
 insta = { workspace = true }
-rustpython-parser = { workspace = true }
-rustpython-ast = { workspace = true }
+ruff_python_ast = { path = "../ruff_python_ast" }
+ruff_python_parser = { path = "../ruff_python_parser" }
+

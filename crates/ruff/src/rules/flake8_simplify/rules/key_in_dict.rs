@@ -1,6 +1,6 @@
 use anyhow::Result;
+use ruff_python_ast::{self as ast, CmpOp, Expr, Ranged};
 use ruff_text_size::TextRange;
-use rustpython_ast::{self as ast, CmpOp, Expr, Ranged};
 
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
