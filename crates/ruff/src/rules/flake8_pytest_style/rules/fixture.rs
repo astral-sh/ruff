@@ -129,6 +129,37 @@ impl Violation for PytestIncorrectFixtureNameUnderscore {
     }
 }
 
+/// ## What it does
+/// Checks for fixtures without a value being injected as a parameter.
+///
+/// ## Why is this bad?
+/// Unused arguments can lead to confusion and should be avoided.
+///
+/// ## Example
+/// ```python
+/// @pytest.fixture
+/// def _patch_something():
+///     ...
+///
+///
+/// def test_foo(_patch_something):
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// @pytest.fixture
+/// def _patch_something():
+///     ...
+///
+///
+/// @pytest.mark.usefixtures("_patch_something")
+/// def test_foo():
+///     ...
+/// ```
+///
+/// ## References
+/// - [API Reference: `pytest.mark.usefixtures`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-mark-usefixtures)
 #[violation]
 pub struct PytestFixtureParamWithoutValue {
     name: String,

@@ -69,6 +69,31 @@ impl Violation for PytestCompositeAssertion {
     }
 }
 
+/// ## What it does
+/// Checks for `assert` statements in `except` clauses.
+///
+/// ## Why is this bad?
+/// If no exception is raised, the assertion will never be executed.
+///
+/// ## Example
+/// ```python
+/// def test_foo():
+///     try:
+///         1 / 0
+///     except ZeroDivisionError as e:
+///         assert e.args
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def test_foo():
+///     with pytest.raises(ZeroDivisionError) as e:
+///         1 / 0
+///     assert e.value.args
+/// ```
+///
+/// ## References
+/// - [API Reference: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
 #[violation]
 pub struct PytestAssertInExcept {
     name: String,
