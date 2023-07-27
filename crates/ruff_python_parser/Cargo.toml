@@ -2,7 +2,7 @@
 name = "ruff_python_parser"
 version = "0.0.0"
 publish = false
-authors = { workspace = true }
+authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>", "RustPython Team"]
 edition = { workspace = true }
 rust-version = { workspace = true }
 homepage = { workspace = true }

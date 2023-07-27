@@ -10,7 +10,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 ExprName {
                     range: 6..7,
                     id: "X",
-                    ctx: Load,
+                    ctx: Store,
                 },
             ),
             type_params: [],
@@ -30,7 +30,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 ExprName {
                     range: 19..20,
                     id: "X",
-                    ctx: Load,
+                    ctx: Store,
                 },
             ),
             type_params: [],
@@ -63,7 +63,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 ExprName {
                     range: 38..39,
                     id: "X",
-                    ctx: Load,
+                    ctx: Store,
                 },
             ),
             type_params: [],
@@ -98,7 +98,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 ExprName {
                     range: 67..68,
                     id: "X",
-                    ctx: Load,
+                    ctx: Store,
                 },
             ),
             type_params: [
@@ -168,7 +168,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 ExprName {
                     range: 107..108,
                     id: "X",
-                    ctx: Load,
+                    ctx: Store,
                 },
             ),
             type_params: [
@@ -199,7 +199,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 ExprName {
                     range: 123..124,
                     id: "X",
-                    ctx: Load,
+                    ctx: Store,
                 },
             ),
             type_params: [
@@ -269,7 +269,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 ExprName {
                     range: 152..153,
                     id: "X",
-                    ctx: Load,
+                    ctx: Store,
                 },
             ),
             type_params: [
@@ -340,7 +340,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 ExprName {
                     range: 185..186,
                     id: "X",
-                    ctx: Load,
+                    ctx: Store,
                 },
             ),
             type_params: [
@@ -419,7 +419,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 ExprName {
                     range: 223..224,
                     id: "X",
-                    ctx: Load,
+                    ctx: Store,
                 },
             ),
             type_params: [
@@ -513,7 +513,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 ExprName {
                     range: 298..302,
                     id: "type",
-                    ctx: Load,
+                    ctx: Store,
                 },
             ),
             type_params: [],
@@ -533,7 +533,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 ExprName {
                     range: 314..319,
                     id: "match",
-                    ctx: Load,
+                    ctx: Store,
                 },
             ),
             type_params: [],
@@ -553,7 +553,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 ExprName {
                     range: 331..335,
                     id: "case",
-                    ctx: Load,
+                    ctx: Store,
                 },
             ),
             type_params: [],
@@ -573,7 +573,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 ExprName {
                     range: 372..375,
                     id: "foo",
-                    ctx: Load,
+                    ctx: Store,
                 },
             ),
             type_params: [],
@@ -593,7 +593,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 ExprName {
                     range: 388..391,
                     id: "foo",
-                    ctx: Load,
+                    ctx: Store,
                 },
             ),
             type_params: [],
@@ -613,7 +613,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 ExprName {
                     range: 405..408,
                     id: "foo",
-                    ctx: Load,
+                    ctx: Store,
                 },
             ),
             type_params: [],
@@ -633,7 +633,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 ExprName {
                     range: 447..448,
                     id: "X",
-                    ctx: Load,
+                    ctx: Store,
                 },
             ),
             type_params: [],
@@ -653,7 +653,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 ExprName {
                     range: 460..461,
                     id: "X",
-                    ctx: Load,
+                    ctx: Store,
                 },
             ),
             type_params: [],
@@ -673,7 +673,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 ExprName {
                     range: 476..477,
                     id: "X",
-                    ctx: Load,
+                    ctx: Store,
                 },
             ),
             type_params: [],
@@ -693,7 +693,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 ExprName {
                     range: 492..493,
                     id: "X",
-                    ctx: Load,
+                    ctx: Store,
                 },
             ),
             type_params: [],
@@ -713,7 +713,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 ExprName {
                     range: 519..520,
                     id: "X",
-                    ctx: Load,
+                    ctx: Store,
                 },
             ),
             type_params: [
@@ -744,7 +744,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 ExprName {
                     range: 533..534,
                     id: "X",
-                    ctx: Load,
+                    ctx: Store,
                 },
             ),
             type_params: [
@@ -775,7 +775,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 ExprName {
                     range: 554..555,
                     id: "X",
-                    ctx: Load,
+                    ctx: Store,
                 },
             ),
             type_params: [

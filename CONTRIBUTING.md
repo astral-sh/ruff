@@ -122,9 +122,9 @@ At time of writing, the repository includes the following crates:
     intermediate representation. The backend for `ruff_python_formatter`.
 - `crates/ruff_index`: library crate inspired by `rustc_index`.
 - `crates/ruff_macros`: proc macro crate containing macros used by Ruff.
-- `crates/ruff_python_ast`: library crate containing Python-specific AST types and utilities. Note
-    that the AST schema itself is defined in the
-    [rustpython-ast](https://github.com/astral-sh/RustPython-Parser) crate.
+- `crates/ruff_python_ast`: library crate containing Python-specific AST types and utilities.
+- `crates/ruff_python_codegen`: library crate containing utilities for generating Python source code.
+- `crates/ruff_python_codegen`: library crate containing utilities for generating Python source code.
 - `crates/ruff_python_formatter`: library crate implementing the Python formatter. Emits an
     intermediate representation for each node, which `ruff_formatter` prints based on the configured
     line length.
@@ -135,8 +135,7 @@ At time of writing, the repository includes the following crates:
     the names of all built-in exceptions and which standard library types are immutable.
 - `crates/ruff_python_trivia`: library crate containing Python-specific trivia utilities (e.g.,
     for analyzing indentation, newlines, etc.).
-- `crates/ruff_rustpython`: library crate containing `RustPython`-specific utilities.
-- `crates/ruff_textwrap`: library crate to indent and dedent Python source code.
+- `crates/ruff_python_parser`: library crate containing the Python parser.
 - `crates/ruff_wasm`: library crate for exposing Ruff as a WebAssembly module. Powers the
     [Ruff Playground](https://play.ruff.rs/).
 

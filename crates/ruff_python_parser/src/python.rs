@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: bfe8038efa3e290b9841ea2f84a2278ded65476a00892aa448e9708655ccb86d
+// sha3: 9c49dc85355275f274dcc32e163c443c0dc567214c9725547e2218e9acd22577
 use num_bigint::BigInt;
 use ruff_text_size::TextSize;
 use ruff_python_ast::{self as ast, Ranged, MagicKind};
@@ -33544,7 +33544,7 @@ fn __action163<
 ) -> ast::Expr
 {
     ast::Expr::Name(
-        ast::ExprName { id: name.into(), ctx: ast::ExprContext::Load, range: (location..end_location).into() },
+        ast::ExprName { id: name.into(), ctx: ast::ExprContext::Store, range: (location..end_location).into() },
     )
 }
 

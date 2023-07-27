@@ -19,7 +19,7 @@ fn main() -> anyhow::Result<()> {
     #[cfg(not(feature = "lalrpop"))]
     {
         target = PathBuf::from("src/python.rs");
-        error = "python.lalrpop and src/python.rs doesn't match. This is a rustpython-ruff_python_parser bug. Please report it unless you are editing rustpython-ruff_python_parser. Run `lalrpop src/python.lalrpop` to build ruff_python_parser again.";
+        error = "python.lalrpop and src/python.rs doesn't match. This is a ruff_python_parser bug. Please report it unless you are editing ruff_python_parser. Run `lalrpop src/python.lalrpop` to build ruff_python_parser again.";
     }
 
     let Some(message) = requires_lalrpop(SOURCE, &target) else {

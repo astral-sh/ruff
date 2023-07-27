@@ -2335,7 +2335,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_literal"
-version = "0.2.0"
+version = "0.0.0"
 dependencies = [
  "bitflags 2.3.3",
  "hexf-parse",

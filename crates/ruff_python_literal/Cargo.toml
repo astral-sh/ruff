@@ -1,11 +1,15 @@
 [package]
 name = "ruff_python_literal"
-version = "0.2.0"
+version = "0.0.0"
+publish = false
 description = "Common literal handling utilities mostly useful for unparse and repr."
-authors = ["RustPython Team"]
-edition = "2021"
-repository = "https://github.com/RustPython/Parser/"
-license = "MIT"
+authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>", "RustPython Team"]
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 
 [dependencies]
 bitflags = { workspace = true }
