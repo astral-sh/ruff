@@ -9,6 +9,7 @@ use ruff_python_ast::visitor::preorder::{walk_expr, PreorderVisitor};
 
 use crate::builders::parenthesize_if_expands;
 use crate::context::NodeLevel;
+use crate::expression::expr_yield::AnyExpressionYield;
 use crate::expression::parentheses::{
     is_expression_parenthesized, optional_parentheses, parenthesized, NeedsParentheses,
     OptionalParentheses, Parentheses, Parenthesize,
@@ -220,8 +221,10 @@ impl NeedsParentheses for Expr {
             Expr::DictComp(expr) => expr.needs_parentheses(parent, context),
             Expr::GeneratorExp(expr) => expr.needs_parentheses(parent, context),
             Expr::Await(expr) => expr.needs_parentheses(parent, context),
-            Expr::Yield(expr) => expr.needs_parentheses(parent, context),
-            Expr::YieldFrom(expr) => expr.needs_parentheses(parent, context),
+            Expr::Yield(expr) => AnyExpressionYield::from(expr).needs_parentheses(parent, context),
+            Expr::YieldFrom(expr) => {
+                AnyExpressionYield::from(expr).needs_parentheses(parent, context)
+            }
             Expr::Compare(expr) => expr.needs_parentheses(parent, context),
             Expr::Call(expr) => expr.needs_parentheses(parent, context),
             Expr::FormattedValue(expr) => expr.needs_parentheses(parent, context),
