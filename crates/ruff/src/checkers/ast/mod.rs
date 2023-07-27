@@ -1361,6 +1361,9 @@ where
                 );
             }
         }
+        self.deferred
+            .type_param_definitions
+            .push((type_param, self.semantic.snapshot()));
     }
 }
 
@@ -1724,6 +1727,24 @@ impl<'a> Checker<'a> {
         }
     }
 
+    fn visit_deferred_type_param_definitions(&mut self) {
+        while !self.deferred.type_param_definitions.is_empty() {
+            let type_params = std::mem::take(&mut self.deferred.type_param_definitions);
+            for (type_param, snapshot) in type_params {
+                self.semantic.restore(snapshot);
+
+                match type_param {
+                    ast::TypeParam::TypeVar(ast::TypeParamTypeVar { bound, .. }) => {
+                        if let Some(bound) = bound {
+                            self.visit_expr(bound);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
     fn visit_deferred_string_type_definitions(&mut self, allocator: &'a typed_arena::Arena<Expr>) {
         while !self.deferred.string_type_definitions.is_empty() {
             let type_definitions = std::mem::take(&mut self.deferred.string_type_definitions);
@@ -1913,6 +1934,7 @@ pub(crate) fn check_ast(
     checker.visit_deferred_functions();
     checker.visit_deferred_lambdas();
     checker.visit_deferred_future_type_definitions();
+    checker.visit_deferred_type_param_definitions();
     let allocator = typed_arena::Arena::new();
     checker.visit_deferred_string_type_definitions(&allocator);
     checker.visit_exports();
