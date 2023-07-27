@@ -138,7 +138,9 @@ pub(crate) fn unused_private_type_var(checker: &Checker, binding: &Binding) -> O
     }
 
     Some(Diagnostic::new(
-        UnusedPrivateTypeVar { name: id.to_string() },
+        UnusedPrivateTypeVar {
+            name: id.to_string(),
+        },
         binding.range,
     ))
 }
@@ -168,13 +170,18 @@ pub(crate) fn unused_private_protocol(checker: &Checker, binding: &Binding) -> O
     }
 
     Some(Diagnostic::new(
-        UnusedPrivateProtocol { name: name.to_string() },
+        UnusedPrivateProtocol {
+            name: name.to_string(),
+        },
         binding.range,
     ))
 }
 
 /// PYI047
-pub(crate) fn unused_private_type_alias(checker: &Checker, binding: &Binding) -> Option<Diagnostic> {
+pub(crate) fn unused_private_type_alias(
+    checker: &Checker,
+    binding: &Binding,
+) -> Option<Diagnostic> {
     if !(binding.kind.is_assignment() && binding.is_private_declaration()) {
         return None;
     }
@@ -193,12 +200,17 @@ pub(crate) fn unused_private_type_alias(checker: &Checker, binding: &Binding) ->
         return None;
     };
 
-    if !checker.semantic().match_typing_expr(annotation, "TypeAlias") {
+    if !checker
+        .semantic()
+        .match_typing_expr(annotation, "TypeAlias")
+    {
         return None;
     }
 
     Some(Diagnostic::new(
-        UnusedPrivateTypeAlias { name: id.to_string() },
+        UnusedPrivateTypeAlias {
+            name: id.to_string(),
+        },
         binding.range,
     ))
 }
