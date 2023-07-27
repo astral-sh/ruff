@@ -69,6 +69,34 @@ impl Violation for PytestCompositeAssertion {
     }
 }
 
+/// ## What it does
+/// Checks for `assert` statements in `except` clauses.
+///
+/// ## Why is this bad?
+/// When testing for exceptions, `pytest.raises()` should be used instead of
+/// `assert` statements in `except` clauses, as it's more explicit and
+/// idiomatic. Further, `pytest.raises()` will fail if the exception is _not_
+/// raised, unlike the `assert` statement.
+///
+/// ## Example
+/// ```python
+/// def test_foo():
+///     try:
+///         1 / 0
+///     except ZeroDivisionError as e:
+///         assert e.args
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def test_foo():
+///     with pytest.raises(ZeroDivisionError) as exc_info:
+///         1 / 0
+///     assert exc_info.value.args
+/// ```
+///
+/// ## References
+/// - [API Reference: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
 #[violation]
 pub struct PytestAssertInExcept {
     name: String,
