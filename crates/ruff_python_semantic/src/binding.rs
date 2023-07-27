@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::ops::{Deref, DerefMut};
 
 use bitflags::bitflags;
@@ -199,6 +200,22 @@ impl<'a> Binding<'a> {
             | BindingKind::SubmoduleImport(SubmoduleImport { call_path }) => Some(&call_path[..1]),
             BindingKind::FromImport(FromImport { call_path }) => {
                 Some(&call_path[..call_path.len() - 1])
+            }
+            _ => None,
+        }
+    }
+
+    /// Returns the fully-qualified symbol name, if this symbol was imported from another module.
+    pub fn member_name(&self) -> Option<Cow<'a, str>> {
+        match &self.kind {
+            BindingKind::Import(Import { call_path }) => {
+                Some(Cow::Owned(format_call_path(call_path)))
+            }
+            BindingKind::FromImport(FromImport { call_path }) => {
+                call_path.last().map(|member| Cow::Borrowed(*member))
+            }
+            BindingKind::SubmoduleImport(SubmoduleImport { call_path }) => {
+                Some(Cow::Owned(format_call_path(call_path)))
             }
             _ => None,
         }

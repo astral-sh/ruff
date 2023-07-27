@@ -206,6 +206,9 @@ fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[Import]) -> Result
         .expect("Expected at least one import");
 
     // Step 1) Remove the import.
+    // This could be a mix of imports...
+    // One framing could be: what's the name of the symbol being imported (e.g., `List` in `from typing import List`,
+    // or `foo` in `import foo`, or `foo.bar` in `import foo.bar`).
     let remove_import_edit = autofix::edits::remove_unused_imports(
         qualified_names.iter().map(|name| name.as_str()),
         stmt,

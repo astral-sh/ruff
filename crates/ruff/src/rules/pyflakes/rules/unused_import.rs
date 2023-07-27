@@ -111,7 +111,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             continue;
         }
 
-        let Some(qualified_name) = binding.qualified_name() else {
+        let Some(member_name) = binding.member_name() else {
             continue;
         };
 
@@ -120,7 +120,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
         };
 
         let import = Import {
-            qualified_name,
+            member_name,
             range: binding.range,
             parent_range: binding.parent_range(checker.semantic()),
         };
@@ -159,14 +159,14 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
         };
 
         for Import {
-            qualified_name,
+            member_name,
             range,
             parent_range,
         } in imports
         {
             let mut diagnostic = Diagnostic::new(
                 UnusedImport {
-                    name: qualified_name.to_string(),
+                    name: member_name.to_string(),
                     context: if in_except_handler {
                         Some(UnusedImportContext::ExceptHandler)
                     } else if in_init {
@@ -193,14 +193,14 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
     // Separately, generate a diagnostic for every _ignored_ import, to ensure that the
     // suppression comments aren't marked as unused.
     for Import {
-        qualified_name,
+        member_name,
         range,
         parent_range,
     } in ignored.into_values().flatten()
     {
         let mut diagnostic = Diagnostic::new(
             UnusedImport {
-                name: qualified_name.to_string(),
+                name: member_name.to_string(),
                 context: None,
                 multiple: false,
             },
@@ -216,7 +216,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
 /// An unused import with its surrounding context.
 struct Import {
     /// The qualified name of the import (e.g., `typing.List` for `from typing import List`).
-    qualified_name: String,
+    member_name: String,
     /// The trimmed range of the import (e.g., `List` in `from typing import List`).
     range: TextRange,
     /// The range of the import's parent statement.
@@ -230,7 +230,7 @@ fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[Import]) -> Result
     let edit = autofix::edits::remove_unused_imports(
         imports
             .iter()
-            .map(|Import { qualified_name, .. }| qualified_name.as_str()),
+            .map(|Import { member_name, .. }| member_name.as_str()),
         stmt,
         parent,
         checker.locator(),

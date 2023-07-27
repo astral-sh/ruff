@@ -83,6 +83,7 @@ pub(crate) fn remove_imports<'a>(
     let trailing_comma = aliases.last().and_then(|alias| alias.comma.clone());
 
     for import in imports {
+        // If it's an import-from, we only care about members.
         let alias_index = aliases.iter().position(|alias| {
             let qualified_name = match import_module {
                 Some((relative, module)) => {

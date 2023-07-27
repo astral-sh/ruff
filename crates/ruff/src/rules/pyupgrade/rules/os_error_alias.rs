@@ -57,6 +57,8 @@ impl AlwaysAutofixableViolation for OSErrorAlias {
 /// Return `true` if an [`Expr`] is an alias of `OSError`.
 fn is_alias(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic.resolve_call_path(expr).map_or(false, |call_path| {
+        println!("expr: {:?}", expr);
+        println!("call_path: {:?}", call_path);
         matches!(
             call_path.as_slice(),
             ["", "EnvironmentError" | "IOError" | "WindowsError"]

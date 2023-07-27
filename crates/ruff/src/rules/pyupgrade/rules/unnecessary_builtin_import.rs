@@ -126,6 +126,7 @@ pub(crate) fn unnecessary_builtin_import(
             let parent = checker.semantic().stmt_parent();
             let unused_imports: Vec<String> = unused_imports
                 .iter()
+                // These are always ImportFrom.
                 .map(|alias| format!("{module}.{}", alias.name))
                 .collect();
             let edit = autofix::edits::remove_unused_imports(
