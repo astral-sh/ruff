@@ -1021,7 +1021,7 @@ fn handle_attribute_comment<'a>(
             .contains(comment.slice().start())
     );
     if comment.line_position().is_end_of_line() {
-        // Attach to node with b
+        // Attach as trailing comment to a. The specific placement is only relevant for fluent style
         // ```python
         // x322 = (
         //     a
@@ -1029,7 +1029,7 @@ fn handle_attribute_comment<'a>(
         //     b
         // )
         // ```
-        CommentPlacement::trailing(comment.enclosing_node(), comment)
+        CommentPlacement::trailing(attribute.value.as_ref(), comment)
     } else {
         CommentPlacement::dangling(attribute, comment)
     }

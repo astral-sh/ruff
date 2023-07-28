@@ -107,7 +107,7 @@ def __await__(): return (yield)
 ```diff
 --- Black
 +++ Ruff
-@@ -65,18 +65,14 @@
+@@ -65,6 +65,7 @@
  
  def spaces2(result=_core.Value(None)):
      assert fut is self._read_fut, (fut, self._read_fut)
@@ -115,22 +115,6 @@ def __await__(): return (yield)
  
  
  def example(session):
--    result = (
--        session.query(models.Customer.id)
--        .filter(
--            models.Customer.account_id == account_id,
--            models.Customer.email == email_address,
--        )
--        .order_by(models.Customer.id.asc())
--        .all()
--    )
-+    result = session.query(models.Customer.id).filter(
-+        models.Customer.account_id == account_id,
-+        models.Customer.email == email_address,
-+    ).order_by(models.Customer.id.asc()).all()
- 
- 
- def long_lines():
 ```
 
 ## Ruff Output
@@ -207,10 +191,15 @@ def spaces2(result=_core.Value(None)):
 
 
 def example(session):
-    result = session.query(models.Customer.id).filter(
-        models.Customer.account_id == account_id,
-        models.Customer.email == email_address,
-    ).order_by(models.Customer.id.asc()).all()
+    result = (
+        session.query(models.Customer.id)
+        .filter(
+            models.Customer.account_id == account_id,
+            models.Customer.email == email_address,
+        )
+        .order_by(models.Customer.id.asc())
+        .all()
+    )
 
 
 def long_lines():

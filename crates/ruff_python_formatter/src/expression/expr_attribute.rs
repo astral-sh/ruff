@@ -1,15 +1,27 @@
+use ruff_formatter::{write, FormatRuleWithOptions};
+use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{Constant, Expr, ExprAttribute, ExprConstant};
 
-use ruff_formatter::write;
-use ruff_python_ast::node::AnyNodeRef;
-
 use crate::comments::{leading_comments, trailing_comments};
-use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parentheses};
+use crate::expression::parentheses::{
+    is_expression_parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
+};
 use crate::prelude::*;
 use crate::FormatNodeRule;
 
 #[derive(Default)]
-pub struct FormatExprAttribute;
+pub struct FormatExprAttribute {
+    fluent_style: bool,
+}
+
+impl FormatRuleWithOptions<ExprAttribute, PyFormatContext<'_>> for FormatExprAttribute {
+    type Options = bool;
+
+    fn with_options(mut self, options: Self::Options) -> Self {
+        self.fluent_style = options;
+        self
+    }
+}
 
 impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
     fn fmt_fields(&self, item: &ExprAttribute, f: &mut PyFormatter) -> FormatResult<()> {
@@ -37,11 +49,32 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
 
         if needs_parentheses {
             value.format().with_options(Parentheses::Always).fmt(f)?;
-        } else if let Expr::Attribute(expr_attribute) = value.as_ref() {
-            // We're in a attribute chain (`a.b.c`). The outermost node adds parentheses if
-            // required, the inner ones don't need them so we skip the `Expr` formatting that
-            // normally adds the parentheses.
-            expr_attribute.format().fmt(f)?;
+        } else if self.fluent_style {
+            // Fluent style: We need to pass the parentheses on to inner attributes or call chains
+            match value.as_ref() {
+                Expr::Attribute(expr) => {
+                    expr.format().with_options(self.fluent_style).fmt(f)?;
+                }
+                Expr::Call(expr) => {
+                    expr.format().with_options(self.fluent_style).fmt(f)?;
+                    // Format the dot on its own line
+                    soft_line_break().fmt(f)?;
+                }
+                Expr::Subscript(expr) => {
+                    expr.format().with_options(self.fluent_style).fmt(f)?;
+                    // Format the dot on its own line
+                    soft_line_break().fmt(f)?;
+                }
+                _ => {
+                    value.format().fmt(f)?;
+                    // TODO: This is inefficient, we already check this in `FormatExpr`.
+                    // TODO 2: This assumes `Parentheses::Preserve`, what's with other parentheses
+                    // kinds
+                    if is_expression_parenthesized(value.as_ref().into(), f.context().source()) {
+                        soft_line_break().fmt(f)?;
+                    }
+                }
+            }
         } else {
             value.format().fmt(f)?;
         }
@@ -50,16 +83,51 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
             hard_line_break().fmt(f)?;
         }
 
-        write!(
-            f,
-            [
-                text("."),
-                trailing_comments(trailing_dot_comments),
-                (!leading_attribute_comments.is_empty()).then_some(hard_line_break()),
-                leading_comments(leading_attribute_comments),
-                attr.format()
-            ]
-        )
+        if self.fluent_style {
+            // Fluent style has line breaks before the dot
+            // ```python
+            // blogs3 = (
+            //     Blog.objects.filter(
+            //         entry__headline__contains="Lennon",
+            //     )
+            //     .filter(
+            //         entry__pub_date__year=2008,
+            //     )
+            //     .filter(
+            //         entry__pub_date__year=2008,
+            //     )
+            // )
+            // ```
+            write!(
+                f,
+                [
+                    (!leading_attribute_comments.is_empty()).then_some(hard_line_break()),
+                    leading_comments(leading_attribute_comments),
+                    text("."),
+                    trailing_comments(trailing_dot_comments),
+                    attr.format()
+                ]
+            )
+        } else {
+            // Regular style
+            // ```python
+            // blogs2 = Blog.objects.filter(
+            //     entry__headline__contains="Lennon",
+            // ).filter(
+            //     entry__pub_date__year=2008,
+            // )
+            // ```
+            write!(
+                f,
+                [
+                    text("."),
+                    trailing_comments(trailing_dot_comments),
+                    (!leading_attribute_comments.is_empty()).then_some(hard_line_break()),
+                    leading_comments(leading_attribute_comments),
+                    attr.format()
+                ]
+            )
+        }
     }
 
     fn fmt_dangling_comments(
