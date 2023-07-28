@@ -2415,6 +2415,45 @@ mod tests {
     }
 
     #[test]
+    fn aliased_submodule_import() {
+        flakes(
+            r#"
+        import fu.bar as baz
+        import fu.bar as baz
+        baz
+        "#,
+            &[Rule::RedefinedWhileUnused],
+        );
+
+        flakes(
+            r#"
+        import fu.bar as baz
+        import baz
+        baz
+        "#,
+            &[Rule::RedefinedWhileUnused],
+        );
+
+        flakes(
+            r#"
+        import fu.bar as baz
+        import fu.bar as bop
+        baz, bop
+        "#,
+            &[],
+        );
+
+        flakes(
+            r#"
+        import foo.baz
+        import foo.baz as foo
+        foo
+        "#,
+            &[Rule::RedefinedWhileUnused],
+        );
+    }
+
+    #[test]
     fn used_package_with_submodule_import() {
         // Usage of package marks submodule imports as used.
         flakes(

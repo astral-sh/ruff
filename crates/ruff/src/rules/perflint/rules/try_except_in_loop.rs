@@ -67,14 +67,15 @@ pub(crate) fn try_except_in_loop(checker: &mut Checker, body: &[Stmt]) {
         return;
     }
 
-    checker.diagnostics.extend(body.iter().filter_map(|stmt| {
-        if let Stmt::Try(ast::StmtTry { handlers, .. }) = stmt {
-            handlers
-                .iter()
-                .next()
-                .map(|handler| Diagnostic::new(TryExceptInLoop, handler.range()))
-        } else {
-            None
-        }
-    }));
+    let [Stmt::Try(ast::StmtTry { handlers, .. })] = body else {
+        return;
+    };
+
+    let Some(handler) = handlers.first() else {
+        return;
+    };
+
+    checker
+        .diagnostics
+        .push(Diagnostic::new(TryExceptInLoop, handler.range()));
 }
