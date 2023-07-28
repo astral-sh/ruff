@@ -559,7 +559,7 @@ print("after empty cells")
     #[test]
     fn test_unused_variable() -> Result<()> {
         let path = "unused_variable.ipynb".to_string();
-        let (diagnostics, source_kind, _) = test_notebook_path(
+        let (diagnostics, source_kind) = test_notebook_path(
             &path,
             Path::new("unused_variable_expected.ipynb"),
             &settings::Settings::for_rule(Rule::UnusedVariable),
