@@ -1273,7 +1273,7 @@ mod tests {
         // Defined name for generator expressions and dict/set comprehension.
         flakes(
             r#"
-        class A:    
+        class A:
             T = range(10)
 
             Z = (x for x in T)
