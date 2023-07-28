@@ -4,9 +4,8 @@ use bitflags::bitflags;
 use rustc_hash::FxHashMap;
 use smallvec::smallvec;
 
-use ruff_python_ast::call_path::{
-    collect_call_path, collect_head_path, from_unqualified_name, CallPath,
-};
+use ruff_python_ast::call_path::{collect_call_path, from_unqualified_name, CallPath};
+use ruff_python_ast::helpers::from_relative_import;
 use ruff_python_ast::{self as ast, Expr, Ranged, Stmt};
 use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_python_stdlib::typing::is_typing_extension;
@@ -24,11 +23,12 @@ use crate::reference::{
     ResolvedReference, ResolvedReferenceId, ResolvedReferences, UnresolvedReferences,
 };
 use crate::scope::{Scope, ScopeId, ScopeKind, Scopes};
-use crate::{UnresolvedReference, UnresolvedReferenceFlags};
+use crate::{Imported, UnresolvedReference, UnresolvedReferenceFlags};
 
 /// A semantic model for a Python module, to enable querying the module's semantic information.
 pub struct SemanticModel<'a> {
     typing_modules: &'a [String],
+    module_path: Option<&'a [String]>,
 
     /// Stack of all visited statements.
     pub stmts: Nodes<'a, Stmt>,
@@ -128,6 +128,7 @@ impl<'a> SemanticModel<'a> {
     pub fn new(typing_modules: &'a [String], path: &'a Path, module: Module<'a>) -> Self {
         Self {
             typing_modules,
+            module_path: module.path(),
             stmts: Nodes::<Stmt>::default(),
             stmt_id: None,
             exprs: Vec::default(),
@@ -582,7 +583,8 @@ impl<'a> SemanticModel<'a> {
         // import pyarrow.csv
         // print(pa.csv.read_csv("test.csv"))
         // ```
-        let call_path = self.bindings[binding_id].call_path()?;
+        let import = self.bindings[binding_id].as_any_import()?;
+        let call_path = import.call_path();
         let segment = call_path.last()?;
         if *segment == symbol {
             return None;
@@ -618,9 +620,8 @@ impl<'a> SemanticModel<'a> {
             }
         }
 
-        let (head, tail) = collect_head_path(value)?;
-
         // If the name was already resolved, look it up; otherwise, search for the symbol.
+        let head = match_head(value)?;
         let binding = if let Some(id) = self.resolved_names.get(&head.into()) {
             self.binding(*id)
         } else {
@@ -629,16 +630,32 @@ impl<'a> SemanticModel<'a> {
 
         match &binding.kind {
             BindingKind::Import(Import { call_path }) => {
+                let value_path = collect_call_path(value)?;
+                let (_, tail) = value_path.split_first()?;
                 let resolved: CallPath = call_path.iter().chain(tail.iter()).copied().collect();
                 Some(resolved)
             }
             BindingKind::SubmoduleImport(SubmoduleImport { call_path }) => {
-                let mut source_path: CallPath = CallPath::from_slice(&call_path[..1]);
-                source_path.extend_from_slice(tail.as_slice());
-                Some(source_path)
+                let value_path = collect_call_path(value)?;
+                let (_, tail) = value_path.split_first()?;
+                let resolved: CallPath = call_path
+                    .iter()
+                    .take(1)
+                    .chain(tail.iter())
+                    .copied()
+                    .collect();
+                Some(resolved)
             }
             BindingKind::FromImport(FromImport { call_path }) => {
-                let resolved: CallPath = call_path.iter().chain(tail.iter()).copied().collect();
+                let value_path = collect_call_path(value)?;
+                let (_, tail) = value_path.split_first()?;
+
+                let resolved: CallPath =
+                    if call_path.first().map_or(false, |segment| *segment == ".") {
+                        from_relative_import(self.module_path?, call_path, tail)?
+                    } else {
+                        call_path.iter().chain(tail.iter()).copied().collect()
+                    };
                 Some(resolved)
             }
             BindingKind::Builtin => Some(smallvec!["", head.id.as_str()]),
