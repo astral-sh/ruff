@@ -203,34 +203,40 @@ pub(crate) fn unused_private_protocol(
 /// PYI049
 pub(crate) fn unused_private_typed_dict(
     checker: &Checker,
-    binding: &Binding,
-) -> Option<Diagnostic> {
-    if !(binding.kind.is_class_definition() && binding.is_private_declaration()) {
-        return None;
-    }
-    if binding.is_used() {
-        return None;
-    }
-
-    let Some(source) = binding.source else {
-        return None;
-    };
-    let Stmt::ClassDef(ast::StmtClassDef { name, bases, .. }) = checker.semantic().stmts[source]
-    else {
-        return None;
-    };
-
-    if !bases
-        .iter()
-        .any(|base| checker.semantic().match_typing_expr(base, "TypedDict"))
+    scope: &Scope,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    for binding in scope
+        .binding_ids()
+        .map(|binding_id| checker.semantic().binding(binding_id))
     {
-        return None;
-    }
+        if !(binding.kind.is_class_definition() && binding.is_private_declaration()) {
+            continue;
+        }
+        if binding.is_used() {
+            continue;
+        }
 
-    Some(Diagnostic::new(
-        UnusedPrivateTypedDict {
-            name: name.to_string(),
-        },
-        binding.range,
-    ))
+        let Some(source) = binding.source else {
+            continue;
+        };
+        let Stmt::ClassDef(ast::StmtClassDef { name, bases, .. }) = checker.semantic().stmts[source]
+        else {
+            continue;
+        };
+
+        if !bases
+            .iter()
+            .any(|base| checker.semantic().match_typing_expr(base, "TypedDict"))
+        {
+            continue;
+        }
+
+        diagnostics.push(Diagnostic::new(
+            UnusedPrivateTypedDict {
+                name: name.to_string(),
+            },
+            binding.range,
+        ));
+    }
 }
