@@ -228,6 +228,46 @@ impl Violation for PytestDeprecatedYieldFixture {
     }
 }
 
+/// ## What it does
+/// Checks for unnecessary `request.addfinalizer` usage in fixtures.
+///
+/// ## Why is this bad?
+/// `pytest` offers two ways to perform cleanup in fixture code. One is sequential
+/// (`yield` statement), and the other is callback-based (`request.addfinalizer`).
+/// The sequential approach is more readable and should be preferred, but `request.addfinalizer`
+/// is allowed when implementing the "factory as fixture" pattern.
+///
+/// ## Example
+/// ```python
+/// @pytest.fixture()
+/// def my_fixture(request):
+///     resource = acquire_resource()
+///     request.addfinalizer(resource.release)
+///     return resource
+/// ```
+///
+/// Use instead:
+/// ```python
+/// @pytest.fixture()
+/// def my_fixture():
+///     resource = acquire_resource()
+///     yield resource
+///     resource.release()
+///
+///
+/// # "factory as fixture" pattern
+/// @pytest.fixture()
+/// def my_factory(request):
+///     def create_resource(arg):
+///         resource = acquire_resource(arg)
+///         request.addfinalizer(resource.release)
+///         return resource
+///     return create_resource
+/// ```
+///
+/// ## References
+/// - [Adding finalizers directly](https://docs.pytest.org/en/latest/how-to/fixtures.html#adding-finalizers-directly)
+/// - [Factories as fixtures](https://docs.pytest.org/en/latest/how-to/fixtures.html#factories-as-fixtures)
 #[violation]
 pub struct PytestFixtureFinalizerCallback;
 
@@ -237,7 +277,38 @@ impl Violation for PytestFixtureFinalizerCallback {
         format!("Use `yield` instead of `request.addfinalizer`")
     }
 }
-
+/// ## What it does
+/// Checks for unnecessary `yield` usage in fixtures.
+///
+/// ## Why is this bad?
+/// `yield` in fixtures is only useful and semantically correct when the fixture contains teardown
+/// code.
+///
+/// ## Example
+/// ```python
+/// @pytest.fixture()
+/// def my_fixture():
+///     resource = acquire_resource()
+///     yield resource
+/// ```
+///
+/// Use instead:
+/// ```python
+/// @pytest.fixture()
+/// def my_fixture_with_teardown():
+///     resource = acquire_resource()
+///     yield resource
+///     resource.release()
+///
+///
+/// @pytest.fixture()
+/// def my_fixture_without_teardown():
+///     resource = acquire_resource()
+///     return resource
+/// ```
+///
+/// ## References
+/// - [Teardown/Cleanup](https://docs.pytest.org/en/latest/how-to/fixtures.html#teardown-cleanup-aka-fixture-finalization)
 #[violation]
 pub struct PytestUselessYieldFixture {
     name: String,
