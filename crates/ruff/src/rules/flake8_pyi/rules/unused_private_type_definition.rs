@@ -199,37 +199,43 @@ pub(crate) fn unused_private_protocol(
 /// PYI047
 pub(crate) fn unused_private_type_alias(
     checker: &Checker,
-    binding: &Scope,
-) -> Option<Diagnostic> {
-    if !(binding.kind.is_assignment() && binding.is_private_declaration()) {
-        return None;
-    }
-    if binding.is_used() {
-        return None;
-    }
-
-    let Some(source) = binding.source else {
-        return None;
-    };
-    let Stmt::AnnAssign(ast::StmtAnnAssign { target, annotation, .. }) = checker.semantic().stmts[source]
-    else {
-        return None
-    };
-    let Some(ast::ExprName { id, .. }) = target.as_name_expr() else {
-        return None;
-    };
-
-    if !checker
-        .semantic()
-        .match_typing_expr(annotation, "TypeAlias")
+    scope: &Scope,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    for binding in scope
+        .binding_ids()
+        .map(|binding_id| checker.semantic().binding(binding_id))
     {
-        return None;
-    }
+        if !(binding.kind.is_assignment() && binding.is_private_declaration()) {
+            continue;
+        }
+        if binding.is_used() {
+            continue;
+        }
 
-    Some(Diagnostic::new(
-        UnusedPrivateTypeAlias {
-            name: id.to_string(),
-        },
-        binding.range,
-    ))
+        let Some(source) = binding.source else {
+        continue;
+        };
+        let Stmt::AnnAssign(ast::StmtAnnAssign { target, annotation, .. }) = checker.semantic().stmts[source]
+        else {
+            continue
+        };
+        let Some(ast::ExprName { id, .. }) = target.as_name_expr() else {
+            continue;
+        };
+
+        if !checker
+            .semantic()
+            .match_typing_expr(annotation, "TypeAlias")
+        {
+            continue;
+        }
+
+        diagnostics.push(Diagnostic::new(
+            UnusedPrivateTypeAlias {
+                name: id.to_string(),
+            },
+            binding.range,
+        ));
+    }
 }
