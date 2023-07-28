@@ -317,7 +317,7 @@ pub(crate) fn unused_arguments(
     scope: &Scope,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    let Some(parent) = &checker.semantic().scope_parent_skip_types(scope) else {
+    let Some(parent) = &checker.semantic().scope_non_type_parent(scope) else {
         return;
     };
 

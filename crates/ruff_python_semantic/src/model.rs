@@ -871,7 +871,7 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Returns the first parent of the given scope that is not a [`ScopeKind::Type`] scope, if any.
-    pub fn scope_parent_skip_types(&self, scope: &Scope) -> Option<&Scope<'a>> {
+    pub fn scope_non_type_parent(&self, scope: &Scope) -> Option<&Scope<'a>> {
         let mut current_scope = scope;
         while let Some(parent) = self.scope_parent(current_scope) {
             if parent.kind.is_type() {
