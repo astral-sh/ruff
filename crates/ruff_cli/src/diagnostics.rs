@@ -29,7 +29,7 @@ use ruff::{fs, IOError};
 use ruff_diagnostics::Diagnostic;
 use ruff_macros::CacheKey;
 use ruff_python_ast::imports::ImportMap;
-use ruff_python_stdlib::path::{is_project_toml};
+use ruff_python_stdlib::path::is_project_toml;
 use ruff_source_file::{LineIndex, SourceCode, SourceFileBuilder};
 
 #[derive(CacheKey)]

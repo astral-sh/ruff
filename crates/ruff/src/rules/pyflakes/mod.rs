@@ -12,7 +12,7 @@ mod tests {
     use anyhow::Result;
     use regex::Regex;
     use ruff_python_parser::lexer::LexResult;
-    
+
     use test_case::test_case;
 
     use ruff_diagnostics::Diagnostic;
