@@ -97,6 +97,8 @@ mod tests {
     #[test_case(Rule::UnusedPrivateTypeVar, Path::new("PYI018.pyi"))]
     #[test_case(Rule::UnusedPrivateProtocol, Path::new("PYI046.py"))]
     #[test_case(Rule::UnusedPrivateProtocol, Path::new("PYI046.pyi"))]
+    #[test_case(Rule::RedundantLiteralUnion, Path::new("PYI051.py"))]
+    #[test_case(Rule::RedundantLiteralUnion, Path::new("PYI051.pyi"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
