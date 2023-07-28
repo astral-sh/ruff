@@ -39,7 +39,7 @@ use ruff_text_size::{TextRange, TextSize};
 use ruff_diagnostics::{Diagnostic, IsolationLevel};
 use ruff_python_ast::all::{extract_all_names, DunderAllFlags};
 use ruff_python_ast::helpers::{
-    extract_handled_exceptions, from_relative_import_parts, literal_path, to_module_path,
+    collect_import_from_member, extract_handled_exceptions, to_module_path,
 };
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::str::trailing_quote;
@@ -394,13 +394,8 @@ where
                         // Attempt to resolve any relative imports; but if we don't know the current
                         // module path, or the relative import extends beyond the package root,
                         // fallback to a literal representation (e.g., `[".", "foo"]`).
-                        let call_path = self
-                            .module_path
-                            .and_then(|module_path| {
-                                from_relative_import_parts(module_path, level, module, &alias.name)
-                            })
-                            .unwrap_or_else(|| literal_path(level, module, &alias.name));
-                        let call_path: Box<[&str]> = call_path.into_boxed_slice();
+                        let call_path = collect_import_from_member(level, module, &alias.name)
+                            .into_boxed_slice();
                         self.add_binding(
                             name,
                             alias.identifier(),

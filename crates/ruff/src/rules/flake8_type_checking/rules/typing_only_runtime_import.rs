@@ -5,7 +5,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, DiagnosticKind, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::{AnyImport, Binding, NodeId, ResolvedReferenceId, Scope};
+use ruff_python_semantic::{AnyImport, Binding, Imported, NodeId, ResolvedReferenceId, Scope};
 use ruff_text_size::TextRange;
 
 use crate::autofix;
@@ -376,13 +376,13 @@ fn diagnostic_for(import_type: ImportType, qualified_name: String) -> Diagnostic
 
 /// Return `true` if `this` is implicitly loaded via importing `that`.
 fn is_implicit_import(this: &Binding, that: &Binding) -> bool {
-    let Some(this_module) = this.module_name() else {
+    let Some(this_import) = this.as_any_import() else {
         return false;
     };
-    let Some(that_module) = that.module_name() else {
+    let Some(that_import) = that.as_any_import() else {
         return false;
     };
-    this_module == that_module
+    this_import.module_name() == that_import.module_name()
 }
 
 /// Return `true` if `name` is exempt from typing-only enforcement.

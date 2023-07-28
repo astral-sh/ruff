@@ -4,7 +4,7 @@ use std::borrow::Cow;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::{AnyImport, Exceptions, NodeId, Scope};
+use ruff_python_semantic::{AnyImport, Exceptions, Imported, NodeId, Scope};
 use ruff_text_size::TextRange;
 
 use crate::autofix;

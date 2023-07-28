@@ -1,8 +1,8 @@
 use ruff_python_ast as ast;
 use ruff_python_ast::Expr;
+use ruff_python_semantic::{BindingKind, Imported, SemanticModel};
 
-use ruff_python_semantic::{BindingKind, Import, SemanticModel};
-
+#[derive(Debug)]
 pub(super) enum Resolution {
     /// The expression resolves to an irrelevant expression type (e.g., a constant).
     IrrelevantExpression,
@@ -37,9 +37,7 @@ pub(super) fn test_expression(expr: &Expr, semantic: &SemanticModel) -> Resoluti
                 | BindingKind::LoopVar
                 | BindingKind::Global
                 | BindingKind::Nonlocal(_) => Resolution::RelevantLocal,
-                BindingKind::Import(Import { call_path })
-                    if matches!(call_path.as_ref(), ["pandas"]) =>
-                {
+                BindingKind::Import(import) if matches!(import.call_path(), ["pandas"]) => {
                     Resolution::PandasModule
                 }
                 _ => Resolution::IrrelevantBinding,

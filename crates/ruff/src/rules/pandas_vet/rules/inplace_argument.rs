@@ -1,11 +1,10 @@
-use ruff_python_ast::{Expr, Keyword, Ranged};
-use ruff_text_size::TextRange;
-
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_true;
-use ruff_python_semantic::{BindingKind, Import};
+use ruff_python_ast::{Expr, Keyword, Ranged};
+use ruff_python_semantic::{BindingKind, Imported};
 use ruff_source_file::Locator;
+use ruff_text_size::TextRange;
 
 use crate::autofix::edits::remove_argument;
 use crate::checkers::ast::Checker;
@@ -65,8 +64,8 @@ pub(crate) fn inplace_argument(
             .first()
             .and_then(|module| checker.semantic().find_binding(module))
             .map_or(false, |binding| {
-                if let BindingKind::Import(Import { call_path }) = &binding.kind {
-                    matches!(call_path.as_ref(), ["pandas"])
+                if let BindingKind::Import(import) = &binding.kind {
+                    matches!(import.call_path(), ["pandas"])
                 } else {
                     false
                 }

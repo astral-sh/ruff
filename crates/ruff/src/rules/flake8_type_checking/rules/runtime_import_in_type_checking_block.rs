@@ -5,7 +5,7 @@ use std::borrow::Cow;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::{AnyImport, NodeId, ResolvedReferenceId, Scope};
+use ruff_python_semantic::{AnyImport, Imported, NodeId, ResolvedReferenceId, Scope};
 
 use crate::autofix;
 use crate::checkers::ast::Checker;

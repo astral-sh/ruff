@@ -177,50 +177,6 @@ impl<'a> Binding<'a> {
         )
     }
 
-    /// Returns the fully-qualified symbol name, if this symbol was imported from another module.
-    pub fn call_path(&self) -> Option<&[&str]> {
-        match &self.kind {
-            BindingKind::Import(Import { call_path }) => Some(call_path),
-            BindingKind::FromImport(FromImport { call_path }) => Some(call_path),
-            BindingKind::SubmoduleImport(SubmoduleImport { call_path }) => Some(call_path),
-            _ => None,
-        }
-    }
-
-    /// Returns the fully-qualified symbol name, if this symbol was imported from another module.
-    pub fn qualified_name(&self) -> Option<String> {
-        self.call_path().map(format_call_path)
-    }
-
-    /// Returns the fully-qualified name of the module from which this symbol was imported, if this
-    /// symbol was imported from another module.
-    pub fn module_name(&self) -> Option<&[&str]> {
-        match &self.kind {
-            BindingKind::Import(Import { call_path })
-            | BindingKind::SubmoduleImport(SubmoduleImport { call_path }) => Some(&call_path[..1]),
-            BindingKind::FromImport(FromImport { call_path }) => {
-                Some(&call_path[..call_path.len() - 1])
-            }
-            _ => None,
-        }
-    }
-
-    /// Returns the fully-qualified symbol name, if this symbol was imported from another module.
-    pub fn member_name(&self) -> Option<Cow<'a, str>> {
-        match &self.kind {
-            BindingKind::Import(Import { call_path }) => {
-                Some(Cow::Owned(format_call_path(call_path)))
-            }
-            BindingKind::FromImport(FromImport { call_path }) => {
-                call_path.last().map(|member| Cow::Borrowed(*member))
-            }
-            BindingKind::SubmoduleImport(SubmoduleImport { call_path }) => {
-                Some(Cow::Owned(format_call_path(call_path)))
-            }
-            _ => None,
-        }
-    }
-
     /// Returns the name of the binding (e.g., `x` in `x = 1`).
     pub fn name<'b>(&self, locator: &'b Locator) -> &'b str {
         locator.slice(self.range)
@@ -245,51 +201,6 @@ impl<'a> Binding<'a> {
             BindingKind::SubmoduleImport(import) => Some(AnyImport::SubmoduleImport(import)),
             BindingKind::FromImport(import) => Some(AnyImport::FromImport(import)),
             _ => None,
-        }
-    }
-}
-
-pub enum AnyImport<'a> {
-    Import(&'a Import<'a>),
-    SubmoduleImport(&'a SubmoduleImport<'a>),
-    FromImport(&'a FromImport<'a>),
-}
-
-impl<'a> AnyImport<'a> {
-    /// Returns the fully-qualified symbol name, if this symbol was imported from another module.
-    pub fn call_path(&self) -> &[&str] {
-        match self {
-            Self::Import(Import { call_path }) => call_path.as_ref(),
-            Self::SubmoduleImport(SubmoduleImport { call_path }) => call_path.as_ref(),
-            Self::FromImport(FromImport { call_path }) => call_path.as_ref(),
-        }
-    }
-
-    /// Returns the fully-qualified symbol name, if this symbol was imported from another module.
-    pub fn qualified_name(&self) -> String {
-        format_call_path(self.call_path())
-    }
-
-    /// Returns the fully-qualified name of the module from which this symbol was imported, if this
-    /// symbol was imported from another module.
-    pub fn module_name(&self) -> &[&str] {
-        match self {
-            Self::Import(Import { call_path }) => &call_path[..1],
-            Self::SubmoduleImport(SubmoduleImport { call_path }) => &call_path[..1],
-            Self::FromImport(FromImport { call_path }) => &call_path[..call_path.len() - 1],
-        }
-    }
-
-    /// Returns the fully-qualified symbol name, if this symbol was imported from another module.
-    pub fn member_name(&self) -> Cow<'a, str> {
-        match self {
-            Self::Import(Import { call_path }) => Cow::Owned(format_call_path(call_path)),
-            Self::SubmoduleImport(SubmoduleImport { call_path }) => {
-                Cow::Owned(format_call_path(call_path))
-            }
-            Self::FromImport(FromImport { call_path }) => {
-                Cow::Borrowed(call_path[call_path.len() - 1])
-            }
         }
     }
 }
@@ -601,5 +512,108 @@ bitflags! {
         const NAME_ERROR = 0b0000_0001;
         const MODULE_NOT_FOUND_ERROR = 0b0000_0010;
         const IMPORT_ERROR = 0b0000_0100;
+    }
+}
+
+/// A trait for imported symbols.
+pub trait Imported<'a> {
+    /// Returns the call path to the imported symbol.
+    fn call_path(&self) -> &[&str];
+
+    /// Returns the module name of the imported symbol.
+    fn module_name(&self) -> &[&str];
+
+    /// Returns the member name of the imported symbol. For a straight import, this is equivalent
+    /// to [`qualified_name`]; for a `from` import, this is the name of the imported symbol.
+    fn member_name(&self) -> Cow<'a, str>;
+
+    /// Returns the fully-qualified name of the imported symbol.
+    fn qualified_name(&self) -> String {
+        format_call_path(self.call_path())
+    }
+}
+
+impl<'a> Imported<'a> for Import<'a> {
+    /// For example, given `import foo`, returns `["foo"]`.
+    fn call_path(&self) -> &[&str] {
+        self.call_path.as_ref()
+    }
+
+    /// For example, given `import foo`, returns `["foo"]`.
+    fn module_name(&self) -> &[&str] {
+        &self.call_path[..1]
+    }
+
+    /// For example, given `import foo`, returns `"foo"`.
+    fn member_name(&self) -> Cow<'a, str> {
+        Cow::Owned(self.qualified_name())
+    }
+}
+
+impl<'a> Imported<'a> for SubmoduleImport<'a> {
+    /// For example, given `import foo.bar`, returns `["foo", "bar"]`.
+    fn call_path(&self) -> &[&str] {
+        self.call_path.as_ref()
+    }
+
+    /// For example, given `import foo.bar`, returns `["foo"]`.
+    fn module_name(&self) -> &[&str] {
+        &self.call_path[..1]
+    }
+
+    /// For example, given `import foo.bar`, returns `"foo.bar"`.
+    fn member_name(&self) -> Cow<'a, str> {
+        Cow::Owned(self.qualified_name())
+    }
+}
+
+impl<'a> Imported<'a> for FromImport<'a> {
+    /// For example, given `from foo import bar`, returns `["foo", "bar"]`.
+    fn call_path(&self) -> &[&str] {
+        self.call_path.as_ref()
+    }
+
+    /// For example, given `from foo import bar`, returns `["foo"]`.
+    fn module_name(&self) -> &[&str] {
+        &self.call_path[..self.call_path.len() - 1]
+    }
+
+    /// For example, given `from foo import bar`, returns `"bar"`.
+    fn member_name(&self) -> Cow<'a, str> {
+        Cow::Borrowed(self.call_path[self.call_path.len() - 1])
+    }
+}
+
+/// A wrapper around an import [`BindingKind`] that can be any of the three types of imports.
+#[derive(Debug, Clone)]
+pub enum AnyImport<'a> {
+    Import(&'a Import<'a>),
+    SubmoduleImport(&'a SubmoduleImport<'a>),
+    FromImport(&'a FromImport<'a>),
+}
+
+impl<'a> Imported<'a> for AnyImport<'a> {
+    fn call_path(&self) -> &[&str] {
+        match self {
+            Self::Import(import) => import.call_path(),
+            Self::SubmoduleImport(import) => import.call_path(),
+            Self::FromImport(import) => import.call_path(),
+        }
+    }
+
+    fn module_name(&self) -> &[&str] {
+        match self {
+            Self::Import(import) => import.module_name(),
+            Self::SubmoduleImport(import) => import.module_name(),
+            Self::FromImport(import) => import.module_name(),
+        }
+    }
+
+    fn member_name(&self) -> Cow<'a, str> {
+        match self {
+            Self::Import(import) => import.member_name(),
+            Self::SubmoduleImport(import) => import.member_name(),
+            Self::FromImport(import) => import.member_name(),
+        }
     }
 }
