@@ -207,11 +207,8 @@ impl Format<PyFormatContext<'_>> for FormatStringPart {
 
         write!(f, [prefix, preferred_quotes])?;
 
-        let (normalized, contains_newlines) = normalize_string(
-            raw_content,
-            preferred_quotes,
-            matches!(prefix, StringPrefix::RAW | StringPrefix::RAW_UPPER),
-        );
+        let (normalized, contains_newlines) =
+            normalize_string(raw_content, preferred_quotes, prefix.is_raw_string());
 
         match normalized {
             Cow::Borrowed(_) => {
@@ -267,6 +264,10 @@ impl StringPrefix {
 
     pub(super) const fn text_len(self) -> TextSize {
         TextSize::new(self.bits().count_ones())
+    }
+
+    pub(super) const fn is_raw_string(self) -> bool {
+        matches!(self, StringPrefix::RAW | StringPrefix::RAW_UPPER)
     }
 }
 
