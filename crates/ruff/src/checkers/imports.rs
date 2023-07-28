@@ -10,7 +10,7 @@ use ruff_python_ast::imports::{ImportMap, ModuleImport};
 use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_stdlib::path::is_python_stub_file;
+
 use ruff_source_file::Locator;
 
 use crate::directives::IsortDirectives;
@@ -18,7 +18,7 @@ use crate::registry::Rule;
 use crate::rules::isort;
 use crate::rules::isort::block::{Block, BlockBuilder};
 use crate::settings::Settings;
-use crate::source_kind::SourceKind;
+use crate::source_kind::{PySourceType, SourceKind};
 
 fn extract_import_map(path: &Path, package: Option<&Path>, blocks: &[&Block]) -> Option<ImportMap> {
     let Some(package) = package else {
@@ -87,12 +87,12 @@ pub(crate) fn check_imports(
     path: &Path,
     package: Option<&Path>,
     source_kind: Option<&SourceKind>,
+    source_type: PySourceType,
 ) -> (Vec<Diagnostic>, Option<ImportMap>) {
-    let is_stub = is_python_stub_file(path);
-
     // Extract all import blocks from the AST.
     let tracker = {
-        let mut tracker = BlockBuilder::new(locator, directives, is_stub, source_kind);
+        let mut tracker =
+            BlockBuilder::new(locator, directives, source_type.is_stub(), source_kind);
         tracker.visit_body(python_ast);
         tracker
     };
@@ -110,7 +110,7 @@ pub(crate) fn check_imports(
                     indexer,
                     settings,
                     package,
-                    source_kind.map_or(false, SourceKind::is_jupyter),
+                    source_type,
                 ) {
                     diagnostics.push(diagnostic);
                 }
@@ -119,7 +119,11 @@ pub(crate) fn check_imports(
     }
     if settings.rules.enabled(Rule::MissingRequiredImport) {
         diagnostics.extend(isort::rules::add_required_imports(
-            python_ast, locator, stylist, settings, is_stub,
+            python_ast,
+            locator,
+            stylist,
+            settings,
+            source_type,
         ));
     }
 

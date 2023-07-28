@@ -119,7 +119,7 @@ pub(crate) fn multiple_with_statements(
                 body.first().expect("Expected body to be non-empty").start(),
             ),
             checker.locator().contents(),
-            checker.is_jupyter_notebook,
+            checker.source_type.is_jupyter(),
         );
 
         let mut diagnostic = Diagnostic::new(

@@ -713,7 +713,7 @@ pub(crate) fn definition(
                                 checker.locator(),
                                 stmt,
                                 "None",
-                                checker.is_jupyter_notebook,
+                                checker.source_type,
                             )
                             .map(Fix::suggested)
                         });
@@ -736,7 +736,7 @@ pub(crate) fn definition(
                                 checker.locator(),
                                 stmt,
                                 return_type,
-                                checker.is_jupyter_notebook,
+                                checker.source_type,
                             )
                             .map(Fix::suggested)
                         });

@@ -9,6 +9,7 @@ use ruff_source_file::Locator;
 use crate::autofix::edits::remove_argument;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
+use crate::source_kind::PySourceType;
 
 /// ## What it does
 /// Checks for uses of `subprocess.run` that send `stdout` and `stderr` to a
@@ -59,7 +60,7 @@ fn generate_fix(
     keywords: &[Keyword],
     stdout: &Keyword,
     stderr: &Keyword,
-    is_jupyter_notebook: bool,
+    source_type: PySourceType,
 ) -> Result<Fix> {
     let (first, second) = if stdout.start() < stderr.start() {
         (stdout, stderr)
@@ -75,7 +76,7 @@ fn generate_fix(
             args,
             keywords,
             false,
-            is_jupyter_notebook,
+            source_type,
         )?],
     ))
 }
@@ -124,7 +125,7 @@ pub(crate) fn replace_stdout_stderr(
                     keywords,
                     stdout,
                     stderr,
-                    checker.is_jupyter_notebook,
+                    checker.source_type,
                 )
             });
         }

@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use ruff_python_ast::{self as ast, Constant, Expr, Ranged};
 use ruff_python_literal::cformat::{CFormatPart, CFormatSpec, CFormatStrOrBytes, CFormatString};
-use ruff_python_parser::{lexer, Mode};
+use ruff_python_parser::lexer;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
 
@@ -203,12 +203,9 @@ pub(crate) fn bad_string_format_type(checker: &mut Checker, expr: &Expr, right: 
     // Grab each string segment (in case there's an implicit concatenation).
     let content = checker.locator().slice(expr.range());
     let mut strings: Vec<TextRange> = vec![];
-    let mode = if checker.is_jupyter_notebook {
-        Mode::Jupyter
-    } else {
-        Mode::Module
-    };
-    for (tok, range) in lexer::lex_starts_at(content, mode, expr.start()).flatten() {
+    for (tok, range) in
+        lexer::lex_starts_at(content, checker.source_type.as_mode(), expr.start()).flatten()
+    {
         if tok.is_string() {
             strings.push(range);
         } else if tok.is_percent() {

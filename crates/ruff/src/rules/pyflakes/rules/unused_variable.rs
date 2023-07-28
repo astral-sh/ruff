@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use ruff_python_ast::{self as ast, Ranged, Stmt};
-use ruff_python_parser::{lexer, Mode, Tok};
+use ruff_python_parser::{lexer, Tok};
 use ruff_text_size::{TextRange, TextSize};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -12,6 +12,7 @@ use ruff_source_file::Locator;
 use crate::autofix::edits::delete_stmt;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
+use crate::source_kind::PySourceType;
 
 /// ## What it does
 /// Checks for the presence of unused variables in function scopes.
@@ -65,14 +66,14 @@ impl Violation for UnusedVariable {
 fn match_token_before<F>(
     location: TextSize,
     locator: &Locator,
-    mode: Mode,
+    source_type: PySourceType,
     f: F,
 ) -> Option<TextRange>
 where
     F: Fn(Tok) -> bool,
 {
     let contents = locator.after(location);
-    for ((_, range), (tok, _)) in lexer::lex_starts_at(contents, mode, location)
+    for ((_, range), (tok, _)) in lexer::lex_starts_at(contents, source_type.as_mode(), location)
         .flatten()
         .tuple_windows()
     {
@@ -88,7 +89,7 @@ where
 fn match_token_after<F>(
     location: TextSize,
     locator: &Locator,
-    mode: Mode,
+    source_type: PySourceType,
     f: F,
 ) -> Option<TextRange>
 where
@@ -101,7 +102,7 @@ where
     let mut sqb_count = 0u32;
     let mut brace_count = 0u32;
 
-    for ((tok, _), (_, range)) in lexer::lex_starts_at(contents, mode, location)
+    for ((tok, _), (_, range)) in lexer::lex_starts_at(contents, source_type.as_mode(), location)
         .flatten()
         .tuple_windows()
     {
@@ -144,7 +145,7 @@ where
 fn match_token_or_closing_brace<F>(
     location: TextSize,
     locator: &Locator,
-    mode: Mode,
+    source_type: PySourceType,
     f: F,
 ) -> Option<TextRange>
 where
@@ -157,7 +158,7 @@ where
     let mut sqb_count = 0u32;
     let mut brace_count = 0u32;
 
-    for (tok, range) in lexer::lex_starts_at(contents, mode, location).flatten() {
+    for (tok, range) in lexer::lex_starts_at(contents, source_type.as_mode(), location).flatten() {
         match tok {
             Tok::Lpar => {
                 par_count = par_count.saturating_add(1);
@@ -209,12 +210,6 @@ fn remove_unused_variable(
     range: TextRange,
     checker: &Checker,
 ) -> Option<Fix> {
-    let mode = if checker.is_jupyter_notebook {
-        Mode::Jupyter
-    } else {
-        Mode::Module
-    };
-
     // First case: simple assignment (`x = 1`)
     if let Stmt::Assign(ast::StmtAssign { targets, value, .. }) = stmt {
         if let Some(target) = targets.iter().find(|target| range == target.range()) {
@@ -226,8 +221,10 @@ fn remove_unused_variable(
                     // but preserve the right-hand side.
                     let start = target.start();
                     let end =
-                        match_token_after(start, checker.locator(), mode, |tok| tok == Tok::Equal)?
-                            .start();
+                        match_token_after(start, checker.locator(), checker.source_type, |tok| {
+                            tok == Tok::Equal
+                        })?
+                        .start();
                     let edit = Edit::deletion(start, end);
                     Some(Fix::suggested(edit))
                 } else {
@@ -252,8 +249,10 @@ fn remove_unused_variable(
                 // but preserve the right-hand side.
                 let start = stmt.start();
                 let end =
-                    match_token_after(start, checker.locator(), mode, |tok| tok == Tok::Equal)?
-                        .start();
+                    match_token_after(start, checker.locator(), checker.source_type, |tok| {
+                        tok == Tok::Equal
+                    })?
+                    .start();
                 let edit = Edit::deletion(start, end);
                 Some(Fix::suggested(edit))
             } else {
@@ -275,17 +274,19 @@ fn remove_unused_variable(
                     let start = match_token_before(
                         item.context_expr.start(),
                         checker.locator(),
-                        mode,
+                        checker.source_type,
                         |tok| tok == Tok::As,
                     )?
                     .end();
 
                     // Find the first colon, comma, or closing bracket after the `as` keyword.
-                    let end =
-                        match_token_or_closing_brace(start, checker.locator(), mode, |tok| {
-                            tok == Tok::Colon || tok == Tok::Comma
-                        })?
-                        .start();
+                    let end = match_token_or_closing_brace(
+                        start,
+                        checker.locator(),
+                        checker.source_type,
+                        |tok| tok == Tok::Colon || tok == Tok::Comma,
+                    )?
+                    .start();
 
                     let edit = Edit::deletion(start, end);
                     return Some(Fix::suggested(edit));

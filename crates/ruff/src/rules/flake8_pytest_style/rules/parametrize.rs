@@ -1,5 +1,5 @@
 use ruff_python_ast::{self as ast, Constant, Decorator, Expr, ExprContext, Ranged};
-use ruff_python_parser::{lexer, Mode, Tok};
+use ruff_python_parser::{lexer, Tok};
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -9,6 +9,7 @@ use ruff_source_file::Locator;
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
+use crate::source_kind::PySourceType;
 
 use super::super::types;
 use super::helpers::{is_pytest_parametrize, split_names};
@@ -99,21 +100,19 @@ fn get_parametrize_name_range(
     decorator: &Decorator,
     expr: &Expr,
     locator: &Locator,
-    is_jupyter_notebook: bool,
+    source_type: PySourceType,
 ) -> TextRange {
     let mut locations = Vec::new();
     let mut implicit_concat = None;
 
-    let mode = if is_jupyter_notebook {
-        Mode::Jupyter
-    } else {
-        Mode::Module
-    };
-
     // The parenthesis are not part of the AST, so we need to tokenize the
     // decorator to find them.
-    for (tok, range) in
-        lexer::lex_starts_at(locator.slice(decorator.range()), mode, decorator.start()).flatten()
+    for (tok, range) in lexer::lex_starts_at(
+        locator.slice(decorator.range()),
+        source_type.as_mode(),
+        decorator.start(),
+    )
+    .flatten()
     {
         match tok {
             Tok::Lpar => locations.push(range.start()),
@@ -152,7 +151,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                             decorator,
                             expr,
                             checker.locator(),
-                            checker.is_jupyter_notebook,
+                            checker.source_type,
                         );
                         let mut diagnostic = Diagnostic::new(
                             PytestParametrizeNamesWrongType {
@@ -187,7 +186,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                             decorator,
                             expr,
                             checker.locator(),
-                            checker.is_jupyter_notebook,
+                            checker.source_type,
                         );
                         let mut diagnostic = Diagnostic::new(
                             PytestParametrizeNamesWrongType {

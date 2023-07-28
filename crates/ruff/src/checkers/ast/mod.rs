@@ -52,7 +52,6 @@ use ruff_python_semantic::{
     ModuleKind, ScopeId, ScopeKind, SemanticModel, SemanticModelFlags, StarImport, SubmoduleImport,
 };
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
-use ruff_python_stdlib::path::{is_jupyter_notebook, is_python_stub_file};
 use ruff_source_file::Locator;
 
 use crate::checkers::ast::deferred::Deferred;
@@ -62,6 +61,7 @@ use crate::noqa::NoqaMapping;
 use crate::registry::Rule;
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::{flags, Settings};
+use crate::source_kind::PySourceType;
 use crate::{docstrings, noqa};
 
 mod analyze;
@@ -74,10 +74,8 @@ pub(crate) struct Checker<'a> {
     package: Option<&'a Path>,
     /// The module representation of the current file (e.g., `foo.bar`).
     module_path: Option<&'a [String]>,
-    /// Whether the current file is a stub (`.pyi`) file.
-    is_stub: bool,
-    /// Whether the current file is a Jupyter notebook (`.ipynb`) file.
-    pub(crate) is_jupyter_notebook: bool,
+    /// The [`PySourceType`] of the current file.
+    pub(crate) source_type: PySourceType,
     /// The [`flags::Noqa`] for the current analysis (i.e., whether to respect suppression
     /// comments).
     noqa: flags::Noqa,
@@ -119,6 +117,7 @@ impl<'a> Checker<'a> {
         stylist: &'a Stylist,
         indexer: &'a Indexer,
         importer: Importer<'a>,
+        source_type: PySourceType,
     ) -> Checker<'a> {
         Checker {
             settings,
@@ -127,8 +126,7 @@ impl<'a> Checker<'a> {
             path,
             package,
             module_path: module.path(),
-            is_stub: is_python_stub_file(path),
-            is_jupyter_notebook: is_jupyter_notebook(path),
+            source_type,
             locator,
             stylist,
             indexer,
@@ -1788,7 +1786,7 @@ impl<'a> Checker<'a> {
                             pyupgrade::rules::quoted_annotation(self, value, range);
                         }
                     }
-                    if self.is_stub {
+                    if self.source_type.is_stub() {
                         if self.enabled(Rule::QuotedAnnotationInStub) {
                             flake8_pyi::rules::quoted_annotation_in_stub(self, value, range);
                         }
@@ -1930,6 +1928,7 @@ pub(crate) fn check_ast(
     noqa: flags::Noqa,
     path: &Path,
     package: Option<&Path>,
+    source_type: PySourceType,
 ) -> Vec<Diagnostic> {
     let module_path = package.and_then(|package| to_module_path(package, path));
     let module = Module {
@@ -1957,6 +1956,7 @@ pub(crate) fn check_ast(
         stylist,
         indexer,
         Importer::new(python_ast, locator, stylist),
+        source_type,
     );
     checker.bind_builtins();
 

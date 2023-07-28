@@ -521,7 +521,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &D
                                     args,
                                     keywords,
                                     false,
-                                    checker.is_jupyter_notebook,
+                                    checker.source_type,
                                 )
                                 .map(Fix::suggested)
                             });

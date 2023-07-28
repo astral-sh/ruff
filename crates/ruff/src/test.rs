@@ -7,7 +7,7 @@ use std::path::Path;
 use anyhow::Result;
 use itertools::Itertools;
 use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::Mode;
+
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic};
@@ -26,7 +26,7 @@ use crate::packaging::detect_package_root;
 use crate::registry::AsRule;
 use crate::rules::pycodestyle::rules::syntax_error;
 use crate::settings::{flags, Settings};
-use crate::source_kind::SourceKind;
+use crate::source_kind::{PySourceType, SourceKind};
 
 #[cfg(not(fuzzing))]
 pub(crate) fn read_jupyter_notebook(path: &Path) -> Result<Notebook> {
@@ -101,13 +101,9 @@ pub(crate) fn max_iterations() -> usize {
 /// A convenient wrapper around [`check_path`], that additionally
 /// asserts that autofixes converge after a fixed number of iterations.
 fn test_contents(source_kind: &mut SourceKind, path: &Path, settings: &Settings) -> Vec<Message> {
-    let mode = if source_kind.is_jupyter() {
-        Mode::Jupyter
-    } else {
-        Mode::Module
-    };
     let contents = source_kind.content().to_string();
-    let tokens: Vec<LexResult> = ruff_python_parser::tokenize(&contents, mode);
+    let source_type = PySourceType::from(path);
+    let tokens: Vec<LexResult> = ruff_python_parser::tokenize(&contents, source_type.as_mode());
     let locator = Locator::new(&contents);
     let stylist = Stylist::from_tokens(&tokens, &locator);
     let indexer = Indexer::from_tokens(&tokens, &locator);
@@ -132,6 +128,7 @@ fn test_contents(source_kind: &mut SourceKind, path: &Path, settings: &Settings)
         settings,
         flags::Noqa::Enabled,
         Some(source_kind),
+        source_type,
     );
 
     let source_has_errors = error.is_some();
@@ -169,7 +166,8 @@ fn test_contents(source_kind: &mut SourceKind, path: &Path, settings: &Settings)
                 notebook.update(&source_map, &fixed_contents);
             };
 
-            let tokens: Vec<LexResult> = ruff_python_parser::tokenize(&fixed_contents, mode);
+            let tokens: Vec<LexResult> =
+                ruff_python_parser::tokenize(&fixed_contents, source_type.as_mode());
             let locator = Locator::new(&fixed_contents);
             let stylist = Stylist::from_tokens(&tokens, &locator);
             let indexer = Indexer::from_tokens(&tokens, &locator);
@@ -194,6 +192,7 @@ fn test_contents(source_kind: &mut SourceKind, path: &Path, settings: &Settings)
                 settings,
                 flags::Noqa::Enabled,
                 Some(source_kind),
+                source_type,
             );
 
             if let Some(fixed_error) = fixed_error {

@@ -22,6 +22,7 @@ use crate::line_width::{LineLength, LineWidth};
 use crate::rules::isort::categorize::KnownModules;
 use crate::rules::isort::types::ImportBlock;
 use crate::settings::types::PythonVersion;
+use crate::source_kind::PySourceType;
 
 mod annotate;
 pub(crate) mod block;
@@ -72,7 +73,7 @@ pub(crate) fn format_imports(
     stylist: &Stylist,
     src: &[PathBuf],
     package: Option<&Path>,
-    is_jupyter_notebook: bool,
+    source_type: PySourceType,
     combine_as_imports: bool,
     force_single_line: bool,
     force_sort_within_sections: bool,
@@ -100,7 +101,7 @@ pub(crate) fn format_imports(
         comments,
         locator,
         split_on_trailing_comma,
-        is_jupyter_notebook,
+        source_type,
     );
 
     // Normalize imports (i.e., deduplicate, aggregate `from` imports).

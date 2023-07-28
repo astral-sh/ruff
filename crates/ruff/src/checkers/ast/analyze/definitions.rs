@@ -30,7 +30,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
         Rule::MissingTypeKwargs,
         Rule::MissingTypeSelf,
     ]);
-    let enforce_stubs = checker.is_stub
+    let enforce_stubs = checker.source_type.is_stub()
         && checker.any_enabled(&[Rule::DocstringInStub, Rule::IterMethodReturnIterable]);
     let enforce_docstrings = checker.any_enabled(&[
         Rule::BlankLineAfterLastSection,

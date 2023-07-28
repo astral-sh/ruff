@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
 use ruff_python_ast::{self as ast, Constant, Expr, Keyword, Ranged};
-use ruff_python_parser::{lexer, Mode};
+use ruff_python_parser::lexer;
 use ruff_text_size::TextSize;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
@@ -13,6 +13,7 @@ use ruff_source_file::Locator;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
+use crate::source_kind::PySourceType;
 
 /// ## What it does
 /// Checks for redundant `open` mode parameters.
@@ -84,7 +85,7 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
                                 mode.replacement_value(),
                                 checker.locator(),
                                 checker.patch(Rule::RedundantOpenModes),
-                                checker.is_jupyter_notebook,
+                                checker.source_type,
                             ));
                         }
                     }
@@ -104,7 +105,7 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
                         mode.replacement_value(),
                         checker.locator(),
                         checker.patch(Rule::RedundantOpenModes),
-                        checker.is_jupyter_notebook,
+                        checker.source_type,
                     ));
                 }
             }
@@ -184,7 +185,7 @@ fn create_check(
     replacement_value: Option<&str>,
     locator: &Locator,
     patch: bool,
-    is_jupyter_notebook: bool,
+    source_type: PySourceType,
 ) -> Diagnostic {
     let mut diagnostic = Diagnostic::new(
         RedundantOpenModes {
@@ -200,8 +201,7 @@ fn create_check(
             )));
         } else {
             diagnostic.try_set_fix(|| {
-                create_remove_param_fix(locator, expr, mode_param, is_jupyter_notebook)
-                    .map(Fix::automatic)
+                create_remove_param_fix(locator, expr, mode_param, source_type).map(Fix::automatic)
             });
         }
     }
@@ -212,7 +212,7 @@ fn create_remove_param_fix(
     locator: &Locator,
     expr: &Expr,
     mode_param: &Expr,
-    is_jupyter_notebook: bool,
+    source_type: PySourceType,
 ) -> Result<Edit> {
     let content = locator.slice(expr.range());
     // Find the last comma before mode_param and create a deletion fix
@@ -221,12 +221,8 @@ fn create_remove_param_fix(
     let mut fix_end: Option<TextSize> = None;
     let mut is_first_arg: bool = false;
     let mut delete_first_arg: bool = false;
-    let mode = if is_jupyter_notebook {
-        Mode::Jupyter
-    } else {
-        Mode::Module
-    };
-    for (tok, range) in lexer::lex_starts_at(content, mode, expr.start()).flatten() {
+    for (tok, range) in lexer::lex_starts_at(content, source_type.as_mode(), expr.start()).flatten()
+    {
         if range.start() == mode_param.start() {
             if is_first_arg {
                 delete_first_arg = true;

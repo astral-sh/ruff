@@ -1,5 +1,5 @@
 use ruff_python_ast::{self as ast, Constant, Expr, Keyword, Ranged};
-use ruff_python_parser::{lexer, Mode, Tok};
+use ruff_python_parser::{lexer, Tok};
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
@@ -9,6 +9,7 @@ use ruff_source_file::Locator;
 use crate::autofix::edits::remove_argument;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
+use crate::source_kind::PySourceType;
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum Reason {
@@ -122,17 +123,14 @@ fn match_encoding_arg<'a>(args: &'a [Expr], kwargs: &'a [Keyword]) -> Option<Enc
 }
 
 /// Return a [`Fix`] replacing the call to encode with a byte string.
-fn replace_with_bytes_literal(locator: &Locator, expr: &Expr, is_jupyter_notebook: bool) -> Fix {
+fn replace_with_bytes_literal(locator: &Locator, expr: &Expr, source_type: PySourceType) -> Fix {
     // Build up a replacement string by prefixing all string tokens with `b`.
     let contents = locator.slice(expr.range());
     let mut replacement = String::with_capacity(contents.len() + 1);
     let mut prev = expr.start();
-    let mode = if is_jupyter_notebook {
-        Mode::Jupyter
-    } else {
-        Mode::Module
-    };
-    for (tok, range) in lexer::lex_starts_at(contents, mode, expr.start()).flatten() {
+    for (tok, range) in
+        lexer::lex_starts_at(contents, source_type.as_mode(), expr.start()).flatten()
+    {
         match tok {
             Tok::Dot => break,
             Tok::String { .. } => {
@@ -183,7 +181,7 @@ pub(crate) fn unnecessary_encode_utf8(
                         diagnostic.set_fix(replace_with_bytes_literal(
                             checker.locator(),
                             expr,
-                            checker.is_jupyter_notebook,
+                            checker.source_type,
                         ));
                     }
                     checker.diagnostics.push(diagnostic);
@@ -205,7 +203,7 @@ pub(crate) fn unnecessary_encode_utf8(
                                 args,
                                 kwargs,
                                 false,
-                                checker.is_jupyter_notebook,
+                                checker.source_type,
                             )
                             .map(Fix::automatic)
                         });
@@ -228,7 +226,7 @@ pub(crate) fn unnecessary_encode_utf8(
                                 args,
                                 kwargs,
                                 false,
-                                checker.is_jupyter_notebook,
+                                checker.source_type,
                             )
                             .map(Fix::automatic)
                         });
@@ -258,7 +256,7 @@ pub(crate) fn unnecessary_encode_utf8(
                                 args,
                                 kwargs,
                                 false,
-                                checker.is_jupyter_notebook,
+                                checker.source_type,
                             )
                             .map(Fix::automatic)
                         });
@@ -281,7 +279,7 @@ pub(crate) fn unnecessary_encode_utf8(
                                 args,
                                 kwargs,
                                 false,
-                                checker.is_jupyter_notebook,
+                                checker.source_type,
                             )
                             .map(Fix::automatic)
                         });

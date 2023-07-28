@@ -15,7 +15,7 @@ pub(crate) fn parameters(parameters: &Parameters, checker: &mut Checker) {
     if checker.settings.rules.enabled(Rule::ImplicitOptional) {
         ruff::rules::implicit_optional(checker, parameters);
     }
-    if checker.is_stub {
+    if checker.source_type.is_stub() {
         if checker.enabled(Rule::TypedArgumentDefaultInStub) {
             flake8_pyi::rules::typed_argument_simple_defaults(checker, parameters);
         }

@@ -2,7 +2,7 @@
 use std::ops::Add;
 
 use ruff_python_ast::{Ranged, Stmt};
-use ruff_python_parser::{lexer, Mode, Tok};
+use ruff_python_parser::{lexer, Tok};
 use ruff_text_size::TextSize;
 
 use ruff_diagnostics::Edit;
@@ -10,6 +10,8 @@ use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_codegen::Stylist;
 use ruff_python_trivia::{textwrap::indent, PythonWhitespace};
 use ruff_source_file::{Locator, UniversalNewlineIterator};
+
+use crate::source_kind::PySourceType;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum Placement<'a> {
@@ -137,7 +139,7 @@ impl<'a> Insertion<'a> {
         mut location: TextSize,
         locator: &Locator<'a>,
         stylist: &Stylist,
-        is_jupyter_notebook: bool,
+        source_type: PySourceType,
     ) -> Insertion<'a> {
         enum Awaiting {
             Colon(u32),
@@ -145,14 +147,9 @@ impl<'a> Insertion<'a> {
             Indent,
         }
 
-        let mode = if is_jupyter_notebook {
-            Mode::Jupyter
-        } else {
-            Mode::Module
-        };
-
         let mut state = Awaiting::Colon(0);
-        for (tok, range) in lexer::lex_starts_at(locator.after(location), mode, location).flatten()
+        for (tok, range) in
+            lexer::lex_starts_at(locator.after(location), source_type.as_mode(), location).flatten()
         {
             match state {
                 // Iterate until we find the colon indicating the start of the block body.
@@ -312,6 +309,8 @@ mod tests {
     use ruff_source_file::{LineEnding, Locator};
     use ruff_text_size::TextSize;
 
+    use crate::source_kind::PySourceType;
+
     use super::Insertion;
 
     #[test]
@@ -432,7 +431,7 @@ x = 1
             let tokens: Vec<LexResult> = ruff_python_parser::tokenize(contents, Mode::Module);
             let locator = Locator::new(contents);
             let stylist = Stylist::from_tokens(&tokens, &locator);
-            Insertion::start_of_block(offset, &locator, &stylist, false)
+            Insertion::start_of_block(offset, &locator, &stylist, PySourceType::default())
         }
 
         let contents = "if True: pass";

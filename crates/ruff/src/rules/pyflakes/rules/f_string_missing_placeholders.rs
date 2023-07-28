@@ -1,5 +1,5 @@
 use ruff_python_ast::{Expr, Ranged};
-use ruff_python_parser::{lexer, Mode, StringKind, Tok};
+use ruff_python_parser::{lexer, StringKind, Tok};
 use ruff_text_size::{TextRange, TextSize};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
@@ -8,6 +8,7 @@ use ruff_source_file::Locator;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
+use crate::source_kind::PySourceType;
 
 /// ## What it does
 /// Checks for f-strings that do not contain any placeholder expressions.
@@ -52,10 +53,10 @@ impl AlwaysAutofixableViolation for FStringMissingPlaceholders {
 fn find_useless_f_strings<'a>(
     expr: &'a Expr,
     locator: &'a Locator,
-    mode: Mode,
+    source_type: PySourceType,
 ) -> impl Iterator<Item = (TextRange, TextRange)> + 'a {
     let contents = locator.slice(expr.range());
-    lexer::lex_starts_at(contents, mode, expr.start())
+    lexer::lex_starts_at(contents, source_type.as_mode(), expr.start())
         .flatten()
         .filter_map(|(tok, range)| match tok {
             Tok::String {
@@ -82,16 +83,13 @@ fn find_useless_f_strings<'a>(
 
 /// F541
 pub(crate) fn f_string_missing_placeholders(expr: &Expr, values: &[Expr], checker: &mut Checker) {
-    let mode = if checker.is_jupyter_notebook {
-        Mode::Jupyter
-    } else {
-        Mode::Module
-    };
     if !values
         .iter()
         .any(|value| matches!(value, Expr::FormattedValue(_)))
     {
-        for (prefix_range, tok_range) in find_useless_f_strings(expr, checker.locator(), mode) {
+        for (prefix_range, tok_range) in
+            find_useless_f_strings(expr, checker.locator(), checker.source_type)
+        {
             let mut diagnostic = Diagnostic::new(FStringMissingPlaceholders, tok_range);
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.set_fix(convert_f_string_to_regular_string(

@@ -73,7 +73,7 @@ pub(crate) fn useless_object_inheritance(checker: &mut Checker, class_def: &ast:
                     &class_def.bases,
                     &class_def.keywords,
                     true,
-                    checker.is_jupyter_notebook,
+                    checker.source_type,
                 )?;
                 Ok(Fix::automatic(edit))
             });

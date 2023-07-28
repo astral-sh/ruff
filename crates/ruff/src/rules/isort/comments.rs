@@ -1,9 +1,11 @@
 use std::borrow::Cow;
 
-use ruff_python_parser::{lexer, Mode, Tok};
+use ruff_python_parser::{lexer, Tok};
 use ruff_text_size::{TextRange, TextSize};
 
 use ruff_source_file::Locator;
+
+use crate::source_kind::PySourceType;
 
 #[derive(Debug)]
 pub(crate) struct Comment<'a> {
@@ -25,15 +27,10 @@ impl Comment<'_> {
 pub(crate) fn collect_comments<'a>(
     range: TextRange,
     locator: &'a Locator,
-    is_jupyter_notebook: bool,
+    source_type: PySourceType,
 ) -> Vec<Comment<'a>> {
     let contents = locator.slice(range);
-    let mode = if is_jupyter_notebook {
-        Mode::Jupyter
-    } else {
-        Mode::Module
-    };
-    lexer::lex_starts_at(contents, mode, range.start())
+    lexer::lex_starts_at(contents, source_type.as_mode(), range.start())
         .flatten()
         .filter_map(|(tok, range)| {
             if let Tok::Comment(value) = tok {

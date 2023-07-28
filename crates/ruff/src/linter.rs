@@ -7,14 +7,14 @@ use colored::Colorize;
 use itertools::Itertools;
 use log::error;
 use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::{Mode, ParseError};
+use ruff_python_parser::ParseError;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::imports::ImportMap;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_stdlib::path::is_python_stub_file;
+
 use ruff_source_file::{Locator, SourceFileBuilder};
 
 use crate::autofix::{fix_file, FixResult};
@@ -32,7 +32,7 @@ use crate::noqa::add_noqa;
 use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle;
 use crate::settings::{flags, Settings};
-use crate::source_kind::SourceKind;
+use crate::source_kind::{PySourceType, SourceKind};
 use crate::{directives, fs};
 
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
@@ -81,6 +81,7 @@ pub fn check_path(
     settings: &Settings,
     noqa: flags::Noqa,
     source_kind: Option<&SourceKind>,
+    source_type: PySourceType,
 ) -> LinterResult<(Vec<Diagnostic>, Option<ImportMap>)> {
     // Aggregate all diagnostics.
     let mut diagnostics = vec![];
@@ -101,9 +102,13 @@ pub fn check_path(
         .iter_enabled()
         .any(|rule_code| rule_code.lint_source().is_tokens())
     {
-        let is_stub = is_python_stub_file(path);
         diagnostics.extend(check_tokens(
-            &tokens, path, locator, indexer, settings, is_stub,
+            &tokens,
+            path,
+            locator,
+            indexer,
+            settings,
+            source_type.is_stub(),
         ));
     }
 
@@ -141,7 +146,7 @@ pub fn check_path(
         match ruff_python_parser::parse_program_tokens(
             tokens,
             &path.to_string_lossy(),
-            source_kind.map_or(false, SourceKind::is_jupyter),
+            source_type.is_jupyter(),
         ) {
             Ok(python_ast) => {
                 if use_ast {
@@ -155,6 +160,7 @@ pub fn check_path(
                         noqa,
                         path,
                         package,
+                        source_type,
                     ));
                 }
                 if use_imports {
@@ -168,6 +174,7 @@ pub fn check_path(
                         path,
                         package,
                         source_kind,
+                        source_type,
                     );
                     imports = module_imports;
                     diagnostics.extend(import_diagnostics);
@@ -260,11 +267,13 @@ const MAX_ITERATIONS: usize = 100;
 
 /// Add any missing `# noqa` pragmas to the source code at the given `Path`.
 pub fn add_noqa_to_path(path: &Path, package: Option<&Path>, settings: &Settings) -> Result<usize> {
+    let source_type = PySourceType::from(path);
+
     // Read the file from disk.
     let contents = std::fs::read_to_string(path)?;
 
     // Tokenize once.
-    let tokens: Vec<LexResult> = ruff_python_parser::tokenize(&contents, Mode::Module);
+    let tokens: Vec<LexResult> = ruff_python_parser::tokenize(&contents, source_type.as_mode());
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(&contents);
@@ -298,6 +307,7 @@ pub fn add_noqa_to_path(path: &Path, package: Option<&Path>, settings: &Settings
         settings,
         flags::Noqa::Disabled,
         None,
+        source_type,
     );
 
     // Log any parse errors.
@@ -330,15 +340,10 @@ pub fn lint_only(
     settings: &Settings,
     noqa: flags::Noqa,
     source_kind: Option<&SourceKind>,
+    source_type: PySourceType,
 ) -> LinterResult<(Vec<Message>, Option<ImportMap>)> {
-    let mode = if source_kind.map_or(false, SourceKind::is_jupyter) {
-        Mode::Jupyter
-    } else {
-        Mode::Module
-    };
-
     // Tokenize once.
-    let tokens: Vec<LexResult> = ruff_python_parser::tokenize(contents, mode);
+    let tokens: Vec<LexResult> = ruff_python_parser::tokenize(contents, source_type.as_mode());
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(contents);
@@ -369,6 +374,7 @@ pub fn lint_only(
         settings,
         noqa,
         source_kind,
+        source_type,
     );
 
     result.map(|(diagnostics, imports)| {
@@ -415,6 +421,7 @@ pub fn lint_fix<'a>(
     noqa: flags::Noqa,
     settings: &Settings,
     source_kind: &mut SourceKind,
+    source_type: PySourceType,
 ) -> Result<FixerResult<'a>> {
     let mut transformed = Cow::Borrowed(contents);
 
@@ -427,16 +434,11 @@ pub fn lint_fix<'a>(
     // Track whether the _initial_ source code was parseable.
     let mut parseable = false;
 
-    let mode = if source_kind.is_jupyter() {
-        Mode::Jupyter
-    } else {
-        Mode::Module
-    };
-
     // Continuously autofix until the source code stabilizes.
     loop {
         // Tokenize once.
-        let tokens: Vec<LexResult> = ruff_python_parser::tokenize(&transformed, mode);
+        let tokens: Vec<LexResult> =
+            ruff_python_parser::tokenize(&transformed, source_type.as_mode());
 
         // Map row and column locations to byte slices (lazily).
         let locator = Locator::new(&transformed);
@@ -467,6 +469,7 @@ pub fn lint_fix<'a>(
             settings,
             noqa,
             Some(source_kind),
+            source_type,
         );
 
         if iterations == 0 {

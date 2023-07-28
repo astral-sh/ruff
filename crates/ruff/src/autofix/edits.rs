@@ -1,7 +1,7 @@
 //! Interface for generating autofix edits from higher-level actions (e.g., "remove an argument").
 use anyhow::{bail, Result};
 use ruff_python_ast::{self as ast, ExceptHandler, Expr, Keyword, Ranged, Stmt};
-use ruff_python_parser::{lexer, Mode};
+use ruff_python_parser::lexer;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::Edit;
@@ -11,6 +11,7 @@ use ruff_python_trivia::{has_leading_content, is_python_whitespace, PythonWhites
 use ruff_source_file::{Locator, NewlineWithTrailingNewline};
 
 use crate::autofix::codemods;
+use crate::source_kind::PySourceType;
 
 /// Return the `Fix` to use when deleting a `Stmt`.
 ///
@@ -81,15 +82,10 @@ pub(crate) fn remove_argument(
     args: &[Expr],
     keywords: &[Keyword],
     remove_parentheses: bool,
-    is_jupyter_notebook: bool,
+    source_type: PySourceType,
 ) -> Result<Edit> {
     // TODO(sbrugman): Preserve trailing comments.
     let contents = locator.after(call_at);
-    let mode = if is_jupyter_notebook {
-        Mode::Jupyter
-    } else {
-        Mode::Module
-    };
 
     let mut fix_start = None;
     let mut fix_end = None;
@@ -102,7 +98,8 @@ pub(crate) fn remove_argument(
     if n_arguments == 1 {
         // Case 1: there is only one argument.
         let mut count = 0u32;
-        for (tok, range) in lexer::lex_starts_at(contents, mode, call_at).flatten() {
+        for (tok, range) in lexer::lex_starts_at(contents, source_type.as_mode(), call_at).flatten()
+        {
             if tok.is_lpar() {
                 if count == 0 {
                     fix_start = Some(if remove_parentheses {
@@ -134,7 +131,8 @@ pub(crate) fn remove_argument(
     {
         // Case 2: argument or keyword is _not_ the last node.
         let mut seen_comma = false;
-        for (tok, range) in lexer::lex_starts_at(contents, mode, call_at).flatten() {
+        for (tok, range) in lexer::lex_starts_at(contents, source_type.as_mode(), call_at).flatten()
+        {
             if seen_comma {
                 if tok.is_non_logical_newline() {
                     // Also delete any non-logical newlines after the comma.
@@ -157,7 +155,8 @@ pub(crate) fn remove_argument(
     } else {
         // Case 3: argument or keyword is the last node, so we have to find the last
         // comma in the stmt.
-        for (tok, range) in lexer::lex_starts_at(contents, mode, call_at).flatten() {
+        for (tok, range) in lexer::lex_starts_at(contents, source_type.as_mode(), call_at).flatten()
+        {
             if range.start() == expr_range.start() {
                 fix_end = Some(expr_range.end());
                 break;

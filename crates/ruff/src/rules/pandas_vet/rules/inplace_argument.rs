@@ -10,6 +10,7 @@ use ruff_source_file::Locator;
 use crate::autofix::edits::remove_argument;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
+use crate::source_kind::PySourceType;
 
 /// ## What it does
 /// Checks for `inplace=True` usages in `pandas` function and method
@@ -107,7 +108,7 @@ pub(crate) fn inplace_argument(
                             keyword.range(),
                             args,
                             keywords,
-                            checker.is_jupyter_notebook,
+                            checker.source_type,
                         ) {
                             diagnostic.set_fix(fix);
                         }
@@ -131,7 +132,7 @@ fn convert_inplace_argument_to_assignment(
     expr_range: TextRange,
     args: &[Expr],
     keywords: &[Keyword],
-    is_jupyter_notebook: bool,
+    source_type: PySourceType,
 ) -> Option<Fix> {
     // Add the assignment.
     let call = expr.as_call_expr()?;
@@ -149,7 +150,7 @@ fn convert_inplace_argument_to_assignment(
         args,
         keywords,
         false,
-        is_jupyter_notebook,
+        source_type,
     )
     .ok()?;
 

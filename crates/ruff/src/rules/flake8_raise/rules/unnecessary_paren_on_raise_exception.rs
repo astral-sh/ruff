@@ -1,5 +1,5 @@
 use ruff_python_ast::{self as ast, Expr, Ranged};
-use ruff_python_parser::{lexer, Mode, Tok};
+use ruff_python_parser::{lexer, Tok};
 use ruff_text_size::{TextRange, TextSize};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
@@ -8,6 +8,7 @@ use ruff_source_file::Locator;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
+use crate::source_kind::PySourceType;
 
 /// ## What it does
 /// Checks for unnecessary parentheses on raised exceptions.
@@ -64,7 +65,7 @@ pub(crate) fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: 
                 return;
             }
 
-            let range = match_parens(func.end(), checker.locator(), checker.is_jupyter_notebook)
+            let range = match_parens(func.end(), checker.locator(), checker.source_type)
                 .expect("Expected call to include parentheses");
             let mut diagnostic = Diagnostic::new(UnnecessaryParenOnRaiseException, range);
             if checker.patch(diagnostic.kind.rule()) {
@@ -79,7 +80,7 @@ pub(crate) fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: 
 fn match_parens(
     start: TextSize,
     locator: &Locator,
-    is_jupyter_notebook: bool,
+    source_type: PySourceType,
 ) -> Option<TextRange> {
     let contents = &locator.contents()[usize::from(start)..];
 
@@ -87,13 +88,7 @@ fn match_parens(
     let mut fix_end = None;
     let mut count = 0u32;
 
-    let mode = if is_jupyter_notebook {
-        Mode::Jupyter
-    } else {
-        Mode::Module
-    };
-
-    for (tok, range) in lexer::lex_starts_at(contents, mode, start).flatten() {
+    for (tok, range) in lexer::lex_starts_at(contents, source_type.as_mode(), start).flatten() {
         match tok {
             Tok::Lpar => {
                 if count == 0 {

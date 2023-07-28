@@ -4,7 +4,7 @@ use ruff_python_ast::{self as ast, Constant, Expr, Ranged};
 use ruff_python_literal::cformat::{
     CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatString,
 };
-use ruff_python_parser::{lexer, Mode, Tok};
+use ruff_python_parser::{lexer, Tok};
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
@@ -337,13 +337,12 @@ pub(crate) fn printf_string_formatting(
     // Grab each string segment (in case there's an implicit concatenation).
     let mut strings: Vec<TextRange> = vec![];
     let mut extension = None;
-    let mode = if checker.is_jupyter_notebook {
-        Mode::Jupyter
-    } else {
-        Mode::Module
-    };
-    for (tok, range) in
-        lexer::lex_starts_at(checker.locator().slice(expr.range()), mode, expr.start()).flatten()
+    for (tok, range) in lexer::lex_starts_at(
+        checker.locator().slice(expr.range()),
+        checker.source_type.as_mode(),
+        expr.start(),
+    )
+    .flatten()
     {
         if tok.is_string() {
             strings.push(range);

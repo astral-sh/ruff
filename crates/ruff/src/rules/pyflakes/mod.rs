@@ -12,7 +12,7 @@ mod tests {
     use anyhow::Result;
     use regex::Regex;
     use ruff_python_parser::lexer::LexResult;
-    use ruff_python_parser::Mode;
+    
     use test_case::test_case;
 
     use ruff_diagnostics::Diagnostic;
@@ -25,6 +25,7 @@ mod tests {
     use crate::registry::{AsRule, Linter, Rule};
     use crate::rules::pyflakes;
     use crate::settings::{flags, Settings};
+    use crate::source_kind::PySourceType;
     use crate::test::{test_path, test_snippet};
     use crate::{assert_messages, directives};
 
@@ -505,8 +506,9 @@ mod tests {
     /// Note that all tests marked with `#[ignore]` should be considered TODOs.
     fn flakes(contents: &str, expected: &[Rule]) {
         let contents = dedent(contents);
+        let source_type = PySourceType::default();
         let settings = Settings::for_rules(Linter::Pyflakes.rules());
-        let tokens: Vec<LexResult> = ruff_python_parser::tokenize(&contents, Mode::Module);
+        let tokens: Vec<LexResult> = ruff_python_parser::tokenize(&contents, source_type.as_mode());
         let locator = Locator::new(&contents);
         let stylist = Stylist::from_tokens(&tokens, &locator);
         let indexer = Indexer::from_tokens(&tokens, &locator);
@@ -530,6 +532,7 @@ mod tests {
             &settings,
             flags::Noqa::Enabled,
             None,
+            source_type,
         );
         diagnostics.sort_by_key(Diagnostic::start);
         let actual = diagnostics

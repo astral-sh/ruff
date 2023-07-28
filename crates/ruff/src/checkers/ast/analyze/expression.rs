@@ -31,7 +31,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 if let Some(operator) = typing::to_pep604_operator(value, slice, &checker.semantic)
                 {
                     if checker.enabled(Rule::FutureRewritableTypeAnnotation) {
-                        if !checker.is_stub
+                        if !checker.source_type.is_stub()
                             && checker.settings.target_version < PythonVersion::Py310
                             && checker.settings.target_version >= PythonVersion::Py37
                             && !checker.semantic.future_annotations()
@@ -44,7 +44,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                         }
                     }
                     if checker.enabled(Rule::NonPEP604Annotation) {
-                        if checker.is_stub
+                        if checker.source_type.is_stub()
                             || checker.settings.target_version >= PythonVersion::Py310
                             || (checker.settings.target_version >= PythonVersion::Py37
                                 && checker.semantic.future_annotations()
@@ -59,7 +59,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
 
             // Ex) list[...]
             if checker.enabled(Rule::FutureRequiredTypeAnnotation) {
-                if !checker.is_stub
+                if !checker.source_type.is_stub()
                     && checker.settings.target_version < PythonVersion::Py39
                     && !checker.semantic.future_annotations()
                     && checker.semantic.in_annotation()
@@ -152,7 +152,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     if checker.enabled(Rule::NumpyDeprecatedFunction) {
                         numpy::rules::deprecated_function(checker, expr);
                     }
-                    if checker.is_stub {
+                    if checker.source_type.is_stub() {
                         if checker.enabled(Rule::CollectionsNamedTuple) {
                             flake8_pyi::rules::collections_named_tuple(checker, expr);
                         }
@@ -167,7 +167,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                             typing::to_pep585_generic(expr, &checker.semantic)
                         {
                             if checker.enabled(Rule::FutureRewritableTypeAnnotation) {
-                                if !checker.is_stub
+                                if !checker.source_type.is_stub()
                                     && checker.settings.target_version < PythonVersion::Py39
                                     && checker.settings.target_version >= PythonVersion::Py37
                                     && !checker.semantic.future_annotations()
@@ -180,7 +180,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                                 }
                             }
                             if checker.enabled(Rule::NonPEP585Annotation) {
-                                if checker.is_stub
+                                if checker.source_type.is_stub()
                                     || checker.settings.target_version >= PythonVersion::Py39
                                     || (checker.settings.target_version >= PythonVersion::Py37
                                         && checker.semantic.future_annotations()
@@ -262,7 +262,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             ]) {
                 if let Some(replacement) = typing::to_pep585_generic(expr, &checker.semantic) {
                     if checker.enabled(Rule::FutureRewritableTypeAnnotation) {
-                        if !checker.is_stub
+                        if !checker.source_type.is_stub()
                             && checker.settings.target_version < PythonVersion::Py39
                             && checker.settings.target_version >= PythonVersion::Py37
                             && !checker.semantic.future_annotations()
@@ -275,7 +275,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                         }
                     }
                     if checker.enabled(Rule::NonPEP585Annotation) {
-                        if checker.is_stub
+                        if checker.source_type.is_stub()
                             || checker.settings.target_version >= PythonVersion::Py39
                             || (checker.settings.target_version >= PythonVersion::Py37
                                 && checker.semantic.future_annotations()
@@ -313,7 +313,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::PrivateMemberAccess) {
                 flake8_self::rules::private_member_access(checker, expr);
             }
-            if checker.is_stub {
+            if checker.source_type.is_stub() {
                 if checker.enabled(Rule::CollectionsNamedTuple) {
                     flake8_pyi::rules::collections_named_tuple(checker, expr);
                 }
@@ -875,7 +875,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::DjangoLocalsInRenderFunction) {
                 flake8_django::rules::locals_in_render_function(checker, func, args, keywords);
             }
-            if checker.is_stub && checker.enabled(Rule::UnsupportedMethodCallOnAll) {
+            if checker.source_type.is_stub() && checker.enabled(Rule::UnsupportedMethodCallOnAll) {
                 flake8_pyi::rules::unsupported_method_call_on_all(checker, func);
             }
         }
@@ -1071,7 +1071,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
         }) => {
             // Ex) `str | None`
             if checker.enabled(Rule::FutureRequiredTypeAnnotation) {
-                if !checker.is_stub
+                if !checker.source_type.is_stub()
                     && checker.settings.target_version < PythonVersion::Py310
                     && !checker.semantic.future_annotations()
                     && checker.semantic.in_annotation()
@@ -1083,7 +1083,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     );
                 }
             }
-            if checker.is_stub {
+            if checker.source_type.is_stub() {
                 if checker.enabled(Rule::DuplicateUnionMember)
                         && checker.semantic.in_type_definition()
                         // Avoid duplicate checks if the parent is an `|`
@@ -1211,7 +1211,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             kind: _,
             range: _,
         }) => {
-            if checker.is_stub && checker.enabled(Rule::NumericLiteralTooLong) {
+            if checker.source_type.is_stub() && checker.enabled(Rule::NumericLiteralTooLong) {
                 flake8_pyi::rules::numeric_literal_too_long(checker, expr);
             }
         }
@@ -1220,7 +1220,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             kind: _,
             range: _,
         }) => {
-            if checker.is_stub && checker.enabled(Rule::StringOrBytesTooLong) {
+            if checker.source_type.is_stub() && checker.enabled(Rule::StringOrBytesTooLong) {
                 flake8_pyi::rules::string_or_bytes_too_long(checker, expr);
             }
         }
@@ -1248,7 +1248,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::UnicodeKindPrefix) {
                 pyupgrade::rules::unicode_kind_prefix(checker, expr, kind.as_deref());
             }
-            if checker.is_stub {
+            if checker.source_type.is_stub() {
                 if checker.enabled(Rule::StringOrBytesTooLong) {
                     flake8_pyi::rules::string_or_bytes_too_long(checker, expr);
                 }
