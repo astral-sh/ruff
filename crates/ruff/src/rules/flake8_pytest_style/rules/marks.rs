@@ -10,12 +10,12 @@ use crate::registry::{AsRule, Rule};
 use super::helpers::get_mark_decorators;
 
 /// ## What it does
-/// Checks for parameter-free `@pytest.mark.<name>()` decorators with or without
+/// Checks for parameter-free `@pytest.mark.<marker>()` decorators with or without
 /// parentheses, depending on the `flake8-pytest-style.mark-parentheses`
 /// setting.
 ///
 /// ## Why is this bad?
-/// If a `@pytest.mark.<name>()` doesn't take any arguments, the parentheses are
+/// If a `@pytest.mark.<marker>()` doesn't take any arguments, the parentheses are
 /// optional.
 ///
 /// Either removing those unnecessary parentheses _or_ requiring them for all
