@@ -50,7 +50,7 @@ fn apply_fixes<'a>(
     let mut fixed = FxHashMap::default();
     let mut source_map = SourceMap::default();
 
-    for (rule, fix) in diagnostics
+    'outer: for (rule, fix) in diagnostics
         .filter_map(|diagnostic| {
             diagnostic
                 .fix
@@ -60,34 +60,36 @@ fn apply_fixes<'a>(
         .sorted_by(|(rule1, fix1), (rule2, fix2)| cmp_fix(*rule1, *rule2, fix1, fix2))
     {
         // Remove any edits that were applied as part of a previous fix.
-        let mut edits = fix.edits();
-        edits.retain(|edit| !applied.contains(edit));
+        let edits = fix.edits();
 
-        // If we already applied an identical fix, skip it.
-        if edits.is_empty() {
-            *fixed.entry(rule).or_default() += 1;
-            continue;
-        }
-
-        // Best-effort approach: if this fix overlaps with a fix we've already applied,
-        // skip it.
-        if last_pos.map_or(false, |last_pos| {
-            edits
-                .min_start()
-                .map_or(false, |fix_location| last_pos >= fix_location)
-        }) {
-            continue;
-        }
-
-        // If this fix requires isolation, and we've already applied another fix in the
-        // same isolation group, skip it.
-        if let IsolationLevel::Group(id) = fix.isolation() {
-            if !isolated.insert(id) {
-                continue;
+        let mut first = true;
+        'inner: for edit in edits.to_sorted() {
+            // Skip any edits that were already applied.
+            if applied.contains(&edit) {
+                continue 'inner;
             }
-        }
 
-        for edit in edits.inorder() {
+            // Lazily enforce any isolation and positional requirements (e.g., avoid applying
+            // overlapping fixes, but avoid applying this requirement if all fixes in the edit were
+            // already applied).
+            if first {
+                // If this fix requires isolation, and we've already applied another fix in the
+                // same isolation group, skip it.
+                if let IsolationLevel::Group(id) = fix.isolation() {
+                    if !isolated.insert(id) {
+                        continue 'outer;
+                    }
+                }
+
+                // Best-effort approach: if this fix overlaps with a fix we've already applied,
+                // skip it.
+                if last_pos.map_or(false, |last_pos| last_pos >= edit.start()) {
+                    continue 'outer;
+                }
+
+                first = false;
+            }
+
             // Add all contents from `last_pos` to `fix.location`.
             let slice = locator.slice(TextRange::new(last_pos.unwrap_or_default(), edit.start()));
             output.push_str(slice);
@@ -122,8 +124,9 @@ fn apply_fixes<'a>(
 
 /// Compare two fixes.
 fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Ordering {
-    fix1.min_start()
-        .cmp(&fix2.min_start())
+    fix1.edits()
+        .min_start()
+        .cmp(&fix2.edits().min_start())
         .then_with(|| match (&rule1, &rule2) {
             // Apply `EndsInPeriod` fixes before `NewLineAfterLastParagraph` fixes.
             (Rule::EndsInPeriod, Rule::NewLineAfterLastParagraph) => std::cmp::Ordering::Less,

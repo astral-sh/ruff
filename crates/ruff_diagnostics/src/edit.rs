@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::ops::Deref;
 
 use ruff_text_size::{TextRange, TextSize};
 #[cfg(feature = "serde")]
@@ -142,5 +143,37 @@ impl EditOperationKind {
 
     pub(crate) const fn is_replacement(self) -> bool {
         matches!(self, EditOperationKind::Replacement)
+    }
+}
+
+/// A collection of [`Edit`] elements to be applied to a source file.
+#[derive(Debug, Clone)]
+pub struct Edits<'a>(&'a [Edit]);
+
+impl<'a> Edits<'a> {
+    pub(crate) fn new(edits: &'a [Edit]) -> Self {
+        Self(edits)
+    }
+
+    /// Return the [`TextSize`] of the first [`Edit`] in the [`Fix`], as determined by the
+    /// start position of the [`Edit`].
+    pub fn min_start(&self) -> Option<TextSize> {
+        self.0.iter().map(Edit::start).min()
+    }
+
+    /// Return an iterator over the [`Edit`] elements in the [`Fix`], sorted by their start
+    /// position.
+    pub fn to_sorted(&self) -> impl IntoIterator<Item = Edit> {
+        let mut edits = self.to_vec();
+        edits.sort_by_key(Edit::start);
+        edits.into_iter()
+    }
+}
+
+impl<'a> Deref for Edits<'a> {
+    type Target = [Edit];
+
+    fn deref(&self) -> &Self::Target {
+        self.0
     }
 }
