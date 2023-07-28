@@ -61,7 +61,6 @@ fn extract_range(body: &[&Stmt]) -> TextRange {
 
 fn extract_indentation_range(body: &[&Stmt], locator: &Locator) -> TextRange {
     let location = body.first().unwrap().start();
-
     TextRange::new(locator.line_start(location), location)
 }
 
