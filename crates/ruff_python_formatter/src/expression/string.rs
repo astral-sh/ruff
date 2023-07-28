@@ -207,7 +207,11 @@ impl Format<PyFormatContext<'_>> for FormatStringPart {
 
         write!(f, [prefix, preferred_quotes])?;
 
-        let (normalized, contains_newlines) = normalize_string(raw_content, preferred_quotes);
+        let (normalized, contains_newlines) = normalize_string(
+            raw_content,
+            preferred_quotes,
+            matches!(prefix, StringPrefix::RAW | StringPrefix::RAW_UPPER),
+        );
 
         match normalized {
             Cow::Borrowed(_) => {
@@ -223,7 +227,7 @@ impl Format<PyFormatContext<'_>> for FormatStringPart {
 }
 
 bitflags! {
-    #[derive(Copy, Clone, Debug)]
+    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
     pub(super) struct StringPrefix: u8 {
         const UNICODE   = 0b0000_0001;
         /// `r"test"`
@@ -434,7 +438,11 @@ impl Format<PyFormatContext<'_>> for StringQuotes {
 /// with the provided `style`.
 ///
 /// Returns the normalized string and whether it contains new lines.
-fn normalize_string(input: &str, quotes: StringQuotes) -> (Cow<str>, ContainsNewlines) {
+fn normalize_string(
+    input: &str,
+    quotes: StringQuotes,
+    is_raw: bool,
+) -> (Cow<str>, ContainsNewlines) {
     // The normalized string if `input` is not yet normalized.
     // `output` must remain empty if `input` is already normalized.
     let mut output = String::new();
@@ -468,7 +476,7 @@ fn normalize_string(input: &str, quotes: StringQuotes) -> (Cow<str>, ContainsNew
         } else if c == '\n' {
             newlines = ContainsNewlines::Yes;
         } else if !quotes.triple {
-            if c == '\\' {
+            if !is_raw && c == '\\' {
                 if let Some(next) = input.as_bytes().get(index + 1).copied().map(char::from) {
                     #[allow(clippy::if_same_then_else)]
                     if next == opposite_quote {
