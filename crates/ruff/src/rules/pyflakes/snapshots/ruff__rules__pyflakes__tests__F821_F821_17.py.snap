@@ -1,178 +1,178 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-F821_17.py:15:12: F821 Undefined name `DoesNotExist`
+F821_17.py:16:12: F821 Undefined name `DoesNotExist`
    |
-13 | # Types used in aliased assignment must exist
-14 | 
-15 | type Foo = DoesNotExist  # F821: Undefined name `DoesNotExist`
+14 | # Types used in aliased assignment must exist
+15 | 
+16 | type Foo = DoesNotExist  # F821: Undefined name `DoesNotExist`
    |            ^^^^^^^^^^^^ F821
-16 | type Foo = list[DoesNotExist]  # F821: Undefined name `DoesNotExist`
+17 | type Foo = list[DoesNotExist]  # F821: Undefined name `DoesNotExist`
    |
 
-F821_17.py:16:17: F821 Undefined name `DoesNotExist`
+F821_17.py:17:17: F821 Undefined name `DoesNotExist`
    |
-15 | type Foo = DoesNotExist  # F821: Undefined name `DoesNotExist`
-16 | type Foo = list[DoesNotExist]  # F821: Undefined name `DoesNotExist`
+16 | type Foo = DoesNotExist  # F821: Undefined name `DoesNotExist`
+17 | type Foo = list[DoesNotExist]  # F821: Undefined name `DoesNotExist`
    |                 ^^^^^^^^^^^^ F821
-17 | 
-18 | # Type parameters do not escape alias scopes
+18 | 
+19 | # Type parameters do not escape alias scopes
    |
 
-F821_17.py:21:1: F821 Undefined name `T`
+F821_17.py:22:1: F821 Undefined name `T`
    |
-20 | type Foo[T] = T
-21 | T  # F821: Undefined name `T` - not accessible afterward alias scope
+21 | type Foo[T] = T
+22 | T  # F821: Undefined name `T` - not accessible afterward alias scope
    | ^ F821
-22 | 
-23 | # Type parameters in functions
+23 | 
+24 | # Type parameters in functions
    |
 
-F821_17.py:38:17: F821 Undefined name `T`
+F821_17.py:39:17: F821 Undefined name `T`
    |
-36 | from some_library import some_decorator
-37 | 
-38 | @some_decorator(T)  # F821: Undefined name `T` - not accessible in decorators
+37 | from some_library import some_decorator
+38 | 
+39 | @some_decorator(T)  # F821: Undefined name `T` - not accessible in decorators
    |                 ^ F821
-39 | 
-40 | def foo[T](t: T) -> None: ...
+40 | 
+41 | def foo[T](t: T) -> None: ...
    |
 
-F821_17.py:41:1: F821 Undefined name `T`
+F821_17.py:42:1: F821 Undefined name `T`
    |
-40 | def foo[T](t: T) -> None: ...
-41 | T  # F821: Undefined name `T` - not accessible afterward function scope
+41 | def foo[T](t: T) -> None: ...
+42 | T  # F821: Undefined name `T` - not accessible afterward function scope
    | ^ F821
    |
 
-F821_17.py:63:17: F821 Undefined name `T`
+F821_17.py:64:17: F821 Undefined name `T`
    |
-62 | from some_library import some_decorator
-63 | @some_decorator(T)  # F821: Undefined name `T` - not accessible in decorators
+63 | from some_library import some_decorator
+64 | @some_decorator(T)  # F821: Undefined name `T` - not accessible in decorators
    |                 ^ F821
-64 | 
-65 | class Foo[T](list[T]): ...
+65 | 
+66 | class Foo[T](list[T]): ...
    |
 
-F821_17.py:66:1: F821 Undefined name `T`
+F821_17.py:67:1: F821 Undefined name `T`
    |
-65 | class Foo[T](list[T]): ...
-66 | T  # F821: Undefined name `T` - not accessible after class scope
+66 | class Foo[T](list[T]): ...
+67 | T  # F821: Undefined name `T` - not accessible after class scope
    | ^ F821
-67 | 
-68 | # Types specified in bounds should exist
+68 | 
+69 | # Types specified in bounds should exist
    |
 
-F821_17.py:70:13: F821 Undefined name `DoesNotExist`
+F821_17.py:71:13: F821 Undefined name `DoesNotExist`
    |
-68 | # Types specified in bounds should exist
-69 | 
-70 | type Foo[T: DoesNotExist] = T  # F821: Undefined name `DoesNotExist`
+69 | # Types specified in bounds should exist
+70 | 
+71 | type Foo[T: DoesNotExist] = T  # F821: Undefined name `DoesNotExist`
    |             ^^^^^^^^^^^^ F821
-71 | def foo[T: DoesNotExist](t: T) -> T: return t  # F821: Undefined name `DoesNotExist`
-72 | class Foo[T: DoesNotExist](list[T]): ...  # F821: Undefined name `DoesNotExist`
+72 | def foo[T: DoesNotExist](t: T) -> T: return t  # F821: Undefined name `DoesNotExist`
+73 | class Foo[T: DoesNotExist](list[T]): ...  # F821: Undefined name `DoesNotExist`
    |
 
-F821_17.py:71:12: F821 Undefined name `DoesNotExist`
+F821_17.py:72:12: F821 Undefined name `DoesNotExist`
    |
-70 | type Foo[T: DoesNotExist] = T  # F821: Undefined name `DoesNotExist`
-71 | def foo[T: DoesNotExist](t: T) -> T: return t  # F821: Undefined name `DoesNotExist`
+71 | type Foo[T: DoesNotExist] = T  # F821: Undefined name `DoesNotExist`
+72 | def foo[T: DoesNotExist](t: T) -> T: return t  # F821: Undefined name `DoesNotExist`
    |            ^^^^^^^^^^^^ F821
-72 | class Foo[T: DoesNotExist](list[T]): ...  # F821: Undefined name `DoesNotExist`
+73 | class Foo[T: DoesNotExist](list[T]): ...  # F821: Undefined name `DoesNotExist`
    |
 
-F821_17.py:72:14: F821 Undefined name `DoesNotExist`
+F821_17.py:73:14: F821 Undefined name `DoesNotExist`
    |
-70 | type Foo[T: DoesNotExist] = T  # F821: Undefined name `DoesNotExist`
-71 | def foo[T: DoesNotExist](t: T) -> T: return t  # F821: Undefined name `DoesNotExist`
-72 | class Foo[T: DoesNotExist](list[T]): ...  # F821: Undefined name `DoesNotExist`
+71 | type Foo[T: DoesNotExist] = T  # F821: Undefined name `DoesNotExist`
+72 | def foo[T: DoesNotExist](t: T) -> T: return t  # F821: Undefined name `DoesNotExist`
+73 | class Foo[T: DoesNotExist](list[T]): ...  # F821: Undefined name `DoesNotExist`
    |              ^^^^^^^^^^^^ F821
-73 | 
-74 | type Foo[T: (DoesNotExist1, DoesNotExist2)] = T  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
+74 | 
+75 | type Foo[T: (DoesNotExist1, DoesNotExist2)] = T  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
    |
 
-F821_17.py:74:14: F821 Undefined name `DoesNotExist1`
+F821_17.py:75:14: F821 Undefined name `DoesNotExist1`
    |
-72 | class Foo[T: DoesNotExist](list[T]): ...  # F821: Undefined name `DoesNotExist`
-73 | 
-74 | type Foo[T: (DoesNotExist1, DoesNotExist2)] = T  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
+73 | class Foo[T: DoesNotExist](list[T]): ...  # F821: Undefined name `DoesNotExist`
+74 | 
+75 | type Foo[T: (DoesNotExist1, DoesNotExist2)] = T  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
    |              ^^^^^^^^^^^^^ F821
-75 | def foo[T: (DoesNotExist1, DoesNotExist2)](t: T) -> T: return t  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
-76 | class Foo[T: (DoesNotExist1, DoesNotExist2)](list[T]): ...  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
+76 | def foo[T: (DoesNotExist1, DoesNotExist2)](t: T) -> T: return t  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
+77 | class Foo[T: (DoesNotExist1, DoesNotExist2)](list[T]): ...  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
    |
 
-F821_17.py:74:29: F821 Undefined name `DoesNotExist2`
+F821_17.py:75:29: F821 Undefined name `DoesNotExist2`
    |
-72 | class Foo[T: DoesNotExist](list[T]): ...  # F821: Undefined name `DoesNotExist`
-73 | 
-74 | type Foo[T: (DoesNotExist1, DoesNotExist2)] = T  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
+73 | class Foo[T: DoesNotExist](list[T]): ...  # F821: Undefined name `DoesNotExist`
+74 | 
+75 | type Foo[T: (DoesNotExist1, DoesNotExist2)] = T  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
    |                             ^^^^^^^^^^^^^ F821
-75 | def foo[T: (DoesNotExist1, DoesNotExist2)](t: T) -> T: return t  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
-76 | class Foo[T: (DoesNotExist1, DoesNotExist2)](list[T]): ...  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
+76 | def foo[T: (DoesNotExist1, DoesNotExist2)](t: T) -> T: return t  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
+77 | class Foo[T: (DoesNotExist1, DoesNotExist2)](list[T]): ...  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
    |
 
-F821_17.py:75:13: F821 Undefined name `DoesNotExist1`
+F821_17.py:76:13: F821 Undefined name `DoesNotExist1`
    |
-74 | type Foo[T: (DoesNotExist1, DoesNotExist2)] = T  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
-75 | def foo[T: (DoesNotExist1, DoesNotExist2)](t: T) -> T: return t  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
+75 | type Foo[T: (DoesNotExist1, DoesNotExist2)] = T  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
+76 | def foo[T: (DoesNotExist1, DoesNotExist2)](t: T) -> T: return t  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
    |             ^^^^^^^^^^^^^ F821
-76 | class Foo[T: (DoesNotExist1, DoesNotExist2)](list[T]): ...  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
+77 | class Foo[T: (DoesNotExist1, DoesNotExist2)](list[T]): ...  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
    |
 
-F821_17.py:75:28: F821 Undefined name `DoesNotExist2`
+F821_17.py:76:28: F821 Undefined name `DoesNotExist2`
    |
-74 | type Foo[T: (DoesNotExist1, DoesNotExist2)] = T  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
-75 | def foo[T: (DoesNotExist1, DoesNotExist2)](t: T) -> T: return t  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
+75 | type Foo[T: (DoesNotExist1, DoesNotExist2)] = T  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
+76 | def foo[T: (DoesNotExist1, DoesNotExist2)](t: T) -> T: return t  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
    |                            ^^^^^^^^^^^^^ F821
-76 | class Foo[T: (DoesNotExist1, DoesNotExist2)](list[T]): ...  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
+77 | class Foo[T: (DoesNotExist1, DoesNotExist2)](list[T]): ...  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
    |
 
-F821_17.py:76:15: F821 Undefined name `DoesNotExist1`
+F821_17.py:77:15: F821 Undefined name `DoesNotExist1`
    |
-74 | type Foo[T: (DoesNotExist1, DoesNotExist2)] = T  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
-75 | def foo[T: (DoesNotExist1, DoesNotExist2)](t: T) -> T: return t  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
-76 | class Foo[T: (DoesNotExist1, DoesNotExist2)](list[T]): ...  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
+75 | type Foo[T: (DoesNotExist1, DoesNotExist2)] = T  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
+76 | def foo[T: (DoesNotExist1, DoesNotExist2)](t: T) -> T: return t  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
+77 | class Foo[T: (DoesNotExist1, DoesNotExist2)](list[T]): ...  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
    |               ^^^^^^^^^^^^^ F821
-77 | 
-78 | # Type parameters in nested classes
+78 | 
+79 | # Type parameters in nested classes
    |
 
-F821_17.py:76:30: F821 Undefined name `DoesNotExist2`
+F821_17.py:77:30: F821 Undefined name `DoesNotExist2`
    |
-74 | type Foo[T: (DoesNotExist1, DoesNotExist2)] = T  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
-75 | def foo[T: (DoesNotExist1, DoesNotExist2)](t: T) -> T: return t  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
-76 | class Foo[T: (DoesNotExist1, DoesNotExist2)](list[T]): ...  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
+75 | type Foo[T: (DoesNotExist1, DoesNotExist2)] = T  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
+76 | def foo[T: (DoesNotExist1, DoesNotExist2)](t: T) -> T: return t  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
+77 | class Foo[T: (DoesNotExist1, DoesNotExist2)](list[T]): ...  # F821: Undefined name `DoesNotExist1`, Undefined name `DoesNotExist2`
    |                              ^^^^^^^^^^^^^ F821
-77 | 
-78 | # Type parameters in nested classes
+78 | 
+79 | # Type parameters in nested classes
    |
 
-F821_17.py:91:52: F821 Undefined name `t`
+F821_17.py:92:52: F821 Undefined name `t`
    |
-89 |             return x
-90 |         
-91 |         def cannot_access_parent_variable(self, x: t) -> t:  # F821: Undefined name `T`
+90 |             return x
+91 |         
+92 |         def cannot_access_parent_variable(self, x: t) -> t:  # F821: Undefined name `T`
    |                                                    ^ F821
-92 |                 t # F821: Undefined name `t`
-93 |                 return x
+93 |                 t # F821: Undefined name `t`
+94 |                 return x
    |
 
-F821_17.py:91:58: F821 Undefined name `t`
+F821_17.py:92:58: F821 Undefined name `t`
    |
-89 |             return x
-90 |         
-91 |         def cannot_access_parent_variable(self, x: t) -> t:  # F821: Undefined name `T`
+90 |             return x
+91 |         
+92 |         def cannot_access_parent_variable(self, x: t) -> t:  # F821: Undefined name `T`
    |                                                          ^ F821
-92 |                 t # F821: Undefined name `t`
-93 |                 return x
+93 |                 t # F821: Undefined name `t`
+94 |                 return x
    |
 
-F821_17.py:92:17: F821 Undefined name `t`
+F821_17.py:93:17: F821 Undefined name `t`
    |
-91 |         def cannot_access_parent_variable(self, x: t) -> t:  # F821: Undefined name `T`
-92 |                 t # F821: Undefined name `t`
+92 |         def cannot_access_parent_variable(self, x: t) -> t:  # F821: Undefined name `T`
+93 |                 t # F821: Undefined name `t`
    |                 ^ F821
-93 |                 return x
+94 |                 return x
    |
 
 

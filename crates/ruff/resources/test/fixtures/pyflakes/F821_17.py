@@ -6,9 +6,10 @@ from some_module import Bar
 
 type Foo[T] = T # OK
 type Foo[T] = list[T] # OK
-type Foo[T: Forward] = T # OK
+type Foo[T: ForwardA] = T # OK
 type Foo[*Ts] = Bar[Ts] # OK
 type Foo[**P] = Bar[P] # OK
+class ForwardA: ...
 
 # Types used in aliased assignment must exist
 
@@ -24,11 +25,11 @@ T  # F821: Undefined name `T` - not accessible afterward alias scope
 
 def foo[T](t: T) -> T: return t  # OK
 async def afoo[T](t: T) -> T: return t  # OK
-def with_forward_ref[T: Forward](t: T) -> T: return t  # OK
+def with_forward_ref[T: ForwardB](t: T) -> T: return t  # OK
 def can_access_inside[T](t: T) -> T:  # OK
     print(T)  # OK
     return t  # OK
-class Forward: ...  # OK
+class ForwardB: ...
 
 
 # Type parameters do not escape function scopes
@@ -44,8 +45,8 @@ T  # F821: Undefined name `T` - not accessible afterward function scope
 # Type parameters in classes
 
 class Foo[T](list[T]): ... # OK
-class UsesForward[T: Forward](list[T]): ...    # OK
-class Forward: ... # OK
+class UsesForward[T: ForwardC](list[T]): ...    # OK
+class ForwardC: ...
 class WithinBody[T](list[T]):   # OK
     t = T   # OK
     x: T  # OK
