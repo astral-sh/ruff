@@ -262,6 +262,7 @@ impl Violation for PytestDeprecatedYieldFixture {
 ///         resource = acquire_resource(arg)
 ///         request.addfinalizer(resource.release)
 ///         return resource
+///
 ///     return create_resource
 /// ```
 ///
