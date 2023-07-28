@@ -2,21 +2,9 @@ x = range(10)
 
 # RUF015
 list(x)[0]
-list(x)[:1]
-list(x)[:1:1]
-list(x)[:1:2]
 tuple(x)[0]
-tuple(x)[:1]
-tuple(x)[:1:1]
-tuple(x)[:1:2]
 list(i for i in x)[0]
-list(i for i in x)[:1]
-list(i for i in x)[:1:1]
-list(i for i in x)[:1:2]
 [i for i in x][0]
-[i for i in x][:1]
-[i for i in x][:1:1]
-[i for i in x][:1:2]
 
 # OK (not indexing (solely) the first element)
 list(x)
@@ -29,6 +17,9 @@ list(x)[::]
 [i for i in x]
 [i for i in x][1]
 [i for i in x][-1]
+[i for i in x][:1]
+[i for i in x][:1:1]
+[i for i in x][:1:2]
 [i for i in x][1:]
 [i for i in x][:3:2]
 [i for i in x][::2]

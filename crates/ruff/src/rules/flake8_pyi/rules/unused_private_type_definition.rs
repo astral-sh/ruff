@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, Stmt};
-use ruff_python_semantic::Binding;
+use ruff_python_semantic::Scope;
 
 use crate::checkers::ast::Checker;
 
@@ -116,69 +116,88 @@ impl Violation for UnusedPrivateTypedDict {
 }
 
 /// PYI018
-pub(crate) fn unused_private_type_var(checker: &Checker, binding: &Binding) -> Option<Diagnostic> {
-    if !(binding.kind.is_assignment() && binding.is_private_declaration()) {
-        return None;
-    }
-    if binding.is_used() {
-        return None;
-    }
+pub(crate) fn unused_private_type_var(
+    checker: &Checker,
+    scope: &Scope,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    for binding in scope
+        .binding_ids()
+        .map(|binding_id| checker.semantic().binding(binding_id))
+    {
+        if !(binding.kind.is_assignment() && binding.is_private_declaration()) {
+            continue;
+        }
+        if binding.is_used() {
+            continue;
+        }
 
-    let Some(source) = binding.source else {
-        return None;
-    };
-    let Stmt::Assign(ast::StmtAssign { targets, value, .. }) = checker.semantic().stmts[source]
-    else {
-        return None;
-    };
-    let [Expr::Name(ast::ExprName { id, .. })] = &targets[..] else {
-        return None;
-    };
-    let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
-        return None;
-    };
-    if !checker.semantic().match_typing_expr(func, "TypeVar") {
-        return None;
-    }
+        let Some(source) = binding.source else {
+            continue;
+        };
+        let Stmt::Assign(ast::StmtAssign { targets, value, .. }) = checker.semantic().stmts[source]
+        else {
+            continue;
+        };
+        let [Expr::Name(ast::ExprName { id, .. })] = &targets[..] else {
+            continue;
+        };
+        let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
+            continue;
+        };
+        if !checker.semantic().match_typing_expr(func, "TypeVar") {
+            continue;
+        }
 
-    Some(Diagnostic::new(
-        UnusedPrivateTypeVar {
-            name: id.to_string(),
-        },
-        binding.range,
-    ))
+        diagnostics.push(Diagnostic::new(
+            UnusedPrivateTypeVar {
+                name: id.to_string(),
+            },
+            binding.range,
+        ));
+    }
 }
 
 /// PYI046
-pub(crate) fn unused_private_protocol(checker: &Checker, binding: &Binding) -> Option<Diagnostic> {
-    if !(binding.kind.is_class_definition() && binding.is_private_declaration()) {
-        return None;
-    }
-    if binding.is_used() {
-        return None;
-    }
-
-    let Some(source) = binding.source else {
-        return None;
-    };
-    let Stmt::ClassDef(ast::StmtClassDef { name, bases, .. }) = checker.semantic().stmts[source]
-    else {
-        return None;
-    };
-
-    if !bases
-        .iter()
-        .any(|base| checker.semantic().match_typing_expr(base, "Protocol"))
+pub(crate) fn unused_private_protocol(
+    checker: &Checker,
+    scope: &Scope,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    for binding in scope
+        .binding_ids()
+        .map(|binding_id| checker.semantic().binding(binding_id))
     {
-        return None;
-    }
+        if !(binding.kind.is_class_definition() && binding.is_private_declaration()) {
+            continue;
+        }
+        if binding.is_used() {
+            continue;
+        }
 
-    Some(Diagnostic::new(
-        UnusedPrivateProtocol {
-            name: name.to_string(),
-        },
-        binding.range,
-    ))
+        let Some(source) = binding.source else {
+            continue;
+        };
+        let Stmt::ClassDef(ast::StmtClassDef { name, bases, .. }) =
+            checker.semantic().stmts[source]
+        else {
+            continue;
+        };
+
+        if !bases
+            .iter()
+            .any(|base| checker.semantic().match_typing_expr(base, "Protocol"))
+        {
+            continue;
+        }
+
+        diagnostics.push(Diagnostic::new(
+            UnusedPrivateProtocol {
+                name: name.to_string(),
+            },
+            binding.range,
+        ));
+    }
 }
 
 /// PYI049
