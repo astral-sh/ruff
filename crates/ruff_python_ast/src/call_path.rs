@@ -278,12 +278,31 @@ pub fn compose_call_path(expr: &Expr) -> Option<String> {
 
 /// Format a call path for display.
 pub fn format_call_path(call_path: &[&str]) -> String {
-    if call_path
-        .first()
-        .expect("Unable to format empty call path")
-        .is_empty()
-    {
+    if call_path.first().map_or(false, |first| first.is_empty()) {
+        // If the first segment is empty, the `CallPath` is that of a builtin.
+        // Ex) `["", "bool"]` -> `"bool"`
         call_path[1..].join(".")
+    } else if call_path
+        .first()
+        .map_or(false, |first| matches!(*first, "."))
+    {
+        // If the call path is dot-prefixed, it's an unresolved relative import.
+        // Ex) `[".foo", "bar"]` -> `".foo.bar"`
+        let mut formatted = String::new();
+        let mut iter = call_path.iter();
+        for segment in iter.by_ref() {
+            if matches!(*segment, ".") {
+                formatted.push('.');
+            } else {
+                formatted.push_str(segment);
+                break;
+            }
+        }
+        for segment in iter {
+            formatted.push('.');
+            formatted.push_str(segment);
+        }
+        formatted
     } else {
         call_path.join(".")
     }

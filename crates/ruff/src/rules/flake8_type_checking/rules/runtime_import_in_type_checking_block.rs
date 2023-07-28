@@ -1,15 +1,16 @@
 use anyhow::Result;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
+use std::borrow::Cow;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::{NodeId, ResolvedReferenceId, Scope};
+use ruff_python_semantic::{AnyImport, NodeId, ResolvedReferenceId, Scope};
 
 use crate::autofix;
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
-use crate::importer::StmtImports;
+use crate::importer::ImportedMembers;
 
 /// ## What it does
 /// Checks for runtime imports defined in a type-checking block.
@@ -51,7 +52,7 @@ impl Violation for RuntimeImportInTypeCheckingBlock {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RuntimeImportInTypeCheckingBlock { qualified_name, .. } = self;
+        let RuntimeImportInTypeCheckingBlock { qualified_name } = self;
         format!(
             "Move import `{qualified_name}` out of type-checking block. Import is used for more than type hinting."
         )
@@ -69,13 +70,13 @@ pub(crate) fn runtime_import_in_type_checking_block(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     // Collect all runtime imports by statement.
-    let mut errors_by_statement: FxHashMap<NodeId, Vec<Import>> = FxHashMap::default();
-    let mut ignores_by_statement: FxHashMap<NodeId, Vec<Import>> = FxHashMap::default();
+    let mut errors_by_statement: FxHashMap<NodeId, Vec<ImportBinding>> = FxHashMap::default();
+    let mut ignores_by_statement: FxHashMap<NodeId, Vec<ImportBinding>> = FxHashMap::default();
 
     for binding_id in scope.binding_ids() {
         let binding = checker.semantic().binding(binding_id);
 
-        let Some(call_path) = binding.call_path() else {
+        let Some(import) = binding.as_any_import() else {
             continue;
         };
 
@@ -96,8 +97,8 @@ pub(crate) fn runtime_import_in_type_checking_block(
                 continue;
             };
 
-            let import = Import {
-                call_path,
+            let import = ImportBinding {
+                import,
                 reference_id,
                 range: binding.range,
                 parent_range: binding.parent_range(checker.semantic()),
@@ -130,8 +131,8 @@ pub(crate) fn runtime_import_in_type_checking_block(
             None
         };
 
-        for Import {
-            call_path,
+        for ImportBinding {
+            import,
             range,
             parent_range,
             ..
@@ -139,7 +140,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
         {
             let mut diagnostic = Diagnostic::new(
                 RuntimeImportInTypeCheckingBlock {
-                    qualified_name: call_path.join("."),
+                    qualified_name: import.qualified_name(),
                 },
                 range,
             );
@@ -155,8 +156,8 @@ pub(crate) fn runtime_import_in_type_checking_block(
 
     // Separately, generate a diagnostic for every _ignored_ import, to ensure that the
     // suppression comments aren't marked as unused.
-    for Import {
-        call_path,
+    for ImportBinding {
+        import,
         range,
         parent_range,
         ..
@@ -164,7 +165,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
     {
         let mut diagnostic = Diagnostic::new(
             RuntimeImportInTypeCheckingBlock {
-                qualified_name: call_path.join("."),
+                qualified_name: import.qualified_name(),
             },
             range,
         );
@@ -176,9 +177,9 @@ pub(crate) fn runtime_import_in_type_checking_block(
 }
 
 /// A runtime-required import with its surrounding context.
-struct Import<'a> {
+struct ImportBinding<'a> {
     /// The qualified name of the import (e.g., `typing.List` for `from typing import List`).
-    call_path: &'a [&'a str],
+    import: AnyImport<'a>,
     /// The first reference to the imported symbol.
     reference_id: ResolvedReferenceId,
     /// The trimmed range of the import (e.g., `List` in `from typing import List`).
@@ -188,29 +189,26 @@ struct Import<'a> {
 }
 
 /// Generate a [`Fix`] to remove runtime imports from a type-checking block.
-fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[Import]) -> Result<Fix> {
+fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[ImportBinding]) -> Result<Fix> {
     let stmt = checker.semantic().stmts[stmt_id];
     let parent = checker.semantic().stmts.parent(stmt);
-    let qualified_names: Vec<String> = imports
+    let member_names: Vec<Cow<'_, str>> = imports
         .iter()
-        .map(|Import { call_path, .. }| call_path.join("."))
+        .map(|ImportBinding { import, .. }| import.member_name())
         .collect();
 
     // Find the first reference across all imports.
     let at = imports
         .iter()
-        .map(|Import { reference_id, .. }| {
+        .map(|ImportBinding { reference_id, .. }| {
             checker.semantic().reference(*reference_id).range().start()
         })
         .min()
         .expect("Expected at least one import");
 
     // Step 1) Remove the import.
-    // This could be a mix of imports...
-    // One framing could be: what's the name of the symbol being imported (e.g., `List` in `from typing import List`,
-    // or `foo` in `import foo`, or `foo.bar` in `import foo.bar`).
     let remove_import_edit = autofix::edits::remove_unused_imports(
-        qualified_names.iter().map(|name| name.as_str()),
+        member_names.iter().map(AsRef::as_ref),
         stmt,
         parent,
         checker.locator(),
@@ -220,9 +218,9 @@ fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[Import]) -> Result
 
     // Step 2) Add the import to the top-level.
     let add_import_edit = checker.importer().runtime_import_edit(
-        &StmtImports {
-            stmt,
-            qualified_names: qualified_names.iter().map(|name| name.as_str()).collect(),
+        &ImportedMembers {
+            statement: stmt,
+            names: member_names.iter().map(AsRef::as_ref).collect(),
         },
         at,
     )?;

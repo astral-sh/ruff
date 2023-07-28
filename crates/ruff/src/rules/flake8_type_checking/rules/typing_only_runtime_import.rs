@@ -1,15 +1,17 @@
+use std::borrow::Cow;
+
 use anyhow::Result;
-use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, DiagnosticKind, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::{Binding, NodeId, ResolvedReferenceId, Scope};
+use ruff_python_semantic::{AnyImport, Binding, NodeId, ResolvedReferenceId, Scope};
+use ruff_text_size::TextRange;
 
 use crate::autofix;
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
-use crate::importer::StmtImports;
+use crate::importer::ImportedMembers;
 use crate::rules::isort::{categorize, ImportSection, ImportType};
 
 /// ## What it does
@@ -188,9 +190,9 @@ pub(crate) fn typing_only_runtime_import(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     // Collect all typing-only imports by statement and import type.
-    let mut errors_by_statement: FxHashMap<(NodeId, ImportType), Vec<Import>> =
+    let mut errors_by_statement: FxHashMap<(NodeId, ImportType), Vec<ImportBinding>> =
         FxHashMap::default();
-    let mut ignores_by_statement: FxHashMap<(NodeId, ImportType), Vec<Import>> =
+    let mut ignores_by_statement: FxHashMap<(NodeId, ImportType), Vec<ImportBinding>> =
         FxHashMap::default();
 
     for binding_id in scope.binding_ids() {
@@ -206,22 +208,9 @@ pub(crate) fn typing_only_runtime_import(
             continue;
         }
 
-        let Some(qualified_name) = binding.qualified_name() else {
+        let Some(import) = binding.as_any_import() else {
             continue;
         };
-
-        if is_exempt(
-            qualified_name.as_str(),
-            &checker
-                .settings
-                .flake8_type_checking
-                .exempt_modules
-                .iter()
-                .map(String::as_str)
-                .collect::<Vec<_>>(),
-        ) {
-            continue;
-        }
 
         let Some(reference_id) = binding.references.first().copied() else {
             continue;
@@ -236,20 +225,25 @@ pub(crate) fn typing_only_runtime_import(
                     .is_typing()
             })
         {
-            // Extract the module base and level from the full name.
-            // Ex) `foo.bar.baz` -> `foo`, `0`
-            // Ex) `.foo.bar.baz` -> `foo`, `1`
-            let level = qualified_name
-                .chars()
-                .take_while(|c| *c == '.')
-                .count()
-                .try_into()
-                .unwrap();
+            let qualified_name = import.qualified_name();
+
+            if is_exempt(
+                qualified_name.as_str(),
+                &checker
+                    .settings
+                    .flake8_type_checking
+                    .exempt_modules
+                    .iter()
+                    .map(String::as_str)
+                    .collect::<Vec<_>>(),
+            ) {
+                continue;
+            }
 
             // Categorize the import, using coarse-grained categorization.
             let import_type = match categorize(
                 qualified_name.as_str(),
-                Some(level),
+                None,
                 &checker.settings.src,
                 checker.package(),
                 &checker.settings.isort.known_modules,
@@ -275,8 +269,8 @@ pub(crate) fn typing_only_runtime_import(
                 continue;
             };
 
-            let import = Import {
-                qualified_name,
+            let import = ImportBinding {
+                import,
                 reference_id,
                 range: binding.range,
                 parent_range: binding.parent_range(checker.semantic()),
@@ -309,17 +303,15 @@ pub(crate) fn typing_only_runtime_import(
             None
         };
 
-        for Import {
-            qualified_name,
+        for ImportBinding {
+            import,
             range,
             parent_range,
             ..
         } in imports
         {
-            let mut diagnostic = Diagnostic::new(
-                diagnostic_for(import_type, qualified_name.to_string()),
-                range,
-            );
+            let mut diagnostic =
+                Diagnostic::new(diagnostic_for(import_type, import.qualified_name()), range);
             if let Some(range) = parent_range {
                 diagnostic.set_parent(range.start());
             }
@@ -333,17 +325,15 @@ pub(crate) fn typing_only_runtime_import(
     // Separately, generate a diagnostic for every _ignored_ import, to ensure that the
     // suppression comments aren't marked as unused.
     for ((_, import_type), imports) in ignores_by_statement {
-        for Import {
-            qualified_name,
+        for ImportBinding {
+            import,
             range,
             parent_range,
             ..
         } in imports
         {
-            let mut diagnostic = Diagnostic::new(
-                diagnostic_for(import_type, qualified_name.to_string()),
-                range,
-            );
+            let mut diagnostic =
+                Diagnostic::new(diagnostic_for(import_type, import.qualified_name()), range);
             if let Some(range) = parent_range {
                 diagnostic.set_parent(range.start());
             }
@@ -353,9 +343,9 @@ pub(crate) fn typing_only_runtime_import(
 }
 
 /// A runtime-required import with its surrounding context.
-struct Import {
+struct ImportBinding<'a> {
     /// The qualified name of the import (e.g., `typing.List` for `from typing import List`).
-    qualified_name: String,
+    import: AnyImport<'a>,
     /// The first reference to the imported symbol.
     reference_id: ResolvedReferenceId,
     /// The trimmed range of the import (e.g., `List` in `from typing import List`).
@@ -412,18 +402,18 @@ fn is_exempt(name: &str, exempt_modules: &[&str]) -> bool {
 }
 
 /// Generate a [`Fix`] to remove typing-only imports from a runtime context.
-fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[Import]) -> Result<Fix> {
+fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[ImportBinding]) -> Result<Fix> {
     let stmt = checker.semantic().stmts[stmt_id];
     let parent = checker.semantic().stmts.parent(stmt);
-    let qualified_names: Vec<&str> = imports
+    let member_names: Vec<Cow<'_, str>> = imports
         .iter()
-        .map(|Import { qualified_name, .. }| qualified_name.as_str())
+        .map(|ImportBinding { import, .. }| import.member_name())
         .collect();
 
     // Find the first reference across all imports.
     let at = imports
         .iter()
-        .map(|Import { reference_id, .. }| {
+        .map(|ImportBinding { reference_id, .. }| {
             checker.semantic().reference(*reference_id).range().start()
         })
         .min()
@@ -431,7 +421,7 @@ fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[Import]) -> Result
 
     // Step 1) Remove the import.
     let remove_import_edit = autofix::edits::remove_unused_imports(
-        qualified_names.iter().copied(),
+        member_names.iter().map(AsRef::as_ref),
         stmt,
         parent,
         checker.locator(),
@@ -441,9 +431,9 @@ fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[Import]) -> Result
 
     // Step 2) Add the import to a `TYPE_CHECKING` block.
     let add_import_edit = checker.importer().typing_import_edit(
-        &StmtImports {
-            stmt,
-            qualified_names,
+        &ImportedMembers {
+            statement: stmt,
+            names: member_names.iter().map(AsRef::as_ref).collect(),
         },
         at,
         checker.semantic(),
