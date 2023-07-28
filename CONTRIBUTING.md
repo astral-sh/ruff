@@ -67,6 +67,7 @@ and pre-commit to run some validation checks:
 
 ```shell
 pipx install pre-commit  # or `pip install pre-commit` if you have a virtualenv
+pre-commit install
 ```
 
 ### Development
