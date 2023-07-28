@@ -8,6 +8,31 @@ use crate::checkers::ast::Checker;
 
 use super::helpers;
 
+/// ## What it does
+/// Checks for usage of `datetime.datetime.today()`.
+///
+/// ## Why is this bad?
+/// `datetime` objects are "naive" by default, in that they do not include
+/// timezone information. "Naive" objects are easy to understand, but ignore
+/// some aspects of reality, which can lead to subtle bugs. A timezone "aware"
+/// `datetime` representing the current time can be created using `now(tz=)`.
+///
+/// In Python 3.11 and later, you can use `datetime.UTC` as the alias for
+/// `datetime.timezone.utc`.
+///
+/// ## Example
+/// ```python
+/// import datetime
+///
+/// datetime.datetime.today()
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import datetime
+///
+/// datetime.datetime.now(tz=datetime.timezone.utc)
+/// ```
 #[violation]
 pub struct CallDatetimeToday;
 
@@ -21,12 +46,6 @@ impl Violation for CallDatetimeToday {
     }
 }
 
-/// Checks for `datetime.datetime.today()`. (DTZ002)
-///
-/// ## Why is this bad?
-///
-/// It uses the system local timezone.
-/// Use `datetime.datetime.now(tz=)` instead.
 pub(crate) fn call_datetime_today(checker: &mut Checker, func: &Expr, location: TextRange) {
     if !checker
         .semantic()
