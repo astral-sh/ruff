@@ -1,14 +1,13 @@
 use std::borrow::Cow;
 
-use num_bigint::BigInt;
-use num_traits::{One, Zero};
-use ruff_python_ast::{self as ast, Comprehension, Constant, Expr, Ranged};
-use ruff_text_size::{TextRange, TextSize};
+use num_traits::Zero;
 use unicode_width::UnicodeWidthStr;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Comprehension, Constant, Expr, Ranged};
 use ruff_python_semantic::SemanticModel;
+use ruff_text_size::{TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -49,37 +48,20 @@ use crate::registry::AsRule;
 #[violation]
 pub(crate) struct UnnecessaryIterableAllocationForFirstElement {
     iterable: String,
-    subscript_kind: HeadSubscriptKind,
 }
 
 impl AlwaysAutofixableViolation for UnnecessaryIterableAllocationForFirstElement {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryIterableAllocationForFirstElement {
-            iterable,
-            subscript_kind,
-        } = self;
+        let UnnecessaryIterableAllocationForFirstElement { iterable } = self;
         let iterable = Self::truncate(iterable);
-        match subscript_kind {
-            HeadSubscriptKind::Index => {
-                format!("Prefer `next({iterable})` over single element slice")
-            }
-            HeadSubscriptKind::Slice => {
-                format!("Prefer `[next({iterable})]` over single element slice")
-            }
-        }
+        format!("Prefer `next({iterable})` over single element slice")
     }
 
     fn autofix_title(&self) -> String {
-        let UnnecessaryIterableAllocationForFirstElement {
-            iterable,
-            subscript_kind,
-        } = self;
+        let UnnecessaryIterableAllocationForFirstElement { iterable } = self;
         let iterable = Self::truncate(iterable);
-        match subscript_kind {
-            HeadSubscriptKind::Index => format!("Replace with `next({iterable})`"),
-            HeadSubscriptKind::Slice => format!("Replace with `[next({iterable})]"),
-        }
+        format!("Replace with `next({iterable})`")
     }
 }
 
@@ -106,9 +88,9 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(
         ..
     } = subscript;
 
-    let Some(subscript_kind) = classify_subscript(slice) else {
+    if !is_head_slice(slice) {
         return;
-    };
+    }
 
     let Some(target) = match_iteration_target(value, checker.semantic()) else {
         return;
@@ -123,72 +105,31 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(
     let mut diagnostic = Diagnostic::new(
         UnnecessaryIterableAllocationForFirstElement {
             iterable: iterable.to_string(),
-            subscript_kind,
         },
         *range,
     );
 
     if checker.patch(diagnostic.kind.rule()) {
-        let replacement = match subscript_kind {
-            HeadSubscriptKind::Index => format!("next({iterable})"),
-            HeadSubscriptKind::Slice => format!("[next({iterable})]"),
-        };
-        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(replacement, *range)));
+        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+            format!("next({iterable})"),
+            *range,
+        )));
     }
 
     checker.diagnostics.push(diagnostic);
 }
 
-/// A subscript slice that represents the first element of a list.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum HeadSubscriptKind {
-    /// The subscript is an index (e.g., `[0]`).
-    Index,
-    /// The subscript is a slice (e.g., `[:1]`).
-    Slice,
-}
-
-/// Check that the slice [`Expr`] is functionally equivalent to slicing into the first element. The
-/// first `bool` checks that the element is in fact first, the second checks if it's a slice or an
-/// index.
-fn classify_subscript(expr: &Expr) -> Option<HeadSubscriptKind> {
-    let result = match expr {
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Int(value),
-            ..
-        }) if value.is_zero() => HeadSubscriptKind::Index,
-        Expr::Slice(ast::ExprSlice {
-            step, lower, upper, ..
-        }) => {
-            // Avoid, e.g., `list(...)[:2]`
-            let upper = upper.as_ref()?;
-            let upper = as_int(upper)?;
-            if !upper.is_one() {
-                return None;
-            }
-
-            // Avoid, e.g., `list(...)[2:]`.
-            if let Some(lower) = lower.as_ref() {
-                let lower = as_int(lower)?;
-                if !lower.is_zero() {
-                    return None;
-                }
-            }
-
-            // Avoid, e.g., `list(...)[::-1]`
-            if let Some(step) = step.as_ref() {
-                let step = as_int(step)?;
-                if step < upper {
-                    return None;
-                }
-            }
-
-            HeadSubscriptKind::Slice
-        }
-        _ => return None,
-    };
-
-    Some(result)
+/// Check that the slice [`Expr`] is a slice of the first element (e.g., `x[0]`).
+fn is_head_slice(expr: &Expr) -> bool {
+    if let Expr::Constant(ast::ExprConstant {
+        value: Constant::Int(value),
+        ..
+    }) = expr
+    {
+        value.is_zero()
+    } else {
+        false
+    }
 }
 
 #[derive(Debug)]
@@ -309,18 +250,4 @@ fn match_simple_comprehension(elt: &Expr, generators: &[Comprehension]) -> Optio
     }
 
     Some(generator.iter.range())
-}
-
-/// If an expression is a constant integer, returns the value of that integer; otherwise,
-/// returns `None`.
-fn as_int(expr: &Expr) -> Option<&BigInt> {
-    if let Expr::Constant(ast::ExprConstant {
-        value: Constant::Int(value),
-        ..
-    }) = expr
-    {
-        Some(value)
-    } else {
-        None
-    }
 }
