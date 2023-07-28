@@ -142,6 +142,8 @@ impl<'a> Printer<'a> {
                 queue.extend_back(content);
             }
 
+            FormatElement::Tombstone => {}
+
             FormatElement::Tag(StartGroup(group)) => {
                 let print_mode =
                     self.print_group(TagKind::Group, group.mode(), args, queue, stack)?;
@@ -1076,6 +1078,8 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
             }
 
             FormatElement::Interned(content) => self.queue.extend_back(content),
+
+            FormatElement::Tombstone => {}
 
             FormatElement::Tag(StartIndent) => {
                 self.stack.push(

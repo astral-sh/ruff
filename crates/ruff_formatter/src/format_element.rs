@@ -61,6 +61,10 @@ pub enum FormatElement {
 
     /// A [Tag] that marks the start/end of some content to which some special formatting is applied.
     Tag(Tag),
+
+    /// No-op format element. Used to *remove* content in post processing phases without
+    /// needing to move the whole vector.
+    Tombstone,
 }
 
 impl std::fmt::Debug for FormatElement {
@@ -95,6 +99,7 @@ impl std::fmt::Debug for FormatElement {
             FormatElement::SourcePosition(position) => {
                 fmt.debug_tuple("SourcePosition").field(position).finish()
             }
+            FormatElement::Tombstone => fmt.write_str("Tombstone"),
         }
     }
 }
@@ -273,7 +278,8 @@ impl FormatElements for FormatElement {
             FormatElement::LineSuffixBoundary
             | FormatElement::Space
             | FormatElement::Tag(_)
-            | FormatElement::SourcePosition(_) => false,
+            | FormatElement::SourcePosition(_)
+            | FormatElement::Tombstone => false,
         }
     }
 

@@ -346,6 +346,8 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                     write!(f, [text("])")])?;
                 }
 
+                FormatElement::Tombstone => write!(f, [text("tombstone")])?,
+
                 FormatElement::Interned(interned) => {
                     let interned_elements = &mut f.context_mut().printed_interned_elements;
 
