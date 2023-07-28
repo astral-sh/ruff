@@ -453,12 +453,14 @@ where
                 args,
                 decorator_list,
                 returns,
+                type_params,
                 ..
             })
             | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
                 body,
                 args,
                 decorator_list,
+                type_params,
                 returns,
                 ..
             }) => {
@@ -471,6 +473,12 @@ where
                 // Function annotations are always evaluated at runtime, unless future annotations
                 // are enabled.
                 let runtime_annotation = !self.semantic.future_annotations();
+
+                self.semantic.push_scope(ScopeKind::Type);
+
+                for type_param in type_params {
+                    self.visit_type_param(type_param);
+                }
 
                 for arg_with_default in args
                     .posonlyargs
@@ -542,17 +550,24 @@ where
                     bases,
                     keywords,
                     decorator_list,
+                    type_params,
                     ..
                 },
             ) => {
+                for decorator in decorator_list {
+                    self.visit_decorator(decorator);
+                }
+
+                self.semantic.push_scope(ScopeKind::Type);
+
+                for type_param in type_params {
+                    self.visit_type_param(type_param);
+                }
                 for expr in bases {
                     self.visit_expr(expr);
                 }
                 for keyword in keywords {
                     self.visit_keyword(keyword);
-                }
-                for decorator in decorator_list {
-                    self.visit_decorator(decorator);
                 }
 
                 let definition = docstrings::extraction::extract_definition(
@@ -562,7 +577,6 @@ where
                     &self.semantic.definitions,
                 );
                 self.semantic.push_definition(definition);
-
                 self.semantic.push_scope(ScopeKind::Class(class_def));
 
                 // Extract any global bindings from the class body.
@@ -571,6 +585,20 @@ where
                 }
 
                 self.visit_body(body);
+            }
+            Stmt::TypeAlias(ast::StmtTypeAlias {
+                range: _range,
+                name,
+                type_params,
+                value,
+            }) => {
+                self.semantic.push_scope(ScopeKind::Type);
+                for type_param in type_params {
+                    self.visit_type_param(type_param);
+                }
+                self.visit_expr(value);
+                self.semantic.pop_scope();
+                self.visit_expr(name);
             }
             Stmt::Try(ast::StmtTry {
                 body,
@@ -715,8 +743,9 @@ where
             | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { name, .. }) => {
                 let scope_id = self.semantic.scope_id;
                 self.deferred.scopes.push(scope_id);
-                self.semantic.pop_scope();
+                self.semantic.pop_scope(); // Function scope
                 self.semantic.pop_definition();
+                self.semantic.pop_scope(); // Type parameter scope
                 self.add_binding(
                     name,
                     stmt.identifier(),
@@ -727,8 +756,9 @@ where
             Stmt::ClassDef(ast::StmtClassDef { name, .. }) => {
                 let scope_id = self.semantic.scope_id;
                 self.deferred.scopes.push(scope_id);
-                self.semantic.pop_scope();
+                self.semantic.pop_scope(); // Class scope
                 self.semantic.pop_definition();
+                self.semantic.pop_scope(); // Type parameter scope
                 self.add_binding(
                     name,
                     stmt.identifier(),
@@ -1331,6 +1361,26 @@ where
             self.visit_stmt(stmt);
         }
     }
+
+    fn visit_type_param(&mut self, type_param: &'b ast::TypeParam) {
+        // Step 1: Binding
+        match type_param {
+            ast::TypeParam::TypeVar(ast::TypeParamTypeVar { name, range, .. })
+            | ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { name, range })
+            | ast::TypeParam::ParamSpec(ast::TypeParamParamSpec { name, range }) => {
+                self.add_binding(
+                    name.as_str(),
+                    *range,
+                    BindingKind::TypeParam,
+                    BindingFlags::empty(),
+                );
+            }
+        }
+        // Step 2: Traversal
+        self.deferred
+            .type_param_definitions
+            .push((type_param, self.semantic.snapshot()));
+    }
 }
 
 impl<'a> Checker<'a> {
@@ -1693,6 +1743,22 @@ impl<'a> Checker<'a> {
         }
     }
 
+    fn visit_deferred_type_param_definitions(&mut self) {
+        while !self.deferred.type_param_definitions.is_empty() {
+            let type_params = std::mem::take(&mut self.deferred.type_param_definitions);
+            for (type_param, snapshot) in type_params {
+                self.semantic.restore(snapshot);
+
+                if let ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
+                    bound: Some(bound), ..
+                }) = type_param
+                {
+                    self.visit_expr(bound);
+                }
+            }
+        }
+    }
+
     fn visit_deferred_string_type_definitions(&mut self, allocator: &'a typed_arena::Arena<Expr>) {
         while !self.deferred.string_type_definitions.is_empty() {
             let type_definitions = std::mem::take(&mut self.deferred.string_type_definitions);
@@ -1882,6 +1948,7 @@ pub(crate) fn check_ast(
     checker.visit_deferred_functions();
     checker.visit_deferred_lambdas();
     checker.visit_deferred_future_type_definitions();
+    checker.visit_deferred_type_param_definitions();
     let allocator = typed_arena::Arena::new();
     checker.visit_deferred_string_type_definitions(&allocator);
     checker.visit_exports();
