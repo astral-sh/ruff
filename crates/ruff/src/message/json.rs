@@ -53,7 +53,7 @@ pub(crate) fn message_to_json_value(message: &Message) -> Value {
         json!({
             "applicability": fix.applicability(),
             "message": message.kind.suggestion.as_deref(),
-            "edits": &ExpandedEdits { edits: fix.edits(), source_code: &source_code },
+            "edits": &ExpandedEdits { edits: &fix.edits(), source_code: &source_code },
         })
     });
 

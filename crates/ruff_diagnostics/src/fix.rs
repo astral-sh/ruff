@@ -1,6 +1,8 @@
 use ruff_text_size::TextSize;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
+use std::ops::Deref;
 
 use crate::edit::Edit;
 
@@ -132,8 +134,8 @@ impl Fix {
     }
 
     /// Return a slice of the [`Edit`] elements in the [`Fix`].
-    pub fn edits(&self) -> &[Edit] {
-        &self.edits
+    pub fn edits(&self) -> Edits {
+        Edits::new(&self.edits)
     }
 
     pub fn into_edits(self) -> Vec<Edit> {
@@ -155,5 +157,45 @@ impl Fix {
     pub fn isolate(mut self, isolation: IsolationLevel) -> Self {
         self.isolation_level = isolation;
         self
+    }
+}
+
+/// A collection of [`Edit`] elements to be applied to a source file.
+#[derive(Debug, Clone)]
+pub struct Edits<'a>(Cow<'a, [Edit]>);
+
+impl<'a> Edits<'a> {
+    fn new(edits: &'a [Edit]) -> Self {
+        Self(Cow::Borrowed(edits))
+    }
+
+    /// Return the [`TextSize`] of the first [`Edit`] in the [`Fix`], as determined by the
+    /// start position of the [`Edit`].
+    pub fn min_start(&self) -> Option<TextSize> {
+        self.0.iter().map(Edit::start).min()
+    }
+
+    /// Return an iterator over the [`Edit`] elements in the [`Fix`], sorted by their start
+    /// position.
+    pub fn inorder(&self) -> impl IntoIterator<Item = Edit> {
+        let mut edits = self.to_vec();
+        edits.sort_by_key(Edit::start);
+        edits.into_iter()
+    }
+
+    /// Filter the [`Edit`] elements in the [`Fix`] by the given predicate.
+    pub fn retain<F>(&mut self, f: F)
+    where
+        F: FnMut(&Edit) -> bool,
+    {
+        self.0.to_mut().retain(f);
+    }
+}
+
+impl<'a> Deref for Edits<'a> {
+    type Target = [Edit];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }

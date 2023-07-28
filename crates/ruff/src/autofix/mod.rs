@@ -1,6 +1,6 @@
+use itertools::Itertools;
 use std::collections::BTreeSet;
 
-use itertools::Itertools;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -45,7 +45,7 @@ fn apply_fixes<'a>(
 ) -> FixResult {
     let mut output = String::with_capacity(locator.len());
     let mut last_pos: Option<TextSize> = None;
-    let mut applied: BTreeSet<&Edit> = BTreeSet::default();
+    let mut applied: BTreeSet<Edit> = BTreeSet::default();
     let mut isolated: FxHashSet<u32> = FxHashSet::default();
     let mut fixed = FxHashMap::default();
     let mut source_map = SourceMap::default();
@@ -59,9 +59,12 @@ fn apply_fixes<'a>(
         })
         .sorted_by(|(rule1, fix1), (rule2, fix2)| cmp_fix(*rule1, *rule2, fix1, fix2))
     {
-        // If we already applied an identical fix as part of another correction, skip
-        // any re-application.
-        if fix.edits().iter().all(|edit| applied.contains(edit)) {
+        // Remove any edits that were applied as part of a previous fix.
+        let mut edits = fix.edits();
+        edits.retain(|edit| !applied.contains(edit));
+
+        // If we already applied an identical fix, skip it.
+        if edits.is_empty() {
             *fixed.entry(rule).or_default() += 1;
             continue;
         }
@@ -69,7 +72,8 @@ fn apply_fixes<'a>(
         // Best-effort approach: if this fix overlaps with a fix we've already applied,
         // skip it.
         if last_pos.map_or(false, |last_pos| {
-            fix.min_start()
+            edits
+                .min_start()
                 .map_or(false, |fix_location| last_pos >= fix_location)
         }) {
             continue;
@@ -83,23 +87,19 @@ fn apply_fixes<'a>(
             }
         }
 
-        for edit in fix
-            .edits()
-            .iter()
-            .sorted_unstable_by_key(|edit| edit.start())
-        {
+        for edit in edits.inorder() {
             // Add all contents from `last_pos` to `fix.location`.
             let slice = locator.slice(TextRange::new(last_pos.unwrap_or_default(), edit.start()));
             output.push_str(slice);
 
             // Add the start source marker for the patch.
-            source_map.push_start_marker(edit, output.text_len());
+            source_map.push_start_marker(&edit, output.text_len());
 
             // Add the patch itself.
             output.push_str(edit.content().unwrap_or_default());
 
             // Add the end source marker for the added patch.
-            source_map.push_end_marker(edit, output.text_len());
+            source_map.push_end_marker(&edit, output.text_len());
 
             // Track that the edit was applied.
             last_pos = Some(edit.end());
