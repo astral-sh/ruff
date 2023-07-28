@@ -873,17 +873,14 @@ impl<'a> SemanticModel<'a> {
     /// Returns the first parent of the given scope that is not a [`ScopeKind::Type`] scope, if any.
     pub fn scope_parent_skip_types(&self, scope: &Scope) -> Option<&Scope<'a>> {
         let mut current_scope = scope;
-        loop {
-            if let Some(parent) = self.scope_parent(current_scope) {
-                if parent.kind.is_type() {
-                    current_scope = parent;
-                } else {
-                    return Some(parent);
-                }
+        while let Some(parent) = self.scope_parent(current_scope) {
+            if parent.kind.is_type() {
+                current_scope = parent;
             } else {
-                return None;
+                return Some(parent);
             }
         }
+        None
     }
 
     /// Returns a mutable reference to the current top most scope.
