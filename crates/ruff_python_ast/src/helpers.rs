@@ -874,7 +874,7 @@ pub fn literal_path<'a>(
             + 1,
     );
 
-    // Remove segments based on the number of dots.
+    // Include the dots
     if let Some(level) = level {
         if level > 0 {
             for _ in 0..level {

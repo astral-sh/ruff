@@ -663,6 +663,7 @@ impl<'a> SemanticModel<'a> {
         module: &str,
         member: &str,
     ) -> Option<ImportedName> {
+        // TODO(charlie): Pass in a slice.
         let module_path: Vec<&str> = module.split('.').collect();
         self.scopes().enumerate().find_map(|(scope_index, scope)| {
             scope.bindings().find_map(|(name, binding_id)| {

@@ -1,10 +1,11 @@
 use anyhow::Result;
-use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
+use std::borrow::Cow;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::{Exceptions, NodeId, Scope};
+use ruff_python_semantic::{AnyImport, Exceptions, NodeId, Scope};
+use ruff_text_size::TextRange;
 
 use crate::autofix;
 use crate::checkers::ast::Checker;
@@ -97,8 +98,8 @@ impl Violation for UnusedImport {
 
 pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut Vec<Diagnostic>) {
     // Collect all unused imports by statement.
-    let mut unused: FxHashMap<(NodeId, Exceptions), Vec<Import>> = FxHashMap::default();
-    let mut ignored: FxHashMap<(NodeId, Exceptions), Vec<Import>> = FxHashMap::default();
+    let mut unused: FxHashMap<(NodeId, Exceptions), Vec<ImportBinding>> = FxHashMap::default();
+    let mut ignored: FxHashMap<(NodeId, Exceptions), Vec<ImportBinding>> = FxHashMap::default();
 
     for binding_id in scope.binding_ids() {
         let binding = checker.semantic().binding(binding_id);
@@ -111,7 +112,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             continue;
         }
 
-        let Some(member_name) = binding.member_name() else {
+        let Some(import) = binding.as_any_import() else {
             continue;
         };
 
@@ -119,8 +120,8 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             continue;
         };
 
-        let import = Import {
-            member_name,
+        let import = ImportBinding {
+            import,
             range: binding.range,
             parent_range: binding.parent_range(checker.semantic()),
         };
@@ -158,15 +159,15 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             None
         };
 
-        for Import {
-            member_name,
+        for ImportBinding {
+            import,
             range,
             parent_range,
         } in imports
         {
             let mut diagnostic = Diagnostic::new(
                 UnusedImport {
-                    name: member_name.to_string(),
+                    name: import.qualified_name(),
                     context: if in_except_handler {
                         Some(UnusedImportContext::ExceptHandler)
                     } else if in_init {
@@ -192,15 +193,15 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
 
     // Separately, generate a diagnostic for every _ignored_ import, to ensure that the
     // suppression comments aren't marked as unused.
-    for Import {
-        member_name,
+    for ImportBinding {
+        import,
         range,
         parent_range,
     } in ignored.into_values().flatten()
     {
         let mut diagnostic = Diagnostic::new(
             UnusedImport {
-                name: member_name.to_string(),
+                name: import.qualified_name(),
                 context: None,
                 multiple: false,
             },
@@ -214,9 +215,9 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
 }
 
 /// An unused import with its surrounding context.
-struct Import {
+struct ImportBinding<'a> {
     /// The qualified name of the import (e.g., `typing.List` for `from typing import List`).
-    member_name: String,
+    import: AnyImport<'a>,
     /// The trimmed range of the import (e.g., `List` in `from typing import List`).
     range: TextRange,
     /// The range of the import's parent statement.
@@ -224,13 +225,17 @@ struct Import {
 }
 
 /// Generate a [`Fix`] to remove unused imports from a statement.
-fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[Import]) -> Result<Fix> {
+fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[ImportBinding]) -> Result<Fix> {
     let stmt = checker.semantic().stmts[stmt_id];
     let parent = checker.semantic().stmts.parent(stmt);
+
+    let member_names: Vec<Cow<'_, str>> = imports
+        .iter()
+        .map(|ImportBinding { import, .. }| import.member_name())
+        .collect();
+
     let edit = autofix::edits::remove_unused_imports(
-        imports
-            .iter()
-            .map(|Import { member_name, .. }| member_name.as_str()),
+        member_names.iter().map(AsRef::as_ref),
         stmt,
         parent,
         checker.locator(),

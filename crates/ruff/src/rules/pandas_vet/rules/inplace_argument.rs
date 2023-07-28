@@ -57,7 +57,7 @@ pub(crate) fn inplace_argument(checker: &mut Checker, call: &ast::ExprCall) {
             .first()
             .and_then(|module| checker.semantic().find_binding(module))
             .is_some_and(|binding| {
-                if let BindingKind::Import(Import { call_path, .. }) = &binding.kind {
+                if let BindingKind::Import(Import { call_path }) = &binding.kind {
                     matches!(call_path.as_ref(), ["pandas"])
                 } else {
                     false

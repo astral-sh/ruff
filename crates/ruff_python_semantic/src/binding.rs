@@ -238,6 +238,60 @@ impl<'a> Binding<'a> {
                 }
             })
     }
+
+    pub fn as_any_import(&'a self) -> Option<AnyImport<'a>> {
+        match &self.kind {
+            BindingKind::Import(import) => Some(AnyImport::Import(import)),
+            BindingKind::SubmoduleImport(import) => Some(AnyImport::SubmoduleImport(import)),
+            BindingKind::FromImport(import) => Some(AnyImport::FromImport(import)),
+            _ => None,
+        }
+    }
+}
+
+pub enum AnyImport<'a> {
+    Import(&'a Import<'a>),
+    SubmoduleImport(&'a SubmoduleImport<'a>),
+    FromImport(&'a FromImport<'a>),
+}
+
+impl<'a> AnyImport<'a> {
+    /// Returns the fully-qualified symbol name, if this symbol was imported from another module.
+    pub fn call_path(&self) -> &[&str] {
+        match self {
+            Self::Import(Import { call_path }) => call_path.as_ref(),
+            Self::SubmoduleImport(SubmoduleImport { call_path }) => call_path.as_ref(),
+            Self::FromImport(FromImport { call_path }) => call_path.as_ref(),
+        }
+    }
+
+    /// Returns the fully-qualified symbol name, if this symbol was imported from another module.
+    pub fn qualified_name(&self) -> String {
+        format_call_path(self.call_path())
+    }
+
+    /// Returns the fully-qualified name of the module from which this symbol was imported, if this
+    /// symbol was imported from another module.
+    pub fn module_name(&self) -> &[&str] {
+        match self {
+            Self::Import(Import { call_path }) => &call_path[..1],
+            Self::SubmoduleImport(SubmoduleImport { call_path }) => &call_path[..1],
+            Self::FromImport(FromImport { call_path }) => &call_path[..call_path.len() - 1],
+        }
+    }
+
+    /// Returns the fully-qualified symbol name, if this symbol was imported from another module.
+    pub fn member_name(&self) -> Cow<'a, str> {
+        match self {
+            Self::Import(Import { call_path }) => Cow::Owned(format_call_path(call_path)),
+            Self::SubmoduleImport(SubmoduleImport { call_path }) => {
+                Cow::Owned(format_call_path(call_path))
+            }
+            Self::FromImport(FromImport { call_path }) => {
+                Cow::Borrowed(call_path[call_path.len() - 1])
+            }
+        }
+    }
 }
 
 bitflags! {
