@@ -45,7 +45,7 @@ fn apply_fixes<'a>(
 ) -> FixResult {
     let mut output = String::with_capacity(locator.len());
     let mut last_pos: Option<TextSize> = None;
-    let mut applied: BTreeSet<Edit> = BTreeSet::default();
+    let mut applied: BTreeSet<&Edit> = BTreeSet::default();
     let mut isolated: FxHashSet<u32> = FxHashSet::default();
     let mut fixed = FxHashMap::default();
     let mut source_map = SourceMap::default();
@@ -59,11 +59,8 @@ fn apply_fixes<'a>(
         })
         .sorted_by(|(rule1, fix1), (rule2, fix2)| cmp_fix(*rule1, *rule2, fix1, fix2))
     {
-        // Remove any edits that were applied as part of a previous fix.
-        let edits = fix.edits();
-
         let mut first = true;
-        'inner: for edit in edits.to_sorted() {
+        'inner: for edit in fix.edits() {
             // Skip any edits that were already applied.
             if applied.contains(&edit) {
                 continue 'inner;
@@ -95,13 +92,13 @@ fn apply_fixes<'a>(
             output.push_str(slice);
 
             // Add the start source marker for the patch.
-            source_map.push_start_marker(&edit, output.text_len());
+            source_map.push_start_marker(edit, output.text_len());
 
             // Add the patch itself.
             output.push_str(edit.content().unwrap_or_default());
 
             // Add the end source marker for the added patch.
-            source_map.push_end_marker(&edit, output.text_len());
+            source_map.push_end_marker(edit, output.text_len());
 
             // Track that the edit was applied.
             last_pos = Some(edit.end());
@@ -124,9 +121,8 @@ fn apply_fixes<'a>(
 
 /// Compare two fixes.
 fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Ordering {
-    fix1.edits()
-        .min_start()
-        .cmp(&fix2.edits().min_start())
+    fix1.min_start()
+        .cmp(&fix2.min_start())
         .then_with(|| match (&rule1, &rule2) {
             // Apply `EndsInPeriod` fixes before `NewLineAfterLastParagraph` fixes.
             (Rule::EndsInPeriod, Rule::NewLineAfterLastParagraph) => std::cmp::Ordering::Less,

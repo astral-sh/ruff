@@ -38,7 +38,7 @@ impl Display for Diff<'_> {
         let mut output = String::with_capacity(self.source_code.source_text().len());
         let mut last_end = TextSize::default();
 
-        for edit in self.fix.edits().to_sorted() {
+        for edit in self.fix.edits() {
             output.push_str(
                 self.source_code
                     .slice(TextRange::new(last_end, edit.start())),
