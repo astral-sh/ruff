@@ -12,7 +12,7 @@ use filetime::FileTime;
 use log::{debug, error, warn};
 use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::FxHashMap;
-use similar::TextDiff;
+use similar::{DiffTag, TextDiff};
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
@@ -285,23 +285,37 @@ pub(crate) fn lint_path(
                                     .enumerate()
                                     .zip(dest_notebook.cells().iter())
                                 {
-                                    if let (Cell::Code(src_code_cell), Cell::Code(dest_code_cell)) =
-                                        (src_cell, dest_cell)
-                                    {
-                                        TextDiff::from_lines(
-                                            &src_code_cell.source.to_string(),
-                                            &dest_code_cell.source.to_string(),
-                                        )
-                                        .unified_diff()
-                                        .missing_newline_hint(false)
-                                        .header(
-                                            &format!("{}:cell {}", &fs::relativize_path(path), idx),
-                                            &format!("{}:cell {}", &fs::relativize_path(path), idx),
-                                        )
-                                        .to_writer(&mut stdout)?;
-                                        stdout.write_all(b"\n")?;
-                                    }
+                                    let (Cell::Code(src_code_cell), Cell::Code(dest_code_cell)) = (src_cell, dest_cell) else {
+                                        continue;
+                                    };
+                                    TextDiff::from_lines(
+                                        &src_code_cell.source.to_string(),
+                                        &dest_code_cell.source.to_string(),
+                                    )
+                                    .unified_diff()
+                                    // Jupyter notebook cells don't necessarily have a newline
+                                    // at the end. For example,
+                                    //
+                                    // ```python
+                                    // print("hello")
+                                    // ```
+                                    //
+                                    // For a cell containing the above code, there'll only be one line,
+                                    // and it won't have a newline at the end. If it did, there'd be
+                                    // two lines, and the second line would be empty:
+                                    //
+                                    // ```python
+                                    // print("hello")
+                                    //
+                                    // ```
+                                    .missing_newline_hint(false)
+                                    .header(
+                                        &format!("{}:cell {}", &fs::relativize_path(path), idx),
+                                        &format!("{}:cell {}", &fs::relativize_path(path), idx),
+                                    )
+                                    .to_writer(&mut stdout)?;
                                 }
+                                stdout.write_all(b"\n")?;
                                 stdout.flush()?;
                             }
                         }
