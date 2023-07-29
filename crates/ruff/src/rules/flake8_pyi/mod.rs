@@ -97,6 +97,8 @@ mod tests {
     #[test_case(Rule::UnusedPrivateTypeVar, Path::new("PYI018.pyi"))]
     #[test_case(Rule::UnusedPrivateProtocol, Path::new("PYI046.py"))]
     #[test_case(Rule::UnusedPrivateProtocol, Path::new("PYI046.pyi"))]
+    #[test_case(Rule::UnusedPrivateTypeAlias, Path::new("PYI047.py"))]
+    #[test_case(Rule::UnusedPrivateTypeAlias, Path::new("PYI047.pyi"))]
     #[test_case(Rule::UnusedPrivateTypedDict, Path::new("PYI049.py"))]
     #[test_case(Rule::UnusedPrivateTypedDict, Path::new("PYI049.pyi"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
