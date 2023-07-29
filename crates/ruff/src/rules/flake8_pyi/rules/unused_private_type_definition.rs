@@ -73,6 +73,44 @@ impl Violation for UnusedPrivateProtocol {
     }
 }
 
+/// ## What it does
+/// Checks for the presence of unused private `typing.TypeAlias` definitions.
+///
+/// ## Why is this bad?
+/// A private `typing.TypeAlias` that is defined but not used is likely a
+/// mistake, and should either be used, made public, or removed to avoid
+/// confusion.
+///
+/// ## Example
+/// ```python
+/// import typing
+///
+/// _UnusedTypeAlias: typing.TypeAlias = int
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import typing
+///
+/// _UsedTypeAlias: typing.TypeAlias = int
+///
+///
+/// def func(arg: _UsedTypeAlias) -> _UsedTypeAlias:
+///     ...
+/// ```
+#[violation]
+pub struct UnusedPrivateTypeAlias {
+    name: String,
+}
+
+impl Violation for UnusedPrivateTypeAlias {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let UnusedPrivateTypeAlias { name } = self;
+        format!("Private TypeAlias `{name}` is never used")
+    }
+}
+
 /// PYI018
 pub(crate) fn unused_private_type_var(
     checker: &Checker,
@@ -152,6 +190,52 @@ pub(crate) fn unused_private_protocol(
         diagnostics.push(Diagnostic::new(
             UnusedPrivateProtocol {
                 name: name.to_string(),
+            },
+            binding.range,
+        ));
+    }
+}
+
+/// PYI047
+pub(crate) fn unused_private_type_alias(
+    checker: &Checker,
+    scope: &Scope,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    for binding in scope
+        .binding_ids()
+        .map(|binding_id| checker.semantic().binding(binding_id))
+    {
+        if !(binding.kind.is_assignment() && binding.is_private_declaration()) {
+            continue;
+        }
+        if binding.is_used() {
+            continue;
+        }
+
+        let Some(source) = binding.source else {
+            continue;
+        };
+        let Stmt::AnnAssign(ast::StmtAnnAssign {
+            target, annotation, ..
+        }) = checker.semantic().stmts[source]
+        else {
+            continue;
+        };
+        let Some(ast::ExprName { id, .. }) = target.as_name_expr() else {
+            continue;
+        };
+
+        if !checker
+            .semantic()
+            .match_typing_expr(annotation, "TypeAlias")
+        {
+            continue;
+        }
+
+        diagnostics.push(Diagnostic::new(
+            UnusedPrivateTypeAlias {
+                name: id.to_string(),
             },
             binding.range,
         ));
