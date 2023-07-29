@@ -1,42 +1,54 @@
 ---
 source: crates/ruff/src/rules/pylint/mod.rs
 ---
-bad_format_character.py:3:7: PLE1300 Unsupported format character 'z' (0x7a) at index 4
+bad_format_character.py:5:1: PLE1300 Unsupported format character 'z' (0x7a) at index 4
   |
-1 | # pylint: disable=missing-docstring,consider-using-f-string
-2 | 
-3 | print("%s %z" % ("hello", "world"))  # [bad-format-character]
-  |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLE1300
+3 | ## Old style formatting
 4 | 
-5 | print("%s" "%z" % ("hello", "world"))  # [bad-format-character]
-  |
-
-bad_format_character.py:5:7: PLE1300 Unsupported format character 'z' (0x7a) at index 1
-  |
-3 | print("%s %z" % ("hello", "world"))  # [bad-format-character]
-4 | 
-5 | print("%s" "%z" % ("hello", "world"))  # [bad-format-character]
-  |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLE1300
+5 | "%s %z" % ("hello", "world")  # [bad-format-character]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLE1300
 6 | 
-7 | print("""%s %z""" % ("hello", "world"))  # [bad-format-character]
+7 | "%s" "%z" % ("hello", "world")  # [bad-format-character]
   |
 
-bad_format_character.py:7:7: PLE1300 Unsupported format character 'z' (0x7a) at index 4
+bad_format_character.py:7:1: PLE1300 Unsupported format character 'z' (0x7a) at index 1
   |
-5 | print("%s" "%z" % ("hello", "world"))  # [bad-format-character]
+5 | "%s %z" % ("hello", "world")  # [bad-format-character]
 6 | 
-7 | print("""%s %z""" % ("hello", "world"))  # [bad-format-character]
-  |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLE1300
+7 | "%s" "%z" % ("hello", "world")  # [bad-format-character]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLE1300
 8 | 
-9 | print("""%s""" """%z""" % ("hello", "world"))  # [bad-format-character]
+9 | """%s %z""" % ("hello", "world")  # [bad-format-character]
   |
 
-bad_format_character.py:9:7: PLE1300 Unsupported format character 'z' (0x7a) at index 1
-  |
-7 | print("""%s %z""" % ("hello", "world"))  # [bad-format-character]
-8 | 
-9 | print("""%s""" """%z""" % ("hello", "world"))  # [bad-format-character]
-  |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLE1300
-  |
+bad_format_character.py:9:1: PLE1300 Unsupported format character 'z' (0x7a) at index 4
+   |
+ 7 | "%s" "%z" % ("hello", "world")  # [bad-format-character]
+ 8 | 
+ 9 | """%s %z""" % ("hello", "world")  # [bad-format-character]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLE1300
+10 | 
+11 | """%s""" """%z""" % ("hello", "world")  # [bad-format-character]
+   |
+
+bad_format_character.py:11:1: PLE1300 Unsupported format character 'z' (0x7a) at index 1
+   |
+ 9 | """%s %z""" % ("hello", "world")  # [bad-format-character]
+10 | 
+11 | """%s""" """%z""" % ("hello", "world")  # [bad-format-character]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLE1300
+12 | 
+13 | ## New style formatting
+   |
+
+bad_format_character.py:15:1: PLE1300 Unsupported format character 'y' (0x79) at index 7
+   |
+13 | ## New style formatting
+14 | 
+15 | "{:s} {:y}".format("hello", "world")  # [bad-format-character]
+   | ^^^^^^^^^^^ PLE1300
+16 | 
+17 | "{:*^30s}".format("centered")
+   |
 
 

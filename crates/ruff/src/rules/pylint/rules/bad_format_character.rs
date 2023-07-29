@@ -1,7 +1,12 @@
 use std::str::FromStr;
 
-use ruff_python_ast::{Expr, Ranged};
-use ruff_python_literal::cformat::{CFormatErrorType, CFormatString};
+use ruff_python_ast::{Constant, Expr, ExprBinOp, ExprConstant, Operator, Ranged};
+use ruff_python_literal::{
+    cformat::{CFormatErrorType, CFormatString},
+    format::FormatPart,
+    format::FromTemplate,
+    format::{FormatSpec, FormatSpecError, FormatString},
+};
 use ruff_python_parser::{lexer, Mode};
 use ruff_text_size::TextRange;
 
@@ -12,7 +17,7 @@ use ruff_python_ast::str::{leading_quote, trailing_quote};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for unsupported argument types in "old-style" format strings.
+/// Checks for unsupported argument types in format strings.
 ///
 /// ## Why is this bad?
 /// The format string is not checked at compile time, so it is easy to
@@ -21,6 +26,11 @@ use crate::checkers::ast::Checker;
 /// ## Example
 /// ```python
 /// print("%z" % "1")
+///
+/// print("{:z}".format("1"))
+///
+/// x = 1
+/// print(f"{x:z}")
 /// ```
 #[violation]
 pub struct BadFormatCharacter {
@@ -38,8 +48,44 @@ impl Violation for BadFormatCharacter {
     }
 }
 
+fn bad_format_character_in_new_style_format(
+    checker: &mut Checker,
+    string: &String,
+    range: &TextRange,
+) {
+    if let Ok(format_string) = FormatString::from_str(string) {
+        // We keep track of the length of the format string so we can report the correct index
+        // in the string literal.
+        let mut parts_len = 0;
+        for part in &format_string.format_parts {
+            match part {
+                FormatPart::Field { format_spec, .. } => {
+                    // Add two for the opening brace and the colon {:
+                    parts_len += 2 + format_spec.len();
+                    if let Err(FormatSpecError::InvalidFormatType) = FormatSpec::parse(format_spec)
+                    {
+                        checker.diagnostics.push(Diagnostic::new(
+                            BadFormatCharacter {
+                                // The format type character is always the last one.
+                                // More info in the official spec:
+                                // https://docs.python.org/3/library/string.html#format-specification-mini-language
+                                format_char: format_spec.chars().last().unwrap(),
+                                index: parts_len - 1,
+                            },
+                            range.clone(),
+                        ));
+                    }
+                    // Add 1 for the closing brace }
+                    parts_len += 1;
+                }
+                FormatPart::Literal(s) => parts_len += s.len(),
+            }
+        }
+    }
+}
+
 /// PLE1300
-pub(crate) fn bad_format_character(checker: &mut Checker, expr: &Expr) {
+fn bad_format_character_in_old_style_format(checker: &mut Checker, expr: &Expr) {
     // Grab each string segment (in case there's an implicit concatenation).
     let content = checker.locator().slice(expr.range());
     let mut strings: Vec<TextRange> = vec![];
@@ -56,7 +102,6 @@ pub(crate) fn bad_format_character(checker: &mut Checker, expr: &Expr) {
     if strings.is_empty() {
         return;
     }
-
     for range in &strings {
         let string = checker.locator().slice(*range);
         let (Some(leader), Some(trailer)) = (leading_quote(string), trailing_quote(string)) else {
@@ -79,5 +124,24 @@ pub(crate) fn bad_format_character(checker: &mut Checker, expr: &Expr) {
                 _ => continue,
             }
         };
+    }
+}
+
+pub(crate) fn bad_format_character(checker: &mut Checker, expr: &Expr) {
+    match expr {
+        Expr::Constant(ExprConstant {
+            value: Constant::Str(value),
+            kind: _,
+            range: _,
+        }) => bad_format_character_in_new_style_format(checker, &value, &expr.range()),
+        Expr::BinOp(ExprBinOp {
+            left: _,
+            op: Operator::Mod,
+            right: _,
+            range: _,
+        }) => {
+            bad_format_character_in_old_style_format(checker, expr);
+        }
+        _ => {}
     }
 }

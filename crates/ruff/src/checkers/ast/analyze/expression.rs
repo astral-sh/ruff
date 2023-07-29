@@ -1244,6 +1244,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     checker.diagnostics.push(diagnostic);
                 }
             }
+            if checker.enabled(Rule::BadFormatCharacter) {
+                pylint::rules::bad_format_character(checker, expr);
+            }
             if checker.enabled(Rule::HardcodedTempFile) {
                 if let Some(diagnostic) = flake8_bandit::rules::hardcoded_tmp_directory(
                     expr,
