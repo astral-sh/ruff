@@ -888,6 +888,7 @@ impl From<ExprCall> for Expr {
 pub struct ExprFormattedValue {
     pub range: TextRange,
     pub value: Box<Expr>,
+    pub debug_text: Option<DebugText>,
     pub conversion: ConversionFlag,
     pub format_spec: Option<Box<Expr>>,
 }
@@ -923,6 +924,14 @@ impl ConversionFlag {
     pub fn to_char(&self) -> Option<char> {
         Some(self.to_byte()? as char)
     }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct DebugText {
+    /// The text between the `{` and the expression node.
+    pub leading: String,
+    /// The text between the expression and the conversion, the format_spec, or the `}`, depending on what's present in the source
+    pub trailing: String,
 }
 
 /// See also [JoinedStr](https://docs.python.org/3/library/ast.html#ast.JoinedStr)

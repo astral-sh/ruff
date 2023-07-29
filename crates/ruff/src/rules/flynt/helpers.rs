@@ -5,6 +5,7 @@ use ruff_text_size::TextRange;
 fn to_formatted_value_expr(inner: &Expr) -> Expr {
     let node = ast::ExprFormattedValue {
         value: Box::new(inner.clone()),
+        debug_text: None,
         conversion: ConversionFlag::None,
         format_spec: None,
         range: TextRange::default(),

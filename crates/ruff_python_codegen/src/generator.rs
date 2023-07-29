@@ -5,8 +5,8 @@ use std::ops::Deref;
 
 use ruff_python_ast::{
     self as ast, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Constant, ConversionFlag,
-    ExceptHandler, Expr, Identifier, MatchCase, Operator, Pattern, Stmt, Suite, TypeParam,
-    TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
+    DebugText, ExceptHandler, Expr, Identifier, MatchCase, Operator, Pattern, Stmt, Suite,
+    TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
 };
 use ruff_python_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
 
@@ -1189,10 +1189,11 @@ impl<'a> Generator<'a> {
             }
             Expr::FormattedValue(ast::ExprFormattedValue {
                 value,
+                debug_text,
                 conversion,
                 format_spec,
                 range: _range,
-            }) => self.unparse_formatted(value, *conversion, format_spec.as_deref()),
+            }) => self.unparse_formatted(value, debug_text, *conversion, format_spec.as_deref()),
             Expr::JoinedStr(ast::ExprJoinedStr {
                 values,
                 range: _range,
@@ -1382,7 +1383,13 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_formatted(&mut self, val: &Expr, conversion: ConversionFlag, spec: Option<&Expr>) {
+    fn unparse_formatted(
+        &mut self,
+        val: &Expr,
+        debug_text: &Option<DebugText>,
+        conversion: ConversionFlag,
+        spec: Option<&Expr>,
+    ) {
         let mut generator = Generator::new(self.indent, self.quote, self.line_ending);
         generator.unparse_expr(val, precedence::FORMATTED_VALUE);
         let brace = if generator.buffer.starts_with('{') {
@@ -1392,7 +1399,16 @@ impl<'a> Generator<'a> {
             "{"
         };
         self.p(brace);
+
+        if let Some(debug_text) = debug_text {
+            self.buffer += debug_text.leading.as_str();
+        }
+
         self.buffer += &generator.buffer;
+
+        if let Some(debug_text) = debug_text {
+            self.buffer += debug_text.trailing.as_str();
+        }
 
         if !conversion.is_none() {
             self.p("!");
@@ -1425,10 +1441,11 @@ impl<'a> Generator<'a> {
             }
             Expr::FormattedValue(ast::ExprFormattedValue {
                 value,
+                debug_text,
                 conversion,
                 format_spec,
                 range: _range,
-            }) => self.unparse_formatted(value, *conversion, format_spec.as_deref()),
+            }) => self.unparse_formatted(value, debug_text, *conversion, format_spec.as_deref()),
             _ => unreachable!(),
         }
     }
@@ -1753,6 +1770,14 @@ class Foo:
         assert_eq!(round_trip(r#""he\"llo""#), r#"'he"llo'"#);
         assert_eq!(round_trip(r#"f"abc{'def'}{1}""#), r#"f"abc{'def'}{1}""#);
         assert_eq!(round_trip(r#"f'abc{"def"}{1}'"#), r#"f"abc{'def'}{1}""#);
+    }
+
+    #[test]
+    fn self_documenting_f_string() {
+        assert_round_trip!(r#"f"{ chr(65)  =   }""#);
+        assert_round_trip!(r#"f"{ chr(65)  =   !s}""#);
+        assert_round_trip!(r#"f"{ chr(65)  =   !r}""#);
+        assert_round_trip!(r#"f"{ chr(65)  =   :#x}""#);
     }
 
     #[test]
