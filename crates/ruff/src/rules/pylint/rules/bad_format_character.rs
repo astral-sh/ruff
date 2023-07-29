@@ -48,11 +48,7 @@ impl Violation for BadFormatCharacter {
     }
 }
 
-fn bad_format_character_in_new_style_format(
-    checker: &mut Checker,
-    string: &String,
-    range: &TextRange,
-) {
+fn bad_format_character_in_new_style_format(checker: &mut Checker, string: &str, range: TextRange) {
     if let Ok(format_string) = FormatString::from_str(string) {
         // We keep track of the length of the format string so we can report the correct index
         // in the string literal.
@@ -72,7 +68,7 @@ fn bad_format_character_in_new_style_format(
                                 format_char: format_spec.chars().last().unwrap(),
                                 index: parts_len - 1,
                             },
-                            range.clone(),
+                            range,
                         ));
                     }
                     // Add 1 for the closing brace }
@@ -119,7 +115,7 @@ fn bad_format_character_in_old_style_format(checker: &mut Checker, expr: &Expr) 
                             index: format_error.index,
                         },
                         expr.range(),
-                    ))
+                    ));
                 }
                 _ => continue,
             }
@@ -133,7 +129,7 @@ pub(crate) fn bad_format_character(checker: &mut Checker, expr: &Expr) {
             value: Constant::Str(value),
             kind: _,
             range: _,
-        }) => bad_format_character_in_new_style_format(checker, &value, &expr.range()),
+        }) => bad_format_character_in_new_style_format(checker, value, expr.range()),
         Expr::BinOp(ExprBinOp {
             left: _,
             op: Operator::Mod,
