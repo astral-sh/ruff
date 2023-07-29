@@ -214,11 +214,13 @@ pub(crate) fn unused_private_type_alias(
         }
 
         let Some(source) = binding.source else {
-        continue;
+            continue;
         };
-        let Stmt::AnnAssign(ast::StmtAnnAssign { target, annotation, .. }) = checker.semantic().stmts[source]
+        let Stmt::AnnAssign(ast::StmtAnnAssign {
+            target, annotation, ..
+        }) = checker.semantic().stmts[source]
         else {
-            continue
+            continue;
         };
         let Some(ast::ExprName { id, .. }) = target.as_name_expr() else {
             continue;
