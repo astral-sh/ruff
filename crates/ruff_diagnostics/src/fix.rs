@@ -1,6 +1,7 @@
-use ruff_text_size::TextSize;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+
+use ruff_text_size::TextSize;
 
 use crate::edit::Edit;
 
@@ -42,8 +43,11 @@ pub enum IsolationLevel {
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Fix {
+    /// The [`Edit`] elements to be applied, sorted by [`Edit::start`] in ascending order.
     edits: Vec<Edit>,
+    /// The [`Applicability`] of the fix.
     applicability: Applicability,
+    /// The [`IsolationLevel`] of the fix.
     isolation_level: IsolationLevel,
 }
 
@@ -83,8 +87,10 @@ impl Fix {
 
     /// Create a new [`Fix`] with [automatic applicability](Applicability::Automatic) from multiple [`Edit`] elements.
     pub fn automatic_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
+        let mut edits: Vec<Edit> = std::iter::once(edit).chain(rest).collect();
+        edits.sort_by_key(Edit::start);
         Self {
-            edits: std::iter::once(edit).chain(rest).collect(),
+            edits,
             applicability: Applicability::Automatic,
             isolation_level: IsolationLevel::default(),
         }
@@ -101,8 +107,10 @@ impl Fix {
 
     /// Create a new [`Fix`] with [suggested applicability](Applicability::Suggested) from multiple [`Edit`] elements.
     pub fn suggested_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
+        let mut edits: Vec<Edit> = std::iter::once(edit).chain(rest).collect();
+        edits.sort_by_key(Edit::start);
         Self {
-            edits: std::iter::once(edit).chain(rest).collect(),
+            edits,
             applicability: Applicability::Suggested,
             isolation_level: IsolationLevel::default(),
         }
@@ -119,8 +127,10 @@ impl Fix {
 
     /// Create a new [`Fix`] with [manual applicability](Applicability::Manual) from multiple [`Edit`] elements.
     pub fn manual_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
+        let mut edits: Vec<Edit> = std::iter::once(edit).chain(rest).collect();
+        edits.sort_by_key(Edit::start);
         Self {
-            edits: std::iter::once(edit).chain(rest).collect(),
+            edits,
             applicability: Applicability::Manual,
             isolation_level: IsolationLevel::default(),
         }
@@ -128,16 +138,12 @@ impl Fix {
 
     /// Return the [`TextSize`] of the first [`Edit`] in the [`Fix`].
     pub fn min_start(&self) -> Option<TextSize> {
-        self.edits.iter().map(Edit::start).min()
+        self.edits.first().map(Edit::start)
     }
 
-    /// Return a slice of the [`Edit`] elements in the [`Fix`].
+    /// Return a slice of the [`Edit`] elements in the [`Fix`], sorted by [`Edit::start`] in ascending order.
     pub fn edits(&self) -> &[Edit] {
         &self.edits
-    }
-
-    pub fn into_edits(self) -> Vec<Edit> {
-        self.edits
     }
 
     /// Return the [`Applicability`] of the [`Fix`].

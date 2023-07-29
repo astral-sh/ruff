@@ -1,8 +1,9 @@
 use std::cmp::Ordering;
 
-use ruff_text_size::{TextRange, TextSize};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+
+use ruff_text_size::{TextRange, TextSize};
 
 /// A text edit to be applied to a source file. Inserts, deletes, or replaces
 /// content at a given location.
