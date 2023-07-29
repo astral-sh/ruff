@@ -12,7 +12,7 @@ use filetime::FileTime;
 use log::{debug, error, warn};
 use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::FxHashMap;
-use similar::{DiffTag, TextDiff};
+use similar::TextDiff;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
