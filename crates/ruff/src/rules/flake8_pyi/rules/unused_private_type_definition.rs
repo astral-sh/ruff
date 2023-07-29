@@ -111,6 +111,48 @@ impl Violation for UnusedPrivateTypeAlias {
     }
 }
 
+/// ## What it does
+/// Checks for the presence of unused private `typing.TypedDict` definitions.
+///
+/// ## Why is this bad?
+/// A private `typing.TypedDict` that is defined but not used is likely a
+/// mistake, and should either be used, made public, or removed to avoid
+/// confusion.
+///
+/// ## Example
+/// ```python
+/// import typing
+///
+///
+/// class _UnusedPrivateTypedDict(typing.TypedDict):
+///     foo: list[int]
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import typing
+///
+///
+/// class _UsedPrivateTypedDict(typing.TypedDict):
+///     foo: set[str]
+///
+///
+/// def func(arg: _UsedPrivateTypedDict) -> _UsedPrivateTypedDict:
+///     ...
+/// ```
+#[violation]
+pub struct UnusedPrivateTypedDict {
+    name: String,
+}
+
+impl Violation for UnusedPrivateTypedDict {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let UnusedPrivateTypedDict { name } = self;
+        format!("Private TypedDict `{name}` is never used")
+    }
+}
+
 /// PYI018
 pub(crate) fn unused_private_type_var(
     checker: &Checker,
@@ -236,6 +278,48 @@ pub(crate) fn unused_private_type_alias(
         diagnostics.push(Diagnostic::new(
             UnusedPrivateTypeAlias {
                 name: id.to_string(),
+            },
+            binding.range,
+        ));
+    }
+}
+
+/// PYI049
+pub(crate) fn unused_private_typed_dict(
+    checker: &Checker,
+    scope: &Scope,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    for binding in scope
+        .binding_ids()
+        .map(|binding_id| checker.semantic().binding(binding_id))
+    {
+        if !(binding.kind.is_class_definition() && binding.is_private_declaration()) {
+            continue;
+        }
+        if binding.is_used() {
+            continue;
+        }
+
+        let Some(source) = binding.source else {
+            continue;
+        };
+        let Stmt::ClassDef(ast::StmtClassDef { name, bases, .. }) =
+            checker.semantic().stmts[source]
+        else {
+            continue;
+        };
+
+        if !bases
+            .iter()
+            .any(|base| checker.semantic().match_typing_expr(base, "TypedDict"))
+        {
+            continue;
+        }
+
+        diagnostics.push(Diagnostic::new(
+            UnusedPrivateTypedDict {
+                name: name.to_string(),
             },
             binding.range,
         ));
