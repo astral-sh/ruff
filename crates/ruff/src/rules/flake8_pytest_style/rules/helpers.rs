@@ -50,7 +50,7 @@ pub(super) fn keyword_is_literal(keyword: &Keyword, literal: &str) -> bool {
         ..
     }) = &keyword.value
     {
-        string == literal
+        *string == literal
     } else {
         false
     }

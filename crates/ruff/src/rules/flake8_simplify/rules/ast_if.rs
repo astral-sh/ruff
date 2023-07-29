@@ -263,14 +263,14 @@ fn is_main_check(expr: &Expr) -> bool {
     }) = expr
     {
         if let Expr::Name(ast::ExprName { id, .. }) = left.as_ref() {
-            if id == "__name__" {
+            if id.as_str() == "__name__" {
                 if comparators.len() == 1 {
                     if let Expr::Constant(ast::ExprConstant {
                         value: Constant::Str(value),
                         ..
                     }) = &comparators[0]
                     {
-                        if value == "__main__" {
+                        if *value == "__main__" {
                             return true;
                         }
                     }
@@ -950,7 +950,7 @@ pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &ast::St
     let node1 = *test_key.clone();
     let node2 = ast::ExprAttribute {
         value: expected_subscript.clone(),
-        attr: Identifier::new("get".to_string(), TextRange::default()),
+        attr: Identifier::new("get", TextRange::default()),
         ctx: ExprContext::Load,
         range: TextRange::default(),
     };

@@ -54,7 +54,7 @@ pub(crate) fn useless_object_inheritance(checker: &mut Checker, class_def: &ast:
         let Expr::Name(ast::ExprName { id, .. }) = base else {
             continue;
         };
-        if id != "object" {
+        if *id != "object" {
             continue;
         }
         if !checker.semantic().is_builtin("object") {

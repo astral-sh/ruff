@@ -74,7 +74,7 @@ pub(crate) fn exclude_with_model_form(
                 let Expr::Name(ast::ExprName { id, .. }) = target else {
                     continue;
                 };
-                if id == "exclude" {
+                if id.as_str() == "exclude" {
                     return Some(Diagnostic::new(DjangoExcludeWithModelForm, target.range()));
                 }
             }

@@ -94,10 +94,7 @@ fn fix_banned_relative_import(
         panic!("Expected Stmt::ImportFrom");
     };
     let node = ast::StmtImportFrom {
-        module: Some(Identifier::new(
-            module_path.to_string(),
-            TextRange::default(),
-        )),
+        module: Some(Identifier::new(module_path, TextRange::default())),
         names: names.clone(),
         level: Some(Int::new(0)),
         range: TextRange::default(),

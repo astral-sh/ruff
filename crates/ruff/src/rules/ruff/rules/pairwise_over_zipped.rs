@@ -125,7 +125,7 @@ pub(crate) fn pairwise_over_zipped(checker: &mut Checker, func: &Expr, args: &[E
     }
 
     // Require the function to be the builtin `zip`.
-    if !(id == "zip" && checker.semantic().is_builtin(id)) {
+    if !(*id == "zip" && checker.semantic().is_builtin(id)) {
         return;
     }
 

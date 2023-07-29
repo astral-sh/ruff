@@ -77,7 +77,7 @@ pub(crate) fn type_param_name_mismatch(checker: &mut Checker, value: &Expr, targ
         return;
     };
 
-    if var_name == param_name {
+    if *var_name == param_name {
         return;
     }
 

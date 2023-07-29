@@ -118,7 +118,7 @@ fn create_class_def_stmt(
     base_class: &Expr,
 ) -> Stmt {
     ast::StmtClassDef {
-        name: Identifier::new(class_name.to_string(), TextRange::default()),
+        name: Identifier::new(class_name, TextRange::default()),
         arguments: Some(Box::new(Arguments {
             args: vec![base_class.clone()],
             keywords: match total_keyword {
@@ -167,7 +167,7 @@ fn properties_from_dict_call(func: &Expr, keywords: &[Keyword]) -> Result<Vec<St
     let Expr::Name(ast::ExprName { id, .. }) = func else {
         bail!("Expected `func` to be `Expr::Name`")
     };
-    if id != "dict" {
+    if *id != "dict" {
         bail!("Expected `id` to be `\"dict\"`")
     }
     if keywords.is_empty() {

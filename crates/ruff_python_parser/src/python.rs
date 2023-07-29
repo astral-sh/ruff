@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: f99d8cb29227bfbe1fa07719f655304a9a93fd4715726687ef40c091adbdbad5
+// sha3: 610d05ec4782fe6dfbe20b76757198e57ba7bf04e19451a8d3b4eeb38c8634ae
 use num_bigint::BigInt;
 use ruff_text_size::TextSize;
 use ruff_python_ast::{self as ast, Ranged, MagicKind};
@@ -47,8 +47,8 @@ mod __parse__Top {
         Variant1((f64, f64)),
         Variant2(f64),
         Variant3(BigInt),
-        Variant4((MagicKind, String)),
-        Variant5(String),
+        Variant4((MagicKind, compact_str::CompactString)),
+        Variant5(compact_str::CompactString),
         Variant6((String, StringKind, bool)),
         Variant7(core::option::Option<token::Tok>),
         Variant8(Option<Box<ast::Parameter>>),
@@ -17563,7 +17563,7 @@ mod __parse__Top {
     fn __pop_Variant4<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, (MagicKind, String), TextSize)
+    ) -> (TextSize, (MagicKind, compact_str::CompactString), TextSize)
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant4(__v), __r)) => (__l, __v, __r),
@@ -17757,16 +17757,6 @@ mod __parse__Top {
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant86(__v), __r)) => (__l, __v, __r),
-            _ => __symbol_type_mismatch()
-        }
-    }
-    fn __pop_Variant5<
-    >(
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, String, TextSize)
-     {
-        match __symbols.pop() {
-            Some((__l, __Symbol::Variant5(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18297,6 +18287,16 @@ mod __parse__Top {
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant17(__v), __r)) => (__l, __v, __r),
+            _ => __symbol_type_mismatch()
+        }
+    }
+    fn __pop_Variant5<
+    >(
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
+    ) -> (TextSize, compact_str::CompactString, TextSize)
+     {
+        match __symbols.pop() {
+            Some((__l, __Symbol::Variant5(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -31580,7 +31580,7 @@ fn __action67<
 {
     {
         // Star import all
-        vec![ast::Alias { name: ast::Identifier::new("*", (location..end_location).into()), asname: None, range: (location..end_location).into() }]
+        vec![ast::Alias { name: ast::Identifier::new(compact_str::CompactString::new_inline("*"), (location..end_location).into()), asname: None, range: (location..end_location).into() }]
     }
 }
 
@@ -31590,7 +31590,7 @@ fn __action68<
 >(
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, n, _): (TextSize, String, TextSize),
+    (_, n, _): (TextSize, compact_str::CompactString, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Identifier
 {
@@ -31603,7 +31603,7 @@ fn __action69<
 >(
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, n, _): (TextSize, String, TextSize),
+    (_, n, _): (TextSize, compact_str::CompactString, TextSize),
     (_, n2, _): (TextSize, alloc::vec::Vec<(token::Tok, ast::Identifier)>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Identifier
@@ -31683,7 +31683,7 @@ fn __action73<
 >(
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, m, _): (TextSize, (MagicKind, String), TextSize),
+    (_, m, _): (TextSize, (MagicKind, compact_str::CompactString), TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -31711,7 +31711,7 @@ fn __action74<
 >(
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, m, _): (TextSize, (MagicKind, String), TextSize),
+    (_, m, _): (TextSize, (MagicKind, compact_str::CompactString), TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -34477,7 +34477,7 @@ fn __action234<
 >(
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, s, _): (TextSize, String, TextSize),
+    (_, s, _): (TextSize, compact_str::CompactString, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Identifier
 {
@@ -45088,7 +45088,7 @@ fn __action777<
 fn __action778<
 >(
     mode: Mode,
-    __0: (TextSize, String, TextSize),
+    __0: (TextSize, compact_str::CompactString, TextSize),
     __1: (TextSize, TextSize, TextSize),
 ) -> ast::Identifier
 {
@@ -45113,7 +45113,7 @@ fn __action778<
 fn __action779<
 >(
     mode: Mode,
-    __0: (TextSize, String, TextSize),
+    __0: (TextSize, compact_str::CompactString, TextSize),
     __1: (TextSize, alloc::vec::Vec<(token::Tok, ast::Identifier)>, TextSize),
     __2: (TextSize, TextSize, TextSize),
 ) -> ast::Identifier
@@ -45977,7 +45977,7 @@ fn __action808<
 fn __action809<
 >(
     mode: Mode,
-    __0: (TextSize, String, TextSize),
+    __0: (TextSize, compact_str::CompactString, TextSize),
     __1: (TextSize, TextSize, TextSize),
 ) -> ast::Identifier
 {
@@ -46299,7 +46299,7 @@ fn __action819<
 fn __action820<
 >(
     mode: Mode,
-    __0: (TextSize, (MagicKind, String), TextSize),
+    __0: (TextSize, (MagicKind, compact_str::CompactString), TextSize),
     __1: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -46324,7 +46324,7 @@ fn __action820<
 fn __action821<
 >(
     mode: Mode,
-    __0: (TextSize, (MagicKind, String), TextSize),
+    __0: (TextSize, (MagicKind, compact_str::CompactString), TextSize),
     __1: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -59054,7 +59054,7 @@ fn __action1268<
 fn __action1269<
 >(
     mode: Mode,
-    __0: (TextSize, String, TextSize),
+    __0: (TextSize, compact_str::CompactString, TextSize),
 ) -> ast::Identifier
 {
     let __start0 = __0.2;
@@ -59077,7 +59077,7 @@ fn __action1269<
 fn __action1270<
 >(
     mode: Mode,
-    __0: (TextSize, String, TextSize),
+    __0: (TextSize, compact_str::CompactString, TextSize),
     __1: (TextSize, alloc::vec::Vec<(token::Tok, ast::Identifier)>, TextSize),
 ) -> ast::Identifier
 {
@@ -59654,7 +59654,7 @@ fn __action1292<
 fn __action1293<
 >(
     mode: Mode,
-    __0: (TextSize, String, TextSize),
+    __0: (TextSize, compact_str::CompactString, TextSize),
 ) -> ast::Identifier
 {
     let __start0 = __0.2;
@@ -59971,7 +59971,7 @@ fn __action1304<
 fn __action1305<
 >(
     mode: Mode,
-    __0: (TextSize, (MagicKind, String), TextSize),
+    __0: (TextSize, (MagicKind, compact_str::CompactString), TextSize),
 ) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
@@ -59994,7 +59994,7 @@ fn __action1305<
 fn __action1306<
 >(
     mode: Mode,
-    __0: (TextSize, (MagicKind, String), TextSize),
+    __0: (TextSize, (MagicKind, compact_str::CompactString), TextSize),
 ) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;

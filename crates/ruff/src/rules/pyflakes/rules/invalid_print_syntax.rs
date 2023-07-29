@@ -60,7 +60,7 @@ pub(crate) fn invalid_print_syntax(checker: &mut Checker, left: &Expr) {
     let Expr::Name(ast::ExprName { id, .. }) = &left else {
         return;
     };
-    if id != "print" {
+    if *id != "print" {
         return;
     }
     if !checker.semantic().is_builtin("print") {

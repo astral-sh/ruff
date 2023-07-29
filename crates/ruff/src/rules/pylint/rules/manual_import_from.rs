@@ -74,7 +74,7 @@ pub(crate) fn manual_from_import(
     if checker.patch(diagnostic.kind.rule()) {
         if names.len() == 1 {
             let node = ast::StmtImportFrom {
-                module: Some(Identifier::new(module.to_string(), TextRange::default())),
+                module: Some(Identifier::new(module, TextRange::default())),
                 names: vec![Alias {
                     name: asname.clone(),
                     asname: None,

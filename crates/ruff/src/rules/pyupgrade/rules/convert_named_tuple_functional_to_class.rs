@@ -165,7 +165,7 @@ fn create_properties_from_keywords(keywords: &[Keyword]) -> Result<Vec<Stmt>> {
 /// keywords.
 fn create_class_def_stmt(typename: &str, body: Vec<Stmt>, base_class: &Expr) -> Stmt {
     ast::StmtClassDef {
-        name: Identifier::new(typename.to_string(), TextRange::default()),
+        name: Identifier::new(typename, TextRange::default()),
         arguments: Some(Box::new(Arguments {
             args: vec![base_class.clone()],
             keywords: vec![],

@@ -13,6 +13,7 @@ license = { workspace = true }
 
 [dependencies]
 bitflags = { workspace = true }
+compact_str = { workspace = true }
 hexf-parse = "0.2.1"
 is-macro.workspace = true
 itertools = { workspace = true }

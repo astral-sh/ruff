@@ -1,3 +1,4 @@
+use compact_str::CompactString;
 use std::str::FromStr;
 
 use ruff_python_ast::{self as ast, Constant, Expr, Ranged};
@@ -295,7 +296,11 @@ fn convertible(format_string: &CFormatString, params: &Expr) -> bool {
         }
 
         // No equivalent in format.
-        if fmt.mapping_key.as_ref().is_some_and(String::is_empty) {
+        if fmt
+            .mapping_key
+            .as_ref()
+            .is_some_and(CompactString::is_empty)
+        {
             return false;
         }
 

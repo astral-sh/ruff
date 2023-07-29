@@ -220,7 +220,7 @@ fn function(
                 })
                 .collect::<Vec<_>>();
             let func = Stmt::FunctionDef(ast::StmtFunctionDef {
-                name: Identifier::new(name.to_string(), TextRange::default()),
+                name: Identifier::new(name, TextRange::default()),
                 parameters: Box::new(Parameters {
                     posonlyargs: new_posonlyargs,
                     args: new_args,
@@ -236,7 +236,7 @@ fn function(
         }
     }
     let func = Stmt::FunctionDef(ast::StmtFunctionDef {
-        name: Identifier::new(name.to_string(), TextRange::default()),
+        name: Identifier::new(name, TextRange::default()),
         parameters: Box::new(parameters.clone()),
         body: vec![body],
         decorator_list: vec![],

@@ -36,6 +36,7 @@ bitflags = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true, features = ["derive", "string"], optional = true }
 colored = { workspace = true }
+compact_str = { workspace = true }
 dirs = { version = "5.0.0" }
 fern = { version = "0.6.1" }
 glob = { workspace = true }

@@ -87,7 +87,7 @@ pub(crate) fn raise_without_from_inside_except(
                 if let Some(name) = name {
                     if exc
                         .as_name_expr()
-                        .is_some_and(|ast::ExprName { id, .. }| name == id)
+                        .is_some_and(|ast::ExprName { id, .. }| name == id.as_str())
                     {
                         continue;
                     }

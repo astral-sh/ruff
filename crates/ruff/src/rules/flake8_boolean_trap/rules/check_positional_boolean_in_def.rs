@@ -110,11 +110,11 @@ pub(crate) fn check_positional_boolean_in_def(
 
         // check for both bool (python class) and 'bool' (string annotation)
         let hint = match expr.as_ref() {
-            Expr::Name(name) => &name.id == "bool",
+            Expr::Name(name) => name.id.as_str() == "bool",
             Expr::Constant(ast::ExprConstant {
                 value: Constant::Str(value),
                 ..
-            }) => value == "bool",
+            }) => *value == "bool",
             _ => false,
         };
         if !hint {

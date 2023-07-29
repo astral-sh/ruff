@@ -74,7 +74,7 @@ pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr) {
         return;
     };
 
-    if !(id == "list" && checker.semantic().is_builtin("list")) {
+    if !(id.as_str() == "list" && checker.semantic().is_builtin("list")) {
         return;
     }
 

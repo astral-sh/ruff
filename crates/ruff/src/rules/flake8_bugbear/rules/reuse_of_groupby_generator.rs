@@ -82,7 +82,7 @@ impl<'a> GroupNameFinder<'a> {
 
     fn name_matches(&self, expr: &Expr) -> bool {
         if let Expr::Name(ast::ExprName { id, .. }) = expr {
-            id == self.group_name
+            id.as_str() == self.group_name
         } else {
             false
         }

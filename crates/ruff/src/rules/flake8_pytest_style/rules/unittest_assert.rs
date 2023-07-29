@@ -393,7 +393,7 @@ impl UnittestAssert {
                 };
                 let node1 = ast::ExprAttribute {
                     value: Box::new(node.into()),
-                    attr: Identifier::new("search".to_string(), TextRange::default()),
+                    attr: Identifier::new("search", TextRange::default()),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
                 };

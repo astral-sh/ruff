@@ -163,7 +163,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                 });
                 let node2 = Expr::Attribute(ast::ExprAttribute {
                     value: Box::new(node1),
-                    attr: Identifier::new(attr_name.to_string(), TextRange::default()),
+                    attr: Identifier::new(attr_name, TextRange::default()),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
                 });

@@ -117,7 +117,7 @@ fn get_element_type(element: &Stmt, semantic: &SemanticModel) -> Option<ContentT
             let Expr::Name(ast::ExprName { id, .. }) = expr else {
                 return None;
             };
-            if id == "objects" {
+            if id.as_str() == "objects" {
                 Some(ContentType::ManagerDeclaration)
             } else {
                 None

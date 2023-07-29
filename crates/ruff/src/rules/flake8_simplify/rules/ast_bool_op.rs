@@ -335,7 +335,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
         let Expr::Name(ast::ExprName { id: func_name, .. }) = func.as_ref() else {
             continue;
         };
-        if func_name != "isinstance" {
+        if func_name.as_str() != "isinstance" {
             continue;
         }
         if !checker.semantic().is_builtin("isinstance") {

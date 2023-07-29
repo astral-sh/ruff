@@ -1,6 +1,7 @@
 use std::fmt;
 
 use anyhow::Result;
+use compact_str::CompactString;
 use ruff_python_ast::{
     self as ast, Constant, Expr, Operator, ParameterWithDefault, Parameters, Ranged,
 };
@@ -150,7 +151,7 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
             let new_expr = Expr::Subscript(ast::ExprSubscript {
                 range: TextRange::default(),
                 value: Box::new(Expr::Name(ast::ExprName {
-                    id: binding,
+                    id: CompactString::from(binding),
                     ctx: ast::ExprContext::Store,
                     range: TextRange::default(),
                 })),

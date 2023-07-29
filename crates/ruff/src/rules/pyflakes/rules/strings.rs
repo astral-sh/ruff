@@ -1,3 +1,4 @@
+use compact_str::CompactString;
 use std::string::ToString;
 
 use ruff_python_ast::{self as ast, Constant, Expr, Identifier, Keyword};
@@ -182,7 +183,7 @@ impl AlwaysAutofixableViolation for PercentFormatExtraNamedArguments {
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[violation]
 pub struct PercentFormatMissingArgument {
-    missing: Vec<String>,
+    missing: Vec<CompactString>,
 }
 
 impl Violation for PercentFormatMissingArgument {
@@ -467,7 +468,7 @@ impl Violation for StringDotFormatExtraPositionalArguments {
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[violation]
 pub struct StringDotFormatMissingArguments {
-    missing: Vec<String>,
+    missing: Vec<CompactString>,
 }
 
 impl Violation for StringDotFormatMissingArguments {
@@ -586,7 +587,7 @@ pub(crate) fn percent_format_extra_named_arguments(
                 value: Constant::Str(value),
                 ..
             })) => {
-                if summary.keywords.contains(value) {
+                if summary.keywords.contains(&CompactString::new(value)) {
                     None
                 } else {
                     Some((index, value.as_str()))
@@ -649,7 +650,7 @@ pub(crate) fn percent_format_missing_arguments(
                 value: Constant::Str(value),
                 ..
             }) => {
-                keywords.insert(value);
+                keywords.insert(CompactString::new(value));
             }
             _ => {
                 return; // Dynamic keys present
@@ -657,10 +658,10 @@ pub(crate) fn percent_format_missing_arguments(
         }
     }
 
-    let missing: Vec<&String> = summary
+    let missing: Vec<&CompactString> = summary
         .keywords
         .iter()
-        .filter(|k| !keywords.contains(k))
+        .filter(|k| !keywords.contains(*k))
         .collect();
 
     if !missing.is_empty() {
@@ -755,7 +756,7 @@ pub(crate) fn string_dot_format_extra_named_arguments(
     let missing: Vec<(usize, &str)> = keywords
         .enumerate()
         .filter_map(|(index, keyword)| {
-            if summary.keywords.contains(keyword.as_ref()) {
+            if summary.keywords.contains(keyword.as_compact_str()) {
                 None
             } else {
                 Some((index, keyword.as_str()))
@@ -880,12 +881,12 @@ pub(crate) fn string_dot_format_missing_argument(
         })
         .collect();
 
-    let missing: Vec<String> = summary
+    let missing: Vec<CompactString> = summary
         .autos
         .iter()
         .chain(summary.indices.iter())
         .filter(|&&i| i >= args.len())
-        .map(ToString::to_string)
+        .map(|value| CompactString::from(value.to_string()))
         .chain(
             summary
                 .keywords

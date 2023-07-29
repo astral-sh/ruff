@@ -1,4 +1,5 @@
 //! Implements helper functions for using vendored/cformat.rs
+use compact_str::CompactString;
 use std::convert::TryFrom;
 use std::str::FromStr;
 
@@ -10,7 +11,7 @@ use rustc_hash::FxHashSet;
 pub(crate) struct CFormatSummary {
     pub(crate) starred: bool,
     pub(crate) num_positional: usize,
-    pub(crate) keywords: FxHashSet<String>,
+    pub(crate) keywords: FxHashSet<CompactString>,
 }
 
 impl From<&CFormatString> for CFormatSummary {
@@ -73,7 +74,10 @@ mod tests {
         let literal = "%(foo)s %s %d %(bar)x";
 
         let expected_positional = 2;
-        let expected_keywords = ["foo", "bar"].into_iter().map(String::from).collect();
+        let expected_keywords = ["foo", "bar"]
+            .into_iter()
+            .map(CompactString::from)
+            .collect();
 
         let format_summary = CFormatSummary::try_from(literal).unwrap();
         assert!(!format_summary.starred);

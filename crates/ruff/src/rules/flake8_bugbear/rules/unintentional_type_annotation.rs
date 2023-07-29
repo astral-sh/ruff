@@ -53,7 +53,7 @@ pub(crate) fn unintentional_type_annotation(
         }
         Expr::Attribute(ast::ExprAttribute { value, .. }) => {
             if let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() {
-                if id != "self" {
+                if id.as_str() != "self" {
                     checker
                         .diagnostics
                         .push(Diagnostic::new(UnintentionalTypeAnnotation, stmt.range()));

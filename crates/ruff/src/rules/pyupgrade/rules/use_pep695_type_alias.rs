@@ -1,3 +1,4 @@
+use compact_str::CompactString;
 use ruff_python_ast::{Expr, ExprName, Ranged, Stmt, StmtAnnAssign, StmtTypeAlias};
 
 use crate::{registry::AsRule, settings::types::PythonVersion};
@@ -25,7 +26,7 @@ use crate::checkers::ast::Checker;
 /// ```
 #[violation]
 pub struct NonPEP695TypeAlias {
-    name: String,
+    name: CompactString,
 }
 
 impl Violation for NonPEP695TypeAlias {

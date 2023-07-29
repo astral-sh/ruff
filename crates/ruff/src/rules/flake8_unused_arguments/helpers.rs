@@ -21,11 +21,13 @@ fn is_empty_stmt(stmt: &Stmt) -> bool {
                 if let Some(exc) = exc {
                     match exc.as_ref() {
                         Expr::Name(ast::ExprName { id, .. }) => {
-                            return id == "NotImplementedError" || id == "NotImplemented";
+                            return id.as_str() == "NotImplementedError"
+                                || id.as_str() == "NotImplemented";
                         }
                         Expr::Call(ast::ExprCall { func, .. }) => {
                             if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
-                                return id == "NotImplementedError" || id == "NotImplemented";
+                                return id.as_str() == "NotImplementedError"
+                                    || id.as_str() == "NotImplemented";
                             }
                         }
                         _ => {}

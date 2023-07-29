@@ -163,7 +163,7 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
     let Expr::Name(ast::ExprName { id, .. }) = attr_value.as_ref() else {
         return;
     };
-    if id != "os" || attr != "environ" {
+    if *id != "os" || attr != "environ" {
         return;
     }
     let Expr::Constant(ast::ExprConstant {

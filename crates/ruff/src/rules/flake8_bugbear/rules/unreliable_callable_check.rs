@@ -74,13 +74,13 @@ pub(crate) fn unreliable_callable_check(
     else {
         return;
     };
-    if string != "__call__" {
+    if *string != "__call__" {
         return;
     }
 
     let mut diagnostic = Diagnostic::new(UnreliableCallableCheck, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
-        if id == "hasattr" {
+        if id.as_str() == "hasattr" {
             if checker.semantic().is_builtin("callable") {
                 diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                     format!("callable({})", checker.locator().slice(obj.range())),

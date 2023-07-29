@@ -42,7 +42,7 @@ impl Violation for ZipWithoutExplicitStrict {
 /// B905
 pub(crate) fn zip_without_explicit_strict(checker: &mut Checker, call: &ast::ExprCall) {
     if let Expr::Name(ast::ExprName { id, .. }) = call.func.as_ref() {
-        if id == "zip"
+        if id.as_str() == "zip"
             && checker.semantic().is_builtin("zip")
             && call.arguments.find_keyword("strict").is_none()
             && !call

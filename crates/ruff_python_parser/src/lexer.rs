@@ -28,6 +28,7 @@
 //!
 //! [Lexical analysis]: https://docs.python.org/3/reference/lexical_analysis.html
 
+use compact_str::CompactString;
 use std::borrow::Cow;
 use std::iter::FusedIterator;
 use std::{char, cmp::Ordering, str::FromStr};
@@ -231,7 +232,7 @@ impl<'source> Lexer<'source> {
             "yield" => Tok::Yield,
             _ => {
                 return Ok(Tok::Name {
-                    name: text.to_string(),
+                    name: CompactString::new(text),
                 })
             }
         };
@@ -395,7 +396,7 @@ impl<'source> Lexer<'source> {
 
         self.cursor.eat_while(|c| !matches!(c, '\n' | '\r'));
 
-        Tok::Comment(self.token_text().to_string())
+        Tok::Comment(CompactString::new(self.token_text()))
     }
 
     /// Lex a single magic command.
@@ -429,7 +430,10 @@ impl<'source> Lexer<'source> {
                     value.push('\\');
                 }
                 '\n' | '\r' | EOF_CHAR => {
-                    return Tok::MagicCommand { kind, value };
+                    return Tok::MagicCommand {
+                        kind,
+                        value: CompactString::from_string_buffer(value),
+                    };
                 }
                 c => {
                     self.cursor.bump();
@@ -585,7 +589,7 @@ impl<'source> Lexer<'source> {
 
                 Ok((
                     Tok::Name {
-                        name: c.to_string(),
+                        name: c.to_string().into(),
                     },
                     self.token_range(),
                 ))
@@ -1145,7 +1149,7 @@ mod tests {
 
     fn str_tok(s: &str) -> Tok {
         Tok::String {
-            value: s.to_owned(),
+            value: s.into(),
             kind: StringKind::String,
             triple_quoted: false,
         }
@@ -1153,7 +1157,7 @@ mod tests {
 
     fn raw_str_tok(s: &str) -> Tok {
         Tok::String {
-            value: s.to_owned(),
+            value: s.to_string(),
             kind: StringKind::RawString,
             triple_quoted: false,
         }
@@ -1166,7 +1170,7 @@ mod tests {
             tokens,
             vec![
                 Tok::MagicCommand {
-                    value: "matplotlib   --inline".to_string(),
+                    value: CompactString::new("matplotlib   --inline"),
                     kind: MagicKind::Magic
                 },
                 Tok::Newline
@@ -1196,7 +1200,7 @@ mod tests {
             tokens,
             vec![
                 Tok::MagicCommand {
-                    value: "matplotlib ".to_string(),
+                    value: CompactString::new_inline("matplotlib "),
                     kind: MagicKind::Magic
                 },
                 Tok::Newline
@@ -1227,47 +1231,47 @@ mod tests {
             tokens,
             vec![
                 Tok::MagicCommand {
-                    value: String::new(),
+                    value: CompactString::default(),
                     kind: MagicKind::Magic,
                 },
                 Tok::Newline,
                 Tok::MagicCommand {
-                    value: String::new(),
+                    value: CompactString::default(),
                     kind: MagicKind::Magic2,
                 },
                 Tok::Newline,
                 Tok::MagicCommand {
-                    value: String::new(),
+                    value: CompactString::default(),
                     kind: MagicKind::Shell,
                 },
                 Tok::Newline,
                 Tok::MagicCommand {
-                    value: String::new(),
+                    value: CompactString::default(),
                     kind: MagicKind::ShCap,
                 },
                 Tok::Newline,
                 Tok::MagicCommand {
-                    value: String::new(),
+                    value: CompactString::default(),
                     kind: MagicKind::Help,
                 },
                 Tok::Newline,
                 Tok::MagicCommand {
-                    value: String::new(),
+                    value: CompactString::default(),
                     kind: MagicKind::Help2,
                 },
                 Tok::Newline,
                 Tok::MagicCommand {
-                    value: String::new(),
+                    value: CompactString::default(),
                     kind: MagicKind::Paren,
                 },
                 Tok::Newline,
                 Tok::MagicCommand {
-                    value: String::new(),
+                    value: CompactString::default(),
                     kind: MagicKind::Quote,
                 },
                 Tok::Newline,
                 Tok::MagicCommand {
-                    value: String::new(),
+                    value: CompactString::default(),
                     kind: MagicKind::Quote2,
                 },
                 Tok::Newline,
@@ -1298,57 +1302,57 @@ mod tests {
             tokens,
             vec![
                 Tok::MagicCommand {
-                    value: "foo".to_string(),
+                    value: CompactString::new_inline("foo"),
                     kind: MagicKind::Help,
                 },
                 Tok::Newline,
                 Tok::MagicCommand {
-                    value: "foo".to_string(),
+                    value: CompactString::new_inline("foo"),
                     kind: MagicKind::Help2,
                 },
                 Tok::Newline,
                 Tok::MagicCommand {
-                    value: "timeit a = b".to_string(),
+                    value: CompactString::new_inline("timeit a = b"),
                     kind: MagicKind::Magic,
                 },
                 Tok::Newline,
                 Tok::MagicCommand {
-                    value: "timeit a % 3".to_string(),
+                    value: CompactString::new_inline("timeit a % 3"),
                     kind: MagicKind::Magic,
                 },
                 Tok::Newline,
                 Tok::MagicCommand {
-                    value: "matplotlib     --inline".to_string(),
+                    value: CompactString::new("matplotlib     --inline"),
                     kind: MagicKind::Magic,
                 },
                 Tok::Newline,
                 Tok::MagicCommand {
-                    value: "pwd   && ls -a | sed 's/^/\\\\    /'".to_string(),
+                    value: CompactString::new("pwd   && ls -a | sed 's/^/\\\\    /'"),
                     kind: MagicKind::Shell,
                 },
                 Tok::Newline,
                 Tok::MagicCommand {
-                    value: "cd /Users/foo/Library/Application\\ Support/".to_string(),
+                    value: CompactString::new("cd /Users/foo/Library/Application\\ Support/"),
                     kind: MagicKind::ShCap,
                 },
                 Tok::Newline,
                 Tok::MagicCommand {
-                    value: "foo 1 2".to_string(),
+                    value: CompactString::new_inline("foo 1 2"),
                     kind: MagicKind::Paren,
                 },
                 Tok::Newline,
                 Tok::MagicCommand {
-                    value: "foo 1 2".to_string(),
+                    value: CompactString::new_inline("foo 1 2"),
                     kind: MagicKind::Quote,
                 },
                 Tok::Newline,
                 Tok::MagicCommand {
-                    value: "foo 1 2".to_string(),
+                    value: CompactString::new_inline("foo 1 2"),
                     kind: MagicKind::Quote2,
                 },
                 Tok::Newline,
                 Tok::MagicCommand {
-                    value: "ls".to_string(),
+                    value: CompactString::new_inline("ls"),
                     kind: MagicKind::Shell,
                 },
                 Tok::Newline,
@@ -1372,7 +1376,7 @@ if True:
                 Tok::Newline,
                 Tok::Indent,
                 Tok::MagicCommand {
-                    value: "matplotlib         --inline".to_string(),
+                    value: CompactString::new("matplotlib         --inline"),
                     kind: MagicKind::Magic,
                 },
                 Tok::Newline,
@@ -1395,38 +1399,38 @@ baz = %matplotlib \
             tokens,
             vec![
                 Tok::Name {
-                    name: "pwd".to_string()
+                    name: CompactString::new_inline("pwd")
                 },
                 Tok::Equal,
                 Tok::MagicCommand {
-                    value: "pwd".to_string(),
+                    value: CompactString::new_inline("pwd"),
                     kind: MagicKind::Shell,
                 },
                 Tok::Newline,
                 Tok::Name {
-                    name: "foo".to_string()
+                    name: CompactString::new_inline("foo")
                 },
                 Tok::Equal,
                 Tok::MagicCommand {
-                    value: "timeit a = b".to_string(),
+                    value: CompactString::new_inline("timeit a = b"),
                     kind: MagicKind::Magic,
                 },
                 Tok::Newline,
                 Tok::Name {
-                    name: "bar".to_string()
+                    name: CompactString::new_inline("bar")
                 },
                 Tok::Equal,
                 Tok::MagicCommand {
-                    value: "timeit a % 3".to_string(),
+                    value: CompactString::new_inline("timeit a % 3"),
                     kind: MagicKind::Magic,
                 },
                 Tok::Newline,
                 Tok::Name {
-                    name: "baz".to_string()
+                    name: CompactString::new_inline("baz")
                 },
                 Tok::Equal,
                 Tok::MagicCommand {
-                    value: "matplotlib         inline".to_string(),
+                    value: CompactString::new("matplotlib         inline"),
                     kind: MagicKind::Magic,
                 },
                 Tok::Newline,
@@ -1508,7 +1512,7 @@ def f(arg=%timeit a = b):
             fn $name() {
                 let source = format!(r"99232  # {}", $eol);
                 let tokens = lex_source(&source);
-                assert_eq!(tokens, vec![Tok::Int { value: BigInt::from(99232) }, Tok::Comment(format!("# {}", $eol)), Tok::Newline]);
+                assert_eq!(tokens, vec![Tok::Int { value: BigInt::from(99232) }, Tok::Comment(CompactString::new(&format!("# {}", $eol))), Tok::Newline]);
             }
             )*
         }
@@ -1533,7 +1537,7 @@ def f(arg=%timeit a = b):
                     tokens,
                     vec![
                         Tok::Int { value: BigInt::from(123) },
-                        Tok::Comment("# Foo".to_string()),
+                        Tok::Comment(CompactString::new_inline("# Foo")),
                         Tok::Newline,
                         Tok::Int { value: BigInt::from(456) },
                         Tok::Newline,
@@ -1558,7 +1562,7 @@ def f(arg=%timeit a = b):
             tokens,
             vec![
                 Tok::Name {
-                    name: String::from("a_variable"),
+                    name: CompactString::new_inline("a_variable"),
                 },
                 Tok::Equal,
                 Tok::Int {
@@ -1590,7 +1594,7 @@ def f(arg=%timeit a = b):
                     vec![
                         Tok::Def,
                         Tok::Name {
-                            name: String::from("foo"),
+                            name: CompactString::new_inline("foo"),
                         },
                         Tok::Lpar,
                         Tok::Rpar,
@@ -1628,7 +1632,7 @@ def f(arg=%timeit a = b):
                     vec![
                         Tok::Def,
                         Tok::Name {
-                            name: String::from("foo"),
+                            name: CompactString::new_inline("foo"),
                         },
                         Tok::Lpar,
                         Tok::Rpar,
@@ -1637,7 +1641,7 @@ def f(arg=%timeit a = b):
                         Tok::Indent,
                         Tok::If,
                         Tok::Name {
-                            name: String::from("x"),
+                            name: CompactString::new_inline("x"),
                         },
                         Tok::Colon,
                         Tok::Newline,
@@ -1669,7 +1673,7 @@ def f(arg=%timeit a = b):
                     vec![
                         Tok::Def,
                         Tok::Name {
-                            name: String::from("foo"),
+                            name: CompactString::new_inline("foo"),
                         },
                         Tok::Lpar,
                         Tok::Rpar,
@@ -1678,7 +1682,7 @@ def f(arg=%timeit a = b):
                         Tok::Indent,
                         Tok::If,
                         Tok::Name {
-                            name: String::from("x"),
+                            name: CompactString::new_inline("x"),
                         },
                         Tok::Colon,
                         Tok::Newline,
@@ -1730,7 +1734,7 @@ def f(arg=%timeit a = b):
                     tokens,
                     vec![
                         Tok::Name {
-                            name: String::from("x"),
+                            name: CompactString::new_inline("x"),
                         },
                         Tok::Equal,
                         Tok::Lsqb,
@@ -1811,9 +1815,9 @@ def f(arg=%timeit a = b):
         assert_eq!(
             tokens,
             vec![
-                Tok::Comment("#Hello".to_owned()),
+                Tok::Comment(CompactString::new_inline("#Hello")),
                 Tok::NonLogicalNewline,
-                Tok::Comment("#World".to_owned()),
+                Tok::Comment(CompactString::new_inline("#World")),
                 Tok::NonLogicalNewline,
             ]
         );

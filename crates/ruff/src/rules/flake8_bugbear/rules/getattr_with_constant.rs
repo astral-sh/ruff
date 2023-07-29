@@ -57,7 +57,7 @@ pub(crate) fn getattr_with_constant(
     let Expr::Name(ast::ExprName { id, .. }) = func else {
         return;
     };
-    if id != "getattr" {
+    if id.as_str() != "getattr" {
         return;
     }
     let [obj, arg] = args else {

@@ -1,4 +1,5 @@
 use crate::{lexer::LexResult, token::Tok, Mode};
+use compact_str::CompactString;
 use itertools::{Itertools, MultiPeek};
 
 /// An [`Iterator`] that transforms a token stream to accommodate soft keywords (namely, `match`
@@ -158,6 +159,6 @@ fn soft_to_name(tok: &Tok) -> Tok {
         _ => unreachable!("other tokens never reach here"),
     };
     Tok::Name {
-        name: name.to_owned(),
+        name: CompactString::new_inline(name),
     }
 }

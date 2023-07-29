@@ -52,7 +52,7 @@ fn assignment(obj: &Expr, name: &str, value: &Expr, generator: Generator) -> Str
     let stmt = Stmt::Assign(ast::StmtAssign {
         targets: vec![Expr::Attribute(ast::ExprAttribute {
             value: Box::new(obj.clone()),
-            attr: Identifier::new(name.to_string(), TextRange::default()),
+            attr: Identifier::new(name, TextRange::default()),
             ctx: ExprContext::Store,
             range: TextRange::default(),
         })],
@@ -72,7 +72,7 @@ pub(crate) fn setattr_with_constant(
     let Expr::Name(ast::ExprName { id, .. }) = func else {
         return;
     };
-    if id != "setattr" {
+    if id.as_str() != "setattr" {
         return;
     }
     let [obj, name, value] = args else {

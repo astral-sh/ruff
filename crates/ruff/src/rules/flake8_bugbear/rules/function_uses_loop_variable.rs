@@ -149,7 +149,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                     Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
                         if attr == "reduce" {
                             if let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() {
-                                if id == "functools" {
+                                if id.as_str() == "functools" {
                                     for arg in args {
                                         if arg.is_lambda_expr() {
                                             self.safe_functions.push(arg);

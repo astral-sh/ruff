@@ -1,4 +1,5 @@
 //! Implements helper functions for using vendored/format.rs
+use compact_str::CompactString;
 use std::convert::TryFrom;
 
 use ruff_python_literal::format::{
@@ -24,7 +25,7 @@ pub(crate) fn error_to_string(err: &FormatParseError) -> String {
 pub(crate) struct FormatSummary {
     pub(crate) autos: Vec<usize>,
     pub(crate) indices: Vec<usize>,
-    pub(crate) keywords: Vec<String>,
+    pub(crate) keywords: Vec<CompactString>,
     pub(crate) has_nested_parts: bool,
 }
 

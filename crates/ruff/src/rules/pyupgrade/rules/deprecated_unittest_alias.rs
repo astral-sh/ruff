@@ -88,7 +88,7 @@ pub(crate) fn deprecated_unittest_alias(checker: &mut Checker, expr: &Expr) {
     let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
         return;
     };
-    if id != "self" {
+    if *id != "self" {
         return;
     }
     let mut diagnostic = Diagnostic::new(

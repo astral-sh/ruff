@@ -47,7 +47,7 @@ fn extract_import_map(path: &Path, package: Option<&Path>, blocks: &[&Block]) ->
             }) => {
                 let level = level.map_or(0, |level| level.to_usize());
                 let module = if let Some(module) = module {
-                    let module: &String = module.as_ref();
+                    let module = module.as_ref();
                     if level == 0 {
                         Cow::Borrowed(module)
                     } else {

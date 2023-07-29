@@ -1,6 +1,7 @@
 //! Implementation of Printf-Style string formatting
 //! as per the [Python Docs](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting).
 use bitflags::bitflags;
+use compact_str::CompactString;
 use num_traits::Signed;
 use std::{
     cmp, fmt,
@@ -119,7 +120,7 @@ pub enum CFormatQuantity {
 
 #[derive(Debug, PartialEq)]
 pub struct CFormatSpec {
-    pub mapping_key: Option<String>,
+    pub mapping_key: Option<CompactString>,
     pub flags: CConversionFlags,
     pub min_field_width: Option<CFormatQuantity>,
     pub precision: Option<CFormatPrecision>,
@@ -410,7 +411,9 @@ impl CFormatSpec {
     }
 }
 
-fn parse_spec_mapping_key<T, I>(iter: &mut ParseIter<I>) -> Result<Option<String>, ParsingError>
+fn parse_spec_mapping_key<T, I>(
+    iter: &mut ParseIter<I>,
+) -> Result<Option<CompactString>, ParsingError>
 where
     T: Into<char> + Copy,
     I: Iterator<Item = T>,
@@ -546,13 +549,13 @@ where
     Ok(None)
 }
 
-fn parse_text_inside_parentheses<T, I>(iter: &mut ParseIter<I>) -> Option<String>
+fn parse_text_inside_parentheses<T, I>(iter: &mut ParseIter<I>) -> Option<CompactString>
 where
     T: Into<char>,
     I: Iterator<Item = T>,
 {
     let mut counter: i32 = 1;
-    let mut contained_text = String::new();
+    let mut contained_text = CompactString::default();
     loop {
         let (_, c) = iter.next()?;
         let c = c.into();
@@ -776,7 +779,7 @@ mod tests {
     #[test]
     fn test_parse_key() {
         let expected = Ok(CFormatSpec {
-            mapping_key: Some("amount".to_owned()),
+            mapping_key: Some(CompactString::new_inline("amount")),
             format_type: CFormatType::Number(CNumberType::Decimal),
             format_char: 'd',
             min_field_width: None,
@@ -786,7 +789,7 @@ mod tests {
         assert_eq!("%(amount)d".parse::<CFormatSpec>(), expected);
 
         let expected = Ok(CFormatSpec {
-            mapping_key: Some("m((u(((l((((ti))))p)))l))e".to_owned()),
+            mapping_key: Some(CompactString::new("m((u(((l((((ti))))p)))l))e")),
             format_type: CFormatType::Number(CNumberType::Decimal),
             format_char: 'd',
             min_field_width: None,

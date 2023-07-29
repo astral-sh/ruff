@@ -839,7 +839,7 @@ where
                 range: _,
             }) => {
                 if let Expr::Name(ast::ExprName { id, ctx, range: _ }) = func.as_ref() {
-                    if id == "locals" && ctx.is_load() {
+                    if id.as_str() == "locals" && ctx.is_load() {
                         let scope = self.semantic.scope_mut();
                         scope.set_uses_locals();
                     }
@@ -1651,21 +1651,21 @@ impl<'a> Checker<'a> {
             && match parent {
                 Stmt::Assign(ast::StmtAssign { targets, .. }) => {
                     if let Some(Expr::Name(ast::ExprName { id, .. })) = targets.first() {
-                        id == "__all__"
+                        id.as_str() == "__all__"
                     } else {
                         false
                     }
                 }
                 Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
                     if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
-                        id == "__all__"
+                        id.as_str() == "__all__"
                     } else {
                         false
                     }
                 }
                 Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
                     if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
-                        id == "__all__"
+                        id.as_str() == "__all__"
                     } else {
                         false
                     }

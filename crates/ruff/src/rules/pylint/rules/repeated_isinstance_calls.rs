@@ -81,7 +81,7 @@ pub(crate) fn repeated_isinstance_calls(
         else {
             continue;
         };
-        if !matches!(func.as_ref(), Expr::Name(ast::ExprName { id, .. }) if id == "isinstance") {
+        if !matches!(func.as_ref(), Expr::Name(ast::ExprName { id, .. }) if *id == "isinstance") {
             continue;
         }
         let [obj, types] = &args[..] else {

@@ -244,6 +244,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37b2a672a2cb129a2e41c10b1224bb368f9f37a2b16b612598138befd7b37eb5"
 
 [[package]]
+name = "castaway"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8a17ed5635fc8536268e5d4de1e22e81ac34419e5f052d4d51f4e01dcc263fcc"
+dependencies = [
+ "rustversion",
+]
+
+[[package]]
 name = "cc"
 version = "1.0.79"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -417,6 +426,20 @@ dependencies = [
  "is-terminal",
  "lazy_static",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "compact_str"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f86b9c4c00838774a6d902ef931eff7470720c51d90c2e32cfe15dc304737b3f"
+dependencies = [
+ "castaway",
+ "cfg-if",
+ "itoa",
+ "ryu",
+ "serde",
+ "static_assertions",
 ]
 
 [[package]]
@@ -2050,6 +2073,7 @@ dependencies = [
  "chrono",
  "clap",
  "colored",
+ "compact_str",
  "dirs 5.0.1",
  "fern",
  "glob",
@@ -2278,6 +2302,7 @@ name = "ruff_python_ast"
 version = "0.0.0"
 dependencies = [
  "bitflags 2.3.3",
+ "compact_str",
  "insta",
  "is-macro",
  "memchr",
@@ -2349,6 +2374,7 @@ name = "ruff_python_literal"
 version = "0.0.0"
 dependencies = [
  "bitflags 2.3.3",
+ "compact_str",
  "hexf-parse",
  "is-macro",
  "itertools",
@@ -2364,6 +2390,7 @@ name = "ruff_python_parser"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "compact_str",
  "insta",
  "is-macro",
  "itertools",

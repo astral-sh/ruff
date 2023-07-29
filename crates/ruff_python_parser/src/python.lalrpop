@@ -270,7 +270,7 @@ ImportAsNames: Vec<ast::Alias> = {
     <location:@L> "(" <i:OneOrMore<ImportAsAlias<Identifier>>> ","? ")" <end_location:@R> => i,
     <location:@L> "*" <end_location:@R> => {
         // Star import all
-        vec![ast::Alias { name: ast::Identifier::new("*", (location..end_location).into()), asname: None, range: (location..end_location).into() }]
+        vec![ast::Alias { name: ast::Identifier::new(compact_str::CompactString::new_inline("*"), (location..end_location).into()), asname: None, range: (location..end_location).into() }]
     },
 };
 
@@ -1836,10 +1836,10 @@ extern {
             kind: <StringKind>,
             triple_quoted: <bool>
         },
-        name => token::Tok::Name { name: <String> },
+        name => token::Tok::Name { name: <compact_str::CompactString> },
         line_magic => token::Tok::MagicCommand {
             kind: <MagicKind>,
-            value: <String>
+            value: <compact_str::CompactString>
         },
         "\n" => token::Tok::Newline,
         ";" => token::Tok::Semi,

@@ -1132,6 +1132,7 @@ impl Truthiness {
 
 #[cfg(test)]
 mod tests {
+    use compact_str::CompactString;
     use std::borrow::Cow;
     use std::cell::RefCell;
     use std::vec;
@@ -1185,7 +1186,7 @@ mod tests {
     fn any_over_stmt_type_alias() {
         let seen = RefCell::new(Vec::new());
         let name = Expr::Name(ExprName {
-            id: "x".to_string(),
+            id: CompactString::new_inline("x"),
             range: TextRange::default(),
             ctx: ExprContext::Load,
         });

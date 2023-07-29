@@ -1,5 +1,6 @@
 use itertools::{Itertools, PeekingNext};
 
+use compact_str::CompactString;
 use num_traits::{cast::ToPrimitive, FromPrimitive, Signed};
 use std::error::Error;
 use std::ops::Deref;
@@ -848,7 +849,7 @@ impl FieldNamePart {
 pub enum FieldType {
     Auto,
     Index(usize),
-    Keyword(String),
+    Keyword(CompactString),
 }
 
 #[derive(Debug, PartialEq)]
@@ -860,7 +861,7 @@ pub struct FieldName {
 impl FieldName {
     pub fn parse(text: &str) -> Result<FieldName, FormatParseError> {
         let mut chars = text.chars().peekable();
-        let mut first = String::new();
+        let mut first = CompactString::default();
         for ch in chars.peeking_take_while(|ch| *ch != '.' && *ch != '[') {
             first.push(ch);
         }
@@ -1312,14 +1313,14 @@ mod tests {
         assert_eq!(
             FieldName::parse("key"),
             Ok(FieldName {
-                field_type: FieldType::Keyword("key".to_owned()),
+                field_type: FieldType::Keyword(CompactString::new_inline("key")),
                 parts: Vec::new(),
             })
         );
         assert_eq!(
             FieldName::parse("key.attr[0][string]"),
             Ok(FieldName {
-                field_type: FieldType::Keyword("key".to_owned()),
+                field_type: FieldType::Keyword(CompactString::new_inline("key")),
                 parts: vec![
                     FieldNamePart::Attribute("attr".to_owned()),
                     FieldNamePart::Index(0),

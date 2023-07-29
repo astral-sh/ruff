@@ -60,7 +60,7 @@ pub(crate) fn type_comparison(checker: &mut Checker, compare: &ast::ExprCompare)
             continue;
         };
 
-        if !(id == "type" && checker.semantic().is_builtin("type")) {
+        if !(*id == "type" && checker.semantic().is_builtin("type")) {
             continue;
         }
 
@@ -74,7 +74,7 @@ pub(crate) fn type_comparison(checker: &mut Checker, compare: &ast::ExprCompare)
                     continue;
                 };
 
-                if id == "type" && checker.semantic().is_builtin("type") {
+                if id.as_str() == "type" && checker.semantic().is_builtin("type") {
                     // Allow comparison for types which are not obvious.
                     if arguments
                         .args

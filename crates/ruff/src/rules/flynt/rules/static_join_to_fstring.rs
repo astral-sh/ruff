@@ -75,7 +75,8 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
                             None
                         }
                     })
-                    .join(joiner),
+                    .join(joiner)
+                    .into(),
             ),
             range: TextRange::default(),
             kind: None,

@@ -5,6 +5,7 @@
 //!
 //! [CPython source]: https://github.com/python/cpython/blob/dfc2e065a2e71011017077e549cd2f9bf4944c54/Include/internal/pycore_token.h;
 use crate::Mode;
+use compact_str::CompactString;
 use num_bigint::BigInt;
 use ruff_python_ast::MagicKind;
 use ruff_text_size::TextSize;
@@ -16,7 +17,7 @@ pub enum Tok {
     /// Token value for a name, commonly known as an identifier.
     Name {
         /// The name value.
-        name: String,
+        name: CompactString,
     },
     /// Token value for an integer.
     Int {
@@ -48,12 +49,12 @@ pub enum Tok {
     /// prior to parsing when the mode is [`Mode::Jupyter`].
     MagicCommand {
         /// The magic command value.
-        value: String,
+        value: CompactString,
         /// The kind of magic command.
         kind: MagicKind,
     },
     /// Token value for a comment. These are filtered out of the token stream prior to parsing.
-    Comment(String),
+    Comment(CompactString),
     /// Token value for a newline.
     Newline,
     /// Token value for a newline that is not a logical line break. These are filtered out of

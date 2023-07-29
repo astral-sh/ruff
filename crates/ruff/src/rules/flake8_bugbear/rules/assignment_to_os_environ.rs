@@ -62,7 +62,7 @@ pub(crate) fn assignment_to_os_environ(checker: &mut Checker, targets: &[Expr]) 
     let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
         return;
     };
-    if id != "os" {
+    if id.as_str() != "os" {
         return;
     }
     checker

@@ -1,6 +1,7 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
 use crate::Ranged;
+use compact_str::CompactString;
 use num_bigint::BigInt;
 use ruff_text_size::{TextRange, TextSize};
 use std::fmt;
@@ -109,7 +110,7 @@ pub enum Stmt {
 pub struct StmtLineMagic {
     pub range: TextRange,
     pub kind: MagicKind,
-    pub value: String,
+    pub value: CompactString,
 }
 
 impl From<StmtLineMagic> for Stmt {
@@ -616,7 +617,7 @@ pub enum Expr {
 pub struct ExprLineMagic {
     pub range: TextRange,
     pub kind: MagicKind,
-    pub value: String,
+    pub value: CompactString,
 }
 
 impl From<ExprLineMagic> for Expr {
@@ -989,7 +990,7 @@ impl From<ExprStarred> for Expr {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprName {
     pub range: TextRange,
-    pub id: String,
+    pub id: CompactString,
     pub ctx: ExprContext,
 }
 
@@ -2380,13 +2381,13 @@ impl MagicKind {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Identifier {
-    id: String,
+    id: CompactString,
     range: TextRange,
 }
 
 impl Identifier {
     #[inline]
-    pub fn new(id: impl Into<String>, range: TextRange) -> Self {
+    pub fn new(id: impl Into<CompactString>, range: TextRange) -> Self {
         Self {
             id: id.into(),
             range,
@@ -2398,6 +2399,11 @@ impl Identifier {
     #[inline]
     pub fn as_str(&self) -> &str {
         self.id.as_str()
+    }
+
+    #[inline]
+    pub fn as_compact_str(&self) -> &CompactString {
+        &self.id
     }
 }
 
@@ -2411,7 +2417,7 @@ impl PartialEq<str> for Identifier {
 impl PartialEq<String> for Identifier {
     #[inline]
     fn eq(&self, other: &String) -> bool {
-        &self.id == other
+        self.id == other
     }
 }
 
@@ -2430,29 +2436,21 @@ impl AsRef<str> for Identifier {
     }
 }
 
-impl AsRef<String> for Identifier {
-    #[inline]
-    fn as_ref(&self) -> &String {
-        &self.id
-    }
-}
-
 impl std::fmt::Display for Identifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Display::fmt(&self.id, f)
     }
 }
 
-impl From<Identifier> for String {
-    #[inline]
-    fn from(identifier: Identifier) -> String {
-        identifier.id
-    }
-}
-
 impl Ranged for Identifier {
     fn range(&self) -> TextRange {
         self.range
+    }
+}
+
+impl From<Identifier> for CompactString {
+    fn from(value: Identifier) -> Self {
+        value.id
     }
 }
 

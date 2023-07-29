@@ -70,7 +70,8 @@ pub(crate) fn private_member_access(checker: &mut Checker, expr: &Expr) {
                 .settings
                 .flake8_self
                 .ignore_names
-                .contains(attr.as_ref())
+                .iter()
+                .any(|name| name == attr.as_str())
             {
                 return;
             }
