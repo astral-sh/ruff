@@ -43,7 +43,7 @@ pub enum IsolationLevel {
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Fix {
-    /// The [`Edit`] elements to be applied, sorted by [`TextSize`].
+    /// The [`Edit`] elements to be applied, sorted by [`Edit::start`] in ascending order.
     edits: Vec<Edit>,
     /// The [`Applicability`] of the fix.
     applicability: Applicability,
@@ -141,7 +141,7 @@ impl Fix {
         self.edits.first().map(Edit::start)
     }
 
-    /// Return a slice of the [`Edit`] elements in the [`Fix`], sorted by their [`TextSize`].
+    /// Return a slice of the [`Edit`] elements in the [`Fix`], sorted by [`Edit::start`] in ascending order.
     pub fn edits(&self) -> &[Edit] {
         &self.edits
     }

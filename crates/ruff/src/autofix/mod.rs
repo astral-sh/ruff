@@ -50,7 +50,7 @@ fn apply_fixes<'a>(
     let mut fixed = FxHashMap::default();
     let mut source_map = SourceMap::default();
 
-    'outer: for (rule, fix) in diagnostics
+    for (rule, fix) in diagnostics
         .filter_map(|diagnostic| {
             diagnostic
                 .fix
@@ -59,34 +59,30 @@ fn apply_fixes<'a>(
         })
         .sorted_by(|(rule1, fix1), (rule2, fix2)| cmp_fix(*rule1, *rule2, fix1, fix2))
     {
-        let mut first = true;
-        'inner: for edit in fix.edits() {
-            // Skip any edits that were already applied.
-            if applied.contains(&edit) {
-                continue 'inner;
+        let mut edits = fix
+            .edits()
+            .iter()
+            .filter(|edit| !applied.contains(edit))
+            .peekable();
+
+        // If the fix contains at least one new edit, enforce isolation and positional requirements.
+        if let Some(first) = edits.peek() {
+            // If this fix requires isolation, and we've already applied another fix in the
+            // same isolation group, skip it.
+            if let IsolationLevel::Group(id) = fix.isolation() {
+                if !isolated.insert(id) {
+                    continue;
+                }
             }
 
-            // Lazily enforce any isolation and positional requirements (e.g., avoid applying
-            // overlapping fixes, but avoid applying this requirement if all fixes in the edit were
-            // already applied).
-            if first {
-                // If this fix requires isolation, and we've already applied another fix in the
-                // same isolation group, skip it.
-                if let IsolationLevel::Group(id) = fix.isolation() {
-                    if !isolated.insert(id) {
-                        continue 'outer;
-                    }
-                }
-
-                // Best-effort approach: if this fix overlaps with a fix we've already applied,
-                // skip it.
-                if last_pos.map_or(false, |last_pos| last_pos >= edit.start()) {
-                    continue 'outer;
-                }
-
-                first = false;
+            // If this fix overlaps with a fix we've already applied, skip it.
+            if last_pos.map_or(false, |last_pos| last_pos >= first.start()) {
+                continue;
             }
+        }
 
+        let mut applied_edits = Vec::with_capacity(fix.edits().len());
+        for edit in edits {
             // Add all contents from `last_pos` to `fix.location`.
             let slice = locator.slice(TextRange::new(last_pos.unwrap_or_default(), edit.start()));
             output.push_str(slice);
@@ -102,9 +98,10 @@ fn apply_fixes<'a>(
 
             // Track that the edit was applied.
             last_pos = Some(edit.end());
-            applied.insert(edit);
+            applied_edits.push(edit);
         }
 
+        applied.extend(applied_edits.drain(..));
         *fixed.entry(rule).or_default() += 1;
     }
 
