@@ -12,6 +12,7 @@ use ruff_python_ast::Ranged;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::Diagnostic;
+use ruff_python_trivia::indentation_at_offset;
 use ruff_source_file::{LineEnding, Locator};
 
 use crate::codes::NoqaCode;
@@ -249,18 +250,11 @@ impl FileExemption {
                     warn!("Invalid `# ruff: noqa` directive at {path_display}:{line}: {err}");
                 }
                 Ok(Some(exemption)) => {
-                    if !locator
-                        .slice(TextRange::new(
-                            locator.line_start(range.start()),
-                            range.start(),
-                        ))
-                        .chars()
-                        .all(char::is_whitespace)
-                    {
+                    if indentation_at_offset(range.start(), locator).is_none() {
                         #[allow(deprecated)]
                         let line = locator.compute_line_index(range.start());
                         let path_display = relativize_path(path);
-                        warn!("Unexpected end-of-line `# ruff: noqa` directive at {path_display}:{line}");
+                        warn!("Unexpected `# ruff: noqa` directive at {path_display}:{line}. File-level suppression comments must appear on their own line.");
                         continue;
                     }
 
@@ -277,7 +271,7 @@ impl FileExemption {
                                     #[allow(deprecated)]
                                     let line = locator.compute_line_index(range.start());
                                     let path_display = relativize_path(path);
-                                    warn!("Invalid code provided to `# ruff: noqa` at {path_display}:{line}: {code}");
+                                    warn!("Invalid rule code provided to `# ruff: noqa` at {path_display}:{line}: {code}");
                                     None
                                 }
                             }));

@@ -2,7 +2,7 @@ use ruff_source_file::Locator;
 use ruff_text_size::{TextRange, TextSize};
 
 /// Extract the leading indentation from a line.
-pub fn indentation_at_offset<'a>(locator: &'a Locator, offset: TextSize) -> Option<&'a str> {
+pub fn indentation_at_offset<'a>(offset: TextSize, locator: &'a Locator) -> Option<&'a str> {
     let line_start = locator.line_start(offset);
     let indentation = &locator.contents()[TextRange::new(line_start, offset)];
 
