@@ -181,6 +181,7 @@ pub enum ScopeKind<'a> {
     AsyncFunction(&'a ast::StmtAsyncFunctionDef),
     Generator,
     Module,
+    Type,
     Lambda(&'a ast::ExprLambda),
 }
 
