@@ -266,14 +266,6 @@ last_call()
 ```diff
 --- Black
 +++ Ruff
-@@ -1,6 +1,6 @@
- ...
- "some_string"
--b"\\xa3"
-+b"NOT_YET_IMPLEMENTED_BYTE_STRING"
- Name
- None
- True
 @@ -31,7 +31,7 @@
  -1
  ~int and not v1 ^ 123 + v2 | True
@@ -299,22 +291,7 @@ last_call()
  1 if True else 2
  str or None if True else str or bytes or None
  (str or None) if True else (str or bytes or None)
-@@ -57,7 +58,13 @@
- {"2.7": dead, "3.7": (long_live or die_hard), **{"3.6": verygood}}
- {**a, **b, **c}
- {"2.7", "3.6", "3.7", "3.8", "3.9", ("4.0" if gilectomy else "3.10")}
--({"a": "b"}, (True or False), (+value), "string", b"bytes") or None
-+(
-+    {"a": "b"},
-+    (True or False),
-+    (+value),
-+    "string",
-+    b"NOT_YET_IMPLEMENTED_BYTE_STRING",
-+) or None
- ()
- (1,)
- (1, 2)
-@@ -115,7 +122,7 @@
+@@ -115,7 +116,7 @@
      arg,
      another,
      kwarg="hey",
@@ -323,11 +300,10 @@ last_call()
  )  # note: no trailing comma pre-3.6
  call(*gidgets[:2])
  call(a, *gidgets[:2])
-@@ -207,25 +214,15 @@
- )
+@@ -208,24 +209,14 @@
  what_is_up_with_those_new_coord_names = (coord_names | set(vars_to_create)) - set(
      vars_to_remove
--)
+ )
 -result = (
 -    session.query(models.Customer.id)
 -    .filter(
@@ -335,7 +311,7 @@ last_call()
 -    )
 -    .order_by(models.Customer.id.asc())
 -    .all()
- )
+-)
 -result = (
 -    session.query(models.Customer.id)
 -    .filter(
@@ -357,7 +333,7 @@ last_call()
  Ø = set()
  authors.łukasz.say_thanks()
  mapping = {
-@@ -328,13 +325,18 @@
+@@ -328,13 +319,18 @@
  ):
      return True
  if (
@@ -379,7 +355,7 @@ last_call()
      ^ aaaaaaaa.i << aaaaaaaa.k >> aaaaaaaa.l**aaaaaaaa.m // aaaaaaaa.n
  ):
      return True
-@@ -342,7 +344,8 @@
+@@ -342,7 +338,8 @@
      ~aaaaaaaaaaaaaaaa.a
      + aaaaaaaaaaaaaaaa.b
      - aaaaaaaaaaaaaaaa.c * aaaaaaaaaaaaaaaa.d @ aaaaaaaaaaaaaaaa.e
@@ -396,7 +372,7 @@ last_call()
 ```py
 ...
 "some_string"
-b"NOT_YET_IMPLEMENTED_BYTE_STRING"
+b"\\xa3"
 Name
 None
 True
@@ -454,13 +430,7 @@ str or None if (1 if True else 2) else str or bytes or None
 {"2.7": dead, "3.7": (long_live or die_hard), **{"3.6": verygood}}
 {**a, **b, **c}
 {"2.7", "3.6", "3.7", "3.8", "3.9", ("4.0" if gilectomy else "3.10")}
-(
-    {"a": "b"},
-    (True or False),
-    (+value),
-    "string",
-    b"NOT_YET_IMPLEMENTED_BYTE_STRING",
-) or None
+({"a": "b"}, (True or False), (+value), "string", b"bytes") or None
 ()
 (1,)
 (1, 2)
