@@ -65,7 +65,7 @@ pub(crate) fn inplace_argument(
             .and_then(|module| checker.semantic().find_binding(module))
             .map_or(false, |binding| {
                 if let BindingKind::Import(import) = &binding.kind {
-                    matches!(import.call_path(), ["pandas"])
+                    matches!(import.path(), ["pandas"])
                 } else {
                     false
                 }

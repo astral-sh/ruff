@@ -1,8 +1,40 @@
 use smallvec::{smallvec, SmallVec};
+use std::ops::{Deref, Index};
 
 use crate::{nodes, Expr};
 
-/// A representation of a qualified name, like `typing.List`.
+/// A generic path to a dot-separated symbol.
+///
+/// For example:
+/// - Given `foo.bar.baz()`, the symbol path for the function call would be `["foo", "bar", "baz"]`.
+/// - Given `foo.bar.baz`, the symbol path for the attribute access would be `["foo", "bar", "baz"]`.
+/// - Given `import foo.bar.baz`, the symbol path for the import would be `["foo", "bar", "baz"]`.
+pub struct SymbolPath<'a>(&'a [&'a str]);
+
+impl<'a> From<CallPath<'a>> for SymbolPath<'a> {
+    fn from(path: CallPath<'a>) -> Self {
+        Self(path.as_slice())
+    }
+}
+
+// impl Index<usize> for SymbolPath<'_> {
+//     type Output = str;
+//
+//     fn index(&self, index: usize) -> &Self::Output {
+//         self.0[index]
+//     }
+// }
+
+impl<'a> Deref for SymbolPath<'a> {
+    type Target = [&'a str];
+
+    fn deref(&self) -> &Self::Target {
+        self.0
+    }
+}
+
+/// A representation of dot-separated path, like `foo.bar.baz`.
+/// The owned version of [`SymbolPath`].
 pub type CallPath<'a> = SmallVec<[&'a str; 8]>;
 
 /// Convert an `Expr` to its [`CallPath`] segments (like `["typing", "List"]`).
@@ -137,15 +169,15 @@ pub fn collect_call_path(expr: &Expr) -> Option<CallPath> {
 
 /// Convert an `Expr` to its call path (like `List`, or `typing.List`).
 pub fn compose_call_path(expr: &Expr) -> Option<String> {
-    collect_call_path(expr).map(|call_path| format_call_path(&call_path))
+    collect_call_path(expr).map(|call_path| format_call_path(SymbolPath::from(call_path)))
 }
 
 /// Format a call path for display.
-pub fn format_call_path(call_path: &[&str]) -> String {
+pub fn format_call_path(call_path: SymbolPath) -> String {
     if call_path.first().map_or(false, |first| first.is_empty()) {
         // If the first segment is empty, the `CallPath` is that of a builtin.
         // Ex) `["", "bool"]` -> `"bool"`
-        call_path[1..].join(".")
+        call_path.iter().skip(1).join(".")
     } else if call_path
         .first()
         .map_or(false, |first| matches!(*first, "."))

@@ -325,7 +325,7 @@ where
                         self.add_binding(
                             name,
                             alias.identifier(),
-                            BindingKind::SubmoduleImport(SubmoduleImport { call_path }),
+                            BindingKind::SubmoduleImport(SubmoduleImport { path: call_path }),
                             BindingFlags::EXTERNAL,
                         );
                     } else {
@@ -346,7 +346,7 @@ where
                         self.add_binding(
                             name,
                             alias.identifier(),
-                            BindingKind::Import(Import { call_path }),
+                            BindingKind::Import(Import { path: call_path }),
                             flags,
                         );
                     }
@@ -399,7 +399,7 @@ where
                         self.add_binding(
                             name,
                             alias.identifier(),
-                            BindingKind::FromImport(FromImport { call_path }),
+                            BindingKind::FromImport(FromImport { path: call_path }),
                             flags,
                         );
                     }

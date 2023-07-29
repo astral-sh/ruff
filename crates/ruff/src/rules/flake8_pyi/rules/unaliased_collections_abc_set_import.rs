@@ -54,7 +54,7 @@ pub(crate) fn unaliased_collections_abc_set_import(
     let BindingKind::FromImport(import) = &binding.kind else {
         return None;
     };
-    if !matches!(import.call_path(), ["collections", "abc", "Set"]) {
+    if !matches!(import.path(), ["collections", "abc", "Set"]) {
         return None;
     }
 
