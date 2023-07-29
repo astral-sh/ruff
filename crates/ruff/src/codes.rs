@@ -191,6 +191,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "E1142") => (RuleGroup::Unspecified, rules::pylint::rules::AwaitOutsideAsync),
         (Pylint, "E1205") => (RuleGroup::Unspecified, rules::pylint::rules::LoggingTooManyArgs),
         (Pylint, "E1206") => (RuleGroup::Unspecified, rules::pylint::rules::LoggingTooFewArgs),
+        (Pylint, "E1300") => (RuleGroup::Unspecified, rules::pylint::rules::BadFormatCharacter),
         (Pylint, "E1307") => (RuleGroup::Unspecified, rules::pylint::rules::BadStringFormatType),
         (Pylint, "E1310") => (RuleGroup::Unspecified, rules::pylint::rules::BadStrStripCall),
         (Pylint, "E1507") => (RuleGroup::Unspecified, rules::pylint::rules::InvalidEnvvarValue),

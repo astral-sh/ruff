@@ -1045,6 +1045,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                         checker.locator,
                     );
                 }
+                if checker.enabled(Rule::BadFormatCharacter) {
+                    pylint::rules::bad_format_character(checker, expr);
+                }
                 if checker.enabled(Rule::BadStringFormatType) {
                     pylint::rules::bad_string_format_type(checker, expr, right);
                 }
