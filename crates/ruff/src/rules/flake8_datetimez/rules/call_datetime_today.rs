@@ -17,9 +17,6 @@ use super::helpers;
 /// some aspects of reality, which can lead to subtle bugs. A timezone "aware"
 /// `datetime` representing the current time can be created using `now(tz=)`.
 ///
-/// In Python 3.11 and later, you can use `datetime.UTC` as the alias for
-/// `datetime.timezone.utc`.
-///
 /// ## Example
 /// ```python
 /// import datetime
@@ -32,6 +29,13 @@ use super::helpers;
 /// import datetime
 ///
 /// datetime.datetime.now(tz=datetime.timezone.utc)
+/// ```
+///
+/// Or, for Python 3.11 and later:
+/// ```python
+/// import datetime
+///
+/// datetime.datetime.now(tz=datetime.UTC)
 /// ```
 #[violation]
 pub struct CallDatetimeToday;
