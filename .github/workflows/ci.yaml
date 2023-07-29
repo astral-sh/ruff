@@ -50,6 +50,10 @@ jobs:
               - crates/ruff_formatter/**
               - crates/ruff_python_trivia/**
               - crates/ruff_python_ast/**
+              - crates/ruff_source_file/**
+              - crates/ruff_python_index/**
+              - crates/ruff_text_size/**
+              - crates/ruff_python_parser/**
 
 
   cargo-fmt:
