@@ -82,10 +82,22 @@ fn key_in_dict(
         return;
     }
 
-    let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() else {
+    let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() else {
         return;
     };
     if attr != "keys" {
+        return;
+    }
+
+    // Ignore `self.keys()`, which will almost certainly be intentional, as in:
+    // ```python
+    // def __contains__(self, key: object) -> bool:
+    //     return key in self.keys()
+    // ```
+    if value
+        .as_name_expr()
+        .map_or(false, |name| matches!(name.id.as_str(), "self"))
+    {
         return;
     }
 
