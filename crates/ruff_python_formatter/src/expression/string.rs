@@ -42,8 +42,8 @@ impl<'a> Strings<'a> {
 impl Ranged for Strings<'_> {
     fn range(&self) -> TextRange {
         match self {
-            Self::Constant(c) => c.range(),
-            Self::JoinedStr(j) => j.range(),
+            Self::Constant(expr) => expr.range(),
+            Self::JoinedStr(expr) => expr.range(),
         }
     }
 }
@@ -51,8 +51,8 @@ impl Ranged for Strings<'_> {
 impl<'a> From<&Strings<'a>> for AnyNodeRef<'a> {
     fn from(value: &Strings<'a>) -> Self {
         match value {
-            Strings::Constant(c) => AnyNodeRef::ExprConstant(c),
-            Strings::JoinedStr(j) => AnyNodeRef::ExprJoinedStr(j),
+            Strings::Constant(expr) => AnyNodeRef::ExprConstant(expr),
+            Strings::JoinedStr(expr) => AnyNodeRef::ExprJoinedStr(expr),
         }
     }
 }
