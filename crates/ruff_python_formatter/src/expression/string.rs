@@ -69,7 +69,7 @@ impl<'a> From<&AnyString<'a>> for AnyNodeRef<'a> {
 }
 
 pub(super) struct FormatString<'a> {
-    constant: &'a AnyString<'a>,
+    string: &'a AnyString<'a>,
     layout: StringLayout,
 }
 
@@ -82,12 +82,12 @@ pub enum StringLayout {
 }
 
 impl<'a> FormatString<'a> {
-    pub(super) fn new(constant: &'a AnyString) -> Self {
-        if let AnyString::Constant(constant) = constant {
+    pub(super) fn new(string: &'a AnyString) -> Self {
+        if let AnyString::Constant(constant) = string {
             debug_assert!(constant.value.is_str() || constant.value.is_bytes());
         }
         Self {
-            constant,
+            string,
             layout: StringLayout::Default,
         }
     }
@@ -102,36 +102,33 @@ impl<'a> Format<PyFormatContext<'_>> for FormatString<'a> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         match self.layout {
             StringLayout::Default => {
-                let string_range = self.constant.range();
+                let string_range = self.string.range();
                 let string_content = f.context().locator().slice(string_range);
 
                 if is_implicit_concatenation(string_content) {
-                    in_parentheses_only_group(&FormatStringContinuation::new(self.constant)).fmt(f)
+                    in_parentheses_only_group(&FormatStringContinuation::new(self.string)).fmt(f)
                 } else {
-                    FormatStringPart::new(
-                        string_range,
-                        self.constant.quoting(&f.context().locator()),
-                    )
-                    .fmt(f)
+                    FormatStringPart::new(string_range, self.string.quoting(&f.context().locator()))
+                        .fmt(f)
                 }
             }
             StringLayout::ImplicitConcatenatedBinaryLeftSide => {
-                FormatStringContinuation::new(self.constant).fmt(f)
+                FormatStringContinuation::new(self.string).fmt(f)
             }
         }
     }
 }
 
 struct FormatStringContinuation<'a> {
-    constant: &'a AnyString<'a>,
+    string: &'a AnyString<'a>,
 }
 
 impl<'a> FormatStringContinuation<'a> {
-    fn new(constant: &'a AnyString<'a>) -> Self {
-        if let AnyString::Constant(constant) = constant {
+    fn new(string: &'a AnyString<'a>) -> Self {
+        if let AnyString::Constant(constant) = string {
             debug_assert!(constant.value.is_str() || constant.value.is_bytes());
         }
-        Self { constant }
+        Self { string }
     }
 }
 
@@ -139,9 +136,9 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         let comments = f.context().comments().clone();
         let locator = f.context().locator();
-        let mut dangling_comments = comments.dangling_comments(self.constant);
+        let mut dangling_comments = comments.dangling_comments(self.string);
 
-        let string_range = self.constant.range();
+        let string_range = self.string.range();
         let string_content = locator.slice(string_range);
 
         // The AST parses implicit concatenation as a single string.
@@ -215,7 +212,7 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
                     joiner.entry(&format_args![
                         line_suffix_boundary(),
                         leading_comments(leading_part_comments),
-                        FormatStringPart::new(token_range, self.constant.quoting(&locator)),
+                        FormatStringPart::new(token_range, self.string.quoting(&locator)),
                         trailing_comments(trailing_part_comments)
                     ]);
 
