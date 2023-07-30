@@ -73,13 +73,11 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 Rule::RedundantLiteralUnion,
             ]) {
                 // Determine if the current expression is an union
-                // Avoid duplicate checks if the parent is an `Union[...]` since these rules traverse nested unions
-                let is_unchecked_union = checker
-                    .semantic
-                    .expr_grandparent()
-                    .and_then(Expr::as_subscript_expr)
-                    .map_or(true, |parent| {
-                        !checker.semantic.match_typing_expr(&parent.value, "Union")
+                // To avoid duplicate checks, we examine whether current `expr` is an `Union[...]`
+                // without a parent, since these rules traverse nested unions
+                let is_unchecked_union = checker.semantic.expr_parent().is_none()
+                    && expr.as_subscript_expr().map_or(false, |subscript| {
+                        checker.semantic.match_typing_expr(&subscript.value, "Union")
                     });
 
                 if is_unchecked_union {
