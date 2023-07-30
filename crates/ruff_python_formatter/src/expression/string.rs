@@ -24,12 +24,12 @@ enum Quoting {
     Preserve,
 }
 
-pub(super) enum Strings<'a> {
+pub(super) enum AnyString<'a> {
     Constant(&'a ExprConstant),
     JoinedStr(&'a ExprJoinedStr),
 }
 
-impl<'a> Strings<'a> {
+impl<'a> AnyString<'a> {
     fn quoting(&self, locator: &Locator) -> Quoting {
         match self {
             Self::Constant(_) => Quoting::CanChange,
@@ -50,7 +50,7 @@ impl<'a> Strings<'a> {
     }
 }
 
-impl Ranged for Strings<'_> {
+impl Ranged for AnyString<'_> {
     fn range(&self) -> TextRange {
         match self {
             Self::Constant(expr) => expr.range(),
@@ -59,17 +59,17 @@ impl Ranged for Strings<'_> {
     }
 }
 
-impl<'a> From<&Strings<'a>> for AnyNodeRef<'a> {
-    fn from(value: &Strings<'a>) -> Self {
+impl<'a> From<&AnyString<'a>> for AnyNodeRef<'a> {
+    fn from(value: &AnyString<'a>) -> Self {
         match value {
-            Strings::Constant(expr) => AnyNodeRef::ExprConstant(expr),
-            Strings::JoinedStr(expr) => AnyNodeRef::ExprJoinedStr(expr),
+            AnyString::Constant(expr) => AnyNodeRef::ExprConstant(expr),
+            AnyString::JoinedStr(expr) => AnyNodeRef::ExprJoinedStr(expr),
         }
     }
 }
 
 pub(super) struct FormatString<'a> {
-    constant: &'a Strings<'a>,
+    constant: &'a AnyString<'a>,
     layout: StringLayout,
 }
 
@@ -82,8 +82,8 @@ pub enum StringLayout {
 }
 
 impl<'a> FormatString<'a> {
-    pub(super) fn new(constant: &'a Strings) -> Self {
-        if let Strings::Constant(constant) = constant {
+    pub(super) fn new(constant: &'a AnyString) -> Self {
+        if let AnyString::Constant(constant) = constant {
             debug_assert!(constant.value.is_str() || constant.value.is_bytes());
         }
         Self {
@@ -123,12 +123,12 @@ impl<'a> Format<PyFormatContext<'_>> for FormatString<'a> {
 }
 
 struct FormatStringContinuation<'a> {
-    constant: &'a Strings<'a>,
+    constant: &'a AnyString<'a>,
 }
 
 impl<'a> FormatStringContinuation<'a> {
-    fn new(constant: &'a Strings<'a>) -> Self {
-        if let Strings::Constant(constant) = constant {
+    fn new(constant: &'a AnyString<'a>) -> Self {
+        if let AnyString::Constant(constant) = constant {
             debug_assert!(constant.value.is_str() || constant.value.is_bytes());
         }
         Self { constant }

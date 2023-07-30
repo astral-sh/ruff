@@ -1,4 +1,4 @@
-use super::string::{FormatString, Strings};
+use super::string::{AnyString, FormatString};
 use crate::context::PyFormatContext;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
@@ -12,7 +12,7 @@ pub struct FormatExprJoinedStr;
 
 impl FormatNodeRule<ExprJoinedStr> for FormatExprJoinedStr {
     fn fmt_fields(&self, item: &ExprJoinedStr, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatString::new(&Strings::JoinedStr(item)).fmt(f)
+        FormatString::new(&AnyString::JoinedStr(item)).fmt(f)
     }
 }
 
