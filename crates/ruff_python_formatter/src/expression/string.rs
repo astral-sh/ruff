@@ -19,22 +19,33 @@ use crate::expression::Expr;
 use crate::prelude::*;
 use crate::QuoteStyle;
 
+enum Quoting {
+    CanChange,
+    Preserve,
+}
+
 pub(super) enum Strings<'a> {
     Constant(&'a ExprConstant),
     JoinedStr(&'a ExprJoinedStr),
 }
 
 impl<'a> Strings<'a> {
-    fn contains_quotes(&self, locator: &Locator) -> bool {
+    fn quoting(&self, locator: &Locator) -> Quoting {
         match self {
-            Self::Constant(_) => false,
-            Self::JoinedStr(joined_str) => joined_str.values.iter().any(|value| match value {
-                Expr::FormattedValue(ast::ExprFormattedValue { range, .. }) => {
-                    let string_content = locator.slice(*range);
-                    string_content.contains('"') || string_content.contains('\'')
+            Self::Constant(_) => Quoting::CanChange,
+            Self::JoinedStr(joined_str) => {
+                if joined_str.values.iter().any(|value| match value {
+                    Expr::FormattedValue(ast::ExprFormattedValue { range, .. }) => {
+                        let string_content = locator.slice(*range);
+                        string_content.contains('"') || string_content.contains('\'')
+                    }
+                    _ => false,
+                }) {
+                    Quoting::Preserve
+                } else {
+                    Quoting::CanChange
                 }
-                _ => false,
-            }),
+            }
         }
     }
 }
@@ -99,7 +110,7 @@ impl<'a> Format<PyFormatContext<'_>> for FormatString<'a> {
                 } else {
                     FormatStringPart::new(
                         string_range,
-                        self.constant.contains_quotes(&f.context().locator()),
+                        self.constant.quoting(&f.context().locator()),
                     )
                     .fmt(f)
                 }
@@ -204,7 +215,7 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
                     joiner.entry(&format_args![
                         line_suffix_boundary(),
                         leading_comments(leading_part_comments),
-                        FormatStringPart::new(token_range, self.constant.contains_quotes(&locator)),
+                        FormatStringPart::new(token_range, self.constant.quoting(&locator)),
                         trailing_comments(trailing_part_comments)
                     ]);
 
@@ -227,14 +238,14 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
 
 struct FormatStringPart {
     part_range: TextRange,
-    contains_quotes: bool,
+    quoting: Quoting,
 }
 
 impl FormatStringPart {
-    const fn new(range: TextRange, contains_quotes: bool) -> Self {
+    const fn new(range: TextRange, quoting: Quoting) -> Self {
         Self {
             part_range: range,
-            contains_quotes,
+            quoting,
         }
     }
 }
@@ -257,12 +268,15 @@ impl Format<PyFormatContext<'_>> for FormatStringPart {
 
         let raw_content = &string_content[relative_raw_content_range];
         let is_raw_string = prefix.is_raw_string();
-        let preferred_quotes = if self.contains_quotes {
-            quotes
-        } else if is_raw_string {
-            preferred_quotes_raw(raw_content, quotes, f.options().quote_style())
-        } else {
-            preferred_quotes(raw_content, quotes, f.options().quote_style())
+        let preferred_quotes = match self.quoting {
+            Quoting::Preserve => quotes,
+            Quoting::CanChange => {
+                if is_raw_string {
+                    preferred_quotes_raw(raw_content, quotes, f.options().quote_style())
+                } else {
+                    preferred_quotes(raw_content, quotes, f.options().quote_style())
+                }
+            }
         };
 
         write!(f, [prefix, preferred_quotes])?;
