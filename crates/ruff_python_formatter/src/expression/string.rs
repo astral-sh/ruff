@@ -337,7 +337,7 @@ fn preferred_quotes_raw(
 
     StringQuotes {
         triple: quotes.triple,
-        // If unescaped configured quotes are found, we can't change the configured quote style.
+        // If unescaped configured quotes are found, we can't change the quote style.
         // For example, `r' " '` can't be changed to `r" " "`.
         style: if contains_unescaped_configured_quotes {
             quotes.style
