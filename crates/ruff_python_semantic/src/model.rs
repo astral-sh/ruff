@@ -594,7 +594,12 @@ impl<'a> SemanticModel<'a> {
             return None;
         }
 
-        self.scopes[scope_id].get(qualified_name)
+        let binding_id = self.scopes[scope_id].get(qualified_name)?;
+        if !self.bindings[binding_id].kind.is_submodule_import() {
+            return None;
+        }
+
+        Some(binding_id)
     }
 
     /// Resolves the [`Expr`] to a fully-qualified symbol-name, if `value` resolves to an imported

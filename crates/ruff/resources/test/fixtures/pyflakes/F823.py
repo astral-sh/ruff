@@ -63,3 +63,10 @@ def main():
 
     for sys in range(5):
         pass
+
+
+import requests_mock as rm
+
+
+def requests_mock(requests_mock: rm.Mocker):
+    print(rm.ANY)
