@@ -1595,6 +1595,15 @@
           "format": "uint",
           "minimum": 0.0
         },
+        "max-public-methods": {
+          "description": "Maximum number of public methods allowed for a class (see: `PLR0904`).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
+        },
         "max-returns": {
           "description": "Maximum number of return statements allowed for a function or method body (see `PLR0911`)",
           "type": [
@@ -2259,6 +2268,8 @@
         "PLR040",
         "PLR0402",
         "PLR09",
+        "PLR090",
+        "PLR0904",
         "PLR091",
         "PLR0911",
         "PLR0912",

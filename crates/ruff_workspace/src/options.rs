@@ -2134,6 +2134,13 @@ pub struct PylintOptions {
     /// Maximum number of statements allowed for a function or method body (see:
     /// `PLR0915`).
     pub max_statements: Option<usize>,
+    #[option(
+        default = r"20",
+        value_type = "int",
+        example = r"max-public-methods = 20"
+    )]
+    /// Maximum number of public methods allowed for a class (see: `PLR0904`).
+    pub max_public_methods: Option<usize>,
 }
 
 impl PylintOptions {
@@ -2147,6 +2154,9 @@ impl PylintOptions {
             max_returns: self.max_returns.unwrap_or(defaults.max_returns),
             max_branches: self.max_branches.unwrap_or(defaults.max_branches),
             max_statements: self.max_statements.unwrap_or(defaults.max_statements),
+            max_public_methods: self
+                .max_public_methods
+                .unwrap_or(defaults.max_public_methods),
         }
     }
 }

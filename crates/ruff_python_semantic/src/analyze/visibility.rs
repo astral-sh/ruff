@@ -184,7 +184,7 @@ pub(crate) fn function_visibility(function: &ast::StmtFunctionDef) -> Visibility
     }
 }
 
-pub(crate) fn method_visibility(function: &ast::StmtFunctionDef) -> Visibility {
+pub fn method_visibility(function: &ast::StmtFunctionDef) -> Visibility {
     // Is this a setter or deleter?
     if function.decorator_list.iter().any(|decorator| {
         collect_call_path(&decorator.expression).is_some_and(|call_path| {
