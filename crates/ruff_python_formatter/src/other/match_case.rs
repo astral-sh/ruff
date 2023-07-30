@@ -14,7 +14,7 @@ impl FormatNodeRule<MatchCase> for FormatMatchCase {
     fn fmt_fields(&self, item: &MatchCase, f: &mut PyFormatter) -> FormatResult<()> {
         let MatchCase {
             range: _,
-            pattern: _,
+            pattern,
             guard,
             body,
         } = item;
@@ -24,7 +24,17 @@ impl FormatNodeRule<MatchCase> for FormatMatchCase {
             [
                 text("case"),
                 space(),
-                not_yet_implemented_custom_text("NOT_YET_IMPLEMENTED_Pattern"),
+                format_with(|f: &mut PyFormatter| {
+                    let comments = f.context().comments();
+
+                    for comment in comments.leading_trailing_comments(pattern) {
+                        // This is a lie, but let's go with it.
+                        comment.mark_formatted();
+                    }
+
+                    // Replace the whole `format_with` with `pattern.format()` once pattern formatting is implemented.
+                    not_yet_implemented_custom_text("NOT_YET_IMPLEMENTED_Pattern", pattern).fmt(f)
+                }),
             ]
         )?;
 
