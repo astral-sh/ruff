@@ -203,12 +203,17 @@ impl Format<PyFormatContext<'_>> for FormatStringPart {
         let raw_content_range = relative_raw_content_range + self.part_range.start();
 
         let raw_content = &string_content[relative_raw_content_range];
-        let preferred_quotes = preferred_quotes(raw_content, quotes, f.options().quote_style());
+        let is_raw_string = prefix.is_raw_string();
+        let preferred_quotes = if is_raw_string {
+            preferred_quotes_raw(raw_content, quotes, f.options().quote_style())
+        } else {
+            preferred_quotes(raw_content, quotes, f.options().quote_style())
+        };
 
         write!(f, [prefix, preferred_quotes])?;
 
         let (normalized, contains_newlines) =
-            normalize_string(raw_content, preferred_quotes, prefix.is_raw_string());
+            normalize_string(raw_content, preferred_quotes, is_raw_string);
 
         match normalized {
             Cow::Borrowed(_) => {
@@ -292,6 +297,53 @@ impl Format<PyFormatContext<'_>> for StringPrefix {
         // Remove the unicode prefix `u` if any because it is meaningless in Python 3+.
 
         Ok(())
+    }
+}
+
+/// Detects the preferred quotes for raw string `input`.
+fn preferred_quotes_raw(
+    input: &str,
+    quotes: StringQuotes,
+    configured_style: QuoteStyle,
+) -> StringQuotes {
+    let configured_quote_char = configured_style.as_char();
+    let mut chars = input.chars().peekable();
+    let contains_unescaped_configured_quotes = loop {
+        match chars.next() {
+            Some('\\') => {
+                // Ignore escaped characters
+                chars.next();
+            }
+            // `"` or `'`
+            Some(c) if c == configured_quote_char => {
+                if !quotes.triple {
+                    break true;
+                }
+
+                if chars.peek() == Some(&configured_quote_char) {
+                    // `""` or `''`
+                    chars.next();
+
+                    if chars.peek() == Some(&configured_quote_char) {
+                        // `"""` or `'''`
+                        break true;
+                    }
+                }
+            }
+            Some(_) => continue,
+            None => break false,
+        }
+    };
+
+    StringQuotes {
+        triple: quotes.triple,
+        // If unescaped configured quotes are found, we can't change the configured quote style.
+        // For example, `r' " '` can't be changed to `r" " "`.
+        style: if contains_unescaped_configured_quotes {
+            quotes.style
+        } else {
+            configured_style
+        },
     }
 }
 

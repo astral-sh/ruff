@@ -84,10 +84,9 @@ f"\"{a}\"{'hello' * b}\"{c}\""
  r"raw string ftw"
  r"Date d\'expiration:(.*)"
  r'Tricky "quote'
--r"Not-so-tricky \"quote"
+ r"Not-so-tricky \"quote"
 -rf"{yay}"
 -"\nThe \"quick\"\nbrown fox\njumps over\nthe 'lazy' dog.\n"
-+r'Not-so-tricky \"quote'
 +f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
 +"\n\
 +The \"quick\"\n\
@@ -148,7 +147,7 @@ f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
 r"raw string ftw"
 r"Date d\'expiration:(.*)"
 r'Tricky "quote'
-r'Not-so-tricky \"quote'
+r"Not-so-tricky \"quote"
 f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
 "\n\
 The \"quick\"\n\
