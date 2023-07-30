@@ -198,7 +198,7 @@ d={'a':1,
 ```diff
 --- Black
 +++ Ruff
-@@ -6,10 +6,10 @@
+@@ -6,8 +6,8 @@
  
  from library import some_connection, some_decorator
  # fmt: off
@@ -207,11 +207,8 @@ d={'a':1,
 +from third_party import X, Y, Z
 +
  # fmt: on
--f"trigger 3.6 mode"
-+f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
+ f"trigger 3.6 mode"
  # Comment 1
- 
- # Comment 2
 @@ -17,26 +17,40 @@
  
  # fmt: off
@@ -403,7 +400,7 @@ from library import some_connection, some_decorator
 from third_party import X, Y, Z
 
 # fmt: on
-f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
+f"trigger 3.6 mode"
 # Comment 1
 
 # Comment 2

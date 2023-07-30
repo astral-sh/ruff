@@ -104,32 +104,14 @@ def g():
 ```diff
 --- Black
 +++ Ruff
-@@ -16,7 +16,7 @@
-     if t == token.COMMENT:  # another trailing comment
-         return DOUBLESPACE
- 
--    assert p is not None, f"INTERNAL ERROR: hand-made leaf without parent: {leaf!r}"
-+    assert p is not None, f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
- 
-     prev = leaf.prev_sibling
-     if not prev:
-@@ -48,7 +48,6 @@
- ###############################################################################
+@@ -49,7 +49,6 @@
  # SECTION BECAUSE SECTIONS
  ###############################################################################
--
  
+-
  def g():
      NO = ""
-@@ -67,7 +66,7 @@
-         return DOUBLESPACE
- 
-     # Another comment because more comments
--    assert p is not None, f"INTERNAL ERROR: hand-made leaf without parent: {leaf!r}"
-+    assert p is not None, f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
- 
-     prev = leaf.prev_sibling
-     if not prev:
+     SPACE = " "
 ```
 
 ## Ruff Output
@@ -153,7 +135,7 @@ def f():
     if t == token.COMMENT:  # another trailing comment
         return DOUBLESPACE
 
-    assert p is not None, f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
+    assert p is not None, f"INTERNAL ERROR: hand-made leaf without parent: {leaf!r}"
 
     prev = leaf.prev_sibling
     if not prev:
@@ -203,7 +185,7 @@ def g():
         return DOUBLESPACE
 
     # Another comment because more comments
-    assert p is not None, f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
+    assert p is not None, f"INTERNAL ERROR: hand-made leaf without parent: {leaf!r}"
 
     prev = leaf.prev_sibling
     if not prev:

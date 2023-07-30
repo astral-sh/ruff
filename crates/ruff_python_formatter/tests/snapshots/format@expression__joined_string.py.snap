@@ -1,0 +1,25 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/joined_string.py
+---
+## Input
+```py
+(
+    f'{one}'
+    f'{two}'
+)
+
+
+rf"Not-so-tricky \"quote"
+```
+
+## Output
+```py
+(f"{one}" f"{two}")
+
+
+rf'Not-so-tricky "quote'
+```
+
+
+

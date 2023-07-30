@@ -67,18 +67,20 @@ def example8():
 ```diff
 --- Black
 +++ Ruff
-@@ -10,9 +10,7 @@
-     while True:
+@@ -11,8 +11,10 @@
          try:
              if report_host:
--                data = (
+                 data = (
 -                    f"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 -                ).encode()
-+                data = (f"NOT_YET_IMPLEMENTED_ExprJoinedStr").encode()
++                    (
++                        f"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
++                    ).encode()
++                )
          except Exception as e:
              pass
  
-@@ -30,15 +28,11 @@
+@@ -30,15 +32,11 @@
  
  
  def example2():
@@ -113,7 +115,11 @@ async def show_status():
     while True:
         try:
             if report_host:
-                data = (f"NOT_YET_IMPLEMENTED_ExprJoinedStr").encode()
+                data = (
+                    (
+                        f"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                    ).encode()
+                )
         except Exception as e:
             pass
 
