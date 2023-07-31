@@ -58,17 +58,13 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
             return Ok(());
         };
 
-        // First entry has never any separator, doesn't matter which one we take;
+        // First entry has never any separator, doesn't matter which one we take.
         joiner.entry(first, &first.format());
 
         let mut last = first;
-        let mut is_last_function_or_class_definition = is_class_or_function_definition(first);
 
         for statement in iter {
-            let is_current_function_or_class_definition =
-                is_class_or_function_definition(statement);
-
-            if is_last_function_or_class_definition || is_current_function_or_class_definition {
+            if is_class_or_function_definition(last) || is_class_or_function_definition(statement) {
                 match self.level {
                     SuiteLevel::TopLevel => {
                         joiner.entry_with_separator(
@@ -81,6 +77,8 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                         joiner.entry_with_separator(&empty_line(), &statement.format(), statement);
                     }
                 }
+            } else if is_import_definition(last) && !is_import_definition(statement) {
+                joiner.entry_with_separator(&empty_line(), &statement.format(), statement);
             } else if is_compound_statement(last) {
                 // Handles the case where a body has trailing comments. The issue is that RustPython does not include
                 // the comments in the range of the suite. This means, the body ends right after the last statement in the body.
@@ -124,7 +122,6 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 joiner.entry(statement, &statement.format());
             }
 
-            is_last_function_or_class_definition = is_current_function_or_class_definition;
             last = statement;
         }
 
@@ -141,6 +138,10 @@ const fn is_class_or_function_definition(stmt: &Stmt) -> bool {
         stmt,
         Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) | Stmt::ClassDef(_)
     )
+}
+
+const fn is_import_definition(stmt: &Stmt) -> bool {
+    matches!(stmt, Stmt::Import(_) | Stmt::ImportFrom(_))
 }
 
 impl FormatRuleWithOptions<Suite, PyFormatContext<'_>> for FormatSuite {
