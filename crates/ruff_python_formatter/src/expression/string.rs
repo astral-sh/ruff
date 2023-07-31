@@ -19,6 +19,7 @@ use crate::expression::Expr;
 use crate::prelude::*;
 use crate::QuoteStyle;
 
+#[derive(Copy, Clone)]
 enum Quoting {
     CanChange,
     Preserve,
@@ -37,7 +38,7 @@ impl<'a> AnyString<'a> {
                 if joined_str.values.iter().any(|value| match value {
                     Expr::FormattedValue(ast::ExprFormattedValue { range, .. }) => {
                         let string_content = locator.slice(*range);
-                        string_content.contains('"') || string_content.contains('\'')
+                        string_content.contains(['"', '\''])
                     }
                     _ => false,
                 }) {
