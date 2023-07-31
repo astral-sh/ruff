@@ -301,6 +301,9 @@ impl Format<PyFormatContext<'_>> for StringPrefix {
 }
 
 /// Detects the preferred quotes for raw string `input`.
+/// The configured quote style is preferred unless `input` contains unescaped quotes of the
+/// configured style. For example, `r"foo"` is preferred over `r'foo'` if the configured
+/// quote style is double quotes.
 fn preferred_quotes_raw(
     input: &str,
     quotes: StringQuotes,
@@ -337,8 +340,6 @@ fn preferred_quotes_raw(
 
     StringQuotes {
         triple: quotes.triple,
-        // If unescaped configured quotes are found, the quote style can't be changed.
-        // For example, `r' " '` can't be changed to `r" " "`.
         style: if contains_unescaped_configured_quotes {
             quotes.style
         } else {
