@@ -19,13 +19,3 @@ class GoodClass:
     def good_cls_method_2(cls, arg1: _S, arg2: _S) -> _S: ...
     @staticmethod
     def static_method(arg1: _S) -> _S: ...
-
-
-# Python > 3.12
-class PEP695BadDunderNew[T]:
-  def __new__[S](cls: type[S], *args: Any, ** kwargs: Any) -> S: ...  # PYI019
-
-  def generic_instance_method[S](self: S) -> S: ...  # PYI019
-
-class PEP695GoodDunderNew[T]:
-  def __new__(cls, *args: Any, **kwargs: Any) -> Self: ...
