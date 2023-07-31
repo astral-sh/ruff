@@ -1,13 +1,15 @@
 use crate::checkers::ast::Checker;
+use crate::settings::types::PythonVersion;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
-use ruff_python_ast::{ArgWithDefault, Arguments, Decorator, Expr, Ranged};
+use ruff_python_ast::{ArgWithDefault, Arguments, Decorator, Expr, Ranged, Stmt};
 use ruff_python_semantic::analyze::visibility::{
     is_abstract, is_classmethod, is_overload, is_staticmethod,
 };
 use ruff_python_semantic::ScopeKind;
 
+// TODO: Check docs for accuracy
 /// ## What it does
 /// Checks if certain methods define a custom `TypeVar`s for their return annotation instead of
 /// using `typing_extensions.Self`. This check currently applies for instance methods that return
@@ -100,15 +102,12 @@ pub(crate) fn custom_typevar_return_type(
 
     let is_violation: bool =
         if is_classmethod(decorator_list, checker.semantic()) || name == "__new__" {
-            println!("Class: {}", name.to_string());
-            check_class_method_for_bad_typevars(args, return_annotation)
+            check_class_method_for_bad_typevars(checker, args, return_annotation)
         } else {
             // If not static, or a class method or __new__ we know it is an instance method
-            println!("Instance: {}", name.to_string());
-            check_instance_method_for_bad_typevars(args, return_annotation)
+            check_instance_method_for_bad_typevars(checker, args, return_annotation)
         };
 
-    println!("{:?}", is_violation);
     if is_violation {
         checker.diagnostics.push(Diagnostic::new(
             CustomTypeVarReturnType {
@@ -120,6 +119,7 @@ pub(crate) fn custom_typevar_return_type(
 }
 
 fn check_class_method_for_bad_typevars(
+    checker: &Checker,
     args: &Arguments,
     return_annotation: &Expr,
 ) -> bool {
@@ -133,6 +133,12 @@ fn check_class_method_for_bad_typevars(
         return false
     };
 
+    // Don't error if the first argument is annotated with `builtins.type[T]` or `typing.Type[T]`
+    // These are edge cases, and it's hard to give good error messages for them.
+    if let Expr::Name(ast::ExprName { id: id_value, .. }) = value.as_ref() {
+        return id_value == "type";
+    }
+
     let Expr::Name(ast::ExprName { id: id_slice, .. }) = slice.as_ref() else {
         return false
     };
@@ -141,10 +147,11 @@ fn check_class_method_for_bad_typevars(
         return false
     };
 
-    return_type == id_slice && is_likely_private_typevar(id_slice)
+    return_type == id_slice && is_likely_private_typevar(checker, args, id_slice)
 }
 
 fn check_instance_method_for_bad_typevars(
+    checker: &Checker,
     args: &Arguments,
     return_annotation: &Expr,
 ) -> bool {
@@ -166,12 +173,60 @@ fn check_instance_method_for_bad_typevars(
         return false;
     }
 
-    is_likely_private_typevar(first_arg_type)
+    is_likely_private_typevar(checker, args, first_arg_type)
 }
 
-fn is_likely_private_typevar(tvar_name: &str) -> bool {
+fn is_likely_private_typevar(checker: &Checker, args: &Arguments, tvar_name: &str) -> bool {
     if tvar_name.starts_with('_') {
         return true;
+    }
+    if checker.settings.target_version < PythonVersion::Py312 {
+        return false;
+    }
+    for ArgWithDefault { def, .. } in &args.args {
+        if def.arg.to_string() != tvar_name {
+            continue;
+        }
+
+        let Some(annotation) = &def.annotation else {
+            continue
+        };
+
+        let Expr::Name(ast::ExprName{id,..}) = annotation.as_ref() else {
+            continue
+        };
+
+        // Check if the binding used in an annotation is an assignment to typing.TypeVar
+        let scope = checker.semantic().scope();
+        let Some(binding_id) = scope.get(id) else {
+            continue
+        };
+
+        let binding = checker.semantic().binding(binding_id);
+        if binding.kind.is_assignment() || binding.kind.is_named_expr_assignment() {
+            if let Some(parent_id) = binding.source {
+                let parent = checker.semantic().stmts[parent_id];
+                if let Stmt::Assign(ast::StmtAssign { value, .. })
+                | Stmt::AnnAssign(ast::StmtAnnAssign {
+                    value: Some(value), ..
+                })
+                | Stmt::AugAssign(ast::StmtAugAssign { value, .. }) = parent
+                {
+                    let Expr::Call(ast::ExprCall{func, ..}) = value.as_ref() else {
+                            continue
+                        };
+                    let Some(call_path) = checker.semantic().resolve_call_path(func) else {
+                            continue
+                        };
+                    if checker
+                        .semantic()
+                        .match_typing_call_path(&call_path, "TypeVar")
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
     }
     false
 }
