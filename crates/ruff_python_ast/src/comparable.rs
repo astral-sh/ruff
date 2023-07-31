@@ -592,24 +592,9 @@ pub struct ExprCall<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprFormattedValue<'a> {
     value: Box<ComparableExpr<'a>>,
-    debug_text: Option<DebugText<'a>>,
+    debug_text: Option<&'a ast::DebugText>,
     conversion: ast::ConversionFlag,
     format_spec: Option<Box<ComparableExpr<'a>>>,
-}
-
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct DebugText<'a> {
-    leading: &'a str,
-    trailing: &'a str,
-}
-
-impl<'a> From<&'a ast::DebugText> for DebugText<'a> {
-    fn from(debug_text: &'a ast::DebugText) -> Self {
-        Self {
-            leading: debug_text.leading.as_str(),
-            trailing: debug_text.trailing.as_str(),
-        }
-    }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -871,7 +856,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
             }) => Self::FormattedValue(ExprFormattedValue {
                 value: value.into(),
                 conversion: *conversion,
-                debug_text: debug_text.as_ref().map(Into::into),
+                debug_text: debug_text.as_ref(),
                 format_spec: format_spec.as_ref().map(Into::into),
             }),
             ast::Expr::JoinedStr(ast::ExprJoinedStr {

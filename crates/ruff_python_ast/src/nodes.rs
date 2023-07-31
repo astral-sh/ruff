@@ -926,7 +926,7 @@ impl ConversionFlag {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct DebugText {
     /// The text between the `{` and the expression node.
     pub leading: String,
