@@ -1,6 +1,6 @@
 use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
 use ruff_python_ast::helpers::is_compound_statement;
-use ruff_python_ast::{Ranged, Stmt, Suite};
+use ruff_python_ast::{self as ast, Constant, Expr, Ranged, Stmt, Suite};
 use ruff_python_trivia::{lines_after, lines_before, skip_trailing_trivia};
 
 use crate::context::{NodeLevel, WithNodeLevel};
@@ -54,24 +54,64 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
 
         let mut f = WithNodeLevel::new(node_level, f);
 
-        if matches!(self.kind, SuiteKind::Other)
-            && is_class_or_function_definition(first)
-            && !comments.has_leading_comments(first)
-        {
-            // Add an empty line for any nested functions or classes defined within non-function
-            // or class compound statements, e.g., this is stable formatting:
-            // ```python
-            // if True:
-            //
-            //     def test():
-            //         ...
-            // ```
-            write!(f, [empty_line()])?;
-        }
-
-        write!(f, [first.format()])?;
-
+        // Format the first statement in the body, which often has special formatting rules.
         let mut last = first;
+        match self.kind {
+            SuiteKind::Other => {
+                if is_class_or_function_definition(first) && !comments.has_leading_comments(first) {
+                    // Add an empty line for any nested functions or classes defined within
+                    // non-function or class compound statements, e.g., this is stable formatting:
+                    // ```python
+                    // if True:
+                    //
+                    //     def test():
+                    //         ...
+                    // ```
+                    write!(f, [empty_line()])?;
+                }
+                write!(f, [first.format()])?;
+            }
+            SuiteKind::Class if is_docstring(first) => {
+                if !comments.has_leading_comments(first) && lines_before(first.start(), source) > 1
+                {
+                    // Allow up to one empty line before a class docstring, e.g., this is
+                    // stable formatting:
+                    // ```python
+                    // class Test:
+                    //
+                    //     """Docstring"""
+                    // ```
+                    write!(f, [empty_line()])?;
+                }
+                write!(f, [first.format()])?;
+
+                // Enforce an empty line after a class docstring, e.g., these are both stable
+                // formatting:
+                // ```python
+                // class Test:
+                //     """Docstring"""
+                //
+                //     ...
+                //
+                //
+                // class Test:
+                //
+                //     """Docstring"""
+                //
+                //     ...
+                // ```
+                if let Some(second) = iter.next() {
+                    // Format the subsequent statement immediately. This rule takes precedence
+                    // over the rules in the loop below (and most of them won't apply anyway,
+                    // e.g., we know the first statement isn't an import).
+                    write!(f, [empty_line(), second.format()])?;
+                    last = second;
+                }
+            }
+            _ => {
+                write!(f, [first.format()])?;
+            }
+        }
 
         for statement in iter {
             if is_class_or_function_definition(last) || is_class_or_function_definition(statement) {
@@ -180,6 +220,20 @@ const fn is_class_or_function_definition(stmt: &Stmt) -> bool {
 /// Returns `true` if a [`Stmt`] is an import.
 const fn is_import_definition(stmt: &Stmt) -> bool {
     matches!(stmt, Stmt::Import(_) | Stmt::ImportFrom(_))
+}
+
+fn is_docstring(stmt: &Stmt) -> bool {
+    let Stmt::Expr(ast::StmtExpr { value, .. }) = stmt else {
+        return false;
+    };
+
+    matches!(
+        value.as_ref(),
+        Expr::Constant(ast::ExprConstant {
+            value: Constant::Str(..),
+            ..
+        })
+    )
 }
 
 impl FormatRuleWithOptions<Suite, PyFormatContext<'_>> for FormatSuite {
