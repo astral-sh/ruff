@@ -335,7 +335,7 @@ jobs:
       - name: "Cache rust"
         uses: Swatinem/rust-cache@v2
       - name: "Formatter progress"
-        run: scripts/formatter_progress.sh
+        run: scripts/formatter_ecosystem_checks.sh
       - name: "Github step summary"
         run: grep "similarity index" target/progress_projects_report.txt | sort > $GITHUB_STEP_SUMMARY
       # CPython is not black formatted, so we run only the stability check
