@@ -155,16 +155,14 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         stmt.is_async_function_def_stmt(),
                     );
                 }
-                if checker.enabled(Rule::CustomTypevarReturnType) {
+                if checker.enabled(Rule::CustomTypeVarReturnType) {
                     flake8_pyi::rules::custom_typevar_return_type(
                         checker,
-                        stmt,
                         name,
                         decorator_list,
                         returns.as_ref().map(AsRef::as_ref),
                         args,
-                        stmt.is_async_function_def_stmt(),
-                    )
+                    );
                 }
                 if checker.enabled(Rule::StrOrReprDefinedInStub) {
                     flake8_pyi::rules::str_or_repr_defined_in_stub(checker, stmt);
