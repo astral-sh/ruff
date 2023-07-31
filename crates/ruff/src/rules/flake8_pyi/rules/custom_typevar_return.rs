@@ -190,7 +190,7 @@ fn is_likely_private_typevar(
     if tvar_name.starts_with('_') {
         return true;
     }
-    if checker.settings.target_version < PythonVersion::Py39 {
+    if checker.settings.target_version < PythonVersion::Py312 {
         return false;
     }
 

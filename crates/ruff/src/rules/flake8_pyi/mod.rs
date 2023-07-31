@@ -12,6 +12,7 @@ mod tests {
     use crate::registry::Rule;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
+    use crate::settings::types::PythonVersion;
 
     #[test_case(Rule::AnyEqNeAnnotation, Path::new("PYI032.py"))]
     #[test_case(Rule::AnyEqNeAnnotation, Path::new("PYI032.pyi"))]
@@ -29,8 +30,6 @@ mod tests {
     #[test_case(Rule::ComplexAssignmentInStub, Path::new("PYI017.pyi"))]
     #[test_case(Rule::ComplexIfStatementInStub, Path::new("PYI002.py"))]
     #[test_case(Rule::ComplexIfStatementInStub, Path::new("PYI002.pyi"))]
-    #[test_case(Rule::CustomTypeVarReturnType, Path::new("PYI019.py"))]
-    #[test_case(Rule::CustomTypeVarReturnType, Path::new("PYI019.pyi"))]
     #[test_case(Rule::DocstringInStub, Path::new("PYI021.py"))]
     #[test_case(Rule::DocstringInStub, Path::new("PYI021.pyi"))]
     #[test_case(Rule::DuplicateUnionMember, Path::new("PYI016.py"))]
@@ -108,6 +107,21 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_pyi").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("PYI019.py"))]
+    #[test_case(Path::new("PYI019.pyi"))]
+    fn custom_type_var_return_type(path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", "PYI019", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_pyi").join(path).as_path(),
+            &settings::Settings {
+                target_version: PythonVersion::Py312,
+                ..settings::Settings::for_rules(vec![Rule::CustomTypeVarReturnType])
+            },
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
