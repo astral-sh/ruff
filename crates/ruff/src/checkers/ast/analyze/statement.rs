@@ -75,6 +75,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             returns,
             args,
             body,
+            type_params,
             ..
         })
         | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
@@ -83,6 +84,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             returns,
             args,
             body,
+            type_params,
             ..
         }) => {
             if checker.enabled(Rule::DjangoNonLeadingReceiverDecorator) {
@@ -162,6 +164,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         decorator_list,
                         returns.as_ref().map(AsRef::as_ref),
                         args,
+                        type_params,
                     );
                 }
                 if checker.enabled(Rule::StrOrReprDefinedInStub) {

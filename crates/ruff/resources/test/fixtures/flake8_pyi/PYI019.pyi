@@ -1,13 +1,22 @@
-from typing import TypeVar, Self
+from typing import TypeVar, Self, Type
 
 _S = TypeVar("_S", bound=BadClass)
 _S2 = TypeVar("_S2", BadClass, GoodClass)
 
 class BadClass:
     def __new__(cls: type[_S], *args: str, **kwargs: int) -> _S: ...  # PYI019
+
+
     def bad_instance_method(self: _S, arg: bytes) -> _S: ...  # PYI019
+
+
     @classmethod
     def bad_class_method(cls: type[_S], arg: int) -> _S: ...  # PYI019
+
+
+    @classmethod
+    def excluded_edge_case(cls: Type[_S], arg: int) -> _S: ...  # Ok
+
 
 class GoodClass:
     def __new__(cls: type[Self], *args: list[int], **kwargs: set[str]) -> Self: ...
@@ -25,7 +34,9 @@ class GoodClass:
 class PEP695BadDunderNew[T]:
   def __new__[S](cls: type[S], *args: Any, ** kwargs: Any) -> S: ...  # PYI019
 
+
   def generic_instance_method[S](self: S) -> S: ...  # PYI019
+
 
 class PEP695GoodDunderNew[T]:
   def __new__(cls, *args: Any, **kwargs: Any) -> Self: ...
