@@ -11,7 +11,7 @@ use crate::comments::{
     dangling_comments, leading_comments, leading_node_comments, trailing_comments,
     CommentLinePosition, SourceComment,
 };
-use crate::context::NodeLevel;
+use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::parentheses::parenthesized;
 use crate::prelude::*;
 use crate::FormatNodeRule;
@@ -60,10 +60,6 @@ impl FormatNodeRule<Arguments> for FormatArguments {
             kwonlyargs,
             kwarg,
         } = item;
-
-        let saved_level = f.context().node_level();
-        f.context_mut()
-            .set_node_level(NodeLevel::ParenthesizedExpression);
 
         let comments = f.context().comments().clone();
         let dangling = comments.dangling_comments(item);
@@ -192,6 +188,8 @@ impl FormatNodeRule<Arguments> for FormatArguments {
             Ok(())
         });
 
+        let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
+
         let num_arguments = posonlyargs.len()
             + args.len()
             + usize::from(vararg.is_some())
@@ -199,7 +197,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
             + usize::from(kwarg.is_some());
 
         if self.parentheses == ArgumentsParentheses::Never {
-            group(&format_inner).fmt(f)?;
+            write!(f, [group(&format_inner)])
         } else if num_arguments == 0 {
             // No arguments, format any dangling comments between `()`
             write!(
@@ -209,14 +207,10 @@ impl FormatNodeRule<Arguments> for FormatArguments {
                     block_indent(&dangling_comments(dangling)),
                     text(")")
                 ]
-            )?;
+            )
         } else {
-            parenthesized("(", &group(&format_inner), ")").fmt(f)?;
+            write!(f, [parenthesized("(", &group(&format_inner), ")")])
         }
-
-        f.context_mut().set_node_level(saved_level);
-
-        Ok(())
     }
 
     fn fmt_dangling_comments(&self, _node: &Arguments, _f: &mut PyFormatter) -> FormatResult<()> {

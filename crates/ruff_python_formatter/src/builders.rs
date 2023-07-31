@@ -4,7 +4,7 @@ use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::comments::{dangling_comments, SourceComment};
-use crate::context::NodeLevel;
+use crate::context::{NodeLevel, WithNodeLevel};
 use crate::prelude::*;
 use crate::MagicTrailingComma;
 
@@ -24,21 +24,18 @@ pub(crate) struct ParenthesizeIfExpands<'a, 'ast> {
 
 impl<'ast> Format<PyFormatContext<'ast>> for ParenthesizeIfExpands<'_, 'ast> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
-        let saved_level = f.context().node_level();
+        {
+            let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
 
-        f.context_mut()
-            .set_node_level(NodeLevel::ParenthesizedExpression);
-
-        let result = group(&format_args![
-            if_group_breaks(&text("(")),
-            soft_block_indent(&Arguments::from(&self.inner)),
-            if_group_breaks(&text(")")),
-        ])
-        .fmt(f);
-
-        f.context_mut().set_node_level(saved_level);
-
-        result
+            write!(
+                f,
+                [group(&format_args![
+                    if_group_breaks(&text("(")),
+                    soft_block_indent(&Arguments::from(&self.inner)),
+                    if_group_breaks(&text(")")),
+                ])]
+            )
+        }
     }
 }
 
