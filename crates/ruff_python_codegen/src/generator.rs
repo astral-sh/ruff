@@ -1193,7 +1193,12 @@ impl<'a> Generator<'a> {
                 conversion,
                 format_spec,
                 range: _range,
-            }) => self.unparse_formatted(value, debug_text, *conversion, format_spec.as_deref()),
+            }) => self.unparse_formatted(
+                value,
+                debug_text.as_ref(),
+                *conversion,
+                format_spec.as_deref(),
+            ),
             Expr::JoinedStr(ast::ExprJoinedStr {
                 values,
                 range: _range,
@@ -1386,7 +1391,7 @@ impl<'a> Generator<'a> {
     fn unparse_formatted(
         &mut self,
         val: &Expr,
-        debug_text: &Option<DebugText>,
+        debug_text: Option<&DebugText>,
         conversion: ConversionFlag,
         spec: Option<&Expr>,
     ) {
@@ -1445,7 +1450,12 @@ impl<'a> Generator<'a> {
                 conversion,
                 format_spec,
                 range: _range,
-            }) => self.unparse_formatted(value, debug_text, *conversion, format_spec.as_deref()),
+            }) => self.unparse_formatted(
+                value,
+                debug_text.as_ref(),
+                *conversion,
+                format_spec.as_deref(),
+            ),
             _ => unreachable!(),
         }
     }
