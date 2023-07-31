@@ -202,14 +202,45 @@ impl<'fmt, 'ast, 'buf> JoinNodesBuilder<'fmt, 'ast, 'buf> {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
+enum Entries {
+    /// No previous entry
+    None,
+    /// One previous ending at the given position.
+    One(TextSize),
+    /// More than one entry, the last one ending at the specific position.
+    MoreThanOne(TextSize),
+}
+
+impl Entries {
+    fn position(self) -> Option<TextSize> {
+        match self {
+            Entries::None => None,
+            Entries::One(position) | Entries::MoreThanOne(position) => Some(position),
+        }
+    }
+
+    const fn is_one_or_more(self) -> bool {
+        !matches!(self, Entries::None)
+    }
+
+    const fn is_more_than_one(self) -> bool {
+        matches!(self, Entries::MoreThanOne(_))
+    }
+
+    const fn next(self, end_position: TextSize) -> Self {
+        match self {
+            Entries::None => Entries::One(end_position),
+            Entries::One(_) | Entries::MoreThanOne(_) => Entries::MoreThanOne(end_position),
+        }
+    }
+}
+
 pub(crate) struct JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
     result: FormatResult<()>,
     fmt: &'fmt mut PyFormatter<'ast, 'buf>,
-    end_of_last_entry: Option<TextSize>,
+    entries: Entries,
     sequence_end: TextSize,
-    /// We need to track whether we have more than one entry since a sole entry doesn't get a
-    /// magic trailing comma even when expanded
-    len: usize,
 }
 
 impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
@@ -217,8 +248,7 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
         Self {
             fmt: f,
             result: Ok(()),
-            end_of_last_entry: None,
-            len: 0,
+            entries: Entries::None,
             sequence_end,
         }
     }
@@ -245,12 +275,11 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
         Separator: Format<PyFormatContext<'ast>>,
     {
         self.result = self.result.and_then(|_| {
-            if self.end_of_last_entry.is_some() {
+            if self.entries.is_one_or_more() {
                 write!(self.fmt, [text(","), separator])?;
             }
 
-            self.end_of_last_entry = Some(node.end());
-            self.len += 1;
+            self.entries = self.entries.next(node.end());
 
             content.fmt(self.fmt)
         });
@@ -286,7 +315,7 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
 
     pub(crate) fn finish(&mut self) -> FormatResult<()> {
         self.result.and_then(|_| {
-            if let Some(last_end) = self.end_of_last_entry.take() {
+            if let Some(last_end) = self.entries.position() {
                 let magic_trailing_comma = match self.fmt.options().magic_trailing_comma() {
                     MagicTrailingComma::Respect => {
                         let first_token = SimpleTokenizer::new(
@@ -310,7 +339,7 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
 
                 // If there is a single entry, only keep the magic trailing comma, don't add it if
                 // it wasn't there. If there is more than one entry, always add it.
-                if magic_trailing_comma || self.len > 1 {
+                if magic_trailing_comma || self.entries.is_more_than_one() {
                     if_group_breaks(&text(",")).fmt(self.fmt)?;
                 }
 
