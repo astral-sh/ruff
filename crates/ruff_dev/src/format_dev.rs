@@ -184,10 +184,6 @@ pub(crate) struct Args {
 }
 
 pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
-    // Enabled ANSI colors on Windows 10.
-    #[cfg(windows)]
-    assert!(colored::control::set_virtual_terminal(true).is_ok());
-
     let log_level = LogLevel::from(&args.log_level_args);
     set_up_logging(&log_level)?;
 
