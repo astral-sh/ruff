@@ -5,7 +5,7 @@ use ruff_python_ast::function::AnyFunctionDefinition;
 use ruff_python_trivia::{lines_after, skip_trailing_trivia};
 
 use crate::comments::{leading_comments, trailing_comments};
-use crate::context::NodeLevel;
+
 use crate::expression::parentheses::{optional_parentheses, Parentheses};
 use crate::prelude::*;
 use crate::FormatNodeRule;
@@ -47,8 +47,8 @@ impl FormatRule<AnyFunctionDefinition<'_>, PyFormatContext<'_>> for FormatAnyFun
             dangling_comments.split_at(trailing_definition_comments_start);
 
         if let Some(last_decorator) = item.decorators().last() {
-            f.join_nodes(NodeLevel::CompoundStatement)
-                .nodes(item.decorators())
+            f.join_with(hard_line_break())
+                .entries(item.decorators().iter().formatted())
                 .finish()?;
 
             if leading_function_definition_comments.is_empty() {
