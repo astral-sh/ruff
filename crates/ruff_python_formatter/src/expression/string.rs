@@ -333,7 +333,7 @@ fn preferred_quotes_raw(
 
                         // We can't turn `r'''""'''` into `r""""""""`, nor can we have
                         // `"""` or `'''` respectively inside the string
-                        if chars.peek() == None || chars.peek() == Some(&configured_quote_char) {
+                        if chars.peek().is_none() || chars.peek() == Some(&configured_quote_char) {
                             break true;
                         }
                     }
