@@ -7,6 +7,7 @@ use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use crate::comments::trailing_comments;
 use crate::expression::parentheses::{parenthesized, Parentheses};
 use crate::prelude::*;
+use crate::statement::suite::SuiteKind;
 
 #[derive(Default)]
 pub struct FormatStmtClassDef;
@@ -52,7 +53,7 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
             [
                 text(":"),
                 trailing_comments(trailing_head_comments),
-                block_indent(&body.format())
+                block_indent(&body.format().with_options(SuiteKind::Class))
             ]
         )
     }

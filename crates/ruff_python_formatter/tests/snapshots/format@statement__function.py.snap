@@ -344,6 +344,7 @@ def with_leading_comment():
 # looking from the position of the if
 # Regression test for https://github.com/python/cpython/blob/ad56340b665c5d8ac1f318964f71697bba41acb7/Lib/logging/__init__.py#L253-L260
 if True:
+
     def f1():
         pass  # a
 else:
@@ -351,6 +352,7 @@ else:
 
 # Here it's actually a trailing comment
 if True:
+
     def f2():
         pass
         # a

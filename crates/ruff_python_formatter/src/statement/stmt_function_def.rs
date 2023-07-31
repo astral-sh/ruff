@@ -8,6 +8,7 @@ use crate::comments::{leading_comments, trailing_comments};
 
 use crate::expression::parentheses::{optional_parentheses, Parentheses};
 use crate::prelude::*;
+use crate::statement::suite::SuiteKind;
 use crate::FormatNodeRule;
 
 #[derive(Default)]
@@ -111,7 +112,7 @@ impl FormatRule<AnyFunctionDefinition<'_>, PyFormatContext<'_>> for FormatAnyFun
             [
                 text(":"),
                 trailing_comments(trailing_definition_comments),
-                block_indent(&item.body().format())
+                block_indent(&item.body().format().with_options(SuiteKind::Function))
             ]
         )
     }
