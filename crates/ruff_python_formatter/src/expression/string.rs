@@ -323,14 +323,21 @@ fn preferred_quotes_raw(
                     break true;
                 }
 
-                if chars.peek() == Some(&configured_quote_char) {
-                    // `""` or `''`
-                    chars.next();
+                match chars.peek() {
+                    // We can't turn `r'''\""'''` into `r"""\"""""`, this would confuse the parser
+                    // about where the closing triple quotes start
+                    None => break true,
+                    Some(next) if *next == configured_quote_char => {
+                        // `""` or `''`
+                        chars.next();
 
-                    if chars.peek() == Some(&configured_quote_char) {
-                        // `"""` or `'''`
-                        break true;
+                        // We can't turn `r'''""'''` into `r""""""""`, nor can we have
+                        // `"""` or `'''` respectively inside the string
+                        if chars.peek().is_none() || chars.peek() == Some(&configured_quote_char) {
+                            break true;
+                        }
                     }
+                    _ => {}
                 }
             }
             Some(_) => continue,
