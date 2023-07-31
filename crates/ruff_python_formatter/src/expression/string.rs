@@ -203,11 +203,17 @@ impl Format<PyFormatContext<'_>> for FormatStringPart {
         let raw_content_range = relative_raw_content_range + self.part_range.start();
 
         let raw_content = &string_content[relative_raw_content_range];
-        let preferred_quotes = preferred_quotes(raw_content, quotes, f.options().quote_style());
+        let is_raw_string = prefix.is_raw_string();
+        let preferred_quotes = if is_raw_string {
+            preferred_quotes_raw(raw_content, quotes, f.options().quote_style())
+        } else {
+            preferred_quotes(raw_content, quotes, f.options().quote_style())
+        };
 
         write!(f, [prefix, preferred_quotes])?;
 
-        let (normalized, contains_newlines) = normalize_string(raw_content, preferred_quotes);
+        let (normalized, contains_newlines) =
+            normalize_string(raw_content, preferred_quotes, is_raw_string);
 
         match normalized {
             Cow::Borrowed(_) => {
@@ -223,7 +229,7 @@ impl Format<PyFormatContext<'_>> for FormatStringPart {
 }
 
 bitflags! {
-    #[derive(Copy, Clone, Debug)]
+    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
     pub(super) struct StringPrefix: u8 {
         const UNICODE   = 0b0000_0001;
         /// `r"test"`
@@ -264,6 +270,10 @@ impl StringPrefix {
     pub(super) const fn text_len(self) -> TextSize {
         TextSize::new(self.bits().count_ones())
     }
+
+    pub(super) const fn is_raw_string(self) -> bool {
+        matches!(self, StringPrefix::RAW | StringPrefix::RAW_UPPER)
+    }
 }
 
 impl Format<PyFormatContext<'_>> for StringPrefix {
@@ -287,6 +297,54 @@ impl Format<PyFormatContext<'_>> for StringPrefix {
         // Remove the unicode prefix `u` if any because it is meaningless in Python 3+.
 
         Ok(())
+    }
+}
+
+/// Detects the preferred quotes for raw string `input`.
+/// The configured quote style is preferred unless `input` contains unescaped quotes of the
+/// configured style. For example, `r"foo"` is preferred over `r'foo'` if the configured
+/// quote style is double quotes.
+fn preferred_quotes_raw(
+    input: &str,
+    quotes: StringQuotes,
+    configured_style: QuoteStyle,
+) -> StringQuotes {
+    let configured_quote_char = configured_style.as_char();
+    let mut chars = input.chars().peekable();
+    let contains_unescaped_configured_quotes = loop {
+        match chars.next() {
+            Some('\\') => {
+                // Ignore escaped characters
+                chars.next();
+            }
+            // `"` or `'`
+            Some(c) if c == configured_quote_char => {
+                if !quotes.triple {
+                    break true;
+                }
+
+                if chars.peek() == Some(&configured_quote_char) {
+                    // `""` or `''`
+                    chars.next();
+
+                    if chars.peek() == Some(&configured_quote_char) {
+                        // `"""` or `'''`
+                        break true;
+                    }
+                }
+            }
+            Some(_) => continue,
+            None => break false,
+        }
+    };
+
+    StringQuotes {
+        triple: quotes.triple,
+        style: if contains_unescaped_configured_quotes {
+            quotes.style
+        } else {
+            configured_style
+        },
     }
 }
 
@@ -434,7 +492,11 @@ impl Format<PyFormatContext<'_>> for StringQuotes {
 /// with the provided `style`.
 ///
 /// Returns the normalized string and whether it contains new lines.
-fn normalize_string(input: &str, quotes: StringQuotes) -> (Cow<str>, ContainsNewlines) {
+fn normalize_string(
+    input: &str,
+    quotes: StringQuotes,
+    is_raw: bool,
+) -> (Cow<str>, ContainsNewlines) {
     // The normalized string if `input` is not yet normalized.
     // `output` must remain empty if `input` is already normalized.
     let mut output = String::new();
@@ -467,7 +529,7 @@ fn normalize_string(input: &str, quotes: StringQuotes) -> (Cow<str>, ContainsNew
             newlines = ContainsNewlines::Yes;
         } else if c == '\n' {
             newlines = ContainsNewlines::Yes;
-        } else if !quotes.triple {
+        } else if !quotes.triple && !is_raw {
             if c == '\\' {
                 if let Some(next) = input.as_bytes().get(index + 1).copied().map(char::from) {
                     #[allow(clippy::if_same_then_else)]
