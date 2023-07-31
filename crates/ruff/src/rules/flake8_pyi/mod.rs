@@ -10,9 +10,9 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
+    use crate::settings::types::PythonVersion;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
-    use crate::settings::types::PythonVersion;
 
     #[test_case(Rule::AnyEqNeAnnotation, Path::new("PYI032.py"))]
     #[test_case(Rule::AnyEqNeAnnotation, Path::new("PYI032.pyi"))]
