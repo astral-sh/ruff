@@ -323,14 +323,21 @@ fn preferred_quotes_raw(
                     break true;
                 }
 
-                if chars.peek() == Some(&configured_quote_char) {
-                    // `""` or `''`
-                    chars.next();
+                match chars.peek() {
+                    // We can't turn `r'''\""'''` into `r"""\"""""`, the last previously inner quote
+                    // we shorten the quoted part and turn the last triple quote char into an
+                    // unterminated string start.
+                    None => break true,
+                    Some(next) if *next == configured_quote_char => {
+                        // `""` or `''`
+                        chars.next();
 
-                    if chars.peek() == Some(&configured_quote_char) {
-                        // `"""` or `'''`
-                        break true;
+                        if chars.peek() == Some(&configured_quote_char) {
+                            // `"""` or `'''`
+                            break true;
+                        }
                     }
+                    _ => {}
                 }
             }
             Some(_) => continue,
