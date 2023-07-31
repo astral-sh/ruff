@@ -27,6 +27,7 @@ R"Test"
 # Block conversion if there is an unescaped quote just before the end of the triple
 # quoted string
 r'''\""'''
+r'''""'''
 r'\""'
 
 'This string will not include \

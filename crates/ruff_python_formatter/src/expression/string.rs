@@ -324,16 +324,16 @@ fn preferred_quotes_raw(
                 }
 
                 match chars.peek() {
-                    // We can't turn `r'''\""'''` into `r"""\"""""`, the last previously inner quote
-                    // we shorten the quoted part and turn the last triple quote char into an
-                    // unterminated string start.
+                    // We can't turn `r'''\""'''` into `r"""\"""""`, this would confuse the parser
+                    // about where the closing triple quotes start
                     None => break true,
                     Some(next) if *next == configured_quote_char => {
                         // `""` or `''`
                         chars.next();
 
-                        if chars.peek() == Some(&configured_quote_char) {
-                            // `"""` or `'''`
+                        // We can't turn `r'''""'''` into `r""""""""`, nor can we have
+                        // `"""` or `'''` respectively inside the string
+                        if chars.peek() == None || chars.peek() == Some(&configured_quote_char) {
                             break true;
                         }
                     }
