@@ -63,10 +63,16 @@ You'll also need [Insta](https://insta.rs/docs/) to update snapshot tests:
 cargo install cargo-insta
 ```
 
-You can optionally install pre-commit to run some validation checks before making a commit:
+and pre-commit to run some validation checks:
 
 ```shell
 pipx install pre-commit  # or `pip install pre-commit` if you have a virtualenv
+```
+
+You can optionally run the following command to run the validation checks as a git hook
+when making a commit:
+
+```shell
 pre-commit install
 ```
 
