@@ -31,7 +31,7 @@ pub enum StringLayout {
 
 impl<'a> FormatString<'a> {
     pub(super) fn new(constant: &'a ExprConstant) -> Self {
-        debug_assert!(constant.value.is_str());
+        debug_assert!(constant.value.is_str() || constant.value.is_bytes());
         Self {
             constant,
             layout: StringLayout::Default,
@@ -70,7 +70,7 @@ struct FormatStringContinuation<'a> {
 
 impl<'a> FormatStringContinuation<'a> {
     fn new(constant: &'a ExprConstant) -> Self {
-        debug_assert!(constant.value.is_str());
+        debug_assert!(constant.value.is_str() || constant.value.is_bytes());
         Self { constant }
     }
 }
