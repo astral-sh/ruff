@@ -4,9 +4,10 @@ use ignore::DirEntry;
 use indicatif::ProgressBar;
 use log::debug;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use ruff::logging::{set_up_logging, LogLevel};
 use ruff::resolver::python_files_in_path;
 use ruff::settings::types::{FilePattern, FilePatternSet};
-use ruff_cli::args::CheckArgs;
+use ruff_cli::args::{CheckArgs, LogLevelArgs};
 use ruff_cli::resolve::resolve;
 use ruff_formatter::{FormatError, LineWidth, PrintError};
 use ruff_python_formatter::{
@@ -178,9 +179,14 @@ pub(crate) struct Args {
     /// Write all errors to this file in addition to stdout. Only used in multi-project mode.
     #[arg(long)]
     pub(crate) error_file: Option<PathBuf>,
+    #[clap(flatten)]
+    pub(crate) log_level_args: LogLevelArgs,
 }
 
 pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
+    let log_level = LogLevel::from(&args.log_level_args);
+    set_up_logging(&log_level)?;
+
     let all_success = if args.multi_project {
         format_dev_multi_project(args)?
     } else {
