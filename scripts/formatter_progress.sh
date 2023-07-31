@@ -51,5 +51,9 @@ fi
 # for i in "$dir"/*/; do git -C "$i" switch main && git -C "$i" pull && echo "# $(basename "$i") $(git -C "$i" rev-parse HEAD)"; done
 
 time cargo run --bin ruff_dev -- format-dev --stability-check --error-file "$target/progress_projects_errors.txt" \
-  --multi-project "$dir" >"$target/progress_projects_report.txt"
+  --multi-project "$dir" >"$target/progress_projects_report.txt" || (
+  echo "Ecosystem check failed"
+  cat "$target/progress_projects_report.txt"
+  exit 1
+)
 grep "similarity index" "$target/progress_projects_report.txt" | sort
