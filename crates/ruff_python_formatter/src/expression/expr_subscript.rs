@@ -4,8 +4,8 @@ use ruff_formatter::{format_args, write};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
 
 use crate::comments::trailing_comments;
-use crate::context::NodeLevel;
 use crate::context::PyFormatContext;
+use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::expr_tuple::TupleParentheses;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
@@ -30,34 +30,22 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
             "A subscript expression can only have a single dangling comment, the one after the bracket"
         );
 
-        if let NodeLevel::Expression(Some(group_id)) = f.context().node_level() {
+        if let NodeLevel::Expression(Some(_)) = f.context().node_level() {
             // Enforce the optional parentheses for parenthesized values.
-            f.context_mut().set_node_level(NodeLevel::Expression(None));
-            let result = value.format().fmt(f);
-            f.context_mut()
-                .set_node_level(NodeLevel::Expression(Some(group_id)));
-            result?;
+            let mut f = WithNodeLevel::new(NodeLevel::Expression(None), f);
+            write!(f, [value.format()])?;
         } else {
             value.format().fmt(f)?;
         }
 
         let format_slice = format_with(|f: &mut PyFormatter| {
-            let saved_level = f.context().node_level();
-            f.context_mut()
-                .set_node_level(NodeLevel::ParenthesizedExpression);
+            let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
 
-            let result = if let Expr::Tuple(tuple) = slice.as_ref() {
-                tuple
-                    .format()
-                    .with_options(TupleParentheses::Preserve)
-                    .fmt(f)
+            if let Expr::Tuple(tuple) = slice.as_ref() {
+                write!(f, [tuple.format().with_options(TupleParentheses::Preserve)])
             } else {
-                slice.format().fmt(f)
-            };
-
-            f.context_mut().set_node_level(saved_level);
-
-            result
+                write!(f, [slice.format()])
+            }
         });
 
         write!(
