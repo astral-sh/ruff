@@ -1778,6 +1778,7 @@ class Foo:
         assert_round_trip!(r#"f"{ chr(65)  =   !s}""#);
         assert_round_trip!(r#"f"{ chr(65)  =   !r}""#);
         assert_round_trip!(r#"f"{ chr(65)  =   :#x}""#);
+        assert_round_trip!(r#"f"{a=!r:0.05f}""#);
     }
 
     #[test]
