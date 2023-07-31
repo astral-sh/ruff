@@ -29,7 +29,6 @@ ignore = { workspace = true }
 indicatif = "0.17.5"
 itertools = { workspace = true }
 libcst = { workspace = true }
-log = { workspace = true }
 once_cell = { workspace = true }
 pretty_assertions = { version = "1.3.0" }
 rayon = "1.7.0"

@@ -2201,7 +2201,6 @@ dependencies = [
  "indoc",
  "itertools",
  "libcst",
- "log",
  "once_cell",
  "pretty_assertions",
  "rayon",

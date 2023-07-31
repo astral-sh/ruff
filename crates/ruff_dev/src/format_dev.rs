@@ -1,4 +1,4 @@
-use anyhow::{bail, format_err, Context};
+use anyhow::{bail, format_err, Context, Error};
 use clap::{CommandFactory, FromArgMatches};
 use ignore::DirEntry;
 use indicatif::ProgressStyle;
@@ -189,28 +189,7 @@ pub(crate) struct Args {
 }
 
 pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
-    // Custom translation since we need the tracing type for `EnvFilter`
-    let log_level = match LogLevel::from(&args.log_level_args) {
-        LogLevel::Default => tracing::Level::INFO,
-        LogLevel::Verbose => tracing::Level::DEBUG,
-        LogLevel::Quiet => tracing::Level::WARN,
-        LogLevel::Silent => tracing::Level::ERROR,
-    };
-    // 1. `RUST_LOG=`, 2. explicit CLI log level, 3. info, the ruff_cli default
-    let filter_layer = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-        EnvFilter::builder()
-            .with_default_directive(log_level.into())
-            .parse_lossy("")
-    });
-    let indicatif_layer = IndicatifLayer::new();
-    let indicitif_compatible_writer_layer = tracing_subscriber::fmt::layer()
-        .with_writer(indicatif_layer.get_stderr_writer())
-        .with_target(false);
-    tracing_subscriber::registry()
-        .with(filter_layer)
-        .with(indicitif_compatible_writer_layer)
-        .with(indicatif_layer)
-        .init();
+    setup_logging(&args.log_level_args);
 
     let all_success = if args.multi_project {
         format_dev_multi_project(args)?
@@ -237,6 +216,31 @@ pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
     } else {
         Ok(ExitCode::FAILURE)
     }
+}
+
+fn setup_logging(log_level_args: &LogLevelArgs) {
+    // Custom translation since we need the tracing type for `EnvFilter`
+    let log_level = match LogLevel::from(log_level_args) {
+        LogLevel::Default => tracing::Level::INFO,
+        LogLevel::Verbose => tracing::Level::DEBUG,
+        LogLevel::Quiet => tracing::Level::WARN,
+        LogLevel::Silent => tracing::Level::ERROR,
+    };
+    // 1. `RUST_LOG=`, 2. explicit CLI log level, 3. info, the ruff_cli default
+    let filter_layer = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+        EnvFilter::builder()
+            .with_default_directive(log_level.into())
+            .parse_lossy("")
+    });
+    let indicatif_layer = IndicatifLayer::new();
+    let indicitif_compatible_writer_layer = tracing_subscriber::fmt::layer()
+        .with_writer(indicatif_layer.get_stderr_writer())
+        .with_target(false);
+    tracing_subscriber::registry()
+        .with(filter_layer)
+        .with(indicitif_compatible_writer_layer)
+        .with(indicatif_layer)
+        .init();
 }
 
 /// Checks a directory of projects
@@ -282,9 +286,6 @@ fn format_dev_multi_project(args: &Args) -> anyhow::Result<bool> {
 
                 info!(
                     parent: None,
-                    file_count = result.file_count,
-                    similarity_index = result.statistics.similarity_index(),
-                    duration = result.duration.as_secs_f32(),
                     "Finished {}: {} files, similarity index {:.3}, {:.2}s",
                     project_path.display(),
                     result.file_count,
@@ -349,72 +350,26 @@ fn format_dev_project(
     // First argument is ignored
     let paths = ruff_check_paths(files)?;
 
-    let pb_span = info_span!("format_dev_project progress bar", first_file = %files[0].display());
-    pb_span.pb_set_style(&ProgressStyle::default_bar());
-    pb_span.pb_set_length(paths.len() as u64);
-    let pb_span_enter = pb_span.enter();
-
-    let result_iter = paths
-        .into_par_iter()
-        .map(|dir_entry| {
-            let dir_entry = match dir_entry.context("Iterating the files in the repository failed")
-            {
-                Ok(dir_entry) => dir_entry,
-                Err(err) => return Err(err),
-            };
-            let file = dir_entry.path().to_path_buf();
-            // For some reason it does not filter in the beginning
-            if dir_entry.file_name() == "pyproject.toml" {
-                return Ok((Ok(Statistics::default()), file));
-            }
-
-            let file = dir_entry.path().to_path_buf();
-            // Handle panics (mostly in `debug_assert!`)
-            let result = match catch_unwind(|| {
-                format_dev_file(&file, stability_check, write, options.clone())
-            }) {
-                Ok(result) => match result {
-                    Err(CheckFileError::SyntaxErrorInInput(error)) => {
-                        // We don't care about this error, only log it
-                        info!(
-                            parent: None,
-                            "Syntax error in {}: {}",
-                            file.display(),
-                            error
-                        );
-                        Ok(Statistics::default())
-                    }
-                    _ => result,
-                },
-                Err(panic) => {
-                    if let Some(message) = panic.downcast_ref::<String>() {
-                        Err(CheckFileError::Panic {
-                            message: message.clone(),
-                        })
-                    } else if let Some(&message) = panic.downcast_ref::<&str>() {
-                        Err(CheckFileError::Panic {
-                            message: message.to_string(),
-                        })
-                    } else {
-                        Err(CheckFileError::Panic {
-                            // This should not happen, but it can
-                            message: "(Panic didn't set a string message)".to_string(),
-                        })
-                    }
-                }
-            };
-            pb_span.pb_inc(1);
-            Ok((result, file))
-        })
-        .collect::<anyhow::Result<Vec<_>>>()?;
-
-    drop(pb_span_enter);
-    drop(pb_span);
+    let results = {
+        let pb_span =
+            info_span!("format_dev_project progress bar", first_file = %files[0].display());
+        pb_span.pb_set_style(&ProgressStyle::default_bar());
+        pb_span.pb_set_length(paths.len() as u64);
+        let _pb_span_enter = pb_span.enter();
+        paths
+            .into_par_iter()
+            .map(|dir_entry| {
+                let result = format_dir_entry(dir_entry, stability_check, write, &options);
+                pb_span.pb_inc(1);
+                result
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?
+    };
 
     let mut statistics = Statistics::default();
     let mut formatted_counter = 0;
     let mut diagnostics = Vec::new();
-    for (result, file) in result_iter {
+    for (result, file) in results {
         formatted_counter += 1;
         match result {
             Ok(statistics_file) => statistics += statistics_file,
@@ -430,6 +385,60 @@ fn format_dev_project(
         diagnostics,
         statistics,
     })
+}
+
+/// Error handling in between walkdir and `format_dev_file`
+fn format_dir_entry(
+    dir_entry: Result<DirEntry, ignore::Error>,
+    stability_check: bool,
+    write: bool,
+    options: &PyFormatOptions,
+) -> anyhow::Result<(Result<Statistics, CheckFileError>, PathBuf), Error> {
+    let dir_entry = match dir_entry.context("Iterating the files in the repository failed") {
+        Ok(dir_entry) => dir_entry,
+        Err(err) => return Err(err),
+    };
+    let file = dir_entry.path().to_path_buf();
+    // For some reason it does not filter in the beginning
+    if dir_entry.file_name() == "pyproject.toml" {
+        return Ok((Ok(Statistics::default()), file));
+    }
+
+    let file = dir_entry.path().to_path_buf();
+    // Handle panics (mostly in `debug_assert!`)
+    let result =
+        match catch_unwind(|| format_dev_file(&file, stability_check, write, options.clone())) {
+            Ok(result) => match result {
+                Err(CheckFileError::SyntaxErrorInInput(error)) => {
+                    // We don't care about this error, only log it
+                    info!(
+                        parent: None,
+                        "Syntax error in {}: {}",
+                        file.display(),
+                        error
+                    );
+                    Ok(Statistics::default())
+                }
+                _ => result,
+            },
+            Err(panic) => {
+                if let Some(message) = panic.downcast_ref::<String>() {
+                    Err(CheckFileError::Panic {
+                        message: message.clone(),
+                    })
+                } else if let Some(&message) = panic.downcast_ref::<&str>() {
+                    Err(CheckFileError::Panic {
+                        message: message.to_string(),
+                    })
+                } else {
+                    Err(CheckFileError::Panic {
+                        // This should not happen, but it can
+                        message: "(Panic didn't set a string message)".to_string(),
+                    })
+                }
+            }
+        };
+    Ok((result, file))
 }
 
 /// A compact diff that only shows a header and changes, but nothing unchanged. This makes viewing
