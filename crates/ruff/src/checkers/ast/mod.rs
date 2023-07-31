@@ -1731,6 +1731,7 @@ impl<'a> Checker<'a> {
     }
 
     fn visit_deferred_future_type_definitions(&mut self) {
+        let snapshot = self.semantic.snapshot();
         while !self.deferred.future_type_definitions.is_empty() {
             let type_definitions = std::mem::take(&mut self.deferred.future_type_definitions);
             for (expr, snapshot) in type_definitions {
@@ -1741,9 +1742,11 @@ impl<'a> Checker<'a> {
                 self.visit_expr(expr);
             }
         }
+        self.semantic.restore(snapshot);
     }
 
     fn visit_deferred_type_param_definitions(&mut self) {
+        let snapshot = self.semantic.snapshot();
         while !self.deferred.type_param_definitions.is_empty() {
             let type_params = std::mem::take(&mut self.deferred.type_param_definitions);
             for (type_param, snapshot) in type_params {
@@ -1757,9 +1760,11 @@ impl<'a> Checker<'a> {
                 }
             }
         }
+        self.semantic.restore(snapshot);
     }
 
     fn visit_deferred_string_type_definitions(&mut self, allocator: &'a typed_arena::Arena<Expr>) {
+        let snapshot = self.semantic.snapshot();
         while !self.deferred.string_type_definitions.is_empty() {
             let type_definitions = std::mem::take(&mut self.deferred.string_type_definitions);
             for (range, value, snapshot) in type_definitions {
@@ -1803,9 +1808,11 @@ impl<'a> Checker<'a> {
                 }
             }
         }
+        self.semantic.restore(snapshot);
     }
 
     fn visit_deferred_functions(&mut self) {
+        let snapshot = self.semantic.snapshot();
         while !self.deferred.functions.is_empty() {
             let deferred_functions = std::mem::take(&mut self.deferred.functions);
             for snapshot in deferred_functions {
@@ -1823,9 +1830,11 @@ impl<'a> Checker<'a> {
                 }
             }
         }
+        self.semantic.restore(snapshot);
     }
 
     fn visit_deferred_lambdas(&mut self) {
+        let snapshot = self.semantic.snapshot();
         while !self.deferred.lambdas.is_empty() {
             let lambdas = std::mem::take(&mut self.deferred.lambdas);
             for (expr, snapshot) in lambdas {
@@ -1844,10 +1853,13 @@ impl<'a> Checker<'a> {
                 }
             }
         }
+        self.semantic.restore(snapshot);
     }
 
     /// Run any lint rules that operate over the module exports (i.e., members of `__all__`).
     fn visit_exports(&mut self) {
+        let snapshot = self.semantic.snapshot();
+
         let exports: Vec<(&str, TextRange)> = self
             .semantic
             .global_scope()
@@ -1890,6 +1902,8 @@ impl<'a> Checker<'a> {
                 }
             }
         }
+
+        self.semantic.restore(snapshot);
     }
 }
 
