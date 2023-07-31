@@ -27,7 +27,7 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
         let dangling_comments = comments.dangling_comments(item.as_any_node_ref());
         debug_assert!(
             dangling_comments.len() <= 1,
-            "The subscript expression must have at most a single comment, the one after the bracket"
+            "A subscript expression can only have a single dangling comment, the one after the bracket"
         );
 
         if let NodeLevel::Expression(Some(group_id)) = f.context().node_level() {
