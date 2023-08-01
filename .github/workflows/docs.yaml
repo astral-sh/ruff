@@ -3,7 +3,7 @@ name: mkdocs
 on:
   workflow_dispatch:
   release:
-    types: [ published ]
+    types: [published]
 
 jobs:
   mkdocs:
