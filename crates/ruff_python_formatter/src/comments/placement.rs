@@ -6,7 +6,7 @@ use ruff_python_ast::{
 };
 use ruff_text_size::TextRange;
 
-use ruff_python_ast::node::{AnyNodeRef, AstNode};
+use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_trivia::{
     indentation_at_offset, PythonWhitespace, SimpleToken, SimpleTokenKind, SimpleTokenizer,
@@ -420,7 +420,7 @@ fn handle_match_comment<'a>(
         // ```
         // Attach the `comment` as leading comment to the next case.
         if comment_indentation <= match_case_indentation {
-            CommentPlacement::leading(next_case.into(), comment)
+            CommentPlacement::leading(next_case, comment)
         } else {
             // Otherwise, delegate to `handle_trailing_body_comment`
             // ```python
@@ -450,7 +450,7 @@ fn handle_match_comment<'a>(
             //     # Trailing match comment
             // ```
             // This is a trailing comment of the last case.
-            CommentPlacement::trailing(match_case.into(), comment)
+            CommentPlacement::trailing(match_case, comment)
         } else {
             // Delegate to `handle_trailing_body_comment` because it's either a trailing indent
             // for the last statement in the `case` body or a comment for the parent of the `match`
@@ -628,7 +628,7 @@ fn handle_trailing_binary_expression_left_or_operator_comment<'a>(
         //      3
         // )
         // ```
-        CommentPlacement::trailing(AnyNodeRef::from(binary_expression.left.as_ref()), comment)
+        CommentPlacement::trailing(binary_expression.left.as_ref(), comment)
     } else if comment.line_position().is_end_of_line() {
         // Is the operator on its own line.
         if locator.contains_line_break(TextRange::new(
@@ -645,7 +645,7 @@ fn handle_trailing_binary_expression_left_or_operator_comment<'a>(
             //      3
             // )
             // ```
-            CommentPlacement::dangling(binary_expression.into(), comment)
+            CommentPlacement::dangling(binary_expression, comment)
         } else {
             // ```python
             // a = (
@@ -806,14 +806,14 @@ fn handle_slice_comments<'a>(
 
     if let Some(node) = node {
         if comment.slice().start() < node.start() {
-            CommentPlacement::leading(node.as_ref().into(), comment)
+            CommentPlacement::leading(node.as_ref(), comment)
         } else {
             // If a trailing comment is an end of line comment that's fine because we have a node
             // ahead of it
-            CommentPlacement::trailing(node.as_ref().into(), comment)
+            CommentPlacement::trailing(node.as_ref(), comment)
         }
     } else {
-        CommentPlacement::dangling(expr_slice.as_any_node_ref(), comment)
+        CommentPlacement::dangling(expr_slice, comment)
     }
 }
 
@@ -955,7 +955,7 @@ fn handle_attribute_comment<'a>(
         // ```
         CommentPlacement::trailing(comment.enclosing_node(), comment)
     } else {
-        CommentPlacement::dangling(attribute.into(), comment)
+        CommentPlacement::dangling(attribute, comment)
     }
 }
 
@@ -997,7 +997,7 @@ fn handle_expr_if_comment<'a>(
     );
     // Between `if` and `test`
     if if_token.range.start() < comment.slice().start() && comment.slice().start() < test.start() {
-        return CommentPlacement::leading(test.as_ref().into(), comment);
+        return CommentPlacement::leading(test.as_ref(), comment);
     }
 
     let else_token = find_only_token_in_range(
@@ -1009,7 +1009,7 @@ fn handle_expr_if_comment<'a>(
     if else_token.range.start() < comment.slice().start()
         && comment.slice().start() < orelse.start()
     {
-        return CommentPlacement::leading(orelse.as_ref().into(), comment);
+        return CommentPlacement::leading(orelse.as_ref(), comment);
     }
 
     CommentPlacement::Default(comment)
@@ -1043,7 +1043,7 @@ fn handle_trailing_expression_starred_star_end_of_line_comment<'a>(
         return CommentPlacement::Default(comment);
     }
 
-    CommentPlacement::leading(starred.as_any_node_ref(), comment)
+    CommentPlacement::leading(starred, comment)
 }
 
 /// Handles trailing own line comments before the `as` keyword of a with item and
@@ -1188,7 +1188,7 @@ fn handle_comprehension_comment<'a>(
             CommentPlacement::Default(comment)
         } else {
             // after the `in` but same line, turn into trailing on the `in` token
-            CommentPlacement::dangling((&comprehension.iter).into(), comment)
+            CommentPlacement::dangling(&comprehension.iter, comment)
         };
     }
 
@@ -1219,12 +1219,12 @@ fn handle_comprehension_comment<'a>(
         );
         if is_own_line {
             if last_end < comment.slice().start() && comment.slice().start() < if_token.start() {
-                return CommentPlacement::dangling((if_node).into(), comment);
+                return CommentPlacement::dangling(if_node, comment);
             }
         } else if if_token.start() < comment.slice().start()
             && comment.slice().start() < if_node.range().start()
         {
-            return CommentPlacement::dangling((if_node).into(), comment);
+            return CommentPlacement::dangling(if_node, comment);
         }
         last_end = if_node.range().end();
     }
