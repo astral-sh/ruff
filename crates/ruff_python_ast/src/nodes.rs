@@ -3044,3 +3044,15 @@ impl Ranged for crate::nodes::ArgWithDefault {
         self.range
     }
 }
+
+mod size_assertions {
+    #[allow(clippy::wildcard_imports)]
+    use super::*;
+    use static_assertions::assert_eq_size;
+
+    assert_eq_size!(Stmt, [u8; 168]);
+    assert_eq_size!(Expr, [u8; 80]);
+    assert_eq_size!(Constant, [u8; 32]);
+    assert_eq_size!(Pattern, [u8; 96]);
+    assert_eq_size!(Mod, [u8; 64]);
+}
