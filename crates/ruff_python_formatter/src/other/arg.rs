@@ -12,7 +12,6 @@ impl FormatNodeRule<Arg> for FormatArg {
             range: _,
             arg,
             annotation,
-            type_comment: _,
         } = item;
 
         arg.format().fmt(f)?;

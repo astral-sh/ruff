@@ -376,7 +376,6 @@ impl<'a> From<&'a Box<ast::Arg>> for ComparableArg<'a> {
 pub struct ComparableArg<'a> {
     arg: &'a str,
     annotation: Option<Box<ComparableExpr<'a>>>,
-    type_comment: Option<&'a str>,
 }
 
 impl<'a> From<&'a ast::Arg> for ComparableArg<'a> {
@@ -384,7 +383,6 @@ impl<'a> From<&'a ast::Arg> for ComparableArg<'a> {
         Self {
             arg: arg.arg.as_str(),
             annotation: arg.annotation.as_ref().map(Into::into),
-            type_comment: arg.type_comment.as_deref(),
         }
     }
 }
@@ -955,7 +953,6 @@ pub struct StmtFunctionDef<'a> {
     decorator_list: Vec<ComparableDecorator<'a>>,
     type_params: Vec<ComparableTypeParam<'a>>,
     returns: Option<ComparableExpr<'a>>,
-    type_comment: Option<&'a str>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -966,7 +963,6 @@ pub struct StmtAsyncFunctionDef<'a> {
     decorator_list: Vec<ComparableDecorator<'a>>,
     type_params: Vec<ComparableTypeParam<'a>>,
     returns: Option<ComparableExpr<'a>>,
-    type_comment: Option<&'a str>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -1048,7 +1044,6 @@ pub struct TypeParamTypeVarTuple<'a> {
 pub struct StmtAssign<'a> {
     targets: Vec<ComparableExpr<'a>>,
     value: ComparableExpr<'a>,
-    type_comment: Option<&'a str>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -1072,7 +1067,6 @@ pub struct StmtFor<'a> {
     iter: ComparableExpr<'a>,
     body: Vec<ComparableStmt<'a>>,
     orelse: Vec<ComparableStmt<'a>>,
-    type_comment: Option<&'a str>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -1081,7 +1075,6 @@ pub struct StmtAsyncFor<'a> {
     iter: ComparableExpr<'a>,
     body: Vec<ComparableStmt<'a>>,
     orelse: Vec<ComparableStmt<'a>>,
-    type_comment: Option<&'a str>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -1102,14 +1095,12 @@ pub struct StmtIf<'a> {
 pub struct StmtWith<'a> {
     items: Vec<ComparableWithItem<'a>>,
     body: Vec<ComparableStmt<'a>>,
-    type_comment: Option<&'a str>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct StmtAsyncWith<'a> {
     items: Vec<ComparableWithItem<'a>>,
     body: Vec<ComparableStmt<'a>>,
-    type_comment: Option<&'a str>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -1221,7 +1212,6 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                 body,
                 decorator_list,
                 returns,
-                type_comment,
                 type_params,
                 range: _range,
             }) => Self::FunctionDef(StmtFunctionDef {
@@ -1230,7 +1220,6 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                 body: body.iter().map(Into::into).collect(),
                 decorator_list: decorator_list.iter().map(Into::into).collect(),
                 returns: returns.as_ref().map(Into::into),
-                type_comment: type_comment.as_ref().map(String::as_str),
                 type_params: type_params.iter().map(Into::into).collect(),
             }),
             ast::Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
@@ -1239,7 +1228,6 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                 body,
                 decorator_list,
                 returns,
-                type_comment,
                 type_params,
                 range: _range,
             }) => Self::AsyncFunctionDef(StmtAsyncFunctionDef {
@@ -1248,7 +1236,6 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                 body: body.iter().map(Into::into).collect(),
                 decorator_list: decorator_list.iter().map(Into::into).collect(),
                 returns: returns.as_ref().map(Into::into),
-                type_comment: type_comment.as_ref().map(String::as_str),
                 type_params: type_params.iter().map(Into::into).collect(),
             }),
             ast::Stmt::ClassDef(ast::StmtClassDef {
@@ -1292,12 +1279,10 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
             ast::Stmt::Assign(ast::StmtAssign {
                 targets,
                 value,
-                type_comment,
                 range: _range,
             }) => Self::Assign(StmtAssign {
                 targets: targets.iter().map(Into::into).collect(),
                 value: value.into(),
-                type_comment: type_comment.as_ref().map(String::as_str),
             }),
             ast::Stmt::AugAssign(ast::StmtAugAssign {
                 target,
@@ -1326,28 +1311,24 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                 iter,
                 body,
                 orelse,
-                type_comment,
                 range: _range,
             }) => Self::For(StmtFor {
                 target: target.into(),
                 iter: iter.into(),
                 body: body.iter().map(Into::into).collect(),
                 orelse: orelse.iter().map(Into::into).collect(),
-                type_comment: type_comment.as_ref().map(String::as_str),
             }),
             ast::Stmt::AsyncFor(ast::StmtAsyncFor {
                 target,
                 iter,
                 body,
                 orelse,
-                type_comment,
                 range: _range,
             }) => Self::AsyncFor(StmtAsyncFor {
                 target: target.into(),
                 iter: iter.into(),
                 body: body.iter().map(Into::into).collect(),
                 orelse: orelse.iter().map(Into::into).collect(),
-                type_comment: type_comment.as_ref().map(String::as_str),
             }),
             ast::Stmt::While(ast::StmtWhile {
                 test,
@@ -1372,22 +1353,18 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
             ast::Stmt::With(ast::StmtWith {
                 items,
                 body,
-                type_comment,
                 range: _range,
             }) => Self::With(StmtWith {
                 items: items.iter().map(Into::into).collect(),
                 body: body.iter().map(Into::into).collect(),
-                type_comment: type_comment.as_ref().map(String::as_str),
             }),
             ast::Stmt::AsyncWith(ast::StmtAsyncWith {
                 items,
                 body,
-                type_comment,
                 range: _range,
             }) => Self::AsyncWith(StmtAsyncWith {
                 items: items.iter().map(Into::into).collect(),
                 body: body.iter().map(Into::into).collect(),
-                type_comment: type_comment.as_ref().map(String::as_str),
             }),
             ast::Stmt::Match(ast::StmtMatch {
                 subject,

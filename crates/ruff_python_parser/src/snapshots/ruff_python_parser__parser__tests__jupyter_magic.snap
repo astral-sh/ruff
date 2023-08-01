@@ -173,7 +173,6 @@ Module(
                     decorator_list: [],
                     returns: None,
                     type_params: [],
-                    type_comment: None,
                 },
             ),
             LineMagic(
@@ -241,7 +240,6 @@ Module(
                         ),
                     ],
                     orelse: [],
-                    type_comment: None,
                 },
             ),
             Assign(
@@ -263,7 +261,6 @@ Module(
                             value: "pwd",
                         },
                     ),
-                    type_comment: None,
                 },
             ),
             AnnAssign(
@@ -314,7 +311,6 @@ Module(
                             value: "foo     bar",
                         },
                     ),
-                    type_comment: None,
                 },
             ),
             LineMagic(
@@ -343,7 +339,6 @@ Module(
                             value: "foo  # comment",
                         },
                     ),
-                    type_comment: None,
                 },
             ),
         ],

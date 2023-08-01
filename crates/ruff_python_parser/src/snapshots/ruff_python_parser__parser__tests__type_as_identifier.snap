@@ -658,7 +658,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                                         range: 514..519,
                                     },
                                     annotation: None,
-                                    type_comment: None,
                                 },
                                 default: None,
                             },
@@ -693,7 +692,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ),
                 },
             ),
-            type_comment: None,
         },
     ),
     Expr(
@@ -803,7 +801,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ],
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -840,7 +837,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     keywords: [],
                 },
             ),
-            type_comment: None,
         },
     ),
     Expr(
@@ -900,7 +896,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     kind: None,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -931,7 +926,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     kind: None,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -962,7 +956,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     kind: None,
                 },
             ),
-            type_comment: None,
         },
     ),
 ]

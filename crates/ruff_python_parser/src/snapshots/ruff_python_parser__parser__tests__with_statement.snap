@@ -28,7 +28,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            type_comment: None,
         },
     ),
     With(
@@ -64,7 +63,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            type_comment: None,
         },
     ),
     With(
@@ -105,7 +103,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            type_comment: None,
         },
     ),
     With(
@@ -162,7 +159,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            type_comment: None,
         },
     ),
     With(
@@ -213,7 +209,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            type_comment: None,
         },
     ),
     With(
@@ -272,7 +267,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            type_comment: None,
         },
     ),
     With(
@@ -298,7 +292,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            type_comment: None,
         },
     ),
     With(
@@ -332,7 +325,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            type_comment: None,
         },
     ),
     With(
@@ -360,7 +352,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            type_comment: None,
         },
     ),
     With(
@@ -396,7 +387,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            type_comment: None,
         },
     ),
     With(
@@ -424,7 +414,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            type_comment: None,
         },
     ),
     With(
@@ -468,7 +457,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            type_comment: None,
         },
     ),
     With(
@@ -509,7 +497,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            type_comment: None,
         },
     ),
     With(
@@ -562,7 +549,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            type_comment: None,
         },
     ),
     With(
@@ -602,7 +588,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            type_comment: None,
         },
     ),
     With(
@@ -650,7 +635,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            type_comment: None,
         },
     ),
     With(
@@ -699,7 +683,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            type_comment: None,
         },
     ),
     With(
@@ -756,7 +739,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            type_comment: None,
         },
     ),
     With(
@@ -796,7 +778,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            type_comment: None,
         },
     ),
     With(
@@ -844,7 +825,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            type_comment: None,
         },
     ),
     With(
@@ -913,7 +893,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            type_comment: None,
         },
     ),
     With(
@@ -990,7 +969,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            type_comment: None,
         },
     ),
     With(
@@ -1026,7 +1004,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            type_comment: None,
         },
     ),
     With(
@@ -1062,7 +1039,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            type_comment: None,
         },
     ),
     With(
@@ -1119,7 +1095,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            type_comment: None,
         },
     ),
     With(
@@ -1176,7 +1151,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            type_comment: None,
         },
     ),
 ]

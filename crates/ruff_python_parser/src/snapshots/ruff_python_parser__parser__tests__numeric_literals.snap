@@ -24,7 +24,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     kind: None,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -48,7 +47,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     kind: None,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -72,7 +70,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     kind: None,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -96,7 +93,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     kind: None,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -120,7 +116,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     kind: None,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -144,7 +139,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     kind: None,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -168,7 +162,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     kind: None,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -192,7 +185,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     kind: None,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -216,7 +208,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     kind: None,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -240,7 +231,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     kind: None,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -265,7 +255,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     kind: None,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -290,7 +279,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     kind: None,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -314,7 +302,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     kind: None,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -338,7 +325,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     kind: None,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -362,7 +348,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     kind: None,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -386,7 +371,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     kind: None,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -410,7 +394,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     kind: None,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -434,7 +417,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     kind: None,
                 },
             ),
-            type_comment: None,
         },
     ),
 ]

@@ -156,7 +156,6 @@ pub struct StmtFunctionDef {
     pub decorator_list: Vec<Decorator>,
     pub returns: Option<Box<Expr>>,
     pub type_params: Vec<TypeParam>,
-    pub type_comment: Option<String>,
 }
 
 impl From<StmtFunctionDef> for Stmt {
@@ -175,7 +174,6 @@ pub struct StmtAsyncFunctionDef {
     pub decorator_list: Vec<Decorator>,
     pub returns: Option<Box<Expr>>,
     pub type_params: Vec<TypeParam>,
-    pub type_comment: Option<String>,
 }
 
 impl From<StmtAsyncFunctionDef> for Stmt {
@@ -249,7 +247,6 @@ pub struct StmtAssign {
     pub range: TextRange,
     pub targets: Vec<Expr>,
     pub value: Box<Expr>,
-    pub type_comment: Option<String>,
 }
 
 impl From<StmtAssign> for Stmt {
@@ -297,7 +294,6 @@ pub struct StmtFor {
     pub iter: Box<Expr>,
     pub body: Vec<Stmt>,
     pub orelse: Vec<Stmt>,
-    pub type_comment: Option<String>,
 }
 
 impl From<StmtFor> for Stmt {
@@ -314,7 +310,6 @@ pub struct StmtAsyncFor {
     pub iter: Box<Expr>,
     pub body: Vec<Stmt>,
     pub orelse: Vec<Stmt>,
-    pub type_comment: Option<String>,
 }
 
 impl From<StmtAsyncFor> for Stmt {
@@ -366,7 +361,6 @@ pub struct StmtWith {
     pub range: TextRange,
     pub items: Vec<WithItem>,
     pub body: Vec<Stmt>,
-    pub type_comment: Option<String>,
 }
 
 impl From<StmtWith> for Stmt {
@@ -381,7 +375,6 @@ pub struct StmtAsyncWith {
     pub range: TextRange,
     pub items: Vec<WithItem>,
     pub body: Vec<Stmt>,
-    pub type_comment: Option<String>,
 }
 
 impl From<StmtAsyncWith> for Stmt {
@@ -1877,7 +1870,6 @@ pub struct Arg {
     pub range: TextRange,
     pub arg: Identifier,
     pub annotation: Option<Box<Expr>>,
-    pub type_comment: Option<String>,
 }
 
 /// See also [keyword](https://docs.python.org/3/library/ast.html#ast.keyword)
@@ -3019,6 +3011,9 @@ mod size_assertions {
     use static_assertions::assert_eq_size;
 
     assert_eq_size!(Stmt, [u8; 168]);
+    assert_eq_size!(StmtFunctionDef, [u8; 128]);
+    assert_eq_size!(StmtClassDef, [u8; 160]);
+    assert_eq_size!(StmtTry, [u8; 104]);
     assert_eq_size!(Expr, [u8; 80]);
     assert_eq_size!(Constant, [u8; 32]);
     assert_eq_size!(Pattern, [u8; 96]);

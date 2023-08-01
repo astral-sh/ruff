@@ -286,7 +286,6 @@ fn generate_fix(
             range: TextRange::default(),
         })],
         value: Box::new(exc_arg.clone()),
-        type_comment: None,
         range: TextRange::default(),
     });
 

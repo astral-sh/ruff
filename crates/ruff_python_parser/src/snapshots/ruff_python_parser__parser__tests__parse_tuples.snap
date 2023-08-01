@@ -56,7 +56,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Load,
                 },
             ),
-            type_comment: None,
         },
     ),
 ]

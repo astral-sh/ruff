@@ -48,7 +48,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                                             range: 31..35,
                                         },
                                         annotation: None,
-                                        type_comment: None,
                                     },
                                     default: None,
                                 },
@@ -67,7 +66,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                         decorator_list: [],
                         returns: None,
                         type_params: [],
-                        type_comment: None,
                     },
                 ),
                 FunctionDef(
@@ -90,7 +88,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                                             range: 70..74,
                                         },
                                         annotation: None,
-                                        type_comment: None,
                                     },
                                     default: None,
                                 },
@@ -103,7 +100,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                                             range: 76..79,
                                         },
                                         annotation: None,
-                                        type_comment: None,
                                     },
                                     default: Some(
                                         Constant(
@@ -132,7 +128,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                         decorator_list: [],
                         returns: None,
                         type_params: [],
-                        type_comment: None,
                     },
                 ),
             ],
