@@ -9,7 +9,7 @@ use ruff_python_ast::{self as ast, Ranged, MagicKind};
 use crate::{
     Mode,
     lexer::{LexicalError, LexicalErrorType},
-    function::{ArgumentList, parse_args, validate_pos_params, validate_arguments},
+    function::{ArgumentList, parse_arguments, validate_pos_params, validate_arguments},
     context::set_context,
     string::parse_strings,
     token::{self, StringKind},
@@ -1194,17 +1194,12 @@ KwargParameter<ParameterType>: Option<Box<ast::Parameter>> = {
 };
 
 ClassDef: ast::Stmt = {
-    <location:@L>  <decorator_list:Decorator*> "class" <name:Identifier> <type_params:TypeParamList?> <a:("(" ArgumentList ")")?> ":" <body:Suite> => {
-        let (bases, keywords) = match a {
-            Some((_, arg, _)) => (arg.args, arg.keywords),
-            None => (vec![], vec![]),
-        };
+    <location:@L>  <decorator_list:Decorator*> "class" <name:Identifier> <type_params:TypeParamList?> <arguments:Arguments?> ":" <body:Suite> => {
         let end_location = body.last().unwrap().end();
         ast::Stmt::ClassDef(
             ast::StmtClassDef {
                 name,
-                bases,
-                keywords,
+                arguments,
                 body,
                 decorator_list,
                 type_params: type_params.unwrap_or_default(),
@@ -1444,9 +1439,9 @@ AtomExpr<Goal>: ast::Expr = {
 
 AtomExpr2<Goal>: ast::Expr = {
     Atom<Goal>,
-    <location:@L> <f:AtomExpr2<"all">> "(" <a:ArgumentList> ")" <end_location:@R> => {
+    <location:@L> <f:AtomExpr2<"all">> <arguments:Arguments> <end_location:@R> => {
         ast::Expr::Call(
-            ast::ExprCall { func: Box::new(f), args: a.args, keywords: a.keywords, range: (location..end_location).into() }
+            ast::ExprCall { func: Box::new(f), arguments, range: (location..end_location).into() }
         )
     },
     <location:@L> <e:AtomExpr2<"all">> "[" <s:SubscriptList> "]" <end_location:@R> => ast::Expr::Subscript(
@@ -1663,10 +1658,14 @@ SingleForComprehension: ast::Comprehension = {
 ExpressionNoCond: ast::Expr = OrTest<"all">;
 ComprehensionIf: ast::Expr = "if" <c:ExpressionNoCond> => c;
 
-ArgumentList: ArgumentList = {
-    <e: Comma<FunctionArgument>> =>? {
-        let arg_list = parse_args(e)?;
-        Ok(arg_list)
+Arguments: ast::Arguments = {
+    <location:@L> "(" <e: Comma<FunctionArgument>> ")" <end_location:@R> =>? {
+        let ArgumentList { args, keywords } = parse_arguments(e)?;
+        Ok(ast::Arguments {
+            args,
+            keywords,
+            range: (location..end_location).into()
+        })
     }
 };
 

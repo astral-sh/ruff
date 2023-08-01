@@ -1,4 +1,4 @@
-use ruff_python_ast::Decorator;
+use ruff_python_ast::{Arguments, Decorator};
 
 use ruff_python_ast::call_path::from_qualified_name;
 use ruff_python_ast::helpers::map_callable;
@@ -43,14 +43,14 @@ pub fn classify(
         FunctionType::StaticMethod
     } else if matches!(name, "__new__" | "__init_subclass__" | "__class_getitem__")
     // Special-case class method, like `__new__`.
-        || scope.bases.iter().any(|expr| {
+        || scope.arguments.as_ref().is_some_and(|Arguments { args, .. }| args.iter().any(|expr| {
             // The class itself extends a known metaclass, so all methods are class methods.
             semantic
                 .resolve_call_path(map_callable(expr))
                 .is_some_and( |call_path| {
                     matches!(call_path.as_slice(), ["", "type"] | ["abc", "ABCMeta"])
                 })
-        })
+        }))
         || decorator_list.iter().any(|decorator| {
             // The method is decorated with a class method decorator (like `@classmethod`).
             semantic

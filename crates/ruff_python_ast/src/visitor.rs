@@ -3,9 +3,9 @@
 pub mod preorder;
 
 use crate::{
-    self as ast, Alias, BoolOp, CmpOp, Comprehension, Decorator, ElifElseClause, ExceptHandler,
-    Expr, ExprContext, Keyword, MatchCase, Operator, Parameter, Parameters, Pattern, Stmt,
-    TypeParam, TypeParamTypeVar, UnaryOp, WithItem,
+    self as ast, Alias, Arguments, BoolOp, CmpOp, Comprehension, Decorator, ElifElseClause,
+    ExceptHandler, Expr, ExprContext, Keyword, MatchCase, Operator, Parameter, Parameters, Pattern,
+    Stmt, TypeParam, TypeParamTypeVar, UnaryOp, WithItem,
 };
 
 /// A trait for AST visitors. Visits all nodes in the AST recursively in evaluation-order.
@@ -51,6 +51,9 @@ pub trait Visitor<'a> {
     }
     fn visit_format_spec(&mut self, format_spec: &'a Expr) {
         walk_format_spec(self, format_spec);
+    }
+    fn visit_arguments(&mut self, arguments: &'a Arguments) {
+        walk_arguments(self, arguments);
     }
     fn visit_parameters(&mut self, parameters: &'a Parameters) {
         walk_parameters(self, parameters);
@@ -143,8 +146,7 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             visitor.visit_body(body);
         }
         Stmt::ClassDef(ast::StmtClassDef {
-            bases,
-            keywords,
+            arguments,
             body,
             decorator_list,
             type_params,
@@ -156,11 +158,8 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             for type_param in type_params {
                 visitor.visit_type_param(type_param);
             }
-            for expr in bases {
-                visitor.visit_expr(expr);
-            }
-            for keyword in keywords {
-                visitor.visit_keyword(keyword);
+            if let Some(arguments) = arguments {
+                visitor.visit_arguments(arguments);
             }
             visitor.visit_body(body);
         }
@@ -522,17 +521,11 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
         }
         Expr::Call(ast::ExprCall {
             func,
-            args,
-            keywords,
+            arguments,
             range: _range,
         }) => {
             visitor.visit_expr(func);
-            for expr in args {
-                visitor.visit_expr(expr);
-            }
-            for keyword in keywords {
-                visitor.visit_keyword(keyword);
-            }
+            visitor.visit_arguments(arguments);
         }
         Expr::FormattedValue(ast::ExprFormattedValue {
             value, format_spec, ..
@@ -643,6 +636,15 @@ pub fn walk_except_handler<'a, V: Visitor<'a> + ?Sized>(
 
 pub fn walk_format_spec<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, format_spec: &'a Expr) {
     visitor.visit_expr(format_spec);
+}
+
+pub fn walk_arguments<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, arguments: &'a Arguments) {
+    for arg in &arguments.args {
+        visitor.visit_expr(arg);
+    }
+    for keyword in &arguments.keywords {
+        visitor.visit_keyword(keyword);
+    }
 }
 
 pub fn walk_parameters<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, parameters: &'a Parameters) {

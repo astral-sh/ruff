@@ -158,8 +158,7 @@ impl From<StmtAsyncFunctionDef> for Stmt {
 pub struct StmtClassDef {
     pub range: TextRange,
     pub name: Identifier,
-    pub bases: Vec<Expr>,
-    pub keywords: Vec<Keyword>,
+    pub arguments: Option<Arguments>,
     pub body: Vec<Stmt>,
     pub type_params: Vec<TypeParam>,
     pub decorator_list: Vec<Decorator>,
@@ -836,8 +835,7 @@ impl From<ExprCompare> for Expr {
 pub struct ExprCall {
     pub range: TextRange,
     pub func: Box<Expr>,
-    pub args: Vec<Expr>,
-    pub keywords: Vec<Keyword>,
+    pub arguments: Arguments,
 }
 
 impl From<ExprCall> for Expr {
@@ -2073,6 +2071,13 @@ pub struct ParameterWithDefault {
     pub default: Option<Box<Expr>>,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct Arguments {
+    pub range: TextRange,
+    pub args: Vec<Expr>,
+    pub keywords: Vec<Keyword>,
+}
+
 pub type Suite = Vec<Stmt>;
 
 impl CmpOp {
@@ -2951,9 +2956,9 @@ mod size_assertions {
     use super::*;
     use static_assertions::assert_eq_size;
 
-    assert_eq_size!(Stmt, [u8; 168]);
+    assert_eq_size!(Stmt, [u8; 176]);
     assert_eq_size!(StmtFunctionDef, [u8; 128]);
-    assert_eq_size!(StmtClassDef, [u8; 160]);
+    assert_eq_size!(StmtClassDef, [u8; 168]);
     assert_eq_size!(StmtTry, [u8; 104]);
     assert_eq_size!(Expr, [u8; 80]);
     assert_eq_size!(Constant, [u8; 32]);
