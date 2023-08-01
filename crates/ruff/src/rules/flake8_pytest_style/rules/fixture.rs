@@ -53,7 +53,7 @@ use super::helpers::{
 /// - `flake8-pytest-style.fixture-parentheses`
 ///
 /// ## References
-/// - [API Reference: Fixtures](https://docs.pytest.org/en/latest/reference/reference.html#fixtures-api)
+/// - [`pytest` documentation: API Reference: Fixtures](https://docs.pytest.org/en/latest/reference/reference.html#fixtures-api)
 #[violation]
 pub struct PytestFixtureIncorrectParenthesesStyle {
     expected: Parentheses,
@@ -169,7 +169,7 @@ impl Violation for PytestIncorrectFixtureNameUnderscore {
 /// ```
 ///
 /// ## References
-/// - [API Reference: `pytest.mark.usefixtures`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-mark-usefixtures)
+/// - [`pytest` documentation: `pytest.mark.usefixtures`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-mark-usefixtures)
 #[violation]
 pub struct PytestFixtureParamWithoutValue {
     name: String,
@@ -217,7 +217,7 @@ impl Violation for PytestFixtureParamWithoutValue {
 /// ```
 ///
 /// ## References
-/// - [`yield_fixture` functions](https://docs.pytest.org/en/latest/yieldfixture.html)
+/// - [`pytest` documentation: `yield_fixture` functions](https://docs.pytest.org/en/latest/yieldfixture.html)
 #[violation]
 pub struct PytestDeprecatedYieldFixture;
 
@@ -228,6 +228,49 @@ impl Violation for PytestDeprecatedYieldFixture {
     }
 }
 
+/// ## What it does
+/// Checks for unnecessary `request.addfinalizer` usages in `pytest` fixtures.
+///
+/// ## Why is this bad?
+/// `pytest` offers two ways to perform cleanup in fixture code. The first is
+/// sequential (via the `yield` statement), the second callback-based (via
+/// `request.addfinalizer`).
+///
+/// The sequential approach is more readable and should be preferred, unless
+/// the fixture uses the "factory as fixture" pattern.
+///
+/// ## Example
+/// ```python
+/// @pytest.fixture()
+/// def my_fixture(request):
+///     resource = acquire_resource()
+///     request.addfinalizer(resource.release)
+///     return resource
+/// ```
+///
+/// Use instead:
+/// ```python
+/// @pytest.fixture()
+/// def my_fixture():
+///     resource = acquire_resource()
+///     yield resource
+///     resource.release()
+///
+///
+/// # "factory-as-fixture" pattern
+/// @pytest.fixture()
+/// def my_factory(request):
+///     def create_resource(arg):
+///         resource = acquire_resource(arg)
+///         request.addfinalizer(resource.release)
+///         return resource
+///
+///     return create_resource
+/// ```
+///
+/// ## References
+/// - [`pytest` documentation: Adding finalizers directly](https://docs.pytest.org/en/latest/how-to/fixtures.html#adding-finalizers-directly)
+/// - [`pytest` documentation: Factories as fixtures](https://docs.pytest.org/en/latest/how-to/fixtures.html#factories-as-fixtures)
 #[violation]
 pub struct PytestFixtureFinalizerCallback;
 
@@ -237,7 +280,39 @@ impl Violation for PytestFixtureFinalizerCallback {
         format!("Use `yield` instead of `request.addfinalizer`")
     }
 }
-
+/// ## What it does
+/// Checks for unnecessary `yield` expressions in `pytest` fixtures.
+///
+/// ## Why is this bad?
+/// In `pytest` fixtures, the `yield` expression should only be used for fixtures
+/// that include teardown code, to clean up the fixture after the test function
+/// has finished executing.
+///
+/// ## Example
+/// ```python
+/// @pytest.fixture()
+/// def my_fixture():
+///     resource = acquire_resource()
+///     yield resource
+/// ```
+///
+/// Use instead:
+/// ```python
+/// @pytest.fixture()
+/// def my_fixture_with_teardown():
+///     resource = acquire_resource()
+///     yield resource
+///     resource.release()
+///
+///
+/// @pytest.fixture()
+/// def my_fixture_without_teardown():
+///     resource = acquire_resource()
+///     return resource
+/// ```
+///
+/// ## References
+/// - [`pytest` documentation: Teardown/Cleanup](https://docs.pytest.org/en/latest/how-to/fixtures.html#teardown-cleanup-aka-fixture-finalization)
 #[violation]
 pub struct PytestUselessYieldFixture {
     name: String,

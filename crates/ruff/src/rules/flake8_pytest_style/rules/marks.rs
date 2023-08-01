@@ -9,6 +9,37 @@ use crate::registry::{AsRule, Rule};
 
 use super::helpers::get_mark_decorators;
 
+/// ## What it does
+/// Checks for parameter-free `@pytest.mark.<marker>()` decorators with or
+/// without parentheses, depending on the `flake8-pytest-style.mark-parentheses`
+/// setting.
+///
+/// ## Why is this bad?
+/// If a `@pytest.mark.<marker>()` doesn't take any arguments, the parentheses are
+/// optional.
+///
+/// Either removing those unnecessary parentheses _or_ requiring them for all
+/// fixtures is fine, but it's best to be consistent.
+///
+/// ## Example
+/// ```python
+/// @pytest.mark.foo
+/// def test_something():
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// @pytest.mark.foo()
+/// def test_something():
+///     ...
+/// ```
+///
+/// ## Options
+/// - `flake8-pytest-style.mark-parentheses`
+///
+/// ## References
+/// - [`pytest` documentation: Marks](https://docs.pytest.org/en/latest/reference/reference.html#marks)
 #[violation]
 pub struct PytestIncorrectMarkParenthesesStyle {
     mark_name: String,
