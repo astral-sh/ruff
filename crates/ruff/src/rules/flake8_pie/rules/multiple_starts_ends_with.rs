@@ -5,7 +5,7 @@ use itertools::Either::{Left, Right};
 
 use ruff_text_size::TextRange;
 
-use ruff_python_ast::{self as ast, BoolOp, Expr, ExprContext, Identifier, Ranged};
+use ruff_python_ast::{self as ast, Arguments, BoolOp, Expr, ExprContext, Identifier, Ranged};
 
 use ruff_diagnostics::AlwaysAutofixableViolation;
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
@@ -73,8 +73,12 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
     for (index, call) in values.iter().enumerate() {
         let Expr::Call(ast::ExprCall {
             func,
-            args,
-            keywords,
+            arguments:
+                Arguments {
+                    args,
+                    keywords,
+                    range: _,
+                },
             range: _,
         }) = &call
         else {
@@ -118,8 +122,12 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                     .map(|expr| {
                         let Expr::Call(ast::ExprCall {
                             func: _,
-                            args,
-                            keywords: _,
+                            arguments:
+                                Arguments {
+                                    args,
+                                    keywords: _,
+                                    range: _,
+                                },
                             range: _,
                         }) = expr
                         else {
@@ -161,8 +169,11 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                 });
                 let node3 = Expr::Call(ast::ExprCall {
                     func: Box::new(node2),
-                    args: vec![node],
-                    keywords: vec![],
+                    arguments: Arguments {
+                        args: vec![node],
+                        keywords: vec![],
+                        range: TextRange::default(),
+                    },
                     range: TextRange::default(),
                 });
                 let call = node3;

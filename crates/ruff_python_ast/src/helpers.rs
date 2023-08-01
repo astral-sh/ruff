@@ -641,6 +641,8 @@ pub fn is_constant_non_singleton(expr: &Expr) -> bool {
 
 /// Return the [`Keyword`] with the given name, if it's present in the list of
 /// [`Keyword`] arguments.
+///
+/// TODO(charlie): Make this an associated function on [`Arguments`].
 pub fn find_keyword<'a>(keywords: &'a [Keyword], keyword_name: &str) -> Option<&'a Keyword> {
     keywords.iter().find(|keyword| {
         let Keyword { arg, .. } = keyword;

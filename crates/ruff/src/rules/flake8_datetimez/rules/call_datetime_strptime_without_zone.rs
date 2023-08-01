@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Constant, Expr};
+use ruff_python_ast::{self as ast, Arguments, Constant, Expr};
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -59,7 +59,11 @@ pub(crate) fn call_datetime_strptime_without_zone(
         return;
     };
 
-    if let Expr::Call(ast::ExprCall { keywords, .. }) = grandparent {
+    if let Expr::Call(ast::ExprCall {
+        arguments: Arguments { keywords, .. },
+        ..
+    }) = grandparent
+    {
         if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = parent {
             let attr = attr.as_str();
             // Ex) `datetime.strptime(...).astimezone()`

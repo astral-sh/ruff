@@ -1,4 +1,4 @@
-use ruff_python_ast::{Constant, Expr, ExprCall, ExprConstant};
+use ruff_python_ast::{Arguments, Constant, Expr, ExprCall, ExprConstant};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -54,7 +54,11 @@ pub(crate) fn path_constructor_current_directory(checker: &mut Checker, expr: &E
         return;
     }
 
-    let Expr::Call(ExprCall { args, keywords, .. }) = expr else {
+    let Expr::Call(ExprCall {
+        arguments: Arguments { args, keywords, .. },
+        ..
+    }) = expr
+    else {
         return;
     };
 

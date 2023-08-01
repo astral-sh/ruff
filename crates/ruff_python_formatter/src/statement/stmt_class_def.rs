@@ -1,4 +1,4 @@
-use ruff_python_ast::{Ranged, StmtClassDef};
+use ruff_python_ast::{Arguments, Ranged, StmtClassDef};
 use ruff_text_size::TextRange;
 
 use ruff_formatter::write;
@@ -17,8 +17,7 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
         let StmtClassDef {
             range: _,
             name,
-            bases,
-            keywords,
+            arguments,
             body,
             type_params: _,
             decorator_list,
@@ -34,7 +33,12 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
 
         write!(f, [text("class"), space(), name.format()])?;
 
-        if !(bases.is_empty() && keywords.is_empty()) {
+        if arguments
+            .as_ref()
+            .is_some_and(|Arguments { args, keywords, .. }| {
+                !(args.is_empty() && keywords.is_empty())
+            })
+        {
             parenthesized(
                 "(",
                 &FormatInheritanceClause {
@@ -75,12 +79,19 @@ struct FormatInheritanceClause<'a> {
 impl Format<PyFormatContext<'_>> for FormatInheritanceClause<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         let StmtClassDef {
-            bases,
-            keywords,
+            arguments:
+                Some(Arguments {
+                    args: bases,
+                    keywords,
+                    ..
+                }),
             name,
             body,
             ..
-        } = self.class_definition;
+        } = self.class_definition
+        else {
+            return Ok(());
+        };
 
         let source = f.context().source();
 

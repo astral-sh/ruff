@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, Keyword, Ranged};
+use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
@@ -88,7 +88,9 @@ pub(crate) fn unnecessary_double_cast_or_process(
     };
     let Expr::Call(ast::ExprCall {
         func,
-        keywords: inner_kw,
+        arguments: Arguments {
+            keywords: inner_kw, ..
+        },
         ..
     }) = arg
     else {

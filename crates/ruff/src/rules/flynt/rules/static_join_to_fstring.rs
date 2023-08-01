@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ruff_python_ast::{self as ast, Constant, Expr, Ranged};
+use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Ranged};
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
@@ -106,7 +106,11 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
 }
 
 pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner: &str) {
-    let Expr::Call(ast::ExprCall { args, keywords, .. }) = expr else {
+    let Expr::Call(ast::ExprCall {
+        arguments: Arguments { args, keywords, .. },
+        ..
+    }) = expr
+    else {
         return;
     };
 

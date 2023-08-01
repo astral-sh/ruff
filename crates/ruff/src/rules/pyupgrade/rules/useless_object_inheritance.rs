@@ -47,7 +47,11 @@ impl AlwaysAutofixableViolation for UselessObjectInheritance {
 
 /// UP004
 pub(crate) fn useless_object_inheritance(checker: &mut Checker, class_def: &ast::StmtClassDef) {
-    for expr in &class_def.bases {
+    let Some(arguments) = class_def.arguments.as_ref() else {
+        return;
+    };
+
+    for expr in &arguments.args {
         let Expr::Name(ast::ExprName { id, .. }) = expr else {
             continue;
         };
@@ -70,8 +74,8 @@ pub(crate) fn useless_object_inheritance(checker: &mut Checker, class_def: &ast:
                     checker.locator(),
                     class_def.name.end(),
                     expr.range(),
-                    &class_def.bases,
-                    &class_def.keywords,
+                    &arguments.args,
+                    &arguments.keywords,
                     true,
                 )?;
                 Ok(Fix::automatic(edit))

@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Arguments, Expr};
 
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_semantic::{BindingKind, SemanticModel};
@@ -53,7 +53,11 @@ pub(super) fn is_dataclass(class_def: &ast::StmtClassDef, semantic: &SemanticMod
 
 /// Returns `true` if the given class is a Pydantic `BaseModel` or `BaseSettings` subclass.
 pub(super) fn is_pydantic_model(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
-    class_def.bases.iter().any(|expr| {
+    let Some(Arguments { args: bases, .. }) = class_def.arguments.as_ref() else {
+        return false;
+    };
+
+    bases.iter().any(|expr| {
         semantic.resolve_call_path(expr).is_some_and(|call_path| {
             matches!(
                 call_path.as_slice(),

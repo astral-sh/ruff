@@ -1,6 +1,6 @@
 //! Generate Python source code from an abstract syntax tree (AST).
 
-use ruff_python_ast::{Arguments, ParameterWithDefault};
+use ruff_python_ast::ParameterWithDefault;
 use std::ops::Deref;
 
 use ruff_python_ast::{

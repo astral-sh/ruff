@@ -1,6 +1,6 @@
 use std::fmt;
 
-use ruff_python_ast::{self as ast, Expr, Ranged, WithItem};
+use ruff_python_ast::{self as ast, Arguments, Expr, Ranged, WithItem};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -81,8 +81,12 @@ pub(crate) fn assert_raises_exception(checker: &mut Checker, items: &[WithItem])
     for item in items {
         let Expr::Call(ast::ExprCall {
             func,
-            args,
-            keywords,
+            arguments:
+                Arguments {
+                    args,
+                    keywords,
+                    range: _,
+                },
             range: _,
         }) = &item.context_expr
         else {

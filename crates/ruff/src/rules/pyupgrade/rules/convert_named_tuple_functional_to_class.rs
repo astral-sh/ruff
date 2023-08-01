@@ -1,7 +1,7 @@
 use anyhow::{bail, Result};
 use log::debug;
 use ruff_python_ast::{
-    self as ast, Constant, Expr, ExprContext, Identifier, Keyword, Ranged, Stmt,
+    self as ast, Arguments, Constant, Expr, ExprContext, Identifier, Keyword, Ranged, Stmt,
 };
 use ruff_text_size::TextRange;
 
@@ -78,8 +78,7 @@ fn match_named_tuple_assign<'a>(
     };
     let Expr::Call(ast::ExprCall {
         func,
-        args,
-        keywords,
+        arguments: Arguments { args, keywords, .. },
         range: _,
     }) = value
     else {
@@ -91,7 +90,7 @@ fn match_named_tuple_assign<'a>(
     Some((typename, args, keywords, func))
 }
 
-/// Generate a `Stmt::AnnAssign` representing the provided property
+/// Generate a [`Stmt::AnnAssign`] representing the provided property
 /// definition.
 fn create_property_assignment_stmt(property: &str, annotation: &Expr) -> Stmt {
     ast::StmtAnnAssign {
@@ -167,8 +166,11 @@ fn create_properties_from_keywords(keywords: &[Keyword]) -> Result<Vec<Stmt>> {
 fn create_class_def_stmt(typename: &str, body: Vec<Stmt>, base_class: &Expr) -> Stmt {
     ast::StmtClassDef {
         name: Identifier::new(typename.to_string(), TextRange::default()),
-        bases: vec![base_class.clone()],
-        keywords: vec![],
+        arguments: Some(Arguments {
+            args: vec![base_class.clone()],
+            keywords: vec![],
+            range: TextRange::default(),
+        }),
         body,
         type_params: vec![],
         decorator_list: vec![],

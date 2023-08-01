@@ -1,6 +1,6 @@
 use std::fmt;
 
-use ruff_python_ast::{self as ast, Expr, ExprContext, Parameters, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Parameters, Ranged, Stmt};
 
 use ruff_diagnostics::{AutofixKind, Violation};
 use ruff_diagnostics::{Diagnostic, Fix};
@@ -111,7 +111,12 @@ pub(crate) fn unnecessary_map(
         }
         ObjectType::List | ObjectType::Set => {
             // Only flag, e.g., `list(map(lambda x: x + 1, iterable))`.
-            let [Expr::Call(ast::ExprCall { func, args, .. })] = args else {
+            let [Expr::Call(ast::ExprCall {
+                func,
+                arguments: Arguments { args, .. },
+                ..
+            })] = args
+            else {
                 return;
             };
 
@@ -137,7 +142,12 @@ pub(crate) fn unnecessary_map(
         }
         ObjectType::Dict => {
             // Only flag, e.g., `dict(map(lambda v: (v, v ** 2), values))`.
-            let [Expr::Call(ast::ExprCall { func, args, .. })] = args else {
+            let [Expr::Call(ast::ExprCall {
+                func,
+                arguments: Arguments { args, .. },
+                ..
+            })] = args
+            else {
                 return;
             };
 

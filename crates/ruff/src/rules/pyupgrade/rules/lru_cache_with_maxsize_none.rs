@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Decorator, Expr, Keyword, Ranged};
+use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, Keyword, Ranged};
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
@@ -61,8 +61,12 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list:
     for decorator in decorator_list {
         let Expr::Call(ast::ExprCall {
             func,
-            args,
-            keywords,
+            arguments:
+                Arguments {
+                    args,
+                    keywords,
+                    range: _,
+                },
             range: _,
         }) = &decorator.expression
         else {

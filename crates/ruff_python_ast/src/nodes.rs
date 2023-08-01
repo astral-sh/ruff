@@ -2071,6 +2071,28 @@ pub struct ParameterWithDefault {
     pub default: Option<Box<Expr>>,
 }
 
+/// An AST node used to represent the arguments passed to a function call or class definition.
+///
+/// For example, given:
+/// ```python
+/// foo(1, 2, 3, bar=4, baz=5)
+/// ```
+/// The `Arguments` node would span from the left to right parentheses (inclusive), and contain
+/// the arguments and keyword arguments in the order they appear in the source code.
+///
+/// Similarly, given:
+/// ```python
+/// class Foo(Bar, baz=1, qux=2):
+///     pass
+/// ```
+/// The `Arguments` node would again span from the left to right parentheses (inclusive), and
+/// contain the `Bar` argument and the `baz` and `qux` keyword arguments in the order they
+/// appear in the source code.
+///
+/// In the context of a class definition, the Python-style AST refers to the arguments as `bases`,
+/// as they represent the "explicitly specified base classes", while the keyword arguments are
+/// typically used for `metaclass`, with any additional arguments being passed to the `metaclass`.
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Arguments {
     pub range: TextRange,
@@ -2935,6 +2957,11 @@ impl Ranged for crate::TypeParam {
     }
 }
 impl Ranged for crate::nodes::Decorator {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+impl Ranged for crate::nodes::Arguments {
     fn range(&self) -> TextRange {
         self.range
     }

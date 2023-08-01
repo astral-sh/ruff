@@ -16,27 +16,30 @@ expression: parse_ast
                             ctx: Load,
                         },
                     ),
-                    args: [
-                        Constant(
-                            ExprConstant {
-                                range: 6..19,
-                                value: Str(
-                                    "Hello world",
-                                ),
-                                kind: None,
-                            },
-                        ),
-                        Constant(
-                            ExprConstant {
-                                range: 21..22,
-                                value: Int(
-                                    2,
-                                ),
-                                kind: None,
-                            },
-                        ),
-                    ],
-                    keywords: [],
+                    arguments: Arguments {
+                        range: 5..23,
+                        args: [
+                            Constant(
+                                ExprConstant {
+                                    range: 6..19,
+                                    value: Str(
+                                        "Hello world",
+                                    ),
+                                    kind: None,
+                                },
+                            ),
+                            Constant(
+                                ExprConstant {
+                                    range: 21..22,
+                                    value: Int(
+                                        2,
+                                    ),
+                                    kind: None,
+                                },
+                            ),
+                        ],
+                        keywords: [],
+                    },
                 },
             ),
         },
