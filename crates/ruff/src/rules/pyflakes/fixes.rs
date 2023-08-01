@@ -115,6 +115,7 @@ pub(crate) fn remove_exception_handler_assignment(
 
     // Lex forwards, to the `:` token.
     let following = SimpleTokenizer::starts_at(bound_exception.range.end(), locator.contents())
+        .skip_trivia()
         .next()
         .context("expected the exception name to be followed by a colon")?;
     debug_assert!(matches!(following.kind, SimpleTokenKind::Colon));
