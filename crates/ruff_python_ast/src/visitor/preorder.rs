@@ -239,7 +239,6 @@ where
             targets,
             value,
             range: _,
-            type_comment: _,
         }) => {
             for expr in targets {
                 visitor.visit_expr(expr);
@@ -320,13 +319,11 @@ where
         Stmt::With(ast::StmtWith {
             items,
             body,
-            type_comment: _,
             range: _,
         })
         | Stmt::AsyncWith(ast::StmtAsyncWith {
             items,
             body,
-            type_comment: _,
             range: _,
         }) => {
             for with_item in items {

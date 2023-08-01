@@ -722,7 +722,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                                         range: 598..603,
                                     },
                                     annotation: None,
-                                    type_comment: None,
                                 },
                                 default: None,
                             },
@@ -757,7 +756,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ),
                 },
             ),
-            type_comment: None,
         },
     ),
     Expr(

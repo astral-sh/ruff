@@ -566,7 +566,6 @@ fn ternary(target_var: &Expr, body_value: &Expr, test: &Expr, orelse_value: &Exp
     let node1 = ast::StmtAssign {
         targets: vec![target_var.clone()],
         value: Box::new(node.into()),
-        type_comment: None,
         range: TextRange::default(),
     };
     node1.into()
@@ -957,7 +956,6 @@ pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &StmtIf)
     let node5 = ast::StmtAssign {
         targets: vec![node4],
         value: Box::new(node3.into()),
-        type_comment: None,
         range: TextRange::default(),
     };
     let contents = checker.generator().stmt(&node5.into());

@@ -79,13 +79,6 @@ impl<'a> AnyFunctionDefinition<'a> {
         }
     }
 
-    pub fn type_comments(self) -> Option<&'a str> {
-        match self {
-            Self::FunctionDefinition(definition) => definition.type_comment.as_deref(),
-            Self::AsyncFunctionDefinition(definition) => definition.type_comment.as_deref(),
-        }
-    }
-
     /// Returns `true` if this is [`Self::AsyncFunctionDefinition`]
     pub const fn is_async(self) -> bool {
         matches!(self, Self::AsyncFunctionDefinition(_))

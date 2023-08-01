@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: 76f8cd8ac95bef60488dc5962346273abca535cd4aa194edd11cda998a4b211e
+// sha3: 7e5118fcea23da57b78e42a0fed09f9d25e7a69899989bcf3ed7fe2b0565feb4
 use num_bigint::BigInt;
 use ruff_text_size::TextSize;
 use ruff_python_ast::{self as ast, Ranged, MagicKind};
@@ -31124,7 +31124,7 @@ fn __action26<
             }
 
             ast::Stmt::Assign(
-                ast::StmtAssign { targets, value, type_comment: None, range: (location..end_location).into() }
+                ast::StmtAssign { targets, value, range: (location..end_location).into() }
             )
         }
     }
@@ -33195,11 +33195,10 @@ fn __action148<
             .end();
         let target = Box::new(set_context(target, ast::ExprContext::Store));
         let iter = Box::new(iter);
-        let type_comment = None;
         if is_async.is_some() {
-            ast::Stmt::AsyncFor(ast::StmtAsyncFor { target, iter, body, orelse, type_comment, range: (location..end_location).into() })
+            ast::Stmt::AsyncFor(ast::StmtAsyncFor { target, iter, body, orelse, range: (location..end_location).into() })
         } else {
-            ast::Stmt::For(ast::StmtFor { target, iter, body, orelse, type_comment, range: (location..end_location).into() })
+            ast::Stmt::For(ast::StmtFor { target, iter, body, orelse, range: (location..end_location).into() })
         }
     }
 }
@@ -33421,11 +33420,10 @@ fn __action156<
 {
     {
         let end_location = body.last().unwrap().end();
-        let type_comment = None;
         if is_async.is_some() {
-            ast::StmtAsyncWith { items, body, type_comment, range: (location..end_location).into() }.into()
+            ast::StmtAsyncWith { items, body, range: (location..end_location).into() }.into()
         } else {
-            ast::StmtWith { items, body, type_comment, range: (location..end_location).into() }.into()
+            ast::StmtWith { items, body, range: (location..end_location).into() }.into()
         }
     }
 }
@@ -33523,11 +33521,10 @@ fn __action162<
         let args = Box::new(args);
         let returns = r.map(Box::new);
         let end_location = body.last().unwrap().end();
-        let type_comment = None;
         if is_async.is_some() {
-            ast::StmtAsyncFunctionDef { name, args, body, decorator_list, returns, type_comment, type_params: type_params.unwrap_or_default(), range: (location..end_location).into() }.into()
+            ast::StmtAsyncFunctionDef { name, args, body, decorator_list, returns, type_params: type_params.unwrap_or_default(), range: (location..end_location).into() }.into()
         } else {
-            ast::StmtFunctionDef { name, args, body, decorator_list, returns, type_comment, type_params: type_params.unwrap_or_default(), range: (location..end_location).into() }.into()
+            ast::StmtFunctionDef { name, args, body, decorator_list, returns, type_params: type_params.unwrap_or_default(), range: (location..end_location).into() }.into()
         }
     }
 }
@@ -33610,7 +33607,7 @@ fn __action166<
 ) -> ast::ArgWithDefault
 {
     {
-        let def = ast::Arg { arg, annotation: None, type_comment: None, range: (location..end_location).into() };
+        let def = ast::Arg { arg, annotation: None, range: (location..end_location).into() };
         ast::ArgWithDefault { def, default: None, range: (location..end_location).into() }
     }
 }
@@ -33625,7 +33622,7 @@ fn __action167<
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Arg
 {
-    ast::Arg { arg, annotation: None, type_comment: None, range: (location..end_location).into() }
+    ast::Arg { arg, annotation: None, range: (location..end_location).into() }
 }
 
 #[allow(unused_variables)]
@@ -33641,7 +33638,7 @@ fn __action168<
 {
     {
         let annotation = a.map(Box::new);
-        let def = ast::Arg { arg, annotation, type_comment: None, range: (location..end_location).into() };
+        let def = ast::Arg { arg, annotation, range: (location..end_location).into() };
         ast::ArgWithDefault { def, default: None, range: (location..end_location).into() }
     }
 }
@@ -33659,7 +33656,7 @@ fn __action169<
 {
     {
         let annotation = a.map(Box::new);
-        ast::Arg { arg, annotation, type_comment: None, range: (location..end_location).into() }
+        ast::Arg { arg, annotation, range: (location..end_location).into() }
     }
 }
 
@@ -33676,7 +33673,7 @@ fn __action170<
 {
     {
         let annotation = a.map(Box::new);
-        ast::Arg { arg, annotation, type_comment: None, range: (location..end_location).into() }
+        ast::Arg { arg, annotation, range: (location..end_location).into() }
     }
 }
 

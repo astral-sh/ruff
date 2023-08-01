@@ -124,7 +124,7 @@ ExpressionStatement: ast::Stmt = {
             }
 
             ast::Stmt::Assign(
-                ast::StmtAssign { targets, value, type_comment: None, range: (location..end_location).into() }
+                ast::StmtAssign { targets, value, range: (location..end_location).into() }
             )
         }
     },
@@ -859,11 +859,10 @@ ForStatement: ast::Stmt = {
             .end();
         let target = Box::new(set_context(target, ast::ExprContext::Store));
         let iter = Box::new(iter);
-        let type_comment = None;
         if is_async.is_some() {
-            ast::Stmt::AsyncFor(ast::StmtAsyncFor { target, iter, body, orelse, type_comment, range: (location..end_location).into() })
+            ast::Stmt::AsyncFor(ast::StmtAsyncFor { target, iter, body, orelse, range: (location..end_location).into() })
         } else {
-            ast::Stmt::For(ast::StmtFor { target, iter, body, orelse, type_comment, range: (location..end_location).into() })
+            ast::Stmt::For(ast::StmtFor { target, iter, body, orelse, range: (location..end_location).into() })
         }
     },
 };
@@ -977,11 +976,10 @@ ExceptClause: ast::ExceptHandler = {
 WithStatement: ast::Stmt = {
     <location:@L> <is_async:"async"?> "with" <items:WithItems> ":" <body:Suite> => {
         let end_location = body.last().unwrap().end();
-        let type_comment = None;
         if is_async.is_some() {
-            ast::StmtAsyncWith { items, body, type_comment, range: (location..end_location).into() }.into()
+            ast::StmtAsyncWith { items, body, range: (location..end_location).into() }.into()
         } else {
-            ast::StmtWith { items, body, type_comment, range: (location..end_location).into() }.into()
+            ast::StmtWith { items, body, range: (location..end_location).into() }.into()
         }
     },
 };
@@ -1017,11 +1015,10 @@ FuncDef: ast::Stmt = {
         let args = Box::new(args);
         let returns = r.map(Box::new);
         let end_location = body.last().unwrap().end();
-        let type_comment = None;
         if is_async.is_some() {
-            ast::StmtAsyncFunctionDef { name, args, body, decorator_list, returns, type_comment, type_params: type_params.unwrap_or_default(), range: (location..end_location).into() }.into()
+            ast::StmtAsyncFunctionDef { name, args, body, decorator_list, returns, type_params: type_params.unwrap_or_default(), range: (location..end_location).into() }.into()
         } else {
-            ast::StmtFunctionDef { name, args, body, decorator_list, returns, type_comment, type_params: type_params.unwrap_or_default(), range: (location..end_location).into() }.into()
+            ast::StmtFunctionDef { name, args, body, decorator_list, returns, type_params: type_params.unwrap_or_default(), range: (location..end_location).into() }.into()
         }
     },
 };
@@ -1142,18 +1139,18 @@ ParameterDef<ArgType>: ast::ArgWithDefault = {
 
 UntypedParameter: ast::ArgWithDefault = {
     <location:@L> <arg:Identifier> <end_location:@R> => {
-        let def = ast::Arg { arg, annotation: None, type_comment: None, range: (location..end_location).into() };
+        let def = ast::Arg { arg, annotation: None, range: (location..end_location).into() };
         ast::ArgWithDefault { def, default: None, range: (location..end_location).into() }
     },
 };
 StarUntypedParameter: ast::Arg = {
-    <location:@L> <arg:Identifier> <end_location:@R> => ast::Arg { arg, annotation: None, type_comment: None, range: (location..end_location).into() },
+    <location:@L> <arg:Identifier> <end_location:@R> => ast::Arg { arg, annotation: None, range: (location..end_location).into() },
 };
 
 TypedParameter: ast::ArgWithDefault = {
     <location:@L> <arg:Identifier> <a:(":" <Test<"all">>)?> <end_location:@R> => {
         let annotation = a.map(Box::new);
-        let def = ast::Arg { arg, annotation, type_comment: None, range: (location..end_location).into() };
+        let def = ast::Arg { arg, annotation, range: (location..end_location).into() };
         ast::ArgWithDefault { def, default: None, range: (location..end_location).into() }
     },
 };
@@ -1161,14 +1158,14 @@ TypedParameter: ast::ArgWithDefault = {
 StarTypedParameter: ast::Arg = {
     <location:@L> <arg:Identifier> <a:(":" <TestOrStarExpr>)?> <end_location:@R> => {
         let annotation = a.map(Box::new);
-        ast::Arg { arg, annotation, type_comment: None, range: (location..end_location).into() }
+        ast::Arg { arg, annotation, range: (location..end_location).into() }
     },
 };
 
 DoubleStarTypedParameter: ast::Arg = {
     <location:@L> <arg:Identifier> <a:(":" <Test<"all">>)?> <end_location:@R> => {
         let annotation = a.map(Box::new);
-        ast::Arg { arg, annotation, type_comment: None, range: (location..end_location).into() }
+        ast::Arg { arg, annotation, range: (location..end_location).into() }
     },
 };
 

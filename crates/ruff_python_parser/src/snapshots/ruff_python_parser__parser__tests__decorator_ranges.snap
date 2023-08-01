@@ -39,7 +39,6 @@ expression: parse_ast
             ],
             returns: None,
             type_params: [],
-            type_comment: None,
         },
     ),
     ClassDef(

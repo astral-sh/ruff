@@ -25,7 +25,6 @@ Ok(
                                             range: 10..11,
                                         },
                                         annotation: None,
-                                        type_comment: None,
                                     },
                                     default: None,
                                 },
@@ -38,7 +37,6 @@ Ok(
                                             range: 13..14,
                                         },
                                         annotation: None,
-                                        type_comment: None,
                                     },
                                     default: Some(
                                         Constant(
@@ -61,7 +59,6 @@ Ok(
                                             range: 19..20,
                                         },
                                         annotation: None,
-                                        type_comment: None,
                                     },
                                     default: Some(
                                         Constant(

@@ -26,7 +26,6 @@ Ok(
                                     range: 9..10,
                                 },
                                 annotation: None,
-                                type_comment: None,
                             },
                             default: None,
                         },
@@ -39,7 +38,6 @@ Ok(
                                     range: 12..13,
                                 },
                                 annotation: None,
-                                type_comment: None,
                             },
                             default: Some(
                                 Constant(
@@ -62,7 +60,6 @@ Ok(
                                     range: 18..19,
                                 },
                                 annotation: None,
-                                type_comment: None,
                             },
                             default: Some(
                                 Constant(
@@ -89,7 +86,6 @@ Ok(
                 decorator_list: [],
                 returns: None,
                 type_params: [],
-                type_comment: None,
             },
         ),
     ],

@@ -17,7 +17,6 @@ impl FormatNodeRule<StmtAssign> for FormatStmtAssign {
             range: _,
             targets,
             value,
-            type_comment: _,
         } = item;
 
         let (first, rest) = targets.split_first().ok_or(FormatError::syntax_error(

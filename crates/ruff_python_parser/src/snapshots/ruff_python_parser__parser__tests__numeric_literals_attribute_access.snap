@@ -41,7 +41,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     keywords: [],
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -75,7 +74,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Load,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -109,7 +107,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Load,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -143,7 +140,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Load,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -184,7 +180,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     keywords: [],
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -218,7 +213,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Load,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -259,7 +253,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     keywords: [],
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -294,7 +287,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Load,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -363,7 +355,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     keywords: [],
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -404,7 +395,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     keywords: [],
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -445,7 +435,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     keywords: [],
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -479,7 +468,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Load,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -520,7 +508,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     keywords: [],
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -551,7 +538,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ),
                 },
             ),
-            type_comment: None,
         },
     ),
     If(
@@ -627,7 +613,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Load,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -666,7 +651,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     keywords: [],
                 },
             ),
-            type_comment: None,
         },
     ),
 ]
