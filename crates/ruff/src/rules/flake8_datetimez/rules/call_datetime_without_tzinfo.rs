@@ -32,6 +32,13 @@ use super::helpers;
 /// ```python
 /// import datetime
 ///
+/// datetime.datetime(2000, 1, 1, 0, 0, 0, tzinfo=datetime.timezone.utc)
+/// ```
+///
+/// Or, for Python 3.11 and later:
+/// ```python
+/// import datetime
+///
 /// datetime.datetime(2000, 1, 1, 0, 0, 0, tzinfo=datetime.UTC)
 /// ```
 #[violation]

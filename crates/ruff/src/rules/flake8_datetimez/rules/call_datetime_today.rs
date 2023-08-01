@@ -18,9 +18,8 @@ use super::helpers;
 /// `datetime` objects are preferred, as they represent a specific moment in
 /// time, unlike "naive" objects.
 ///
-/// `datetime.datetime.today()` crates a "naive" object; instead, use
-/// instead, use `datetime.datetime.now(tz=)` to create a timezone-aware
-/// object.
+/// `datetime.datetime.today()` creates a "naive" object; instead, use
+/// `datetime.datetime.now(tz=)` to create a timezone-aware object.
 ///
 /// ## Example
 /// ```python

@@ -8,6 +8,39 @@ use crate::checkers::ast::Checker;
 
 use super::helpers;
 
+/// ## What it does
+/// Checks for usage of `datetime.datetime.utcnow()`.
+///
+/// ## Why is this bad?
+/// `datetime` objects are "naive" by default, in that they do not include
+/// timezone information. "Naive" objects are easy to understand, but ignore
+/// some aspects of reality, which can lead to subtle bugs. Timezone-aware
+/// `datetime` objects are preferred, as they represent a specific moment in
+/// time, unlike "naive" objects.
+///
+/// `datetime.datetime.utcnow()` creates a "naive" object; instead, use
+/// `datetime.datetime.now(tz=)` to create a timezone-aware object.
+///
+/// ## Example
+/// ```python
+/// import datetime
+///
+/// datetime.datetime.utcnow()
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import datetime
+///
+/// datetime.datetime.now(tz=datetime.timezone.utc)
+/// ```
+///
+/// Or, for Python 3.11 and later:
+/// ```python
+/// import datetime
+///
+/// datetime.datetime.now(tz=datetime.UTC)
+/// ```
 #[violation]
 pub struct CallDatetimeUtcnow;
 
@@ -21,14 +54,6 @@ impl Violation for CallDatetimeUtcnow {
     }
 }
 
-/// Checks for `datetime.datetime.today()`. (DTZ003)
-///
-/// ## Why is this bad?
-///
-/// Because naive `datetime` objects are treated by many `datetime` methods as
-/// local times, it is preferred to use aware datetimes to represent times in
-/// UTC. As such, the recommended way to create an object representing the
-/// current time in UTC is by calling `datetime.now(timezone.utc)`.
 pub(crate) fn call_datetime_utcnow(checker: &mut Checker, func: &Expr, location: TextRange) {
     if !checker
         .semantic()
