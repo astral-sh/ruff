@@ -19,7 +19,7 @@ this_will_be_wrapped_in_parens, = struct.unpack(b"12345678901234567890")
 ```diff
 --- Black
 +++ Ruff
-@@ -4,9 +4,9 @@
+@@ -4,7 +4,7 @@
      sdfjsdfjlksdljkfsdlkf,
      sdfsdjfklsdfjlksdljkf,
      sdsfsdfjskdflsfsdf,
@@ -27,10 +27,7 @@ this_will_be_wrapped_in_parens, = struct.unpack(b"12345678901234567890")
 +) = 1, 2, 3
  
  # This is as well.
--(this_will_be_wrapped_in_parens,) = struct.unpack(b"12345678901234567890")
-+(this_will_be_wrapped_in_parens,) = struct.unpack(b"NOT_YET_IMPLEMENTED_BYTE_STRING")
- 
- (a,) = call()
+ (this_will_be_wrapped_in_parens,) = struct.unpack(b"12345678901234567890")
 ```
 
 ## Ruff Output
@@ -45,7 +42,7 @@ this_will_be_wrapped_in_parens, = struct.unpack(b"12345678901234567890")
 ) = 1, 2, 3
 
 # This is as well.
-(this_will_be_wrapped_in_parens,) = struct.unpack(b"NOT_YET_IMPLEMENTED_BYTE_STRING")
+(this_will_be_wrapped_in_parens,) = struct.unpack(b"12345678901234567890")
 
 (a,) = call()
 ```

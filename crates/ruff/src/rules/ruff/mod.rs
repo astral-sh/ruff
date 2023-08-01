@@ -167,9 +167,9 @@ mod tests {
     }
 
     #[test]
-    fn ruff_noqa() -> Result<()> {
+    fn ruff_noqa_all() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("ruff/ruff_noqa.py"),
+            Path::new("ruff/ruff_noqa_all.py"),
             &settings::Settings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
         )?;
         assert_messages!(diagnostics);
@@ -177,9 +177,19 @@ mod tests {
     }
 
     #[test]
-    fn ruff_targeted_noqa() -> Result<()> {
+    fn ruff_noqa_codes() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("ruff/ruff_targeted_noqa.py"),
+            Path::new("ruff/ruff_noqa_codes.py"),
+            &settings::Settings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn ruff_noqa_invalid() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/ruff_noqa_invalid.py"),
             &settings::Settings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
         )?;
         assert_messages!(diagnostics);

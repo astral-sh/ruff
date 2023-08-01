@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::fmt::Display;
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::iter;
@@ -39,6 +40,20 @@ pub fn round_trip(path: &Path) -> anyhow::Result<String> {
     let mut writer = Vec::new();
     notebook.write_inner(&mut writer)?;
     Ok(String::from_utf8(writer)?)
+}
+
+impl Display for SourceValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SourceValue::String(string) => f.write_str(string),
+            SourceValue::StringArray(string_array) => {
+                for string in string_array {
+                    f.write_str(string)?;
+                }
+                Ok(())
+            }
+        }
+    }
 }
 
 impl Cell {
@@ -405,6 +420,11 @@ impl Notebook {
         self.update_cell_offsets(source_map);
         self.update_cell_content(transformed);
         self.content = transformed.to_string();
+    }
+
+    /// Return a slice of [`Cell`] in the Jupyter notebook.
+    pub fn cells(&self) -> &[Cell] {
+        &self.raw.cells
     }
 
     /// Return `true` if the notebook is a Python notebook, `false` otherwise.

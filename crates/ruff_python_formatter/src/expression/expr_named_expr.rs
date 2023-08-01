@@ -32,11 +32,25 @@ impl FormatNodeRule<ExprNamedExpr> for FormatExprNamedExpr {
 impl NeedsParentheses for ExprNamedExpr {
     fn needs_parentheses(
         &self,
-        _parent: AnyNodeRef,
+        parent: AnyNodeRef,
         _context: &PyFormatContext,
     ) -> OptionalParentheses {
         // Unlike tuples, named expression parentheses are not part of the range even when
         // mandatory. See [PEP 572](https://peps.python.org/pep-0572/) for details.
-        OptionalParentheses::Always
+        if parent.is_stmt_ann_assign()
+            || parent.is_stmt_assign()
+            || parent.is_stmt_aug_assign()
+            || parent.is_stmt_assert()
+            || parent.is_stmt_return()
+            || parent.is_except_handler_except_handler()
+            || parent.is_with_item()
+            || parent.is_stmt_delete()
+            || parent.is_stmt_for()
+            || parent.is_stmt_async_for()
+        {
+            OptionalParentheses::Always
+        } else {
+            OptionalParentheses::Never
+        }
     }
 }

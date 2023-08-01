@@ -5,7 +5,7 @@ use ruff_formatter::{format_args, write, Argument, Arguments};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_trivia::{first_non_trivia_token, SimpleToken, SimpleTokenKind, SimpleTokenizer};
 
-use crate::context::NodeLevel;
+use crate::context::{NodeLevel, WithNodeLevel};
 use crate::prelude::*;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -134,23 +134,20 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatParenthesized<'_, 'ast> {
 
         let current_level = f.context().node_level();
 
-        f.context_mut()
-            .set_node_level(NodeLevel::ParenthesizedExpression);
+        let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
 
-        let result = if let NodeLevel::Expression(Some(group_id)) = current_level {
+        if let NodeLevel::Expression(Some(group_id)) = current_level {
             // Use fits expanded if there's an enclosing group that adds the optional parentheses.
             // This ensures that expanding this parenthesized expression does not expand the optional parentheses group.
-            fits_expanded(&inner)
-                .with_condition(Some(Condition::if_group_fits_on_line(group_id)))
-                .fmt(f)
+            write!(
+                f,
+                [fits_expanded(&inner)
+                    .with_condition(Some(Condition::if_group_fits_on_line(group_id)))]
+            )
         } else {
             // It's not necessary to wrap the content if it is not inside of an optional_parentheses group.
-            inner.fmt(f)
-        };
-
-        f.context_mut().set_node_level(current_level);
-
-        result
+            write!(f, [inner])
+        }
     }
 }
 
@@ -173,35 +170,30 @@ pub(crate) struct FormatOptionalParentheses<'content, 'ast> {
 
 impl<'ast> Format<PyFormatContext<'ast>> for FormatOptionalParentheses<'_, 'ast> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
-        let saved_level = f.context().node_level();
-
         // The group id is used as a condition in [`in_parentheses_only`] to create a conditional group
         // that is only active if the optional parentheses group expands.
         let parens_id = f.group_id("optional_parentheses");
 
-        f.context_mut()
-            .set_node_level(NodeLevel::Expression(Some(parens_id)));
+        let mut f = WithNodeLevel::new(NodeLevel::Expression(Some(parens_id)), f);
 
         // We can't use `soft_block_indent` here because that would always increment the indent,
         // even if the group does not break (the indent is not soft). This would result in
         // too deep indentations if a `parenthesized` group expands. Using `indent_if_group_breaks`
         // gives us the desired *soft* indentation that is only present if the optional parentheses
         // are shown.
-        let result = group(&format_args![
-            if_group_breaks(&text("(")),
-            indent_if_group_breaks(
-                &format_args![soft_line_break(), Arguments::from(&self.content)],
-                parens_id
-            ),
-            soft_line_break(),
-            if_group_breaks(&text(")"))
-        ])
-        .with_group_id(Some(parens_id))
-        .fmt(f);
-
-        f.context_mut().set_node_level(saved_level);
-
-        result
+        write!(
+            f,
+            [group(&format_args![
+                if_group_breaks(&text("(")),
+                indent_if_group_breaks(
+                    &format_args![soft_line_break(), Arguments::from(&self.content)],
+                    parens_id
+                ),
+                soft_line_break(),
+                if_group_breaks(&text(")"))
+            ])
+            .with_group_id(Some(parens_id))]
+        )
     }
 }
 

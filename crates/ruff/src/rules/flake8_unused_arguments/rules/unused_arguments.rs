@@ -317,10 +317,7 @@ pub(crate) fn unused_arguments(
     scope: &Scope,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    let Some(parent) = scope
-        .parent
-        .map(|scope_id| &checker.semantic().scopes[scope_id])
-    else {
+    let Some(parent) = &checker.semantic().first_non_type_parent_scope(scope) else {
         return;
     };
 

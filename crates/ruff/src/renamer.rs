@@ -242,6 +242,7 @@ impl Renamer {
             // By default, replace the binding's name with the target name.
             BindingKind::Annotation
             | BindingKind::Argument
+            | BindingKind::TypeParam
             | BindingKind::NamedExprAssignment
             | BindingKind::UnpackedAssignment
             | BindingKind::Assignment

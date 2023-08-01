@@ -5,7 +5,7 @@ use ruff_python_semantic::{Binding, BindingKind, ScopeKind};
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
-use crate::rules::{flake8_type_checking, flake8_unused_arguments, pyflakes, pylint};
+use crate::rules::{flake8_pyi, flake8_type_checking, flake8_unused_arguments, pyflakes, pylint};
 
 /// Run lint rules over all deferred scopes in the [`SemanticModel`].
 pub(crate) fn deferred_scopes(checker: &mut Checker) {
@@ -24,6 +24,10 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         Rule::UnusedImport,
         Rule::UnusedLambdaArgument,
         Rule::UnusedMethodArgument,
+        Rule::UnusedPrivateProtocol,
+        Rule::UnusedPrivateTypeAlias,
+        Rule::UnusedPrivateTypeVar,
+        Rule::UnusedPrivateTypedDict,
         Rule::UnusedStaticMethodArgument,
         Rule::UnusedVariable,
     ]) {
@@ -211,6 +215,21 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                     }
                     diagnostics.push(diagnostic);
                 }
+            }
+        }
+
+        if checker.is_stub {
+            if checker.enabled(Rule::UnusedPrivateTypeVar) {
+                flake8_pyi::rules::unused_private_type_var(checker, scope, &mut diagnostics);
+            }
+            if checker.enabled(Rule::UnusedPrivateProtocol) {
+                flake8_pyi::rules::unused_private_protocol(checker, scope, &mut diagnostics);
+            }
+            if checker.enabled(Rule::UnusedPrivateTypeAlias) {
+                flake8_pyi::rules::unused_private_type_alias(checker, scope, &mut diagnostics);
+            }
+            if checker.enabled(Rule::UnusedPrivateTypedDict) {
+                flake8_pyi::rules::unused_private_typed_dict(checker, scope, &mut diagnostics);
             }
         }
 

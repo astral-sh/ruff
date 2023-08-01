@@ -1,6 +1,6 @@
+use itertools::Itertools;
 use std::collections::BTreeSet;
 
-use itertools::Itertools;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -59,35 +59,30 @@ fn apply_fixes<'a>(
         })
         .sorted_by(|(rule1, fix1), (rule2, fix2)| cmp_fix(*rule1, *rule2, fix1, fix2))
     {
-        // If we already applied an identical fix as part of another correction, skip
-        // any re-application.
-        if fix.edits().iter().all(|edit| applied.contains(edit)) {
-            *fixed.entry(rule).or_default() += 1;
-            continue;
-        }
+        let mut edits = fix
+            .edits()
+            .iter()
+            .filter(|edit| !applied.contains(edit))
+            .peekable();
 
-        // Best-effort approach: if this fix overlaps with a fix we've already applied,
-        // skip it.
-        if last_pos.map_or(false, |last_pos| {
-            fix.min_start()
-                .map_or(false, |fix_location| last_pos >= fix_location)
-        }) {
-            continue;
-        }
+        // If the fix contains at least one new edit, enforce isolation and positional requirements.
+        if let Some(first) = edits.peek() {
+            // If this fix requires isolation, and we've already applied another fix in the
+            // same isolation group, skip it.
+            if let IsolationLevel::Group(id) = fix.isolation() {
+                if !isolated.insert(id) {
+                    continue;
+                }
+            }
 
-        // If this fix requires isolation, and we've already applied another fix in the
-        // same isolation group, skip it.
-        if let IsolationLevel::Group(id) = fix.isolation() {
-            if !isolated.insert(id) {
+            // If this fix overlaps with a fix we've already applied, skip it.
+            if last_pos.map_or(false, |last_pos| last_pos >= first.start()) {
                 continue;
             }
         }
 
-        for edit in fix
-            .edits()
-            .iter()
-            .sorted_unstable_by_key(|edit| edit.start())
-        {
+        let mut applied_edits = Vec::with_capacity(fix.edits().len());
+        for edit in edits {
             // Add all contents from `last_pos` to `fix.location`.
             let slice = locator.slice(TextRange::new(last_pos.unwrap_or_default(), edit.start()));
             output.push_str(slice);
@@ -103,9 +98,10 @@ fn apply_fixes<'a>(
 
             // Track that the edit was applied.
             last_pos = Some(edit.end());
-            applied.insert(edit);
+            applied_edits.push(edit);
         }
 
+        applied.extend(applied_edits.drain(..));
         *fixed.entry(rule).or_default() += 1;
     }
 
