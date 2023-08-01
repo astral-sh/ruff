@@ -1,8 +1,7 @@
-use ruff_python_ast::{self as ast, Expr, Stmt};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::any_over_expr;
+use ruff_python_ast::{self as ast, Expr, Stmt};
 
 use crate::checkers::ast::Checker;
 
@@ -89,7 +88,7 @@ pub(crate) fn manual_list_copy(checker: &mut Checker, target: &Expr, body: &[Stm
         return;
     }
 
-    // Avoid, e.g., `for x in y: filtered[x].append(x * x)`.
+    // Avoid, e.g., `for x in y: filtered[x].append(x)`.
     if any_over_expr(value, &|expr| {
         expr.as_name_expr().map_or(false, |expr| expr.id == *id)
     }) {

@@ -2,6 +2,7 @@ use ruff_python_ast::{self as ast, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::any_over_expr;
 
 use crate::checkers::ast::Checker;
@@ -125,6 +126,13 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, target: &Expr, bo
     // Avoid, e.g., `for x in y: filtered[x].append(x * x)`.
     if any_over_expr(value, &|expr| {
         expr.as_name_expr().map_or(false, |expr| expr.id == *id)
+    }) {
+        return;
+    }
+
+    // Avoid, e.g., `for x in y: filtered.append(filtered[-1] * 2)`.
+    if any_over_expr(arg, &|expr| {
+        ComparableExpr::from(expr) == ComparableExpr::from(value)
     }) {
         return;
     }
