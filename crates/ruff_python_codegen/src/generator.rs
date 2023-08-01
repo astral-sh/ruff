@@ -1,12 +1,12 @@
 //! Generate Python source code from an abstract syntax tree (AST).
 
-use ruff_python_ast::ArgWithDefault;
+use ruff_python_ast::ParameterWithDefault;
 use std::ops::Deref;
 
 use ruff_python_ast::{
-    self as ast, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Constant, ConversionFlag,
-    DebugText, ExceptHandler, Expr, Identifier, MatchCase, Operator, Pattern, Stmt, Suite,
-    TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
+    self as ast, Alias, BoolOp, CmpOp, Comprehension, Constant, ConversionFlag, DebugText,
+    ExceptHandler, Expr, Identifier, MatchCase, Operator, Parameter, Parameters, Pattern, Stmt,
+    Suite, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
 };
 use ruff_python_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
 
@@ -205,7 +205,7 @@ impl<'a> Generator<'a> {
         match ast {
             Stmt::FunctionDef(ast::StmtFunctionDef {
                 name,
-                args,
+                parameters,
                 body,
                 returns,
                 decorator_list,
@@ -224,7 +224,7 @@ impl<'a> Generator<'a> {
                     self.p_id(name);
                     self.unparse_type_params(type_params);
                     self.p("(");
-                    self.unparse_args(args);
+                    self.unparse_parameters(parameters);
                     self.p(")");
                     if let Some(returns) = returns {
                         self.p(" -> ");
@@ -239,7 +239,7 @@ impl<'a> Generator<'a> {
             }
             Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
                 name,
-                args,
+                parameters,
                 body,
                 returns,
                 decorator_list,
@@ -258,7 +258,7 @@ impl<'a> Generator<'a> {
                     self.p_id(name);
                     self.unparse_type_params(type_params);
                     self.p("(");
-                    self.unparse_args(args);
+                    self.unparse_parameters(parameters);
                     self.p(")");
                     if let Some(returns) = returns {
                         self.p(" -> ");
@@ -985,14 +985,14 @@ impl<'a> Generator<'a> {
                 });
             }
             Expr::Lambda(ast::ExprLambda {
-                args,
+                parameters,
                 body,
                 range: _range,
             }) => {
                 group_if!(precedence::LAMBDA, {
-                    let npos = args.args.len() + args.posonlyargs.len();
+                    let npos = parameters.args.len() + parameters.posonlyargs.len();
                     self.p(if npos > 0 { "lambda " } else { "lambda" });
-                    self.unparse_args(args);
+                    self.unparse_parameters(parameters);
                     self.p(": ");
                     self.unparse_expr(body, precedence::LAMBDA);
                 });
@@ -1324,42 +1324,47 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_args(&mut self, args: &Arguments) {
+    fn unparse_parameters(&mut self, parameters: &Parameters) {
         let mut first = true;
-        for (i, arg_with_default) in args.posonlyargs.iter().chain(&args.args).enumerate() {
+        for (i, parameter_with_default) in parameters
+            .posonlyargs
+            .iter()
+            .chain(&parameters.args)
+            .enumerate()
+        {
             self.p_delim(&mut first, ", ");
-            self.unparse_arg_with_default(arg_with_default);
-            self.p_if(i + 1 == args.posonlyargs.len(), ", /");
+            self.unparse_parameter_with_default(parameter_with_default);
+            self.p_if(i + 1 == parameters.posonlyargs.len(), ", /");
         }
-        if args.vararg.is_some() || !args.kwonlyargs.is_empty() {
+        if parameters.vararg.is_some() || !parameters.kwonlyargs.is_empty() {
             self.p_delim(&mut first, ", ");
             self.p("*");
         }
-        if let Some(vararg) = &args.vararg {
-            self.unparse_arg(vararg);
+        if let Some(vararg) = &parameters.vararg {
+            self.unparse_parameter(vararg);
         }
-        for kwarg in &args.kwonlyargs {
+        for kwarg in &parameters.kwonlyargs {
             self.p_delim(&mut first, ", ");
-            self.unparse_arg_with_default(kwarg);
+            self.unparse_parameter_with_default(kwarg);
         }
-        if let Some(kwarg) = &args.kwarg {
+        if let Some(kwarg) = &parameters.kwarg {
             self.p_delim(&mut first, ", ");
             self.p("**");
-            self.unparse_arg(kwarg);
+            self.unparse_parameter(kwarg);
         }
     }
 
-    fn unparse_arg(&mut self, arg: &Arg) {
-        self.p_id(&arg.arg);
-        if let Some(ann) = &arg.annotation {
+    fn unparse_parameter(&mut self, parameter: &Parameter) {
+        self.p_id(&parameter.arg);
+        if let Some(ann) = &parameter.annotation {
             self.p(": ");
             self.unparse_expr(ann, precedence::COMMA);
         }
     }
 
-    fn unparse_arg_with_default(&mut self, arg_with_default: &ArgWithDefault) {
-        self.unparse_arg(&arg_with_default.def);
-        if let Some(default) = &arg_with_default.default {
+    fn unparse_parameter_with_default(&mut self, parameter_with_default: &ParameterWithDefault) {
+        self.unparse_parameter(&parameter_with_default.def);
+        if let Some(default) = &parameter_with_default.default {
             self.p("=");
             self.unparse_expr(default, precedence::COMMA);
         }

@@ -1,6 +1,6 @@
 use std::usize;
 
-use ruff_python_ast::{Arguments, Ranged};
+use ruff_python_ast::{Parameters, Ranged};
 use ruff_text_size::{TextRange, TextSize};
 
 use ruff_formatter::{format_args, write, FormatRuleWithOptions};
@@ -17,14 +17,14 @@ use crate::prelude::*;
 use crate::FormatNodeRule;
 
 #[derive(Eq, PartialEq, Debug, Default)]
-pub enum ArgumentsParentheses {
-    /// By default, arguments will always preserve their surrounding parentheses.
+pub enum ParametersParentheses {
+    /// By default, parameters will always preserve their surrounding parentheses.
     #[default]
     Preserve,
 
     /// Handle special cases where parentheses should never be used.
     ///
-    /// An example where parentheses are never used for arguments would be with lambda
+    /// An example where parentheses are never used for parameters would be with lambda
     /// expressions. The following is invalid syntax:
     /// ```python
     /// lambda (x, y, z): ...
@@ -37,12 +37,12 @@ pub enum ArgumentsParentheses {
 }
 
 #[derive(Default)]
-pub struct FormatArguments {
-    parentheses: ArgumentsParentheses,
+pub struct FormatParameters {
+    parentheses: ParametersParentheses,
 }
 
-impl FormatRuleWithOptions<Arguments, PyFormatContext<'_>> for FormatArguments {
-    type Options = ArgumentsParentheses;
+impl FormatRuleWithOptions<Parameters, PyFormatContext<'_>> for FormatParameters {
+    type Options = ParametersParentheses;
 
     fn with_options(mut self, options: Self::Options) -> Self {
         self.parentheses = options;
@@ -50,9 +50,9 @@ impl FormatRuleWithOptions<Arguments, PyFormatContext<'_>> for FormatArguments {
     }
 }
 
-impl FormatNodeRule<Arguments> for FormatArguments {
-    fn fmt_fields(&self, item: &Arguments, f: &mut PyFormatter) -> FormatResult<()> {
-        let Arguments {
+impl FormatNodeRule<Parameters> for FormatParameters {
+    fn fmt_fields(&self, item: &Parameters, f: &mut PyFormatter) -> FormatResult<()> {
+        let Parameters {
             range: _,
             posonlyargs,
             args,
@@ -70,10 +70,10 @@ impl FormatNodeRule<Arguments> for FormatArguments {
             let mut joiner = f.join_with(separator);
             let mut last_node: Option<AnyNodeRef> = None;
 
-            for arg_with_default in posonlyargs {
-                joiner.entry(&arg_with_default.format());
+            for parameter_with_default in posonlyargs {
+                joiner.entry(&parameter_with_default.format());
 
-                last_node = Some(arg_with_default.into());
+                last_node = Some(parameter_with_default.into());
             }
 
             let slash_comments_end = if posonlyargs.is_empty() {
@@ -86,7 +86,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
                         comment.slice().range(),
                         comment.line_position(),
                     )
-                    .expect("Unexpected dangling comment type in function arguments");
+                    .expect("Unexpected dangling comment type in function parameters");
                     matches!(
                         assignment,
                         ArgumentSeparatorCommentLocation::SlashLeading
@@ -100,10 +100,10 @@ impl FormatNodeRule<Arguments> for FormatArguments {
                 slash_comments_end
             };
 
-            for arg_with_default in args {
-                joiner.entry(&arg_with_default.format());
+            for parameter_with_default in args {
+                joiner.entry(&parameter_with_default.format());
 
-                last_node = Some(arg_with_default.into());
+                last_node = Some(parameter_with_default.into());
             }
 
             // kw only args need either a `*args` ahead of them capturing all var args or a `*`
@@ -139,10 +139,10 @@ impl FormatNodeRule<Arguments> for FormatArguments {
                 });
             }
 
-            for arg_with_default in kwonlyargs {
-                joiner.entry(&arg_with_default.format());
+            for parameter_with_default in kwonlyargs {
+                joiner.entry(&parameter_with_default.format());
 
-                last_node = Some(arg_with_default.into());
+                last_node = Some(parameter_with_default.into());
             }
 
             if let Some(kwarg) = kwarg {
@@ -168,7 +168,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
             // # Never expands, the comma is always preserved
             // x2 = lambda y,: 1
             // ```
-            if self.parentheses == ArgumentsParentheses::Never {
+            if self.parentheses == ParametersParentheses::Never {
                 // For lambdas (no parentheses), preserve the trailing comma. It doesn't
                 // behave like a magic trailing comma, it's just preserved
                 if has_trailing_comma(item, last_node, f.context().source()) {
@@ -190,16 +190,16 @@ impl FormatNodeRule<Arguments> for FormatArguments {
 
         let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
 
-        let num_arguments = posonlyargs.len()
+        let num_parameters = posonlyargs.len()
             + args.len()
             + usize::from(vararg.is_some())
             + kwonlyargs.len()
             + usize::from(kwarg.is_some());
 
-        if self.parentheses == ArgumentsParentheses::Never {
+        if self.parentheses == ParametersParentheses::Never {
             write!(f, [group(&format_inner)])
-        } else if num_arguments == 0 {
-            // No arguments, format any dangling comments between `()`
+        } else if num_parameters == 0 {
+            // No parameters, format any dangling comments between `()`
             write!(
                 f,
                 [
@@ -213,7 +213,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
         }
     }
 
-    fn fmt_dangling_comments(&self, _node: &Arguments, _f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_dangling_comments(&self, _node: &Parameters, _f: &mut PyFormatter) -> FormatResult<()> {
         // Handled in `fmt_fields`
         Ok(())
     }
@@ -283,18 +283,18 @@ pub(crate) struct ArgumentSeparator {
 /// Returns slash and star
 pub(crate) fn find_argument_separators(
     contents: &str,
-    arguments: &Arguments,
+    parameters: &Parameters,
 ) -> (Option<ArgumentSeparator>, Option<ArgumentSeparator>) {
     // We only compute preceding_end and token location here since following_start depends on the
     // star location, but the star location depends on slash's position
-    let slash = if let Some(preceding_end) = arguments.posonlyargs.last().map(Ranged::end) {
+    let slash = if let Some(preceding_end) = parameters.posonlyargs.last().map(Ranged::end) {
         // ```text
         // def f(a1=1, a2=2, /, a3, a4): pass
         //                 ^^^^^^^^^^^ the range (defaults)
         // def f(a1, a2, /, a3, a4): pass
         //             ^^^^^^^^^^^^ the range (no default)
         // ```
-        let range = TextRange::new(preceding_end, arguments.end());
+        let range = TextRange::new(preceding_end, parameters.end());
         let mut tokens = SimpleTokenizer::new(contents, range).skip_trivia();
 
         let comma = tokens
@@ -312,22 +312,22 @@ pub(crate) fn find_argument_separators(
     };
 
     // If we have a vararg we have a node that the comments attach to
-    let star = if arguments.vararg.is_some() {
+    let star = if parameters.vararg.is_some() {
         // When the vararg is present the comments attach there and we don't need to do manual
         // formatting
         None
-    } else if let Some(first_keyword_argument) = arguments.kwonlyargs.first() {
+    } else if let Some(first_keyword_argument) = parameters.kwonlyargs.first() {
         // Check in that order:
         // * `f(a, /, b, *, c)` and `f(a=1, /, b=2, *, c)`
         // * `f(a, /, *, b)`
         // * `f(*, b)` (else branch)
-        let after_arguments = arguments
+        let after_parameters = parameters
             .args
             .last()
             .map(|arg| arg.range.end())
             .or(slash.map(|(_, slash)| slash.end()));
-        if let Some(preceding_end) = after_arguments {
-            let range = TextRange::new(preceding_end, arguments.end());
+        if let Some(preceding_end) = after_parameters {
+            let range = TextRange::new(preceding_end, parameters.end());
             let mut tokens = SimpleTokenizer::new(contents, range).skip_trivia();
 
             let comma = tokens
@@ -345,7 +345,7 @@ pub(crate) fn find_argument_separators(
                 following_start: first_keyword_argument.start(),
             })
         } else {
-            let mut tokens = SimpleTokenizer::new(contents, arguments.range).skip_trivia();
+            let mut tokens = SimpleTokenizer::new(contents, parameters.range).skip_trivia();
 
             let lparen = tokens
                 .next()
@@ -356,7 +356,7 @@ pub(crate) fn find_argument_separators(
                 .expect("The function definition can't end here");
             debug_assert!(star.kind() == SimpleTokenKind::Star, "{star:?}");
             Some(ArgumentSeparator {
-                preceding_end: arguments.range.start(),
+                preceding_end: parameters.range.start(),
                 separator: star.range,
                 following_start: first_keyword_argument.start(),
             })
@@ -371,13 +371,13 @@ pub(crate) fn find_argument_separators(
     // * `f(a, /, *b)`
     // * `f(a, /, *, b)`
     // * `f(a, /)`
-    let slash_following_start = arguments
+    let slash_following_start = parameters
         .args
         .first()
         .map(Ranged::start)
-        .or(arguments.vararg.as_ref().map(|first| first.start()))
+        .or(parameters.vararg.as_ref().map(|first| first.start()))
         .or(star.as_ref().map(|star| star.separator.start()))
-        .unwrap_or(arguments.end());
+        .unwrap_or(parameters.end());
     let slash = slash.map(|(preceding_end, slash)| ArgumentSeparator {
         preceding_end,
         separator: slash,
@@ -387,13 +387,13 @@ pub(crate) fn find_argument_separators(
     (slash, star)
 }
 
-/// Locates positional only arguments separator `/` or the keywords only arguments
+/// Locates positional only parameters separator `/` or the keywords only parameters
 /// separator `*` comments.
 ///
 /// ```python
 /// def test(
 ///     a,
-///     # Positional only arguments after here
+///     # Positional only parameters after here
 ///     /, # trailing positional argument comment.
 ///     b,
 /// ):
@@ -403,7 +403,7 @@ pub(crate) fn find_argument_separators(
 /// ```python
 /// def f(
 ///     a="",
-///     # Keyword only arguments only after here
+///     # Keyword only parameters only after here
 ///     *, # trailing keyword argument comment.
 ///     b="",
 /// ):
@@ -439,43 +439,43 @@ pub(crate) fn find_argument_separators(
 ///
 /// ```text
 /// def f(a1, a2): pass
-///       ^^^^^^ arguments (args)
+///       ^^^^^^ parameters (args)
 /// ```
-/// Use a star to separate keyword only arguments:
+/// Use a star to separate keyword only parameters:
 /// ```text
 /// def f(a1, a2, *, a3, a4): pass
-///       ^^^^^^            arguments (args)
-///                  ^^^^^^ keyword only arguments (kwargs)
+///       ^^^^^^            parameters (args)
+///                  ^^^^^^ keyword only parameters (kwargs)
 /// ```
-/// Use a slash to separate positional only arguments. Note that this changes the arguments left
-/// of the slash while the star change the arguments right of it:
+/// Use a slash to separate positional only parameters. Note that this changes the parameters left
+/// of the slash while the star change the parameters right of it:
 /// ```text
 /// def f(a1, a2, /, a3, a4): pass
-///       ^^^^^^            positional only arguments (posonlyargs)
-///                  ^^^^^^ arguments (args)
+///       ^^^^^^            positional only parameters (posonlyargs)
+///                  ^^^^^^ parameters (args)
 /// ```
 /// You can combine both:
 /// ```text
 /// def f(a1, a2, /, a3, a4, *, a5, a6): pass
-///       ^^^^^^                       positional only arguments (posonlyargs)
-///                  ^^^^^^            arguments (args)
-///                             ^^^^^^ keyword only arguments (kwargs)
+///       ^^^^^^                       positional only parameters (posonlyargs)
+///                  ^^^^^^            parameters (args)
+///                             ^^^^^^ keyword only parameters (kwargs)
 /// ```
 /// They can all have defaults, meaning that the preceding node ends at the default instead of the
 /// argument itself:
 /// ```text
 /// def f(a1=1, a2=2, /, a3=3, a4=4, *, a5=5, a6=6): pass
 ///          ^     ^        ^     ^        ^     ^ defaults
-///       ^^^^^^^^^^                               positional only arguments (posonlyargs)
-///                      ^^^^^^^^^^                arguments (args)
-///                                     ^^^^^^^^^^ keyword only arguments (kwargs)
+///       ^^^^^^^^^^                               positional only parameters (posonlyargs)
+///                      ^^^^^^^^^^                parameters (args)
+///                                     ^^^^^^^^^^ keyword only parameters (kwargs)
 /// ```
-/// An especially difficult case is having no regular arguments, so comments from both slash and
+/// An especially difficult case is having no regular parameters, so comments from both slash and
 /// star will attach to either a2 or a3 and the next token is incorrect.
 /// ```text
 /// def f(a1, a2, /, *, a3, a4): pass
-///       ^^^^^^               positional only arguments (posonlyargs)
-///                     ^^^^^^ keyword only arguments (kwargs)
+///       ^^^^^^               positional only parameters (posonlyargs)
+///                     ^^^^^^ keyword only parameters (kwargs)
 /// ```
 pub(crate) fn assign_argument_separator_comment_placement(
     slash: Option<&ArgumentSeparator>,
@@ -583,27 +583,31 @@ pub(crate) enum ArgumentSeparatorCommentLocation {
     StarTrailing,
 }
 
-fn has_trailing_comma(arguments: &Arguments, last_node: Option<AnyNodeRef>, source: &str) -> bool {
+fn has_trailing_comma(
+    parameters: &Parameters,
+    last_node: Option<AnyNodeRef>,
+    source: &str,
+) -> bool {
     // No nodes, no trailing comma
     let Some(last_node) = last_node else {
         return false;
     };
 
-    let ends_with_pos_only_argument_separator = !arguments.posonlyargs.is_empty()
-        && arguments.args.is_empty()
-        && arguments.vararg.is_none()
-        && arguments.kwonlyargs.is_empty()
-        && arguments.kwarg.is_none();
+    let ends_with_pos_only_argument_separator = !parameters.posonlyargs.is_empty()
+        && parameters.args.is_empty()
+        && parameters.vararg.is_none()
+        && parameters.kwonlyargs.is_empty()
+        && parameters.kwarg.is_none();
 
     let mut tokens = SimpleTokenizer::starts_at(last_node.end(), source).skip_trivia();
     // `def a(b, c, /): ... `
     // The slash lacks its own node
     if ends_with_pos_only_argument_separator {
         let comma = tokens.next();
-        assert!(matches!(comma, Some(SimpleToken { kind: SimpleTokenKind::Comma, .. })), "The last positional only argument must be separated by a `,` from the positional only arguments separator `/` but found '{comma:?}'.");
+        assert!(matches!(comma, Some(SimpleToken { kind: SimpleTokenKind::Comma, .. })), "The last positional only argument must be separated by a `,` from the positional only parameters separator `/` but found '{comma:?}'.");
 
         let slash = tokens.next();
-        assert!(matches!(slash, Some(SimpleToken { kind: SimpleTokenKind::Slash, .. })), "The positional argument separator must be present for a function that has positional only arguments but found '{slash:?}'.");
+        assert!(matches!(slash, Some(SimpleToken { kind: SimpleTokenKind::Slash, .. })), "The positional argument separator must be present for a function that has positional only parameters but found '{slash:?}'.");
     }
 
     tokens

@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, ArgWithDefault, Constant, Expr, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Constant, Expr, ParameterWithDefault, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -524,7 +524,7 @@ pub(crate) fn definition(
     let is_overridden = visibility::is_override(decorator_list, checker.semantic());
 
     // ANN001, ANN401
-    for ArgWithDefault {
+    for ParameterWithDefault {
         def,
         default: _,
         range: _,
@@ -627,7 +627,7 @@ pub(crate) fn definition(
 
     // ANN101, ANN102
     if is_method && !visibility::is_staticmethod(cast::decorator_list(stmt), checker.semantic()) {
-        if let Some(ArgWithDefault {
+        if let Some(ParameterWithDefault {
             def,
             default: _,
             range: _,

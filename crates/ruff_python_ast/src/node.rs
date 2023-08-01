@@ -1,7 +1,7 @@
 use crate::{
-    self as ast, Alias, Arg, ArgWithDefault, Arguments, Comprehension, Decorator, ExceptHandler,
-    Expr, Keyword, MatchCase, Mod, Pattern, Ranged, Stmt, TypeParam, TypeParamParamSpec,
-    TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
+    self as ast, Alias, Comprehension, Decorator, ExceptHandler, Expr, Keyword, MatchCase, Mod,
+    Parameter, ParameterWithDefault, Parameters, Pattern, Ranged, Stmt, TypeParam,
+    TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
 };
 use ruff_text_size::TextRange;
 use std::ptr::NonNull;
@@ -90,9 +90,9 @@ pub enum AnyNode {
     PatternMatchAs(ast::PatternMatchAs),
     PatternMatchOr(ast::PatternMatchOr),
     Comprehension(Comprehension),
-    Arguments(Arguments),
-    Arg(Arg),
-    ArgWithDefault(ArgWithDefault),
+    Parameters(Parameters),
+    Parameter(Parameter),
+    ParameterWithDefault(ParameterWithDefault),
     Keyword(Keyword),
     Alias(Alias),
     WithItem(WithItem),
@@ -177,9 +177,9 @@ impl AnyNode {
             | AnyNode::PatternMatchAs(_)
             | AnyNode::PatternMatchOr(_)
             | AnyNode::Comprehension(_)
-            | AnyNode::Arguments(_)
-            | AnyNode::Arg(_)
-            | AnyNode::ArgWithDefault(_)
+            | AnyNode::Parameters(_)
+            | AnyNode::Parameter(_)
+            | AnyNode::ParameterWithDefault(_)
             | AnyNode::Keyword(_)
             | AnyNode::Alias(_)
             | AnyNode::WithItem(_)
@@ -264,9 +264,9 @@ impl AnyNode {
             | AnyNode::PatternMatchAs(_)
             | AnyNode::PatternMatchOr(_)
             | AnyNode::Comprehension(_)
-            | AnyNode::Arguments(_)
-            | AnyNode::Arg(_)
-            | AnyNode::ArgWithDefault(_)
+            | AnyNode::Parameters(_)
+            | AnyNode::Parameter(_)
+            | AnyNode::ParameterWithDefault(_)
             | AnyNode::Keyword(_)
             | AnyNode::Alias(_)
             | AnyNode::WithItem(_)
@@ -351,9 +351,9 @@ impl AnyNode {
             | AnyNode::PatternMatchAs(_)
             | AnyNode::PatternMatchOr(_)
             | AnyNode::Comprehension(_)
-            | AnyNode::Arguments(_)
-            | AnyNode::Arg(_)
-            | AnyNode::ArgWithDefault(_)
+            | AnyNode::Parameters(_)
+            | AnyNode::Parameter(_)
+            | AnyNode::ParameterWithDefault(_)
             | AnyNode::Keyword(_)
             | AnyNode::Alias(_)
             | AnyNode::WithItem(_)
@@ -438,9 +438,9 @@ impl AnyNode {
             | AnyNode::ExprLineMagic(_)
             | AnyNode::ExceptHandlerExceptHandler(_)
             | AnyNode::Comprehension(_)
-            | AnyNode::Arguments(_)
-            | AnyNode::Arg(_)
-            | AnyNode::ArgWithDefault(_)
+            | AnyNode::Parameters(_)
+            | AnyNode::Parameter(_)
+            | AnyNode::ParameterWithDefault(_)
             | AnyNode::Keyword(_)
             | AnyNode::Alias(_)
             | AnyNode::WithItem(_)
@@ -525,9 +525,9 @@ impl AnyNode {
             | AnyNode::PatternMatchAs(_)
             | AnyNode::PatternMatchOr(_)
             | AnyNode::Comprehension(_)
-            | AnyNode::Arguments(_)
-            | AnyNode::Arg(_)
-            | AnyNode::ArgWithDefault(_)
+            | AnyNode::Parameters(_)
+            | AnyNode::Parameter(_)
+            | AnyNode::ParameterWithDefault(_)
             | AnyNode::Keyword(_)
             | AnyNode::Alias(_)
             | AnyNode::WithItem(_)
@@ -631,9 +631,9 @@ impl AnyNode {
             Self::PatternMatchAs(node) => AnyNodeRef::PatternMatchAs(node),
             Self::PatternMatchOr(node) => AnyNodeRef::PatternMatchOr(node),
             Self::Comprehension(node) => AnyNodeRef::Comprehension(node),
-            Self::Arguments(node) => AnyNodeRef::Arguments(node),
-            Self::Arg(node) => AnyNodeRef::Arg(node),
-            Self::ArgWithDefault(node) => AnyNodeRef::ArgWithDefault(node),
+            Self::Parameters(node) => AnyNodeRef::Parameters(node),
+            Self::Parameter(node) => AnyNodeRef::Parameter(node),
+            Self::ParameterWithDefault(node) => AnyNodeRef::ParameterWithDefault(node),
             Self::Keyword(node) => AnyNodeRef::Keyword(node),
             Self::Alias(node) => AnyNodeRef::Alias(node),
             Self::WithItem(node) => AnyNodeRef::WithItem(node),
@@ -2613,12 +2613,12 @@ impl AstNode for Comprehension {
         AnyNode::from(self)
     }
 }
-impl AstNode for Arguments {
+impl AstNode for Parameters {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
     {
-        if let AnyNode::Arguments(node) = kind {
+        if let AnyNode::Parameters(node) = kind {
             Some(node)
         } else {
             None
@@ -2626,7 +2626,7 @@ impl AstNode for Arguments {
     }
 
     fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::Arguments(node) = kind {
+        if let AnyNodeRef::Parameters(node) = kind {
             Some(node)
         } else {
             None
@@ -2641,12 +2641,12 @@ impl AstNode for Arguments {
         AnyNode::from(self)
     }
 }
-impl AstNode for Arg {
+impl AstNode for Parameter {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
     {
-        if let AnyNode::Arg(node) = kind {
+        if let AnyNode::Parameter(node) = kind {
             Some(node)
         } else {
             None
@@ -2654,7 +2654,7 @@ impl AstNode for Arg {
     }
 
     fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::Arg(node) = kind {
+        if let AnyNodeRef::Parameter(node) = kind {
             Some(node)
         } else {
             None
@@ -2669,12 +2669,12 @@ impl AstNode for Arg {
         AnyNode::from(self)
     }
 }
-impl AstNode for ArgWithDefault {
+impl AstNode for ParameterWithDefault {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
     {
-        if let AnyNode::ArgWithDefault(node) = kind {
+        if let AnyNode::ParameterWithDefault(node) = kind {
             Some(node)
         } else {
             None
@@ -2682,7 +2682,7 @@ impl AstNode for ArgWithDefault {
     }
 
     fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ArgWithDefault(node) = kind {
+        if let AnyNodeRef::ParameterWithDefault(node) = kind {
             Some(node)
         } else {
             None
@@ -3444,19 +3444,19 @@ impl From<Comprehension> for AnyNode {
         AnyNode::Comprehension(node)
     }
 }
-impl From<Arguments> for AnyNode {
-    fn from(node: Arguments) -> Self {
-        AnyNode::Arguments(node)
+impl From<Parameters> for AnyNode {
+    fn from(node: Parameters) -> Self {
+        AnyNode::Parameters(node)
     }
 }
-impl From<Arg> for AnyNode {
-    fn from(node: Arg) -> Self {
-        AnyNode::Arg(node)
+impl From<Parameter> for AnyNode {
+    fn from(node: Parameter) -> Self {
+        AnyNode::Parameter(node)
     }
 }
-impl From<ArgWithDefault> for AnyNode {
-    fn from(node: ArgWithDefault) -> Self {
-        AnyNode::ArgWithDefault(node)
+impl From<ParameterWithDefault> for AnyNode {
+    fn from(node: ParameterWithDefault) -> Self {
+        AnyNode::ParameterWithDefault(node)
     }
 }
 impl From<Keyword> for AnyNode {
@@ -3574,9 +3574,9 @@ impl Ranged for AnyNode {
             AnyNode::PatternMatchAs(node) => node.range(),
             AnyNode::PatternMatchOr(node) => node.range(),
             AnyNode::Comprehension(node) => node.range(),
-            AnyNode::Arguments(node) => node.range(),
-            AnyNode::Arg(node) => node.range(),
-            AnyNode::ArgWithDefault(node) => node.range(),
+            AnyNode::Parameters(node) => node.range(),
+            AnyNode::Parameter(node) => node.range(),
+            AnyNode::ParameterWithDefault(node) => node.range(),
             AnyNode::Keyword(node) => node.range(),
             AnyNode::Alias(node) => node.range(),
             AnyNode::WithItem(node) => node.range(),
@@ -3661,9 +3661,9 @@ pub enum AnyNodeRef<'a> {
     PatternMatchAs(&'a ast::PatternMatchAs),
     PatternMatchOr(&'a ast::PatternMatchOr),
     Comprehension(&'a Comprehension),
-    Arguments(&'a Arguments),
-    Arg(&'a Arg),
-    ArgWithDefault(&'a ArgWithDefault),
+    Parameters(&'a Parameters),
+    Parameter(&'a Parameter),
+    ParameterWithDefault(&'a ParameterWithDefault),
     Keyword(&'a Keyword),
     Alias(&'a Alias),
     WithItem(&'a WithItem),
@@ -3747,9 +3747,9 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::PatternMatchAs(node) => NonNull::from(*node).cast(),
             AnyNodeRef::PatternMatchOr(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Comprehension(node) => NonNull::from(*node).cast(),
-            AnyNodeRef::Arguments(node) => NonNull::from(*node).cast(),
-            AnyNodeRef::Arg(node) => NonNull::from(*node).cast(),
-            AnyNodeRef::ArgWithDefault(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::Parameters(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::Parameter(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ParameterWithDefault(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Keyword(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Alias(node) => NonNull::from(*node).cast(),
             AnyNodeRef::WithItem(node) => NonNull::from(*node).cast(),
@@ -3839,9 +3839,9 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::PatternMatchAs(_) => NodeKind::PatternMatchAs,
             AnyNodeRef::PatternMatchOr(_) => NodeKind::PatternMatchOr,
             AnyNodeRef::Comprehension(_) => NodeKind::Comprehension,
-            AnyNodeRef::Arguments(_) => NodeKind::Arguments,
-            AnyNodeRef::Arg(_) => NodeKind::Arg,
-            AnyNodeRef::ArgWithDefault(_) => NodeKind::ArgWithDefault,
+            AnyNodeRef::Parameters(_) => NodeKind::Parameters,
+            AnyNodeRef::Parameter(_) => NodeKind::Parameter,
+            AnyNodeRef::ParameterWithDefault(_) => NodeKind::ParameterWithDefault,
             AnyNodeRef::Keyword(_) => NodeKind::Keyword,
             AnyNodeRef::Alias(_) => NodeKind::Alias,
             AnyNodeRef::WithItem(_) => NodeKind::WithItem,
@@ -3926,9 +3926,9 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::PatternMatchAs(_)
             | AnyNodeRef::PatternMatchOr(_)
             | AnyNodeRef::Comprehension(_)
-            | AnyNodeRef::Arguments(_)
-            | AnyNodeRef::Arg(_)
-            | AnyNodeRef::ArgWithDefault(_)
+            | AnyNodeRef::Parameters(_)
+            | AnyNodeRef::Parameter(_)
+            | AnyNodeRef::ParameterWithDefault(_)
             | AnyNodeRef::Keyword(_)
             | AnyNodeRef::Alias(_)
             | AnyNodeRef::WithItem(_)
@@ -4013,9 +4013,9 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::PatternMatchAs(_)
             | AnyNodeRef::PatternMatchOr(_)
             | AnyNodeRef::Comprehension(_)
-            | AnyNodeRef::Arguments(_)
-            | AnyNodeRef::Arg(_)
-            | AnyNodeRef::ArgWithDefault(_)
+            | AnyNodeRef::Parameters(_)
+            | AnyNodeRef::Parameter(_)
+            | AnyNodeRef::ParameterWithDefault(_)
             | AnyNodeRef::Keyword(_)
             | AnyNodeRef::Alias(_)
             | AnyNodeRef::WithItem(_)
@@ -4099,9 +4099,9 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::PatternMatchAs(_)
             | AnyNodeRef::PatternMatchOr(_)
             | AnyNodeRef::Comprehension(_)
-            | AnyNodeRef::Arguments(_)
-            | AnyNodeRef::Arg(_)
-            | AnyNodeRef::ArgWithDefault(_)
+            | AnyNodeRef::Parameters(_)
+            | AnyNodeRef::Parameter(_)
+            | AnyNodeRef::ParameterWithDefault(_)
             | AnyNodeRef::Keyword(_)
             | AnyNodeRef::Alias(_)
             | AnyNodeRef::WithItem(_)
@@ -4186,9 +4186,9 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprLineMagic(_)
             | AnyNodeRef::ExceptHandlerExceptHandler(_)
             | AnyNodeRef::Comprehension(_)
-            | AnyNodeRef::Arguments(_)
-            | AnyNodeRef::Arg(_)
-            | AnyNodeRef::ArgWithDefault(_)
+            | AnyNodeRef::Parameters(_)
+            | AnyNodeRef::Parameter(_)
+            | AnyNodeRef::ParameterWithDefault(_)
             | AnyNodeRef::Keyword(_)
             | AnyNodeRef::Alias(_)
             | AnyNodeRef::WithItem(_)
@@ -4273,9 +4273,9 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::PatternMatchAs(_)
             | AnyNodeRef::PatternMatchOr(_)
             | AnyNodeRef::Comprehension(_)
-            | AnyNodeRef::Arguments(_)
-            | AnyNodeRef::Arg(_)
-            | AnyNodeRef::ArgWithDefault(_)
+            | AnyNodeRef::Parameters(_)
+            | AnyNodeRef::Parameter(_)
+            | AnyNodeRef::ParameterWithDefault(_)
             | AnyNodeRef::Keyword(_)
             | AnyNodeRef::Alias(_)
             | AnyNodeRef::WithItem(_)
@@ -4877,19 +4877,19 @@ impl<'a> From<&'a Comprehension> for AnyNodeRef<'a> {
         AnyNodeRef::Comprehension(node)
     }
 }
-impl<'a> From<&'a Arguments> for AnyNodeRef<'a> {
-    fn from(node: &'a Arguments) -> Self {
-        AnyNodeRef::Arguments(node)
+impl<'a> From<&'a Parameters> for AnyNodeRef<'a> {
+    fn from(node: &'a Parameters) -> Self {
+        AnyNodeRef::Parameters(node)
     }
 }
-impl<'a> From<&'a Arg> for AnyNodeRef<'a> {
-    fn from(node: &'a Arg) -> Self {
-        AnyNodeRef::Arg(node)
+impl<'a> From<&'a Parameter> for AnyNodeRef<'a> {
+    fn from(node: &'a Parameter) -> Self {
+        AnyNodeRef::Parameter(node)
     }
 }
-impl<'a> From<&'a ArgWithDefault> for AnyNodeRef<'a> {
-    fn from(node: &'a ArgWithDefault) -> Self {
-        AnyNodeRef::ArgWithDefault(node)
+impl<'a> From<&'a ParameterWithDefault> for AnyNodeRef<'a> {
+    fn from(node: &'a ParameterWithDefault) -> Self {
+        AnyNodeRef::ParameterWithDefault(node)
     }
 }
 impl<'a> From<&'a Keyword> for AnyNodeRef<'a> {
@@ -4985,9 +4985,9 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::PatternMatchAs(node) => node.range(),
             AnyNodeRef::PatternMatchOr(node) => node.range(),
             AnyNodeRef::Comprehension(node) => node.range(),
-            AnyNodeRef::Arguments(node) => node.range(),
-            AnyNodeRef::Arg(node) => node.range(),
-            AnyNodeRef::ArgWithDefault(node) => node.range(),
+            AnyNodeRef::Parameters(node) => node.range(),
+            AnyNodeRef::Parameter(node) => node.range(),
+            AnyNodeRef::ParameterWithDefault(node) => node.range(),
             AnyNodeRef::Keyword(node) => node.range(),
             AnyNodeRef::Alias(node) => node.range(),
             AnyNodeRef::WithItem(node) => node.range(),
@@ -5075,9 +5075,9 @@ pub enum NodeKind {
     PatternMatchOr,
     TypeIgnoreTypeIgnore,
     Comprehension,
-    Arguments,
-    Arg,
-    ArgWithDefault,
+    Parameters,
+    Parameter,
+    ParameterWithDefault,
     Keyword,
     Alias,
     WithItem,

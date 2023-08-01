@@ -7,13 +7,13 @@ use ruff_python_parser::{parse_tokens, Mode};
 
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::visitor::{
-    walk_alias, walk_arg, walk_arguments, walk_comprehension, walk_except_handler, walk_expr,
-    walk_keyword, walk_match_case, walk_pattern, walk_stmt, walk_type_param, walk_with_item,
+    walk_alias, walk_comprehension, walk_except_handler, walk_expr, walk_keyword, walk_match_case,
+    walk_parameter, walk_parameters, walk_pattern, walk_stmt, walk_type_param, walk_with_item,
     Visitor,
 };
 use ruff_python_ast::{
-    Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, ExceptHandler, Expr, Keyword, MatchCase,
-    Operator, Pattern, Stmt, TypeParam, UnaryOp, WithItem,
+    Alias, BoolOp, CmpOp, Comprehension, ExceptHandler, Expr, Keyword, MatchCase, Operator,
+    Parameter, Parameters, Pattern, Stmt, TypeParam, UnaryOp, WithItem,
 };
 
 #[test]
@@ -234,15 +234,15 @@ impl Visitor<'_> for RecordVisitor {
         self.exit_node();
     }
 
-    fn visit_arguments(&mut self, arguments: &Arguments) {
-        self.enter_node(arguments);
-        walk_arguments(self, arguments);
+    fn visit_parameters(&mut self, parameters: &Parameters) {
+        self.enter_node(parameters);
+        walk_parameters(self, parameters);
         self.exit_node();
     }
 
-    fn visit_arg(&mut self, arg: &Arg) {
-        self.enter_node(arg);
-        walk_arg(self, arg);
+    fn visit_parameter(&mut self, parameter: &Parameter) {
+        self.enter_node(parameter);
+        walk_parameter(self, parameter);
         self.exit_node();
     }
 

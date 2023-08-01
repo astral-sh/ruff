@@ -1,8 +1,8 @@
 use std::iter::Peekable;
 
 use ruff_python_ast::{
-    Alias, Arg, ArgWithDefault, Arguments, Comprehension, Decorator, ElifElseClause, ExceptHandler,
-    Expr, Keyword, MatchCase, Mod, Pattern, Ranged, Stmt, TypeParam, WithItem,
+    Alias, Comprehension, Decorator, ElifElseClause, ExceptHandler, Expr, Keyword, MatchCase, Mod,
+    Parameter, ParameterWithDefault, Parameters, Pattern, Ranged, Stmt, TypeParam, WithItem,
 };
 use ruff_text_size::{TextRange, TextSize};
 
@@ -229,25 +229,25 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast> {
         self.finish_node(format_spec);
     }
 
-    fn visit_arguments(&mut self, arguments: &'ast Arguments) {
-        if self.start_node(arguments).is_traverse() {
-            walk_arguments(self, arguments);
+    fn visit_parameters(&mut self, parameters: &'ast Parameters) {
+        if self.start_node(parameters).is_traverse() {
+            walk_parameters(self, parameters);
         }
-        self.finish_node(arguments);
+        self.finish_node(parameters);
     }
 
-    fn visit_arg(&mut self, arg: &'ast Arg) {
+    fn visit_parameter(&mut self, arg: &'ast Parameter) {
         if self.start_node(arg).is_traverse() {
-            walk_arg(self, arg);
+            walk_parameter(self, arg);
         }
         self.finish_node(arg);
     }
 
-    fn visit_arg_with_default(&mut self, arg_with_default: &'ast ArgWithDefault) {
-        if self.start_node(arg_with_default).is_traverse() {
-            walk_arg_with_default(self, arg_with_default);
+    fn visit_parameter_with_default(&mut self, parameter_with_default: &'ast ParameterWithDefault) {
+        if self.start_node(parameter_with_default).is_traverse() {
+            walk_parameter_with_default(self, parameter_with_default);
         }
-        self.finish_node(arg_with_default);
+        self.finish_node(parameter_with_default);
     }
 
     fn visit_keyword(&mut self, keyword: &'ast Keyword) {

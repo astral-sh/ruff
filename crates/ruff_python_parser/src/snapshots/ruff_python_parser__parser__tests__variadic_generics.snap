@@ -10,12 +10,12 @@ expression: parse_ast
                 id: "args_to_tuple",
                 range: 5..18,
             },
-            args: Arguments {
+            parameters: Parameters {
                 range: 18..30,
                 posonlyargs: [],
                 args: [],
                 vararg: Some(
-                    Arg {
+                    Parameter {
                         range: 20..29,
                         arg: Identifier {
                             id: "args",

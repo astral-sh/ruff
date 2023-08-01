@@ -1,7 +1,7 @@
 use crate::{
-    self as ast, Alias, Arg, ArgWithDefault, Arguments, BoolOp, CmpOp, Comprehension, Constant,
-    Decorator, ElifElseClause, ExceptHandler, Expr, Keyword, MatchCase, Mod, Operator, Pattern,
-    Stmt, TypeParam, TypeParamTypeVar, UnaryOp, WithItem,
+    self as ast, Alias, BoolOp, CmpOp, Comprehension, Constant, Decorator, ElifElseClause,
+    ExceptHandler, Expr, Keyword, MatchCase, Mod, Operator, Parameter, ParameterWithDefault,
+    Parameters, Pattern, Stmt, TypeParam, TypeParamTypeVar, UnaryOp, WithItem,
 };
 
 /// Visitor that traverses all nodes recursively in pre-order.
@@ -56,16 +56,16 @@ pub trait PreorderVisitor<'a> {
         walk_format_spec(self, format_spec);
     }
 
-    fn visit_arguments(&mut self, arguments: &'a Arguments) {
-        walk_arguments(self, arguments);
+    fn visit_parameters(&mut self, parameters: &'a Parameters) {
+        walk_parameters(self, parameters);
     }
 
-    fn visit_arg(&mut self, arg: &'a Arg) {
-        walk_arg(self, arg);
+    fn visit_parameter(&mut self, arg: &'a Parameter) {
+        walk_parameter(self, arg);
     }
 
-    fn visit_arg_with_default(&mut self, arg_with_default: &'a ArgWithDefault) {
-        walk_arg_with_default(self, arg_with_default);
+    fn visit_parameter_with_default(&mut self, parameter_with_default: &'a ParameterWithDefault) {
+        walk_parameter_with_default(self, parameter_with_default);
     }
 
     fn visit_keyword(&mut self, keyword: &'a Keyword) {
@@ -133,7 +133,7 @@ where
         }) => visitor.visit_expr(value),
 
         Stmt::FunctionDef(ast::StmtFunctionDef {
-            args,
+            parameters,
             body,
             decorator_list,
             returns,
@@ -141,7 +141,7 @@ where
             ..
         })
         | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-            args,
+            parameters,
             body,
             decorator_list,
             returns,
@@ -156,7 +156,7 @@ where
                 visitor.visit_type_param(type_param);
             }
 
-            visitor.visit_arguments(args);
+            visitor.visit_parameters(parameters);
 
             for expr in returns {
                 visitor.visit_annotation(expr);
@@ -469,11 +469,11 @@ where
         }
 
         Expr::Lambda(ast::ExprLambda {
-            args,
+            parameters,
             body,
             range: _range,
         }) => {
-            visitor.visit_arguments(args);
+            visitor.visit_parameters(parameters);
             visitor.visit_expr(body);
         }
 
@@ -749,42 +749,44 @@ pub fn walk_format_spec<'a, V: PreorderVisitor<'a> + ?Sized>(
     visitor.visit_expr(format_spec);
 }
 
-pub fn walk_arguments<'a, V>(visitor: &mut V, arguments: &'a Arguments)
+pub fn walk_parameters<'a, V>(visitor: &mut V, parameters: &'a Parameters)
 where
     V: PreorderVisitor<'a> + ?Sized,
 {
-    for arg in arguments.posonlyargs.iter().chain(&arguments.args) {
-        visitor.visit_arg_with_default(arg);
+    for arg in parameters.posonlyargs.iter().chain(&parameters.args) {
+        visitor.visit_parameter_with_default(arg);
     }
 
-    if let Some(arg) = &arguments.vararg {
-        visitor.visit_arg(arg);
+    if let Some(arg) = &parameters.vararg {
+        visitor.visit_parameter(arg);
     }
 
-    for arg in &arguments.kwonlyargs {
-        visitor.visit_arg_with_default(arg);
+    for arg in &parameters.kwonlyargs {
+        visitor.visit_parameter_with_default(arg);
     }
 
-    if let Some(arg) = &arguments.kwarg {
-        visitor.visit_arg(arg);
+    if let Some(arg) = &parameters.kwarg {
+        visitor.visit_parameter(arg);
     }
 }
 
-pub fn walk_arg<'a, V>(visitor: &mut V, arg: &'a Arg)
+pub fn walk_parameter<'a, V>(visitor: &mut V, parameter: &'a Parameter)
 where
     V: PreorderVisitor<'a> + ?Sized,
 {
-    if let Some(expr) = &arg.annotation {
+    if let Some(expr) = &parameter.annotation {
         visitor.visit_annotation(expr);
     }
 }
 
-pub fn walk_arg_with_default<'a, V>(visitor: &mut V, arg_with_default: &'a ArgWithDefault)
-where
+pub fn walk_parameter_with_default<'a, V>(
+    visitor: &mut V,
+    parameter_with_default: &'a ParameterWithDefault,
+) where
     V: PreorderVisitor<'a> + ?Sized,
 {
-    visitor.visit_arg(&arg_with_default.def);
-    if let Some(expr) = &arg_with_default.default {
+    visitor.visit_parameter(&parameter_with_default.def);
+    if let Some(expr) = &parameter_with_default.default {
         visitor.visit_expr(expr);
     }
 }

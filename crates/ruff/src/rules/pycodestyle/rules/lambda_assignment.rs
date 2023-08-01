@@ -1,5 +1,6 @@
 use ruff_python_ast::{
-    self as ast, Arg, ArgWithDefault, Arguments, Constant, Expr, Identifier, Ranged, Stmt,
+    self as ast, Constant, Expr, Identifier, Parameter, ParameterWithDefault, Parameters, Ranged,
+    Stmt,
 };
 use ruff_text_size::TextRange;
 
@@ -67,7 +68,10 @@ pub(crate) fn lambda_assignment(
         return;
     };
 
-    let Expr::Lambda(ast::ExprLambda { args, body, .. }) = value else {
+    let Expr::Lambda(ast::ExprLambda {
+        parameters, body, ..
+    }) = value
+    else {
         return;
     };
 
@@ -87,7 +91,7 @@ pub(crate) fn lambda_assignment(
             let mut indented = String::new();
             for (idx, line) in function(
                 id,
-                args,
+                parameters,
                 body,
                 annotation,
                 checker.semantic(),
@@ -173,7 +177,7 @@ fn extract_types(annotation: &Expr, semantic: &SemanticModel) -> Option<(Vec<Exp
 
 fn function(
     name: &str,
-    args: &Arguments,
+    parameters: &Parameters,
     body: &Expr,
     annotation: Option<&Expr>,
     semantic: &SemanticModel,
@@ -187,40 +191,40 @@ fn function(
         if let Some((arg_types, return_type)) = extract_types(annotation, semantic) {
             // A `lambda` expression can only have positional and positional-only
             // arguments. The order is always positional-only first, then positional.
-            let new_posonlyargs = args
+            let new_posonlyargs = parameters
                 .posonlyargs
                 .iter()
                 .enumerate()
-                .map(|(idx, arg_with_default)| ArgWithDefault {
-                    def: Arg {
+                .map(|(idx, parameter)| ParameterWithDefault {
+                    def: Parameter {
                         annotation: arg_types
                             .get(idx)
                             .map(|arg_type| Box::new(arg_type.clone())),
-                        ..arg_with_default.def.clone()
+                        ..parameter.def.clone()
                     },
-                    ..arg_with_default.clone()
+                    ..parameter.clone()
                 })
                 .collect::<Vec<_>>();
-            let new_args = args
+            let new_args = parameters
                 .args
                 .iter()
                 .enumerate()
-                .map(|(idx, arg_with_default)| ArgWithDefault {
-                    def: Arg {
+                .map(|(idx, parameter)| ParameterWithDefault {
+                    def: Parameter {
                         annotation: arg_types
                             .get(idx + new_posonlyargs.len())
                             .map(|arg_type| Box::new(arg_type.clone())),
-                        ..arg_with_default.def.clone()
+                        ..parameter.def.clone()
                     },
-                    ..arg_with_default.clone()
+                    ..parameter.clone()
                 })
                 .collect::<Vec<_>>();
             let func = Stmt::FunctionDef(ast::StmtFunctionDef {
                 name: Identifier::new(name.to_string(), TextRange::default()),
-                args: Box::new(Arguments {
+                parameters: Box::new(Parameters {
                     posonlyargs: new_posonlyargs,
                     args: new_args,
-                    ..args.clone()
+                    ..parameters.clone()
                 }),
                 body: vec![body],
                 decorator_list: vec![],
@@ -233,7 +237,7 @@ fn function(
     }
     let func = Stmt::FunctionDef(ast::StmtFunctionDef {
         name: Identifier::new(name.to_string(), TextRange::default()),
-        args: Box::new(args.clone()),
+        parameters: Box::new(parameters.clone()),
         body: vec![body],
         decorator_list: vec![],
         returns: None,

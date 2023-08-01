@@ -1,4 +1,4 @@
-use ruff_python_ast::{Arguments, Decorator, Ranged};
+use ruff_python_ast::{Decorator, Parameters, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -57,7 +57,7 @@ pub(crate) fn invalid_first_argument_name_for_method(
     scope: &Scope,
     name: &str,
     decorator_list: &[Decorator],
-    args: &Arguments,
+    parameters: &Parameters,
 ) -> Option<Diagnostic> {
     if !matches!(
         function_type::classify(
@@ -72,7 +72,10 @@ pub(crate) fn invalid_first_argument_name_for_method(
     ) {
         return None;
     }
-    let arg = args.posonlyargs.first().or_else(|| args.args.first())?;
+    let arg = parameters
+        .posonlyargs
+        .first()
+        .or_else(|| parameters.args.first())?;
     if &arg.def.arg == "self" {
         return None;
     }

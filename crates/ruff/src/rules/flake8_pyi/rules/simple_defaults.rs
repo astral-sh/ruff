@@ -1,5 +1,5 @@
 use ruff_python_ast::{
-    self as ast, ArgWithDefault, Arguments, Constant, Expr, Operator, Ranged, Stmt, UnaryOp,
+    self as ast, Constant, Expr, Operator, ParameterWithDefault, Parameters, Ranged, Stmt, UnaryOp,
 };
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
@@ -400,16 +400,16 @@ fn is_annotatable_type_alias(value: &Expr, semantic: &SemanticModel) -> bool {
 }
 
 /// PYI011
-pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, arguments: &Arguments) {
-    for ArgWithDefault {
+pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, parameters: &Parameters) {
+    for ParameterWithDefault {
         def,
         default,
         range: _,
-    } in arguments
+    } in parameters
         .posonlyargs
         .iter()
-        .chain(&arguments.args)
-        .chain(&arguments.kwonlyargs)
+        .chain(&parameters.args)
+        .chain(&parameters.kwonlyargs)
     {
         let Some(default) = default else {
             continue;
@@ -437,16 +437,16 @@ pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, arguments: &
 }
 
 /// PYI014
-pub(crate) fn argument_simple_defaults(checker: &mut Checker, arguments: &Arguments) {
-    for ArgWithDefault {
+pub(crate) fn argument_simple_defaults(checker: &mut Checker, parameters: &Parameters) {
+    for ParameterWithDefault {
         def,
         default,
         range: _,
-    } in arguments
+    } in parameters
         .posonlyargs
         .iter()
-        .chain(&arguments.args)
-        .chain(&arguments.kwonlyargs)
+        .chain(&parameters.args)
+        .chain(&parameters.kwonlyargs)
     {
         let Some(default) = default else {
             continue;

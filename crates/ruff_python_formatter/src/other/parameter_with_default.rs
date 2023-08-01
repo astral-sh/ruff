@@ -1,15 +1,15 @@
 use ruff_formatter::write;
-use ruff_python_ast::ArgWithDefault;
+use ruff_python_ast::ParameterWithDefault;
 
 use crate::prelude::*;
 use crate::FormatNodeRule;
 
 #[derive(Default)]
-pub struct FormatArgWithDefault;
+pub struct FormatParameterWithDefault;
 
-impl FormatNodeRule<ArgWithDefault> for FormatArgWithDefault {
-    fn fmt_fields(&self, item: &ArgWithDefault, f: &mut PyFormatter) -> FormatResult<()> {
-        let ArgWithDefault {
+impl FormatNodeRule<ParameterWithDefault> for FormatParameterWithDefault {
+    fn fmt_fields(&self, item: &ParameterWithDefault, f: &mut PyFormatter) -> FormatResult<()> {
+        let ParameterWithDefault {
             range: _,
             def,
             default,

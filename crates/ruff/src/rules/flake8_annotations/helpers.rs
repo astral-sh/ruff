@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
+use ruff_python_ast::{self as ast, Expr, Parameters, Stmt};
 
 use ruff_python_ast::cast;
 use ruff_python_semantic::analyze::visibility;
@@ -6,11 +6,11 @@ use ruff_python_semantic::{Definition, Member, MemberKind, SemanticModel};
 
 pub(super) fn match_function_def(
     stmt: &Stmt,
-) -> (&str, &Arguments, Option<&Expr>, &[Stmt], &[ast::Decorator]) {
+) -> (&str, &Parameters, Option<&Expr>, &[Stmt], &[ast::Decorator]) {
     match stmt {
         Stmt::FunctionDef(ast::StmtFunctionDef {
             name,
-            args,
+            parameters,
             returns,
             body,
             decorator_list,
@@ -18,14 +18,14 @@ pub(super) fn match_function_def(
         })
         | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
             name,
-            args,
+            parameters,
             returns,
             body,
             decorator_list,
             ..
         }) => (
             name,
-            args,
+            parameters,
             returns.as_ref().map(AsRef::as_ref),
             body,
             decorator_list,

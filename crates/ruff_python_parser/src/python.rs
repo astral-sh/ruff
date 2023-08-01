@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: 5eea4e365b6d7ea02f64f350bf973830a71442f4690d98e9a286c2a03b5260cc
+// sha3: 9d48ea8f9d9a0a466240b3334066323fb9659fd9efe31f8748e4b940cd71b5e1
 use num_bigint::BigInt;
 use ruff_text_size::TextSize;
 use ruff_python_ast::{self as ast, Ranged, MagicKind};
@@ -53,12 +53,12 @@ mod __parse__Top {
         Variant7(core::option::Option<token::Tok>),
         Variant8((token::Tok, ArgumentList, token::Tok)),
         Variant9(core::option::Option<(token::Tok, ArgumentList, token::Tok)>),
-        Variant10(Option<Box<ast::Arg>>),
-        Variant11(core::option::Option<Option<Box<ast::Arg>>>),
-        Variant12(ast::ArgWithDefault),
-        Variant13(alloc::vec::Vec<ast::ArgWithDefault>),
-        Variant14((Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)),
-        Variant15(core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>),
+        Variant10(Option<Box<ast::Parameter>>),
+        Variant11(core::option::Option<Option<Box<ast::Parameter>>>),
+        Variant12(ast::ParameterWithDefault),
+        Variant13(alloc::vec::Vec<ast::ParameterWithDefault>),
+        Variant14((Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)),
+        Variant15(core::option::Option<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)>),
         Variant16(ast::Expr),
         Variant17(core::option::Option<ast::Expr>),
         Variant18(alloc::vec::Vec<ast::Expr>),
@@ -90,8 +90,8 @@ mod __parse__Top {
         Variant44(alloc::vec::Vec<(TextSize, (String, StringKind, bool), TextSize)>),
         Variant45((ast::CmpOp, ast::Expr)),
         Variant46(alloc::vec::Vec<(ast::CmpOp, ast::Expr)>),
-        Variant47(ast::Arguments),
-        Variant48(core::option::Option<ast::Arguments>),
+        Variant47(ast::Parameters),
+        Variant48(core::option::Option<ast::Parameters>),
         Variant49(TextSize),
         Variant50(ast::Operator),
         Variant51(ArgumentList),
@@ -107,8 +107,8 @@ mod __parse__Top {
         Variant61((ast::Expr, ast::Expr)),
         Variant62(Vec<(Option<Box<ast::Expr>>, ast::Expr)>),
         Variant63(core::option::Option<Vec<(Option<Box<ast::Expr>>, ast::Expr)>>),
-        Variant64(ast::Arg),
-        Variant65(core::option::Option<ast::Arg>),
+        Variant64(ast::Parameter),
+        Variant65(core::option::Option<ast::Parameter>),
         Variant66(ast::ExceptHandler),
         Variant67(alloc::vec::Vec<ast::ExceptHandler>),
         Variant68(core::option::Option<(Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)>),
@@ -124,9 +124,9 @@ mod __parse__Top {
         Variant78(Vec<ast::Identifier>),
         Variant79(Vec<(ast::Identifier, ast::Pattern)>),
         Variant80(Vec<(ast::Expr, ast::Pattern)>),
-        Variant81(Vec<ast::ArgWithDefault>),
+        Variant81(Vec<ast::ParameterWithDefault>),
         Variant82(Vec<ast::TypeParam>),
-        Variant83((Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>)),
+        Variant83((Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>)),
         Variant84(core::option::Option<ast::Pattern>),
         Variant85(ast::Comprehension),
         Variant86(alloc::vec::Vec<ast::Comprehension>),
@@ -17606,16 +17606,6 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant14<
-    >(
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, (Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>), TextSize)
-     {
-        match __symbols.pop() {
-            Some((__l, __Symbol::Variant14(__v), __r)) => (__l, __v, __r),
-            _ => __symbol_type_mismatch()
-        }
-    }
     fn __pop_Variant60<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
@@ -17623,6 +17613,16 @@ mod __parse__Top {
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant60(__v), __r)) => (__l, __v, __r),
+            _ => __symbol_type_mismatch()
+        }
+    }
+    fn __pop_Variant14<
+    >(
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
+    ) -> (TextSize, (Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>), TextSize)
+     {
+        match __symbols.pop() {
+            Some((__l, __Symbol::Variant14(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -17679,7 +17679,7 @@ mod __parse__Top {
     fn __pop_Variant83<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize)
+    ) -> (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize)
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant83(__v), __r)) => (__l, __v, __r),
@@ -17789,7 +17789,7 @@ mod __parse__Top {
     fn __pop_Variant10<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, Option<Box<ast::Arg>>, TextSize)
+    ) -> (TextSize, Option<Box<ast::Parameter>>, TextSize)
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant10(__v), __r)) => (__l, __v, __r),
@@ -17876,16 +17876,6 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant81<
-    >(
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, Vec<ast::ArgWithDefault>, TextSize)
-     {
-        match __symbols.pop() {
-            Some((__l, __Symbol::Variant81(__v), __r)) => (__l, __v, __r),
-            _ => __symbol_type_mismatch()
-        }
-    }
     fn __pop_Variant54<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
@@ -17913,6 +17903,16 @@ mod __parse__Top {
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant78(__v), __r)) => (__l, __v, __r),
+            _ => __symbol_type_mismatch()
+        }
+    }
+    fn __pop_Variant81<
+    >(
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
+    ) -> (TextSize, Vec<ast::ParameterWithDefault>, TextSize)
+     {
+        match __symbols.pop() {
+            Some((__l, __Symbol::Variant81(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18006,16 +18006,6 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant13<
-    >(
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize)
-     {
-        match __symbols.pop() {
-            Some((__l, __Symbol::Variant13(__v), __r)) => (__l, __v, __r),
-            _ => __symbol_type_mismatch()
-        }
-    }
     fn __pop_Variant86<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
@@ -18076,6 +18066,16 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
+    fn __pop_Variant13<
+    >(
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
+    ) -> (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize)
+     {
+        match __symbols.pop() {
+            Some((__l, __Symbol::Variant13(__v), __r)) => (__l, __v, __r),
+            _ => __symbol_type_mismatch()
+        }
+    }
     fn __pop_Variant37<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
@@ -18123,36 +18123,6 @@ mod __parse__Top {
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant69(__v), __r)) => (__l, __v, __r),
-            _ => __symbol_type_mismatch()
-        }
-    }
-    fn __pop_Variant64<
-    >(
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, ast::Arg, TextSize)
-     {
-        match __symbols.pop() {
-            Some((__l, __Symbol::Variant64(__v), __r)) => (__l, __v, __r),
-            _ => __symbol_type_mismatch()
-        }
-    }
-    fn __pop_Variant12<
-    >(
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, ast::ArgWithDefault, TextSize)
-     {
-        match __symbols.pop() {
-            Some((__l, __Symbol::Variant12(__v), __r)) => (__l, __v, __r),
-            _ => __symbol_type_mismatch()
-        }
-    }
-    fn __pop_Variant47<
-    >(
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, ast::Arguments, TextSize)
-     {
-        match __symbols.pop() {
-            Some((__l, __Symbol::Variant47(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18266,6 +18236,36 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
+    fn __pop_Variant64<
+    >(
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
+    ) -> (TextSize, ast::Parameter, TextSize)
+     {
+        match __symbols.pop() {
+            Some((__l, __Symbol::Variant64(__v), __r)) => (__l, __v, __r),
+            _ => __symbol_type_mismatch()
+        }
+    }
+    fn __pop_Variant12<
+    >(
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
+    ) -> (TextSize, ast::ParameterWithDefault, TextSize)
+     {
+        match __symbols.pop() {
+            Some((__l, __Symbol::Variant12(__v), __r)) => (__l, __v, __r),
+            _ => __symbol_type_mismatch()
+        }
+    }
+    fn __pop_Variant47<
+    >(
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
+    ) -> (TextSize, ast::Parameters, TextSize)
+     {
+        match __symbols.pop() {
+            Some((__l, __Symbol::Variant47(__v), __r)) => (__l, __v, __r),
+            _ => __symbol_type_mismatch()
+        }
+    }
     fn __pop_Variant36<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
@@ -18339,7 +18339,7 @@ mod __parse__Top {
     fn __pop_Variant15<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>, TextSize)
+    ) -> (TextSize, core::option::Option<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)>, TextSize)
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant15(__v), __r)) => (__l, __v, __r),
@@ -18369,7 +18369,7 @@ mod __parse__Top {
     fn __pop_Variant11<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, core::option::Option<Option<Box<ast::Arg>>>, TextSize)
+    ) -> (TextSize, core::option::Option<Option<Box<ast::Parameter>>>, TextSize)
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant11(__v), __r)) => (__l, __v, __r),
@@ -18436,26 +18436,6 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant65<
-    >(
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, core::option::Option<ast::Arg>, TextSize)
-     {
-        match __symbols.pop() {
-            Some((__l, __Symbol::Variant65(__v), __r)) => (__l, __v, __r),
-            _ => __symbol_type_mismatch()
-        }
-    }
-    fn __pop_Variant48<
-    >(
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, core::option::Option<ast::Arguments>, TextSize)
-     {
-        match __symbols.pop() {
-            Some((__l, __Symbol::Variant48(__v), __r)) => (__l, __v, __r),
-            _ => __symbol_type_mismatch()
-        }
-    }
     fn __pop_Variant17<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
@@ -18473,6 +18453,26 @@ mod __parse__Top {
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant25(__v), __r)) => (__l, __v, __r),
+            _ => __symbol_type_mismatch()
+        }
+    }
+    fn __pop_Variant65<
+    >(
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
+    ) -> (TextSize, core::option::Option<ast::Parameter>, TextSize)
+     {
+        match __symbols.pop() {
+            Some((__l, __Symbol::Variant65(__v), __r)) => (__l, __v, __r),
+            _ => __symbol_type_mismatch()
+        }
+    }
+    fn __pop_Variant48<
+    >(
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
+    ) -> (TextSize, core::option::Option<ast::Parameters>, TextSize)
+     {
+        match __symbols.pop() {
+            Some((__l, __Symbol::Variant48(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -33457,7 +33457,7 @@ fn __action161<
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, name, _): (TextSize, ast::Identifier, TextSize),
     (_, type_params, _): (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
-    (_, args, _): (TextSize, ast::Arguments, TextSize),
+    (_, args, _): (TextSize, ast::Parameters, TextSize),
     (_, r, _): (TextSize, core::option::Option<ast::Expr>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, body, _): (TextSize, ast::Suite, TextSize),
@@ -33468,9 +33468,9 @@ fn __action161<
         let returns = r.map(Box::new);
         let end_location = body.last().unwrap().end();
         if is_async.is_some() {
-            ast::StmtAsyncFunctionDef { name, args, body, decorator_list, returns, type_params: type_params.unwrap_or_default(), range: (location..end_location).into() }.into()
+            ast::StmtAsyncFunctionDef { name, parameters:args, body, decorator_list, returns, type_params: type_params.unwrap_or_default(), range: (location..end_location).into() }.into()
         } else {
-            ast::StmtFunctionDef { name, args, body, decorator_list, returns, type_params: type_params.unwrap_or_default(), range: (location..end_location).into() }.into()
+            ast::StmtFunctionDef { name, parameters:args, body, decorator_list, returns, type_params: type_params.unwrap_or_default(), range: (location..end_location).into() }.into()
         }
     }
 }
@@ -33523,17 +33523,17 @@ fn __action164<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, a, _): (TextSize, core::option::Option<ast::Arguments>, TextSize),
+    (_, a, _): (TextSize, core::option::Option<ast::Parameters>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     {
         a.as_ref().map(validate_arguments).transpose()?;
 
         let range = (location..end_location).into();
         let args = a
-            .map_or_else(|| ast::Arguments::empty(range), |mut arguments| {
+            .map_or_else(|| ast::Parameters::empty(range), |mut arguments| {
                 arguments.range = range;
                 arguments
             });
@@ -33550,11 +33550,11 @@ fn __action165<
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, arg, _): (TextSize, ast::Identifier, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ArgWithDefault
+) -> ast::ParameterWithDefault
 {
     {
-        let def = ast::Arg { arg, annotation: None, range: (location..end_location).into() };
-        ast::ArgWithDefault { def, default: None, range: (location..end_location).into() }
+        let def = ast::Parameter { arg, annotation: None, range: (location..end_location).into() };
+        ast::ParameterWithDefault { def, default: None, range: (location..end_location).into() }
     }
 }
 
@@ -33566,9 +33566,9 @@ fn __action166<
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, arg, _): (TextSize, ast::Identifier, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::Arg
+) -> ast::Parameter
 {
-    ast::Arg { arg, annotation: None, range: (location..end_location).into() }
+    ast::Parameter { arg, annotation: None, range: (location..end_location).into() }
 }
 
 #[allow(unused_variables)]
@@ -33580,12 +33580,12 @@ fn __action167<
     (_, arg, _): (TextSize, ast::Identifier, TextSize),
     (_, a, _): (TextSize, core::option::Option<ast::Expr>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ArgWithDefault
+) -> ast::ParameterWithDefault
 {
     {
         let annotation = a.map(Box::new);
-        let def = ast::Arg { arg, annotation, range: (location..end_location).into() };
-        ast::ArgWithDefault { def, default: None, range: (location..end_location).into() }
+        let def = ast::Parameter { arg, annotation, range: (location..end_location).into() };
+        ast::ParameterWithDefault { def, default: None, range: (location..end_location).into() }
     }
 }
 
@@ -33598,11 +33598,11 @@ fn __action168<
     (_, arg, _): (TextSize, ast::Identifier, TextSize),
     (_, a, _): (TextSize, core::option::Option<ast::Expr>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::Arg
+) -> ast::Parameter
 {
     {
         let annotation = a.map(Box::new);
-        ast::Arg { arg, annotation, range: (location..end_location).into() }
+        ast::Parameter { arg, annotation, range: (location..end_location).into() }
     }
 }
 
@@ -33615,11 +33615,11 @@ fn __action169<
     (_, arg, _): (TextSize, ast::Identifier, TextSize),
     (_, a, _): (TextSize, core::option::Option<ast::Expr>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::Arg
+) -> ast::Parameter
 {
     {
         let annotation = a.map(Box::new);
-        ast::Arg { arg, annotation, range: (location..end_location).into() }
+        ast::Parameter { arg, annotation, range: (location..end_location).into() }
     }
 }
 
@@ -33835,7 +33835,7 @@ fn __action181<
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, location_args, _): (TextSize, TextSize, TextSize),
-    (_, p, _): (TextSize, core::option::Option<ast::Arguments>, TextSize),
+    (_, p, _): (TextSize, core::option::Option<ast::Parameters>, TextSize),
     (_, end_location_args, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, body, _): (TextSize, ast::Expr, TextSize),
@@ -33845,11 +33845,11 @@ fn __action181<
     {
         p.as_ref().map(validate_arguments).transpose()?;
         let p = p
-            .unwrap_or_else(|| ast::Arguments::empty((location_args..end_location_args).into()));
+            .unwrap_or_else(|| ast::Parameters::empty((location_args..end_location_args).into()));
 
         Ok(ast::Expr::Lambda(
             ast::ExprLambda {
-                args: Box::new(p),
+                parameters: Box::new(p),
                 body: Box::new(body),
                 range: (location..end_location).into()
             }
@@ -34864,8 +34864,8 @@ fn __action257<
 fn __action258<
 >(
     mode: Mode,
-    (_, __0, _): (TextSize, ast::Arguments, TextSize),
-) -> core::option::Option<ast::Arguments>
+    (_, __0, _): (TextSize, ast::Parameters, TextSize),
+) -> core::option::Option<ast::Parameters>
 {
     Some(__0)
 }
@@ -34877,7 +34877,7 @@ fn __action259<
     mode: Mode,
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> core::option::Option<ast::Arguments>
+) -> core::option::Option<ast::Parameters>
 {
     None
 }
@@ -34888,11 +34888,11 @@ fn __action260<
 >(
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, param1, _): (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-    (_, args2, _): (TextSize, core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>, TextSize),
+    (_, param1, _): (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
+    (_, args2, _): (TextSize, core::option::Option<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)>, TextSize),
     (_, _, _): (TextSize, core::option::Option<token::Tok>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     {
         validate_pos_params(&param1)?;
@@ -34901,7 +34901,7 @@ fn __action260<
         // Now gather rest of parameters:
         let (vararg, kwonlyargs, kwarg) = args2.unwrap_or((None, vec![], None));
 
-        Ok(ast::Arguments {
+        Ok(ast::Parameters {
             posonlyargs,
             args,
             kwonlyargs,
@@ -34918,11 +34918,11 @@ fn __action261<
 >(
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, param1, _): (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-    (_, kw, _): (TextSize, Option<Box<ast::Arg>>, TextSize),
+    (_, param1, _): (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
+    (_, kw, _): (TextSize, Option<Box<ast::Parameter>>, TextSize),
     (_, _, _): (TextSize, core::option::Option<token::Tok>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     {
         validate_pos_params(&param1)?;
@@ -34933,7 +34933,7 @@ fn __action261<
         let kwonlyargs = vec![];
         let kwarg = kw;
 
-        Ok(ast::Arguments {
+        Ok(ast::Parameters {
             posonlyargs,
             args,
             kwonlyargs,
@@ -34950,14 +34950,14 @@ fn __action262<
 >(
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, params, _): (TextSize, (Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>), TextSize),
+    (_, params, _): (TextSize, (Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>), TextSize),
     (_, _, _): (TextSize, core::option::Option<token::Tok>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::Arguments
+) -> ast::Parameters
 {
     {
         let (vararg, kwonlyargs, kwarg) = params;
-        ast::Arguments {
+        ast::Parameters {
             posonlyargs: vec![],
             args: vec![],
             kwonlyargs,
@@ -34974,13 +34974,13 @@ fn __action263<
 >(
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, kwarg, _): (TextSize, Option<Box<ast::Arg>>, TextSize),
+    (_, kwarg, _): (TextSize, Option<Box<ast::Parameter>>, TextSize),
     (_, _, _): (TextSize, core::option::Option<token::Tok>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::Arguments
+) -> ast::Parameters
 {
     {
-        ast::Arguments {
+        ast::Parameters {
             posonlyargs: vec![],
             args: vec![],
             kwonlyargs: vec![],
@@ -35129,8 +35129,8 @@ fn __action274<
 fn __action275<
 >(
     mode: Mode,
-    (_, __0, _): (TextSize, ast::Arguments, TextSize),
-) -> core::option::Option<ast::Arguments>
+    (_, __0, _): (TextSize, ast::Parameters, TextSize),
+) -> core::option::Option<ast::Parameters>
 {
     Some(__0)
 }
@@ -35142,7 +35142,7 @@ fn __action276<
     mode: Mode,
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> core::option::Option<ast::Arguments>
+) -> core::option::Option<ast::Parameters>
 {
     None
 }
@@ -35152,8 +35152,8 @@ fn __action276<
 fn __action277<
 >(
     mode: Mode,
-    (_, __0, _): (TextSize, ast::Arguments, TextSize),
-) -> ast::Arguments
+    (_, __0, _): (TextSize, ast::Parameters, TextSize),
+) -> ast::Parameters
 {
     __0
 }
@@ -35164,11 +35164,11 @@ fn __action278<
 >(
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, param1, _): (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-    (_, args2, _): (TextSize, core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>, TextSize),
+    (_, param1, _): (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
+    (_, args2, _): (TextSize, core::option::Option<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)>, TextSize),
     (_, _, _): (TextSize, core::option::Option<token::Tok>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     {
         validate_pos_params(&param1)?;
@@ -35177,7 +35177,7 @@ fn __action278<
         // Now gather rest of parameters:
         let (vararg, kwonlyargs, kwarg) = args2.unwrap_or((None, vec![], None));
 
-        Ok(ast::Arguments {
+        Ok(ast::Parameters {
             posonlyargs,
             args,
             kwonlyargs,
@@ -35194,11 +35194,11 @@ fn __action279<
 >(
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, param1, _): (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-    (_, kw, _): (TextSize, Option<Box<ast::Arg>>, TextSize),
+    (_, param1, _): (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
+    (_, kw, _): (TextSize, Option<Box<ast::Parameter>>, TextSize),
     (_, _, _): (TextSize, core::option::Option<token::Tok>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     {
         validate_pos_params(&param1)?;
@@ -35209,7 +35209,7 @@ fn __action279<
         let kwonlyargs = vec![];
         let kwarg = kw;
 
-        Ok(ast::Arguments {
+        Ok(ast::Parameters {
             posonlyargs,
             args,
             kwonlyargs,
@@ -35226,14 +35226,14 @@ fn __action280<
 >(
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, params, _): (TextSize, (Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>), TextSize),
+    (_, params, _): (TextSize, (Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>), TextSize),
     (_, _, _): (TextSize, core::option::Option<token::Tok>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::Arguments
+) -> ast::Parameters
 {
     {
         let (vararg, kwonlyargs, kwarg) = params;
-        ast::Arguments {
+        ast::Parameters {
             posonlyargs: vec![],
             args: vec![],
             kwonlyargs,
@@ -35250,13 +35250,13 @@ fn __action281<
 >(
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, kwarg, _): (TextSize, Option<Box<ast::Arg>>, TextSize),
+    (_, kwarg, _): (TextSize, Option<Box<ast::Parameter>>, TextSize),
     (_, _, _): (TextSize, core::option::Option<token::Tok>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::Arguments
+) -> ast::Parameters
 {
     {
-        ast::Arguments {
+        ast::Parameters {
             posonlyargs: vec![],
             args: vec![],
             kwonlyargs: vec![],
@@ -36873,8 +36873,8 @@ fn __action411<
 >(
     mode: Mode,
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, __0, _): (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Option<Box<ast::Arg>>
+    (_, __0, _): (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Option<Box<ast::Parameter>>
 {
     __0
 }
@@ -36885,8 +36885,8 @@ fn __action412<
 >(
     mode: Mode,
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, kwarg, _): (TextSize, core::option::Option<ast::Arg>, TextSize),
-) -> Option<Box<ast::Arg>>
+    (_, kwarg, _): (TextSize, core::option::Option<ast::Parameter>, TextSize),
+) -> Option<Box<ast::Parameter>>
 {
     {
         kwarg.map(Box::new)
@@ -36898,8 +36898,8 @@ fn __action412<
 fn __action413<
 >(
     mode: Mode,
-    (_, __0, _): (TextSize, (Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>), TextSize),
-) -> core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>
+    (_, __0, _): (TextSize, (Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>), TextSize),
+) -> core::option::Option<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)>
 {
     Some(__0)
 }
@@ -36911,7 +36911,7 @@ fn __action414<
     mode: Mode,
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>
+) -> core::option::Option<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)>
 {
     None
 }
@@ -36922,8 +36922,8 @@ fn __action415<
 >(
     mode: Mode,
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, __0, _): (TextSize, (Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>), TextSize),
-) -> (Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)
+    (_, __0, _): (TextSize, (Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>), TextSize),
+) -> (Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)
 {
     __0
 }
@@ -36935,10 +36935,10 @@ fn __action416<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, va, _): (TextSize, core::option::Option<ast::Arg>, TextSize),
-    (_, kwonlyargs, _): (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-    (_, kwarg, _): (TextSize, core::option::Option<Option<Box<ast::Arg>>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    (_, va, _): (TextSize, core::option::Option<ast::Parameter>, TextSize),
+    (_, kwonlyargs, _): (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+    (_, kwarg, _): (TextSize, core::option::Option<Option<Box<ast::Parameter>>>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     {
         if va.is_none() && kwonlyargs.is_empty() && kwarg.is_none() {
@@ -36960,8 +36960,8 @@ fn __action416<
 fn __action417<
 >(
     mode: Mode,
-    (_, args, _): (TextSize, Vec<ast::ArgWithDefault>, TextSize),
-) -> (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>)
+    (_, args, _): (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
+) -> (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>)
 {
     {
         (vec![], args)
@@ -36973,11 +36973,11 @@ fn __action417<
 fn __action418<
 >(
     mode: Mode,
-    (_, posonlyargs, _): (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    (_, posonlyargs, _): (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, args, _): (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>)
+    (_, args, _): (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>)
 {
     {
         (posonlyargs, args)
@@ -36990,8 +36990,8 @@ fn __action419<
 >(
     mode: Mode,
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, __0, _): (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Option<Box<ast::Arg>>
+    (_, __0, _): (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Option<Box<ast::Parameter>>
 {
     __0
 }
@@ -37002,8 +37002,8 @@ fn __action420<
 >(
     mode: Mode,
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, kwarg, _): (TextSize, core::option::Option<ast::Arg>, TextSize),
-) -> Option<Box<ast::Arg>>
+    (_, kwarg, _): (TextSize, core::option::Option<ast::Parameter>, TextSize),
+) -> Option<Box<ast::Parameter>>
 {
     {
         kwarg.map(Box::new)
@@ -37015,8 +37015,8 @@ fn __action420<
 fn __action421<
 >(
     mode: Mode,
-    (_, __0, _): (TextSize, (Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>), TextSize),
-) -> core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>
+    (_, __0, _): (TextSize, (Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>), TextSize),
+) -> core::option::Option<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)>
 {
     Some(__0)
 }
@@ -37028,7 +37028,7 @@ fn __action422<
     mode: Mode,
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>
+) -> core::option::Option<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)>
 {
     None
 }
@@ -37039,8 +37039,8 @@ fn __action423<
 >(
     mode: Mode,
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, __0, _): (TextSize, (Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>), TextSize),
-) -> (Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)
+    (_, __0, _): (TextSize, (Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>), TextSize),
+) -> (Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)
 {
     __0
 }
@@ -37052,10 +37052,10 @@ fn __action424<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, va, _): (TextSize, core::option::Option<ast::Arg>, TextSize),
-    (_, kwonlyargs, _): (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-    (_, kwarg, _): (TextSize, core::option::Option<Option<Box<ast::Arg>>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    (_, va, _): (TextSize, core::option::Option<ast::Parameter>, TextSize),
+    (_, kwonlyargs, _): (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+    (_, kwarg, _): (TextSize, core::option::Option<Option<Box<ast::Parameter>>>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     {
         if va.is_none() && kwonlyargs.is_empty() && kwarg.is_none() {
@@ -37077,8 +37077,8 @@ fn __action424<
 fn __action425<
 >(
     mode: Mode,
-    (_, args, _): (TextSize, Vec<ast::ArgWithDefault>, TextSize),
-) -> (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>)
+    (_, args, _): (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
+) -> (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>)
 {
     {
         (vec![], args)
@@ -37090,11 +37090,11 @@ fn __action425<
 fn __action426<
 >(
     mode: Mode,
-    (_, posonlyargs, _): (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    (_, posonlyargs, _): (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, args, _): (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>)
+    (_, args, _): (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>)
 {
     {
         (posonlyargs, args)
@@ -37420,8 +37420,8 @@ fn __action451<
 fn __action452<
 >(
     mode: Mode,
-    (_, e, _): (TextSize, ast::ArgWithDefault, TextSize),
-) -> Vec<ast::ArgWithDefault>
+    (_, e, _): (TextSize, ast::ParameterWithDefault, TextSize),
+) -> Vec<ast::ParameterWithDefault>
 {
     vec![e]
 }
@@ -37431,10 +37431,10 @@ fn __action452<
 fn __action453<
 >(
     mode: Mode,
-    (_, mut v, _): (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    (_, mut v, _): (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, e, _): (TextSize, ast::ArgWithDefault, TextSize),
-) -> Vec<ast::ArgWithDefault>
+    (_, e, _): (TextSize, ast::ParameterWithDefault, TextSize),
+) -> Vec<ast::ParameterWithDefault>
 {
     {
         v.push(e);
@@ -37447,8 +37447,8 @@ fn __action453<
 fn __action454<
 >(
     mode: Mode,
-    (_, __0, _): (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> core::option::Option<Option<Box<ast::Arg>>>
+    (_, __0, _): (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> core::option::Option<Option<Box<ast::Parameter>>>
 {
     Some(__0)
 }
@@ -37460,7 +37460,7 @@ fn __action455<
     mode: Mode,
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> core::option::Option<Option<Box<ast::Arg>>>
+) -> core::option::Option<Option<Box<ast::Parameter>>>
 {
     None
 }
@@ -37472,7 +37472,7 @@ fn __action456<
     mode: Mode,
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> alloc::vec::Vec<ast::ArgWithDefault>
+) -> alloc::vec::Vec<ast::ParameterWithDefault>
 {
     alloc::vec![]
 }
@@ -37482,8 +37482,8 @@ fn __action456<
 fn __action457<
 >(
     mode: Mode,
-    (_, v, _): (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> alloc::vec::Vec<ast::ArgWithDefault>
+    (_, v, _): (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> alloc::vec::Vec<ast::ParameterWithDefault>
 {
     v
 }
@@ -37494,8 +37494,8 @@ fn __action458<
 >(
     mode: Mode,
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, __0, _): (TextSize, ast::ArgWithDefault, TextSize),
-) -> ast::ArgWithDefault
+    (_, __0, _): (TextSize, ast::ParameterWithDefault, TextSize),
+) -> ast::ParameterWithDefault
 {
     __0
 }
@@ -37505,8 +37505,8 @@ fn __action458<
 fn __action459<
 >(
     mode: Mode,
-    (_, i, _): (TextSize, ast::ArgWithDefault, TextSize),
-) -> ast::ArgWithDefault
+    (_, i, _): (TextSize, ast::ParameterWithDefault, TextSize),
+) -> ast::ParameterWithDefault
 {
     i
 }
@@ -37516,11 +37516,11 @@ fn __action459<
 fn __action460<
 >(
     mode: Mode,
-    (_, mut i, _): (TextSize, ast::ArgWithDefault, TextSize),
+    (_, mut i, _): (TextSize, ast::ParameterWithDefault, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, e, _): (TextSize, ast::Expr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ArgWithDefault
+) -> ast::ParameterWithDefault
 {
     {
         i.default = Some(Box::new(e));
@@ -37534,8 +37534,8 @@ fn __action460<
 fn __action461<
 >(
     mode: Mode,
-    (_, __0, _): (TextSize, ast::Arg, TextSize),
-) -> core::option::Option<ast::Arg>
+    (_, __0, _): (TextSize, ast::Parameter, TextSize),
+) -> core::option::Option<ast::Parameter>
 {
     Some(__0)
 }
@@ -37547,7 +37547,7 @@ fn __action462<
     mode: Mode,
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> core::option::Option<ast::Arg>
+) -> core::option::Option<ast::Parameter>
 {
     None
 }
@@ -37557,8 +37557,8 @@ fn __action462<
 fn __action463<
 >(
     mode: Mode,
-    (_, e, _): (TextSize, ast::ArgWithDefault, TextSize),
-) -> Vec<ast::ArgWithDefault>
+    (_, e, _): (TextSize, ast::ParameterWithDefault, TextSize),
+) -> Vec<ast::ParameterWithDefault>
 {
     vec![e]
 }
@@ -37568,10 +37568,10 @@ fn __action463<
 fn __action464<
 >(
     mode: Mode,
-    (_, mut v, _): (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    (_, mut v, _): (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, e, _): (TextSize, ast::ArgWithDefault, TextSize),
-) -> Vec<ast::ArgWithDefault>
+    (_, e, _): (TextSize, ast::ParameterWithDefault, TextSize),
+) -> Vec<ast::ParameterWithDefault>
 {
     {
         v.push(e);
@@ -37584,8 +37584,8 @@ fn __action464<
 fn __action465<
 >(
     mode: Mode,
-    (_, __0, _): (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> core::option::Option<Option<Box<ast::Arg>>>
+    (_, __0, _): (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> core::option::Option<Option<Box<ast::Parameter>>>
 {
     Some(__0)
 }
@@ -37597,7 +37597,7 @@ fn __action466<
     mode: Mode,
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> core::option::Option<Option<Box<ast::Arg>>>
+) -> core::option::Option<Option<Box<ast::Parameter>>>
 {
     None
 }
@@ -37609,7 +37609,7 @@ fn __action467<
     mode: Mode,
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> alloc::vec::Vec<ast::ArgWithDefault>
+) -> alloc::vec::Vec<ast::ParameterWithDefault>
 {
     alloc::vec![]
 }
@@ -37619,8 +37619,8 @@ fn __action467<
 fn __action468<
 >(
     mode: Mode,
-    (_, v, _): (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> alloc::vec::Vec<ast::ArgWithDefault>
+    (_, v, _): (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> alloc::vec::Vec<ast::ParameterWithDefault>
 {
     v
 }
@@ -37631,8 +37631,8 @@ fn __action469<
 >(
     mode: Mode,
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, __0, _): (TextSize, ast::ArgWithDefault, TextSize),
-) -> ast::ArgWithDefault
+    (_, __0, _): (TextSize, ast::ParameterWithDefault, TextSize),
+) -> ast::ParameterWithDefault
 {
     __0
 }
@@ -37642,8 +37642,8 @@ fn __action469<
 fn __action470<
 >(
     mode: Mode,
-    (_, i, _): (TextSize, ast::ArgWithDefault, TextSize),
-) -> ast::ArgWithDefault
+    (_, i, _): (TextSize, ast::ParameterWithDefault, TextSize),
+) -> ast::ParameterWithDefault
 {
     i
 }
@@ -37653,11 +37653,11 @@ fn __action470<
 fn __action471<
 >(
     mode: Mode,
-    (_, mut i, _): (TextSize, ast::ArgWithDefault, TextSize),
+    (_, mut i, _): (TextSize, ast::ParameterWithDefault, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, e, _): (TextSize, ast::Expr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ArgWithDefault
+) -> ast::ParameterWithDefault
 {
     {
         i.default = Some(Box::new(e));
@@ -37671,8 +37671,8 @@ fn __action471<
 fn __action472<
 >(
     mode: Mode,
-    (_, __0, _): (TextSize, ast::Arg, TextSize),
-) -> core::option::Option<ast::Arg>
+    (_, __0, _): (TextSize, ast::Parameter, TextSize),
+) -> core::option::Option<ast::Parameter>
 {
     Some(__0)
 }
@@ -37684,7 +37684,7 @@ fn __action473<
     mode: Mode,
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> core::option::Option<ast::Arg>
+) -> core::option::Option<ast::Parameter>
 {
     None
 }
@@ -37694,8 +37694,8 @@ fn __action473<
 fn __action474<
 >(
     mode: Mode,
-    (_, __0, _): (TextSize, ast::Arg, TextSize),
-) -> core::option::Option<ast::Arg>
+    (_, __0, _): (TextSize, ast::Parameter, TextSize),
+) -> core::option::Option<ast::Parameter>
 {
     Some(__0)
 }
@@ -37707,7 +37707,7 @@ fn __action475<
     mode: Mode,
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> core::option::Option<ast::Arg>
+) -> core::option::Option<ast::Parameter>
 {
     None
 }
@@ -37777,8 +37777,8 @@ fn __action479<
 fn __action480<
 >(
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ArgWithDefault, TextSize),
-) -> alloc::vec::Vec<ast::ArgWithDefault>
+    (_, __0, _): (TextSize, ast::ParameterWithDefault, TextSize),
+) -> alloc::vec::Vec<ast::ParameterWithDefault>
 {
     alloc::vec![__0]
 }
@@ -37788,9 +37788,9 @@ fn __action480<
 fn __action481<
 >(
     mode: Mode,
-    (_, v, _): (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-    (_, e, _): (TextSize, ast::ArgWithDefault, TextSize),
-) -> alloc::vec::Vec<ast::ArgWithDefault>
+    (_, v, _): (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+    (_, e, _): (TextSize, ast::ParameterWithDefault, TextSize),
+) -> alloc::vec::Vec<ast::ParameterWithDefault>
 {
     { let mut v = v; v.push(e); v }
 }
@@ -37800,8 +37800,8 @@ fn __action481<
 fn __action482<
 >(
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ArgWithDefault, TextSize),
-) -> alloc::vec::Vec<ast::ArgWithDefault>
+    (_, __0, _): (TextSize, ast::ParameterWithDefault, TextSize),
+) -> alloc::vec::Vec<ast::ParameterWithDefault>
 {
     alloc::vec![__0]
 }
@@ -37811,9 +37811,9 @@ fn __action482<
 fn __action483<
 >(
     mode: Mode,
-    (_, v, _): (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-    (_, e, _): (TextSize, ast::ArgWithDefault, TextSize),
-) -> alloc::vec::Vec<ast::ArgWithDefault>
+    (_, v, _): (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+    (_, e, _): (TextSize, ast::ParameterWithDefault, TextSize),
+) -> alloc::vec::Vec<ast::ParameterWithDefault>
 {
     { let mut v = v; v.push(e); v }
 }
@@ -40505,11 +40505,11 @@ fn __action618<
 >(
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
-    __1: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-    __2: (TextSize, core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>, TextSize),
+    __1: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
+    __2: (TextSize, core::option::Option<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.0;
     let __end0 = __3.2;
@@ -40534,10 +40534,10 @@ fn __action619<
 >(
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
-    __1: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-    __2: (TextSize, core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>, TextSize),
+    __1: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
+    __2: (TextSize, core::option::Option<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)>, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
     let __end0 = __3.0;
@@ -40563,11 +40563,11 @@ fn __action620<
 >(
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
-    __1: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __1: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
+    __2: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.0;
     let __end0 = __3.2;
@@ -40592,10 +40592,10 @@ fn __action621<
 >(
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
-    __1: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __1: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
+    __2: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
     let __end0 = __3.0;
@@ -40621,10 +40621,10 @@ fn __action622<
 >(
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
-    __1: (TextSize, (Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>), TextSize),
+    __1: (TextSize, (Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>), TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::Arguments
+) -> ast::Parameters
 {
     let __start0 = __2.0;
     let __end0 = __2.2;
@@ -40648,9 +40648,9 @@ fn __action623<
 >(
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
-    __1: (TextSize, (Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>), TextSize),
+    __1: (TextSize, (Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>), TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::Arguments
+) -> ast::Parameters
 {
     let __start0 = __1.2;
     let __end0 = __2.0;
@@ -40675,10 +40675,10 @@ fn __action624<
 >(
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
-    __1: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __1: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::Arguments
+) -> ast::Parameters
 {
     let __start0 = __2.0;
     let __end0 = __2.2;
@@ -40702,9 +40702,9 @@ fn __action625<
 >(
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
-    __1: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __1: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::Arguments
+) -> ast::Parameters
 {
     let __start0 = __1.2;
     let __end0 = __2.0;
@@ -40729,11 +40729,11 @@ fn __action626<
 >(
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
-    __1: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-    __2: (TextSize, core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>, TextSize),
+    __1: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
+    __2: (TextSize, core::option::Option<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.0;
     let __end0 = __3.2;
@@ -40758,10 +40758,10 @@ fn __action627<
 >(
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
-    __1: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-    __2: (TextSize, core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>, TextSize),
+    __1: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
+    __2: (TextSize, core::option::Option<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)>, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
     let __end0 = __3.0;
@@ -40787,11 +40787,11 @@ fn __action628<
 >(
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
-    __1: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __1: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
+    __2: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.0;
     let __end0 = __3.2;
@@ -40816,10 +40816,10 @@ fn __action629<
 >(
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
-    __1: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __1: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
+    __2: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
     let __end0 = __3.0;
@@ -40845,10 +40845,10 @@ fn __action630<
 >(
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
-    __1: (TextSize, (Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>), TextSize),
+    __1: (TextSize, (Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>), TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::Arguments
+) -> ast::Parameters
 {
     let __start0 = __2.0;
     let __end0 = __2.2;
@@ -40872,9 +40872,9 @@ fn __action631<
 >(
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
-    __1: (TextSize, (Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>), TextSize),
+    __1: (TextSize, (Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>), TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::Arguments
+) -> ast::Parameters
 {
     let __start0 = __1.2;
     let __end0 = __2.0;
@@ -40899,10 +40899,10 @@ fn __action632<
 >(
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
-    __1: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __1: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::Arguments
+) -> ast::Parameters
 {
     let __start0 = __2.0;
     let __end0 = __2.2;
@@ -40926,9 +40926,9 @@ fn __action633<
 >(
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
-    __1: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __1: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::Arguments
+) -> ast::Parameters
 {
     let __start0 = __1.2;
     let __end0 = __2.0;
@@ -41654,7 +41654,7 @@ fn __action658<
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, ast::Identifier, TextSize),
     __5: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
-    __6: (TextSize, ast::Arguments, TextSize),
+    __6: (TextSize, ast::Parameters, TextSize),
     __7: (TextSize, core::option::Option<ast::Expr>, TextSize),
     __8: (TextSize, token::Tok, TextSize),
     __9: (TextSize, ast::Suite, TextSize),
@@ -41692,7 +41692,7 @@ fn __action659<
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Identifier, TextSize),
     __4: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
-    __5: (TextSize, ast::Arguments, TextSize),
+    __5: (TextSize, ast::Parameters, TextSize),
     __6: (TextSize, core::option::Option<ast::Expr>, TextSize),
     __7: (TextSize, token::Tok, TextSize),
     __8: (TextSize, ast::Suite, TextSize),
@@ -41958,8 +41958,8 @@ fn __action667<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> core::option::Option<Option<Box<ast::Arg>>>
+    __1: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> core::option::Option<Option<Box<ast::Parameter>>>
 {
     let __start0 = __0.0;
     let __end0 = __1.2;
@@ -41981,12 +41981,12 @@ fn __action668<
 >(
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
-    __1: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __1: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __3: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.0;
     let __end0 = __3.2;
@@ -42012,11 +42012,11 @@ fn __action669<
 >(
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
-    __1: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __1: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __3: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.0;
     let __end0 = __3.2;
@@ -42042,11 +42042,11 @@ fn __action670<
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, core::option::Option<ast::Arg>, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, core::option::Option<ast::Parameter>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __4.0;
     let __end0 = __5.2;
@@ -42073,9 +42073,9 @@ fn __action671<
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, core::option::Option<ast::Arg>, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __2: (TextSize, core::option::Option<ast::Parameter>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -42101,8 +42101,8 @@ fn __action672<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> core::option::Option<Option<Box<ast::Arg>>>
+    __1: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> core::option::Option<Option<Box<ast::Parameter>>>
 {
     let __start0 = __0.0;
     let __end0 = __1.2;
@@ -42124,12 +42124,12 @@ fn __action673<
 >(
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
-    __1: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __1: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __3: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.0;
     let __end0 = __3.2;
@@ -42155,11 +42155,11 @@ fn __action674<
 >(
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
-    __1: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __1: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __3: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.0;
     let __end0 = __3.2;
@@ -42185,11 +42185,11 @@ fn __action675<
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, core::option::Option<ast::Arg>, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, core::option::Option<ast::Parameter>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __4.0;
     let __end0 = __5.2;
@@ -42216,9 +42216,9 @@ fn __action676<
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, core::option::Option<ast::Arg>, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __2: (TextSize, core::option::Option<ast::Parameter>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -42244,8 +42244,8 @@ fn __action677<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ArgWithDefault, TextSize),
-) -> alloc::vec::Vec<ast::ArgWithDefault>
+    __1: (TextSize, ast::ParameterWithDefault, TextSize),
+) -> alloc::vec::Vec<ast::ParameterWithDefault>
 {
     let __start0 = __0.0;
     let __end0 = __1.2;
@@ -42266,10 +42266,10 @@ fn __action677<
 fn __action678<
 >(
     mode: Mode,
-    __0: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ArgWithDefault, TextSize),
-) -> alloc::vec::Vec<ast::ArgWithDefault>
+    __2: (TextSize, ast::ParameterWithDefault, TextSize),
+) -> alloc::vec::Vec<ast::ParameterWithDefault>
 {
     let __start0 = __1.0;
     let __end0 = __2.2;
@@ -42291,10 +42291,10 @@ fn __action678<
 fn __action679<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>)
+) -> (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>)
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -42318,11 +42318,11 @@ fn __action679<
 fn __action680<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>)
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>)
 {
     let __start0 = __3.0;
     let __end0 = __3.2;
@@ -42347,10 +42347,10 @@ fn __action681<
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, core::option::Option<ast::Arg>, TextSize),
+    __2: (TextSize, core::option::Option<ast::Parameter>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
     let __end0 = __3.0;
@@ -42378,11 +42378,11 @@ fn __action682<
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, core::option::Option<ast::Arg>, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, core::option::Option<ast::Parameter>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.0;
     let __end0 = __3.2;
@@ -42409,8 +42409,8 @@ fn __action683<
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, core::option::Option<ast::Arg>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __2: (TextSize, core::option::Option<ast::Parameter>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -42436,9 +42436,9 @@ fn __action684<
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, core::option::Option<ast::Arg>, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __2: (TextSize, core::option::Option<ast::Parameter>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.0;
     let __end0 = __3.2;
@@ -42462,8 +42462,8 @@ fn __action685<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ArgWithDefault, TextSize),
-) -> alloc::vec::Vec<ast::ArgWithDefault>
+    __1: (TextSize, ast::ParameterWithDefault, TextSize),
+) -> alloc::vec::Vec<ast::ParameterWithDefault>
 {
     let __start0 = __0.0;
     let __end0 = __1.2;
@@ -42484,10 +42484,10 @@ fn __action685<
 fn __action686<
 >(
     mode: Mode,
-    __0: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ArgWithDefault, TextSize),
-) -> alloc::vec::Vec<ast::ArgWithDefault>
+    __2: (TextSize, ast::ParameterWithDefault, TextSize),
+) -> alloc::vec::Vec<ast::ParameterWithDefault>
 {
     let __start0 = __1.0;
     let __end0 = __2.2;
@@ -42509,10 +42509,10 @@ fn __action686<
 fn __action687<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>)
+) -> (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>)
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -42536,11 +42536,11 @@ fn __action687<
 fn __action688<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>)
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>)
 {
     let __start0 = __3.0;
     let __end0 = __3.2;
@@ -42565,10 +42565,10 @@ fn __action689<
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, core::option::Option<ast::Arg>, TextSize),
+    __2: (TextSize, core::option::Option<ast::Parameter>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
     let __end0 = __3.0;
@@ -42596,11 +42596,11 @@ fn __action690<
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, core::option::Option<ast::Arg>, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, core::option::Option<ast::Parameter>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.0;
     let __end0 = __3.2;
@@ -42627,8 +42627,8 @@ fn __action691<
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, core::option::Option<ast::Arg>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __2: (TextSize, core::option::Option<ast::Parameter>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -42654,9 +42654,9 @@ fn __action692<
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, core::option::Option<ast::Arg>, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __2: (TextSize, core::option::Option<ast::Parameter>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.0;
     let __end0 = __3.2;
@@ -42681,10 +42681,10 @@ fn __action693<
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
+    __2: (TextSize, ast::Parameter, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.0;
     let __end0 = __2.2;
@@ -42711,8 +42711,8 @@ fn __action694<
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __3: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.2;
     let __end0 = __2.0;
@@ -42739,11 +42739,11 @@ fn __action695<
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, ast::Parameter, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.0;
     let __end0 = __2.2;
@@ -42770,10 +42770,10 @@ fn __action696<
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.2;
     let __end0 = __2.0;
@@ -42801,8 +42801,8 @@ fn __action697<
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __2: (TextSize, ast::Parameter, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.0;
     let __end0 = __2.2;
@@ -42826,7 +42826,7 @@ fn __action698<
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.2;
     let __end0 = __1.2;
@@ -42851,9 +42851,9 @@ fn __action699<
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __2: (TextSize, ast::Parameter, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.0;
     let __end0 = __2.2;
@@ -42878,8 +42878,8 @@ fn __action700<
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __2: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.2;
     let __end0 = __2.0;
@@ -45329,7 +45329,7 @@ fn __action784<
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, core::option::Option<ast::Expr>, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::Arg
+) -> ast::Parameter
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -45851,7 +45851,7 @@ fn __action802<
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Identifier, TextSize),
     __4: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
-    __5: (TextSize, ast::Arguments, TextSize),
+    __5: (TextSize, ast::Parameters, TextSize),
     __6: (TextSize, core::option::Option<ast::Expr>, TextSize),
     __7: (TextSize, token::Tok, TextSize),
     __8: (TextSize, ast::Suite, TextSize),
@@ -45889,7 +45889,7 @@ fn __action803<
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
     __3: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
-    __4: (TextSize, ast::Arguments, TextSize),
+    __4: (TextSize, ast::Parameters, TextSize),
     __5: (TextSize, core::option::Option<ast::Expr>, TextSize),
     __6: (TextSize, token::Tok, TextSize),
     __7: (TextSize, ast::Suite, TextSize),
@@ -46444,7 +46444,7 @@ fn __action823<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<ast::Arguments>, TextSize),
+    __1: (TextSize, core::option::Option<ast::Parameters>, TextSize),
     __2: (TextSize, TextSize, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, ast::Expr, TextSize),
@@ -47453,11 +47453,11 @@ fn __action857<
 fn __action858<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-    __1: (TextSize, core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>, TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
+    __1: (TextSize, core::option::Option<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47482,10 +47482,10 @@ fn __action858<
 fn __action859<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-    __1: (TextSize, core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>, TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
+    __1: (TextSize, core::option::Option<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)>, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47509,12 +47509,12 @@ fn __action859<
 fn __action860<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __2: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47540,11 +47540,11 @@ fn __action860<
 fn __action861<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __2: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47569,10 +47569,10 @@ fn __action861<
 fn __action862<
 >(
     mode: Mode,
-    __0: (TextSize, (Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>), TextSize),
+    __0: (TextSize, (Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::Arguments
+) -> ast::Parameters
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47596,9 +47596,9 @@ fn __action862<
 fn __action863<
 >(
     mode: Mode,
-    __0: (TextSize, (Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>), TextSize),
+    __0: (TextSize, (Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>), TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> ast::Arguments
+) -> ast::Parameters
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47621,10 +47621,10 @@ fn __action863<
 fn __action864<
 >(
     mode: Mode,
-    __0: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __0: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::Arguments
+) -> ast::Parameters
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47648,9 +47648,9 @@ fn __action864<
 fn __action865<
 >(
     mode: Mode,
-    __0: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __0: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> ast::Arguments
+) -> ast::Parameters
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47673,11 +47673,11 @@ fn __action865<
 fn __action866<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-    __1: (TextSize, core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>, TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
+    __1: (TextSize, core::option::Option<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47702,10 +47702,10 @@ fn __action866<
 fn __action867<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-    __1: (TextSize, core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>, TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
+    __1: (TextSize, core::option::Option<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)>, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47729,12 +47729,12 @@ fn __action867<
 fn __action868<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __2: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47760,11 +47760,11 @@ fn __action868<
 fn __action869<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __2: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47789,10 +47789,10 @@ fn __action869<
 fn __action870<
 >(
     mode: Mode,
-    __0: (TextSize, (Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>), TextSize),
+    __0: (TextSize, (Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::Arguments
+) -> ast::Parameters
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47816,9 +47816,9 @@ fn __action870<
 fn __action871<
 >(
     mode: Mode,
-    __0: (TextSize, (Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>), TextSize),
+    __0: (TextSize, (Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>), TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> ast::Arguments
+) -> ast::Parameters
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47841,10 +47841,10 @@ fn __action871<
 fn __action872<
 >(
     mode: Mode,
-    __0: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __0: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::Arguments
+) -> ast::Parameters
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47868,9 +47868,9 @@ fn __action872<
 fn __action873<
 >(
     mode: Mode,
-    __0: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __0: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> ast::Arguments
+) -> ast::Parameters
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47894,10 +47894,10 @@ fn __action874<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
+    __1: (TextSize, ast::Parameter, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __3: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47924,8 +47924,8 @@ fn __action875<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __2: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47950,11 +47950,11 @@ fn __action876<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, ast::Parameter, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47981,10 +47981,10 @@ fn __action877<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __3: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -48010,8 +48010,8 @@ fn __action878<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __1: (TextSize, ast::Parameter, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -48035,7 +48035,7 @@ fn __action879<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -48058,9 +48058,9 @@ fn __action880<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __1: (TextSize, ast::Parameter, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -48085,8 +48085,8 @@ fn __action881<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __1: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -48110,10 +48110,10 @@ fn __action882<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<ast::Arg>, TextSize),
+    __1: (TextSize, core::option::Option<ast::Parameter>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __3: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -48139,11 +48139,11 @@ fn __action883<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<ast::Arg>, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, core::option::Option<ast::Parameter>, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -48170,8 +48170,8 @@ fn __action884<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<ast::Arg>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __1: (TextSize, core::option::Option<ast::Parameter>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -48195,9 +48195,9 @@ fn __action885<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<ast::Arg>, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __1: (TextSize, core::option::Option<ast::Parameter>, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -48222,10 +48222,10 @@ fn __action886<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<ast::Arguments>, TextSize),
+    __1: (TextSize, core::option::Option<ast::Parameters>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -48854,7 +48854,7 @@ fn __action908<
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, core::option::Option<ast::Expr>, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::Arg
+) -> ast::Parameter
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -48880,7 +48880,7 @@ fn __action909<
     mode: Mode,
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> ast::Arg
+) -> ast::Parameter
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -49519,7 +49519,7 @@ fn __action931<
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, core::option::Option<ast::Expr>, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::ArgWithDefault
+) -> ast::ParameterWithDefault
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -49545,7 +49545,7 @@ fn __action932<
     mode: Mode,
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> ast::ArgWithDefault
+) -> ast::ParameterWithDefault
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -49962,10 +49962,10 @@ fn __action947<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
+    __2: (TextSize, ast::Parameter, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __4.2;
@@ -49992,8 +49992,8 @@ fn __action948<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __3: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __3.2;
@@ -50018,11 +50018,11 @@ fn __action949<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, ast::Parameter, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __5.2;
@@ -50049,10 +50049,10 @@ fn __action950<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __4.2;
@@ -50078,8 +50078,8 @@ fn __action951<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __2: (TextSize, ast::Parameter, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __2.2;
@@ -50103,7 +50103,7 @@ fn __action952<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __1.2;
@@ -50126,9 +50126,9 @@ fn __action953<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __2: (TextSize, ast::Parameter, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __3.2;
@@ -50153,8 +50153,8 @@ fn __action954<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __2: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __2.2;
@@ -50177,12 +50177,12 @@ fn __action955<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
+    __1: (TextSize, ast::Parameter, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __3: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -50209,10 +50209,10 @@ fn __action956<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __2: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -50237,13 +50237,13 @@ fn __action957<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, ast::Parameter, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __4.2;
@@ -50270,12 +50270,12 @@ fn __action958<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __3: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -50301,10 +50301,10 @@ fn __action959<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
+    __1: (TextSize, ast::Parameter, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __1.2;
@@ -50330,7 +50330,7 @@ fn __action960<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -50353,11 +50353,11 @@ fn __action961<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, ast::Parameter, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -50382,10 +50382,10 @@ fn __action962<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __1.2;
@@ -50409,11 +50409,11 @@ fn __action963<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
+    __1: (TextSize, ast::Parameter, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __3: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -50439,9 +50439,9 @@ fn __action964<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __2: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -50465,12 +50465,12 @@ fn __action965<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, ast::Parameter, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __5: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __4.2;
@@ -50496,11 +50496,11 @@ fn __action966<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __3: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -50525,9 +50525,9 @@ fn __action967<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
+    __1: (TextSize, ast::Parameter, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __1.2;
@@ -50551,7 +50551,7 @@ fn __action968<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -50573,10 +50573,10 @@ fn __action969<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, ast::Parameter, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -50600,9 +50600,9 @@ fn __action970<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __1.2;
@@ -50626,10 +50626,10 @@ fn __action971<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
+    __2: (TextSize, ast::Parameter, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<core::option::Option<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __4.2;
@@ -50656,8 +50656,8 @@ fn __action972<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __3: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<core::option::Option<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -50682,11 +50682,11 @@ fn __action973<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, ast::Parameter, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<core::option::Option<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __5.2;
@@ -50713,10 +50713,10 @@ fn __action974<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<core::option::Option<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __4.2;
@@ -50742,8 +50742,8 @@ fn __action975<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
-) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __2: (TextSize, ast::Parameter, TextSize),
+) -> Result<core::option::Option<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -50767,7 +50767,7 @@ fn __action976<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<core::option::Option<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __1.2;
@@ -50790,9 +50790,9 @@ fn __action977<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __2: (TextSize, ast::Parameter, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<core::option::Option<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -50817,8 +50817,8 @@ fn __action978<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __2: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<core::option::Option<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -50840,15 +50840,15 @@ fn __action978<
 fn __action979<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __6: (TextSize, token::Tok, TextSize),
     __7: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __5.2;
@@ -50875,14 +50875,14 @@ fn __action979<
 fn __action980<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __4.2;
@@ -50908,16 +50908,16 @@ fn __action980<
 fn __action981<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __6: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __7: (TextSize, token::Tok, TextSize),
     __8: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __6.2;
@@ -50945,15 +50945,15 @@ fn __action981<
 fn __action982<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __6: (TextSize, token::Tok, TextSize),
     __7: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __5.2;
@@ -50980,13 +50980,13 @@ fn __action982<
 fn __action983<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __3.2;
@@ -51011,12 +51011,12 @@ fn __action983<
 fn __action984<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __2.2;
@@ -51040,14 +51040,14 @@ fn __action984<
 fn __action985<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __4.2;
@@ -51073,13 +51073,13 @@ fn __action985<
 fn __action986<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __3.2;
@@ -51104,10 +51104,10 @@ fn __action986<
 fn __action987<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
     let __end0 = __1.0;
@@ -51131,14 +51131,14 @@ fn __action987<
 fn __action988<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __6: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __5.2;
@@ -51164,13 +51164,13 @@ fn __action988<
 fn __action989<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __5: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __4.2;
@@ -51195,15 +51195,15 @@ fn __action989<
 fn __action990<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __6: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __7: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __6.2;
@@ -51230,14 +51230,14 @@ fn __action990<
 fn __action991<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __6: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __5.2;
@@ -51263,12 +51263,12 @@ fn __action991<
 fn __action992<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __3.2;
@@ -51292,11 +51292,11 @@ fn __action992<
 fn __action993<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __2.2;
@@ -51319,13 +51319,13 @@ fn __action993<
 fn __action994<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __5: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __4.2;
@@ -51350,12 +51350,12 @@ fn __action994<
 fn __action995<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __3.2;
@@ -51379,9 +51379,9 @@ fn __action995<
 fn __action996<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
     let __end0 = __1.0;
@@ -51405,8 +51405,8 @@ fn __action997<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-) -> Option<Box<ast::Arg>>
+    __1: (TextSize, ast::Parameter, TextSize),
+) -> Option<Box<ast::Parameter>>
 {
     let __start0 = __1.0;
     let __end0 = __1.2;
@@ -51428,7 +51428,7 @@ fn __action998<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-) -> Option<Box<ast::Arg>>
+) -> Option<Box<ast::Parameter>>
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -51451,10 +51451,10 @@ fn __action999<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
+    __1: (TextSize, ast::Parameter, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __3: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __1.2;
@@ -51479,8 +51479,8 @@ fn __action1000<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __2: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
     let __end0 = __1.0;
@@ -51505,11 +51505,11 @@ fn __action1001<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, ast::Parameter, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __1.2;
@@ -51534,10 +51534,10 @@ fn __action1002<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __3: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
     let __end0 = __1.0;
@@ -51563,8 +51563,8 @@ fn __action1003<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __1: (TextSize, ast::Parameter, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __1.2;
@@ -51586,7 +51586,7 @@ fn __action1004<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -51609,9 +51609,9 @@ fn __action1005<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __1: (TextSize, ast::Parameter, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __1.2;
@@ -51634,8 +51634,8 @@ fn __action1006<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __1: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
     let __end0 = __1.0;
@@ -51660,10 +51660,10 @@ fn __action1007<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
+    __2: (TextSize, ast::Parameter, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __4.2;
@@ -51690,8 +51690,8 @@ fn __action1008<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __3: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __3.2;
@@ -51716,11 +51716,11 @@ fn __action1009<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, ast::Parameter, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __5.2;
@@ -51747,10 +51747,10 @@ fn __action1010<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __4.2;
@@ -51776,8 +51776,8 @@ fn __action1011<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __2: (TextSize, ast::Parameter, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __2.2;
@@ -51801,7 +51801,7 @@ fn __action1012<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __1.2;
@@ -51824,9 +51824,9 @@ fn __action1013<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __2: (TextSize, ast::Parameter, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __3.2;
@@ -51851,8 +51851,8 @@ fn __action1014<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __2: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __2.2;
@@ -51875,12 +51875,12 @@ fn __action1015<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
+    __1: (TextSize, ast::Parameter, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __3: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -51907,10 +51907,10 @@ fn __action1016<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __2: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -51935,13 +51935,13 @@ fn __action1017<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, ast::Parameter, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __4.2;
@@ -51968,12 +51968,12 @@ fn __action1018<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __3: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -51999,10 +51999,10 @@ fn __action1019<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
+    __1: (TextSize, ast::Parameter, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __1.2;
@@ -52028,7 +52028,7 @@ fn __action1020<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -52051,11 +52051,11 @@ fn __action1021<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, ast::Parameter, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -52080,10 +52080,10 @@ fn __action1022<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __1.2;
@@ -52107,11 +52107,11 @@ fn __action1023<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
+    __1: (TextSize, ast::Parameter, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __3: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -52137,9 +52137,9 @@ fn __action1024<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __2: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -52163,12 +52163,12 @@ fn __action1025<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, ast::Parameter, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __5: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __4.2;
@@ -52194,11 +52194,11 @@ fn __action1026<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __3: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -52223,9 +52223,9 @@ fn __action1027<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
+    __1: (TextSize, ast::Parameter, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __1.2;
@@ -52249,7 +52249,7 @@ fn __action1028<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -52271,10 +52271,10 @@ fn __action1029<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, ast::Parameter, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -52298,9 +52298,9 @@ fn __action1030<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __1.2;
@@ -52324,10 +52324,10 @@ fn __action1031<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
+    __2: (TextSize, ast::Parameter, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<core::option::Option<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __4.2;
@@ -52354,8 +52354,8 @@ fn __action1032<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __3: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<core::option::Option<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -52380,11 +52380,11 @@ fn __action1033<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, ast::Parameter, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<core::option::Option<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __5.2;
@@ -52411,10 +52411,10 @@ fn __action1034<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<core::option::Option<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __4.2;
@@ -52440,8 +52440,8 @@ fn __action1035<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
-) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __2: (TextSize, ast::Parameter, TextSize),
+) -> Result<core::option::Option<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -52465,7 +52465,7 @@ fn __action1036<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<core::option::Option<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __1.2;
@@ -52488,9 +52488,9 @@ fn __action1037<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::Arg, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __2: (TextSize, ast::Parameter, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<core::option::Option<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -52515,8 +52515,8 @@ fn __action1038<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<core::option::Option<(Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __2: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<core::option::Option<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)>,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -52538,15 +52538,15 @@ fn __action1038<
 fn __action1039<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __6: (TextSize, token::Tok, TextSize),
     __7: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __5.2;
@@ -52573,14 +52573,14 @@ fn __action1039<
 fn __action1040<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __4.2;
@@ -52606,16 +52606,16 @@ fn __action1040<
 fn __action1041<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __6: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __7: (TextSize, token::Tok, TextSize),
     __8: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __6.2;
@@ -52643,15 +52643,15 @@ fn __action1041<
 fn __action1042<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __6: (TextSize, token::Tok, TextSize),
     __7: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __5.2;
@@ -52678,13 +52678,13 @@ fn __action1042<
 fn __action1043<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __3.2;
@@ -52709,12 +52709,12 @@ fn __action1043<
 fn __action1044<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __2.2;
@@ -52738,14 +52738,14 @@ fn __action1044<
 fn __action1045<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __4.2;
@@ -52771,13 +52771,13 @@ fn __action1045<
 fn __action1046<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __3.2;
@@ -52802,10 +52802,10 @@ fn __action1046<
 fn __action1047<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
     let __end0 = __1.0;
@@ -52829,14 +52829,14 @@ fn __action1047<
 fn __action1048<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __6: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __5.2;
@@ -52862,13 +52862,13 @@ fn __action1048<
 fn __action1049<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __5: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __4.2;
@@ -52893,15 +52893,15 @@ fn __action1049<
 fn __action1050<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __6: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __7: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __6.2;
@@ -52928,14 +52928,14 @@ fn __action1050<
 fn __action1051<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __6: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __5.2;
@@ -52961,12 +52961,12 @@ fn __action1051<
 fn __action1052<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __3.2;
@@ -52990,11 +52990,11 @@ fn __action1052<
 fn __action1053<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __2.2;
@@ -53017,13 +53017,13 @@ fn __action1053<
 fn __action1054<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __5: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __4.2;
@@ -53048,12 +53048,12 @@ fn __action1054<
 fn __action1055<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __3.2;
@@ -53077,9 +53077,9 @@ fn __action1055<
 fn __action1056<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
     let __end0 = __1.0;
@@ -53681,7 +53681,7 @@ fn __action1077<
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Identifier, TextSize),
     __4: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
-    __5: (TextSize, ast::Arguments, TextSize),
+    __5: (TextSize, ast::Parameters, TextSize),
     __6: (TextSize, token::Tok, TextSize),
     __7: (TextSize, ast::Expr, TextSize),
     __8: (TextSize, token::Tok, TextSize),
@@ -53720,7 +53720,7 @@ fn __action1078<
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Identifier, TextSize),
     __4: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
-    __5: (TextSize, ast::Arguments, TextSize),
+    __5: (TextSize, ast::Parameters, TextSize),
     __6: (TextSize, token::Tok, TextSize),
     __7: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -53756,7 +53756,7 @@ fn __action1079<
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
     __3: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
-    __4: (TextSize, ast::Arguments, TextSize),
+    __4: (TextSize, ast::Parameters, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Expr, TextSize),
     __7: (TextSize, token::Tok, TextSize),
@@ -53793,7 +53793,7 @@ fn __action1080<
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
     __3: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
-    __4: (TextSize, ast::Arguments, TextSize),
+    __4: (TextSize, ast::Parameters, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -53899,7 +53899,7 @@ fn __action1084<
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Expr, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::Arg
+) -> ast::Parameter
 {
     let __start0 = __1.0;
     let __end0 = __2.2;
@@ -53924,7 +53924,7 @@ fn __action1085<
     mode: Mode,
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> ast::Arg
+) -> ast::Parameter
 {
     let __start0 = __0.2;
     let __end0 = __1.0;
@@ -54003,7 +54003,7 @@ fn __action1088<
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Expr, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::ArgWithDefault
+) -> ast::ParameterWithDefault
 {
     let __start0 = __1.0;
     let __end0 = __2.2;
@@ -54028,7 +54028,7 @@ fn __action1089<
     mode: Mode,
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> ast::ArgWithDefault
+) -> ast::ParameterWithDefault
 {
     let __start0 = __0.2;
     let __end0 = __1.0;
@@ -54078,7 +54078,7 @@ fn __action1091<
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Expr, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::Arg
+) -> ast::Parameter
 {
     let __start0 = __1.0;
     let __end0 = __2.2;
@@ -54103,7 +54103,7 @@ fn __action1092<
     mode: Mode,
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> ast::Arg
+) -> ast::Parameter
 {
     let __start0 = __0.2;
     let __end0 = __1.0;
@@ -59272,7 +59272,7 @@ fn __action1274<
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Expr, TextSize),
-) -> ast::Arg
+) -> ast::Parameter
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -59297,7 +59297,7 @@ fn __action1275<
 >(
     mode: Mode,
     __0: (TextSize, ast::Identifier, TextSize),
-) -> ast::Arg
+) -> ast::Parameter
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -60101,7 +60101,7 @@ fn __action1307<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<ast::Arguments>, TextSize),
+    __1: (TextSize, core::option::Option<ast::Parameters>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Expr, TextSize),
 ) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
@@ -60852,10 +60852,10 @@ fn __action1335<
 fn __action1336<
 >(
     mode: Mode,
-    __0: (TextSize, ast::ArgWithDefault, TextSize),
+    __0: (TextSize, ast::ParameterWithDefault, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Expr, TextSize),
-) -> ast::ArgWithDefault
+) -> ast::ParameterWithDefault
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -60879,10 +60879,10 @@ fn __action1336<
 fn __action1337<
 >(
     mode: Mode,
-    __0: (TextSize, ast::ArgWithDefault, TextSize),
+    __0: (TextSize, ast::ParameterWithDefault, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Expr, TextSize),
-) -> ast::ArgWithDefault
+) -> ast::ParameterWithDefault
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -60906,14 +60906,14 @@ fn __action1337<
 fn __action1338<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __6: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __6.2;
     let __end0 = __6.2;
@@ -60941,13 +60941,13 @@ fn __action1338<
 fn __action1339<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __5.2;
     let __end0 = __5.2;
@@ -60974,15 +60974,15 @@ fn __action1339<
 fn __action1340<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __6: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __7: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __7.2;
     let __end0 = __7.2;
@@ -61011,14 +61011,14 @@ fn __action1340<
 fn __action1341<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __6: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __6.2;
     let __end0 = __6.2;
@@ -61046,12 +61046,12 @@ fn __action1341<
 fn __action1342<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __4.2;
     let __end0 = __4.2;
@@ -61077,11 +61077,11 @@ fn __action1342<
 fn __action1343<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -61106,13 +61106,13 @@ fn __action1343<
 fn __action1344<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __5.2;
     let __end0 = __5.2;
@@ -61139,12 +61139,12 @@ fn __action1344<
 fn __action1345<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __4.2;
     let __end0 = __4.2;
@@ -61170,9 +61170,9 @@ fn __action1345<
 fn __action1346<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.2;
     let __end0 = __1.2;
@@ -61195,13 +61195,13 @@ fn __action1346<
 fn __action1347<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __5.2;
     let __end0 = __5.2;
@@ -61228,12 +61228,12 @@ fn __action1347<
 fn __action1348<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __4.2;
     let __end0 = __4.2;
@@ -61259,14 +61259,14 @@ fn __action1348<
 fn __action1349<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __6: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __6.2;
     let __end0 = __6.2;
@@ -61294,13 +61294,13 @@ fn __action1349<
 fn __action1350<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __5.2;
     let __end0 = __5.2;
@@ -61327,11 +61327,11 @@ fn __action1350<
 fn __action1351<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __3: (TextSize, ast::Parameter, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -61356,10 +61356,10 @@ fn __action1351<
 fn __action1352<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -61383,12 +61383,12 @@ fn __action1352<
 fn __action1353<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __3: (TextSize, ast::Parameter, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __4.2;
     let __end0 = __4.2;
@@ -61414,11 +61414,11 @@ fn __action1353<
 fn __action1354<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -61443,8 +61443,8 @@ fn __action1354<
 fn __action1355<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -61466,11 +61466,11 @@ fn __action1355<
 fn __action1356<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __2: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -61495,10 +61495,10 @@ fn __action1356<
 fn __action1357<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __2: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -61523,11 +61523,11 @@ fn __action1358<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
+    __1: (TextSize, ast::Parameter, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __3: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __4.2;
     let __end0 = __4.2;
@@ -61555,9 +61555,9 @@ fn __action1359<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __2: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -61583,12 +61583,12 @@ fn __action1360<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, ast::Parameter, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __5.2;
     let __end0 = __5.2;
@@ -61616,11 +61616,11 @@ fn __action1361<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __3: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __4.2;
     let __end0 = __4.2;
@@ -61647,9 +61647,9 @@ fn __action1362<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
+    __1: (TextSize, ast::Parameter, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -61675,7 +61675,7 @@ fn __action1363<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.2;
     let __end0 = __1.2;
@@ -61699,10 +61699,10 @@ fn __action1364<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, ast::Parameter, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -61728,9 +61728,9 @@ fn __action1365<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -61755,10 +61755,10 @@ fn __action1366<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
+    __1: (TextSize, ast::Parameter, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __3: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -61785,8 +61785,8 @@ fn __action1367<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __2: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -61811,11 +61811,11 @@ fn __action1368<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, ast::Parameter, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __4.2;
     let __end0 = __4.2;
@@ -61842,10 +61842,10 @@ fn __action1369<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __3: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -61871,8 +61871,8 @@ fn __action1370<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __1: (TextSize, ast::Parameter, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.2;
     let __end0 = __1.2;
@@ -61896,7 +61896,7 @@ fn __action1371<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -61919,9 +61919,9 @@ fn __action1372<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __1: (TextSize, ast::Parameter, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -61946,8 +61946,8 @@ fn __action1373<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __1: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.2;
     let __end0 = __1.2;
@@ -61970,9 +61970,9 @@ fn __action1373<
 fn __action1374<
 >(
     mode: Mode,
-    __0: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __0: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> ast::Arguments
+) -> ast::Parameters
 {
     let __start0 = __1.2;
     let __end0 = __1.2;
@@ -61995,8 +61995,8 @@ fn __action1374<
 fn __action1375<
 >(
     mode: Mode,
-    __0: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> ast::Arguments
+    __0: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> ast::Parameters
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -62018,14 +62018,14 @@ fn __action1375<
 fn __action1376<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __6: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __6.2;
     let __end0 = __6.2;
@@ -62053,13 +62053,13 @@ fn __action1376<
 fn __action1377<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __5.2;
     let __end0 = __5.2;
@@ -62086,15 +62086,15 @@ fn __action1377<
 fn __action1378<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __6: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __7: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __7.2;
     let __end0 = __7.2;
@@ -62123,14 +62123,14 @@ fn __action1378<
 fn __action1379<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __6: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __6.2;
     let __end0 = __6.2;
@@ -62158,12 +62158,12 @@ fn __action1379<
 fn __action1380<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __4.2;
     let __end0 = __4.2;
@@ -62189,11 +62189,11 @@ fn __action1380<
 fn __action1381<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -62218,13 +62218,13 @@ fn __action1381<
 fn __action1382<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __5.2;
     let __end0 = __5.2;
@@ -62251,12 +62251,12 @@ fn __action1382<
 fn __action1383<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __4.2;
     let __end0 = __4.2;
@@ -62282,9 +62282,9 @@ fn __action1383<
 fn __action1384<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.2;
     let __end0 = __1.2;
@@ -62307,13 +62307,13 @@ fn __action1384<
 fn __action1385<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __5.2;
     let __end0 = __5.2;
@@ -62340,12 +62340,12 @@ fn __action1385<
 fn __action1386<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __4.2;
     let __end0 = __4.2;
@@ -62371,14 +62371,14 @@ fn __action1386<
 fn __action1387<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __6: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __6.2;
     let __end0 = __6.2;
@@ -62406,13 +62406,13 @@ fn __action1387<
 fn __action1388<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __5.2;
     let __end0 = __5.2;
@@ -62439,11 +62439,11 @@ fn __action1388<
 fn __action1389<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __3: (TextSize, ast::Parameter, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -62468,10 +62468,10 @@ fn __action1389<
 fn __action1390<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -62495,12 +62495,12 @@ fn __action1390<
 fn __action1391<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __3: (TextSize, ast::Parameter, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __4.2;
     let __end0 = __4.2;
@@ -62526,11 +62526,11 @@ fn __action1391<
 fn __action1392<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -62555,8 +62555,8 @@ fn __action1392<
 fn __action1393<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -62578,11 +62578,11 @@ fn __action1393<
 fn __action1394<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __2: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -62607,10 +62607,10 @@ fn __action1394<
 fn __action1395<
 >(
     mode: Mode,
-    __0: (TextSize, (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>), TextSize),
+    __0: (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __2: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -62635,11 +62635,11 @@ fn __action1396<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
+    __1: (TextSize, ast::Parameter, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __3: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __4.2;
     let __end0 = __4.2;
@@ -62667,9 +62667,9 @@ fn __action1397<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __2: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -62695,12 +62695,12 @@ fn __action1398<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, ast::Parameter, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __5.2;
     let __end0 = __5.2;
@@ -62728,11 +62728,11 @@ fn __action1399<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __3: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __4.2;
     let __end0 = __4.2;
@@ -62759,9 +62759,9 @@ fn __action1400<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
+    __1: (TextSize, ast::Parameter, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -62787,7 +62787,7 @@ fn __action1401<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.2;
     let __end0 = __1.2;
@@ -62811,10 +62811,10 @@ fn __action1402<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, ast::Parameter, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -62840,9 +62840,9 @@ fn __action1403<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -62867,10 +62867,10 @@ fn __action1404<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
+    __1: (TextSize, ast::Parameter, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __3: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -62897,8 +62897,8 @@ fn __action1405<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __2: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -62923,11 +62923,11 @@ fn __action1406<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, ast::Parameter, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __4.2;
     let __end0 = __4.2;
@@ -62954,10 +62954,10 @@ fn __action1407<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __1: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __3: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -62983,8 +62983,8 @@ fn __action1408<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __1: (TextSize, ast::Parameter, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.2;
     let __end0 = __1.2;
@@ -63008,7 +63008,7 @@ fn __action1409<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -63031,9 +63031,9 @@ fn __action1410<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __1: (TextSize, ast::Parameter, TextSize),
+    __2: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -63058,8 +63058,8 @@ fn __action1411<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __1: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.2;
     let __end0 = __1.2;
@@ -63082,9 +63082,9 @@ fn __action1411<
 fn __action1412<
 >(
     mode: Mode,
-    __0: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __0: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> ast::Arguments
+) -> ast::Parameters
 {
     let __start0 = __1.2;
     let __end0 = __1.2;
@@ -63107,8 +63107,8 @@ fn __action1412<
 fn __action1413<
 >(
     mode: Mode,
-    __0: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> ast::Arguments
+    __0: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> ast::Parameters
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -63131,9 +63131,9 @@ fn __action1414<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<ast::Arguments>, TextSize),
+    __1: (TextSize, core::option::Option<ast::Parameters>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -63723,7 +63723,7 @@ fn __action1436<
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Expr, TextSize),
-) -> ast::Arg
+) -> ast::Parameter
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -63748,7 +63748,7 @@ fn __action1437<
 >(
     mode: Mode,
     __0: (TextSize, ast::Identifier, TextSize),
-) -> ast::Arg
+) -> ast::Parameter
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -63771,7 +63771,7 @@ fn __action1438<
 >(
     mode: Mode,
     __0: (TextSize, ast::Identifier, TextSize),
-) -> ast::Arg
+) -> ast::Parameter
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -64604,7 +64604,7 @@ fn __action1467<
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Expr, TextSize),
-) -> ast::ArgWithDefault
+) -> ast::ParameterWithDefault
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -64629,7 +64629,7 @@ fn __action1468<
 >(
     mode: Mode,
     __0: (TextSize, ast::Identifier, TextSize),
-) -> ast::ArgWithDefault
+) -> ast::ParameterWithDefault
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -64652,7 +64652,7 @@ fn __action1469<
 >(
     mode: Mode,
     __0: (TextSize, ast::Identifier, TextSize),
-) -> ast::ArgWithDefault
+) -> ast::ParameterWithDefault
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -65462,8 +65462,8 @@ fn __action1499<
 fn __action1500<
 >(
     mode: Mode,
-    __0: (TextSize, ast::Arguments, TextSize),
-) -> core::option::Option<ast::Arguments>
+    __0: (TextSize, ast::Parameters, TextSize),
+) -> core::option::Option<ast::Parameters>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -65484,9 +65484,9 @@ fn __action1501<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arguments, TextSize),
+    __1: (TextSize, ast::Parameters, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __1.2;
@@ -65510,7 +65510,7 @@ fn __action1502<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
     let __end0 = __1.0;
@@ -66309,7 +66309,7 @@ fn __action1533<
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
     __3: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
-    __4: (TextSize, ast::Arguments, TextSize),
+    __4: (TextSize, ast::Parameters, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Expr, TextSize),
     __7: (TextSize, token::Tok, TextSize),
@@ -66349,7 +66349,7 @@ fn __action1534<
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Identifier, TextSize),
     __4: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
-    __5: (TextSize, ast::Arguments, TextSize),
+    __5: (TextSize, ast::Parameters, TextSize),
     __6: (TextSize, token::Tok, TextSize),
     __7: (TextSize, ast::Expr, TextSize),
     __8: (TextSize, token::Tok, TextSize),
@@ -66387,7 +66387,7 @@ fn __action1535<
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
     __3: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
-    __4: (TextSize, ast::Arguments, TextSize),
+    __4: (TextSize, ast::Parameters, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -66423,7 +66423,7 @@ fn __action1536<
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Identifier, TextSize),
     __4: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
-    __5: (TextSize, ast::Arguments, TextSize),
+    __5: (TextSize, ast::Parameters, TextSize),
     __6: (TextSize, token::Tok, TextSize),
     __7: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -66456,7 +66456,7 @@ fn __action1537<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Identifier, TextSize),
     __2: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
-    __3: (TextSize, ast::Arguments, TextSize),
+    __3: (TextSize, ast::Parameters, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, ast::Expr, TextSize),
     __6: (TextSize, token::Tok, TextSize),
@@ -66494,7 +66494,7 @@ fn __action1538<
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
     __3: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
-    __4: (TextSize, ast::Arguments, TextSize),
+    __4: (TextSize, ast::Parameters, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Expr, TextSize),
     __7: (TextSize, token::Tok, TextSize),
@@ -66530,7 +66530,7 @@ fn __action1539<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Identifier, TextSize),
     __2: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
-    __3: (TextSize, ast::Arguments, TextSize),
+    __3: (TextSize, ast::Parameters, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -66564,7 +66564,7 @@ fn __action1540<
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
     __3: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
-    __4: (TextSize, ast::Arguments, TextSize),
+    __4: (TextSize, ast::Parameters, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -66694,8 +66694,8 @@ fn __action1545<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arg, TextSize),
-) -> Option<Box<ast::Arg>>
+    __1: (TextSize, ast::Parameter, TextSize),
+) -> Option<Box<ast::Parameter>>
 {
     let __start0 = __1.0;
     let __end0 = __1.2;
@@ -66717,7 +66717,7 @@ fn __action1546<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-) -> Option<Box<ast::Arg>>
+) -> Option<Box<ast::Parameter>>
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -67085,14 +67085,14 @@ fn __action1560<
 fn __action1561<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __6: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -67118,16 +67118,16 @@ fn __action1561<
 fn __action1562<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, ast::Arg, TextSize),
+    __5: (TextSize, ast::Parameter, TextSize),
     __6: (TextSize, token::Tok, TextSize),
-    __7: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __7: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __8: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -67155,17 +67155,17 @@ fn __action1562<
 fn __action1563<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, ast::Arg, TextSize),
+    __6: (TextSize, ast::Parameter, TextSize),
     __7: (TextSize, token::Tok, TextSize),
-    __8: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __8: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __9: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -67194,13 +67194,13 @@ fn __action1563<
 fn __action1564<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -67225,15 +67225,15 @@ fn __action1564<
 fn __action1565<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __6: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __7: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -67260,16 +67260,16 @@ fn __action1565<
 fn __action1566<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, token::Tok, TextSize),
-    __7: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __7: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __8: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -67297,15 +67297,15 @@ fn __action1566<
 fn __action1567<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __6: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __7: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -67332,17 +67332,17 @@ fn __action1567<
 fn __action1568<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, ast::Arg, TextSize),
-    __6: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __5: (TextSize, ast::Parameter, TextSize),
+    __6: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __7: (TextSize, token::Tok, TextSize),
-    __8: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __8: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __9: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -67371,18 +67371,18 @@ fn __action1568<
 fn __action1569<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, ast::Arg, TextSize),
-    __7: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __6: (TextSize, ast::Parameter, TextSize),
+    __7: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __8: (TextSize, token::Tok, TextSize),
-    __9: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __9: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __10: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -67412,14 +67412,14 @@ fn __action1569<
 fn __action1570<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __6: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -67445,16 +67445,16 @@ fn __action1570<
 fn __action1571<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __5: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __6: (TextSize, token::Tok, TextSize),
-    __7: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __7: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __8: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -67482,17 +67482,17 @@ fn __action1571<
 fn __action1572<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __6: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __7: (TextSize, token::Tok, TextSize),
-    __8: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __8: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __9: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -67521,12 +67521,12 @@ fn __action1572<
 fn __action1573<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -67550,14 +67550,14 @@ fn __action1573<
 fn __action1574<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, ast::Arg, TextSize),
+    __5: (TextSize, ast::Parameter, TextSize),
     __6: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -67583,15 +67583,15 @@ fn __action1574<
 fn __action1575<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, ast::Arg, TextSize),
+    __6: (TextSize, ast::Parameter, TextSize),
     __7: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -67618,11 +67618,11 @@ fn __action1575<
 fn __action1576<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -67645,13 +67645,13 @@ fn __action1576<
 fn __action1577<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -67676,14 +67676,14 @@ fn __action1577<
 fn __action1578<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -67709,13 +67709,13 @@ fn __action1578<
 fn __action1579<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -67740,15 +67740,15 @@ fn __action1579<
 fn __action1580<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, ast::Arg, TextSize),
-    __6: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __5: (TextSize, ast::Parameter, TextSize),
+    __6: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __7: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -67775,16 +67775,16 @@ fn __action1580<
 fn __action1581<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, ast::Arg, TextSize),
-    __7: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __6: (TextSize, ast::Parameter, TextSize),
+    __7: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __8: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -67812,12 +67812,12 @@ fn __action1581<
 fn __action1582<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -67841,14 +67841,14 @@ fn __action1582<
 fn __action1583<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __5: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __6: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -67874,15 +67874,15 @@ fn __action1583<
 fn __action1584<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __6: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __7: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -67909,9 +67909,9 @@ fn __action1584<
 fn __action1585<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -67932,11 +67932,11 @@ fn __action1585<
 fn __action1586<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -67959,12 +67959,12 @@ fn __action1586<
 fn __action1587<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -67988,13 +67988,13 @@ fn __action1587<
 fn __action1588<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -68019,15 +68019,15 @@ fn __action1588<
 fn __action1589<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, ast::Arg, TextSize),
+    __5: (TextSize, ast::Parameter, TextSize),
     __6: (TextSize, token::Tok, TextSize),
-    __7: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __7: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -68054,16 +68054,16 @@ fn __action1589<
 fn __action1590<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, ast::Arg, TextSize),
+    __6: (TextSize, ast::Parameter, TextSize),
     __7: (TextSize, token::Tok, TextSize),
-    __8: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __8: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -68091,12 +68091,12 @@ fn __action1590<
 fn __action1591<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -68120,14 +68120,14 @@ fn __action1591<
 fn __action1592<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __6: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -68153,15 +68153,15 @@ fn __action1592<
 fn __action1593<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, token::Tok, TextSize),
-    __7: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __7: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -68188,14 +68188,14 @@ fn __action1593<
 fn __action1594<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __6: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -68221,16 +68221,16 @@ fn __action1594<
 fn __action1595<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, ast::Arg, TextSize),
-    __6: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __5: (TextSize, ast::Parameter, TextSize),
+    __6: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __7: (TextSize, token::Tok, TextSize),
-    __8: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __8: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -68258,17 +68258,17 @@ fn __action1595<
 fn __action1596<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, ast::Arg, TextSize),
-    __7: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __6: (TextSize, ast::Parameter, TextSize),
+    __7: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __8: (TextSize, token::Tok, TextSize),
-    __9: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __9: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -68297,13 +68297,13 @@ fn __action1596<
 fn __action1597<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -68328,15 +68328,15 @@ fn __action1597<
 fn __action1598<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __5: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __6: (TextSize, token::Tok, TextSize),
-    __7: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __7: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -68363,16 +68363,16 @@ fn __action1598<
 fn __action1599<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __6: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __7: (TextSize, token::Tok, TextSize),
-    __8: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __8: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -68400,11 +68400,11 @@ fn __action1599<
 fn __action1600<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __3: (TextSize, ast::Parameter, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -68427,13 +68427,13 @@ fn __action1600<
 fn __action1601<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, ast::Arg, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __5: (TextSize, ast::Parameter, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -68458,14 +68458,14 @@ fn __action1601<
 fn __action1602<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, ast::Arg, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __6: (TextSize, ast::Parameter, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -68491,10 +68491,10 @@ fn __action1602<
 fn __action1603<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -68516,12 +68516,12 @@ fn __action1603<
 fn __action1604<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -68545,13 +68545,13 @@ fn __action1604<
 fn __action1605<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -68576,12 +68576,12 @@ fn __action1605<
 fn __action1606<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __3: (TextSize, ast::Parameter, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -68605,14 +68605,14 @@ fn __action1606<
 fn __action1607<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, ast::Arg, TextSize),
-    __6: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __5: (TextSize, ast::Parameter, TextSize),
+    __6: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -68638,15 +68638,15 @@ fn __action1607<
 fn __action1608<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, ast::Arg, TextSize),
-    __7: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __6: (TextSize, ast::Parameter, TextSize),
+    __7: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -68673,11 +68673,11 @@ fn __action1608<
 fn __action1609<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -68700,13 +68700,13 @@ fn __action1609<
 fn __action1610<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __5: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -68731,14 +68731,14 @@ fn __action1610<
 fn __action1611<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __6: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -68764,8 +68764,8 @@ fn __action1611<
 fn __action1612<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -68785,10 +68785,10 @@ fn __action1612<
 fn __action1613<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -68810,11 +68810,11 @@ fn __action1613<
 fn __action1614<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -68837,11 +68837,11 @@ fn __action1614<
 fn __action1615<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __2: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -68864,13 +68864,13 @@ fn __action1615<
 fn __action1616<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -68895,14 +68895,14 @@ fn __action1616<
 fn __action1617<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __6: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -68928,10 +68928,10 @@ fn __action1617<
 fn __action1618<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __2: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -68953,12 +68953,12 @@ fn __action1618<
 fn __action1619<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -68982,13 +68982,13 @@ fn __action1619<
 fn __action1620<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -69013,14 +69013,14 @@ fn __action1620<
 fn __action1621<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __6: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -69046,16 +69046,16 @@ fn __action1621<
 fn __action1622<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, ast::Arg, TextSize),
+    __5: (TextSize, ast::Parameter, TextSize),
     __6: (TextSize, token::Tok, TextSize),
-    __7: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __7: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __8: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -69083,17 +69083,17 @@ fn __action1622<
 fn __action1623<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, ast::Arg, TextSize),
+    __6: (TextSize, ast::Parameter, TextSize),
     __7: (TextSize, token::Tok, TextSize),
-    __8: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __8: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __9: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -69122,13 +69122,13 @@ fn __action1623<
 fn __action1624<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -69153,15 +69153,15 @@ fn __action1624<
 fn __action1625<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __6: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __7: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -69188,16 +69188,16 @@ fn __action1625<
 fn __action1626<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, token::Tok, TextSize),
-    __7: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __7: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __8: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -69225,15 +69225,15 @@ fn __action1626<
 fn __action1627<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __6: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __7: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -69260,17 +69260,17 @@ fn __action1627<
 fn __action1628<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, ast::Arg, TextSize),
-    __6: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __5: (TextSize, ast::Parameter, TextSize),
+    __6: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __7: (TextSize, token::Tok, TextSize),
-    __8: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __8: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __9: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -69299,18 +69299,18 @@ fn __action1628<
 fn __action1629<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, ast::Arg, TextSize),
-    __7: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __6: (TextSize, ast::Parameter, TextSize),
+    __7: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __8: (TextSize, token::Tok, TextSize),
-    __9: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __9: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __10: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -69340,14 +69340,14 @@ fn __action1629<
 fn __action1630<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __6: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -69373,16 +69373,16 @@ fn __action1630<
 fn __action1631<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __5: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __6: (TextSize, token::Tok, TextSize),
-    __7: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __7: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __8: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -69410,17 +69410,17 @@ fn __action1631<
 fn __action1632<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __6: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __7: (TextSize, token::Tok, TextSize),
-    __8: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __8: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __9: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -69449,12 +69449,12 @@ fn __action1632<
 fn __action1633<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -69478,14 +69478,14 @@ fn __action1633<
 fn __action1634<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, ast::Arg, TextSize),
+    __5: (TextSize, ast::Parameter, TextSize),
     __6: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -69511,15 +69511,15 @@ fn __action1634<
 fn __action1635<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, ast::Arg, TextSize),
+    __6: (TextSize, ast::Parameter, TextSize),
     __7: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -69546,11 +69546,11 @@ fn __action1635<
 fn __action1636<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -69573,13 +69573,13 @@ fn __action1636<
 fn __action1637<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -69604,14 +69604,14 @@ fn __action1637<
 fn __action1638<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -69637,13 +69637,13 @@ fn __action1638<
 fn __action1639<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -69668,15 +69668,15 @@ fn __action1639<
 fn __action1640<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, ast::Arg, TextSize),
-    __6: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __5: (TextSize, ast::Parameter, TextSize),
+    __6: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __7: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -69703,16 +69703,16 @@ fn __action1640<
 fn __action1641<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, ast::Arg, TextSize),
-    __7: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __6: (TextSize, ast::Parameter, TextSize),
+    __7: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __8: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -69740,12 +69740,12 @@ fn __action1641<
 fn __action1642<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -69769,14 +69769,14 @@ fn __action1642<
 fn __action1643<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __5: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __6: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -69802,15 +69802,15 @@ fn __action1643<
 fn __action1644<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __6: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __7: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -69837,9 +69837,9 @@ fn __action1644<
 fn __action1645<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -69860,11 +69860,11 @@ fn __action1645<
 fn __action1646<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -69887,12 +69887,12 @@ fn __action1646<
 fn __action1647<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -69916,13 +69916,13 @@ fn __action1647<
 fn __action1648<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -69947,15 +69947,15 @@ fn __action1648<
 fn __action1649<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, ast::Arg, TextSize),
+    __5: (TextSize, ast::Parameter, TextSize),
     __6: (TextSize, token::Tok, TextSize),
-    __7: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __7: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -69982,16 +69982,16 @@ fn __action1649<
 fn __action1650<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, ast::Arg, TextSize),
+    __6: (TextSize, ast::Parameter, TextSize),
     __7: (TextSize, token::Tok, TextSize),
-    __8: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __8: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -70019,12 +70019,12 @@ fn __action1650<
 fn __action1651<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -70048,14 +70048,14 @@ fn __action1651<
 fn __action1652<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __6: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -70081,15 +70081,15 @@ fn __action1652<
 fn __action1653<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, token::Tok, TextSize),
-    __7: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __7: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -70116,14 +70116,14 @@ fn __action1653<
 fn __action1654<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, ast::Parameter, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __6: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -70149,16 +70149,16 @@ fn __action1654<
 fn __action1655<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, ast::Arg, TextSize),
-    __6: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __5: (TextSize, ast::Parameter, TextSize),
+    __6: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __7: (TextSize, token::Tok, TextSize),
-    __8: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __8: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -70186,17 +70186,17 @@ fn __action1655<
 fn __action1656<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, ast::Arg, TextSize),
-    __7: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __6: (TextSize, ast::Parameter, TextSize),
+    __7: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __8: (TextSize, token::Tok, TextSize),
-    __9: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __9: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -70225,13 +70225,13 @@ fn __action1656<
 fn __action1657<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -70256,15 +70256,15 @@ fn __action1657<
 fn __action1658<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __5: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __6: (TextSize, token::Tok, TextSize),
-    __7: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __7: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -70291,16 +70291,16 @@ fn __action1658<
 fn __action1659<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __6: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __7: (TextSize, token::Tok, TextSize),
-    __8: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __8: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -70328,11 +70328,11 @@ fn __action1659<
 fn __action1660<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __3: (TextSize, ast::Parameter, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -70355,13 +70355,13 @@ fn __action1660<
 fn __action1661<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, ast::Arg, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __5: (TextSize, ast::Parameter, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -70386,14 +70386,14 @@ fn __action1661<
 fn __action1662<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, ast::Arg, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __6: (TextSize, ast::Parameter, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -70419,10 +70419,10 @@ fn __action1662<
 fn __action1663<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -70444,12 +70444,12 @@ fn __action1663<
 fn __action1664<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -70473,13 +70473,13 @@ fn __action1664<
 fn __action1665<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -70504,12 +70504,12 @@ fn __action1665<
 fn __action1666<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Arg, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __3: (TextSize, ast::Parameter, TextSize),
+    __4: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -70533,14 +70533,14 @@ fn __action1666<
 fn __action1667<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, ast::Arg, TextSize),
-    __6: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __5: (TextSize, ast::Parameter, TextSize),
+    __6: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -70566,15 +70566,15 @@ fn __action1667<
 fn __action1668<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, ast::Arg, TextSize),
-    __7: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __6: (TextSize, ast::Parameter, TextSize),
+    __7: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -70601,11 +70601,11 @@ fn __action1668<
 fn __action1669<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -70628,13 +70628,13 @@ fn __action1669<
 fn __action1670<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __5: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -70659,14 +70659,14 @@ fn __action1670<
 fn __action1671<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __6: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -70692,8 +70692,8 @@ fn __action1671<
 fn __action1672<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -70713,10 +70713,10 @@ fn __action1672<
 fn __action1673<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -70738,11 +70738,11 @@ fn __action1673<
 fn __action1674<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -70765,11 +70765,11 @@ fn __action1674<
 fn __action1675<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __2: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -70792,13 +70792,13 @@ fn __action1675<
 fn __action1676<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -70823,14 +70823,14 @@ fn __action1676<
 fn __action1677<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
     __6: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -70856,10 +70856,10 @@ fn __action1677<
 fn __action1678<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __2: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -70881,12 +70881,12 @@ fn __action1678<
 fn __action1679<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __4: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __2.2;
@@ -70910,13 +70910,13 @@ fn __action1679<
 fn __action1680<
 >(
     mode: Mode,
-    __0: (TextSize, Vec<ast::ArgWithDefault>, TextSize),
+    __0: (TextSize, Vec<ast::ParameterWithDefault>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ArgWithDefault>, TextSize),
+    __3: (TextSize, alloc::vec::Vec<ast::ParameterWithDefault>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, Option<Box<ast::Arg>>, TextSize),
-) -> Result<ast::Arguments,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __5: (TextSize, Option<Box<ast::Parameter>>, TextSize),
+) -> Result<ast::Parameters,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -70942,7 +70942,7 @@ fn __action1681<
 >(
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::Arguments, TextSize),
+    __1: (TextSize, ast::Parameters, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Expr, TextSize),
 ) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
@@ -72093,7 +72093,7 @@ fn __action1721<
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
     __3: (TextSize, Vec<ast::TypeParam>, TextSize),
-    __4: (TextSize, ast::Arguments, TextSize),
+    __4: (TextSize, ast::Parameters, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Expr, TextSize),
     __7: (TextSize, token::Tok, TextSize),
@@ -72129,7 +72129,7 @@ fn __action1722<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
-    __3: (TextSize, ast::Arguments, TextSize),
+    __3: (TextSize, ast::Parameters, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, ast::Expr, TextSize),
     __6: (TextSize, token::Tok, TextSize),
@@ -72168,7 +72168,7 @@ fn __action1723<
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Identifier, TextSize),
     __4: (TextSize, Vec<ast::TypeParam>, TextSize),
-    __5: (TextSize, ast::Arguments, TextSize),
+    __5: (TextSize, ast::Parameters, TextSize),
     __6: (TextSize, token::Tok, TextSize),
     __7: (TextSize, ast::Expr, TextSize),
     __8: (TextSize, token::Tok, TextSize),
@@ -72206,7 +72206,7 @@ fn __action1724<
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Identifier, TextSize),
-    __4: (TextSize, ast::Arguments, TextSize),
+    __4: (TextSize, ast::Parameters, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Expr, TextSize),
     __7: (TextSize, token::Tok, TextSize),
@@ -72245,7 +72245,7 @@ fn __action1725<
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
     __3: (TextSize, Vec<ast::TypeParam>, TextSize),
-    __4: (TextSize, ast::Arguments, TextSize),
+    __4: (TextSize, ast::Parameters, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -72277,7 +72277,7 @@ fn __action1726<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
-    __3: (TextSize, ast::Arguments, TextSize),
+    __3: (TextSize, ast::Parameters, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -72312,7 +72312,7 @@ fn __action1727<
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Identifier, TextSize),
     __4: (TextSize, Vec<ast::TypeParam>, TextSize),
-    __5: (TextSize, ast::Arguments, TextSize),
+    __5: (TextSize, ast::Parameters, TextSize),
     __6: (TextSize, token::Tok, TextSize),
     __7: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -72346,7 +72346,7 @@ fn __action1728<
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Identifier, TextSize),
-    __4: (TextSize, ast::Arguments, TextSize),
+    __4: (TextSize, ast::Parameters, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -72380,7 +72380,7 @@ fn __action1729<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Identifier, TextSize),
     __2: (TextSize, Vec<ast::TypeParam>, TextSize),
-    __3: (TextSize, ast::Arguments, TextSize),
+    __3: (TextSize, ast::Parameters, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, ast::Expr, TextSize),
     __6: (TextSize, token::Tok, TextSize),
@@ -72414,7 +72414,7 @@ fn __action1730<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Identifier, TextSize),
-    __2: (TextSize, ast::Arguments, TextSize),
+    __2: (TextSize, ast::Parameters, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, ast::Expr, TextSize),
     __5: (TextSize, token::Tok, TextSize),
@@ -72451,7 +72451,7 @@ fn __action1731<
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
     __3: (TextSize, Vec<ast::TypeParam>, TextSize),
-    __4: (TextSize, ast::Arguments, TextSize),
+    __4: (TextSize, ast::Parameters, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Expr, TextSize),
     __7: (TextSize, token::Tok, TextSize),
@@ -72487,7 +72487,7 @@ fn __action1732<
     __0: (TextSize, alloc::vec::Vec<ast::Decorator>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
-    __3: (TextSize, ast::Arguments, TextSize),
+    __3: (TextSize, ast::Parameters, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, ast::Expr, TextSize),
     __6: (TextSize, token::Tok, TextSize),
@@ -72524,7 +72524,7 @@ fn __action1733<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Identifier, TextSize),
     __2: (TextSize, Vec<ast::TypeParam>, TextSize),
-    __3: (TextSize, ast::Arguments, TextSize),
+    __3: (TextSize, ast::Parameters, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -72554,7 +72554,7 @@ fn __action1734<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Identifier, TextSize),
-    __2: (TextSize, ast::Arguments, TextSize),
+    __2: (TextSize, ast::Parameters, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -72587,7 +72587,7 @@ fn __action1735<
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
     __3: (TextSize, Vec<ast::TypeParam>, TextSize),
-    __4: (TextSize, ast::Arguments, TextSize),
+    __4: (TextSize, ast::Parameters, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -72619,7 +72619,7 @@ fn __action1736<
     __0: (TextSize, alloc::vec::Vec<ast::Decorator>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
-    __3: (TextSize, ast::Arguments, TextSize),
+    __3: (TextSize, ast::Parameters, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt

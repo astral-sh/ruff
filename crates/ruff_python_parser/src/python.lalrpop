@@ -1015,9 +1015,9 @@ FuncDef: ast::Stmt = {
         let returns = r.map(Box::new);
         let end_location = body.last().unwrap().end();
         if is_async.is_some() {
-            ast::StmtAsyncFunctionDef { name, args, body, decorator_list, returns, type_params: type_params.unwrap_or_default(), range: (location..end_location).into() }.into()
+            ast::StmtAsyncFunctionDef { name, parameters:args, body, decorator_list, returns, type_params: type_params.unwrap_or_default(), range: (location..end_location).into() }.into()
         } else {
-            ast::StmtFunctionDef { name, args, body, decorator_list, returns, type_params: type_params.unwrap_or_default(), range: (location..end_location).into() }.into()
+            ast::StmtFunctionDef { name, parameters:args, body, decorator_list, returns, type_params: type_params.unwrap_or_default(), range: (location..end_location).into() }.into()
         }
     },
 };
@@ -1041,13 +1041,13 @@ TypeAliasStatement: ast::Stmt = {
     },
 };
 
-Parameters: ast::Arguments = {
+Parameters: ast::Parameters = {
     <location:@L> "(" <a: (ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>)?> ")" <end_location:@R> =>? {
         a.as_ref().map(validate_arguments).transpose()?;
 
         let range = (location..end_location).into();
         let args = a
-            .map_or_else(|| ast::Arguments::empty(range), |mut arguments| {
+            .map_or_else(|| ast::Parameters::empty(range), |mut arguments| {
                 arguments.range = range;
                 arguments
             });
@@ -1058,15 +1058,15 @@ Parameters: ast::Arguments = {
 
 // Note that this is a macro which is used once for function defs, and
 // once for lambda defs.
-ParameterList<ArgType, StarArgType, DoubleStarArgType>: ast::Arguments = {
-    <location:@L> <param1:ParameterDefs<ArgType>> <args2:("," <ParameterListStarArgs<ArgType, StarArgType, DoubleStarArgType>>)?> ","? <end_location:@R> =>? {
+ParameterList<ParameterType, StarParameterType, DoubleStarParameterType>: ast::Parameters = {
+    <location:@L> <param1:ParameterDefs<ParameterType>> <args2:("," <ParameterListStarArgs<ParameterType, StarParameterType, DoubleStarParameterType>>)?> ","? <end_location:@R> =>? {
         validate_pos_params(&param1)?;
         let (posonlyargs, args) = param1;
 
         // Now gather rest of parameters:
         let (vararg, kwonlyargs, kwarg) = args2.unwrap_or((None, vec![], None));
 
-        Ok(ast::Arguments {
+        Ok(ast::Parameters {
             posonlyargs,
             args,
             kwonlyargs,
@@ -1075,7 +1075,7 @@ ParameterList<ArgType, StarArgType, DoubleStarArgType>: ast::Arguments = {
             range: (location..end_location).into()
         })
     },
-    <location:@L> <param1:ParameterDefs<ArgType>> <kw:("," <KwargParameter<DoubleStarArgType>>)> ","? <end_location:@R> =>? {
+    <location:@L> <param1:ParameterDefs<ParameterType>> <kw:("," <KwargParameter<DoubleStarParameterType>>)> ","? <end_location:@R> =>? {
         validate_pos_params(&param1)?;
         let (posonlyargs, args) = param1;
 
@@ -1084,7 +1084,7 @@ ParameterList<ArgType, StarArgType, DoubleStarArgType>: ast::Arguments = {
         let kwonlyargs = vec![];
         let kwarg = kw;
 
-        Ok(ast::Arguments {
+        Ok(ast::Parameters {
             posonlyargs,
             args,
             kwonlyargs,
@@ -1093,9 +1093,9 @@ ParameterList<ArgType, StarArgType, DoubleStarArgType>: ast::Arguments = {
             range: (location..end_location).into()
         })
     },
-    <location:@L> <params:ParameterListStarArgs<ArgType, StarArgType, DoubleStarArgType>> ","? <end_location:@R> => {
+    <location:@L> <params:ParameterListStarArgs<ParameterType, StarParameterType, DoubleStarParameterType>> ","? <end_location:@R> => {
         let (vararg, kwonlyargs, kwarg) = params;
-        ast::Arguments {
+        ast::Parameters {
             posonlyargs: vec![],
             args: vec![],
             kwonlyargs,
@@ -1104,8 +1104,8 @@ ParameterList<ArgType, StarArgType, DoubleStarArgType>: ast::Arguments = {
             range: (location..end_location).into()
         }
     },
-    <location:@L> <kwarg:KwargParameter<DoubleStarArgType>> ","? <end_location:@R> => {
-        ast::Arguments {
+    <location:@L> <kwarg:KwargParameter<DoubleStarParameterType>> ","? <end_location:@R> => {
+        ast::Parameters {
             posonlyargs: vec![],
             args: vec![],
             kwonlyargs: vec![],
@@ -1118,61 +1118,61 @@ ParameterList<ArgType, StarArgType, DoubleStarArgType>: ast::Arguments = {
 
 // Use inline here to make sure the "," is not creating an ambiguity.
 #[inline]
-ParameterDefs<ArgType>: (Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>) = {
-    <args:OneOrMore<ParameterDef<ArgType>>> => {
+ParameterDefs<ParameterType>: (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>) = {
+    <args:OneOrMore<ParameterDef<ParameterType>>> => {
         (vec![], args)
     },
-    <posonlyargs:OneOrMore<ParameterDef<ArgType>>> "," "/" <args:("," <ParameterDef<ArgType>>)*>  => {
+    <posonlyargs:OneOrMore<ParameterDef<ParameterType>>> "," "/" <args:("," <ParameterDef<ParameterType>>)*>  => {
         (posonlyargs, args)
     },
 };
 
-ParameterDef<ArgType>: ast::ArgWithDefault = {
-    <i:ArgType> => i,
-    <mut i:ArgType> "=" <e:Test<"all">> <end_location:@R> => {
+ParameterDef<ParameterType>: ast::ParameterWithDefault = {
+    <i:ParameterType> => i,
+    <mut i:ParameterType> "=" <e:Test<"all">> <end_location:@R> => {
         i.default = Some(Box::new(e));
         i.range = (i.range.start()..end_location).into();
         i
     },
 };
 
-UntypedParameter: ast::ArgWithDefault = {
+UntypedParameter: ast::ParameterWithDefault = {
     <location:@L> <arg:Identifier> <end_location:@R> => {
-        let def = ast::Arg { arg, annotation: None, range: (location..end_location).into() };
-        ast::ArgWithDefault { def, default: None, range: (location..end_location).into() }
+        let def = ast::Parameter { arg, annotation: None, range: (location..end_location).into() };
+        ast::ParameterWithDefault { def, default: None, range: (location..end_location).into() }
     },
 };
-StarUntypedParameter: ast::Arg = {
-    <location:@L> <arg:Identifier> <end_location:@R> => ast::Arg { arg, annotation: None, range: (location..end_location).into() },
+StarUntypedParameter: ast::Parameter = {
+    <location:@L> <arg:Identifier> <end_location:@R> => ast::Parameter { arg, annotation: None, range: (location..end_location).into() },
 };
 
-TypedParameter: ast::ArgWithDefault = {
+TypedParameter: ast::ParameterWithDefault = {
     <location:@L> <arg:Identifier> <a:(":" <Test<"all">>)?> <end_location:@R> => {
         let annotation = a.map(Box::new);
-        let def = ast::Arg { arg, annotation, range: (location..end_location).into() };
-        ast::ArgWithDefault { def, default: None, range: (location..end_location).into() }
+        let def = ast::Parameter { arg, annotation, range: (location..end_location).into() };
+        ast::ParameterWithDefault { def, default: None, range: (location..end_location).into() }
     },
 };
 
-StarTypedParameter: ast::Arg = {
+StarTypedParameter: ast::Parameter = {
     <location:@L> <arg:Identifier> <a:(":" <TestOrStarExpr>)?> <end_location:@R> => {
         let annotation = a.map(Box::new);
-        ast::Arg { arg, annotation, range: (location..end_location).into() }
+        ast::Parameter { arg, annotation, range: (location..end_location).into() }
     },
 };
 
-DoubleStarTypedParameter: ast::Arg = {
+DoubleStarTypedParameter: ast::Parameter = {
     <location:@L> <arg:Identifier> <a:(":" <Test<"all">>)?> <end_location:@R> => {
         let annotation = a.map(Box::new);
-        ast::Arg { arg, annotation, range: (location..end_location).into() }
+        ast::Parameter { arg, annotation, range: (location..end_location).into() }
     },
 };
 
 // Use inline here to make sure the "," is not creating an ambiguity.
 // TODO: figure out another grammar that makes this inline no longer required.
 #[inline]
-ParameterListStarArgs<ArgType, StarArgType, DoubleStarArgType>: (Option<Box<ast::Arg>>, Vec<ast::ArgWithDefault>, Option<Box<ast::Arg>>) = {
-    <location:@L> "*" <va:StarArgType?> <kwonlyargs:("," <ParameterDef<ArgType>>)*> <kwarg:("," <KwargParameter<DoubleStarArgType>>)?> =>? {
+ParameterListStarArgs<ParameterType, StarParameterType, DoubleStarParameterType>: (Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>) = {
+    <location:@L> "*" <va:StarParameterType?> <kwonlyargs:("," <ParameterDef<ParameterType>>)*> <kwarg:("," <KwargParameter<DoubleStarParameterType>>)?> =>? {
         if va.is_none() && kwonlyargs.is_empty() && kwarg.is_none() {
             return Err(LexicalError {
                 error: LexicalErrorType::OtherError("named arguments must follow bare *".to_string()),
@@ -1187,8 +1187,8 @@ ParameterListStarArgs<ArgType, StarArgType, DoubleStarArgType>: (Option<Box<ast:
     }
 };
 
-KwargParameter<ArgType>: Option<Box<ast::Arg>> = {
-    "**" <kwarg:ArgType?> => {
+KwargParameter<ParameterType>: Option<Box<ast::Parameter>> = {
+    "**" <kwarg:ParameterType?> => {
         kwarg.map(Box::new)
     }
 };
@@ -1291,11 +1291,11 @@ LambdaDef: ast::Expr = {
     <location:@L> "lambda" <location_args:@L> <p:ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter>?> <end_location_args:@R> ":" <body:Test<"all">> <end_location:@R> =>? {
         p.as_ref().map(validate_arguments).transpose()?;
         let p = p
-            .unwrap_or_else(|| ast::Arguments::empty((location_args..end_location_args).into()));
+            .unwrap_or_else(|| ast::Parameters::empty((location_args..end_location_args).into()));
 
         Ok(ast::Expr::Lambda(
             ast::ExprLambda {
-                args: Box::new(p),
+                parameters: Box::new(p),
                 body: Box::new(body),
                 range: (location..end_location).into()
             }

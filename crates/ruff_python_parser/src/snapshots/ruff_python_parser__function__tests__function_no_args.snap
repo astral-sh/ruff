@@ -11,7 +11,7 @@ Ok(
                     id: "f",
                     range: 4..5,
                 },
-                args: Arguments {
+                parameters: Parameters {
                     range: 5..7,
                     posonlyargs: [],
                     args: [],

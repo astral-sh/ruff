@@ -1,14 +1,14 @@
 use crate::prelude::*;
 use crate::FormatNodeRule;
 use ruff_formatter::write;
-use ruff_python_ast::Arg;
+use ruff_python_ast::Parameter;
 
 #[derive(Default)]
-pub struct FormatArg;
+pub struct FormatParameter;
 
-impl FormatNodeRule<Arg> for FormatArg {
-    fn fmt_fields(&self, item: &Arg, f: &mut PyFormatter) -> FormatResult<()> {
-        let Arg {
+impl FormatNodeRule<Parameter> for FormatParameter {
+    fn fmt_fields(&self, item: &Parameter, f: &mut PyFormatter) -> FormatResult<()> {
+        let Parameter {
             range: _,
             arg,
             annotation,

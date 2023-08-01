@@ -48,7 +48,7 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
         name,
         decorator_list,
         returns,
-        args,
+        parameters,
         ..
     }) = stmt
     else {
@@ -69,7 +69,9 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
 
     // It is a violation only if the method signature matches that of `object.__str__`
     // or `object.__repr__` exactly and the method is not decorated as abstract.
-    if !args.kwonlyargs.is_empty() || (args.args.len() + args.posonlyargs.len()) > 1 {
+    if !parameters.kwonlyargs.is_empty()
+        || (parameters.args.len() + parameters.posonlyargs.len()) > 1
+    {
         return;
     }
 

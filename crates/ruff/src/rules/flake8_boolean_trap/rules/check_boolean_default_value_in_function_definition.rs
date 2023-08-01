@@ -1,4 +1,4 @@
-use ruff_python_ast::{ArgWithDefault, Arguments, Decorator};
+use ruff_python_ast::{Decorator, ParameterWithDefault, Parameters};
 
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
@@ -59,7 +59,7 @@ pub(crate) fn check_boolean_default_value_in_function_definition(
     checker: &mut Checker,
     name: &str,
     decorator_list: &[Decorator],
-    arguments: &Arguments,
+    parameters: &Parameters,
 ) {
     if is_allowed_func_def(name) {
         return;
@@ -72,11 +72,11 @@ pub(crate) fn check_boolean_default_value_in_function_definition(
         return;
     }
 
-    for ArgWithDefault {
+    for ParameterWithDefault {
         def: _,
         default,
         range: _,
-    } in arguments.args.iter().chain(&arguments.posonlyargs)
+    } in parameters.args.iter().chain(&parameters.posonlyargs)
     {
         let Some(default) = default else {
             continue;

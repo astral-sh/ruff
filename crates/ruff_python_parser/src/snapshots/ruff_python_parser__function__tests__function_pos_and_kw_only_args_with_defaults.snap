@@ -11,13 +11,13 @@ Ok(
                     id: "f",
                     range: 4..5,
                 },
-                args: Arguments {
+                parameters: Parameters {
                     range: 5..32,
                     posonlyargs: [],
                     args: [
-                        ArgWithDefault {
+                        ParameterWithDefault {
                             range: 6..7,
-                            def: Arg {
+                            def: Parameter {
                                 range: 6..7,
                                 arg: Identifier {
                                     id: "a",
@@ -27,9 +27,9 @@ Ok(
                             },
                             default: None,
                         },
-                        ArgWithDefault {
+                        ParameterWithDefault {
                             range: 9..10,
-                            def: Arg {
+                            def: Parameter {
                                 range: 9..10,
                                 arg: Identifier {
                                     id: "b",
@@ -39,9 +39,9 @@ Ok(
                             },
                             default: None,
                         },
-                        ArgWithDefault {
+                        ParameterWithDefault {
                             range: 12..13,
-                            def: Arg {
+                            def: Parameter {
                                 range: 12..13,
                                 arg: Identifier {
                                     id: "c",
@@ -54,9 +54,9 @@ Ok(
                     ],
                     vararg: None,
                     kwonlyargs: [
-                        ArgWithDefault {
+                        ParameterWithDefault {
                             range: 18..19,
-                            def: Arg {
+                            def: Parameter {
                                 range: 18..19,
                                 arg: Identifier {
                                     id: "d",
@@ -66,9 +66,9 @@ Ok(
                             },
                             default: None,
                         },
-                        ArgWithDefault {
+                        ParameterWithDefault {
                             range: 21..25,
-                            def: Arg {
+                            def: Parameter {
                                 range: 21..22,
                                 arg: Identifier {
                                     id: "e",
@@ -88,9 +88,9 @@ Ok(
                                 ),
                             ),
                         },
-                        ArgWithDefault {
+                        ParameterWithDefault {
                             range: 27..31,
-                            def: Arg {
+                            def: Parameter {
                                 range: 27..28,
                                 arg: Identifier {
                                     id: "f",

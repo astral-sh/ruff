@@ -10,7 +10,7 @@
 //!
 //! This module can be used to identify the [`TextRange`] of the `except` token.
 
-use crate::{self as ast, Alias, Arg, ArgWithDefault, ExceptHandler, Ranged, Stmt};
+use crate::{self as ast, Alias, ExceptHandler, Parameter, ParameterWithDefault, Ranged, Stmt};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_python_trivia::{is_python_whitespace, Cursor};
@@ -38,8 +38,8 @@ impl Identifier for Stmt {
     }
 }
 
-impl Identifier for Arg {
-    /// Return the [`TextRange`] for the identifier defining an [`Arg`].
+impl Identifier for Parameter {
+    /// Return the [`TextRange`] for the identifier defining an [`Parameter`].
     ///
     /// For example, return the range of `x` in:
     /// ```python
@@ -51,8 +51,8 @@ impl Identifier for Arg {
     }
 }
 
-impl Identifier for ArgWithDefault {
-    /// Return the [`TextRange`] for the identifier defining an [`ArgWithDefault`].
+impl Identifier for ParameterWithDefault {
+    /// Return the [`TextRange`] for the identifier defining an [`ParameterWithDefault`].
     ///
     /// For example, return the range of `x` in:
     /// ```python

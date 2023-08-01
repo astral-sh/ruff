@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, Ranged};
+use ruff_python_ast::{self as ast, Expr, Keyword, Parameters, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -20,7 +20,7 @@ impl Violation for PytestPatchWithLambda {
 /// Visitor that checks references the argument names in the lambda body.
 #[derive(Debug)]
 struct LambdaBodyVisitor<'a> {
-    arguments: &'a Arguments,
+    parameters: &'a Parameters,
     uses_args: bool,
 }
 
@@ -31,7 +31,7 @@ where
     fn visit_expr(&mut self, expr: &'b Expr) {
         match expr {
             Expr::Name(ast::ExprName { id, .. }) => {
-                if includes_arg_name(id, self.arguments) {
+                if includes_arg_name(id, self.parameters) {
                     self.uses_args = true;
                 }
             }
@@ -55,7 +55,7 @@ fn check_patch_call(
     }
 
     let ast::ExprLambda {
-        args,
+        parameters,
         body,
         range: _,
     } = CallArguments::new(args, keywords)
@@ -64,7 +64,7 @@ fn check_patch_call(
 
     // Walk the lambda body.
     let mut visitor = LambdaBodyVisitor {
-        arguments: args,
+        parameters,
         uses_args: false,
     };
     visitor.visit_expr(body);

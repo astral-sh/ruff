@@ -129,7 +129,7 @@ Module(
                         id: "foo",
                         range: 570..573,
                     },
-                    args: Arguments {
+                    parameters: Parameters {
                         range: 573..575,
                         posonlyargs: [],
                         args: [],

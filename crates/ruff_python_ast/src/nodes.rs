@@ -122,7 +122,7 @@ impl From<StmtLineMagic> for Stmt {
 pub struct StmtFunctionDef {
     pub range: TextRange,
     pub name: Identifier,
-    pub args: Box<Arguments>,
+    pub parameters: Box<Parameters>,
     pub body: Vec<Stmt>,
     pub decorator_list: Vec<Decorator>,
     pub returns: Option<Box<Expr>>,
@@ -140,7 +140,7 @@ impl From<StmtFunctionDef> for Stmt {
 pub struct StmtAsyncFunctionDef {
     pub range: TextRange,
     pub name: Identifier,
-    pub args: Box<Arguments>,
+    pub parameters: Box<Parameters>,
     pub body: Vec<Stmt>,
     pub decorator_list: Vec<Decorator>,
     pub returns: Option<Box<Expr>>,
@@ -668,7 +668,7 @@ impl From<ExprUnaryOp> for Expr {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprLambda {
     pub range: TextRange,
-    pub args: Box<Arguments>,
+    pub parameters: Box<Parameters>,
     pub body: Box<Expr>,
 }
 
@@ -1822,22 +1822,9 @@ impl From<ExceptHandlerExceptHandler> for ExceptHandler {
     }
 }
 
-/// See also [arguments](https://docs.python.org/3/library/ast.html#ast.arguments)
-#[derive(Clone, Debug, PartialEq)]
-pub struct PythonArguments {
-    pub range: TextRange,
-    pub posonlyargs: Vec<Arg>,
-    pub args: Vec<Arg>,
-    pub vararg: Option<Box<Arg>>,
-    pub kwonlyargs: Vec<Arg>,
-    pub kw_defaults: Vec<Expr>,
-    pub kwarg: Option<Box<Arg>>,
-    pub defaults: Vec<Expr>,
-}
-
 /// See also [arg](https://docs.python.org/3/library/ast.html#ast.arg)
 #[derive(Clone, Debug, PartialEq)]
-pub struct Arg {
+pub struct Parameter {
     pub range: TextRange,
     pub arg: Identifier,
     pub annotation: Option<Box<Expr>>,
@@ -2056,22 +2043,22 @@ pub struct Decorator {
 
 /// An alternative type of AST `arguments`. This is ruff_python_parser-friendly and human-friendly definition of function arguments.
 /// This form also has advantage to implement pre-order traverse.
-/// `defaults` and `kw_defaults` fields are removed and the default values are placed under each `arg_with_default` typed argument.
+///
+/// `defaults` and `kw_defaults` fields are removed and the default values are placed under each [`ParameterWithDefault`] typed argument.
 /// `vararg` and `kwarg` are still typed as `arg` because they never can have a default value.
 ///
-/// The matching Python style AST type is [`PythonArguments`]. While [`PythonArguments`] has ordered `kwonlyargs` fields by
-/// default existence, [Arguments] has location-ordered kwonlyargs fields.
+/// The original Python-style AST type orders `kwonlyargs` fields by default existence; [Parameters] has location-ordered `kwonlyargs` fields.
 ///
-/// NOTE: This type is different from original Python AST.
+/// NOTE: This type differs from the original Python AST. See: [arguments](https://docs.python.org/3/library/ast.html#ast.arguments).
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Arguments {
+pub struct Parameters {
     pub range: TextRange,
-    pub posonlyargs: Vec<ArgWithDefault>,
-    pub args: Vec<ArgWithDefault>,
-    pub vararg: Option<Box<Arg>>,
-    pub kwonlyargs: Vec<ArgWithDefault>,
-    pub kwarg: Option<Box<Arg>>,
+    pub posonlyargs: Vec<ParameterWithDefault>,
+    pub args: Vec<ParameterWithDefault>,
+    pub vararg: Option<Box<Parameter>>,
+    pub kwonlyargs: Vec<ParameterWithDefault>,
+    pub kwarg: Option<Box<Parameter>>,
 }
 
 /// An alternative type of AST `arg`. This is used for each function argument that might have a default value.
@@ -2080,9 +2067,9 @@ pub struct Arguments {
 /// NOTE: This type is different from original Python AST.
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct ArgWithDefault {
+pub struct ParameterWithDefault {
     pub range: TextRange,
-    pub def: Arg,
+    pub def: Parameter,
     pub default: Option<Box<Expr>>,
 }
 
@@ -2105,7 +2092,7 @@ impl CmpOp {
     }
 }
 
-impl Arguments {
+impl Parameters {
     pub fn empty(range: TextRange) -> Self {
         Self {
             range,
@@ -2124,21 +2111,21 @@ fn clone_boxed_expr(expr: &Box<Expr>) -> Box<Expr> {
     Box::new(expr.clone())
 }
 
-impl ArgWithDefault {
-    pub fn as_arg(&self) -> &Arg {
+impl ParameterWithDefault {
+    pub fn as_parameter(&self) -> &Parameter {
         &self.def
     }
 
-    pub fn to_arg(&self) -> (Arg, Option<Box<Expr>>) {
-        let ArgWithDefault {
+    pub fn to_parameter(&self) -> (Parameter, Option<Box<Expr>>) {
+        let ParameterWithDefault {
             range: _,
             def,
             default,
         } = self;
         (def.clone(), default.as_ref().map(clone_boxed_expr))
     }
-    pub fn into_arg(self) -> (Arg, Option<Box<Expr>>) {
-        let ArgWithDefault {
+    pub fn into_parameter(self) -> (Parameter, Option<Box<Expr>>) {
+        let ParameterWithDefault {
             range: _,
             def,
             default,
@@ -2147,7 +2134,7 @@ impl ArgWithDefault {
     }
 }
 
-impl Arguments {
+impl Parameters {
     pub fn defaults(&self) -> impl std::iter::Iterator<Item = &Expr> {
         self.posonlyargs
             .iter()
@@ -2156,14 +2143,14 @@ impl Arguments {
     }
 
     #[allow(clippy::type_complexity)]
-    pub fn split_kwonlyargs(&self) -> (Vec<&Arg>, Vec<(&Arg, &Expr)>) {
+    pub fn split_kwonlyargs(&self) -> (Vec<&Parameter>, Vec<(&Parameter, &Expr)>) {
         let mut args = Vec::new();
         let mut with_defaults = Vec::new();
         for arg in &self.kwonlyargs {
             if let Some(ref default) = arg.default {
-                with_defaults.push((arg.as_arg(), &**default));
+                with_defaults.push((arg.as_parameter(), &**default));
             } else {
-                args.push(arg.as_arg());
+                args.push(arg.as_parameter());
             }
         }
         (args, with_defaults)
@@ -2838,12 +2825,7 @@ impl Ranged for crate::ExceptHandler {
     }
 }
 
-impl Ranged for crate::nodes::PythonArguments {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::Arg {
+impl Ranged for crate::nodes::Parameter {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -2952,12 +2934,12 @@ impl Ranged for crate::nodes::Decorator {
         self.range
     }
 }
-impl Ranged for crate::nodes::Arguments {
+impl Ranged for crate::nodes::Parameters {
     fn range(&self) -> TextRange {
         self.range
     }
 }
-impl Ranged for crate::nodes::ArgWithDefault {
+impl Ranged for crate::nodes::ParameterWithDefault {
     fn range(&self) -> TextRange {
         self.range
     }

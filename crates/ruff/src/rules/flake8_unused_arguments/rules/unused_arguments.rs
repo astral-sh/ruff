@@ -2,7 +2,7 @@ use std::iter;
 
 use regex::Regex;
 use ruff_python_ast as ast;
-use ruff_python_ast::{Arg, Arguments};
+use ruff_python_ast::{Parameter, Parameters};
 
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -215,26 +215,26 @@ impl Argumentable {
 /// Check a plain function for unused arguments.
 fn function(
     argumentable: Argumentable,
-    args: &Arguments,
+    parameters: &Parameters,
     values: &Scope,
     semantic: &SemanticModel,
     dummy_variable_rgx: &Regex,
     ignore_variadic_names: bool,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    let args = args
+    let args = parameters
         .posonlyargs
         .iter()
-        .chain(&args.args)
-        .chain(&args.kwonlyargs)
-        .map(|arg_with_default| &arg_with_default.def)
+        .chain(&parameters.args)
+        .chain(&parameters.kwonlyargs)
+        .map(|parameter_with_default| &parameter_with_default.def)
         .chain(
-            iter::once::<Option<&Arg>>(args.vararg.as_deref())
+            iter::once::<Option<&Parameter>>(parameters.vararg.as_deref())
                 .flatten()
                 .skip(usize::from(ignore_variadic_names)),
         )
         .chain(
-            iter::once::<Option<&Arg>>(args.kwarg.as_deref())
+            iter::once::<Option<&Parameter>>(parameters.kwarg.as_deref())
                 .flatten()
                 .skip(usize::from(ignore_variadic_names)),
         );
@@ -251,27 +251,27 @@ fn function(
 /// Check a method for unused arguments.
 fn method(
     argumentable: Argumentable,
-    args: &Arguments,
+    parameters: &Parameters,
     values: &Scope,
     semantic: &SemanticModel,
     dummy_variable_rgx: &Regex,
     ignore_variadic_names: bool,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    let args = args
+    let args = parameters
         .posonlyargs
         .iter()
-        .chain(&args.args)
-        .chain(&args.kwonlyargs)
+        .chain(&parameters.args)
+        .chain(&parameters.kwonlyargs)
         .skip(1)
-        .map(|arg_with_default| &arg_with_default.def)
+        .map(|parameter_with_default| &parameter_with_default.def)
         .chain(
-            iter::once::<Option<&Arg>>(args.vararg.as_deref())
+            iter::once::<Option<&Parameter>>(parameters.vararg.as_deref())
                 .flatten()
                 .skip(usize::from(ignore_variadic_names)),
         )
         .chain(
-            iter::once::<Option<&Arg>>(args.kwarg.as_deref())
+            iter::once::<Option<&Parameter>>(parameters.kwarg.as_deref())
                 .flatten()
                 .skip(usize::from(ignore_variadic_names)),
         );
@@ -287,13 +287,13 @@ fn method(
 
 fn call<'a>(
     argumentable: Argumentable,
-    args: impl Iterator<Item = &'a Arg>,
+    parameters: impl Iterator<Item = &'a Parameter>,
     values: &Scope,
     semantic: &SemanticModel,
     dummy_variable_rgx: &Regex,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    diagnostics.extend(args.filter_map(|arg| {
+    diagnostics.extend(parameters.filter_map(|arg| {
         let binding = values
             .get(arg.arg.as_str())
             .map(|binding_id| semantic.binding(binding_id))?;
@@ -324,14 +324,14 @@ pub(crate) fn unused_arguments(
     match &scope.kind {
         ScopeKind::Function(ast::StmtFunctionDef {
             name,
-            args,
+            parameters,
             body,
             decorator_list,
             ..
         })
         | ScopeKind::AsyncFunction(ast::StmtAsyncFunctionDef {
             name,
-            args,
+            parameters,
             body,
             decorator_list,
             ..
@@ -350,7 +350,7 @@ pub(crate) fn unused_arguments(
                     {
                         function(
                             Argumentable::Function,
-                            args,
+                            parameters,
                             scope,
                             checker.semantic(),
                             &checker.settings.dummy_variable_rgx,
@@ -375,7 +375,7 @@ pub(crate) fn unused_arguments(
                     {
                         method(
                             Argumentable::Method,
-                            args,
+                            parameters,
                             scope,
                             checker.semantic(),
                             &checker.settings.dummy_variable_rgx,
@@ -400,7 +400,7 @@ pub(crate) fn unused_arguments(
                     {
                         method(
                             Argumentable::ClassMethod,
-                            args,
+                            parameters,
                             scope,
                             checker.semantic(),
                             &checker.settings.dummy_variable_rgx,
@@ -425,7 +425,7 @@ pub(crate) fn unused_arguments(
                     {
                         function(
                             Argumentable::StaticMethod,
-                            args,
+                            parameters,
                             scope,
                             checker.semantic(),
                             &checker.settings.dummy_variable_rgx,
@@ -439,11 +439,11 @@ pub(crate) fn unused_arguments(
                 }
             }
         }
-        ScopeKind::Lambda(ast::ExprLambda { args, .. }) => {
+        ScopeKind::Lambda(ast::ExprLambda { parameters, .. }) => {
             if checker.enabled(Argumentable::Lambda.rule_code()) {
                 function(
                     Argumentable::Lambda,
-                    args,
+                    parameters,
                     scope,
                     checker.semantic(),
                     &checker.settings.dummy_variable_rgx,

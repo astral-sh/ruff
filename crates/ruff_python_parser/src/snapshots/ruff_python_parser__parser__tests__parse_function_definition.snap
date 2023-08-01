@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_python_parser/src/parser.rs
-expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
+expression: "parse_suite(source, \"<test>\").unwrap()"
 ---
 [
     FunctionDef(
@@ -10,13 +10,13 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 id: "func",
                 range: 4..8,
             },
-            args: Arguments {
+            parameters: Parameters {
                 range: 8..11,
                 posonlyargs: [],
                 args: [
-                    ArgWithDefault {
+                    ParameterWithDefault {
                         range: 9..10,
-                        def: Arg {
+                        def: Parameter {
                             range: 9..10,
                             arg: Identifier {
                                 id: "a",
@@ -57,13 +57,13 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 id: "func",
                 range: 26..30,
             },
-            args: Arguments {
+            parameters: Parameters {
                 range: 33..39,
                 posonlyargs: [],
                 args: [
-                    ArgWithDefault {
+                    ParameterWithDefault {
                         range: 34..38,
-                        def: Arg {
+                        def: Parameter {
                             range: 34..38,
                             arg: Identifier {
                                 id: "a",
@@ -131,13 +131,13 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 id: "func",
                 range: 59..63,
             },
-            args: Arguments {
+            parameters: Parameters {
                 range: 71..77,
                 posonlyargs: [],
                 args: [
-                    ArgWithDefault {
+                    ParameterWithDefault {
                         range: 72..76,
-                        def: Arg {
+                        def: Parameter {
                             range: 72..76,
                             arg: Identifier {
                                 id: "a",
@@ -213,13 +213,13 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 id: "func",
                 range: 97..101,
             },
-            args: Arguments {
+            parameters: Parameters {
                 range: 118..124,
                 posonlyargs: [],
                 args: [
-                    ArgWithDefault {
+                    ParameterWithDefault {
                         range: 119..123,
-                        def: Arg {
+                        def: Parameter {
                             range: 119..123,
                             arg: Identifier {
                                 id: "a",
@@ -310,12 +310,12 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 id: "func",
                 range: 144..148,
             },
-            args: Arguments {
+            parameters: Parameters {
                 range: 153..162,
                 posonlyargs: [],
                 args: [],
                 vararg: Some(
-                    Arg {
+                    Parameter {
                         range: 155..161,
                         arg: Identifier {
                             id: "a",
@@ -377,12 +377,12 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 id: "func",
                 range: 177..181,
             },
-            args: Arguments {
+            parameters: Parameters {
                 range: 186..221,
                 posonlyargs: [],
                 args: [],
                 vararg: Some(
-                    Arg {
+                    Parameter {
                         range: 188..200,
                         arg: Identifier {
                             id: "args",
@@ -411,7 +411,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 ),
                 kwonlyargs: [],
                 kwarg: Some(
-                    Arg {
+                    Parameter {
                         range: 204..220,
                         arg: Identifier {
                             id: "kwargs",
@@ -475,7 +475,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 id: "func",
                 range: 236..240,
             },
-            args: Arguments {
+            parameters: Parameters {
                 range: 261..263,
                 posonlyargs: [],
                 args: [],

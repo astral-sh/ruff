@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, ArgWithDefault, Arguments, Expr, Ranged};
+use ruff_python_ast::{self as ast, Expr, ParameterWithDefault, Parameters, Ranged};
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::Violation;
@@ -105,7 +105,7 @@ where
 }
 
 /// B008
-pub(crate) fn function_call_in_argument_default(checker: &mut Checker, arguments: &Arguments) {
+pub(crate) fn function_call_in_argument_default(checker: &mut Checker, parameters: &Parameters) {
     // Map immutable calls to (module, member) format.
     let extend_immutable_calls: Vec<CallPath> = checker
         .settings
@@ -116,15 +116,15 @@ pub(crate) fn function_call_in_argument_default(checker: &mut Checker, arguments
         .collect();
     let diagnostics = {
         let mut visitor = ArgumentDefaultVisitor::new(checker.semantic(), extend_immutable_calls);
-        for ArgWithDefault {
+        for ParameterWithDefault {
             default,
             def: _,
             range: _,
-        } in arguments
+        } in parameters
             .posonlyargs
             .iter()
-            .chain(&arguments.args)
-            .chain(&arguments.kwonlyargs)
+            .chain(&parameters.args)
+            .chain(&parameters.kwonlyargs)
         {
             if let Some(expr) = &default {
                 visitor.visit_expr(expr);

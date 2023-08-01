@@ -9,13 +9,13 @@ expression: parse_ast
             value: Lambda(
                 ExprLambda {
                     range: 0..18,
-                    args: Arguments {
+                    parameters: Parameters {
                         range: 7..11,
                         posonlyargs: [],
                         args: [
-                            ArgWithDefault {
+                            ParameterWithDefault {
                                 range: 7..8,
-                                def: Arg {
+                                def: Parameter {
                                     range: 7..8,
                                     arg: Identifier {
                                         id: "x",
@@ -25,9 +25,9 @@ expression: parse_ast
                                 },
                                 default: None,
                             },
-                            ArgWithDefault {
+                            ParameterWithDefault {
                                 range: 10..11,
-                                def: Arg {
+                                def: Parameter {
                                     range: 10..11,
                                     arg: Identifier {
                                         id: "y",

@@ -10,13 +10,13 @@ Ok(
                 value: Lambda(
                     ExprLambda {
                         range: 0..26,
-                        args: Arguments {
+                        parameters: Parameters {
                             range: 7..23,
                             posonlyargs: [],
                             args: [
-                                ArgWithDefault {
+                                ParameterWithDefault {
                                     range: 7..8,
-                                    def: Arg {
+                                    def: Parameter {
                                         range: 7..8,
                                         arg: Identifier {
                                             id: "a",
@@ -26,9 +26,9 @@ Ok(
                                     },
                                     default: None,
                                 },
-                                ArgWithDefault {
+                                ParameterWithDefault {
                                     range: 10..11,
-                                    def: Arg {
+                                    def: Parameter {
                                         range: 10..11,
                                         arg: Identifier {
                                             id: "b",
@@ -38,9 +38,9 @@ Ok(
                                     },
                                     default: None,
                                 },
-                                ArgWithDefault {
+                                ParameterWithDefault {
                                     range: 13..14,
-                                    def: Arg {
+                                    def: Parameter {
                                         range: 13..14,
                                         arg: Identifier {
                                             id: "c",
@@ -53,9 +53,9 @@ Ok(
                             ],
                             vararg: None,
                             kwonlyargs: [
-                                ArgWithDefault {
+                                ParameterWithDefault {
                                     range: 19..20,
-                                    def: Arg {
+                                    def: Parameter {
                                         range: 19..20,
                                         arg: Identifier {
                                             id: "d",
@@ -65,9 +65,9 @@ Ok(
                                     },
                                     default: None,
                                 },
-                                ArgWithDefault {
+                                ParameterWithDefault {
                                     range: 22..23,
-                                    def: Arg {
+                                    def: Parameter {
                                         range: 22..23,
                                         arg: Identifier {
                                             id: "e",

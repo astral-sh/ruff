@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, Stmt};
+use ruff_python_ast::{self as ast, Decorator, Expr, Parameters, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -116,14 +116,14 @@ pub(crate) fn non_self_return_type(
     name: &str,
     decorator_list: &[Decorator],
     returns: Option<&Expr>,
-    args: &Arguments,
+    parameters: &Parameters,
     async_: bool,
 ) {
     let ScopeKind::Class(class_def) = checker.semantic().scope().kind else {
         return;
     };
 
-    if args.args.is_empty() && args.posonlyargs.is_empty() {
+    if parameters.args.is_empty() && parameters.posonlyargs.is_empty() {
         return;
     }
 

@@ -1,4 +1,4 @@
-use ruff_python_ast::{Arguments, Stmt};
+use ruff_python_ast::{Parameters, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -58,12 +58,12 @@ impl Violation for TooManyArguments {
 }
 
 /// PLR0913
-pub(crate) fn too_many_arguments(checker: &mut Checker, arguments: &Arguments, stmt: &Stmt) {
-    let num_arguments = arguments
+pub(crate) fn too_many_arguments(checker: &mut Checker, parameters: &Parameters, stmt: &Stmt) {
+    let num_arguments = parameters
         .args
         .iter()
-        .chain(&arguments.kwonlyargs)
-        .chain(&arguments.posonlyargs)
+        .chain(&parameters.kwonlyargs)
+        .chain(&parameters.posonlyargs)
         .filter(|arg| !checker.settings.dummy_variable_rgx.is_match(&arg.def.arg))
         .count();
     if num_arguments > checker.settings.pylint.max_args {
