@@ -1,13 +1,14 @@
 use ruff_python_ast::Ranged;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
-use ruff_formatter::{format_args, write, FormatError, SourceCode};
+use ruff_formatter::{format_args, write, FormatContext, FormatError, SourceCode};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
-use ruff_python_trivia::{lines_after, lines_before, skip_trailing_trivia};
+use ruff_python_trivia::{lines_after, lines_before, skip_trailing_trivia, PythonWhitespace};
 
 use crate::comments::SourceComment;
 use crate::context::NodeLevel;
 use crate::prelude::*;
+use crate::PyLabel;
 
 /// Formats the leading comments of a node.
 pub(crate) fn leading_node_comments<T>(node: &T) -> FormatLeadingComments
@@ -36,6 +37,7 @@ impl Format<PyFormatContext<'_>> for FormatLeadingComments<'_> {
             FormatLeadingComments::Node(node) => comments.leading_comments(*node),
             FormatLeadingComments::Comments(comments) => comments,
         };
+        let source = f.context().source();
 
         for comment in leading_comments
             .iter()
@@ -43,16 +45,68 @@ impl Format<PyFormatContext<'_>> for FormatLeadingComments<'_> {
         {
             let slice = comment.slice();
 
-            let lines_after_comment = lines_after(slice.end(), f.context().source());
-            write!(
-                f,
-                [format_comment(comment), empty_lines(lines_after_comment)]
-            )?;
+            let suppression_kind =
+                SuppressionKind::from_str(comment.slice.text(f.context().source_code()));
+
+            match suppression_kind {
+                Some(SuppressionKind::FormatOff) => f.write_element(FormatElement::Tag(
+                    tag::Tag::StartLabelled(LabelId::of(PyLabel::FmtOff)),
+                ))?,
+                Some(SuppressionKind::FormatOn) => {
+                    f.write_element(FormatElement::Tag(tag::Tag::StartLabelled(LabelId::of(
+                        PyLabel::FmtOn,
+                    ))))?;
+                }
+                None => {}
+            }
+
+            format_comment(comment).fmt(f)?;
+
+            if matches!(suppression_kind, Some(SuppressionKind::FormatOff)) {
+                f.write_element(FormatElement::Tag(tag::Tag::EndLabelled))?;
+            } else {
+                let lines_after_comment = lines_after(slice.end(), source);
+                empty_lines(lines_after_comment).fmt(f)?;
+
+                if matches!(suppression_kind, Some(SuppressionKind::FormatOn)) {
+                    f.write_element(FormatElement::Tag(tag::Tag::EndLabelled))?;
+                }
+            }
 
             comment.mark_formatted();
         }
 
         Ok(())
+    }
+}
+
+enum SuppressionKind {
+    FormatOff,
+    FormatOn,
+}
+
+impl SuppressionKind {
+    fn from_str(comment_text: &str) -> Option<SuppressionKind> {
+        let comment_text = comment_text
+            .strip_prefix('#')
+            .unwrap_or(comment_text)
+            .trim_whitespace_start();
+
+        if let Some(suppression_kind) = comment_text.strip_prefix("fmt:") {
+            match suppression_kind.trim_whitespace() {
+                "off" => Some(SuppressionKind::FormatOff),
+                "on" => Some(SuppressionKind::FormatOn),
+                _ => None,
+            }
+        } else if let Some(suppression_kind) = comment_text.strip_prefix("yapf:") {
+            match suppression_kind.trim_whitespace() {
+                "disable" => Some(SuppressionKind::FormatOff),
+                "enable" => Some(SuppressionKind::FormatOn),
+                _ => None,
+            }
+        } else {
+            None
+        }
     }
 }
 
@@ -130,6 +184,7 @@ impl Format<PyFormatContext<'_>> for FormatTrailingComments<'_> {
         };
 
         let mut has_trailing_own_line_comment = false;
+        let source = f.context().source();
 
         for trailing in trailing_comments
             .iter()
@@ -137,10 +192,27 @@ impl Format<PyFormatContext<'_>> for FormatTrailingComments<'_> {
         {
             let slice = trailing.slice();
 
-            has_trailing_own_line_comment |= trailing.line_position().is_own_line();
+            let suppression_kind = SuppressionKind::from_str(slice.text(f.context().source_code()));
+
+            has_trailing_own_line_comment =
+                has_trailing_own_line_comment | trailing.line_position.is_own_line();
+
+            match suppression_kind {
+                Some(SuppressionKind::FormatOn) => {
+                    f.write_element(FormatElement::Tag(tag::Tag::StartLabelled(LabelId::of(
+                        PyLabel::FmtOn,
+                    ))))?;
+                }
+                Some(SuppressionKind::FormatOff) => {
+                    f.write_element(FormatElement::Tag(tag::Tag::StartLabelled(LabelId::of(
+                        PyLabel::FmtOff,
+                    ))))?;
+                }
+                None => {}
+            }
 
             if has_trailing_own_line_comment {
-                let lines_before_comment = lines_before(slice.start(), f.context().source());
+                let lines_before_comment = lines_before(slice.start(), source);
 
                 // A trailing comment at the end of a body or list
                 // ```python
@@ -169,6 +241,10 @@ impl Format<PyFormatContext<'_>> for FormatTrailingComments<'_> {
                         expand_parent()
                     ]
                 )?;
+            }
+
+            if suppression_kind.is_some() {
+                f.write_element(FormatElement::Tag(tag::Tag::EndLabelled))?;
             }
 
             trailing.mark_formatted();

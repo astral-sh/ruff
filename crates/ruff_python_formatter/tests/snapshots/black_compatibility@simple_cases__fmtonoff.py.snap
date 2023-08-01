@@ -198,192 +198,47 @@ d={'a':1,
 ```diff
 --- Black
 +++ Ruff
-@@ -6,8 +6,8 @@
- 
- from library import some_connection, some_decorator
- # fmt: off
--from third_party import (X,
--                         Y, Z)
-+from third_party import X, Y, Z
-+
- # fmt: on
- f"trigger 3.6 mode"
- # Comment 1
-@@ -17,26 +17,40 @@
- 
- # fmt: off
- def func_no_args():
--  a; b; c
--  if True: raise RuntimeError
--  if False: ...
--  for i in range(10):
--    print(i)
--    continue
--  exec('new-style exec', {}, {})
--  return None
-+    a
-+    b
-+    c
-+    if True:
-+        raise RuntimeError
-+    if False:
-+        ...
-+    for i in range(10):
-+        print(i)
-+        continue
-+    exec("new-style exec", {}, {})
-+    return None
-+
-+
- async def coroutine(arg, exec=False):
-- 'Single-line docstring. Multiline is harder to reformat.'
-- async with some_connection() as conn:
--     await conn.do_what_i_mean('SELECT bobby, tables FROM xkcd', timeout=2)
-- await asyncio.sleep(1)
-+    "Single-line docstring. Multiline is harder to reformat."
-+    async with some_connection() as conn:
-+        await conn.do_what_i_mean("SELECT bobby, tables FROM xkcd", timeout=2)
-+    await asyncio.sleep(1)
-+
-+
- @asyncio.coroutine
--@some_decorator(
--with_args=True,
--many_args=[1,2,3]
--)
--def function_signature_stress_test(number:int,no_annotation=None,text:str='default',* ,debug:bool=False,**kwargs) -> str:
-- return text[number:-1]
-+@some_decorator(with_args=True, many_args=[1, 2, 3])
-+def function_signature_stress_test(
-+    number: int,
-+    no_annotation=None,
-+    text: str = "default",
-+    *,
-+    debug: bool = False,
-+    **kwargs,
-+) -> str:
-+    return text[number:-1]
-+
-+
- # fmt: on
- def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r""):
-     offset = attr.ib(default=attr.Factory(lambda: _r.uniform(1, 2)))
-@@ -63,15 +77,15 @@
+@@ -63,7 +63,7 @@
  
  something = {
      # fmt: off
 -    key: 'value',
-+    key: "value",
++    key: 'value'
  }
  
  
- def subscriptlist():
-     atom[
-         # fmt: off
--        'some big and',
--        'complex subscript',
-+        "some big and",
-+        "complex subscript",
-         # fmt: on
-         goes + here,
-         andhere,
-@@ -80,38 +94,36 @@
- 
- def import_as_names():
+@@ -122,8 +122,10 @@
+     """
      # fmt: off
--    from hello import a,        b
--    'unformatted'
-+    from hello import a, b
+ 
+-    # hey, that won't work
+ 
++        #hey, that won't work
 +
-+    "unformatted"
++
      # fmt: on
+     pass
  
- 
- def testlist_star_expr():
-     # fmt: off
--    a , b = *hello
--    'unformatted'
-+    a, b = *hello
-+    "unformatted"
-     # fmt: on
- 
- 
- def yield_expr():
-     # fmt: off
-     yield hello
--    'unformatted'
-+    "unformatted"
-     # fmt: on
-     "formatted"
-     # fmt: off
--    ( yield hello )
--    'unformatted'
-+    (yield hello)
-+    "unformatted"
-     # fmt: on
- 
- 
- def example(session):
-     # fmt: off
--    result = session\
--        .query(models.Customer.id)\
--        .filter(models.Customer.account_id == account_id,
--                models.Customer.email == email_address)\
--        .order_by(models.Customer.id.asc())\
--        .all()
-+    result = session.query(models.Customer.id).filter(
-+        models.Customer.account_id == account_id, models.Customer.email == email_address
-+    ).order_by(models.Customer.id.asc()).all()
-     # fmt: on
- 
- 
-@@ -132,10 +144,10 @@
-     """Another known limitation."""
+@@ -136,9 +138,9 @@
+     and_=indeed . it  is  not  formatted
+     because . the . handling . inside . generate_ignored_nodes()
+     now . considers . multiple . fmt . directives . within . one . prefix
++        # ...but comments still get reformatted even though they should not be
      # fmt: on
      # fmt: off
--    this=should.not_be.formatted()
--    and_=indeed . it  is  not  formatted
--    because . the . handling . inside . generate_ignored_nodes()
--    now . considers . multiple . fmt . directives . within . one . prefix
-+    this = should.not_be.formatted()
-+    and_ = indeed.it is not formatted
-+    because.the.handling.inside.generate_ignored_nodes()
-+    now.considers.multiple.fmt.directives.within.one.prefix
+-    # ...but comments still get reformatted even though they should not be
      # fmt: on
-     # fmt: off
-     # ...but comments still get reformatted even though they should not be
-@@ -153,9 +165,7 @@
-             )
-         )
-         # fmt: off
--        a = (
--            unnecessary_bracket()
--        )
-+        a = unnecessary_bracket()
-         # fmt: on
-     _type_comment_re = re.compile(
-         r"""
-@@ -178,7 +188,7 @@
+ 
+ 
+@@ -178,7 +180,7 @@
          $
          """,
          # fmt: off
 -        re.MULTILINE|re.VERBOSE
-+        re.MULTILINE | re.VERBOSE,
++        re.MULTILINE|re.VERBOSE,
          # fmt: on
      )
  
-@@ -216,8 +226,7 @@
-     xxxxxxxxxx_xxxxxxxxxxx_xxxxxxx_xxxxxxxxx=5,
- )
- # fmt: off
--yield  'hello'
-+yield "hello"
- # No formatting to the end of the file
--l=[1,2,3]
--d={'a':1,
--   'b':2}
-+l = [1, 2, 3]
-+d = {"a": 1, "b": 2}
 ```
 
 ## Ruff Output
@@ -397,8 +252,8 @@ from third_party import X, Y, Z
 
 from library import some_connection, some_decorator
 # fmt: off
-from third_party import X, Y, Z
-
+from third_party import (X,
+                         Y, Z)
 # fmt: on
 f"trigger 3.6 mode"
 # Comment 1
@@ -408,40 +263,26 @@ f"trigger 3.6 mode"
 
 # fmt: off
 def func_no_args():
-    a
-    b
-    c
-    if True:
-        raise RuntimeError
-    if False:
-        ...
-    for i in range(10):
-        print(i)
-        continue
-    exec("new-style exec", {}, {})
-    return None
-
-
+  a; b; c
+  if True: raise RuntimeError
+  if False: ...
+  for i in range(10):
+    print(i)
+    continue
+  exec('new-style exec', {}, {})
+  return None
 async def coroutine(arg, exec=False):
-    "Single-line docstring. Multiline is harder to reformat."
-    async with some_connection() as conn:
-        await conn.do_what_i_mean("SELECT bobby, tables FROM xkcd", timeout=2)
-    await asyncio.sleep(1)
-
-
+ 'Single-line docstring. Multiline is harder to reformat.'
+ async with some_connection() as conn:
+     await conn.do_what_i_mean('SELECT bobby, tables FROM xkcd', timeout=2)
+ await asyncio.sleep(1)
 @asyncio.coroutine
-@some_decorator(with_args=True, many_args=[1, 2, 3])
-def function_signature_stress_test(
-    number: int,
-    no_annotation=None,
-    text: str = "default",
-    *,
-    debug: bool = False,
-    **kwargs,
-) -> str:
-    return text[number:-1]
-
-
+@some_decorator(
+with_args=True,
+many_args=[1,2,3]
+)
+def function_signature_stress_test(number:int,no_annotation=None,text:str='default',* ,debug:bool=False,**kwargs) -> str:
+ return text[number:-1]
 # fmt: on
 def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r""):
     offset = attr.ib(default=attr.Factory(lambda: _r.uniform(1, 2)))
@@ -468,15 +309,15 @@ def spaces2(result=_core.Value(None)):
 
 something = {
     # fmt: off
-    key: "value",
+    key: 'value'
 }
 
 
 def subscriptlist():
     atom[
         # fmt: off
-        "some big and",
-        "complex subscript",
+        'some big and',
+        'complex subscript',
         # fmt: on
         goes + here,
         andhere,
@@ -485,36 +326,38 @@ def subscriptlist():
 
 def import_as_names():
     # fmt: off
-    from hello import a, b
-
-    "unformatted"
+    from hello import a,        b
+    'unformatted'
     # fmt: on
 
 
 def testlist_star_expr():
     # fmt: off
-    a, b = *hello
-    "unformatted"
+    a , b = *hello
+    'unformatted'
     # fmt: on
 
 
 def yield_expr():
     # fmt: off
     yield hello
-    "unformatted"
+    'unformatted'
     # fmt: on
     "formatted"
     # fmt: off
-    (yield hello)
-    "unformatted"
+    ( yield hello )
+    'unformatted'
     # fmt: on
 
 
 def example(session):
     # fmt: off
-    result = session.query(models.Customer.id).filter(
-        models.Customer.account_id == account_id, models.Customer.email == email_address
-    ).order_by(models.Customer.id.asc()).all()
+    result = session\
+        .query(models.Customer.id)\
+        .filter(models.Customer.account_id == account_id,
+                models.Customer.email == email_address)\
+        .order_by(models.Customer.id.asc())\
+        .all()
     # fmt: on
 
 
@@ -525,7 +368,9 @@ def off_and_on_without_data():
     """
     # fmt: off
 
-    # hey, that won't work
+
+        #hey, that won't work
+
 
     # fmt: on
     pass
@@ -535,13 +380,13 @@ def on_and_off_broken():
     """Another known limitation."""
     # fmt: on
     # fmt: off
-    this = should.not_be.formatted()
-    and_ = indeed.it is not formatted
-    because.the.handling.inside.generate_ignored_nodes()
-    now.considers.multiple.fmt.directives.within.one.prefix
+    this=should.not_be.formatted()
+    and_=indeed . it  is  not  formatted
+    because . the . handling . inside . generate_ignored_nodes()
+    now . considers . multiple . fmt . directives . within . one . prefix
+        # ...but comments still get reformatted even though they should not be
     # fmt: on
     # fmt: off
-    # ...but comments still get reformatted even though they should not be
     # fmt: on
 
 
@@ -556,7 +401,9 @@ def long_lines():
             )
         )
         # fmt: off
-        a = unnecessary_bracket()
+        a = (
+            unnecessary_bracket()
+        )
         # fmt: on
     _type_comment_re = re.compile(
         r"""
@@ -579,7 +426,7 @@ def long_lines():
         $
         """,
         # fmt: off
-        re.MULTILINE | re.VERBOSE,
+        re.MULTILINE|re.VERBOSE,
         # fmt: on
     )
 
@@ -617,10 +464,11 @@ cfg.rule(
     xxxxxxxxxx_xxxxxxxxxxx_xxxxxxx_xxxxxxxxx=5,
 )
 # fmt: off
-yield "hello"
+yield  'hello'
 # No formatting to the end of the file
-l = [1, 2, 3]
-d = {"a": 1, "b": 2}
+l=[1,2,3]
+d={'a':1,
+   'b':2}
 ```
 
 ## Black Output

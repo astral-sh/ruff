@@ -67,6 +67,18 @@ pub enum FormatElement {
     Tombstone,
 }
 
+impl FormatElement {
+    pub fn intern(mut elements: Vec<FormatElement>) -> Option<FormatElement> {
+        match elements.len() {
+            0 => None,
+            // Doesn't get cheaper than calling clone, use the element directly
+            // SAFETY: Safe because of the `len == 1` check in the match arm.
+            1 => Some(elements.pop().unwrap()),
+            _ => Some(FormatElement::Interned(Interned::new(elements))),
+        }
+    }
+}
+
 impl std::fmt::Debug for FormatElement {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {

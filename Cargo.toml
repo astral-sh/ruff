@@ -49,6 +49,7 @@ toml = { version = "0.7.2" }
 tracing = "0.1.37"
 tracing-indicatif = "0.3.4"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
+unicode-width = { version = "0.1.10" }
 wsl = { version = "0.1.0" }
 
 # v1.0.1

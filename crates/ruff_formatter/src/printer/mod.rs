@@ -1274,7 +1274,6 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                             MeasureMode::FirstLine => return Fits::Yes,
                             MeasureMode::AllLines => {
                                 self.state.line_width = 0;
-                                self.state.pending_indent = args.indention();
                                 continue;
                             }
                         }

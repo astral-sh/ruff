@@ -11,7 +11,7 @@ use crate::{
 };
 use rustc_hash::FxHashMap;
 use std::collections::HashMap;
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 
 /// A formatted document.
 #[derive(Debug, Clone, Eq, PartialEq, Default)]
@@ -29,7 +29,7 @@ impl Document {
     /// [`BestFitting`]'s content expands is not propagated past the [`BestFitting`] element.
     ///
     /// [`BestFitting`]: FormatElement::BestFitting
-    pub(crate) fn propagate_expand(&mut self) {
+    pub fn propagate_expand(&mut self) {
         #[derive(Debug)]
         enum Enclosing<'a> {
             Group(&'a tag::Group),
@@ -145,6 +145,12 @@ impl Deref for Document {
 
     fn deref(&self) -> &Self::Target {
         self.elements.as_slice()
+    }
+}
+
+impl DerefMut for Document {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.elements.as_mut_slice()
     }
 }
 

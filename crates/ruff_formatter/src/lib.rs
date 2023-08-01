@@ -74,13 +74,20 @@ impl IndentStyle {
     pub const DEFAULT_SPACES: u8 = 2;
 
     /// Returns `true` if this is an [IndentStyle::Tab].
-    pub const fn is_tab(&self) -> bool {
+    pub const fn is_tab(self) -> bool {
         matches!(self, IndentStyle::Tab)
     }
 
     /// Returns `true` if this is an [IndentStyle::Space].
-    pub const fn is_space(&self) -> bool {
+    pub const fn is_space(self) -> bool {
         matches!(self, IndentStyle::Space(_))
+    }
+
+    pub const fn text_len(self) -> TextSize {
+        match self {
+            IndentStyle::Tab => TextSize::new(1),
+            IndentStyle::Space(spaces) => TextSize::new(spaces as u32),
+        }
     }
 }
 
@@ -302,6 +309,11 @@ impl<Context> Formatted<Context> {
     /// Returns the formatted document.
     pub fn document(&self) -> &Document {
         &self.document
+    }
+
+    /// Returns the formatted document.
+    pub fn document_mut(&mut self) -> &mut Document {
+        &mut self.document
     }
 
     /// Consumes `self` and returns the formatted document.
