@@ -308,6 +308,7 @@ impl<'a> SemanticModel<'a> {
 
         let mut seen_function = false;
         let mut import_starred = false;
+        let mut class_variables_visible = true;
         for (index, scope_id) in self.scopes.ancestor_ids(self.scope_id).enumerate() {
             let scope = &self.scopes[scope_id];
             if scope.kind.is_class() {
@@ -321,7 +322,8 @@ impl<'a> SemanticModel<'a> {
                 if seen_function && matches!(name.id.as_str(), "__class__") {
                     return ReadResult::ImplicitGlobal;
                 }
-                // Do not allow usages of class symbols unless it is the immediate parent, e.g.:
+                // Do not allow usages of class symbols unless it is the immediate parent
+                // (excluding type scopes), e.g.:
                 //
                 // ```python
                 // class Foo:
@@ -334,11 +336,15 @@ impl<'a> SemanticModel<'a> {
                 //      def d(self):
                 //          print(a)  # not allowed
                 // ```
-                //
-                if index > 0 {
+                if !class_variables_visible {
                     continue;
                 }
             }
+
+            // Allow class variables to be visible for an additional scope level
+            // when a type scope is seen — this covers the type scope present between
+            // function and class definitions and their parent class scope.
+            class_variables_visible = scope.kind.is_type() && index == 0;
 
             if let Some(binding_id) = scope.get(name.id.as_str()) {
                 // Mark the binding as used.
@@ -500,16 +506,19 @@ impl<'a> SemanticModel<'a> {
         }
 
         let mut seen_function = false;
+        let mut class_variables_visible = true;
         for (index, scope_id) in self.scopes.ancestor_ids(self.scope_id).enumerate() {
             let scope = &self.scopes[scope_id];
             if scope.kind.is_class() {
                 if seen_function && matches!(symbol, "__class__") {
                     return None;
                 }
-                if index > 0 {
+                if !class_variables_visible {
                     continue;
                 }
             }
+
+            class_variables_visible = scope.kind.is_type() && index == 0;
 
             if let Some(binding_id) = scope.get(symbol) {
                 match self.bindings[binding_id].kind {
@@ -585,7 +594,12 @@ impl<'a> SemanticModel<'a> {
             return None;
         }
 
-        self.scopes[scope_id].get(qualified_name)
+        let binding_id = self.scopes[scope_id].get(qualified_name)?;
+        if !self.bindings[binding_id].kind.is_submodule_import() {
+            return None;
+        }
+
+        Some(binding_id)
     }
 
     /// Resolves the [`Expr`] to a fully-qualified symbol-name, if `value` resolves to an imported
@@ -854,6 +868,24 @@ impl<'a> SemanticModel<'a> {
     /// Returns the current top most scope.
     pub fn scope(&self) -> &Scope<'a> {
         &self.scopes[self.scope_id]
+    }
+
+    /// Returns the parent of the given scope, if any.
+    pub fn parent_scope(&self, scope: &Scope) -> Option<&Scope<'a>> {
+        scope.parent.map(|scope_id| &self.scopes[scope_id])
+    }
+
+    /// Returns the first parent of the given scope that is not a [`ScopeKind::Type`] scope, if any.
+    pub fn first_non_type_parent_scope(&self, scope: &Scope) -> Option<&Scope<'a>> {
+        let mut current_scope = scope;
+        while let Some(parent) = self.parent_scope(current_scope) {
+            if parent.kind.is_type() {
+                current_scope = parent;
+            } else {
+                return Some(parent);
+            }
+        }
+        None
     }
 
     /// Returns a mutable reference to the current top most scope.

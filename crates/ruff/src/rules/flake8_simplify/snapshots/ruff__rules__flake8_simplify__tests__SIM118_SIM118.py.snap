@@ -265,6 +265,7 @@ SIM118.py:30:8: SIM118 [*] Use `k in obj` instead of `k in obj.keys()`
    30 |+(k for k in obj)  # SIM118
 31 31 | 
 32 32 | key in (obj or {}).keys()  # SIM118
+33 33 | 
 
 SIM118.py:32:1: SIM118 [*] Use `key in (obj or {})` instead of `key in (obj or {}).keys()`
    |
@@ -272,6 +273,8 @@ SIM118.py:32:1: SIM118 [*] Use `key in (obj or {})` instead of `key in (obj or {
 31 | 
 32 | key in (obj or {}).keys()  # SIM118
    | ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM118
+33 | 
+34 | from typing import KeysView
    |
    = help: Convert to `key in (obj or {})`
 
@@ -281,5 +284,8 @@ SIM118.py:32:1: SIM118 [*] Use `key in (obj or {})` instead of `key in (obj or {
 31 31 | 
 32    |-key in (obj or {}).keys()  # SIM118
    32 |+key in (obj or {})  # SIM118
+33 33 | 
+34 34 | from typing import KeysView
+35 35 | 
 
 

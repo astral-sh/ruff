@@ -198,20 +198,21 @@ d={'a':1,
 ```diff
 --- Black
 +++ Ruff
-@@ -6,10 +6,9 @@
+@@ -6,10 +6,10 @@
  
  from library import some_connection, some_decorator
  # fmt: off
 -from third_party import (X,
 -                         Y, Z)
 +from third_party import X, Y, Z
++
  # fmt: on
 -f"trigger 3.6 mode"
 +f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
  # Comment 1
  
  # Comment 2
-@@ -17,26 +16,40 @@
+@@ -17,26 +17,40 @@
  
  # fmt: off
  def func_no_args():
@@ -270,7 +271,7 @@ d={'a':1,
  # fmt: on
  def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r""):
      offset = attr.ib(default=attr.Factory(lambda: _r.uniform(1, 2)))
-@@ -63,15 +76,15 @@
+@@ -63,15 +77,15 @@
  
  something = {
      # fmt: off
@@ -289,13 +290,14 @@ d={'a':1,
          # fmt: on
          goes + here,
          andhere,
-@@ -80,38 +93,35 @@
+@@ -80,38 +94,36 @@
  
  def import_as_names():
      # fmt: off
 -    from hello import a,        b
 -    'unformatted'
 +    from hello import a, b
++
 +    "unformatted"
      # fmt: on
  
@@ -338,7 +340,7 @@ d={'a':1,
      # fmt: on
  
  
-@@ -132,10 +142,10 @@
+@@ -132,10 +144,10 @@
      """Another known limitation."""
      # fmt: on
      # fmt: off
@@ -353,7 +355,7 @@ d={'a':1,
      # fmt: on
      # fmt: off
      # ...but comments still get reformatted even though they should not be
-@@ -153,9 +163,7 @@
+@@ -153,9 +165,7 @@
              )
          )
          # fmt: off
@@ -364,7 +366,7 @@ d={'a':1,
          # fmt: on
      _type_comment_re = re.compile(
          r"""
-@@ -178,7 +186,7 @@
+@@ -178,7 +188,7 @@
          $
          """,
          # fmt: off
@@ -373,7 +375,7 @@ d={'a':1,
          # fmt: on
      )
  
-@@ -216,8 +224,7 @@
+@@ -216,8 +226,7 @@
      xxxxxxxxxx_xxxxxxxxxxx_xxxxxxx_xxxxxxxxx=5,
  )
  # fmt: off
@@ -399,6 +401,7 @@ from third_party import X, Y, Z
 from library import some_connection, some_decorator
 # fmt: off
 from third_party import X, Y, Z
+
 # fmt: on
 f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
 # Comment 1
@@ -486,6 +489,7 @@ def subscriptlist():
 def import_as_names():
     # fmt: off
     from hello import a, b
+
     "unformatted"
     # fmt: on
 

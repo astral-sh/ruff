@@ -1424,6 +1424,16 @@
             "type": "string"
           }
         },
+        "extend-ignore-names": {
+          "description": "Additional names (or patterns) to ignore when considering `pep8-naming` violations, in addition to those included in `ignore-names`.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "ignore-names": {
           "description": "A list of names (or patterns) to ignore when considering `pep8-naming` violations.",
           "type": [
@@ -2393,7 +2403,9 @@
         "PYI044",
         "PYI045",
         "PYI046",
+        "PYI047",
         "PYI048",
+        "PYI049",
         "PYI05",
         "PYI050",
         "PYI051",

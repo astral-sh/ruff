@@ -44,7 +44,7 @@ pub(super) fn in_dunder_init(semantic: &SemanticModel, settings: &Settings) -> b
     if name != "__init__" {
         return false;
     }
-    let Some(parent) = scope.parent.map(|scope_id| &semantic.scopes[scope_id]) else {
+    let Some(parent) = semantic.first_non_type_parent_scope(scope) else {
         return false;
     };
 

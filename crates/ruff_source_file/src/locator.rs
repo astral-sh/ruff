@@ -76,7 +76,11 @@ impl<'a> Locator<'a> {
         if let Some(index) = memrchr2(b'\n', b'\r', bytes) {
             // SAFETY: Safe because `index < offset`
             TextSize::try_from(index).unwrap().add(TextSize::from(1))
+        } else if self.contents.starts_with('\u{feff}') {
+            // Skip the BOM.
+            '\u{feff}'.text_len()
         } else {
+            // Start of file.
             TextSize::default()
         }
     }

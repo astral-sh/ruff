@@ -297,7 +297,7 @@ fn handle_own_line_comment_between_branches<'a>(
 
     // It depends on the indentation level of the comment if it is a leading comment for the
     // following branch or if it a trailing comment of the previous body's last statement.
-    let comment_indentation = indentation_at_offset(locator, comment.slice().range().start())
+    let comment_indentation = indentation_at_offset(comment.slice().range().start(), locator)
         .unwrap_or_default()
         .len();
 
@@ -402,7 +402,7 @@ fn handle_match_comment<'a>(
 
     let next_case = match_stmt.cases.get(current_case_index + 1);
 
-    let comment_indentation = indentation_at_offset(locator, comment.slice().range().start())
+    let comment_indentation = indentation_at_offset(comment.slice().range().start(), locator)
         .unwrap_or_default()
         .len();
     let match_case_indentation = indentation(locator, match_case).unwrap().len();
@@ -480,7 +480,7 @@ fn handle_own_line_comment_after_branch<'a>(
 
     // We only care about the length because indentations with mixed spaces and tabs are only valid if
     // the indent-level doesn't depend on the tab width (the indent level must be the same if the tab width is 1 or 8).
-    let comment_indentation = indentation_at_offset(locator, comment.slice().range().start())
+    let comment_indentation = indentation_at_offset(comment.slice().range().start(), locator)
         .unwrap_or_default()
         .len();
 
@@ -493,7 +493,7 @@ fn handle_own_line_comment_after_branch<'a>(
     // # Trailing if comment
     // ```
     // Here we keep the comment a trailing comment of the `if`
-    let preceding_indentation = indentation_at_offset(locator, preceding_node.start())
+    let preceding_indentation = indentation_at_offset(preceding_node.start(), locator)
         .unwrap_or_default()
         .len();
     if comment_indentation == preceding_indentation {

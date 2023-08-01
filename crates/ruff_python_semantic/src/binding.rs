@@ -413,6 +413,18 @@ pub enum BindingKind<'a> {
     /// ```
     Assignment,
 
+    /// A binding for a generic type parameter, like `X` in:
+    /// ```python
+    /// def foo[X](x: X):
+    ///    ...
+    ///
+    /// class Foo[X](x: X):
+    ///   ...
+    ///
+    /// type Foo[X] = ...
+    /// ```
+    TypeParam,
+
     /// A binding for a for-loop variable, like `x` in:
     /// ```python
     /// for x in range(10):

@@ -85,7 +85,7 @@ pub fn test_snippet(contents: &str, settings: &Settings) -> Vec<Message> {
 }
 
 thread_local! {
-    static MAX_ITERATIONS: std::cell::Cell<usize> = std::cell::Cell::new(30);
+    static MAX_ITERATIONS: std::cell::Cell<usize> = std::cell::Cell::new(8);
 }
 
 pub fn set_max_iterations(max: usize) {

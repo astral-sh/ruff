@@ -12,6 +12,7 @@ use ruff_python_ast::Ranged;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::Diagnostic;
+use ruff_python_trivia::indentation_at_offset;
 use ruff_source_file::{LineEnding, Locator};
 
 use crate::codes::NoqaCode;
@@ -248,22 +249,34 @@ impl FileExemption {
                     let path_display = relativize_path(path);
                     warn!("Invalid `# ruff: noqa` directive at {path_display}:{line}: {err}");
                 }
-                Ok(Some(ParsedFileExemption::All)) => {
-                    return Some(Self::All);
-                }
-                Ok(Some(ParsedFileExemption::Codes(codes))) => {
-                    exempt_codes.extend(codes.into_iter().filter_map(|code| {
-                        if let Ok(rule) = Rule::from_code(get_redirect_target(code).unwrap_or(code))
-                        {
-                            Some(rule.noqa_code())
-                        } else {
-                            #[allow(deprecated)]
-                            let line = locator.compute_line_index(range.start());
-                            let path_display = relativize_path(path);
-                            warn!("Invalid code provided to `# ruff: noqa` at {path_display}:{line}: {code}");
-                            None
+                Ok(Some(exemption)) => {
+                    if indentation_at_offset(range.start(), locator).is_none() {
+                        #[allow(deprecated)]
+                        let line = locator.compute_line_index(range.start());
+                        let path_display = relativize_path(path);
+                        warn!("Unexpected `# ruff: noqa` directive at {path_display}:{line}. File-level suppression comments must appear on their own line.");
+                        continue;
+                    }
+
+                    match exemption {
+                        ParsedFileExemption::All => {
+                            return Some(Self::All);
                         }
-                    }));
+                        ParsedFileExemption::Codes(codes) => {
+                            exempt_codes.extend(codes.into_iter().filter_map(|code| {
+                                if let Ok(rule) = Rule::from_code(get_redirect_target(code).unwrap_or(code))
+                                {
+                                    Some(rule.noqa_code())
+                                } else {
+                                    #[allow(deprecated)]
+                                    let line = locator.compute_line_index(range.start());
+                                    let path_display = relativize_path(path);
+                                    warn!("Invalid rule code provided to `# ruff: noqa` at {path_display}:{line}: {code}");
+                                    None
+                                }
+                            }));
+                        }
+                    }
                 }
                 Ok(None) => {}
             }

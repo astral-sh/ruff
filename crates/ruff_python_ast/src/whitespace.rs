@@ -12,7 +12,7 @@ pub fn indentation<'a, T>(locator: &'a Locator, located: &T) -> Option<&'a str>
 where
     T: Ranged,
 {
-    indentation_at_offset(locator, located.start())
+    indentation_at_offset(located.start(), locator)
 }
 
 /// Return the end offset at which the empty lines following a statement.
