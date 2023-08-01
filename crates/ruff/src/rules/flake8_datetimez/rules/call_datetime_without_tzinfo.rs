@@ -14,9 +14,12 @@ use super::helpers;
 ///
 /// ## Why is this bad?
 /// `datetime` objects are "naive" by default, in that they do not include
-/// timezone information. By providing a `tzinfo`, a `datetime` can be made
-/// timezone "aware". "Naive" objects are easy to understand, but ignore some
-/// aspects of reality, which can lead to subtle bugs.
+/// timezone information. "Naive" objects are easy to understand, but ignore
+/// some aspects of reality, which can lead to subtle bugs. Timezone-aware
+/// `datetime` objects are preferred, as they represent a specific moment in
+/// time, unlike "naive" objects.
+///
+/// By providing a `tzinfo` value, a `datetime` can be made timezone-aware.
 ///
 /// ## Example
 /// ```python
