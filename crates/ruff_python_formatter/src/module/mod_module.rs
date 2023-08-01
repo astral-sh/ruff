@@ -1,4 +1,4 @@
-use crate::statement::suite::SuiteLevel;
+use crate::statement::suite::SuiteKind;
 use crate::{AsFormat, FormatNodeRule, PyFormatter};
 use ruff_formatter::prelude::hard_line_break;
 use ruff_formatter::{write, Buffer, FormatResult};
@@ -13,7 +13,7 @@ impl FormatNodeRule<ModModule> for FormatModModule {
         write!(
             f,
             [
-                body.format().with_options(SuiteLevel::TopLevel),
+                body.format().with_options(SuiteKind::TopLevel),
                 // Trailing newline at the end of the file
                 hard_line_break()
             ]

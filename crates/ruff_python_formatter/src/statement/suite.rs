@@ -8,38 +8,40 @@ use crate::prelude::*;
 
 /// Level at which the [`Suite`] appears in the source code.
 #[derive(Copy, Clone, Debug)]
-pub enum SuiteLevel {
+pub enum SuiteKind {
     /// Statements at the module level / top level
     TopLevel,
 
-    /// Statements in a nested body
-    Nested,
-}
+    /// Statements in a function body.
+    Function,
 
-impl SuiteLevel {
-    const fn is_nested(self) -> bool {
-        matches!(self, SuiteLevel::Nested)
-    }
+    /// Statements in a class body.
+    Class,
+
+    /// Statements in any other body (e.g., `if` or `while`).
+    Other,
 }
 
 #[derive(Debug)]
 pub struct FormatSuite {
-    level: SuiteLevel,
+    kind: SuiteKind,
 }
 
 impl Default for FormatSuite {
     fn default() -> Self {
         FormatSuite {
-            level: SuiteLevel::Nested,
+            kind: SuiteKind::Other,
         }
     }
 }
 
 impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
     fn fmt(&self, statements: &Suite, f: &mut PyFormatter) -> FormatResult<()> {
-        let node_level = match self.level {
-            SuiteLevel::TopLevel => NodeLevel::TopLevel,
-            SuiteLevel::Nested => NodeLevel::CompoundStatement,
+        let node_level = match self.kind {
+            SuiteKind::TopLevel => NodeLevel::TopLevel,
+            SuiteKind::Function | SuiteKind::Class | SuiteKind::Other => {
+                NodeLevel::CompoundStatement
+            }
         };
 
         let comments = f.context().comments().clone();
@@ -51,18 +53,33 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
         };
 
         let mut f = WithNodeLevel::new(node_level, f);
-        // First entry has never any separator, doesn't matter which one we take.
+
+        if matches!(self.kind, SuiteKind::Other)
+            && is_class_or_function_definition(first)
+            && !comments.has_leading_comments(first)
+        {
+            // Add an empty line for any nested functions or classes defined within non-function
+            // or class compound statements, e.g., this is stable formatting:
+            // ```python
+            // if True:
+            //
+            //     def test():
+            //         ...
+            // ```
+            write!(f, [empty_line()])?;
+        }
+
         write!(f, [first.format()])?;
 
         let mut last = first;
 
         for statement in iter {
             if is_class_or_function_definition(last) || is_class_or_function_definition(statement) {
-                match self.level {
-                    SuiteLevel::TopLevel => {
+                match self.kind {
+                    SuiteKind::TopLevel => {
                         write!(f, [empty_line(), empty_line(), statement.format()])?;
                     }
-                    SuiteLevel::Nested => {
+                    SuiteKind::Function | SuiteKind::Class | SuiteKind::Other => {
                         write!(f, [empty_line(), statement.format()])?;
                     }
                 }
@@ -95,13 +112,12 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 match lines_before(start, source) {
                     0 | 1 => write!(f, [hard_line_break()])?,
                     2 => write!(f, [empty_line()])?,
-                    3.. => {
-                        if self.level.is_nested() {
+                    3.. => match self.kind {
+                        SuiteKind::TopLevel => write!(f, [empty_line(), empty_line()])?,
+                        SuiteKind::Function | SuiteKind::Class | SuiteKind::Other => {
                             write!(f, [empty_line()])?;
-                        } else {
-                            write!(f, [empty_line(), empty_line()])?;
                         }
-                    }
+                    },
                 }
 
                 write!(f, [statement.format()])?;
@@ -167,10 +183,10 @@ const fn is_import_definition(stmt: &Stmt) -> bool {
 }
 
 impl FormatRuleWithOptions<Suite, PyFormatContext<'_>> for FormatSuite {
-    type Options = SuiteLevel;
+    type Options = SuiteKind;
 
     fn with_options(mut self, options: Self::Options) -> Self {
-        self.level = options;
+        self.kind = options;
         self
     }
 }
@@ -199,10 +215,10 @@ mod tests {
 
     use crate::comments::Comments;
     use crate::prelude::*;
-    use crate::statement::suite::SuiteLevel;
+    use crate::statement::suite::SuiteKind;
     use crate::PyFormatOptions;
 
-    fn format_suite(level: SuiteLevel) -> String {
+    fn format_suite(level: SuiteKind) -> String {
         let source = r#"
 a = 10
 
@@ -239,7 +255,7 @@ def trailing_func():
 
     #[test]
     fn top_level() {
-        let formatted = format_suite(SuiteLevel::TopLevel);
+        let formatted = format_suite(SuiteKind::TopLevel);
 
         assert_eq!(
             formatted,
@@ -274,7 +290,7 @@ def trailing_func():
 
     #[test]
     fn nested_level() {
-        let formatted = format_suite(SuiteLevel::Nested);
+        let formatted = format_suite(SuiteKind::Other);
 
         assert_eq!(
             formatted,
