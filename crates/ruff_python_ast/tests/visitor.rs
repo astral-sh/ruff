@@ -144,11 +144,7 @@ where
     V: Visitor<'a> + ?Sized,
 {
     match module {
-        ast::Mod::Module(ast::ModModule {
-            body,
-            range: _,
-            type_ignores: _,
-        }) => {
+        ast::Mod::Module(ast::ModModule { body, range: _ }) => {
             visitor.visit_body(body);
         }
         ast::Mod::Interactive(ast::ModInteractive { body, range: _ }) => {

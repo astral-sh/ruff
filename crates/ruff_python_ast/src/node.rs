@@ -1,7 +1,7 @@
 use crate::{
     self as ast, Alias, Arg, ArgWithDefault, Arguments, Comprehension, Decorator, ExceptHandler,
-    Expr, Keyword, MatchCase, Mod, Pattern, Ranged, Stmt, TypeIgnore, TypeParam,
-    TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
+    Expr, Keyword, MatchCase, Mod, Pattern, Ranged, Stmt, TypeParam, TypeParamParamSpec,
+    TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
 };
 use ruff_text_size::TextRange;
 use std::ptr::NonNull;
@@ -91,7 +91,6 @@ pub enum AnyNode {
     PatternMatchStar(ast::PatternMatchStar),
     PatternMatchAs(ast::PatternMatchAs),
     PatternMatchOr(ast::PatternMatchOr),
-    TypeIgnoreTypeIgnore(ast::TypeIgnoreTypeIgnore),
     Comprehension(Comprehension),
     Arguments(Arguments),
     Arg(Arg),
@@ -181,7 +180,6 @@ impl AnyNode {
             | AnyNode::PatternMatchStar(_)
             | AnyNode::PatternMatchAs(_)
             | AnyNode::PatternMatchOr(_)
-            | AnyNode::TypeIgnoreTypeIgnore(_)
             | AnyNode::Comprehension(_)
             | AnyNode::Arguments(_)
             | AnyNode::Arg(_)
@@ -271,7 +269,6 @@ impl AnyNode {
             | AnyNode::PatternMatchStar(_)
             | AnyNode::PatternMatchAs(_)
             | AnyNode::PatternMatchOr(_)
-            | AnyNode::TypeIgnoreTypeIgnore(_)
             | AnyNode::Comprehension(_)
             | AnyNode::Arguments(_)
             | AnyNode::Arg(_)
@@ -361,7 +358,6 @@ impl AnyNode {
             | AnyNode::PatternMatchStar(_)
             | AnyNode::PatternMatchAs(_)
             | AnyNode::PatternMatchOr(_)
-            | AnyNode::TypeIgnoreTypeIgnore(_)
             | AnyNode::Comprehension(_)
             | AnyNode::Arguments(_)
             | AnyNode::Arg(_)
@@ -451,7 +447,6 @@ impl AnyNode {
             | AnyNode::ExprSlice(_)
             | AnyNode::ExprLineMagic(_)
             | AnyNode::ExceptHandlerExceptHandler(_)
-            | AnyNode::TypeIgnoreTypeIgnore(_)
             | AnyNode::Comprehension(_)
             | AnyNode::Arguments(_)
             | AnyNode::Arg(_)
@@ -541,97 +536,6 @@ impl AnyNode {
             | AnyNode::PatternMatchStar(_)
             | AnyNode::PatternMatchAs(_)
             | AnyNode::PatternMatchOr(_)
-            | AnyNode::TypeIgnoreTypeIgnore(_)
-            | AnyNode::Comprehension(_)
-            | AnyNode::Arguments(_)
-            | AnyNode::Arg(_)
-            | AnyNode::ArgWithDefault(_)
-            | AnyNode::Keyword(_)
-            | AnyNode::Alias(_)
-            | AnyNode::WithItem(_)
-            | AnyNode::MatchCase(_)
-            | AnyNode::Decorator(_)
-            | AnyNode::TypeParamTypeVar(_)
-            | AnyNode::TypeParamTypeVarTuple(_)
-            | AnyNode::TypeParamParamSpec(_)
-            | AnyNode::ElifElseClause(_) => None,
-        }
-    }
-
-    pub fn type_ignore(self) -> Option<TypeIgnore> {
-        match self {
-            AnyNode::TypeIgnoreTypeIgnore(node) => Some(TypeIgnore::TypeIgnore(node)),
-
-            AnyNode::ModModule(_)
-            | AnyNode::ModInteractive(_)
-            | AnyNode::ModExpression(_)
-            | AnyNode::ModFunctionType(_)
-            | AnyNode::StmtFunctionDef(_)
-            | AnyNode::StmtAsyncFunctionDef(_)
-            | AnyNode::StmtClassDef(_)
-            | AnyNode::StmtReturn(_)
-            | AnyNode::StmtDelete(_)
-            | AnyNode::StmtTypeAlias(_)
-            | AnyNode::StmtAssign(_)
-            | AnyNode::StmtAugAssign(_)
-            | AnyNode::StmtAnnAssign(_)
-            | AnyNode::StmtFor(_)
-            | AnyNode::StmtAsyncFor(_)
-            | AnyNode::StmtWhile(_)
-            | AnyNode::StmtIf(_)
-            | AnyNode::StmtWith(_)
-            | AnyNode::StmtAsyncWith(_)
-            | AnyNode::StmtMatch(_)
-            | AnyNode::StmtRaise(_)
-            | AnyNode::StmtTry(_)
-            | AnyNode::StmtTryStar(_)
-            | AnyNode::StmtAssert(_)
-            | AnyNode::StmtImport(_)
-            | AnyNode::StmtImportFrom(_)
-            | AnyNode::StmtGlobal(_)
-            | AnyNode::StmtNonlocal(_)
-            | AnyNode::StmtExpr(_)
-            | AnyNode::StmtPass(_)
-            | AnyNode::StmtBreak(_)
-            | AnyNode::StmtContinue(_)
-            | AnyNode::StmtLineMagic(_)
-            | AnyNode::ExprBoolOp(_)
-            | AnyNode::ExprNamedExpr(_)
-            | AnyNode::ExprBinOp(_)
-            | AnyNode::ExprUnaryOp(_)
-            | AnyNode::ExprLambda(_)
-            | AnyNode::ExprIfExp(_)
-            | AnyNode::ExprDict(_)
-            | AnyNode::ExprSet(_)
-            | AnyNode::ExprListComp(_)
-            | AnyNode::ExprSetComp(_)
-            | AnyNode::ExprDictComp(_)
-            | AnyNode::ExprGeneratorExp(_)
-            | AnyNode::ExprAwait(_)
-            | AnyNode::ExprYield(_)
-            | AnyNode::ExprYieldFrom(_)
-            | AnyNode::ExprCompare(_)
-            | AnyNode::ExprCall(_)
-            | AnyNode::ExprFormattedValue(_)
-            | AnyNode::ExprJoinedStr(_)
-            | AnyNode::ExprConstant(_)
-            | AnyNode::ExprAttribute(_)
-            | AnyNode::ExprSubscript(_)
-            | AnyNode::ExprStarred(_)
-            | AnyNode::ExprName(_)
-            | AnyNode::ExprList(_)
-            | AnyNode::ExprTuple(_)
-            | AnyNode::ExprSlice(_)
-            | AnyNode::ExprLineMagic(_)
-            | AnyNode::PatternMatchValue(_)
-            | AnyNode::PatternMatchSingleton(_)
-            | AnyNode::PatternMatchSequence(_)
-            | AnyNode::PatternMatchMapping(_)
-            | AnyNode::PatternMatchClass(_)
-            | AnyNode::PatternMatchStar(_)
-            | AnyNode::PatternMatchAs(_)
-            | AnyNode::PatternMatchOr(_)
-            | AnyNode::ExceptHandlerExceptHandler(_)
             | AnyNode::Comprehension(_)
             | AnyNode::Arguments(_)
             | AnyNode::Arg(_)
@@ -666,10 +570,6 @@ impl AnyNode {
 
     pub const fn is_except_handler(&self) -> bool {
         self.as_ref().is_except_handler()
-    }
-
-    pub const fn is_type_ignore(&self) -> bool {
-        self.as_ref().is_type_ignore()
     }
 
     pub const fn as_ref(&self) -> AnyNodeRef {
@@ -744,7 +644,6 @@ impl AnyNode {
             Self::PatternMatchStar(node) => AnyNodeRef::PatternMatchStar(node),
             Self::PatternMatchAs(node) => AnyNodeRef::PatternMatchAs(node),
             Self::PatternMatchOr(node) => AnyNodeRef::PatternMatchOr(node),
-            Self::TypeIgnoreTypeIgnore(node) => AnyNodeRef::TypeIgnoreTypeIgnore(node),
             Self::Comprehension(node) => AnyNodeRef::Comprehension(node),
             Self::Arguments(node) => AnyNodeRef::Arguments(node),
             Self::Arg(node) => AnyNodeRef::Arg(node),
@@ -2755,34 +2654,6 @@ impl AstNode for ast::PatternMatchOr {
         AnyNode::from(self)
     }
 }
-impl AstNode for ast::TypeIgnoreTypeIgnore {
-    fn cast(kind: AnyNode) -> Option<Self>
-    where
-        Self: Sized,
-    {
-        if let AnyNode::TypeIgnoreTypeIgnore(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::TypeIgnoreTypeIgnore(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn as_any_node_ref(&self) -> AnyNodeRef {
-        AnyNodeRef::from(self)
-    }
-
-    fn into_any_node(self) -> AnyNode {
-        AnyNode::from(self)
-    }
-}
 
 impl AstNode for Comprehension {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -3226,14 +3097,6 @@ impl From<ExceptHandler> for AnyNode {
     }
 }
 
-impl From<TypeIgnore> for AnyNode {
-    fn from(ignore: TypeIgnore) -> Self {
-        match ignore {
-            TypeIgnore::TypeIgnore(ignore) => AnyNode::TypeIgnoreTypeIgnore(ignore),
-        }
-    }
-}
-
 impl From<ast::ModModule> for AnyNode {
     fn from(node: ast::ModModule) -> Self {
         AnyNode::ModModule(node)
@@ -3660,12 +3523,6 @@ impl From<ast::PatternMatchOr> for AnyNode {
     }
 }
 
-impl From<ast::TypeIgnoreTypeIgnore> for AnyNode {
-    fn from(node: ast::TypeIgnoreTypeIgnore) -> Self {
-        AnyNode::TypeIgnoreTypeIgnore(node)
-    }
-}
-
 impl From<Comprehension> for AnyNode {
     fn from(node: Comprehension) -> Self {
         AnyNode::Comprehension(node)
@@ -3802,7 +3659,6 @@ impl Ranged for AnyNode {
             AnyNode::PatternMatchStar(node) => node.range(),
             AnyNode::PatternMatchAs(node) => node.range(),
             AnyNode::PatternMatchOr(node) => node.range(),
-            AnyNode::TypeIgnoreTypeIgnore(node) => node.range(),
             AnyNode::Comprehension(node) => node.range(),
             AnyNode::Arguments(node) => node.range(),
             AnyNode::Arg(node) => node.range(),
@@ -3892,7 +3748,6 @@ pub enum AnyNodeRef<'a> {
     PatternMatchStar(&'a ast::PatternMatchStar),
     PatternMatchAs(&'a ast::PatternMatchAs),
     PatternMatchOr(&'a ast::PatternMatchOr),
-    TypeIgnoreTypeIgnore(&'a ast::TypeIgnoreTypeIgnore),
     Comprehension(&'a Comprehension),
     Arguments(&'a Arguments),
     Arg(&'a Arg),
@@ -3981,7 +3836,6 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::PatternMatchStar(node) => NonNull::from(*node).cast(),
             AnyNodeRef::PatternMatchAs(node) => NonNull::from(*node).cast(),
             AnyNodeRef::PatternMatchOr(node) => NonNull::from(*node).cast(),
-            AnyNodeRef::TypeIgnoreTypeIgnore(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Comprehension(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Arguments(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Arg(node) => NonNull::from(*node).cast(),
@@ -4076,7 +3930,6 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::PatternMatchStar(_) => NodeKind::PatternMatchStar,
             AnyNodeRef::PatternMatchAs(_) => NodeKind::PatternMatchAs,
             AnyNodeRef::PatternMatchOr(_) => NodeKind::PatternMatchOr,
-            AnyNodeRef::TypeIgnoreTypeIgnore(_) => NodeKind::TypeIgnoreTypeIgnore,
             AnyNodeRef::Comprehension(_) => NodeKind::Comprehension,
             AnyNodeRef::Arguments(_) => NodeKind::Arguments,
             AnyNodeRef::Arg(_) => NodeKind::Arg,
@@ -4166,7 +4019,6 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::PatternMatchStar(_)
             | AnyNodeRef::PatternMatchAs(_)
             | AnyNodeRef::PatternMatchOr(_)
-            | AnyNodeRef::TypeIgnoreTypeIgnore(_)
             | AnyNodeRef::Comprehension(_)
             | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Arg(_)
@@ -4256,7 +4108,6 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::PatternMatchStar(_)
             | AnyNodeRef::PatternMatchAs(_)
             | AnyNodeRef::PatternMatchOr(_)
-            | AnyNodeRef::TypeIgnoreTypeIgnore(_)
             | AnyNodeRef::Comprehension(_)
             | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Arg(_)
@@ -4346,7 +4197,6 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::PatternMatchStar(_)
             | AnyNodeRef::PatternMatchAs(_)
             | AnyNodeRef::PatternMatchOr(_)
-            | AnyNodeRef::TypeIgnoreTypeIgnore(_)
             | AnyNodeRef::Comprehension(_)
             | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Arg(_)
@@ -4436,7 +4286,6 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprSlice(_)
             | AnyNodeRef::ExprLineMagic(_)
             | AnyNodeRef::ExceptHandlerExceptHandler(_)
-            | AnyNodeRef::TypeIgnoreTypeIgnore(_)
             | AnyNodeRef::Comprehension(_)
             | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Arg(_)
@@ -4526,97 +4375,6 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::PatternMatchStar(_)
             | AnyNodeRef::PatternMatchAs(_)
             | AnyNodeRef::PatternMatchOr(_)
-            | AnyNodeRef::TypeIgnoreTypeIgnore(_)
-            | AnyNodeRef::Comprehension(_)
-            | AnyNodeRef::Arguments(_)
-            | AnyNodeRef::Arg(_)
-            | AnyNodeRef::ArgWithDefault(_)
-            | AnyNodeRef::Keyword(_)
-            | AnyNodeRef::Alias(_)
-            | AnyNodeRef::WithItem(_)
-            | AnyNodeRef::MatchCase(_)
-            | AnyNodeRef::Decorator(_)
-            | AnyNodeRef::TypeParamTypeVar(_)
-            | AnyNodeRef::TypeParamTypeVarTuple(_)
-            | AnyNodeRef::TypeParamParamSpec(_)
-            | AnyNodeRef::ElifElseClause(_) => false,
-        }
-    }
-
-    pub const fn is_type_ignore(self) -> bool {
-        match self {
-            AnyNodeRef::TypeIgnoreTypeIgnore(_) => true,
-
-            AnyNodeRef::ModModule(_)
-            | AnyNodeRef::ModInteractive(_)
-            | AnyNodeRef::ModExpression(_)
-            | AnyNodeRef::ModFunctionType(_)
-            | AnyNodeRef::StmtFunctionDef(_)
-            | AnyNodeRef::StmtAsyncFunctionDef(_)
-            | AnyNodeRef::StmtClassDef(_)
-            | AnyNodeRef::StmtReturn(_)
-            | AnyNodeRef::StmtDelete(_)
-            | AnyNodeRef::StmtTypeAlias(_)
-            | AnyNodeRef::StmtAssign(_)
-            | AnyNodeRef::StmtAugAssign(_)
-            | AnyNodeRef::StmtAnnAssign(_)
-            | AnyNodeRef::StmtFor(_)
-            | AnyNodeRef::StmtAsyncFor(_)
-            | AnyNodeRef::StmtWhile(_)
-            | AnyNodeRef::StmtIf(_)
-            | AnyNodeRef::StmtWith(_)
-            | AnyNodeRef::StmtAsyncWith(_)
-            | AnyNodeRef::StmtMatch(_)
-            | AnyNodeRef::StmtRaise(_)
-            | AnyNodeRef::StmtTry(_)
-            | AnyNodeRef::StmtTryStar(_)
-            | AnyNodeRef::StmtAssert(_)
-            | AnyNodeRef::StmtImport(_)
-            | AnyNodeRef::StmtImportFrom(_)
-            | AnyNodeRef::StmtGlobal(_)
-            | AnyNodeRef::StmtNonlocal(_)
-            | AnyNodeRef::StmtExpr(_)
-            | AnyNodeRef::StmtPass(_)
-            | AnyNodeRef::StmtBreak(_)
-            | AnyNodeRef::StmtContinue(_)
-            | AnyNodeRef::StmtLineMagic(_)
-            | AnyNodeRef::ExprBoolOp(_)
-            | AnyNodeRef::ExprNamedExpr(_)
-            | AnyNodeRef::ExprBinOp(_)
-            | AnyNodeRef::ExprUnaryOp(_)
-            | AnyNodeRef::ExprLambda(_)
-            | AnyNodeRef::ExprIfExp(_)
-            | AnyNodeRef::ExprDict(_)
-            | AnyNodeRef::ExprSet(_)
-            | AnyNodeRef::ExprListComp(_)
-            | AnyNodeRef::ExprSetComp(_)
-            | AnyNodeRef::ExprDictComp(_)
-            | AnyNodeRef::ExprGeneratorExp(_)
-            | AnyNodeRef::ExprAwait(_)
-            | AnyNodeRef::ExprYield(_)
-            | AnyNodeRef::ExprYieldFrom(_)
-            | AnyNodeRef::ExprCompare(_)
-            | AnyNodeRef::ExprCall(_)
-            | AnyNodeRef::ExprFormattedValue(_)
-            | AnyNodeRef::ExprJoinedStr(_)
-            | AnyNodeRef::ExprConstant(_)
-            | AnyNodeRef::ExprAttribute(_)
-            | AnyNodeRef::ExprSubscript(_)
-            | AnyNodeRef::ExprStarred(_)
-            | AnyNodeRef::ExprName(_)
-            | AnyNodeRef::ExprList(_)
-            | AnyNodeRef::ExprTuple(_)
-            | AnyNodeRef::ExprSlice(_)
-            | AnyNodeRef::ExprLineMagic(_)
-            | AnyNodeRef::PatternMatchValue(_)
-            | AnyNodeRef::PatternMatchSingleton(_)
-            | AnyNodeRef::PatternMatchSequence(_)
-            | AnyNodeRef::PatternMatchMapping(_)
-            | AnyNodeRef::PatternMatchClass(_)
-            | AnyNodeRef::PatternMatchStar(_)
-            | AnyNodeRef::PatternMatchAs(_)
-            | AnyNodeRef::PatternMatchOr(_)
-            | AnyNodeRef::ExceptHandlerExceptHandler(_)
             | AnyNodeRef::Comprehension(_)
             | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Arg(_)
@@ -5090,12 +4848,6 @@ impl<'a> From<&'a ast::PatternMatchOr> for AnyNodeRef<'a> {
     }
 }
 
-impl<'a> From<&'a ast::TypeIgnoreTypeIgnore> for AnyNodeRef<'a> {
-    fn from(node: &'a ast::TypeIgnoreTypeIgnore) -> Self {
-        AnyNodeRef::TypeIgnoreTypeIgnore(node)
-    }
-}
-
 impl<'a> From<&'a Decorator> for AnyNodeRef<'a> {
     fn from(node: &'a Decorator) -> Self {
         AnyNodeRef::Decorator(node)
@@ -5237,14 +4989,6 @@ impl<'a> From<&'a ExceptHandler> for AnyNodeRef<'a> {
     }
 }
 
-impl<'a> From<&'a TypeIgnore> for AnyNodeRef<'a> {
-    fn from(ignore: &'a TypeIgnore) -> Self {
-        match ignore {
-            TypeIgnore::TypeIgnore(ignore) => AnyNodeRef::TypeIgnoreTypeIgnore(ignore),
-        }
-    }
-}
-
 impl<'a> From<&'a Comprehension> for AnyNodeRef<'a> {
     fn from(node: &'a Comprehension) -> Self {
         AnyNodeRef::Comprehension(node)
@@ -5359,7 +5103,6 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::PatternMatchStar(node) => node.range(),
             AnyNodeRef::PatternMatchAs(node) => node.range(),
             AnyNodeRef::PatternMatchOr(node) => node.range(),
-            AnyNodeRef::TypeIgnoreTypeIgnore(node) => node.range(),
             AnyNodeRef::Comprehension(node) => node.range(),
             AnyNodeRef::Arguments(node) => node.range(),
             AnyNodeRef::Arg(node) => node.range(),

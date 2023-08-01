@@ -1,7 +1,7 @@
 use crate::{
     self as ast, Alias, Arg, ArgWithDefault, Arguments, BoolOp, CmpOp, Comprehension, Constant,
     Decorator, ElifElseClause, ExceptHandler, Expr, Keyword, MatchCase, Mod, Operator, Pattern,
-    Stmt, TypeIgnore, TypeParam, TypeParamTypeVar, UnaryOp, WithItem,
+    Stmt, TypeParam, TypeParamTypeVar, UnaryOp, WithItem,
 };
 
 /// Visitor that traverses all nodes recursively in pre-order.
@@ -96,10 +96,6 @@ pub trait PreorderVisitor<'a> {
         walk_body(self, body);
     }
 
-    fn visit_type_ignore(&mut self, type_ignore: &'a TypeIgnore) {
-        walk_type_ignore(self, type_ignore);
-    }
-
     fn visit_elif_else_clause(&mut self, elif_else_clause: &'a ElifElseClause) {
         walk_elif_else_clause(self, elif_else_clause);
     }
@@ -110,15 +106,8 @@ where
     V: PreorderVisitor<'a> + ?Sized,
 {
     match module {
-        Mod::Module(ast::ModModule {
-            body,
-            range: _,
-            type_ignores,
-        }) => {
+        Mod::Module(ast::ModModule { body, range: _ }) => {
             visitor.visit_body(body);
-            for ignore in type_ignores {
-                visitor.visit_type_ignore(ignore);
-            }
         }
         Mod::Interactive(ast::ModInteractive { body, range: _ }) => visitor.visit_body(body),
         Mod::Expression(ast::ModExpression { body, range: _ }) => visitor.visit_expr(body),
@@ -939,13 +928,6 @@ where
             }
         }
     }
-}
-
-#[inline]
-pub fn walk_type_ignore<'a, V>(_visitor: &mut V, _type_ignore: &'a TypeIgnore)
-where
-    V: PreorderVisitor<'a> + ?Sized,
-{
 }
 
 pub fn walk_bool_op<'a, V>(_visitor: &mut V, _bool_op: &'a BoolOp)

@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: bf0ea34f78939474a89bc0d4b6e7c14f370a2d2cd2ca8b98bd5aefdae0e1d5f1
+// sha3: 76f8cd8ac95bef60488dc5962346273abca535cd4aa194edd11cda998a4b211e
 use num_bigint::BigInt;
 use ruff_text_size::TextSize;
 use ruff_python_ast::{self as ast, Ranged, MagicKind};
@@ -30770,7 +30770,7 @@ fn __action1<
     (_, end, _): (TextSize, TextSize, TextSize),
 ) -> ast::Mod
 {
-    ast::ModModule { body, type_ignores: vec![], range: (start..end).into() }.into()
+    ast::ModModule { body, range: (start..end).into() }.into()
 }
 
 #[allow(unused_variables)]
