@@ -1,17 +1,16 @@
 use std::cmp::Ordering;
 
+use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{
     self as ast, Comprehension, Expr, ExprAttribute, ExprBinOp, ExprIfExp, ExprSlice, ExprStarred,
     MatchCase, Parameters, Ranged,
 };
-use ruff_text_size::TextRange;
-
-use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::whitespace::indentation;
 use ruff_python_trivia::{
     indentation_at_offset, PythonWhitespace, SimpleToken, SimpleTokenKind, SimpleTokenizer,
 };
 use ruff_source_file::{Locator, UniversalNewlines};
+use ruff_text_size::TextRange;
 
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
 use crate::expression::expr_slice::{assign_comment_in_slice, ExprSliceCommentSection};
@@ -81,6 +80,7 @@ pub(super) fn place_comment<'a>(
         AnyNodeRef::StmtFunctionDef(_) | AnyNodeRef::StmtAsyncFunctionDef(_) => {
             handle_leading_function_with_decorators_comment(comment)
         }
+        AnyNodeRef::StmtImportFrom(import_from) => handle_import_from_comment(comment, import_from),
         _ => CommentPlacement::Default(comment),
     }
 }
@@ -1103,6 +1103,51 @@ fn find_only_token_in_range(
     let mut tokens = tokens.skip_while(|token| token.kind == SimpleTokenKind::LParen);
     debug_assert_eq!(tokens.next(), None);
     token
+}
+
+/// Attach an enclosed end-of-line comment to a [`StmtImportFrom`].
+///
+/// For example, given:
+/// ```python
+/// from foo import (  # comment
+///    bar,
+/// )
+/// ```
+///
+/// The comment will be attached to the `StmtImportFrom` node as a dangling comment, to ensure
+/// that it remains on the same line as the `StmtImportFrom` itself.
+fn handle_import_from_comment<'a>(
+    comment: DecoratedComment<'a>,
+    import_from: &'a ast::StmtImportFrom,
+) -> CommentPlacement<'a> {
+    // The comment needs to be on the same line, but before the first member. For example, we want
+    // to treat this as a dangling comment:
+    // ```python
+    // from foo import (  # comment
+    //     bar,
+    //     baz,
+    //     qux,
+    // )
+    // ```
+    // However, this should _not_ be treated as a dangling comment:
+    // ```python
+    // from foo import (bar,  # comment
+    //     baz,
+    //     qux,
+    // )
+    // ```
+    // Thus, we check whether the comment is an end-of-line comment _between_ the start of the
+    // statement and the first member. If so, the only possible position is immediately following
+    // the open parenthesis.
+    if comment.line_position().is_end_of_line()
+        && import_from.names.first().is_some_and(|first_name| {
+            import_from.start() < comment.start() && comment.start() < first_name.start()
+        })
+    {
+        CommentPlacement::dangling(comment.enclosing_node(), comment)
+    } else {
+        CommentPlacement::Default(comment)
+    }
 }
 
 // Handle comments inside comprehensions, e.g.
