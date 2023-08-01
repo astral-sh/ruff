@@ -1726,12 +1726,8 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
         return;
     };
 
-    let (Stmt::FunctionDef(ast::StmtFunctionDef {
-        args: arguments, ..
-    })
-    | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-        args: arguments, ..
-    })) = stmt
+    let (Stmt::FunctionDef(ast::StmtFunctionDef { parameters, .. })
+    | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { parameters, .. })) = stmt
     else {
         return;
     };
@@ -1742,11 +1738,11 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
         def,
         default: _,
         range: _,
-    } in arguments
+    } in parameters
         .posonlyargs
         .iter()
-        .chain(&arguments.args)
-        .chain(&arguments.kwonlyargs)
+        .chain(&parameters.args)
+        .chain(&parameters.kwonlyargs)
         .skip(
             // If this is a non-static method, skip `cls` or `self`.
             usize::from(
@@ -1763,7 +1759,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
 
     // Check specifically for `vararg` and `kwarg`, which can be prefixed with a
     // single or double star, respectively.
-    if let Some(arg) = &arguments.vararg {
+    if let Some(arg) = &parameters.vararg {
         let arg_name = arg.arg.as_str();
         let starred_arg_name = format!("*{arg_name}");
         if !arg_name.starts_with('_')
@@ -1773,7 +1769,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
             missing_arg_names.insert(starred_arg_name);
         }
     }
-    if let Some(arg) = &arguments.kwarg {
+    if let Some(arg) = &parameters.kwarg {
         let arg_name = arg.arg.as_str();
         let starred_arg_name = format!("**{arg_name}");
         if !arg_name.starts_with('_')

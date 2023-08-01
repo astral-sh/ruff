@@ -347,22 +347,23 @@ where
 {
     match stmt {
         Stmt::FunctionDef(ast::StmtFunctionDef {
-            args,
+            parameters,
             body,
             decorator_list,
             returns,
             ..
         })
         | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-            args,
+            parameters,
             body,
             decorator_list,
             returns,
             ..
         }) => {
-            args.posonlyargs
+            parameters
+                .posonlyargs
                 .iter()
-                .chain(args.args.iter().chain(args.kwonlyargs.iter()))
+                .chain(parameters.args.iter().chain(parameters.kwonlyargs.iter()))
                 .any(|parameter| {
                     parameter
                         .default
@@ -374,13 +375,15 @@ where
                             .as_ref()
                             .is_some_and(|expr| any_over_expr(expr, func))
                 })
-                || args.vararg.as_ref().is_some_and(|arg| {
-                    arg.annotation
+                || parameters.vararg.as_ref().is_some_and(|parameter| {
+                    parameter
+                        .annotation
                         .as_ref()
                         .is_some_and(|expr| any_over_expr(expr, func))
                 })
-                || args.kwarg.as_ref().is_some_and(|arg| {
-                    arg.annotation
+                || parameters.kwarg.as_ref().is_some_and(|parameter| {
+                    parameter
+                        .annotation
                         .as_ref()
                         .is_some_and(|expr| any_over_expr(expr, func))
                 })

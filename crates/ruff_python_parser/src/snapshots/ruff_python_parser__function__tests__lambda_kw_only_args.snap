@@ -10,7 +10,7 @@ Ok(
                 value: Lambda(
                     ExprLambda {
                         range: 0..20,
-                        args: Parameters {
+                        parameters: Parameters {
                             range: 7..17,
                             posonlyargs: [],
                             args: [],

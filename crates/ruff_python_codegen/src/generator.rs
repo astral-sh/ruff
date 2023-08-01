@@ -205,7 +205,7 @@ impl<'a> Generator<'a> {
         match ast {
             Stmt::FunctionDef(ast::StmtFunctionDef {
                 name,
-                args,
+                parameters,
                 body,
                 returns,
                 decorator_list,
@@ -224,7 +224,7 @@ impl<'a> Generator<'a> {
                     self.p_id(name);
                     self.unparse_type_params(type_params);
                     self.p("(");
-                    self.unparse_parameters(args);
+                    self.unparse_parameters(parameters);
                     self.p(")");
                     if let Some(returns) = returns {
                         self.p(" -> ");
@@ -239,7 +239,7 @@ impl<'a> Generator<'a> {
             }
             Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
                 name,
-                args,
+                parameters,
                 body,
                 returns,
                 decorator_list,
@@ -258,7 +258,7 @@ impl<'a> Generator<'a> {
                     self.p_id(name);
                     self.unparse_type_params(type_params);
                     self.p("(");
-                    self.unparse_parameters(args);
+                    self.unparse_parameters(parameters);
                     self.p(")");
                     if let Some(returns) = returns {
                         self.p(" -> ");
@@ -985,14 +985,14 @@ impl<'a> Generator<'a> {
                 });
             }
             Expr::Lambda(ast::ExprLambda {
-                args,
+                parameters,
                 body,
                 range: _range,
             }) => {
                 group_if!(precedence::LAMBDA, {
-                    let npos = args.args.len() + args.posonlyargs.len();
+                    let npos = parameters.args.len() + parameters.posonlyargs.len();
                     self.p(if npos > 0 { "lambda " } else { "lambda" });
-                    self.unparse_parameters(args);
+                    self.unparse_parameters(parameters);
                     self.p(": ");
                     self.unparse_expr(body, precedence::LAMBDA);
                 });

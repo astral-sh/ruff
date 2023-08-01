@@ -234,9 +234,9 @@ impl Visitor<'_> for RecordVisitor {
         self.exit_node();
     }
 
-    fn visit_parameters(&mut self, arguments: &Parameters) {
-        self.enter_node(arguments);
-        walk_parameters(self, arguments);
+    fn visit_parameters(&mut self, parameters: &Parameters) {
+        self.enter_node(parameters);
+        walk_parameters(self, parameters);
         self.exit_node();
     }
 

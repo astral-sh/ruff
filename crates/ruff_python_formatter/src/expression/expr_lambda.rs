@@ -16,18 +16,20 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
     fn fmt_fields(&self, item: &ExprLambda, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprLambda {
             range: _,
-            args,
+            parameters,
             body,
         } = item;
 
         write!(f, [text("lambda")])?;
 
-        if !args.args.is_empty() {
+        if !parameters.args.is_empty() {
             write!(
                 f,
                 [
                     space(),
-                    args.format().with_options(ParametersParentheses::Never),
+                    parameters
+                        .format()
+                        .with_options(ParametersParentheses::Never),
                 ]
             )?;
         }
@@ -44,7 +46,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                 //     lambda  # Dangling
                 //     : 1
                 // )
-                dangling_node_comments(args.as_ref())
+                dangling_node_comments(parameters.as_ref())
             ]
         )
     }

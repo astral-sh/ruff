@@ -3,17 +3,17 @@ source: crates/ruff_python_ast/tests/visitor.rs
 expression: trace
 ---
 - StmtFunctionDef
-  - Arguments
+  - Parameters
     - ExprConstant
     - ExprConstant
     - ExprConstant
-    - Arg
-    - Arg
-    - Arg
-    - Arg
-    - Arg
-    - Arg
-    - Arg
-    - Arg
+    - Parameter
+    - Parameter
+    - Parameter
+    - Parameter
+    - Parameter
+    - Parameter
+    - Parameter
+    - Parameter
   - StmtPass
 

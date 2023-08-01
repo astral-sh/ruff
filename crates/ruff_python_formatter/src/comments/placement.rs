@@ -44,7 +44,7 @@ pub(super) fn place_comment<'a>(
     // Change comment placement depending on the node type. These can be seen as node-specific
     // fixups.
     match comment.enclosing_node() {
-        AnyNodeRef::Arguments(arguments) => {
+        AnyNodeRef::Parameters(arguments) => {
             handle_parameters_separator_comment(comment, arguments, locator)
         }
         AnyNodeRef::Comprehension(comprehension) => {
@@ -832,11 +832,11 @@ fn handle_leading_function_with_decorators_comment(comment: DecoratedComment) ->
         .preceding_node()
         .is_some_and(|node| node.is_decorator());
 
-    let is_following_arguments = comment
+    let is_following_parameters = comment
         .following_node()
-        .is_some_and(|node| node.is_arguments());
+        .is_some_and(|node| node.is_parameters());
 
-    if comment.line_position().is_own_line() && is_preceding_decorator && is_following_arguments {
+    if comment.line_position().is_own_line() && is_preceding_decorator && is_following_parameters {
         CommentPlacement::dangling(comment.enclosing_node(), comment)
     } else {
         CommentPlacement::Default(comment)

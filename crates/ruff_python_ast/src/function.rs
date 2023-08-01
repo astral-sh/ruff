@@ -51,8 +51,8 @@ impl<'a> AnyFunctionDefinition<'a> {
     /// Returns the function arguments (parameters).
     pub fn arguments(self) -> &'a Parameters {
         match self {
-            Self::FunctionDefinition(definition) => definition.args.as_ref(),
-            Self::AsyncFunctionDefinition(definition) => definition.args.as_ref(),
+            Self::FunctionDefinition(definition) => definition.parameters.as_ref(),
+            Self::AsyncFunctionDefinition(definition) => definition.parameters.as_ref(),
         }
     }
 

@@ -122,7 +122,7 @@ impl From<StmtLineMagic> for Stmt {
 pub struct StmtFunctionDef {
     pub range: TextRange,
     pub name: Identifier,
-    pub args: Box<Parameters>,
+    pub parameters: Box<Parameters>,
     pub body: Vec<Stmt>,
     pub decorator_list: Vec<Decorator>,
     pub returns: Option<Box<Expr>>,
@@ -140,7 +140,7 @@ impl From<StmtFunctionDef> for Stmt {
 pub struct StmtAsyncFunctionDef {
     pub range: TextRange,
     pub name: Identifier,
-    pub args: Box<Parameters>,
+    pub parameters: Box<Parameters>,
     pub body: Vec<Stmt>,
     pub decorator_list: Vec<Decorator>,
     pub returns: Option<Box<Expr>>,
@@ -668,7 +668,7 @@ impl From<ExprUnaryOp> for Expr {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprLambda {
     pub range: TextRange,
-    pub args: Box<Parameters>,
+    pub parameters: Box<Parameters>,
     pub body: Box<Expr>,
 }
 

@@ -116,14 +116,14 @@ pub(crate) fn non_self_return_type(
     name: &str,
     decorator_list: &[Decorator],
     returns: Option<&Expr>,
-    args: &Parameters,
+    parameters: &Parameters,
     async_: bool,
 ) {
     let ScopeKind::Class(class_def) = checker.semantic().scope().kind else {
         return;
     };
 
-    if args.args.is_empty() && args.posonlyargs.is_empty() {
+    if parameters.args.is_empty() && parameters.posonlyargs.is_empty() {
         return;
     }
 

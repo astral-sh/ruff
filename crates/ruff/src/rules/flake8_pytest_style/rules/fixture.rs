@@ -643,8 +643,8 @@ fn check_fixture_decorator_name(checker: &mut Checker, decorator: &Decorator) {
 }
 
 /// PT021
-fn check_fixture_addfinalizer(checker: &mut Checker, args: &Parameters, body: &[Stmt]) {
-    if !includes_arg_name("request", args) {
+fn check_fixture_addfinalizer(checker: &mut Checker, parameters: &Parameters, body: &[Stmt]) {
+    if !includes_arg_name("request", parameters) {
         return;
     }
 
@@ -696,7 +696,7 @@ pub(crate) fn fixture(
     checker: &mut Checker,
     stmt: &Stmt,
     name: &str,
-    args: &Parameters,
+    parameters: &Parameters,
     decorators: &[Decorator],
     body: &[Stmt],
 ) {
@@ -724,7 +724,7 @@ pub(crate) fn fixture(
         }
 
         if checker.enabled(Rule::PytestFixtureFinalizerCallback) {
-            check_fixture_addfinalizer(checker, args, body);
+            check_fixture_addfinalizer(checker, parameters, body);
         }
 
         if checker.enabled(Rule::PytestUnnecessaryAsyncioMarkOnFixture)
@@ -735,6 +735,6 @@ pub(crate) fn fixture(
     }
 
     if checker.enabled(Rule::PytestFixtureParamWithoutValue) && name.starts_with("test_") {
-        check_test_function_args(checker, args);
+        check_test_function_args(checker, parameters);
     }
 }

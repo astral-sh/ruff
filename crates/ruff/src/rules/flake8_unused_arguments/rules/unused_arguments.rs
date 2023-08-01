@@ -324,14 +324,14 @@ pub(crate) fn unused_arguments(
     match &scope.kind {
         ScopeKind::Function(ast::StmtFunctionDef {
             name,
-            args,
+            parameters,
             body,
             decorator_list,
             ..
         })
         | ScopeKind::AsyncFunction(ast::StmtAsyncFunctionDef {
             name,
-            args,
+            parameters,
             body,
             decorator_list,
             ..
@@ -350,7 +350,7 @@ pub(crate) fn unused_arguments(
                     {
                         function(
                             Argumentable::Function,
-                            args,
+                            parameters,
                             scope,
                             checker.semantic(),
                             &checker.settings.dummy_variable_rgx,
@@ -375,7 +375,7 @@ pub(crate) fn unused_arguments(
                     {
                         method(
                             Argumentable::Method,
-                            args,
+                            parameters,
                             scope,
                             checker.semantic(),
                             &checker.settings.dummy_variable_rgx,
@@ -400,7 +400,7 @@ pub(crate) fn unused_arguments(
                     {
                         method(
                             Argumentable::ClassMethod,
-                            args,
+                            parameters,
                             scope,
                             checker.semantic(),
                             &checker.settings.dummy_variable_rgx,
@@ -425,7 +425,7 @@ pub(crate) fn unused_arguments(
                     {
                         function(
                             Argumentable::StaticMethod,
-                            args,
+                            parameters,
                             scope,
                             checker.semantic(),
                             &checker.settings.dummy_variable_rgx,
@@ -439,11 +439,11 @@ pub(crate) fn unused_arguments(
                 }
             }
         }
-        ScopeKind::Lambda(ast::ExprLambda { args, .. }) => {
+        ScopeKind::Lambda(ast::ExprLambda { parameters, .. }) => {
             if checker.enabled(Argumentable::Lambda.rule_code()) {
                 function(
                     Argumentable::Lambda,
-                    args,
+                    parameters,
                     scope,
                     checker.semantic(),
                     &checker.settings.dummy_variable_rgx,

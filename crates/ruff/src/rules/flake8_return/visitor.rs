@@ -46,13 +46,13 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                 return;
             }
             Stmt::FunctionDef(ast::StmtFunctionDef {
-                args,
+                parameters,
                 decorator_list,
                 returns,
                 ..
             })
             | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-                args,
+                parameters,
                 decorator_list,
                 returns,
                 ..
@@ -66,7 +66,7 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                 if let Some(returns) = returns {
                     visitor::walk_expr(self, returns);
                 }
-                visitor::walk_parameters(self, args);
+                visitor::walk_parameters(self, parameters);
                 self.parents.pop();
 
                 // But don't recurse into the body.

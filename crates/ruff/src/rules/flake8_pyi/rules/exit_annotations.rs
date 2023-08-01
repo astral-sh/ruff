@@ -104,7 +104,7 @@ pub(crate) fn bad_exit_annotation(
     checker: &mut Checker,
     is_async: bool,
     name: &Identifier,
-    args: &Parameters,
+    parameters: &Parameters,
 ) {
     let func_kind = match name.as_str() {
         "__exit__" if !is_async => FuncKind::Sync,
@@ -112,16 +112,16 @@ pub(crate) fn bad_exit_annotation(
         _ => return,
     };
 
-    let positional_args = args
+    let positional_args = parameters
         .args
         .iter()
-        .chain(args.posonlyargs.iter())
+        .chain(parameters.posonlyargs.iter())
         .collect::<SmallVec<[&ParameterWithDefault; 4]>>();
 
     // If there are less than three positional arguments, at least one of them must be a star-arg,
     // and it must be annotated with `object`.
     if positional_args.len() < 4 {
-        check_short_args_list(checker, args, func_kind);
+        check_short_args_list(checker, parameters, func_kind);
     }
 
     // Every positional argument (beyond the first four) must have a default.
@@ -140,7 +140,11 @@ pub(crate) fn bad_exit_annotation(
     }
 
     // ...as should all keyword-only arguments.
-    for parameter in args.kwonlyargs.iter().filter(|arg| arg.default.is_none()) {
+    for parameter in parameters
+        .kwonlyargs
+        .iter()
+        .filter(|arg| arg.default.is_none())
+    {
         checker.diagnostics.push(Diagnostic::new(
             BadExitAnnotation {
                 func_kind,
@@ -155,8 +159,8 @@ pub(crate) fn bad_exit_annotation(
 
 /// Determine whether a "short" argument list (i.e., an argument list with less than four elements)
 /// contains a star-args argument annotated with `object`. If not, report an error.
-fn check_short_args_list(checker: &mut Checker, args: &Parameters, func_kind: FuncKind) {
-    if let Some(varargs) = &args.vararg {
+fn check_short_args_list(checker: &mut Checker, parameters: &Parameters, func_kind: FuncKind) {
+    if let Some(varargs) = &parameters.vararg {
         if let Some(annotation) = varargs
             .annotation
             .as_ref()
@@ -187,7 +191,7 @@ fn check_short_args_list(checker: &mut Checker, args: &Parameters, func_kind: Fu
                 func_kind,
                 error_kind: ErrorKind::MissingArgs,
             },
-            args.range(),
+            parameters.range(),
         ));
     }
 }

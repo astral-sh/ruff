@@ -9,7 +9,7 @@ expression: trace
     - TypeParamTypeVar
     - TypeParamTypeVarTuple
     - TypeParamParamSpec
-    - Arguments
+    - Parameters
     - StmtExpr
       - ExprConstant
         - Ellipsis

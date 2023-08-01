@@ -56,8 +56,8 @@ pub trait PreorderVisitor<'a> {
         walk_format_spec(self, format_spec);
     }
 
-    fn visit_parameters(&mut self, arguments: &'a Parameters) {
-        walk_parameters(self, arguments);
+    fn visit_parameters(&mut self, parameters: &'a Parameters) {
+        walk_parameters(self, parameters);
     }
 
     fn visit_parameter(&mut self, arg: &'a Parameter) {
@@ -133,7 +133,7 @@ where
         }) => visitor.visit_expr(value),
 
         Stmt::FunctionDef(ast::StmtFunctionDef {
-            args,
+            parameters,
             body,
             decorator_list,
             returns,
@@ -141,7 +141,7 @@ where
             ..
         })
         | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-            args,
+            parameters,
             body,
             decorator_list,
             returns,
@@ -156,7 +156,7 @@ where
                 visitor.visit_type_param(type_param);
             }
 
-            visitor.visit_parameters(args);
+            visitor.visit_parameters(parameters);
 
             for expr in returns {
                 visitor.visit_annotation(expr);
@@ -469,11 +469,11 @@ where
         }
 
         Expr::Lambda(ast::ExprLambda {
-            args,
+            parameters,
             body,
             range: _range,
         }) => {
-            visitor.visit_parameters(args);
+            visitor.visit_parameters(parameters);
             visitor.visit_expr(body);
         }
 

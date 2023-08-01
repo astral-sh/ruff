@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_python_parser/src/parser.rs
-expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
+expression: "parse_suite(source, \"<test>\").unwrap()"
 ---
 [
     FunctionDef(
@@ -10,7 +10,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 id: "func",
                 range: 4..8,
             },
-            args: Parameters {
+            parameters: Parameters {
                 range: 8..11,
                 posonlyargs: [],
                 args: [
@@ -57,7 +57,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 id: "func",
                 range: 26..30,
             },
-            args: Parameters {
+            parameters: Parameters {
                 range: 33..39,
                 posonlyargs: [],
                 args: [
@@ -131,7 +131,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 id: "func",
                 range: 59..63,
             },
-            args: Parameters {
+            parameters: Parameters {
                 range: 71..77,
                 posonlyargs: [],
                 args: [
@@ -213,7 +213,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 id: "func",
                 range: 97..101,
             },
-            args: Parameters {
+            parameters: Parameters {
                 range: 118..124,
                 posonlyargs: [],
                 args: [
@@ -310,7 +310,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 id: "func",
                 range: 144..148,
             },
-            args: Parameters {
+            parameters: Parameters {
                 range: 153..162,
                 posonlyargs: [],
                 args: [],
@@ -377,7 +377,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 id: "func",
                 range: 177..181,
             },
-            args: Parameters {
+            parameters: Parameters {
                 range: 186..221,
                 posonlyargs: [],
                 args: [],
@@ -475,7 +475,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                 id: "func",
                 range: 236..240,
             },
-            args: Parameters {
+            parameters: Parameters {
                 range: 261..263,
                 posonlyargs: [],
                 args: [],

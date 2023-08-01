@@ -59,7 +59,7 @@ pub(crate) fn invalid_first_argument_name_for_class_method(
     scope: &Scope,
     name: &str,
     decorator_list: &[Decorator],
-    args: &Parameters,
+    parameters: &Parameters,
 ) -> Option<Diagnostic> {
     if !matches!(
         function_type::classify(
@@ -78,7 +78,10 @@ pub(crate) fn invalid_first_argument_name_for_class_method(
         def,
         default: _,
         range: _,
-    }) = args.posonlyargs.first().or_else(|| args.args.first())
+    }) = parameters
+        .posonlyargs
+        .first()
+        .or_else(|| parameters.args.first())
     {
         if &def.arg != "cls" {
             if checker

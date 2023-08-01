@@ -229,11 +229,11 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast> {
         self.finish_node(format_spec);
     }
 
-    fn visit_parameters(&mut self, arguments: &'ast Parameters) {
-        if self.start_node(arguments).is_traverse() {
-            walk_parameters(self, arguments);
+    fn visit_parameters(&mut self, parameters: &'ast Parameters) {
+        if self.start_node(parameters).is_traverse() {
+            walk_parameters(self, parameters);
         }
-        self.finish_node(arguments);
+        self.finish_node(parameters);
     }
 
     fn visit_parameter(&mut self, arg: &'ast Parameter) {

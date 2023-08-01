@@ -53,12 +53,12 @@ impl Violation for RedundantNumericUnion {
 }
 
 /// PYI041
-pub(crate) fn redundant_numeric_union(checker: &mut Checker, args: &Parameters) {
-    for annotation in args
+pub(crate) fn redundant_numeric_union(checker: &mut Checker, parameters: &Parameters) {
+    for annotation in parameters
         .args
         .iter()
-        .chain(args.posonlyargs.iter())
-        .chain(args.kwonlyargs.iter())
+        .chain(parameters.posonlyargs.iter())
+        .chain(parameters.kwonlyargs.iter())
         .filter_map(|arg| arg.def.annotation.as_ref())
     {
         check_annotation(checker, annotation);
@@ -67,10 +67,10 @@ pub(crate) fn redundant_numeric_union(checker: &mut Checker, args: &Parameters) 
     // If annotations on `args` or `kwargs` are flagged by this rule, the annotations themselves
     // are not accurate, but check them anyway. It's possible that flagging them will help the user
     // realize they're incorrect.
-    for annotation in args
+    for annotation in parameters
         .vararg
         .iter()
-        .chain(args.kwarg.iter())
+        .chain(parameters.kwarg.iter())
         .filter_map(|arg| arg.annotation.as_ref())
     {
         check_annotation(checker, annotation);

@@ -103,7 +103,7 @@ pub fn walk_elif_else_clause<'a, V: Visitor<'a> + ?Sized>(
 pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
     match stmt {
         Stmt::FunctionDef(ast::StmtFunctionDef {
-            args,
+            parameters,
             body,
             decorator_list,
             returns,
@@ -116,14 +116,14 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             for type_param in type_params {
                 visitor.visit_type_param(type_param);
             }
-            visitor.visit_parameters(args);
+            visitor.visit_parameters(parameters);
             for expr in returns {
                 visitor.visit_annotation(expr);
             }
             visitor.visit_body(body);
         }
         Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-            args,
+            parameters,
             body,
             decorator_list,
             returns,
@@ -136,7 +136,7 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             for type_param in type_params {
                 visitor.visit_type_param(type_param);
             }
-            visitor.visit_parameters(args);
+            visitor.visit_parameters(parameters);
             for expr in returns {
                 visitor.visit_annotation(expr);
             }
@@ -411,11 +411,11 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
             visitor.visit_expr(operand);
         }
         Expr::Lambda(ast::ExprLambda {
-            args,
+            parameters,
             body,
             range: _range,
         }) => {
-            visitor.visit_parameters(args);
+            visitor.visit_parameters(parameters);
             visitor.visit_expr(body);
         }
         Expr::IfExp(ast::ExprIfExp {

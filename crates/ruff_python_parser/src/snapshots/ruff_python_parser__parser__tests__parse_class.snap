@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_python_parser/src/parser.rs
-expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
+expression: "parse_suite(source, \"<test>\").unwrap()"
 ---
 [
     ClassDef(
@@ -35,7 +35,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                             id: "__init__",
                             range: 22..30,
                         },
-                        args: Parameters {
+                        parameters: Parameters {
                             range: 30..36,
                             posonlyargs: [],
                             args: [
@@ -75,7 +75,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                             id: "method_with_default",
                             range: 50..69,
                         },
-                        args: Parameters {
+                        parameters: Parameters {
                             range: 69..90,
                             posonlyargs: [],
                             args: [

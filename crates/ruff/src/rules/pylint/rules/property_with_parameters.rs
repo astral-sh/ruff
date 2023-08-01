@@ -51,7 +51,7 @@ pub(crate) fn property_with_parameters(
     checker: &mut Checker,
     stmt: &Stmt,
     decorator_list: &[Decorator],
-    args: &Parameters,
+    parameters: &Parameters,
 ) {
     if !decorator_list
         .iter()
@@ -59,11 +59,11 @@ pub(crate) fn property_with_parameters(
     {
         return;
     }
-    if args
+    if parameters
         .posonlyargs
         .iter()
-        .chain(&args.args)
-        .chain(&args.kwonlyargs)
+        .chain(&parameters.args)
+        .chain(&parameters.kwonlyargs)
         .count()
         > 1
         && checker.semantic().is_builtin("property")

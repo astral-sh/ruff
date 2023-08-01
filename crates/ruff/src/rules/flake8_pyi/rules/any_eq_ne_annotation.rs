@@ -53,16 +53,16 @@ impl AlwaysAutofixableViolation for AnyEqNeAnnotation {
 }
 
 /// PYI032
-pub(crate) fn any_eq_ne_annotation(checker: &mut Checker, name: &str, args: &Parameters) {
+pub(crate) fn any_eq_ne_annotation(checker: &mut Checker, name: &str, parameters: &Parameters) {
     if !matches!(name, "__eq__" | "__ne__") {
         return;
     }
 
-    if args.args.len() != 2 {
+    if parameters.args.len() != 2 {
         return;
     }
 
-    let Some(annotation) = &args.args[1].def.annotation else {
+    let Some(annotation) = &parameters.args[1].def.annotation else {
         return;
     };
 

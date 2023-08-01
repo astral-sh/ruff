@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_python_parser/src/parser.rs
-expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
+expression: "parse_suite(source, \"<test>\").unwrap()"
 ---
 [
     Expr(
@@ -645,7 +645,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
             value: Lambda(
                 ExprLambda {
                     range: 507..535,
-                    args: Parameters {
+                    parameters: Parameters {
                         range: 514..519,
                         posonlyargs: [],
                         args: [

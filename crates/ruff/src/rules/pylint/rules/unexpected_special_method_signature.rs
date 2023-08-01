@@ -141,24 +141,31 @@ pub(crate) fn unexpected_special_method_signature(
     stmt: &Stmt,
     name: &str,
     decorator_list: &[Decorator],
-    args: &Parameters,
+    parameters: &Parameters,
 ) {
     if !checker.semantic().scope().kind.is_class() {
         return;
     }
 
     // Ignore methods with positional-only or keyword-only parameters, or variadic parameters.
-    if !args.posonlyargs.is_empty() || !args.kwonlyargs.is_empty() || args.kwarg.is_some() {
+    if !parameters.posonlyargs.is_empty()
+        || !parameters.kwonlyargs.is_empty()
+        || parameters.kwarg.is_some()
+    {
         return;
     }
 
     // Method has no parameter, will be caught by no-method-argument (E0211/N805).
-    if args.args.is_empty() && args.vararg.is_none() {
+    if parameters.args.is_empty() && parameters.vararg.is_none() {
         return;
     }
 
-    let actual_params = args.args.len();
-    let mandatory_params = args.args.iter().filter(|arg| arg.default.is_none()).count();
+    let actual_params = parameters.args.len();
+    let mandatory_params = parameters
+        .args
+        .iter()
+        .filter(|arg| arg.default.is_none())
+        .count();
 
     let Some(expected_params) =
         ExpectedParams::from_method(name, is_staticmethod(decorator_list, checker.semantic()))
@@ -171,12 +178,12 @@ pub(crate) fn unexpected_special_method_signature(
             if mandatory_params >= min {
                 mandatory_params <= max
             } else {
-                args.vararg.is_some() || actual_params <= max
+                parameters.vararg.is_some() || actual_params <= max
             }
         }
         ExpectedParams::Fixed(expected) => match expected.cmp(&mandatory_params) {
             Ordering::Less => false,
-            Ordering::Greater => args.vararg.is_some() || actual_params >= expected,
+            Ordering::Greater => parameters.vararg.is_some() || actual_params >= expected,
             Ordering::Equal => true,
         },
     };

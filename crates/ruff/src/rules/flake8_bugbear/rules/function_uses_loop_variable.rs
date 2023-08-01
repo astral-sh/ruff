@@ -86,8 +86,12 @@ struct SuspiciousVariablesVisitor<'a> {
 impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
-            Stmt::FunctionDef(ast::StmtFunctionDef { args, body, .. })
-            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { args, body, .. }) => {
+            Stmt::FunctionDef(ast::StmtFunctionDef {
+                parameters, body, ..
+            })
+            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
+                parameters, body, ..
+            }) => {
                 // Collect all loaded variable names.
                 let mut visitor = LoadedNamesVisitor::default();
                 visitor.visit_body(body);
@@ -99,7 +103,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                             return false;
                         }
 
-                        if includes_arg_name(&loaded.id, args) {
+                        if includes_arg_name(&loaded.id, parameters) {
                             return false;
                         }
 
@@ -165,7 +169,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                 }
             }
             Expr::Lambda(ast::ExprLambda {
-                args,
+                parameters,
                 body,
                 range: _,
             }) => {
@@ -181,7 +185,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                                 return false;
                             }
 
-                            if includes_arg_name(&loaded.id, args) {
+                            if includes_arg_name(&loaded.id, parameters) {
                                 return false;
                             }
 

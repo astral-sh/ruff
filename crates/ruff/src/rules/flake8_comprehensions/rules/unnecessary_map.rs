@@ -98,11 +98,14 @@ pub(crate) fn unnecessary_map(
             };
 
             // Only flag, e.g., `map(lambda x: x + 1, iterable)`.
-            let [Expr::Lambda(ast::ExprLambda { args, body, .. }), _] = args else {
+            let [Expr::Lambda(ast::ExprLambda {
+                parameters, body, ..
+            }), _] = args
+            else {
                 return;
             };
 
-            if late_binding(args, body) {
+            if late_binding(parameters, body) {
                 return;
             }
         }
@@ -121,11 +124,14 @@ pub(crate) fn unnecessary_map(
                 return;
             };
 
-            let Expr::Lambda(ast::ExprLambda { args, body, .. }) = argument else {
+            let Expr::Lambda(ast::ExprLambda {
+                parameters, body, ..
+            }) = argument
+            else {
                 return;
             };
 
-            if late_binding(args, body) {
+            if late_binding(parameters, body) {
                 return;
             }
         }
@@ -140,7 +146,10 @@ pub(crate) fn unnecessary_map(
                 return;
             };
 
-            let Expr::Lambda(ast::ExprLambda { args, body, .. }) = argument else {
+            let Expr::Lambda(ast::ExprLambda {
+                parameters, body, ..
+            }) = argument
+            else {
                 return;
             };
 
@@ -154,7 +163,7 @@ pub(crate) fn unnecessary_map(
                 return;
             }
 
-            if late_binding(args, body) {
+            if late_binding(parameters, body) {
                 return;
             }
         }
@@ -243,8 +252,8 @@ impl<'a> Visitor<'a> for LateBindingVisitor<'a> {
 
     fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
-            Expr::Lambda(ast::ExprLambda { args, .. }) => {
-                self.lambdas.push(args);
+            Expr::Lambda(ast::ExprLambda { parameters, .. }) => {
+                self.lambdas.push(parameters);
                 visitor::walk_expr(self, expr);
                 self.lambdas.pop();
             }

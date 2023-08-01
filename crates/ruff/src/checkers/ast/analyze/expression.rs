@@ -1256,7 +1256,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
         }
         Expr::Lambda(
             lambda @ ast::ExprLambda {
-                args: _,
+                parameters: _,
                 body: _,
                 range: _,
             },

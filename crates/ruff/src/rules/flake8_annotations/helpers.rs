@@ -10,7 +10,7 @@ pub(super) fn match_function_def(
     match stmt {
         Stmt::FunctionDef(ast::StmtFunctionDef {
             name,
-            args,
+            parameters,
             returns,
             body,
             decorator_list,
@@ -18,14 +18,14 @@ pub(super) fn match_function_def(
         })
         | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
             name,
-            args,
+            parameters,
             returns,
             body,
             decorator_list,
             ..
         }) => (
             name,
-            args,
+            parameters,
             returns.as_ref().map(AsRef::as_ref),
             body,
             decorator_list,

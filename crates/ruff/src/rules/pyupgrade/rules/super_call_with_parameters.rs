@@ -98,7 +98,8 @@ pub(crate) fn super_call_with_parameters(
 
     // Find the enclosing function definition (if any).
     let Some(Stmt::FunctionDef(ast::StmtFunctionDef {
-        args: parent_args, ..
+        parameters: parent_parameters,
+        ..
     })) = parents.find(|stmt| stmt.is_function_def_stmt())
     else {
         return;
@@ -110,7 +111,7 @@ pub(crate) fn super_call_with_parameters(
             arg: parent_arg, ..
         },
         ..
-    }) = parent_args.args.first()
+    }) = parent_parameters.args.first()
     else {
         return;
     };

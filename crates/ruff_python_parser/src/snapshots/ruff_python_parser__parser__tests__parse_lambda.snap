@@ -9,7 +9,7 @@ expression: parse_ast
             value: Lambda(
                 ExprLambda {
                     range: 0..18,
-                    args: Parameters {
+                    parameters: Parameters {
                         range: 7..11,
                         posonlyargs: [],
                         args: [

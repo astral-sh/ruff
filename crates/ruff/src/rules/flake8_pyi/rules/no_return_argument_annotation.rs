@@ -47,12 +47,12 @@ impl Violation for NoReturnArgumentAnnotationInStub {
 }
 
 /// PYI050
-pub(crate) fn no_return_argument_annotation(checker: &mut Checker, args: &Parameters) {
-    for annotation in args
+pub(crate) fn no_return_argument_annotation(checker: &mut Checker, parameters: &Parameters) {
+    for annotation in parameters
         .posonlyargs
         .iter()
-        .chain(&args.args)
-        .chain(&args.kwonlyargs)
+        .chain(&parameters.args)
+        .chain(&parameters.kwonlyargs)
         .filter_map(|arg| arg.def.annotation.as_ref())
     {
         if checker.semantic().match_typing_expr(annotation, "NoReturn") {

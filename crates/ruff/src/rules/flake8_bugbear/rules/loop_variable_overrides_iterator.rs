@@ -71,7 +71,7 @@ where
                 }
             }
             Expr::Lambda(ast::ExprLambda {
-                args,
+                parameters,
                 body,
                 range: _,
             }) => {
@@ -80,11 +80,11 @@ where
                     def,
                     default: _,
                     range: _,
-                } in args
+                } in parameters
                     .posonlyargs
                     .iter()
-                    .chain(&args.args)
-                    .chain(&args.kwonlyargs)
+                    .chain(&parameters.args)
+                    .chain(&parameters.kwonlyargs)
                 {
                     self.names.remove(def.arg.as_str());
                 }
