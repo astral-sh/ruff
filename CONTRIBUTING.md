@@ -69,7 +69,7 @@ and pre-commit to run some validation checks:
 pipx install pre-commit  # or `pip install pre-commit` if you have a virtualenv
 ```
 
-You can optionally run the following command to run the validation checks as a git hook
+You can optionally install pre-commit hooks to automatically run the validation checks
 when making a commit:
 
 ```shell
