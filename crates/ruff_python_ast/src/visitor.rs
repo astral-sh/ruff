@@ -664,16 +664,16 @@ pub fn walk_parameters<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, parameters:
     }
 
     for arg in &parameters.posonlyargs {
-        visitor.visit_parameter(&arg.def);
+        visitor.visit_parameter(&arg.parameter);
     }
     for arg in &parameters.args {
-        visitor.visit_parameter(&arg.def);
+        visitor.visit_parameter(&arg.parameter);
     }
     if let Some(arg) = &parameters.vararg {
         visitor.visit_parameter(arg);
     }
     for arg in &parameters.kwonlyargs {
-        visitor.visit_parameter(&arg.def);
+        visitor.visit_parameter(&arg.parameter);
     }
     if let Some(arg) = &parameters.kwarg {
         visitor.visit_parameter(arg);

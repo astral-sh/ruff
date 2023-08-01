@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: 9d48ea8f9d9a0a466240b3334066323fb9659fd9efe31f8748e4b940cd71b5e1
+// sha3: c7811af123576ce856886b56b55a0ac5e2f03c8b7458080b2b83fb3bec3d52ef
 use num_bigint::BigInt;
 use ruff_text_size::TextSize;
 use ruff_python_ast::{self as ast, Ranged, MagicKind};
@@ -33553,8 +33553,8 @@ fn __action165<
 ) -> ast::ParameterWithDefault
 {
     {
-        let def = ast::Parameter { arg, annotation: None, range: (location..end_location).into() };
-        ast::ParameterWithDefault { def, default: None, range: (location..end_location).into() }
+        let def = ast::Parameter { name:arg, annotation: None, range: (location..end_location).into() };
+        ast::ParameterWithDefault { parameter:def, default: None, range: (location..end_location).into() }
     }
 }
 
@@ -33568,7 +33568,7 @@ fn __action166<
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Parameter
 {
-    ast::Parameter { arg, annotation: None, range: (location..end_location).into() }
+    ast::Parameter { name:arg, annotation: None, range: (location..end_location).into() }
 }
 
 #[allow(unused_variables)]
@@ -33584,8 +33584,8 @@ fn __action167<
 {
     {
         let annotation = a.map(Box::new);
-        let def = ast::Parameter { arg, annotation, range: (location..end_location).into() };
-        ast::ParameterWithDefault { def, default: None, range: (location..end_location).into() }
+        let def = ast::Parameter { name:arg, annotation, range: (location..end_location).into() };
+        ast::ParameterWithDefault { parameter:def, default: None, range: (location..end_location).into() }
     }
 }
 
@@ -33602,7 +33602,7 @@ fn __action168<
 {
     {
         let annotation = a.map(Box::new);
-        ast::Parameter { arg, annotation, range: (location..end_location).into() }
+        ast::Parameter { name:arg, annotation, range: (location..end_location).into() }
     }
 }
 
@@ -33619,7 +33619,7 @@ fn __action169<
 {
     {
         let annotation = a.map(Box::new);
-        ast::Parameter { arg, annotation, range: (location..end_location).into() }
+        ast::Parameter { name:arg, annotation, range: (location..end_location).into() }
     }
 }
 

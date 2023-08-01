@@ -1735,7 +1735,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
     // Look for arguments that weren't included in the docstring.
     let mut missing_arg_names: FxHashSet<String> = FxHashSet::default();
     for ParameterWithDefault {
-        def,
+        parameter,
         default: _,
         range: _,
     } in parameters
@@ -1751,7 +1751,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
             ),
         )
     {
-        let arg_name = def.arg.as_str();
+        let arg_name = parameter.name.as_str();
         if !arg_name.starts_with('_') && !docstrings_args.contains(arg_name) {
             missing_arg_names.insert(arg_name.to_string());
         }
@@ -1760,7 +1760,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
     // Check specifically for `vararg` and `kwarg`, which can be prefixed with a
     // single or double star, respectively.
     if let Some(arg) = &parameters.vararg {
-        let arg_name = arg.arg.as_str();
+        let arg_name = arg.name.as_str();
         let starred_arg_name = format!("*{arg_name}");
         if !arg_name.starts_with('_')
             && !docstrings_args.contains(arg_name)
@@ -1770,7 +1770,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
         }
     }
     if let Some(arg) = &parameters.kwarg {
-        let arg_name = arg.arg.as_str();
+        let arg_name = arg.name.as_str();
         let starred_arg_name = format!("**{arg_name}");
         if !arg_name.starts_with('_')
             && !docstrings_args.contains(arg_name)

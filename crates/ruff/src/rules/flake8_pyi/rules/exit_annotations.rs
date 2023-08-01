@@ -213,7 +213,7 @@ fn check_positional_args(
     ];
 
     for (arg, (error_info, predicate)) in positional_args.iter().skip(1).take(3).zip(validations) {
-        let Some(annotation) = arg.def.annotation.as_ref() else {
+        let Some(annotation) = arg.parameter.annotation.as_ref() else {
             continue;
         };
 

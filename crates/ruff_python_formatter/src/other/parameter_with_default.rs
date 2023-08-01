@@ -11,14 +11,14 @@ impl FormatNodeRule<ParameterWithDefault> for FormatParameterWithDefault {
     fn fmt_fields(&self, item: &ParameterWithDefault, f: &mut PyFormatter) -> FormatResult<()> {
         let ParameterWithDefault {
             range: _,
-            def,
+            parameter,
             default,
         } = item;
 
-        write!(f, [def.format()])?;
+        write!(f, [parameter.format()])?;
 
         if let Some(default) = default {
-            let space = def.annotation.is_some().then_some(space());
+            let space = parameter.annotation.is_some().then_some(space());
             write!(f, [space, text("="), space, group(&default.format())])?;
         }
 

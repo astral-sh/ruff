@@ -73,7 +73,7 @@ pub(crate) fn check_boolean_default_value_in_function_definition(
     }
 
     for ParameterWithDefault {
-        def: _,
+        parameter: _,
         default,
         range: _,
     } in parameters.args.iter().chain(&parameters.posonlyargs)

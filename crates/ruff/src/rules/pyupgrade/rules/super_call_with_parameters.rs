@@ -107,8 +107,8 @@ pub(crate) fn super_call_with_parameters(
 
     // Extract the name of the first argument to the enclosing function.
     let Some(ParameterWithDefault {
-        def: Parameter {
-            arg: parent_arg, ..
+        parameter: Parameter {
+            name: parent_arg, ..
         },
         ..
     }) = parent_parameters.args.first()

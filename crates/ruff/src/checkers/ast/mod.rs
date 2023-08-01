@@ -491,7 +491,7 @@ where
                     .chain(&parameters.args)
                     .chain(&parameters.kwonlyargs)
                 {
-                    if let Some(expr) = &parameter_with_default.def.annotation {
+                    if let Some(expr) = &parameter_with_default.parameter.annotation {
                         if runtime_annotation {
                             self.visit_runtime_annotation(expr);
                         } else {
@@ -896,7 +896,7 @@ where
                 // Visit the default arguments, but avoid the body, which will be deferred.
                 for ParameterWithDefault {
                     default,
-                    def: _,
+                    parameter: _,
                     range: _,
                 } in parameters
                     .posonlyargs
@@ -1298,16 +1298,16 @@ where
         // Bind, but intentionally avoid walking default expressions, as we handle them
         // upstream.
         for parameter_with_default in &parameters.posonlyargs {
-            self.visit_parameter(&parameter_with_default.def);
+            self.visit_parameter(&parameter_with_default.parameter);
         }
         for parameter_with_default in &parameters.args {
-            self.visit_parameter(&parameter_with_default.def);
+            self.visit_parameter(&parameter_with_default.parameter);
         }
         if let Some(arg) = &parameters.vararg {
             self.visit_parameter(arg);
         }
         for parameter_with_default in &parameters.kwonlyargs {
-            self.visit_parameter(&parameter_with_default.def);
+            self.visit_parameter(&parameter_with_default.parameter);
         }
         if let Some(arg) = &parameters.kwarg {
             self.visit_parameter(arg);
@@ -1322,7 +1322,7 @@ where
         // Bind, but intentionally avoid walking the annotation, as we handle it
         // upstream.
         self.add_binding(
-            &parameter.arg,
+            &parameter.name,
             parameter.identifier(),
             BindingKind::Argument,
             BindingFlags::empty(),

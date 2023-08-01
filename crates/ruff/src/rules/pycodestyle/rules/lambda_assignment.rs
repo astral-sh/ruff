@@ -196,11 +196,11 @@ fn function(
                 .iter()
                 .enumerate()
                 .map(|(idx, parameter)| ParameterWithDefault {
-                    def: Parameter {
+                    parameter: Parameter {
                         annotation: arg_types
                             .get(idx)
                             .map(|arg_type| Box::new(arg_type.clone())),
-                        ..parameter.def.clone()
+                        ..parameter.parameter.clone()
                     },
                     ..parameter.clone()
                 })
@@ -210,11 +210,11 @@ fn function(
                 .iter()
                 .enumerate()
                 .map(|(idx, parameter)| ParameterWithDefault {
-                    def: Parameter {
+                    parameter: Parameter {
                         annotation: arg_types
                             .get(idx + new_posonlyargs.len())
                             .map(|arg_type| Box::new(arg_type.clone())),
-                        ..parameter.def.clone()
+                        ..parameter.parameter.clone()
                     },
                     ..parameter.clone()
                 })

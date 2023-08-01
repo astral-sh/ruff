@@ -76,7 +76,7 @@ pub(crate) fn invalid_first_argument_name_for_method(
         .posonlyargs
         .first()
         .or_else(|| parameters.args.first())?;
-    if &arg.def.arg == "self" {
+    if &arg.parameter.name == "self" {
         return None;
     }
     if checker
@@ -90,6 +90,6 @@ pub(crate) fn invalid_first_argument_name_for_method(
     }
     Some(Diagnostic::new(
         InvalidFirstArgumentNameForMethod,
-        arg.def.range(),
+        arg.parameter.range(),
     ))
 }

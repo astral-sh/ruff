@@ -118,7 +118,7 @@ pub(crate) fn function_call_in_argument_default(checker: &mut Checker, parameter
         let mut visitor = ArgumentDefaultVisitor::new(checker.semantic(), extend_immutable_calls);
         for ParameterWithDefault {
             default,
-            def: _,
+            parameter: _,
             range: _,
         } in parameters
             .posonlyargs

@@ -47,7 +47,7 @@ impl Identifier for Parameter {
     ///     ...
     /// ```
     fn identifier(&self) -> TextRange {
-        self.arg.range()
+        self.name.range()
     }
 }
 
@@ -60,7 +60,7 @@ impl Identifier for ParameterWithDefault {
     ///     ...
     /// ```
     fn identifier(&self) -> TextRange {
-        self.def.identifier()
+        self.parameter.identifier()
     }
 }
 

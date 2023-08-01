@@ -715,9 +715,9 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                         args: [
                             ParameterWithDefault {
                                 range: 598..603,
-                                def: Parameter {
+                                parameter: Parameter {
                                     range: 598..603,
-                                    arg: Identifier {
+                                    name: Identifier {
                                         id: "query",
                                         range: 598..603,
                                     },

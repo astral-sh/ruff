@@ -615,17 +615,17 @@ fn check_test_function_args(checker: &mut Checker, parameters: &Parameters) {
         .chain(&parameters.kwonlyargs)
         .for_each(
             |ParameterWithDefault {
-                 def,
+                 parameter,
                  default: _,
                  range: _,
              }| {
-                let name = &def.arg;
+                let name = &parameter.name;
                 if name.starts_with('_') {
                     checker.diagnostics.push(Diagnostic::new(
                         PytestFixtureParamWithoutValue {
                             name: name.to_string(),
                         },
-                        def.range(),
+                        parameter.range(),
                     ));
                 }
             },

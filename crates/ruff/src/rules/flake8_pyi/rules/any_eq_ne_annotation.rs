@@ -62,7 +62,7 @@ pub(crate) fn any_eq_ne_annotation(checker: &mut Checker, name: &str, parameters
         return;
     }
 
-    let Some(annotation) = &parameters.args[1].def.annotation else {
+    let Some(annotation) = &parameters.args[1].parameter.annotation else {
         return;
     };
 

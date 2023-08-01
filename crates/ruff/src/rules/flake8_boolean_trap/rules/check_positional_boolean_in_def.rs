@@ -96,15 +96,15 @@ pub(crate) fn check_positional_boolean_in_def(
     }
 
     for ParameterWithDefault {
-        def,
+        parameter,
         default: _,
         range: _,
     } in parameters.posonlyargs.iter().chain(&parameters.args)
     {
-        if def.annotation.is_none() {
+        if parameter.annotation.is_none() {
             continue;
         }
-        let Some(expr) = &def.annotation else {
+        let Some(expr) = &parameter.annotation else {
             continue;
         };
 
@@ -122,7 +122,7 @@ pub(crate) fn check_positional_boolean_in_def(
         }
         checker.diagnostics.push(Diagnostic::new(
             BooleanPositionalArgInFunctionDefinition,
-            def.range(),
+            parameter.range(),
         ));
     }
 }

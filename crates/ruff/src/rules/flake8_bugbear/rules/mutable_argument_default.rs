@@ -60,7 +60,7 @@ impl Violation for MutableArgumentDefault {
 pub(crate) fn mutable_argument_default(checker: &mut Checker, parameters: &Parameters) {
     // Scan in reverse order to right-align zip().
     for ParameterWithDefault {
-        def,
+        parameter,
         default,
         range: _,
     } in parameters
@@ -74,7 +74,7 @@ pub(crate) fn mutable_argument_default(checker: &mut Checker, parameters: &Param
         };
 
         if is_mutable_expr(default, checker.semantic())
-            && !def
+            && !parameter
                 .annotation
                 .as_ref()
                 .is_some_and(|expr| is_immutable_annotation(expr, checker.semantic()))

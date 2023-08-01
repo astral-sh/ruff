@@ -32,12 +32,12 @@ pub(crate) fn validate_arguments(arguments: &ast::Parameters) -> Result<(), Lexi
     for arg in posonlyargs
         .chain(args)
         .chain(kwonlyargs)
-        .map(|arg| &arg.def)
+        .map(|arg| &arg.parameter)
         .chain(vararg)
         .chain(kwarg)
     {
         let range = arg.range;
-        let arg_name = arg.arg.as_str();
+        let arg_name = arg.name.as_str();
         if !all_arg_names.insert(arg_name) {
             return Err(LexicalError {
                 error: LexicalErrorType::DuplicateArgumentError(arg_name.to_string()),
@@ -66,7 +66,7 @@ pub(crate) fn validate_pos_params(
     if let Some(invalid) = first_invalid {
         return Err(LexicalError {
             error: LexicalErrorType::DefaultArgumentError,
-            location: invalid.def.range.start(),
+            location: invalid.parameter.range.start(),
         });
     }
     Ok(())

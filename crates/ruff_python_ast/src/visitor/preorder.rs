@@ -785,7 +785,7 @@ pub fn walk_parameter_with_default<'a, V>(
 ) where
     V: PreorderVisitor<'a> + ?Sized,
 {
-    visitor.visit_parameter(&parameter_with_default.def);
+    visitor.visit_parameter(&parameter_with_default.parameter);
     if let Some(expr) = &parameter_with_default.default {
         visitor.visit_expr(expr);
     }

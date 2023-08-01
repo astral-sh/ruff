@@ -381,7 +381,7 @@ pub struct ComparableParameter<'a> {
 impl<'a> From<&'a ast::Parameter> for ComparableParameter<'a> {
     fn from(arg: &'a ast::Parameter) -> Self {
         Self {
-            arg: arg.arg.as_str(),
+            arg: arg.name.as_str(),
             annotation: arg.annotation.as_ref().map(Into::into),
         }
     }
@@ -396,7 +396,7 @@ pub struct ComparableParameterWithDefault<'a> {
 impl<'a> From<&'a ast::ParameterWithDefault> for ComparableParameterWithDefault<'a> {
     fn from(arg: &'a ast::ParameterWithDefault) -> Self {
         Self {
-            def: (&arg.def).into(),
+            def: (&arg.parameter).into(),
             default: arg.default.as_ref().map(Into::into),
         }
     }
