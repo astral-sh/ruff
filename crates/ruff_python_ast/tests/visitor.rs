@@ -147,21 +147,7 @@ where
         ast::Mod::Module(ast::ModModule { body, range: _ }) => {
             visitor.visit_body(body);
         }
-        ast::Mod::Interactive(ast::ModInteractive { body, range: _ }) => {
-            visitor.visit_body(body);
-        }
         ast::Mod::Expression(ast::ModExpression { body, range: _ }) => visitor.visit_expr(body),
-        ast::Mod::FunctionType(ast::ModFunctionType {
-            range: _,
-            argtypes,
-            returns,
-        }) => {
-            for arg_type in argtypes {
-                visitor.visit_expr(arg_type);
-            }
-
-            visitor.visit_expr(returns);
-        }
     }
 }
 

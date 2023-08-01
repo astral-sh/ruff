@@ -22,7 +22,6 @@ grammar(mode: Mode);
 // By having only a single pub function, we reduce this to one.
 pub(crate) Top: ast::Mod = {
     <start:@L> StartModule <body:Program> <end:@R> => ast::ModModule { body, range: (start..end).into() }.into(),
-    <start:@L> StartInteractive <body:Program> <end:@R> => ast::ModInteractive { body, range: (start..end).into() }.into(),
     <start:@L> StartExpression <body:TestList> ("\n")* <end:@R> => ast::ModExpression { body: Box::new(body), range: (start..end).into() }.into()
 };
 
@@ -1743,7 +1742,6 @@ extern {
         Indent => token::Tok::Indent,
         Dedent => token::Tok::Dedent,
         StartModule => token::Tok::StartModule,
-        StartInteractive => token::Tok::StartInteractive,
         StartExpression => token::Tok::StartExpression,
         "+" => token::Tok::Plus,
         "-" => token::Tok::Minus,

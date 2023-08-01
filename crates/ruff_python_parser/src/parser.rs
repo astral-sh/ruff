@@ -25,6 +25,7 @@ use crate::{
     Mode, Parse,
 };
 use ruff_python_ast as ast;
+use ruff_python_ast::ModModule;
 
 /// Parse a full Python program usually consisting of multiple lines.
 ///
@@ -48,10 +49,7 @@ use ruff_python_ast as ast;
 /// ```
 #[deprecated = "Use ruff_python_ast::Suite::parse from ruff_python_parser::Parse trait."]
 pub fn parse_program(source: &str, source_path: &str) -> Result<ast::Suite, ParseError> {
-    parse(source, Mode::Module, source_path).map(|top| match top {
-        ast::Mod::Module(ast::ModModule { body, .. }) => body,
-        _ => unreachable!(),
-    })
+    ModModule::parse(source, source_path).map(|module| module.body)
 }
 
 /// Parses a single Python expression.
@@ -718,7 +716,6 @@ except* OSError as e:
 
         assert!(parse(source, Mode::Expression, "<embedded>").is_ok());
         assert!(parse(source, Mode::Module, "<embedded>").is_ok());
-        assert!(parse(source, Mode::Interactive, "<embedded>").is_ok());
     }
 
     #[test]

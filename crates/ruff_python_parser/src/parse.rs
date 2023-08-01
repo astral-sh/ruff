@@ -74,7 +74,7 @@ impl Parse for ast::ModModule {
     ) -> Result<Self, ParseError> {
         match parse_tokens(lxr, Mode::Module, source_path)? {
             ast::Mod::Module(m) => Ok(m),
-            _ => unreachable!("Mode::Module doesn't return other variant"),
+            ast::Mod::Expression(_) => unreachable!("Mode::Module doesn't return other variant"),
         }
     }
 }
@@ -88,20 +88,7 @@ impl Parse for ast::ModExpression {
     ) -> Result<Self, ParseError> {
         match parse_tokens(lxr, Mode::Expression, source_path)? {
             ast::Mod::Expression(m) => Ok(m),
-            _ => unreachable!("Mode::Module doesn't return other variant"),
-        }
-    }
-}
-
-impl Parse for ast::ModInteractive {
-    const MODE: Mode = Mode::Interactive;
-    fn parse_tokens(
-        lxr: impl IntoIterator<Item = LexResult>,
-        source_path: &str,
-    ) -> Result<Self, ParseError> {
-        match parse_tokens(lxr, Mode::Interactive, source_path)? {
-            ast::Mod::Interactive(m) => Ok(m),
-            _ => unreachable!("Mode::Module doesn't return other variant"),
+            ast::Mod::Module(_) => unreachable!("Mode::Module doesn't return other variant"),
         }
     }
 }

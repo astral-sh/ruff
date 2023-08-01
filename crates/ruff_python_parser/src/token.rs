@@ -203,7 +203,6 @@ pub enum Tok {
 
     // RustPython specific.
     StartModule,
-    StartInteractive,
     StartExpression,
 }
 
@@ -211,7 +210,6 @@ impl Tok {
     pub fn start_marker(mode: Mode) -> Self {
         match mode {
             Mode::Module | Mode::Jupyter => Tok::StartModule,
-            Mode::Interactive => Tok::StartInteractive,
             Mode::Expression => Tok::StartExpression,
         }
     }
@@ -240,7 +238,6 @@ impl fmt::Display for Tok {
             Indent => f.write_str("Indent"),
             Dedent => f.write_str("Dedent"),
             StartModule => f.write_str("StartProgram"),
-            StartInteractive => f.write_str("StartInteractive"),
             StartExpression => f.write_str("StartExpression"),
             EndOfFile => f.write_str("EOF"),
             Lpar => f.write_str("'('"),
@@ -872,7 +869,6 @@ impl TokenKind {
             Tok::With => TokenKind::With,
             Tok::Yield => TokenKind::Yield,
             Tok::StartModule => TokenKind::StartModule,
-            Tok::StartInteractive => TokenKind::StartInteractive,
             Tok::StartExpression => TokenKind::StartExpression,
         }
     }
