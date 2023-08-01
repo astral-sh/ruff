@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -42,6 +42,7 @@ jobs:
               - "!crates/ruff_formatter/**"
               - "!crates/ruff_dev/**"
               - "!crates/ruff_shrinking/**"
+              - scripts/check_ecosystem.py
 
             formatter:
               - Cargo.toml
@@ -54,7 +55,6 @@ jobs:
               - crates/ruff_python_index/**
               - crates/ruff_text_size/**
               - crates/ruff_python_parser/**
-
 
   cargo-fmt:
     name: "cargo fmt"
@@ -83,7 +83,7 @@ jobs:
   cargo-test:
     strategy:
       matrix:
-        os: [ ubuntu-latest, windows-latest ]
+        os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     name: "cargo test | ${{ matrix.os }}"
     steps:
@@ -234,7 +234,6 @@ jobs:
         uses: taiki-e/install-action@cargo-udeps
       - name: "Run cargo-udeps"
         run: cargo +nightly-2023-06-08 udeps
-
 
   python-package:
     name: "python package"
