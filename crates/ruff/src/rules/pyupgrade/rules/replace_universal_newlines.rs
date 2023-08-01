@@ -54,9 +54,7 @@ pub(crate) fn replace_universal_newlines(checker: &mut Checker, func: &Expr, kwa
     if checker
         .semantic()
         .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["subprocess", "run"])
-        })
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["subprocess", "run"]))
     {
         let Some(kwarg) = find_keyword(kwargs, "universal_newlines") else {
             return;

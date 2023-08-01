@@ -549,10 +549,10 @@ pub(crate) fn deprecated_import(
     level: Option<u32>,
 ) {
     // Avoid relative and star imports.
-    if level.map_or(false, |level| level > 0) {
+    if level.is_some_and(|level| level > 0) {
         return;
     }
-    if names.first().map_or(false, |name| &name.name == "*") {
+    if names.first().is_some_and(|name| &name.name == "*") {
         return;
     }
     let Some(module) = module else {

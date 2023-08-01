@@ -305,7 +305,7 @@ impl<'a> Importer<'a> {
             }) = stmt
             {
                 if level.map_or(true, |level| level.to_u32() == 0)
-                    && name.as_ref().map_or(false, |name| name == module)
+                    && name.as_ref().is_some_and(|name| name == module)
                 {
                     import_from = Some(*stmt);
                 }

@@ -144,7 +144,7 @@ where
             while self
                 .splits
                 .peek()
-                .map_or(false, |split| stmt.start() >= **split)
+                .is_some_and(|split| stmt.start() >= **split)
             {
                 self.splits.next();
             }
@@ -165,7 +165,7 @@ where
                 // the case of multiple empty cells).
                 while cell_offsets
                     .peek()
-                    .map_or(false, |split| stmt.start() >= **split)
+                    .is_some_and(|split| stmt.start() >= **split)
                 {
                     cell_offsets.next();
                 }

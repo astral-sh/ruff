@@ -157,7 +157,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                 }
 
                 for keyword in keywords {
-                    if keyword.arg.as_ref().map_or(false, |arg| arg == "key")
+                    if keyword.arg.as_ref().is_some_and(|arg| arg == "key")
                         && keyword.value.is_lambda_expr()
                     {
                         self.safe_functions.push(&keyword.value);

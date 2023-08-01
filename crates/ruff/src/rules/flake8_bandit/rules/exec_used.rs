@@ -35,9 +35,7 @@ pub(crate) fn exec_used(checker: &mut Checker, func: &Expr) {
     if checker
         .semantic()
         .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["" | "builtin", "exec"])
-        })
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["" | "builtin", "exec"]))
     {
         checker
             .diagnostics

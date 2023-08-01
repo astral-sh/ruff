@@ -194,7 +194,7 @@ fn is_valid_default_value_with_annotation(
             return allow_container
                 && keys.len() <= 10
                 && keys.iter().zip(values).all(|(k, v)| {
-                    k.as_ref().map_or(false, |k| {
+                    k.as_ref().is_some_and(|k| {
                         is_valid_default_value_with_annotation(k, false, locator, semantic)
                     }) && is_valid_default_value_with_annotation(v, false, locator, semantic)
                 });
@@ -215,7 +215,7 @@ fn is_valid_default_value_with_annotation(
                     if semantic
                         .resolve_call_path(operand)
                         .as_ref()
-                        .map_or(false, is_allowed_negated_math_attribute)
+                        .is_some_and(is_allowed_negated_math_attribute)
                     {
                         return true;
                     }
@@ -264,7 +264,7 @@ fn is_valid_default_value_with_annotation(
             if semantic
                 .resolve_call_path(default)
                 .as_ref()
-                .map_or(false, is_allowed_math_attribute)
+                .is_some_and(is_allowed_math_attribute)
             {
                 return true;
             }
@@ -332,7 +332,7 @@ fn is_type_var_like_call(expr: &Expr, semantic: &SemanticModel) -> bool {
     let Expr::Call(ast::ExprCall { func, .. }) = expr else {
         return false;
     };
-    semantic.resolve_call_path(func).map_or(false, |call_path| {
+    semantic.resolve_call_path(func).is_some_and(|call_path| {
         matches!(
             call_path.as_slice(),
             [
@@ -370,7 +370,7 @@ fn is_final_assignment(annotation: &Expr, value: &Expr, semantic: &SemanticModel
 /// Returns `true` if the a class is an enum, based on its base classes.
 fn is_enum(bases: &[Expr], semantic: &SemanticModel) -> bool {
     return bases.iter().any(|expr| {
-        semantic.resolve_call_path(expr).map_or(false, |call_path| {
+        semantic.resolve_call_path(expr).is_some_and(|call_path| {
             matches!(
                 call_path.as_slice(),
                 [

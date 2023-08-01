@@ -76,7 +76,7 @@ pub(crate) fn manual_list_copy(checker: &mut Checker, target: &Expr, body: &[Stm
     };
 
     // Only flag direct list copies (e.g., `for x in y: filtered.append(x)`).
-    if !arg.as_name_expr().map_or(false, |arg| arg.id == *id) {
+    if !arg.as_name_expr().is_some_and(|arg| arg.id == *id) {
         return;
     }
 
@@ -90,7 +90,7 @@ pub(crate) fn manual_list_copy(checker: &mut Checker, target: &Expr, body: &[Stm
 
     // Avoid, e.g., `for x in y: filtered[x].append(x)`.
     if any_over_expr(value, &|expr| {
-        expr.as_name_expr().map_or(false, |expr| expr.id == *id)
+        expr.as_name_expr().is_some_and(|expr| expr.id == *id)
     }) {
         return;
     }

@@ -87,9 +87,7 @@ pub(crate) fn invalid_envvar_default(
     if checker
         .semantic()
         .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["os", "getenv"])
-        })
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["os", "getenv"]))
     {
         // Find the `default` argument, if it exists.
         let Some(expr) = args

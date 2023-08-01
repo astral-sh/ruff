@@ -50,9 +50,7 @@ pub(crate) fn use_of_read_table(checker: &mut Checker, func: &Expr, keywords: &[
     if checker
         .semantic()
         .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["pandas", "read_table"])
-        })
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["pandas", "read_table"]))
     {
         if let Some(Expr::Constant(ast::ExprConstant {
             value: Constant::Str(value),

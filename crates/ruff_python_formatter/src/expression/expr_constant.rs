@@ -101,7 +101,7 @@ pub(super) fn is_multiline_string(constant: &ExprConstant, source: &str) -> bool
         let quotes =
             StringQuotes::parse(&contents[TextRange::new(prefix.text_len(), contents.text_len())]);
 
-        quotes.map_or(false, StringQuotes::is_triple) && contents.contains(['\n', '\r'])
+        quotes.is_some_and(StringQuotes::is_triple) && contents.contains(['\n', '\r'])
     } else {
         false
     }

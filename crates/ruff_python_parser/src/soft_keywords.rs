@@ -132,8 +132,8 @@ where
             }
         }
 
-        self.start_of_line = next.as_ref().map_or(false, |lex_result| {
-            lex_result.as_ref().map_or(false, |(tok, _)| {
+        self.start_of_line = next.as_ref().is_some_and(|lex_result| {
+            lex_result.as_ref().is_ok_and(|(tok, _)| {
                 if matches!(tok, Tok::NonLogicalNewline | Tok::Comment { .. }) {
                     return self.start_of_line;
                 }

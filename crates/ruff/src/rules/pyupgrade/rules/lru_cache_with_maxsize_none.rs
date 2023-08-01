@@ -75,16 +75,14 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list:
             && checker
                 .semantic()
                 .resolve_call_path(func)
-                .map_or(false, |call_path| {
-                    matches!(call_path.as_slice(), ["functools", "lru_cache"])
-                })
+                .is_some_and(|call_path| matches!(call_path.as_slice(), ["functools", "lru_cache"]))
         {
             let Keyword {
                 arg,
                 value,
                 range: _,
             } = &keywords[0];
-            if arg.as_ref().map_or(false, |arg| arg == "maxsize") && is_const_none(value) {
+            if arg.as_ref().is_some_and(|arg| arg == "maxsize") && is_const_none(value) {
                 let mut diagnostic = Diagnostic::new(
                     LRUCacheWithMaxsizeNone,
                     TextRange::new(func.end(), decorator.end()),

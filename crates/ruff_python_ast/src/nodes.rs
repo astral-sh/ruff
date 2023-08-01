@@ -2378,10 +2378,10 @@ pub enum Constant {
 
 impl Constant {
     pub fn is_true(self) -> bool {
-        self.bool().map_or(false, |b| b)
+        self.bool().is_some_and(|b| b)
     }
     pub fn is_false(self) -> bool {
-        self.bool().map_or(false, |b| !b)
+        self.bool().is_some_and(|b| !b)
     }
     pub fn complex(self) -> Option<(f64, f64)> {
         match self {

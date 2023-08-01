@@ -27,7 +27,7 @@ pub fn parse_type_annotation(
 ) -> Result<(Expr, AnnotationKind)> {
     let expression = &source[range];
 
-    if str::raw_contents(expression).map_or(false, |body| body == value) {
+    if str::raw_contents(expression).is_some_and(|body| body == value) {
         // The annotation is considered "simple" if and only if the raw representation (e.g.,
         // `List[int]` within "List[int]") exactly matches the parsed representation. This
         // isn't the case, e.g., for implicit concatenations, or for annotations that contain

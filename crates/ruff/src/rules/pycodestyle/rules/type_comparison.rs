@@ -79,8 +79,8 @@ pub(crate) fn type_comparison(
                         && checker
                             .semantic()
                             .resolve_call_path(value)
-                            .map_or(false, |call_path| {
-                                call_path.first().map_or(false, |module| *module == "types")
+                            .is_some_and(|call_path| {
+                                call_path.first().is_some_and(|module| *module == "types")
                             })
                     {
                         checker

@@ -106,16 +106,14 @@ impl Violation for EmptyMethodWithoutAbstractDecorator {
 
 fn is_abc_class(bases: &[Expr], keywords: &[Keyword], semantic: &SemanticModel) -> bool {
     keywords.iter().any(|keyword| {
-        keyword.arg.as_ref().map_or(false, |arg| arg == "metaclass")
+        keyword.arg.as_ref().is_some_and(|arg| arg == "metaclass")
             && semantic
                 .resolve_call_path(&keyword.value)
-                .map_or(false, |call_path| {
-                    matches!(call_path.as_slice(), ["abc", "ABCMeta"])
-                })
+                .is_some_and(|call_path| matches!(call_path.as_slice(), ["abc", "ABCMeta"]))
     }) || bases.iter().any(|base| {
-        semantic.resolve_call_path(base).map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["abc", "ABC"])
-        })
+        semantic
+            .resolve_call_path(base)
+            .is_some_and(|call_path| matches!(call_path.as_slice(), ["abc", "ABC"]))
     })
 }
 

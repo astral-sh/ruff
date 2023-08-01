@@ -5,10 +5,7 @@ use crate::keyword::is_keyword;
 pub fn is_identifier(name: &str) -> bool {
     // Is the first character a letter or underscore?
     let mut chars = name.chars();
-    if !chars
-        .next()
-        .map_or(false, |c| c.is_alphabetic() || c == '_')
-    {
+    if !chars.next().is_some_and(|c| c.is_alphabetic() || c == '_') {
         return false;
     }
 
@@ -41,7 +38,7 @@ pub fn is_module_name(name: &str) -> bool {
     let mut chars = name.chars();
     if !chars
         .next()
-        .map_or(false, |c| c.is_ascii_lowercase() || c == '_')
+        .is_some_and(|c| c.is_ascii_lowercase() || c == '_')
     {
         return false;
     }

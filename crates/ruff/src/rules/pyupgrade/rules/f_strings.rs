@@ -362,7 +362,7 @@ pub(crate) fn f_strings(
     if existing
         .chars()
         .last()
-        .map_or(false, |char| char.is_ascii_alphabetic())
+        .is_some_and(|char| char.is_ascii_alphabetic())
     {
         contents.insert(0, ' ');
     }

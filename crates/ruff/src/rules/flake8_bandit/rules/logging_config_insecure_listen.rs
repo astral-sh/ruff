@@ -43,9 +43,7 @@ pub(crate) fn logging_config_insecure_listen(
     if checker
         .semantic()
         .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["logging", "config", "listen"])
-        })
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["logging", "config", "listen"]))
     {
         if find_keyword(keywords, "verify").is_some() {
             return;

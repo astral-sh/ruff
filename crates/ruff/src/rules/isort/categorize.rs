@@ -74,7 +74,7 @@ pub(crate) fn categorize<'a>(
 ) -> &'a ImportSection {
     let module_base = module_name.split('.').next().unwrap();
     let (import_type, reason) = {
-        if level.map_or(false, |level| level > 0) {
+        if level.is_some_and(|level| level > 0) {
             (
                 &ImportSection::Known(ImportType::LocalFolder),
                 Reason::NonZeroLevel,
@@ -113,7 +113,7 @@ pub(crate) fn categorize<'a>(
 }
 
 fn same_package(package: Option<&Path>, module_base: &str) -> bool {
-    package.map_or(false, |package| package.ends_with(module_base))
+    package.is_some_and(|package| package.ends_with(module_base))
 }
 
 fn match_sources<'a>(paths: &'a [PathBuf], base: &str) -> Option<&'a Path> {

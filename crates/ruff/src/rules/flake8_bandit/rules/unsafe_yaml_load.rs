@@ -69,16 +69,14 @@ pub(crate) fn unsafe_yaml_load(
     if checker
         .semantic()
         .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["yaml", "load"])
-        })
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["yaml", "load"]))
     {
         let call_args = CallArguments::new(args, keywords);
         if let Some(loader_arg) = call_args.argument("Loader", 1) {
             if !checker
                 .semantic()
                 .resolve_call_path(loader_arg)
-                .map_or(false, |call_path| {
+                .is_some_and(|call_path| {
                     matches!(call_path.as_slice(), ["yaml", "SafeLoader" | "CSafeLoader"])
                 })
             {

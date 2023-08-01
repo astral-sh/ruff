@@ -339,7 +339,7 @@ where
                         if alias
                             .asname
                             .as_ref()
-                            .map_or(false, |asname| asname.as_str() == alias.name.as_str())
+                            .is_some_and(|asname| asname.as_str() == alias.name.as_str())
                         {
                             flags |= BindingFlags::EXPLICIT_EXPORT;
                         }
@@ -384,7 +384,7 @@ where
                         if alias
                             .asname
                             .as_ref()
-                            .map_or(false, |asname| asname.as_str() == alias.name.as_str())
+                            .is_some_and(|asname| asname.as_str() == alias.name.as_str())
                         {
                             flags |= BindingFlags::EXPLICIT_EXPORT;
                         }
@@ -1103,7 +1103,7 @@ where
                                     arg,
                                     range: _,
                                 } = keyword;
-                                if arg.as_ref().map_or(false, |arg| arg == "type") {
+                                if arg.as_ref().is_some_and(|arg| arg == "type") {
                                     self.visit_type_definition(value);
                                 } else {
                                     self.visit_non_type_definition(value);

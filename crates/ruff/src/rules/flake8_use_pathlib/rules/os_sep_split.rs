@@ -85,9 +85,7 @@ pub(crate) fn os_sep_split(
     if !checker
         .semantic()
         .resolve_call_path(sep)
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["os", "sep"])
-        })
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["os", "sep"]))
     {
         return;
     }

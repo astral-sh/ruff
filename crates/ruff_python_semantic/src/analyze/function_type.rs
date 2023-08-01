@@ -31,7 +31,7 @@ pub fn classify(
         // `@staticmethod`).
         semantic
             .resolve_call_path(map_callable(&decorator.expression))
-            .map_or(false, |call_path| {
+            .is_some_and(|call_path| {
                 matches!(
                     call_path.as_slice(),
                     ["", "staticmethod"] | ["abc", "abstractstaticmethod"]
@@ -47,7 +47,7 @@ pub fn classify(
             // The class itself extends a known metaclass, so all methods are class methods.
             semantic
                 .resolve_call_path(map_callable(expr))
-                .map_or(false, |call_path| {
+                .is_some_and( |call_path| {
                     matches!(call_path.as_slice(), ["", "type"] | ["abc", "ABCMeta"])
                 })
         })
@@ -55,7 +55,7 @@ pub fn classify(
             // The method is decorated with a class method decorator (like `@classmethod`).
             semantic
                 .resolve_call_path(map_callable(&decorator.expression))
-                .map_or(false, |call_path| {
+                .is_some_and( |call_path| {
                     matches!(
                         call_path.as_slice(),
                         ["", "classmethod"] | ["abc", "abstractclassmethod"]

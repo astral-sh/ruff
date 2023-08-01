@@ -69,9 +69,7 @@ pub(crate) fn raise_vanilla_class(checker: &mut Checker, expr: &Expr) {
         } else {
             expr
         })
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["", "Exception"])
-        })
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["", "Exception"]))
     {
         checker
             .diagnostics

@@ -378,7 +378,7 @@ fn loop_block<'stmt>(
             // For `break` statements we don't want to continue with the
             // loop, but instead with the statement after the loop (i.e.
             // not change anything).
-            !block.stmts.last().map_or(false, Stmt::is_break_stmt)
+            !block.stmts.last().is_some_and(Stmt::is_break_stmt)
         },
     );
     NextBlock::If {

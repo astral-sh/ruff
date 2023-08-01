@@ -110,7 +110,7 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, target: &Expr, bo
 
     // Ignore direct list copies (e.g., `for x in y: filtered.append(x)`).
     if if_test.is_none() {
-        if arg.as_name_expr().map_or(false, |arg| arg.id == *id) {
+        if arg.as_name_expr().is_some_and(|arg| arg.id == *id) {
             return;
         }
     }
@@ -125,7 +125,7 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, target: &Expr, bo
 
     // Avoid, e.g., `for x in y: filtered[x].append(x * x)`.
     if any_over_expr(value, &|expr| {
-        expr.as_name_expr().map_or(false, |expr| expr.id == *id)
+        expr.as_name_expr().is_some_and(|expr| expr.id == *id)
     }) {
         return;
     }
@@ -152,10 +152,10 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, target: &Expr, bo
     // filtered = [x for x in y if x in filtered]
     // ```
     if let Some(value_name) = value.as_name_expr() {
-        if if_test.map_or(false, |test| {
+        if if_test.is_some_and(|test| {
             any_over_expr(test, &|expr| {
                 expr.as_name_expr()
-                    .map_or(false, |expr| expr.id == value_name.id)
+                    .is_some_and(|expr| expr.id == value_name.id)
             })
         }) {
             return;

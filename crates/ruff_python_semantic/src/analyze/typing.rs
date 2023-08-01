@@ -116,7 +116,7 @@ pub fn to_pep585_generic(expr: &Expr, semantic: &SemanticModel) -> Option<Module
 
 /// Return whether a given expression uses a PEP 585 standard library generic.
 pub fn is_pep585_generic(expr: &Expr, semantic: &SemanticModel) -> bool {
-    semantic.resolve_call_path(expr).map_or(false, |call_path| {
+    semantic.resolve_call_path(expr).is_some_and(|call_path| {
         let [module, name] = call_path.as_slice() else {
             return false;
         };
@@ -189,14 +189,13 @@ pub fn to_pep604_operator(
 pub fn is_immutable_annotation(expr: &Expr, semantic: &SemanticModel) -> bool {
     match expr {
         Expr::Name(_) | Expr::Attribute(_) => {
-            semantic.resolve_call_path(expr).map_or(false, |call_path| {
+            semantic.resolve_call_path(expr).is_some_and(|call_path| {
                 is_immutable_non_generic_type(call_path.as_slice())
                     || is_immutable_generic_type(call_path.as_slice())
             })
         }
-        Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => semantic
-            .resolve_call_path(value)
-            .map_or(false, |call_path| {
+        Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+            semantic.resolve_call_path(value).is_some_and(|call_path| {
                 if is_immutable_generic_type(call_path.as_slice()) {
                     true
                 } else if matches!(call_path.as_slice(), ["typing", "Union"]) {
@@ -211,14 +210,15 @@ pub fn is_immutable_annotation(expr: &Expr, semantic: &SemanticModel) -> bool {
                 } else if matches!(call_path.as_slice(), ["typing", "Annotated"]) {
                     if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
                         elts.first()
-                            .map_or(false, |elt| is_immutable_annotation(elt, semantic))
+                            .is_some_and(|elt| is_immutable_annotation(elt, semantic))
                     } else {
                         false
                     }
                 } else {
                     false
                 }
-            }),
+            })
+        }
         Expr::BinOp(ast::ExprBinOp {
             left,
             op: Operator::BitOr,
@@ -239,7 +239,7 @@ pub fn is_immutable_func(
     semantic: &SemanticModel,
     extend_immutable_calls: &[CallPath],
 ) -> bool {
-    semantic.resolve_call_path(func).map_or(false, |call_path| {
+    semantic.resolve_call_path(func).is_some_and(|call_path| {
         is_immutable_return_type(call_path.as_slice())
             || extend_immutable_calls
                 .iter()
@@ -253,7 +253,7 @@ pub fn is_mutable_func(func: &Expr, semantic: &SemanticModel) -> bool {
         .resolve_call_path(func)
         .as_ref()
         .map(CallPath::as_slice)
-        .map_or(false, is_mutable_return_type)
+        .is_some_and(is_mutable_return_type)
 }
 
 /// Return `true` if `expr` is an expression that resolves to a mutable value.
@@ -291,9 +291,10 @@ pub fn is_type_checking_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> b
     }
 
     // Ex) `if typing.TYPE_CHECKING:`
-    if semantic.resolve_call_path(test).map_or(false, |call_path| {
-        matches!(call_path.as_slice(), ["typing", "TYPE_CHECKING"])
-    }) {
+    if semantic
+        .resolve_call_path(test)
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["typing", "TYPE_CHECKING"]))
+    {
         return true;
     }
 

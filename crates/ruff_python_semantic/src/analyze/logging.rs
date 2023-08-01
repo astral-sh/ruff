@@ -74,9 +74,7 @@ pub fn exc_info<'a>(keywords: &'a [Keyword], semantic: &SemanticModel) -> Option
         .value
         .as_call_expr()
         .and_then(|call| semantic.resolve_call_path(&call.func))
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["sys", "exc_info"])
-        })
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["sys", "exc_info"]))
     {
         return Some(exc_info);
     }

@@ -373,7 +373,7 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
 
 /// Return `true` if the `func` is a known function that never returns.
 fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
-    semantic.resolve_call_path(func).map_or(false, |call_path| {
+    semantic.resolve_call_path(func).is_some_and(|call_path| {
         matches!(
             call_path.as_slice(),
             ["" | "builtins" | "sys" | "_thread" | "pytest", "exit"]
@@ -552,7 +552,7 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
                     if content[after_equals..]
                         .chars()
                         .next()
-                        .map_or(false, char::is_alphabetic)
+                        .is_some_and(char::is_alphabetic)
                     {
                         "return ".to_string()
                     } else {

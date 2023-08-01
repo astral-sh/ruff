@@ -42,9 +42,7 @@ pub(crate) fn no_explicit_stacklevel(checker: &mut Checker, func: &Expr, keyword
     if !checker
         .semantic()
         .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["warnings", "warn"])
-        })
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["warnings", "warn"]))
     {
         return;
     }

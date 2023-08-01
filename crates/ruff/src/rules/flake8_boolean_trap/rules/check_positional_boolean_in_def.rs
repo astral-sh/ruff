@@ -88,7 +88,7 @@ pub(crate) fn check_positional_boolean_in_def(
 
     if decorator_list.iter().any(|decorator| {
         collect_call_path(&decorator.expression)
-            .map_or(false, |call_path| call_path.as_slice() == [name, "setter"])
+            .is_some_and(|call_path| call_path.as_slice() == [name, "setter"])
     }) {
         return;
     }
