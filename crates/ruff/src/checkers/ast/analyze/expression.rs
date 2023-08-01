@@ -79,14 +79,14 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 Rule::DuplicateUnionMember,
                 Rule::RedundantLiteralUnion,
             ]) {
-                // Determine if the current expression is an union
-                // To avoid duplicate checks, we examine whether current `expr` is an `Union[...]`
-                // without a parent, since these rules traverse nested unions
-                let is_unchecked_union = checker.semantic.expr_parent().is_none()
-                    && expr.as_subscript_expr().map_or(false, |subscript| {
-                        checker
-                            .semantic
-                            .match_typing_expr(&subscript.value, "Union")
+                // Avoid duplicate checks if the parent is an `Union[...]` since these rules
+                // traverse nested unions.
+                let is_unchecked_union = checker
+                    .semantic
+                    .expr_grandparent()
+                    .and_then(Expr::as_subscript_expr)
+                    .map_or(true, |parent| {
+                        !checker.semantic.match_typing_expr(&parent.value, "Union")
                     });
 
                 if is_unchecked_union {
@@ -181,7 +181,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                                     && checker.semantic.in_annotation()
                                     && !checker.settings.pyupgrade.keep_runtime_typing
                                 {
-                                    flake8_future_annotations::rules::future_rewritable_type_annotation(checker, expr);
+                                    flake8_future_annotations::rules::future_rewritable_type_annotation(
+                                                checker, expr,
+                                            );
                                 }
                             }
                             if checker.enabled(Rule::NonPEP585Annotation) {
@@ -387,8 +389,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                                         .enabled(Rule::StringDotFormatExtraPositionalArguments)
                                     {
                                         pyflakes::rules::string_dot_format_extra_positional_arguments(
-                                            checker, &summary, args, location,
-                                        );
+                                                checker,
+                                                &summary, args, location,
+                                            );
                                     }
                                     if checker.enabled(Rule::StringDotFormatMissingArguments) {
                                         pyflakes::rules::string_dot_format_missing_argument(
