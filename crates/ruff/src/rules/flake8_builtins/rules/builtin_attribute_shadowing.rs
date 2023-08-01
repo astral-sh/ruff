@@ -136,15 +136,15 @@ fn is_standard_library_override(
     match name {
         // Ex) `Event#set`
         "set" => class_def.bases.iter().any(|base| {
-            model.resolve_call_path(base).map_or(false, |call_path| {
-                matches!(call_path.as_slice(), ["threading", "Event"])
-            })
+            model
+                .resolve_call_path(base)
+                .is_some_and(|call_path| matches!(call_path.as_slice(), ["threading", "Event"]))
         }),
         // Ex) `Filter#filter`
         "filter" => class_def.bases.iter().any(|base| {
-            model.resolve_call_path(base).map_or(false, |call_path| {
-                matches!(call_path.as_slice(), ["logging", "Filter"])
-            })
+            model
+                .resolve_call_path(base)
+                .is_some_and(|call_path| matches!(call_path.as_slice(), ["logging", "Filter"]))
         }),
         _ => false,
     }

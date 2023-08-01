@@ -252,7 +252,7 @@ fn is_iterator(bases: &[Expr], semantic: &SemanticModel) -> bool {
     bases.iter().any(|expr| {
         semantic
             .resolve_call_path(map_subscript(expr))
-            .map_or(false, |call_path| {
+            .is_some_and(|call_path| {
                 matches!(
                     call_path.as_slice(),
                     ["typing", "Iterator"] | ["collections", "abc", "Iterator"]
@@ -265,7 +265,7 @@ fn is_iterator(bases: &[Expr], semantic: &SemanticModel) -> bool {
 fn is_iterable(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_call_path(map_subscript(expr))
-        .map_or(false, |call_path| {
+        .is_some_and(|call_path| {
             matches!(
                 call_path.as_slice(),
                 ["typing", "Iterable" | "Iterator"]
@@ -279,7 +279,7 @@ fn is_async_iterator(bases: &[Expr], semantic: &SemanticModel) -> bool {
     bases.iter().any(|expr| {
         semantic
             .resolve_call_path(map_subscript(expr))
-            .map_or(false, |call_path| {
+            .is_some_and(|call_path| {
                 matches!(
                     call_path.as_slice(),
                     ["typing", "AsyncIterator"] | ["collections", "abc", "AsyncIterator"]
@@ -292,7 +292,7 @@ fn is_async_iterator(bases: &[Expr], semantic: &SemanticModel) -> bool {
 fn is_async_iterable(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_call_path(map_subscript(expr))
-        .map_or(false, |call_path| {
+        .is_some_and(|call_path| {
             matches!(
                 call_path.as_slice(),
                 ["typing", "AsyncIterable" | "AsyncIterator"]

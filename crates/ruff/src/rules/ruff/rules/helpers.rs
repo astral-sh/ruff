@@ -21,9 +21,9 @@ pub(super) fn is_special_attribute(value: &Expr) -> bool {
 
 /// Returns `true` if the given [`Expr`] is a `dataclasses.field` call.
 pub(super) fn is_dataclass_field(func: &Expr, semantic: &SemanticModel) -> bool {
-    semantic.resolve_call_path(func).map_or(false, |call_path| {
-        matches!(call_path.as_slice(), ["dataclasses", "field"])
-    })
+    semantic
+        .resolve_call_path(func)
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["dataclasses", "field"]))
 }
 
 /// Returns `true` if the given [`Expr`] is a `typing.ClassVar` annotation.
@@ -47,16 +47,14 @@ pub(super) fn is_dataclass(class_def: &ast::StmtClassDef, semantic: &SemanticMod
     class_def.decorator_list.iter().any(|decorator| {
         semantic
             .resolve_call_path(map_callable(&decorator.expression))
-            .map_or(false, |call_path| {
-                matches!(call_path.as_slice(), ["dataclasses", "dataclass"])
-            })
+            .is_some_and(|call_path| matches!(call_path.as_slice(), ["dataclasses", "dataclass"]))
     })
 }
 
 /// Returns `true` if the given class is a Pydantic `BaseModel` or `BaseSettings` subclass.
 pub(super) fn is_pydantic_model(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
     class_def.bases.iter().any(|expr| {
-        semantic.resolve_call_path(expr).map_or(false, |call_path| {
+        semantic.resolve_call_path(expr).is_some_and(|call_path| {
             matches!(
                 call_path.as_slice(),
                 ["pydantic", "BaseModel" | "BaseSettings"]
@@ -70,16 +68,16 @@ pub(super) fn is_pydantic_model(class_def: &ast::StmtClassDef, semantic: &Semant
 ///
 /// See: <https://docs.python.org/3.10/reference/datamodel.html#descriptors>
 pub(super) fn is_descriptor_class(func: &Expr, semantic: &SemanticModel) -> bool {
-    semantic.lookup_attribute(func).map_or(false, |id| {
+    semantic.lookup_attribute(func).is_some_and(|id| {
         let BindingKind::ClassDefinition(scope_id) = semantic.binding(id).kind else {
             return false;
         };
 
         // Look for `__get__`, `__set__`, and `__delete__` methods.
         ["__get__", "__set__", "__delete__"].iter().any(|method| {
-            semantic.scopes[scope_id].get(method).map_or(false, |id| {
-                semantic.binding(id).kind.is_function_definition()
-            })
+            semantic.scopes[scope_id]
+                .get(method)
+                .is_some_and(|id| semantic.binding(id).kind.is_function_definition())
         })
     })
 }

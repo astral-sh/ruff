@@ -78,7 +78,7 @@ fn check_type_check_call(checker: &mut Checker, call: &Expr) -> bool {
     checker
         .semantic()
         .resolve_call_path(call)
-        .map_or(false, |call_path| {
+        .is_some_and(|call_path| {
             matches!(
                 call_path.as_slice(),
                 ["", "isinstance" | "issubclass" | "callable"]
@@ -103,7 +103,7 @@ fn is_builtin_exception(checker: &mut Checker, exc: &Expr) -> bool {
     return checker
         .semantic()
         .resolve_call_path(exc)
-        .map_or(false, |call_path| {
+        .is_some_and(|call_path| {
             matches!(
                 call_path.as_slice(),
                 [

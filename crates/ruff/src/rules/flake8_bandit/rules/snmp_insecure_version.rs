@@ -47,7 +47,7 @@ pub(crate) fn snmp_insecure_version(checker: &mut Checker, func: &Expr, keywords
     if checker
         .semantic()
         .resolve_call_path(func)
-        .map_or(false, |call_path| {
+        .is_some_and(|call_path| {
             matches!(call_path.as_slice(), ["pysnmp", "hlapi", "CommunityData"])
         })
     {

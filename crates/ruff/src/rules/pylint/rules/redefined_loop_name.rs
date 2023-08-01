@@ -174,9 +174,10 @@ impl<'a, 'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'a, 'b> {
             Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
                 // Check for single-target assignments which are of the
                 // form `x = cast(..., x)`.
-                if targets.first().map_or(false, |target| {
-                    assignment_is_cast_expr(value, target, self.context)
-                }) {
+                if targets
+                    .first()
+                    .is_some_and(|target| assignment_is_cast_expr(value, target, self.context))
+                {
                     return;
                 }
                 self.assignment_targets.extend(

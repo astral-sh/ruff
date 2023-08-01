@@ -218,7 +218,7 @@ impl UnittestAssert {
         if keywords.iter().any(|kw| {
             kw.arg
                 .as_ref()
-                .map_or(false, |kwarg_name| !arg_spec.contains(&kwarg_name.as_str()))
+                .is_some_and(|kwarg_name| !arg_spec.contains(&kwarg_name.as_str()))
         }) {
             bail!("Unknown keyword argument");
         }
@@ -240,7 +240,7 @@ impl UnittestAssert {
                 if keyword
                     .arg
                     .as_ref()
-                    .map_or(false, |kwarg_name| &kwarg_name == arg_name)
+                    .is_some_and(|kwarg_name| &kwarg_name == arg_name)
                 {
                     Some(&keyword.value)
                 } else {

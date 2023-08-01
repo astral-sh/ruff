@@ -64,7 +64,7 @@ pub(crate) fn inplace_argument(
         if !call_path
             .first()
             .and_then(|module| checker.semantic().find_binding(module))
-            .map_or(false, |binding| {
+            .is_some_and(|binding| {
                 matches!(
                     binding.kind,
                     BindingKind::Import(Import {

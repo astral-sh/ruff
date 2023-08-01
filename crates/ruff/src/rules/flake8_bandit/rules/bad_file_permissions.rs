@@ -57,9 +57,7 @@ pub(crate) fn bad_file_permissions(
     if checker
         .semantic()
         .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["os", "chmod"])
-        })
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["os", "chmod"]))
     {
         let call_args = CallArguments::new(args, keywords);
         if let Some(mode_arg) = call_args.argument("mode", 1) {

@@ -201,14 +201,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     if checker.enabled(Rule::NonLowercaseVariableInFunction) {
                         if checker.semantic.scope().kind.is_any_function() {
                             // Ignore globals.
-                            if !checker
-                                .semantic
-                                .scope()
-                                .get(id)
-                                .map_or(false, |binding_id| {
-                                    checker.semantic.binding(binding_id).is_global()
-                                })
-                            {
+                            if !checker.semantic.scope().get(id).is_some_and(|binding_id| {
+                                checker.semantic.binding(binding_id).is_global()
+                            }) {
                                 pep8_naming::rules::non_lowercase_variable_in_function(
                                     checker, expr, id,
                                 );

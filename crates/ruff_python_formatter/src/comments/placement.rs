@@ -830,11 +830,11 @@ fn handle_slice_comments<'a>(
 fn handle_leading_function_with_decorators_comment(comment: DecoratedComment) -> CommentPlacement {
     let is_preceding_decorator = comment
         .preceding_node()
-        .map_or(false, |node| node.is_decorator());
+        .is_some_and(|node| node.is_decorator());
 
     let is_following_arguments = comment
         .following_node()
-        .map_or(false, |node| node.is_arguments());
+        .is_some_and(|node| node.is_arguments());
 
     if comment.line_position().is_own_line() && is_preceding_decorator && is_following_arguments {
         CommentPlacement::dangling(comment.enclosing_node(), comment)
@@ -1237,7 +1237,7 @@ fn are_same_optional<'a, T>(left: AnyNodeRef, right: Option<T>) -> bool
 where
     T: Into<AnyNodeRef<'a>>,
 {
-    right.map_or(false, |right| left.ptr_eq(right.into()))
+    right.is_some_and(|right| left.ptr_eq(right.into()))
 }
 
 /// The last child of the last branch, if the node hs multiple branches.

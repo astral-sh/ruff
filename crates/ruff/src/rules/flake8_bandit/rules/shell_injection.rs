@@ -379,7 +379,7 @@ fn is_partial_path(expr: &Expr) -> bool {
         Expr::List(ast::ExprList { elts, .. }) => elts.first().and_then(string_literal),
         _ => string_literal(expr),
     };
-    string_literal.map_or(false, |text| !is_full_path(text))
+    string_literal.is_some_and(|text| !is_full_path(text))
 }
 
 /// Return `true` if the [`Expr`] is a wildcard command.
@@ -410,7 +410,7 @@ fn is_wildcard_command(expr: &Expr) -> bool {
         has_star && has_command
     } else {
         let string_literal = string_literal(expr);
-        string_literal.map_or(false, |text| {
+        string_literal.is_some_and(|text| {
             text.contains('*')
                 && (text.contains("chown")
                     || text.contains("chmod")

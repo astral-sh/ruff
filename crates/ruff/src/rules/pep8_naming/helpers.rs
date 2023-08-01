@@ -29,7 +29,7 @@ pub(super) fn is_named_tuple_assignment(stmt: &Stmt, semantic: &SemanticModel) -
     let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
         return false;
     };
-    semantic.resolve_call_path(func).map_or(false, |call_path| {
+    semantic.resolve_call_path(func).is_some_and(|call_path| {
         matches!(
             call_path.as_slice(),
             ["collections", "namedtuple"] | ["typing", "NamedTuple"]
@@ -44,9 +44,9 @@ pub(super) fn is_typed_dict_assignment(stmt: &Stmt, semantic: &SemanticModel) ->
     let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
         return false;
     };
-    semantic.resolve_call_path(func).map_or(false, |call_path| {
-        matches!(call_path.as_slice(), ["typing", "TypedDict"])
-    })
+    semantic
+        .resolve_call_path(func)
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["typing", "TypedDict"]))
 }
 
 pub(super) fn is_type_var_assignment(stmt: &Stmt, semantic: &SemanticModel) -> bool {
@@ -56,9 +56,9 @@ pub(super) fn is_type_var_assignment(stmt: &Stmt, semantic: &SemanticModel) -> b
     let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
         return false;
     };
-    semantic.resolve_call_path(func).map_or(false, |call_path| {
-        matches!(call_path.as_slice(), ["typing", "TypeVar" | "NewType"])
-    })
+    semantic
+        .resolve_call_path(func)
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["typing", "TypeVar" | "NewType"]))
 }
 
 pub(super) fn is_typed_dict_class(bases: &[Expr], semantic: &SemanticModel) -> bool {

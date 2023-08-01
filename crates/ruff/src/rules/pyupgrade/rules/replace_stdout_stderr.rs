@@ -89,9 +89,7 @@ pub(crate) fn replace_stdout_stderr(
     if checker
         .semantic()
         .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["subprocess", "run"])
-        })
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["subprocess", "run"]))
     {
         // Find `stdout` and `stderr` kwargs.
         let Some(stdout) = find_keyword(keywords, "stdout") else {
@@ -105,15 +103,11 @@ pub(crate) fn replace_stdout_stderr(
         if !checker
             .semantic()
             .resolve_call_path(&stdout.value)
-            .map_or(false, |call_path| {
-                matches!(call_path.as_slice(), ["subprocess", "PIPE"])
-            })
+            .is_some_and(|call_path| matches!(call_path.as_slice(), ["subprocess", "PIPE"]))
             || !checker
                 .semantic()
                 .resolve_call_path(&stderr.value)
-                .map_or(false, |call_path| {
-                    matches!(call_path.as_slice(), ["subprocess", "PIPE"])
-                })
+                .is_some_and(|call_path| matches!(call_path.as_slice(), ["subprocess", "PIPE"]))
         {
             return;
         }

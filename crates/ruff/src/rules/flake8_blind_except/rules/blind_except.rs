@@ -77,7 +77,7 @@ pub(crate) fn blind_except(
         if let Stmt::Raise(ast::StmtRaise { exc, .. }) = stmt {
             if let Some(exc) = exc {
                 if let Expr::Name(ast::ExprName { id, .. }) = exc.as_ref() {
-                    name.map_or(false, |name| id == name)
+                    name.is_some_and(|name| id == name)
                 } else {
                     false
                 }

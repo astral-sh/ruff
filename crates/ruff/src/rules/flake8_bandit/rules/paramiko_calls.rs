@@ -39,9 +39,7 @@ pub(crate) fn paramiko_call(checker: &mut Checker, func: &Expr) {
     if checker
         .semantic()
         .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["paramiko", "exec_command"])
-        })
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["paramiko", "exec_command"]))
     {
         checker
             .diagnostics

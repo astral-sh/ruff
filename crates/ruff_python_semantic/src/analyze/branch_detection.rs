@@ -12,7 +12,7 @@ fn common_ancestor(
     stop: Option<NodeId>,
     node_tree: &Nodes,
 ) -> Option<NodeId> {
-    if stop.map_or(false, |stop| left == stop || right == stop) {
+    if stop.is_some_and(|stop| left == stop || right == stop) {
         return None;
     }
 
@@ -89,7 +89,7 @@ fn descendant_of<'a>(
     node_tree: &Nodes<'a>,
 ) -> bool {
     ancestors.iter().any(|ancestor| {
-        node_tree.node_id(ancestor).map_or(false, |ancestor| {
+        node_tree.node_id(ancestor).is_some_and(|ancestor| {
             common_ancestor(stmt, ancestor, Some(stop), node_tree).is_some()
         })
     })

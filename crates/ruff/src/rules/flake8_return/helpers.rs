@@ -8,7 +8,7 @@ use ruff_source_file::{Locator, UniversalNewlines};
 /// non-`None` value.
 pub(super) fn result_exists(returns: &[&ast::StmtReturn]) -> bool {
     returns.iter().any(|stmt| {
-        stmt.value.as_deref().map_or(false, |value| {
+        stmt.value.as_deref().is_some_and(|value| {
             !matches!(
                 value,
                 Expr::Constant(constant) if constant.value.is_none()

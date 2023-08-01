@@ -574,9 +574,9 @@ fn ternary(target_var: &Expr, body_value: &Expr, test: &Expr, orelse_value: &Exp
 /// Return `true` if the `Expr` contains a reference to any of the given `${module}.${target}`.
 fn contains_call_path(expr: &Expr, targets: &[&[&str]], semantic: &SemanticModel) -> bool {
     any_over_expr(expr, &|expr| {
-        semantic.resolve_call_path(expr).map_or(false, |call_path| {
-            targets.iter().any(|target| &call_path.as_slice() == target)
-        })
+        semantic
+            .resolve_call_path(expr)
+            .is_some_and(|call_path| targets.iter().any(|target| &call_path.as_slice() == target))
     })
 }
 
@@ -767,9 +767,10 @@ pub(crate) fn manual_dict_lookup(checker: &mut Checker, stmt_if: &StmtIf) {
     let [Stmt::Return(ast::StmtReturn { value, range: _ })] = body.as_slice() else {
         return;
     };
-    if value.as_ref().map_or(false, |value| {
-        contains_effect(value, |id| checker.semantic().is_builtin(id))
-    }) {
+    if value
+        .as_ref()
+        .is_some_and(|value| contains_effect(value, |id| checker.semantic().is_builtin(id)))
+    {
         return;
     }
 
@@ -789,7 +790,7 @@ pub(crate) fn manual_dict_lookup(checker: &mut Checker, stmt_if: &StmtIf) {
                 let [Stmt::Return(ast::StmtReturn { value, range: _ })] = body.as_slice() else {
                     return;
                 };
-                if value.as_ref().map_or(false, |value| {
+                if value.as_ref().is_some_and(|value| {
                     contains_effect(value, |id| checker.semantic().is_builtin(id))
                 }) {
                     return;
@@ -815,7 +816,7 @@ pub(crate) fn manual_dict_lookup(checker: &mut Checker, stmt_if: &StmtIf) {
                     return;
                 };
 
-                if value.as_ref().map_or(false, |value| {
+                if value.as_ref().is_some_and(|value| {
                     contains_effect(value, |id| checker.semantic().is_builtin(id))
                 }) {
                     return;

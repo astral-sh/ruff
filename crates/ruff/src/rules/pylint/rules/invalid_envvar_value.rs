@@ -84,9 +84,7 @@ pub(crate) fn invalid_envvar_value(
     if checker
         .semantic()
         .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["os", "getenv"])
-        })
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["os", "getenv"]))
     {
         // Find the `key` argument, if it exists.
         let Some(expr) = args

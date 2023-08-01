@@ -76,7 +76,7 @@ fn apply_fixes<'a>(
             }
 
             // If this fix overlaps with a fix we've already applied, skip it.
-            if last_pos.map_or(false, |last_pos| last_pos >= first.start()) {
+            if last_pos.is_some_and(|last_pos| last_pos >= first.start()) {
                 continue;
             }
         }

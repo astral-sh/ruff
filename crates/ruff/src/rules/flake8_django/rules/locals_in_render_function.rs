@@ -54,9 +54,7 @@ pub(crate) fn locals_in_render_function(
     if !checker
         .semantic()
         .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["django", "shortcuts", "render"])
-        })
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["django", "shortcuts", "render"]))
     {
         return;
     }
@@ -85,7 +83,7 @@ fn is_locals_call(expr: &Expr, semantic: &SemanticModel) -> bool {
     let Expr::Call(ast::ExprCall { func, .. }) = expr else {
         return false;
     };
-    semantic.resolve_call_path(func).map_or(false, |call_path| {
-        matches!(call_path.as_slice(), ["", "locals"])
-    })
+    semantic
+        .resolve_call_path(func)
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["", "locals"]))
 }

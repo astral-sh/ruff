@@ -109,7 +109,7 @@ fn match_encoding_arg<'a>(args: &'a [Expr], kwargs: &'a [Keyword]) -> Option<Enc
         // Ex `"".encode(kwarg=kwarg)`
         (0, 1) => {
             let kwarg = &kwargs[0];
-            if kwarg.arg.as_ref().map_or(false, |arg| arg == "encoding") {
+            if kwarg.arg.as_ref().is_some_and(|arg| arg == "encoding") {
                 if is_utf8_encoding_arg(&kwarg.value) {
                     return Some(EncodingArg::Keyword(kwarg));
                 }

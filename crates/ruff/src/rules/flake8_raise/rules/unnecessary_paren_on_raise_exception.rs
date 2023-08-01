@@ -59,9 +59,7 @@ pub(crate) fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: 
             if checker
                 .semantic()
                 .lookup_attribute(func)
-                .map_or(false, |id| {
-                    checker.semantic().binding(id).kind.is_function_definition()
-                })
+                .is_some_and(|id| checker.semantic().binding(id).kind.is_function_definition())
             {
                 return;
             }

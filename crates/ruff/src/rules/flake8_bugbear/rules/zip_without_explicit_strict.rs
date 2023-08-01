@@ -76,7 +76,7 @@ fn is_infinite_iterator(arg: &Expr, semantic: &SemanticModel) -> bool {
         return false;
     };
 
-    semantic.resolve_call_path(func).map_or(false, |call_path| {
+    semantic.resolve_call_path(func).is_some_and(|call_path| {
         match call_path.as_slice() {
             ["itertools", "cycle" | "count"] => true,
             ["itertools", "repeat"] => {
@@ -92,7 +92,7 @@ fn is_infinite_iterator(arg: &Expr, semantic: &SemanticModel) -> bool {
 
                 // Ex) `iterools.repeat(1, times=None)`
                 for keyword in keywords {
-                    if keyword.arg.as_ref().map_or(false, |name| name == "times") {
+                    if keyword.arg.as_ref().is_some_and(|name| name == "times") {
                         if is_const_none(&keyword.value) {
                             return true;
                         }

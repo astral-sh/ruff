@@ -220,7 +220,7 @@ fn check_positional_args(
         // If there's an annotation that's not `object` or `Unused`, check that the annotated type
         // matches the predicate.
         if non_none_annotation_element(annotation, checker.semantic())
-            .map_or(false, |elem| predicate(elem, checker.semantic()))
+            .is_some_and(|elem| predicate(elem, checker.semantic()))
         {
             continue;
         }
@@ -297,7 +297,7 @@ fn is_object_or_unused(expr: &Expr, model: &SemanticModel) -> bool {
     model
         .resolve_call_path(expr)
         .as_ref()
-        .map_or(false, |call_path| {
+        .is_some_and(|call_path| {
             matches!(
                 call_path.as_slice(),
                 ["" | "builtins", "object"] | ["_typeshed", "Unused"]
@@ -310,9 +310,7 @@ fn is_base_exception(expr: &Expr, model: &SemanticModel) -> bool {
     model
         .resolve_call_path(expr)
         .as_ref()
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["" | "builtins", "BaseException"])
-        })
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["" | "builtins", "BaseException"]))
 }
 
 /// Return `true` if the [`Expr`] is the `types.TracebackType` type.
@@ -320,9 +318,7 @@ fn is_traceback_type(expr: &Expr, model: &SemanticModel) -> bool {
     model
         .resolve_call_path(expr)
         .as_ref()
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["types", "TracebackType"])
-        })
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["types", "TracebackType"]))
 }
 
 /// Return `true` if the [`Expr`] is, e.g., `Type[BaseException]`.
@@ -335,9 +331,7 @@ fn is_base_exception_type(expr: &Expr, model: &SemanticModel) -> bool {
         || model
             .resolve_call_path(value)
             .as_ref()
-            .map_or(false, |call_path| {
-                matches!(call_path.as_slice(), ["" | "builtins", "type"])
-            })
+            .is_some_and(|call_path| matches!(call_path.as_slice(), ["" | "builtins", "type"]))
     {
         is_base_exception(slice, model)
     } else {

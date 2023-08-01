@@ -422,10 +422,10 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             // Only use the layout if the first or last expression has parentheses of some sort.
             let first_parenthesized = self
                 .first
-                .map_or(false, |first| has_parentheses(first, self.source));
+                .is_some_and(|first| has_parentheses(first, self.source));
             let last_parenthesized = self
                 .last
-                .map_or(false, |last| has_parentheses(last, self.source));
+                .is_some_and(|last| has_parentheses(last, self.source));
             first_parenthesized || last_parenthesized
         }
     }

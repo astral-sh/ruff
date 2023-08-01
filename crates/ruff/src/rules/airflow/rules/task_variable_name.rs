@@ -68,7 +68,7 @@ pub(crate) fn variable_name_task_id(
     if !checker
         .semantic()
         .resolve_call_path(func)
-        .map_or(false, |call_path| matches!(call_path[0], "airflow"))
+        .is_some_and(|call_path| matches!(call_path[0], "airflow"))
     {
         return None;
     }
