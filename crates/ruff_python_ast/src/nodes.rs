@@ -20,7 +20,6 @@ pub enum Mod {
 pub struct ModModule {
     pub range: TextRange,
     pub body: Vec<Stmt>,
-    pub type_ignores: Vec<TypeIgnore>,
 }
 
 impl From<ModModule> for Mod {
@@ -2037,26 +2036,6 @@ impl From<PatternMatchOr> for Pattern {
     }
 }
 
-/// See also [type_ignore](https://docs.python.org/3/library/ast.html#ast.type_ignore)
-#[derive(Clone, Debug, PartialEq, is_macro::Is)]
-pub enum TypeIgnore {
-    TypeIgnore(TypeIgnoreTypeIgnore),
-}
-
-/// See also [TypeIgnore](https://docs.python.org/3/library/ast.html#ast.TypeIgnore)
-#[derive(Clone, Debug, PartialEq)]
-pub struct TypeIgnoreTypeIgnore {
-    pub range: TextRange,
-    pub lineno: Int,
-    pub tag: String,
-}
-
-impl From<TypeIgnoreTypeIgnore> for TypeIgnore {
-    fn from(payload: TypeIgnoreTypeIgnore) -> Self {
-        TypeIgnore::TypeIgnore(payload)
-    }
-}
-
 /// See also [type_param](https://docs.python.org/3/library/ast.html#ast.type_param)
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum TypeParam {
@@ -2993,18 +2972,6 @@ impl Ranged for crate::Pattern {
     }
 }
 
-impl Ranged for crate::nodes::TypeIgnoreTypeIgnore {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::TypeIgnore {
-    fn range(&self) -> TextRange {
-        match self {
-            Self::TypeIgnore(node) => node.range(),
-        }
-    }
-}
 impl Ranged for crate::nodes::TypeParamTypeVar {
     fn range(&self) -> TextRange {
         self.range
@@ -3055,5 +3022,5 @@ mod size_assertions {
     assert_eq_size!(Expr, [u8; 80]);
     assert_eq_size!(Constant, [u8; 32]);
     assert_eq_size!(Pattern, [u8; 96]);
-    assert_eq_size!(Mod, [u8; 64]);
+    assert_eq_size!(Mod, [u8; 48]);
 }

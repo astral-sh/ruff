@@ -5,12 +5,12 @@ use insta::assert_snapshot;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::visitor::preorder::{
     walk_alias, walk_arg, walk_arguments, walk_comprehension, walk_except_handler, walk_expr,
-    walk_keyword, walk_match_case, walk_module, walk_pattern, walk_stmt, walk_type_ignore,
-    walk_type_param, walk_with_item, PreorderVisitor,
+    walk_keyword, walk_match_case, walk_module, walk_pattern, walk_stmt, walk_type_param,
+    walk_with_item, PreorderVisitor,
 };
 use ruff_python_ast::{
     Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Constant, ExceptHandler, Expr, Keyword,
-    MatchCase, Mod, Operator, Pattern, Stmt, TypeIgnore, TypeParam, UnaryOp, WithItem,
+    MatchCase, Mod, Operator, Pattern, Stmt, TypeParam, UnaryOp, WithItem,
 };
 use ruff_python_parser::lexer::lex;
 use ruff_python_parser::{parse_tokens, Mode};
@@ -270,12 +270,6 @@ impl PreorderVisitor<'_> for RecordVisitor {
     fn visit_pattern(&mut self, pattern: &Pattern) {
         self.enter_node(pattern);
         walk_pattern(self, pattern);
-        self.exit_node();
-    }
-
-    fn visit_type_ignore(&mut self, type_ignore: &TypeIgnore) {
-        self.enter_node(type_ignore);
-        walk_type_ignore(self, type_ignore);
         self.exit_node();
     }
 

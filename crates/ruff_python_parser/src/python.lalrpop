@@ -21,7 +21,7 @@ grammar(mode: Mode);
 // For each public entry point, a full parse table is generated.
 // By having only a single pub function, we reduce this to one.
 pub(crate) Top: ast::Mod = {
-    <start:@L> StartModule <body:Program> <end:@R> => ast::ModModule { body, type_ignores: vec![], range: (start..end).into() }.into(),
+    <start:@L> StartModule <body:Program> <end:@R> => ast::ModModule { body, range: (start..end).into() }.into(),
     <start:@L> StartInteractive <body:Program> <end:@R> => ast::ModInteractive { body, range: (start..end).into() }.into(),
     <start:@L> StartExpression <body:TestList> ("\n")* <end:@R> => ast::ModExpression { body: Box::new(body), range: (start..end).into() }.into()
 };

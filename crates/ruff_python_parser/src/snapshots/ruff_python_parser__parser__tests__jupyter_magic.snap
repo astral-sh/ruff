@@ -347,6 +347,5 @@ Module(
                 },
             ),
         ],
-        type_ignores: [],
     },
 )

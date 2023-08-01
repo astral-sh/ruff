@@ -2657,46 +2657,6 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternMatchOr {
     }
 }
 
-impl FormatRule<ast::TypeIgnoreTypeIgnore, PyFormatContext<'_>>
-    for crate::other::type_ignore_type_ignore::FormatTypeIgnoreTypeIgnore
-{
-    #[inline]
-    fn fmt(
-        &self,
-        node: &ast::TypeIgnoreTypeIgnore,
-        f: &mut Formatter<PyFormatContext<'_>>,
-    ) -> FormatResult<()> {
-        FormatNodeRule::<ast::TypeIgnoreTypeIgnore>::fmt(self, node, f)
-    }
-}
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::TypeIgnoreTypeIgnore {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::TypeIgnoreTypeIgnore,
-        crate::other::type_ignore_type_ignore::FormatTypeIgnoreTypeIgnore,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::other::type_ignore_type_ignore::FormatTypeIgnoreTypeIgnore::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::TypeIgnoreTypeIgnore {
-    type Format = FormatOwnedWithRule<
-        ast::TypeIgnoreTypeIgnore,
-        crate::other::type_ignore_type_ignore::FormatTypeIgnoreTypeIgnore,
-        PyFormatContext<'ast>,
-    >;
-    fn into_format(self) -> Self::Format {
-        FormatOwnedWithRule::new(
-            self,
-            crate::other::type_ignore_type_ignore::FormatTypeIgnoreTypeIgnore::default(),
-        )
-    }
-}
-
 impl FormatRule<ast::Comprehension, PyFormatContext<'_>>
     for crate::other::comprehension::FormatComprehension
 {
