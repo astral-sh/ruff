@@ -70,6 +70,8 @@ E70.py:68:1: E703 [*] Statement ends with an unnecessary semicolon
 67 | 0\
 68 | ;
    | ^ E703
+69 | #: E701:2:3
+70 | a = \
    |
    = help: Remove unnecessary semicolon
 
@@ -80,5 +82,24 @@ E70.py:68:1: E703 [*] Statement ends with an unnecessary semicolon
 67    |-0\
 68    |-;
    67 |+0
+69 68 | #: E701:2:3
+70 69 | a = \
+71 70 |   5;
+
+E70.py:71:4: E703 [*] Statement ends with an unnecessary semicolon
+   |
+69 | #: E701:2:3
+70 | a = \
+71 |   5;
+   |    ^ E703
+   |
+   = help: Remove unnecessary semicolon
+
+ℹ Fix
+68 68 | ;
+69 69 | #: E701:2:3
+70 70 | a = \
+71    |-  5;
+   71 |+  5
 
 
