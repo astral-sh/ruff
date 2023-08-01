@@ -620,26 +620,26 @@ pub(super) enum CommentPlacement<'a> {
 impl<'a> CommentPlacement<'a> {
     /// Makes `comment` a [leading comment](self#leading-comments) of `node`.
     #[inline]
-    pub(super) fn leading(node: AnyNodeRef<'a>, comment: impl Into<SourceComment>) -> Self {
+    pub(super) fn leading(node: impl Into<AnyNodeRef<'a>>, comment: DecoratedComment) -> Self {
         Self::Leading {
-            node,
+            node: node.into(),
             comment: comment.into(),
         }
     }
 
     /// Makes `comment` a [dangling comment](self::dangling-comments) of `node`.
-    pub(super) fn dangling(node: AnyNodeRef<'a>, comment: impl Into<SourceComment>) -> Self {
+    pub(super) fn dangling(node: impl Into<AnyNodeRef<'a>>, comment: DecoratedComment) -> Self {
         Self::Dangling {
-            node,
+            node: node.into(),
             comment: comment.into(),
         }
     }
 
     /// Makes `comment` a [trailing comment](self::trailing-comments) of `node`.
     #[inline]
-    pub(super) fn trailing(node: AnyNodeRef<'a>, comment: impl Into<SourceComment>) -> Self {
+    pub(super) fn trailing(node: impl Into<AnyNodeRef<'a>>, comment: DecoratedComment) -> Self {
         Self::Trailing {
-            node,
+            node: node.into(),
             comment: comment.into(),
         }
     }
