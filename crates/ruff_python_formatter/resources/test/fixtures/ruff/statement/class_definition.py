@@ -43,3 +43,52 @@ class TestTrailingComment2: # trailing comment
     pass
 
 
+class Test:
+    """Docstring"""
+
+
+class Test:
+    # comment
+    """Docstring"""
+
+
+class Test:
+    """Docstring"""
+    x = 1
+
+
+class Test:
+    """Docstring"""
+    # comment
+    x = 1
+
+
+class Test:
+
+    """Docstring"""
+
+
+class Test:
+    # comment
+
+    """Docstring"""
+
+
+class Test:
+
+    # comment
+
+    """Docstring"""
+
+
+class Test:
+
+    """Docstring"""
+    x = 1
+
+
+class Test:
+
+    """Docstring"""
+    # comment
+    x = 1
