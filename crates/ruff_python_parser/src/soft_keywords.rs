@@ -31,7 +31,7 @@ where
     pub fn new(lexer: I, mode: Mode) -> Self {
         Self {
             underlying: lexer.multipeek(), // spell-checker:ignore multipeek
-            start_of_line: matches!(mode, Mode::Interactive | Mode::Module),
+            start_of_line: matches!(mode, Mode::Module),
         }
     }
 }
@@ -140,11 +140,7 @@ where
 
                 matches!(
                     tok,
-                    Tok::StartModule
-                        | Tok::StartInteractive
-                        | Tok::Newline
-                        | Tok::Indent
-                        | Tok::Dedent
+                    Tok::StartModule | Tok::Newline | Tok::Indent | Tok::Dedent
                 )
             })
         });

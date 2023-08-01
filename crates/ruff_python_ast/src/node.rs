@@ -22,9 +22,7 @@ pub trait AstNode: Ranged {
 #[derive(Clone, Debug, is_macro::Is, PartialEq)]
 pub enum AnyNode {
     ModModule(ast::ModModule),
-    ModInteractive(ast::ModInteractive),
     ModExpression(ast::ModExpression),
-    ModFunctionType(ast::ModFunctionType),
     StmtFunctionDef(ast::StmtFunctionDef),
     StmtAsyncFunctionDef(ast::StmtAsyncFunctionDef),
     StmtClassDef(ast::StmtClassDef),
@@ -140,9 +138,7 @@ impl AnyNode {
             AnyNode::StmtLineMagic(node) => Some(Stmt::LineMagic(node)),
 
             AnyNode::ModModule(_)
-            | AnyNode::ModInteractive(_)
             | AnyNode::ModExpression(_)
-            | AnyNode::ModFunctionType(_)
             | AnyNode::ExprBoolOp(_)
             | AnyNode::ExprNamedExpr(_)
             | AnyNode::ExprBinOp(_)
@@ -228,9 +224,7 @@ impl AnyNode {
             AnyNode::ExprLineMagic(node) => Some(Expr::LineMagic(node)),
 
             AnyNode::ModModule(_)
-            | AnyNode::ModInteractive(_)
             | AnyNode::ModExpression(_)
-            | AnyNode::ModFunctionType(_)
             | AnyNode::StmtFunctionDef(_)
             | AnyNode::StmtAsyncFunctionDef(_)
             | AnyNode::StmtClassDef(_)
@@ -288,9 +282,7 @@ impl AnyNode {
     pub fn module(self) -> Option<Mod> {
         match self {
             AnyNode::ModModule(node) => Some(Mod::Module(node)),
-            AnyNode::ModInteractive(node) => Some(Mod::Interactive(node)),
             AnyNode::ModExpression(node) => Some(Mod::Expression(node)),
-            AnyNode::ModFunctionType(node) => Some(Mod::FunctionType(node)),
 
             AnyNode::StmtFunctionDef(_)
             | AnyNode::StmtAsyncFunctionDef(_)
@@ -386,9 +378,7 @@ impl AnyNode {
             AnyNode::PatternMatchOr(node) => Some(Pattern::MatchOr(node)),
 
             AnyNode::ModModule(_)
-            | AnyNode::ModInteractive(_)
             | AnyNode::ModExpression(_)
-            | AnyNode::ModFunctionType(_)
             | AnyNode::StmtFunctionDef(_)
             | AnyNode::StmtAsyncFunctionDef(_)
             | AnyNode::StmtClassDef(_)
@@ -468,9 +458,7 @@ impl AnyNode {
             AnyNode::ExceptHandlerExceptHandler(node) => Some(ExceptHandler::ExceptHandler(node)),
 
             AnyNode::ModModule(_)
-            | AnyNode::ModInteractive(_)
             | AnyNode::ModExpression(_)
-            | AnyNode::ModFunctionType(_)
             | AnyNode::StmtFunctionDef(_)
             | AnyNode::StmtAsyncFunctionDef(_)
             | AnyNode::StmtClassDef(_)
@@ -575,9 +563,7 @@ impl AnyNode {
     pub const fn as_ref(&self) -> AnyNodeRef {
         match self {
             Self::ModModule(node) => AnyNodeRef::ModModule(node),
-            Self::ModInteractive(node) => AnyNodeRef::ModInteractive(node),
             Self::ModExpression(node) => AnyNodeRef::ModExpression(node),
-            Self::ModFunctionType(node) => AnyNodeRef::ModFunctionType(node),
             Self::StmtFunctionDef(node) => AnyNodeRef::StmtFunctionDef(node),
             Self::StmtAsyncFunctionDef(node) => AnyNodeRef::StmtAsyncFunctionDef(node),
             Self::StmtClassDef(node) => AnyNodeRef::StmtClassDef(node),
@@ -694,34 +680,6 @@ impl AstNode for ast::ModModule {
         AnyNode::from(self)
     }
 }
-impl AstNode for ast::ModInteractive {
-    fn cast(kind: AnyNode) -> Option<Self>
-    where
-        Self: Sized,
-    {
-        if let AnyNode::ModInteractive(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ModInteractive(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn as_any_node_ref(&self) -> AnyNodeRef {
-        AnyNodeRef::from(self)
-    }
-
-    fn into_any_node(self) -> AnyNode {
-        AnyNode::from(self)
-    }
-}
 impl AstNode for ast::ModExpression {
     fn cast(kind: AnyNode) -> Option<Self>
     where
@@ -736,34 +694,6 @@ impl AstNode for ast::ModExpression {
 
     fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
         if let AnyNodeRef::ModExpression(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn as_any_node_ref(&self) -> AnyNodeRef {
-        AnyNodeRef::from(self)
-    }
-
-    fn into_any_node(self) -> AnyNode {
-        AnyNode::from(self)
-    }
-}
-impl AstNode for ast::ModFunctionType {
-    fn cast(kind: AnyNode) -> Option<Self>
-    where
-        Self: Sized,
-    {
-        if let AnyNode::ModFunctionType(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ModFunctionType(node) = kind {
             Some(node)
         } else {
             None
@@ -3067,9 +2997,7 @@ impl From<Mod> for AnyNode {
     fn from(module: Mod) -> Self {
         match module {
             Mod::Module(node) => AnyNode::ModModule(node),
-            Mod::Interactive(node) => AnyNode::ModInteractive(node),
             Mod::Expression(node) => AnyNode::ModExpression(node),
-            Mod::FunctionType(node) => AnyNode::ModFunctionType(node),
         }
     }
 }
@@ -3103,21 +3031,9 @@ impl From<ast::ModModule> for AnyNode {
     }
 }
 
-impl From<ast::ModInteractive> for AnyNode {
-    fn from(node: ast::ModInteractive) -> Self {
-        AnyNode::ModInteractive(node)
-    }
-}
-
 impl From<ast::ModExpression> for AnyNode {
     fn from(node: ast::ModExpression) -> Self {
         AnyNode::ModExpression(node)
-    }
-}
-
-impl From<ast::ModFunctionType> for AnyNode {
-    fn from(node: ast::ModFunctionType) -> Self {
-        AnyNode::ModFunctionType(node)
     }
 }
 
@@ -3590,9 +3506,7 @@ impl Ranged for AnyNode {
     fn range(&self) -> TextRange {
         match self {
             AnyNode::ModModule(node) => node.range(),
-            AnyNode::ModInteractive(node) => node.range(),
             AnyNode::ModExpression(node) => node.range(),
-            AnyNode::ModFunctionType(node) => node.range(),
             AnyNode::StmtFunctionDef(node) => node.range(),
             AnyNode::StmtAsyncFunctionDef(node) => node.range(),
             AnyNode::StmtClassDef(node) => node.range(),
@@ -3679,9 +3593,7 @@ impl Ranged for AnyNode {
 #[derive(Copy, Clone, Debug, is_macro::Is, PartialEq)]
 pub enum AnyNodeRef<'a> {
     ModModule(&'a ast::ModModule),
-    ModInteractive(&'a ast::ModInteractive),
     ModExpression(&'a ast::ModExpression),
-    ModFunctionType(&'a ast::ModFunctionType),
     StmtFunctionDef(&'a ast::StmtFunctionDef),
     StmtAsyncFunctionDef(&'a ast::StmtAsyncFunctionDef),
     StmtClassDef(&'a ast::StmtClassDef),
@@ -3767,9 +3679,7 @@ impl AnyNodeRef<'_> {
     pub fn as_ptr(&self) -> NonNull<()> {
         match self {
             AnyNodeRef::ModModule(node) => NonNull::from(*node).cast(),
-            AnyNodeRef::ModInteractive(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ModExpression(node) => NonNull::from(*node).cast(),
-            AnyNodeRef::ModFunctionType(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtFunctionDef(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtAsyncFunctionDef(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtClassDef(node) => NonNull::from(*node).cast(),
@@ -3861,9 +3771,7 @@ impl AnyNodeRef<'_> {
     pub const fn kind(self) -> NodeKind {
         match self {
             AnyNodeRef::ModModule(_) => NodeKind::ModModule,
-            AnyNodeRef::ModInteractive(_) => NodeKind::ModInteractive,
             AnyNodeRef::ModExpression(_) => NodeKind::ModExpression,
-            AnyNodeRef::ModFunctionType(_) => NodeKind::ModFunctionType,
             AnyNodeRef::StmtFunctionDef(_) => NodeKind::StmtFunctionDef,
             AnyNodeRef::StmtAsyncFunctionDef(_) => NodeKind::StmtAsyncFunctionDef,
             AnyNodeRef::StmtClassDef(_) => NodeKind::StmtClassDef,
@@ -3979,9 +3887,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtLineMagic(_) => true,
 
             AnyNodeRef::ModModule(_)
-            | AnyNodeRef::ModInteractive(_)
             | AnyNodeRef::ModExpression(_)
-            | AnyNodeRef::ModFunctionType(_)
             | AnyNodeRef::ExprBoolOp(_)
             | AnyNodeRef::ExprNamedExpr(_)
             | AnyNodeRef::ExprBinOp(_)
@@ -4067,9 +3973,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprLineMagic(_) => true,
 
             AnyNodeRef::ModModule(_)
-            | AnyNodeRef::ModInteractive(_)
             | AnyNodeRef::ModExpression(_)
-            | AnyNodeRef::ModFunctionType(_)
             | AnyNodeRef::StmtFunctionDef(_)
             | AnyNodeRef::StmtAsyncFunctionDef(_)
             | AnyNodeRef::StmtClassDef(_)
@@ -4126,10 +4030,7 @@ impl AnyNodeRef<'_> {
 
     pub const fn is_module(self) -> bool {
         match self {
-            AnyNodeRef::ModModule(_)
-            | AnyNodeRef::ModInteractive(_)
-            | AnyNodeRef::ModExpression(_)
-            | AnyNodeRef::ModFunctionType(_) => true,
+            AnyNodeRef::ModModule(_) | AnyNodeRef::ModExpression(_) => true,
 
             AnyNodeRef::StmtFunctionDef(_)
             | AnyNodeRef::StmtAsyncFunctionDef(_)
@@ -4225,9 +4126,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::PatternMatchOr(_) => true,
 
             AnyNodeRef::ModModule(_)
-            | AnyNodeRef::ModInteractive(_)
             | AnyNodeRef::ModExpression(_)
-            | AnyNodeRef::ModFunctionType(_)
             | AnyNodeRef::StmtFunctionDef(_)
             | AnyNodeRef::StmtAsyncFunctionDef(_)
             | AnyNodeRef::StmtClassDef(_)
@@ -4307,9 +4206,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::ExceptHandlerExceptHandler(_) => true,
 
             AnyNodeRef::ModModule(_)
-            | AnyNodeRef::ModInteractive(_)
             | AnyNodeRef::ModExpression(_)
-            | AnyNodeRef::ModFunctionType(_)
             | AnyNodeRef::StmtFunctionDef(_)
             | AnyNodeRef::StmtAsyncFunctionDef(_)
             | AnyNodeRef::StmtClassDef(_)
@@ -4428,21 +4325,9 @@ impl<'a> From<&'a ast::ModModule> for AnyNodeRef<'a> {
     }
 }
 
-impl<'a> From<&'a ast::ModInteractive> for AnyNodeRef<'a> {
-    fn from(node: &'a ast::ModInteractive) -> Self {
-        AnyNodeRef::ModInteractive(node)
-    }
-}
-
 impl<'a> From<&'a ast::ModExpression> for AnyNodeRef<'a> {
     fn from(node: &'a ast::ModExpression) -> Self {
         AnyNodeRef::ModExpression(node)
-    }
-}
-
-impl<'a> From<&'a ast::ModFunctionType> for AnyNodeRef<'a> {
-    fn from(node: &'a ast::ModFunctionType) -> Self {
-        AnyNodeRef::ModFunctionType(node)
     }
 }
 
@@ -4947,9 +4832,7 @@ impl<'a> From<&'a Mod> for AnyNodeRef<'a> {
     fn from(module: &'a Mod) -> Self {
         match module {
             Mod::Module(node) => AnyNodeRef::ModModule(node),
-            Mod::Interactive(node) => AnyNodeRef::ModInteractive(node),
             Mod::Expression(node) => AnyNodeRef::ModExpression(node),
-            Mod::FunctionType(node) => AnyNodeRef::ModFunctionType(node),
         }
     }
 }
@@ -5034,9 +4917,7 @@ impl Ranged for AnyNodeRef<'_> {
     fn range(&self) -> TextRange {
         match self {
             AnyNodeRef::ModModule(node) => node.range(),
-            AnyNodeRef::ModInteractive(node) => node.range(),
             AnyNodeRef::ModExpression(node) => node.range(),
-            AnyNodeRef::ModFunctionType(node) => node.range(),
             AnyNodeRef::StmtFunctionDef(node) => node.range(),
             AnyNodeRef::StmtAsyncFunctionDef(node) => node.range(),
             AnyNodeRef::StmtClassDef(node) => node.range(),

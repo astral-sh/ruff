@@ -10,9 +10,7 @@ use std::fmt::Debug;
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum Mod {
     Module(ModModule),
-    Interactive(ModInteractive),
     Expression(ModExpression),
-    FunctionType(ModFunctionType),
 }
 
 /// See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)
@@ -28,19 +26,6 @@ impl From<ModModule> for Mod {
     }
 }
 
-/// See also [Interactive](https://docs.python.org/3/library/ast.html#ast.Interactive)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ModInteractive {
-    pub range: TextRange,
-    pub body: Vec<Stmt>,
-}
-
-impl From<ModInteractive> for Mod {
-    fn from(payload: ModInteractive) -> Self {
-        Mod::Interactive(payload)
-    }
-}
-
 /// See also [Expression](https://docs.python.org/3/library/ast.html#ast.Expression)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ModExpression {
@@ -51,20 +36,6 @@ pub struct ModExpression {
 impl From<ModExpression> for Mod {
     fn from(payload: ModExpression) -> Self {
         Mod::Expression(payload)
-    }
-}
-
-/// See also [FunctionType](https://docs.python.org/3/library/ast.html#ast.FunctionType)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ModFunctionType {
-    pub range: TextRange,
-    pub argtypes: Vec<Expr>,
-    pub returns: Box<Expr>,
-}
-
-impl From<ModFunctionType> for Mod {
-    fn from(payload: ModFunctionType) -> Self {
-        Mod::FunctionType(payload)
     }
 }
 
@@ -2474,17 +2445,7 @@ impl Ranged for crate::nodes::ModModule {
         self.range
     }
 }
-impl Ranged for crate::nodes::ModInteractive {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
 impl Ranged for crate::nodes::ModExpression {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ModFunctionType {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -2493,9 +2454,7 @@ impl Ranged for crate::Mod {
     fn range(&self) -> TextRange {
         match self {
             Self::Module(node) => node.range(),
-            Self::Interactive(node) => node.range(),
             Self::Expression(node) => node.range(),
-            Self::FunctionType(node) => node.range(),
         }
     }
 }
@@ -3017,5 +2976,5 @@ mod size_assertions {
     assert_eq_size!(Expr, [u8; 80]);
     assert_eq_size!(Constant, [u8; 32]);
     assert_eq_size!(Pattern, [u8; 96]);
-    assert_eq_size!(Mod, [u8; 48]);
+    assert_eq_size!(Mod, [u8; 32]);
 }

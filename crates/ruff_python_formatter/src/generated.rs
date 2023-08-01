@@ -41,46 +41,6 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ModModule {
     }
 }
 
-impl FormatRule<ast::ModInteractive, PyFormatContext<'_>>
-    for crate::module::mod_interactive::FormatModInteractive
-{
-    #[inline]
-    fn fmt(
-        &self,
-        node: &ast::ModInteractive,
-        f: &mut Formatter<PyFormatContext<'_>>,
-    ) -> FormatResult<()> {
-        FormatNodeRule::<ast::ModInteractive>::fmt(self, node, f)
-    }
-}
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ModInteractive {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ModInteractive,
-        crate::module::mod_interactive::FormatModInteractive,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::module::mod_interactive::FormatModInteractive::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ModInteractive {
-    type Format = FormatOwnedWithRule<
-        ast::ModInteractive,
-        crate::module::mod_interactive::FormatModInteractive,
-        PyFormatContext<'ast>,
-    >;
-    fn into_format(self) -> Self::Format {
-        FormatOwnedWithRule::new(
-            self,
-            crate::module::mod_interactive::FormatModInteractive::default(),
-        )
-    }
-}
-
 impl FormatRule<ast::ModExpression, PyFormatContext<'_>>
     for crate::module::mod_expression::FormatModExpression
 {
@@ -117,46 +77,6 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ModExpression {
         FormatOwnedWithRule::new(
             self,
             crate::module::mod_expression::FormatModExpression::default(),
-        )
-    }
-}
-
-impl FormatRule<ast::ModFunctionType, PyFormatContext<'_>>
-    for crate::module::mod_function_type::FormatModFunctionType
-{
-    #[inline]
-    fn fmt(
-        &self,
-        node: &ast::ModFunctionType,
-        f: &mut Formatter<PyFormatContext<'_>>,
-    ) -> FormatResult<()> {
-        FormatNodeRule::<ast::ModFunctionType>::fmt(self, node, f)
-    }
-}
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ModFunctionType {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ModFunctionType,
-        crate::module::mod_function_type::FormatModFunctionType,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::module::mod_function_type::FormatModFunctionType::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ModFunctionType {
-    type Format = FormatOwnedWithRule<
-        ast::ModFunctionType,
-        crate::module::mod_function_type::FormatModFunctionType,
-        PyFormatContext<'ast>,
-    >;
-    fn into_format(self) -> Self::Format {
-        FormatOwnedWithRule::new(
-            self,
-            crate::module::mod_function_type::FormatModFunctionType::default(),
         )
     }
 }

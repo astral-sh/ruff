@@ -115,7 +115,7 @@ pub use parse::Parse;
 pub use parser::{parse, parse_starts_at, parse_tokens, ParseError, ParseErrorType};
 #[allow(deprecated)]
 pub use parser::{parse_expression, parse_expression_starts_at, parse_program};
-use ruff_python_ast::{CmpOp, Expr, Mod, ModModule, Ranged, Suite};
+use ruff_python_ast::{CmpOp, Expr, ModModule, Ranged, Suite};
 use ruff_text_size::{TextRange, TextSize};
 pub use string::FStringErrorType;
 pub use token::{StringKind, Tok, TokenKind};
@@ -149,10 +149,7 @@ pub fn parse_program_tokens(
     lxr: Vec<LexResult>,
     source_path: &str,
 ) -> anyhow::Result<Suite, ParseError> {
-    parser::parse_tokens(lxr, Mode::Module, source_path).map(|top| match top {
-        Mod::Module(ModModule { body, .. }) => body,
-        _ => unreachable!(),
-    })
+    ModModule::parse_tokens(lxr, source_path).map(|module| module.body)
 }
 
 /// Return the `Range` of the first `Tok::Colon` token in a `Range`.
@@ -270,8 +267,6 @@ impl LocatedCmpOp {
 pub enum Mode {
     /// The code consists of a sequence of statements.
     Module,
-    /// The code consists of a sequence of interactive statement.
-    Interactive,
     /// The code consists of a single expression.
     Expression,
     /// The code consists of a sequence of statements which are part of a
