@@ -66,7 +66,7 @@ impl Violation for PytestRaisesTooBroad {
 /// ```
 ///
 /// ## References
-/// - [API Reference: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
+/// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
 #[violation]
 pub struct PytestRaisesWithoutException;
 

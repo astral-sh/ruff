@@ -45,7 +45,7 @@ use super::helpers::{is_empty_or_null_string, is_pytest_fail};
 /// ```
 ///
 /// ## References
-/// - [API Reference: `pytest.fail`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fail)
+/// - [`pytest` documentation: `pytest.fail`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fail)
 #[violation]
 pub struct PytestFailWithoutMessage;
 

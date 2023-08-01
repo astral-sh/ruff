@@ -53,7 +53,7 @@ use super::helpers::{
 /// - `flake8-pytest-style.fixture-parentheses`
 ///
 /// ## References
-/// - [API Reference: Fixtures](https://docs.pytest.org/en/latest/reference/reference.html#fixtures-api)
+/// - [`pytest` documentation: API Reference: Fixtures](https://docs.pytest.org/en/latest/reference/reference.html#fixtures-api)
 #[violation]
 pub struct PytestFixtureIncorrectParenthesesStyle {
     expected: Parentheses,
@@ -169,7 +169,7 @@ impl Violation for PytestIncorrectFixtureNameUnderscore {
 /// ```
 ///
 /// ## References
-/// - [API Reference: `pytest.mark.usefixtures`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-mark-usefixtures)
+/// - [`pytest` documentation: `pytest.mark.usefixtures`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-mark-usefixtures)
 #[violation]
 pub struct PytestFixtureParamWithoutValue {
     name: String,
@@ -217,7 +217,7 @@ impl Violation for PytestFixtureParamWithoutValue {
 /// ```
 ///
 /// ## References
-/// - [`yield_fixture` functions](https://docs.pytest.org/en/latest/yieldfixture.html)
+/// - [`pytest` documentation: `yield_fixture` functions](https://docs.pytest.org/en/latest/yieldfixture.html)
 #[violation]
 pub struct PytestDeprecatedYieldFixture;
 
@@ -229,13 +229,15 @@ impl Violation for PytestDeprecatedYieldFixture {
 }
 
 /// ## What it does
-/// Checks for unnecessary `request.addfinalizer` usage in fixtures.
+/// Checks for unnecessary `request.addfinalizer` usages in `pytest` fixtures.
 ///
 /// ## Why is this bad?
-/// `pytest` offers two ways to perform cleanup in fixture code. One is sequential
-/// (`yield` statement), and the other is callback-based (`request.addfinalizer`).
-/// The sequential approach is more readable and should be preferred, but `request.addfinalizer`
-/// is allowed when implementing the "factory as fixture" pattern.
+/// `pytest` offers two ways to perform cleanup in fixture code. The first is
+/// sequential (via the `yield` statement), the second callback-based (via
+/// `request.addfinalizer`).
+///
+/// The sequential approach is more readable and should be preferred, unless
+/// the fixture uses the "factory as fixture" pattern.
 ///
 /// ## Example
 /// ```python
@@ -255,7 +257,7 @@ impl Violation for PytestDeprecatedYieldFixture {
 ///     resource.release()
 ///
 ///
-/// # "factory as fixture" pattern
+/// # "factory-as-fixture" pattern
 /// @pytest.fixture()
 /// def my_factory(request):
 ///     def create_resource(arg):
@@ -267,8 +269,8 @@ impl Violation for PytestDeprecatedYieldFixture {
 /// ```
 ///
 /// ## References
-/// - [Adding finalizers directly](https://docs.pytest.org/en/latest/how-to/fixtures.html#adding-finalizers-directly)
-/// - [Factories as fixtures](https://docs.pytest.org/en/latest/how-to/fixtures.html#factories-as-fixtures)
+/// - [`pytest` documentation: Adding finalizers directly](https://docs.pytest.org/en/latest/how-to/fixtures.html#adding-finalizers-directly)
+/// - [`pytest` documentation: Factories as fixtures](https://docs.pytest.org/en/latest/how-to/fixtures.html#factories-as-fixtures)
 #[violation]
 pub struct PytestFixtureFinalizerCallback;
 
@@ -279,11 +281,12 @@ impl Violation for PytestFixtureFinalizerCallback {
     }
 }
 /// ## What it does
-/// Checks for unnecessary `yield` usage in fixtures.
+/// Checks for unnecessary `yield` expressions in `pytest` fixtures.
 ///
 /// ## Why is this bad?
-/// `yield` in fixtures is only useful and semantically correct when the fixture contains teardown
-/// code.
+/// In `pytest` fixtures, the `yield` expression should only be used for fixtures
+/// that include teardown code, to clean up the fixture after the test function
+/// has finished executing.
 ///
 /// ## Example
 /// ```python
@@ -309,7 +312,7 @@ impl Violation for PytestFixtureFinalizerCallback {
 /// ```
 ///
 /// ## References
-/// - [Teardown/Cleanup](https://docs.pytest.org/en/latest/how-to/fixtures.html#teardown-cleanup-aka-fixture-finalization)
+/// - [`pytest` documentation: Teardown/Cleanup](https://docs.pytest.org/en/latest/how-to/fixtures.html#teardown-cleanup-aka-fixture-finalization)
 #[violation]
 pub struct PytestUselessYieldFixture {
     name: String,

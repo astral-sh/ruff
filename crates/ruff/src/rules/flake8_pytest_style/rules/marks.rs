@@ -10,8 +10,8 @@ use crate::registry::{AsRule, Rule};
 use super::helpers::get_mark_decorators;
 
 /// ## What it does
-/// Checks for parameter-free `@pytest.mark.<marker>()` decorators with or without
-/// parentheses, depending on the `flake8-pytest-style.mark-parentheses`
+/// Checks for parameter-free `@pytest.mark.<marker>()` decorators with or
+/// without parentheses, depending on the `flake8-pytest-style.mark-parentheses`
 /// setting.
 ///
 /// ## Why is this bad?
@@ -39,7 +39,7 @@ use super::helpers::get_mark_decorators;
 /// - `flake8-pytest-style.mark-parentheses`
 ///
 /// ## References
-/// - [API Reference: Marks](https://docs.pytest.org/en/latest/reference/reference.html#marks)
+/// - [`pytest` documentation: Marks](https://docs.pytest.org/en/latest/reference/reference.html#marks)
 #[violation]
 pub struct PytestIncorrectMarkParenthesesStyle {
     mark_name: String,
