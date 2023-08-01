@@ -76,12 +76,6 @@ when making a commit:
 pre-commit install
 ```
 
-or you can run pre-commit manually as needed:
-
-```shell
-pre-commit run --all-files
-```
-
 ### Development
 
 After cloning the repository, run Ruff locally from the repository root with:
