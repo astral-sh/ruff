@@ -12,24 +12,6 @@ expression: parse_ast
             kind: None,
         },
     ),
-    Constant(
-        ExprConstant {
-            range: 6..13,
-            value: Str(
-                "user=",
-            ),
-            kind: None,
-        },
-    ),
-    Constant(
-        ExprConstant {
-            range: 6..13,
-            value: Str(
-                "",
-            ),
-            kind: None,
-        },
-    ),
     FormattedValue(
         ExprFormattedValue {
             range: 6..13,
@@ -40,7 +22,13 @@ expression: parse_ast
                     ctx: Load,
                 },
             ),
-            conversion: Repr,
+            debug_text: Some(
+                DebugText {
+                    leading: "",
+                    trailing: "=",
+                },
+            ),
+            conversion: None,
             format_spec: None,
         },
     ),
@@ -49,24 +37,6 @@ expression: parse_ast
             range: 13..28,
             value: Str(
                 " with text and ",
-            ),
-            kind: None,
-        },
-    ),
-    Constant(
-        ExprConstant {
-            range: 28..37,
-            value: Str(
-                "second=",
-            ),
-            kind: None,
-        },
-    ),
-    Constant(
-        ExprConstant {
-            range: 28..37,
-            value: Str(
-                "",
             ),
             kind: None,
         },
@@ -81,7 +51,13 @@ expression: parse_ast
                     ctx: Load,
                 },
             ),
-            conversion: Repr,
+            debug_text: Some(
+                DebugText {
+                    leading: "",
+                    trailing: "=",
+                },
+            ),
+            conversion: None,
             format_spec: None,
         },
     ),

@@ -182,11 +182,15 @@ impl<'a> StringParser<'a> {
         };
 
         let mut expression = String::new();
+        // for self-documenting strings we also store the `=` and any trailing space inside
+        // expression (because we want to combine it with any trailing spaces before the equal
+        // sign). the expression_length is the length of the actual expression part that we pass to
+        // `parse_fstring_expr`
+        let mut expression_length = 0;
         let mut spec = None;
         let mut delimiters = Vec::new();
         let mut conversion = ConversionFlag::None;
         let mut self_documenting = false;
-        let mut trailing_seq = String::new();
         let start_location = self.get_pos();
 
         assert_eq!(self.next_char(), Some('{'));
@@ -230,6 +234,8 @@ impl<'a> StringParser<'a> {
                 // match a python 3.8 self documenting expression
                 // format '{' PYTHON_EXPRESSION '=' FORMAT_SPECIFIER? '}'
                 '=' if self.peek() != Some('=') && delimiters.is_empty() => {
+                    expression_length = expression.len();
+                    expression.push(ch);
                     self_documenting = true;
                 }
 
@@ -304,40 +310,28 @@ impl<'a> StringParser<'a> {
                     }
 
                     let ret = if self_documenting {
-                        // TODO: range is wrong but `self_documenting` needs revisiting beyond
-                        // ranges: https://github.com/astral-sh/ruff/issues/5970
-                        vec![
-                            Expr::from(ast::ExprConstant {
-                                value: Constant::Str(expression.clone() + "="),
-                                kind: None,
-                                range: self.range(start_location),
+                        let value =
+                            parse_fstring_expr(&expression[..expression_length], start_location)
+                                .map_err(|e| {
+                                    FStringError::new(
+                                        InvalidExpression(Box::new(e.error)),
+                                        start_location,
+                                    )
+                                })?;
+                        let leading =
+                            &expression[..usize::from(value.range().start() - start_location) - 1];
+                        let trailing =
+                            &expression[usize::from(value.range().end() - start_location) - 1..];
+                        vec![Expr::from(ast::ExprFormattedValue {
+                            value: Box::new(value),
+                            debug_text: Some(ast::DebugText {
+                                leading: leading.to_string(),
+                                trailing: trailing.to_string(),
                             }),
-                            Expr::from(ast::ExprConstant {
-                                value: trailing_seq.into(),
-                                kind: None,
-                                range: self.range(start_location),
-                            }),
-                            Expr::from(ast::ExprFormattedValue {
-                                value: Box::new(
-                                    parse_fstring_expr(&expression, start_location).map_err(
-                                        |e| {
-                                            FStringError::new(
-                                                InvalidExpression(Box::new(e.error)),
-                                                start_location,
-                                            )
-                                        },
-                                    )?,
-                                ),
-                                conversion: if conversion == ConversionFlag::None && spec.is_none()
-                                {
-                                    ConversionFlag::Repr
-                                } else {
-                                    conversion
-                                },
-                                format_spec: spec,
-                                range: self.range(start_location),
-                            }),
-                        ]
+                            conversion,
+                            format_spec: spec,
+                            range: self.range(start_location),
+                        })]
                     } else {
                         vec![Expr::from(ast::ExprFormattedValue {
                             value: Box::new(
@@ -348,6 +342,7 @@ impl<'a> StringParser<'a> {
                                     )
                                 })?,
                             ),
+                            debug_text: None,
                             conversion,
                             format_spec: spec,
                             range: self.range(start_location),
@@ -369,9 +364,7 @@ impl<'a> StringParser<'a> {
                         }
                     }
                 }
-                ' ' if self_documenting => {
-                    trailing_seq.push(ch);
-                }
+                ' ' if self_documenting => expression.push(ch),
                 '\\' => return Err(FStringError::new(UnterminatedString, self.get_pos()).into()),
                 _ => {
                     if self_documenting {

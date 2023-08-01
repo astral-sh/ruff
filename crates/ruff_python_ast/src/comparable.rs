@@ -592,6 +592,7 @@ pub struct ExprCall<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprFormattedValue<'a> {
     value: Box<ComparableExpr<'a>>,
+    debug_text: Option<&'a ast::DebugText>,
     conversion: ast::ConversionFlag,
     format_spec: Option<Box<ComparableExpr<'a>>>,
 }
@@ -849,11 +850,13 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
             ast::Expr::FormattedValue(ast::ExprFormattedValue {
                 value,
                 conversion,
+                debug_text,
                 format_spec,
                 range: _range,
             }) => Self::FormattedValue(ExprFormattedValue {
                 value: value.into(),
                 conversion: *conversion,
+                debug_text: debug_text.as_ref(),
                 format_spec: format_spec.as_ref().map(Into::into),
             }),
             ast::Expr::JoinedStr(ast::ExprJoinedStr {
