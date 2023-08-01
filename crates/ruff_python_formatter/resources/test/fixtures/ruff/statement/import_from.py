@@ -14,3 +14,24 @@ from a import (
     aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjfsaahflakjslhdfkjalhdskjfa as sdkjflsdjlahlfd,
 )
 from aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjfsaahflakjslhdfkjalhdskjfa import *
+
+
+from a import bar  # comment
+
+from a import bar, bar, bar, bar, bar, bar, bar, bar, bar, bar, bar, bar, bar, bar, bar, bar  # comment
+
+from a import (  # comment
+    bar,
+)
+
+from a import (  # comment
+    bar
+)
+
+from a import bar, bar, bar, bar, bar, bar, bar, bar, bar, bar, bar, bar, bar, bar, bar, bar
+# comment
+
+from a import \
+    (  # comment
+    bar,
+)
