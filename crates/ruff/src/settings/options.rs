@@ -324,13 +324,6 @@ pub struct Options {
     /// The tabulation size to calculate line length.
     pub tab_size: Option<TabSize>,
     #[option(
-        default = "None",
-        value_type = "str",
-        example = r#"
-            required-version = "0.0.193"
-        "#
-    )]
-    #[option(
         default = r#"[]"#,
         value_type = "list[str]",
         example = r#"logger-objects = ["logging_setup.logger"]"#
@@ -354,6 +347,13 @@ pub struct Options {
     /// `logging_setup.logger` is treated as a `logging.Logger` object when
     /// imported from other modules (e.g., `from logging_setup import logger`).
     pub logger_objects: Option<Vec<String>>,
+    #[option(
+        default = "None",
+        value_type = "str",
+        example = r#"
+            required-version = "0.0.193"
+        "#
+    )]
     /// Require a specific version of Ruff to be running (useful for unifying
     /// results across many environments, e.g., with a `pyproject.toml`
     /// file).
