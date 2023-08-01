@@ -75,3 +75,9 @@ def f(
 
 # ...but we do preserve a trailing comma after the arguments
 a = lambda b,: 0
+
+lambda *a: ()
+
+lambda **b: ()
+
+lambda *a, b: ()
