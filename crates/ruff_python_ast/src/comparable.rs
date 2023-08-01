@@ -340,16 +340,16 @@ impl<'a> From<&'a ast::Constant> for ComparableConstant<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ComparableArguments<'a> {
-    posonlyargs: Vec<ComparableArgWithDefault<'a>>,
-    args: Vec<ComparableArgWithDefault<'a>>,
-    vararg: Option<ComparableArg<'a>>,
-    kwonlyargs: Vec<ComparableArgWithDefault<'a>>,
-    kwarg: Option<ComparableArg<'a>>,
+pub struct ComparableParameters<'a> {
+    posonlyargs: Vec<ComparableParameterWithDefault<'a>>,
+    args: Vec<ComparableParameterWithDefault<'a>>,
+    vararg: Option<ComparableParameter<'a>>,
+    kwonlyargs: Vec<ComparableParameterWithDefault<'a>>,
+    kwarg: Option<ComparableParameter<'a>>,
 }
 
-impl<'a> From<&'a ast::Arguments> for ComparableArguments<'a> {
-    fn from(arguments: &'a ast::Arguments) -> Self {
+impl<'a> From<&'a ast::Parameters> for ComparableParameters<'a> {
+    fn from(arguments: &'a ast::Parameters) -> Self {
         Self {
             posonlyargs: arguments.posonlyargs.iter().map(Into::into).collect(),
             args: arguments.args.iter().map(Into::into).collect(),
@@ -360,26 +360,26 @@ impl<'a> From<&'a ast::Arguments> for ComparableArguments<'a> {
     }
 }
 
-impl<'a> From<&'a Box<ast::Arguments>> for ComparableArguments<'a> {
-    fn from(arguments: &'a Box<ast::Arguments>) -> Self {
+impl<'a> From<&'a Box<ast::Parameters>> for ComparableParameters<'a> {
+    fn from(arguments: &'a Box<ast::Parameters>) -> Self {
         (arguments.as_ref()).into()
     }
 }
 
-impl<'a> From<&'a Box<ast::Arg>> for ComparableArg<'a> {
-    fn from(arg: &'a Box<ast::Arg>) -> Self {
+impl<'a> From<&'a Box<ast::Parameter>> for ComparableParameter<'a> {
+    fn from(arg: &'a Box<ast::Parameter>) -> Self {
         (arg.as_ref()).into()
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ComparableArg<'a> {
+pub struct ComparableParameter<'a> {
     arg: &'a str,
     annotation: Option<Box<ComparableExpr<'a>>>,
 }
 
-impl<'a> From<&'a ast::Arg> for ComparableArg<'a> {
-    fn from(arg: &'a ast::Arg) -> Self {
+impl<'a> From<&'a ast::Parameter> for ComparableParameter<'a> {
+    fn from(arg: &'a ast::Parameter) -> Self {
         Self {
             arg: arg.arg.as_str(),
             annotation: arg.annotation.as_ref().map(Into::into),
@@ -388,13 +388,13 @@ impl<'a> From<&'a ast::Arg> for ComparableArg<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ComparableArgWithDefault<'a> {
-    def: ComparableArg<'a>,
+pub struct ComparableParameterWithDefault<'a> {
+    def: ComparableParameter<'a>,
     default: Option<ComparableExpr<'a>>,
 }
 
-impl<'a> From<&'a ast::ArgWithDefault> for ComparableArgWithDefault<'a> {
-    fn from(arg: &'a ast::ArgWithDefault) -> Self {
+impl<'a> From<&'a ast::ParameterWithDefault> for ComparableParameterWithDefault<'a> {
+    fn from(arg: &'a ast::ParameterWithDefault) -> Self {
         Self {
             def: (&arg.def).into(),
             default: arg.default.as_ref().map(Into::into),
@@ -511,7 +511,7 @@ pub struct ExprUnaryOp<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprLambda<'a> {
-    args: ComparableArguments<'a>,
+    args: ComparableParameters<'a>,
     body: Box<ComparableExpr<'a>>,
 }
 
@@ -948,7 +948,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct StmtFunctionDef<'a> {
     name: &'a str,
-    args: ComparableArguments<'a>,
+    args: ComparableParameters<'a>,
     body: Vec<ComparableStmt<'a>>,
     decorator_list: Vec<ComparableDecorator<'a>>,
     type_params: Vec<ComparableTypeParam<'a>>,
@@ -958,7 +958,7 @@ pub struct StmtFunctionDef<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct StmtAsyncFunctionDef<'a> {
     name: &'a str,
-    args: ComparableArguments<'a>,
+    args: ComparableParameters<'a>,
     body: Vec<ComparableStmt<'a>>,
     decorator_list: Vec<ComparableDecorator<'a>>,
     type_params: Vec<ComparableTypeParam<'a>>,

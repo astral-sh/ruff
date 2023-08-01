@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::path::Path;
 
 use crate::{
-    self as ast, Arguments, Constant, ExceptHandler, Expr, Keyword, MatchCase, Pattern, Ranged,
+    self as ast, Constant, ExceptHandler, Expr, Keyword, MatchCase, Parameters, Pattern, Ranged,
     Stmt, TypeParam,
 };
 use num_traits::Zero;
@@ -363,12 +363,12 @@ where
             args.posonlyargs
                 .iter()
                 .chain(args.args.iter().chain(args.kwonlyargs.iter()))
-                .any(|arg_with_default| {
-                    arg_with_default
+                .any(|parameter| {
+                    parameter
                         .default
                         .as_ref()
                         .is_some_and(|expr| any_over_expr(expr, func))
-                        || arg_with_default
+                        || parameter
                             .def
                             .annotation
                             .as_ref()
@@ -709,23 +709,23 @@ pub fn extract_handled_exceptions(handlers: &[ExceptHandler]) -> Vec<&Expr> {
     handled_exceptions
 }
 
-/// Returns `true` if the given name is included in the given [`Arguments`].
-pub fn includes_arg_name(name: &str, arguments: &Arguments) -> bool {
-    if arguments
+/// Returns `true` if the given name is included in the given [`Parameters`].
+pub fn includes_arg_name(name: &str, parameters: &Parameters) -> bool {
+    if parameters
         .posonlyargs
         .iter()
-        .chain(&arguments.args)
-        .chain(&arguments.kwonlyargs)
+        .chain(&parameters.args)
+        .chain(&parameters.kwonlyargs)
         .any(|arg| arg.def.arg.as_str() == name)
     {
         return true;
     }
-    if let Some(arg) = &arguments.vararg {
+    if let Some(arg) = &parameters.vararg {
         if arg.arg.as_str() == name {
             return true;
         }
     }
-    if let Some(arg) = &arguments.kwarg {
+    if let Some(arg) = &parameters.kwarg {
         if arg.arg.as_str() == name {
             return true;
         }

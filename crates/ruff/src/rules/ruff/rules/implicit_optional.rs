@@ -1,7 +1,9 @@
 use std::fmt;
 
 use anyhow::Result;
-use ruff_python_ast::{self as ast, ArgWithDefault, Arguments, Constant, Expr, Operator, Ranged};
+use ruff_python_ast::{
+    self as ast, Constant, Expr, Operator, ParameterWithDefault, Parameters, Ranged,
+};
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -165,16 +167,16 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
 }
 
 /// RUF013
-pub(crate) fn implicit_optional(checker: &mut Checker, arguments: &Arguments) {
-    for ArgWithDefault {
+pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) {
+    for ParameterWithDefault {
         def,
         default,
         range: _,
-    } in arguments
+    } in parameters
         .posonlyargs
         .iter()
-        .chain(&arguments.args)
-        .chain(&arguments.kwonlyargs)
+        .chain(&parameters.args)
+        .chain(&parameters.kwonlyargs)
     {
         let Some(default) = default else { continue };
         if !is_const_none(default) {

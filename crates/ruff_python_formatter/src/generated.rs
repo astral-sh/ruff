@@ -2617,95 +2617,108 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::Comprehension {
     }
 }
 
-impl FormatRule<ast::Arguments, PyFormatContext<'_>> for crate::other::arguments::FormatArguments {
-    #[inline]
-    fn fmt(
-        &self,
-        node: &ast::Arguments,
-        f: &mut Formatter<PyFormatContext<'_>>,
-    ) -> FormatResult<()> {
-        FormatNodeRule::<ast::Arguments>::fmt(self, node, f)
-    }
-}
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::Arguments {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::Arguments,
-        crate::other::arguments::FormatArguments,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, crate::other::arguments::FormatArguments::default())
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::Arguments {
-    type Format = FormatOwnedWithRule<
-        ast::Arguments,
-        crate::other::arguments::FormatArguments,
-        PyFormatContext<'ast>,
-    >;
-    fn into_format(self) -> Self::Format {
-        FormatOwnedWithRule::new(self, crate::other::arguments::FormatArguments::default())
-    }
-}
-
-impl FormatRule<ast::Arg, PyFormatContext<'_>> for crate::other::arg::FormatArg {
-    #[inline]
-    fn fmt(&self, node: &ast::Arg, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
-        FormatNodeRule::<ast::Arg>::fmt(self, node, f)
-    }
-}
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::Arg {
-    type Format<'a> =
-        FormatRefWithRule<'a, ast::Arg, crate::other::arg::FormatArg, PyFormatContext<'ast>>;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, crate::other::arg::FormatArg::default())
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::Arg {
-    type Format =
-        FormatOwnedWithRule<ast::Arg, crate::other::arg::FormatArg, PyFormatContext<'ast>>;
-    fn into_format(self) -> Self::Format {
-        FormatOwnedWithRule::new(self, crate::other::arg::FormatArg::default())
-    }
-}
-
-impl FormatRule<ast::ArgWithDefault, PyFormatContext<'_>>
-    for crate::other::arg_with_default::FormatArgWithDefault
+impl FormatRule<ast::Parameters, PyFormatContext<'_>>
+    for crate::other::parameters::FormatParameters
 {
     #[inline]
     fn fmt(
         &self,
-        node: &ast::ArgWithDefault,
+        node: &ast::Parameters,
         f: &mut Formatter<PyFormatContext<'_>>,
     ) -> FormatResult<()> {
-        FormatNodeRule::<ast::ArgWithDefault>::fmt(self, node, f)
+        FormatNodeRule::<ast::Parameters>::fmt(self, node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ArgWithDefault {
+impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::Parameters {
     type Format<'a> = FormatRefWithRule<
         'a,
-        ast::ArgWithDefault,
-        crate::other::arg_with_default::FormatArgWithDefault,
+        ast::Parameters,
+        crate::other::parameters::FormatParameters,
+        PyFormatContext<'ast>,
+    >;
+    fn format(&self) -> Self::Format<'_> {
+        FormatRefWithRule::new(self, crate::other::parameters::FormatParameters::default())
+    }
+}
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::Parameters {
+    type Format = FormatOwnedWithRule<
+        ast::Parameters,
+        crate::other::parameters::FormatParameters,
+        PyFormatContext<'ast>,
+    >;
+    fn into_format(self) -> Self::Format {
+        FormatOwnedWithRule::new(self, crate::other::parameters::FormatParameters::default())
+    }
+}
+
+impl FormatRule<ast::Parameter, PyFormatContext<'_>> for crate::other::parameter::FormatParameter {
+    #[inline]
+    fn fmt(
+        &self,
+        node: &ast::Parameter,
+        f: &mut Formatter<PyFormatContext<'_>>,
+    ) -> FormatResult<()> {
+        FormatNodeRule::<ast::Parameter>::fmt(self, node, f)
+    }
+}
+impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::Parameter {
+    type Format<'a> = FormatRefWithRule<
+        'a,
+        ast::Parameter,
+        crate::other::parameter::FormatParameter,
+        PyFormatContext<'ast>,
+    >;
+    fn format(&self) -> Self::Format<'_> {
+        FormatRefWithRule::new(self, crate::other::parameter::FormatParameter::default())
+    }
+}
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::Parameter {
+    type Format = FormatOwnedWithRule<
+        ast::Parameter,
+        crate::other::parameter::FormatParameter,
+        PyFormatContext<'ast>,
+    >;
+    fn into_format(self) -> Self::Format {
+        FormatOwnedWithRule::new(self, crate::other::parameter::FormatParameter::default())
+    }
+}
+
+impl FormatRule<ast::ParameterWithDefault, PyFormatContext<'_>>
+    for crate::other::parameter_with_default::FormatParameterWithDefault
+{
+    #[inline]
+    fn fmt(
+        &self,
+        node: &ast::ParameterWithDefault,
+        f: &mut Formatter<PyFormatContext<'_>>,
+    ) -> FormatResult<()> {
+        FormatNodeRule::<ast::ParameterWithDefault>::fmt(self, node, f)
+    }
+}
+impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ParameterWithDefault {
+    type Format<'a> = FormatRefWithRule<
+        'a,
+        ast::ParameterWithDefault,
+        crate::other::parameter_with_default::FormatParameterWithDefault,
         PyFormatContext<'ast>,
     >;
     fn format(&self) -> Self::Format<'_> {
         FormatRefWithRule::new(
             self,
-            crate::other::arg_with_default::FormatArgWithDefault::default(),
+            crate::other::parameter_with_default::FormatParameterWithDefault::default(),
         )
     }
 }
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ArgWithDefault {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ParameterWithDefault {
     type Format = FormatOwnedWithRule<
-        ast::ArgWithDefault,
-        crate::other::arg_with_default::FormatArgWithDefault,
+        ast::ParameterWithDefault,
+        crate::other::parameter_with_default::FormatParameterWithDefault,
         PyFormatContext<'ast>,
     >;
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(
             self,
-            crate::other::arg_with_default::FormatArgWithDefault::default(),
+            crate::other::parameter_with_default::FormatParameterWithDefault::default(),
         )
     }
 }

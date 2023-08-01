@@ -4,7 +4,7 @@ use ruff_python_ast::Ranged;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::Arguments;
+use ruff_python_ast::Parameters;
 
 use crate::checkers::ast::Checker;
 use crate::settings::types::PythonVersion::Py311;
@@ -47,7 +47,7 @@ impl Violation for NoReturnArgumentAnnotationInStub {
 }
 
 /// PYI050
-pub(crate) fn no_return_argument_annotation(checker: &mut Checker, args: &Arguments) {
+pub(crate) fn no_return_argument_annotation(checker: &mut Checker, args: &Parameters) {
     for annotation in args
         .posonlyargs
         .iter()

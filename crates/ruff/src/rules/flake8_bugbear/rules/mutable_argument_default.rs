@@ -1,4 +1,4 @@
-use ruff_python_ast::{ArgWithDefault, Arguments, Ranged};
+use ruff_python_ast::{ParameterWithDefault, Parameters, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -57,17 +57,17 @@ impl Violation for MutableArgumentDefault {
 }
 
 /// B006
-pub(crate) fn mutable_argument_default(checker: &mut Checker, arguments: &Arguments) {
+pub(crate) fn mutable_argument_default(checker: &mut Checker, parameters: &Parameters) {
     // Scan in reverse order to right-align zip().
-    for ArgWithDefault {
+    for ParameterWithDefault {
         def,
         default,
         range: _,
-    } in arguments
+    } in parameters
         .posonlyargs
         .iter()
-        .chain(&arguments.args)
-        .chain(&arguments.kwonlyargs)
+        .chain(&parameters.args)
+        .chain(&parameters.kwonlyargs)
     {
         let Some(default) = default else {
             continue;

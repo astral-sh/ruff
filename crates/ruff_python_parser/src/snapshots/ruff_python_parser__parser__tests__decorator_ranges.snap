@@ -10,7 +10,7 @@ expression: parse_ast
                 id: "test",
                 range: 18..22,
             },
-            args: Arguments {
+            args: Parameters {
                 range: 22..24,
                 posonlyargs: [],
                 args: [],

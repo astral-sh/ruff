@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use ruff_python_ast::{Arguments, Decorator, Stmt};
+use ruff_python_ast::{Decorator, Parameters, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -141,7 +141,7 @@ pub(crate) fn unexpected_special_method_signature(
     stmt: &Stmt,
     name: &str,
     decorator_list: &[Decorator],
-    args: &Arguments,
+    args: &Parameters,
 ) {
     if !checker.semantic().scope().kind.is_class() {
         return;

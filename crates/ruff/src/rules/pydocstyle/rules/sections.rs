@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff_python_ast::{self as ast, ArgWithDefault, Stmt};
+use ruff_python_ast::{self as ast, ParameterWithDefault, Stmt};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 
@@ -1738,7 +1738,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
 
     // Look for arguments that weren't included in the docstring.
     let mut missing_arg_names: FxHashSet<String> = FxHashSet::default();
-    for ArgWithDefault {
+    for ParameterWithDefault {
         def,
         default: _,
         range: _,

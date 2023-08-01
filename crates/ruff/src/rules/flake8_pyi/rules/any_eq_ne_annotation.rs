@@ -1,4 +1,4 @@
-use ruff_python_ast::{Arguments, Ranged};
+use ruff_python_ast::{Parameters, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -53,7 +53,7 @@ impl AlwaysAutofixableViolation for AnyEqNeAnnotation {
 }
 
 /// PYI032
-pub(crate) fn any_eq_ne_annotation(checker: &mut Checker, name: &str, args: &Arguments) {
+pub(crate) fn any_eq_ne_annotation(checker: &mut Checker, name: &str, args: &Parameters) {
     if !matches!(name, "__eq__" | "__ne__") {
         return;
     }

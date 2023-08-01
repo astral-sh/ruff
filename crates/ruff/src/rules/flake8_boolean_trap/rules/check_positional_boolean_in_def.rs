@@ -1,4 +1,6 @@
-use ruff_python_ast::{self as ast, ArgWithDefault, Arguments, Constant, Decorator, Expr, Ranged};
+use ruff_python_ast::{
+    self as ast, Constant, Decorator, Expr, ParameterWithDefault, Parameters, Ranged,
+};
 
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
@@ -80,7 +82,7 @@ pub(crate) fn check_positional_boolean_in_def(
     checker: &mut Checker,
     name: &str,
     decorator_list: &[Decorator],
-    arguments: &Arguments,
+    parameters: &Parameters,
 ) {
     if is_allowed_func_def(name) {
         return;
@@ -93,11 +95,11 @@ pub(crate) fn check_positional_boolean_in_def(
         return;
     }
 
-    for ArgWithDefault {
+    for ParameterWithDefault {
         def,
         default: _,
         range: _,
-    } in arguments.posonlyargs.iter().chain(&arguments.args)
+    } in parameters.posonlyargs.iter().chain(&parameters.args)
     {
         if def.annotation.is_none() {
             continue;

@@ -1,6 +1,6 @@
 use crate::node::AnyNodeRef;
 use crate::{
-    Arguments, Decorator, Expr, Identifier, Ranged, StmtAsyncFunctionDef, StmtFunctionDef, Suite,
+    Decorator, Expr, Identifier, Parameters, Ranged, StmtAsyncFunctionDef, StmtFunctionDef, Suite,
 };
 use ruff_text_size::TextRange;
 
@@ -49,7 +49,7 @@ impl<'a> AnyFunctionDefinition<'a> {
     }
 
     /// Returns the function arguments (parameters).
-    pub fn arguments(self) -> &'a Arguments {
+    pub fn arguments(self) -> &'a Parameters {
         match self {
             Self::FunctionDefinition(definition) => definition.args.as_ref(),
             Self::AsyncFunctionDefinition(definition) => definition.args.as_ref(),

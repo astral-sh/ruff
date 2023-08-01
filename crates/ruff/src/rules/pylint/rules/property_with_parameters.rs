@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, Stmt};
+use ruff_python_ast::{self as ast, Decorator, Expr, Parameters, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -51,7 +51,7 @@ pub(crate) fn property_with_parameters(
     checker: &mut Checker,
     stmt: &Stmt,
     decorator_list: &[Decorator],
-    args: &Arguments,
+    args: &Parameters,
 ) {
     if !decorator_list
         .iter()

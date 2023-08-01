@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, Ranged};
+use ruff_python_ast::{self as ast, Expr, Keyword, Parameters, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -20,7 +20,7 @@ impl Violation for PytestPatchWithLambda {
 /// Visitor that checks references the argument names in the lambda body.
 #[derive(Debug)]
 struct LambdaBodyVisitor<'a> {
-    arguments: &'a Arguments,
+    arguments: &'a Parameters,
     uses_args: bool,
 }
 

@@ -1,4 +1,4 @@
-use ruff_python_ast::{Arg, ArgWithDefault, Arguments, Expr, Ranged};
+use ruff_python_ast::{Expr, Parameter, ParameterWithDefault, Parameters, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -53,9 +53,9 @@ impl Violation for HardcodedPasswordDefault {
     }
 }
 
-fn check_password_kwarg(arg: &Arg, default: &Expr) -> Option<Diagnostic> {
+fn check_password_kwarg(parameter: &Parameter, default: &Expr) -> Option<Diagnostic> {
     string_literal(default).filter(|string| !string.is_empty())?;
-    let kwarg_name = &arg.arg;
+    let kwarg_name = &parameter.arg;
     if !matches_password_name(kwarg_name) {
         return None;
     }
@@ -68,16 +68,16 @@ fn check_password_kwarg(arg: &Arg, default: &Expr) -> Option<Diagnostic> {
 }
 
 /// S107
-pub(crate) fn hardcoded_password_default(checker: &mut Checker, arguments: &Arguments) {
-    for ArgWithDefault {
+pub(crate) fn hardcoded_password_default(checker: &mut Checker, parameters: &Parameters) {
+    for ParameterWithDefault {
         def,
         default,
         range: _,
-    } in arguments
+    } in parameters
         .posonlyargs
         .iter()
-        .chain(&arguments.args)
-        .chain(&arguments.kwonlyargs)
+        .chain(&parameters.args)
+        .chain(&parameters.kwonlyargs)
     {
         let Some(default) = default else {
             continue;

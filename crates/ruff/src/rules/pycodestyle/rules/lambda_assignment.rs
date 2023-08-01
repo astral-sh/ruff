@@ -1,5 +1,6 @@
 use ruff_python_ast::{
-    self as ast, Arg, ArgWithDefault, Arguments, Constant, Expr, Identifier, Ranged, Stmt,
+    self as ast, Constant, Expr, Identifier, Parameter, ParameterWithDefault, Parameters, Ranged,
+    Stmt,
 };
 use ruff_text_size::TextRange;
 
@@ -173,7 +174,7 @@ fn extract_types(annotation: &Expr, semantic: &SemanticModel) -> Option<(Vec<Exp
 
 fn function(
     name: &str,
-    args: &Arguments,
+    args: &Parameters,
     body: &Expr,
     annotation: Option<&Expr>,
     semantic: &SemanticModel,
@@ -191,33 +192,33 @@ fn function(
                 .posonlyargs
                 .iter()
                 .enumerate()
-                .map(|(idx, arg_with_default)| ArgWithDefault {
-                    def: Arg {
+                .map(|(idx, parameter)| ParameterWithDefault {
+                    def: Parameter {
                         annotation: arg_types
                             .get(idx)
                             .map(|arg_type| Box::new(arg_type.clone())),
-                        ..arg_with_default.def.clone()
+                        ..parameter.def.clone()
                     },
-                    ..arg_with_default.clone()
+                    ..parameter.clone()
                 })
                 .collect::<Vec<_>>();
             let new_args = args
                 .args
                 .iter()
                 .enumerate()
-                .map(|(idx, arg_with_default)| ArgWithDefault {
-                    def: Arg {
+                .map(|(idx, parameter)| ParameterWithDefault {
+                    def: Parameter {
                         annotation: arg_types
                             .get(idx + new_posonlyargs.len())
                             .map(|arg_type| Box::new(arg_type.clone())),
-                        ..arg_with_default.def.clone()
+                        ..parameter.def.clone()
                     },
-                    ..arg_with_default.clone()
+                    ..parameter.clone()
                 })
                 .collect::<Vec<_>>();
             let func = Stmt::FunctionDef(ast::StmtFunctionDef {
                 name: Identifier::new(name.to_string(), TextRange::default()),
-                args: Box::new(Arguments {
+                args: Box::new(Parameters {
                     posonlyargs: new_posonlyargs,
                     args: new_args,
                     ..args.clone()

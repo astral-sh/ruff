@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arg, ArgWithDefault, Expr, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Expr, Parameter, ParameterWithDefault, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -105,8 +105,8 @@ pub(crate) fn super_call_with_parameters(
     };
 
     // Extract the name of the first argument to the enclosing function.
-    let Some(ArgWithDefault {
-        def: Arg {
+    let Some(ParameterWithDefault {
+        def: Parameter {
             arg: parent_arg, ..
         },
         ..

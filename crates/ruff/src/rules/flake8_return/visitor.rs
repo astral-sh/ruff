@@ -66,7 +66,7 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                 if let Some(returns) = returns {
                     visitor::walk_expr(self, returns);
                 }
-                visitor::walk_arguments(self, args);
+                visitor::walk_parameters(self, args);
                 self.parents.pop();
 
                 // But don't recurse into the body.

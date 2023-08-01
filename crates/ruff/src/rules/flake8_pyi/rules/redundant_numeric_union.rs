@@ -1,4 +1,4 @@
-use ruff_python_ast::{Arguments, Expr, Ranged};
+use ruff_python_ast::{Expr, Parameters, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -53,7 +53,7 @@ impl Violation for RedundantNumericUnion {
 }
 
 /// PYI041
-pub(crate) fn redundant_numeric_union(checker: &mut Checker, args: &Arguments) {
+pub(crate) fn redundant_numeric_union(checker: &mut Checker, args: &Parameters) {
     for annotation in args
         .args
         .iter()

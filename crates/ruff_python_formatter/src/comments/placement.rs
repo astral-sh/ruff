@@ -1,8 +1,8 @@
 use std::cmp::Ordering;
 
 use ruff_python_ast::{
-    self as ast, Arguments, Comprehension, Expr, ExprAttribute, ExprBinOp, ExprIfExp, ExprSlice,
-    ExprStarred, MatchCase, Ranged,
+    self as ast, Comprehension, Expr, ExprAttribute, ExprBinOp, ExprIfExp, ExprSlice, ExprStarred,
+    MatchCase, Parameters, Ranged,
 };
 use ruff_text_size::TextRange;
 
@@ -15,7 +15,7 @@ use ruff_source_file::{Locator, UniversalNewlines};
 
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
 use crate::expression::expr_slice::{assign_comment_in_slice, ExprSliceCommentSection};
-use crate::other::arguments::{
+use crate::other::parameters::{
     assign_argument_separator_comment_placement, find_argument_separators,
 };
 
@@ -45,7 +45,7 @@ pub(super) fn place_comment<'a>(
     // fixups.
     match comment.enclosing_node() {
         AnyNodeRef::Arguments(arguments) => {
-            handle_arguments_separator_comment(comment, arguments, locator)
+            handle_parameters_separator_comment(comment, arguments, locator)
         }
         AnyNodeRef::Comprehension(comprehension) => {
             handle_comprehension_comment(comment, comprehension, locator)
@@ -559,16 +559,16 @@ fn handle_own_line_comment_after_branch<'a>(
     }
 }
 
-/// Attaches comments for the positional only arguments separator `/` or the keywords only arguments
-/// separator `*` as dangling comments to the enclosing [`Arguments`] node.
+/// Attaches comments for the positional-only parameters separator `/` or the keywords-only
+/// parameters separator `*` as dangling comments to the enclosing [`Parameters`] node.
 ///
 /// See [`assign_argument_separator_comment_placement`]
-fn handle_arguments_separator_comment<'a>(
+fn handle_parameters_separator_comment<'a>(
     comment: DecoratedComment<'a>,
-    arguments: &Arguments,
+    parameters: &Parameters,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    let (slash, star) = find_argument_separators(locator.contents(), arguments);
+    let (slash, star) = find_argument_separators(locator.contents(), parameters);
     let comment_range = comment.slice().range();
     let placement = assign_argument_separator_comment_placement(
         slash.as_ref(),

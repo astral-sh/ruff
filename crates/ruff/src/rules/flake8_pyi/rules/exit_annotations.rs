@@ -1,8 +1,8 @@
 use std::fmt::{Display, Formatter};
 
 use ruff_python_ast::{
-    ArgWithDefault, Arguments, Expr, ExprBinOp, ExprSubscript, ExprTuple, Identifier, Operator,
-    Ranged,
+    Expr, ExprBinOp, ExprSubscript, ExprTuple, Identifier, Operator, ParameterWithDefault,
+    Parameters, Ranged,
 };
 use smallvec::SmallVec;
 
@@ -104,7 +104,7 @@ pub(crate) fn bad_exit_annotation(
     checker: &mut Checker,
     is_async: bool,
     name: &Identifier,
-    args: &Arguments,
+    args: &Parameters,
 ) {
     let func_kind = match name.as_str() {
         "__exit__" if !is_async => FuncKind::Sync,
@@ -116,7 +116,7 @@ pub(crate) fn bad_exit_annotation(
         .args
         .iter()
         .chain(args.posonlyargs.iter())
-        .collect::<SmallVec<[&ArgWithDefault; 4]>>();
+        .collect::<SmallVec<[&ParameterWithDefault; 4]>>();
 
     // If there are less than three positional arguments, at least one of them must be a star-arg,
     // and it must be annotated with `object`.
@@ -125,28 +125,28 @@ pub(crate) fn bad_exit_annotation(
     }
 
     // Every positional argument (beyond the first four) must have a default.
-    for arg_with_default in positional_args
+    for parameter in positional_args
         .iter()
         .skip(4)
-        .filter(|arg_with_default| arg_with_default.default.is_none())
+        .filter(|parameter| parameter.default.is_none())
     {
         checker.diagnostics.push(Diagnostic::new(
             BadExitAnnotation {
                 func_kind,
                 error_kind: ErrorKind::ArgsAfterFirstFourMustHaveDefault,
             },
-            arg_with_default.range(),
+            parameter.range(),
         ));
     }
 
     // ...as should all keyword-only arguments.
-    for arg_with_default in args.kwonlyargs.iter().filter(|arg| arg.default.is_none()) {
+    for parameter in args.kwonlyargs.iter().filter(|arg| arg.default.is_none()) {
         checker.diagnostics.push(Diagnostic::new(
             BadExitAnnotation {
                 func_kind,
                 error_kind: ErrorKind::AllKwargsMustHaveDefault,
             },
-            arg_with_default.range(),
+            parameter.range(),
         ));
     }
 
@@ -155,7 +155,7 @@ pub(crate) fn bad_exit_annotation(
 
 /// Determine whether a "short" argument list (i.e., an argument list with less than four elements)
 /// contains a star-args argument annotated with `object`. If not, report an error.
-fn check_short_args_list(checker: &mut Checker, args: &Arguments, func_kind: FuncKind) {
+fn check_short_args_list(checker: &mut Checker, args: &Parameters, func_kind: FuncKind) {
     if let Some(varargs) = &args.vararg {
         if let Some(annotation) = varargs
             .annotation
@@ -196,7 +196,7 @@ fn check_short_args_list(checker: &mut Checker, args: &Arguments, func_kind: Fun
 /// annotated correctly.
 fn check_positional_args(
     checker: &mut Checker,
-    positional_args: &[&ArgWithDefault],
+    positional_args: &[&ParameterWithDefault],
     kind: FuncKind,
 ) {
     // For each argument, define the predicate against which to check the annotation.

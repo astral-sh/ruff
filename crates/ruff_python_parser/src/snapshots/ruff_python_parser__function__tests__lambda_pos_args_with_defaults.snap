@@ -10,13 +10,13 @@ Ok(
                 value: Lambda(
                     ExprLambda {
                         range: 0..23,
-                        args: Arguments {
+                        args: Parameters {
                             range: 7..20,
                             posonlyargs: [],
                             args: [
-                                ArgWithDefault {
+                                ParameterWithDefault {
                                     range: 7..8,
-                                    def: Arg {
+                                    def: Parameter {
                                         range: 7..8,
                                         arg: Identifier {
                                             id: "a",
@@ -26,9 +26,9 @@ Ok(
                                     },
                                     default: None,
                                 },
-                                ArgWithDefault {
+                                ParameterWithDefault {
                                     range: 10..14,
-                                    def: Arg {
+                                    def: Parameter {
                                         range: 10..11,
                                         arg: Identifier {
                                             id: "b",
@@ -48,9 +48,9 @@ Ok(
                                         ),
                                     ),
                                 },
-                                ArgWithDefault {
+                                ParameterWithDefault {
                                     range: 16..20,
-                                    def: Arg {
+                                    def: Parameter {
                                         range: 16..17,
                                         arg: Identifier {
                                             id: "c",

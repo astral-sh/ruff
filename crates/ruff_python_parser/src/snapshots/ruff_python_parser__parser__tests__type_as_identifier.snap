@@ -645,13 +645,13 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
             value: Lambda(
                 ExprLambda {
                     range: 507..535,
-                    args: Arguments {
+                    args: Parameters {
                         range: 514..519,
                         posonlyargs: [],
                         args: [
-                            ArgWithDefault {
+                            ParameterWithDefault {
                                 range: 514..519,
-                                def: Arg {
+                                def: Parameter {
                                     range: 514..519,
                                     arg: Identifier {
                                         id: "query",

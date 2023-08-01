@@ -12,7 +12,7 @@ pub(crate) struct ArgumentList {
 }
 
 // Perform validation of function/lambda arguments in a function definition.
-pub(crate) fn validate_arguments(arguments: &ast::Arguments) -> Result<(), LexicalError> {
+pub(crate) fn validate_arguments(arguments: &ast::Parameters) -> Result<(), LexicalError> {
     let mut all_arg_names = FxHashSet::with_capacity_and_hasher(
         arguments.posonlyargs.len()
             + arguments.args.len()
@@ -26,8 +26,8 @@ pub(crate) fn validate_arguments(arguments: &ast::Arguments) -> Result<(), Lexic
     let args = arguments.args.iter();
     let kwonlyargs = arguments.kwonlyargs.iter();
 
-    let vararg: Option<&ast::Arg> = arguments.vararg.as_deref();
-    let kwarg: Option<&ast::Arg> = arguments.kwarg.as_deref();
+    let vararg: Option<&ast::Parameter> = arguments.vararg.as_deref();
+    let kwarg: Option<&ast::Parameter> = arguments.kwarg.as_deref();
 
     for arg in posonlyargs
         .chain(args)
@@ -50,7 +50,10 @@ pub(crate) fn validate_arguments(arguments: &ast::Arguments) -> Result<(), Lexic
 }
 
 pub(crate) fn validate_pos_params(
-    args: &(Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>),
+    args: &(
+        Vec<ast::ParameterWithDefault>,
+        Vec<ast::ParameterWithDefault>,
+    ),
 ) -> Result<(), LexicalError> {
     let (posonlyargs, args) = args;
     #[allow(clippy::skip_while_next)]

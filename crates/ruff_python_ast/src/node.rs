@@ -1,7 +1,7 @@
 use crate::{
-    self as ast, Alias, Arg, ArgWithDefault, Arguments, Comprehension, Decorator, ExceptHandler,
-    Expr, Keyword, MatchCase, Mod, Pattern, Ranged, Stmt, TypeParam, TypeParamParamSpec,
-    TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
+    self as ast, Alias, Comprehension, Decorator, ExceptHandler, Expr, Keyword, MatchCase, Mod,
+    Parameter, ParameterWithDefault, Parameters, Pattern, Ranged, Stmt, TypeParam,
+    TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
 };
 use ruff_text_size::TextRange;
 use std::ptr::NonNull;
@@ -90,9 +90,9 @@ pub enum AnyNode {
     PatternMatchAs(ast::PatternMatchAs),
     PatternMatchOr(ast::PatternMatchOr),
     Comprehension(Comprehension),
-    Arguments(Arguments),
-    Arg(Arg),
-    ArgWithDefault(ArgWithDefault),
+    Arguments(Parameters),
+    Arg(Parameter),
+    ArgWithDefault(ParameterWithDefault),
     Keyword(Keyword),
     Alias(Alias),
     WithItem(WithItem),
@@ -2613,7 +2613,7 @@ impl AstNode for Comprehension {
         AnyNode::from(self)
     }
 }
-impl AstNode for Arguments {
+impl AstNode for Parameters {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2641,7 +2641,7 @@ impl AstNode for Arguments {
         AnyNode::from(self)
     }
 }
-impl AstNode for Arg {
+impl AstNode for Parameter {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2669,7 +2669,7 @@ impl AstNode for Arg {
         AnyNode::from(self)
     }
 }
-impl AstNode for ArgWithDefault {
+impl AstNode for ParameterWithDefault {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -3444,18 +3444,18 @@ impl From<Comprehension> for AnyNode {
         AnyNode::Comprehension(node)
     }
 }
-impl From<Arguments> for AnyNode {
-    fn from(node: Arguments) -> Self {
+impl From<Parameters> for AnyNode {
+    fn from(node: Parameters) -> Self {
         AnyNode::Arguments(node)
     }
 }
-impl From<Arg> for AnyNode {
-    fn from(node: Arg) -> Self {
+impl From<Parameter> for AnyNode {
+    fn from(node: Parameter) -> Self {
         AnyNode::Arg(node)
     }
 }
-impl From<ArgWithDefault> for AnyNode {
-    fn from(node: ArgWithDefault) -> Self {
+impl From<ParameterWithDefault> for AnyNode {
+    fn from(node: ParameterWithDefault) -> Self {
         AnyNode::ArgWithDefault(node)
     }
 }
@@ -3661,9 +3661,9 @@ pub enum AnyNodeRef<'a> {
     PatternMatchAs(&'a ast::PatternMatchAs),
     PatternMatchOr(&'a ast::PatternMatchOr),
     Comprehension(&'a Comprehension),
-    Arguments(&'a Arguments),
-    Arg(&'a Arg),
-    ArgWithDefault(&'a ArgWithDefault),
+    Arguments(&'a Parameters),
+    Arg(&'a Parameter),
+    ArgWithDefault(&'a ParameterWithDefault),
     Keyword(&'a Keyword),
     Alias(&'a Alias),
     WithItem(&'a WithItem),
@@ -4877,18 +4877,18 @@ impl<'a> From<&'a Comprehension> for AnyNodeRef<'a> {
         AnyNodeRef::Comprehension(node)
     }
 }
-impl<'a> From<&'a Arguments> for AnyNodeRef<'a> {
-    fn from(node: &'a Arguments) -> Self {
+impl<'a> From<&'a Parameters> for AnyNodeRef<'a> {
+    fn from(node: &'a Parameters) -> Self {
         AnyNodeRef::Arguments(node)
     }
 }
-impl<'a> From<&'a Arg> for AnyNodeRef<'a> {
-    fn from(node: &'a Arg) -> Self {
+impl<'a> From<&'a Parameter> for AnyNodeRef<'a> {
+    fn from(node: &'a Parameter) -> Self {
         AnyNodeRef::Arg(node)
     }
 }
-impl<'a> From<&'a ArgWithDefault> for AnyNodeRef<'a> {
-    fn from(node: &'a ArgWithDefault) -> Self {
+impl<'a> From<&'a ParameterWithDefault> for AnyNodeRef<'a> {
+    fn from(node: &'a ParameterWithDefault) -> Self {
         AnyNodeRef::ArgWithDefault(node)
     }
 }

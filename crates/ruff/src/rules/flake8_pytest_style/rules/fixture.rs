@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_python_ast::Decorator;
-use ruff_python_ast::{self as ast, ArgWithDefault, Arguments, Expr, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Expr, ParameterWithDefault, Parameters, Ranged, Stmt};
 use ruff_text_size::{TextLen, TextRange};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
@@ -607,14 +607,14 @@ fn check_fixture_returns(checker: &mut Checker, stmt: &Stmt, name: &str, body: &
 }
 
 /// PT019
-fn check_test_function_args(checker: &mut Checker, arguments: &Arguments) {
-    arguments
+fn check_test_function_args(checker: &mut Checker, parameters: &Parameters) {
+    parameters
         .posonlyargs
         .iter()
-        .chain(&arguments.args)
-        .chain(&arguments.kwonlyargs)
+        .chain(&parameters.args)
+        .chain(&parameters.kwonlyargs)
         .for_each(
-            |ArgWithDefault {
+            |ParameterWithDefault {
                  def,
                  default: _,
                  range: _,
@@ -643,7 +643,7 @@ fn check_fixture_decorator_name(checker: &mut Checker, decorator: &Decorator) {
 }
 
 /// PT021
-fn check_fixture_addfinalizer(checker: &mut Checker, args: &Arguments, body: &[Stmt]) {
+fn check_fixture_addfinalizer(checker: &mut Checker, args: &Parameters, body: &[Stmt]) {
     if !includes_arg_name("request", args) {
         return;
     }
@@ -696,7 +696,7 @@ pub(crate) fn fixture(
     checker: &mut Checker,
     stmt: &Stmt,
     name: &str,
-    args: &Arguments,
+    args: &Parameters,
     decorators: &[Decorator],
     body: &[Stmt],
 ) {

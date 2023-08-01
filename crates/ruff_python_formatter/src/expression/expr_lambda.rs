@@ -1,7 +1,7 @@
 use crate::comments::dangling_node_comments;
 use crate::context::PyFormatContext;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
-use crate::other::arguments::ArgumentsParentheses;
+use crate::other::parameters::ParametersParentheses;
 use crate::AsFormat;
 use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::prelude::{space, text};
@@ -27,7 +27,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                 f,
                 [
                     space(),
-                    args.format().with_options(ArgumentsParentheses::Never),
+                    args.format().with_options(ParametersParentheses::Never),
                 ]
             )?;
         }
