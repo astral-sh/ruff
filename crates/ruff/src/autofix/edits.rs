@@ -294,8 +294,8 @@ fn next_stmt_break(semicolon: TextSize, locator: &Locator) -> TextSize {
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use ruff_python_ast::{Ranged, Suite};
-    use ruff_python_parser::Parse;
+    use ruff_python_ast::Ranged;
+    use ruff_python_parser::parse_suite;
     use ruff_text_size::TextSize;
 
     use ruff_source_file::Locator;
@@ -305,13 +305,13 @@ mod tests {
     #[test]
     fn find_semicolon() -> Result<()> {
         let contents = "x = 1";
-        let program = Suite::parse(contents, "<filename>")?;
+        let program = parse_suite(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert_eq!(trailing_semicolon(stmt.end(), &locator), None);
 
         let contents = "x = 1; y = 1";
-        let program = Suite::parse(contents, "<filename>")?;
+        let program = parse_suite(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert_eq!(
@@ -320,7 +320,7 @@ mod tests {
         );
 
         let contents = "x = 1 ; y = 1";
-        let program = Suite::parse(contents, "<filename>")?;
+        let program = parse_suite(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert_eq!(
@@ -333,7 +333,7 @@ x = 1 \
   ; y = 1
 "
         .trim();
-        let program = Suite::parse(contents, "<filename>")?;
+        let program = parse_suite(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert_eq!(

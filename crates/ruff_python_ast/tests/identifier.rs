@@ -1,5 +1,4 @@
-use ruff_python_ast::Stmt;
-use ruff_python_parser::{Parse, ParseError};
+use ruff_python_parser::{parse_suite, ParseError};
 use ruff_text_size::{TextRange, TextSize};
 
 use ruff_python_ast::identifier;
@@ -13,8 +12,9 @@ else:
     pass
 "#
     .trim();
-    let stmt = Stmt::parse(contents, "<filename>")?;
-    let range = identifier::else_(&stmt, contents).unwrap();
+    let stmts = parse_suite(contents, "<filename>")?;
+    let stmt = stmts.first().unwrap();
+    let range = identifier::else_(stmt, contents).unwrap();
     assert_eq!(&contents[range], "else");
     assert_eq!(
         range,

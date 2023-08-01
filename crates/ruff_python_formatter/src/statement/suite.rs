@@ -194,8 +194,8 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Suite {
 #[cfg(test)]
 mod tests {
     use ruff_formatter::format;
-    use ruff_python_ast::Suite;
-    use ruff_python_parser::Parse;
+
+    use ruff_python_parser::parse_suite;
 
     use crate::comments::Comments;
     use crate::prelude::*;
@@ -224,7 +224,7 @@ def trailing_func():
     pass
 "#;
 
-        let statements = Suite::parse(source, "test.py").unwrap();
+        let statements = parse_suite(source, "test.py").unwrap();
 
         let context = PyFormatContext::new(PyFormatOptions::default(), source, Comments::default());
 

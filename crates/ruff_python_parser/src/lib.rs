@@ -94,14 +94,13 @@
 //! mode or tokenizing the source beforehand:
 //!
 //! ```
-//! use ruff_python_parser::{Parse};
-//! use ruff_python_ast as ast;
+//! use ruff_python_parser::parse_suite;
 //!
 //! let python_source = r#"
 //! def is_odd(i):
 //!   return bool(i & 1)
 //! "#;
-//! let ast = ast::Suite::parse(python_source, "<embedded>");
+//! let ast = parse_suite(python_source, "<embedded>");
 //!
 //! assert!(ast.is_ok());
 //! ```
@@ -111,11 +110,11 @@
 //! [lexer]: crate::lexer
 
 use crate::lexer::LexResult;
-pub use parse::Parse;
-pub use parser::{parse, parse_starts_at, parse_tokens, ParseError, ParseErrorType};
-#[allow(deprecated)]
-pub use parser::{parse_expression, parse_expression_starts_at, parse_program};
-use ruff_python_ast::{CmpOp, Expr, ModModule, Ranged, Suite};
+pub use parser::{
+    parse, parse_expression, parse_expression_starts_at, parse_program, parse_starts_at,
+    parse_suite, parse_tokens, ParseError, ParseErrorType,
+};
+use ruff_python_ast::{CmpOp, Expr, Mod, Ranged, Suite};
 use ruff_text_size::{TextRange, TextSize};
 pub use string::FStringErrorType;
 pub use token::{StringKind, Tok, TokenKind};
@@ -124,7 +123,6 @@ mod function;
 // Skip flattening lexer to distinguish from full ruff_python_parser
 mod context;
 pub mod lexer;
-mod parse;
 mod parser;
 mod soft_keywords;
 mod string;
@@ -149,7 +147,10 @@ pub fn parse_program_tokens(
     lxr: Vec<LexResult>,
     source_path: &str,
 ) -> anyhow::Result<Suite, ParseError> {
-    ModModule::parse_tokens(lxr, source_path).map(|module| module.body)
+    match parse_tokens(lxr, Mode::Module, source_path)? {
+        Mod::Module(m) => Ok(m.body),
+        Mod::Expression(_) => unreachable!("Mode::Module doesn't return other variant"),
+    }
 }
 
 /// Return the `Range` of the first `Tok::Colon` token in a `Range`.
@@ -344,11 +345,10 @@ mod python {
 
 #[cfg(test)]
 mod tests {
-    use crate::Parse;
-    use crate::{first_colon_range, locate_cmp_ops, LocatedCmpOp};
+    use crate::{first_colon_range, locate_cmp_ops, parse_expression, LocatedCmpOp};
     use anyhow::Result;
     use ruff_python_ast::CmpOp;
-    use ruff_python_ast::Expr;
+
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
     #[test]
@@ -366,7 +366,7 @@ mod tests {
     #[test]
     fn extract_cmp_op_location() -> Result<()> {
         let contents = "x == 1";
-        let expr = Expr::parse(contents, "<filename>")?;
+        let expr = parse_expression(contents, "<filename>")?;
         assert_eq!(
             locate_cmp_ops(&expr, contents),
             vec![LocatedCmpOp::new(
@@ -376,7 +376,7 @@ mod tests {
         );
 
         let contents = "x != 1";
-        let expr = Expr::parse(contents, "<filename>")?;
+        let expr = parse_expression(contents, "<filename>")?;
         assert_eq!(
             locate_cmp_ops(&expr, contents),
             vec![LocatedCmpOp::new(
@@ -386,7 +386,7 @@ mod tests {
         );
 
         let contents = "x is 1";
-        let expr = Expr::parse(contents, "<filename>")?;
+        let expr = parse_expression(contents, "<filename>")?;
         assert_eq!(
             locate_cmp_ops(&expr, contents),
             vec![LocatedCmpOp::new(
@@ -396,7 +396,7 @@ mod tests {
         );
 
         let contents = "x is not 1";
-        let expr = Expr::parse(contents, "<filename>")?;
+        let expr = parse_expression(contents, "<filename>")?;
         assert_eq!(
             locate_cmp_ops(&expr, contents),
             vec![LocatedCmpOp::new(
@@ -406,7 +406,7 @@ mod tests {
         );
 
         let contents = "x in 1";
-        let expr = Expr::parse(contents, "<filename>")?;
+        let expr = parse_expression(contents, "<filename>")?;
         assert_eq!(
             locate_cmp_ops(&expr, contents),
             vec![LocatedCmpOp::new(
@@ -416,7 +416,7 @@ mod tests {
         );
 
         let contents = "x not in 1";
-        let expr = Expr::parse(contents, "<filename>")?;
+        let expr = parse_expression(contents, "<filename>")?;
         assert_eq!(
             locate_cmp_ops(&expr, contents),
             vec![LocatedCmpOp::new(
@@ -426,7 +426,7 @@ mod tests {
         );
 
         let contents = "x != (1 is not 2)";
-        let expr = Expr::parse(contents, "<filename>")?;
+        let expr = parse_expression(contents, "<filename>")?;
         assert_eq!(
             locate_cmp_ops(&expr, contents),
             vec![LocatedCmpOp::new(
