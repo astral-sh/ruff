@@ -1,4 +1,4 @@
-use crate::Parse;
+use crate::{parse_expression, parse_expression_starts_at};
 use anyhow::Result;
 use ruff_python_ast::relocate::relocate_expr;
 use ruff_python_ast::str;
@@ -33,7 +33,7 @@ pub fn parse_type_annotation(
         // isn't the case, e.g., for implicit concatenations, or for annotations that contain
         // escaped quotes.
         let leading_quote = str::leading_quote(expression).unwrap();
-        let expr = Expr::parse_starts_at(
+        let expr = parse_expression_starts_at(
             value,
             "<filename>",
             range.start() + leading_quote.text_len(),
@@ -41,7 +41,7 @@ pub fn parse_type_annotation(
         Ok((expr, AnnotationKind::Simple))
     } else {
         // Otherwise, consider this a "complex" annotation.
-        let mut expr = Expr::parse(value, "<filename>")?;
+        let mut expr = parse_expression(value, "<filename>")?;
         relocate_expr(&mut expr, range);
         Ok((expr, AnnotationKind::Complex))
     }

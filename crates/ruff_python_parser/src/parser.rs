@@ -18,14 +18,15 @@ use itertools::Itertools;
 pub(super) use lalrpop_util::ParseError as LalrpopError;
 use ruff_text_size::{TextRange, TextSize};
 
+use crate::lexer::{lex, lex_starts_at};
 use crate::{
     lexer::{self, LexResult, LexicalError, LexicalErrorType},
     python,
     token::Tok,
-    Mode, Parse,
+    Mode,
 };
 use ruff_python_ast as ast;
-use ruff_python_ast::ModModule;
+use ruff_python_ast::{Mod, ModModule, Suite};
 
 /// Parse a full Python program usually consisting of multiple lines.
 ///
@@ -47,9 +48,16 @@ use ruff_python_ast::ModModule;
 /// let program = parser::parse_program(source, "<embedded>");
 /// assert!(program.is_ok());
 /// ```
-#[deprecated = "Use ruff_python_ast::Suite::parse from ruff_python_parser::Parse trait."]
-pub fn parse_program(source: &str, source_path: &str) -> Result<ast::Suite, ParseError> {
-    ModModule::parse(source, source_path).map(|module| module.body)
+pub fn parse_program(source: &str, source_path: &str) -> Result<ModModule, ParseError> {
+    let lexer = lex(source, Mode::Module);
+    match parse_tokens(lexer, Mode::Module, source_path)? {
+        Mod::Module(m) => Ok(m),
+        Mod::Expression(_) => unreachable!("Mode::Module doesn't return other variant"),
+    }
+}
+
+pub fn parse_suite(source: &str, source_path: &str) -> Result<Suite, ParseError> {
+    parse_program(source, source_path).map(|m| m.body)
 }
 
 /// Parses a single Python expression.
@@ -68,9 +76,12 @@ pub fn parse_program(source: &str, source_path: &str) -> Result<ast::Suite, Pars
 /// assert!(expr.is_ok());
 ///
 /// ```
-#[deprecated = "Use ruff_python_ast::Expr::parse from ruff_python_parser::Parse trait."]
-pub fn parse_expression(source: &str, path: &str) -> Result<ast::Expr, ParseError> {
-    ast::Expr::parse(source, path)
+pub fn parse_expression(source: &str, source_path: &str) -> Result<ast::Expr, ParseError> {
+    let lexer = lex(source, Mode::Expression);
+    match parse_tokens(lexer, Mode::Expression, source_path)? {
+        Mod::Expression(expression) => Ok(*expression.body),
+        Mod::Module(_m) => unreachable!("Mode::Expression doesn't return other variant"),
+    }
 }
 
 /// Parses a Python expression from a given location.
@@ -90,13 +101,16 @@ pub fn parse_expression(source: &str, path: &str) -> Result<ast::Expr, ParseErro
 /// let expr = parse_expression_starts_at("1 + 2", "<embedded>", TextSize::from(400));
 /// assert!(expr.is_ok());
 /// ```
-#[deprecated = "Use ruff_python_ast::Expr::parse_starts_at from ruff_python_parser::Parse trait."]
 pub fn parse_expression_starts_at(
     source: &str,
-    path: &str,
+    source_path: &str,
     offset: TextSize,
 ) -> Result<ast::Expr, ParseError> {
-    ast::Expr::parse_starts_at(source, path, offset)
+    let lexer = lex_starts_at(source, Mode::Module, offset);
+    match parse_tokens(lexer, Mode::Expression, source_path)? {
+        Mod::Expression(expression) => Ok(*expression.body),
+        Mod::Module(_m) => unreachable!("Mode::Expression doesn't return other variant"),
+    }
 }
 
 /// Parse the given Python source code using the specified [`Mode`].
@@ -384,71 +398,69 @@ impl ParseErrorType {
 
 #[cfg(test)]
 mod tests {
-    use crate::Parse;
     use insta::assert_debug_snapshot;
-    use ruff_python_ast as ast;
 
     use super::*;
 
     #[test]
     fn test_parse_empty() {
-        let parse_ast = ast::Suite::parse("", "<test>").unwrap();
+        let parse_ast = parse_suite("", "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_string() {
         let source = "'Hello world'";
-        let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_f_string() {
         let source = "f'Hello world'";
-        let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_print_hello() {
         let source = "print('Hello world')";
-        let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_print_2() {
         let source = "print('Hello world', 2)";
-        let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_kwargs() {
         let source = "my_func('positional', keyword=2)";
-        let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_if_elif_else() {
         let source = "if 1: 10\nelif 2: 20\nelse: 30";
-        let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_lambda() {
         let source = "lambda x, y: x * y"; // lambda(x, y): x * y";
-        let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_lambda_no_args() {
         let source = "lambda: 1";
-        let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
@@ -456,7 +468,7 @@ mod tests {
     fn test_parse_tuples() {
         let source = "a, b = 4, 5";
 
-        insta::assert_debug_snapshot!(ast::Suite::parse(source, "<test>").unwrap());
+        insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
     }
 
     #[test]
@@ -468,7 +480,7 @@ class Foo(A, B):
  def method_with_default(self, arg='default'):
   pass
 ";
-        insta::assert_debug_snapshot!(ast::Suite::parse(source, "<test>").unwrap());
+        insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
     }
 
     #[test]
@@ -499,7 +511,7 @@ class Foo[**P](): ...
 class Foo[X, Y: str, *U, **P]():
   pass
 ";
-        insta::assert_debug_snapshot!(ast::Suite::parse(source, "<test>").unwrap());
+        insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
     }
     #[test]
     fn test_parse_function_definition() {
@@ -525,69 +537,69 @@ def func[**P](*args: P.args, **kwargs: P.kwargs):
 def func[T, U: str, *Ts, **P]():
     pass
   ";
-        insta::assert_debug_snapshot!(ast::Suite::parse(source, "<test>").unwrap());
+        insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
     }
 
     #[test]
     fn test_parse_dict_comprehension() {
         let source = "{x1: x2 for y in z}";
-        let parse_ast = ast::Expr::parse(source, "<test>").unwrap();
+        let parse_ast = parse_expression(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_list_comprehension() {
         let source = "[x for y in z]";
-        let parse_ast = ast::Expr::parse(source, "<test>").unwrap();
+        let parse_ast = parse_expression(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_double_list_comprehension() {
         let source = "[x for y, y2 in z for a in b if a < 5 if a > 10]";
-        let parse_ast = ast::Expr::parse(source, "<test>").unwrap();
+        let parse_ast = parse_expression(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_generator_comprehension() {
         let source = "(x for y in z)";
-        let parse_ast = ast::Expr::parse(source, "<test>").unwrap();
+        let parse_ast = parse_expression(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_named_expression_generator_comprehension() {
         let source = "(x := y + 1 for y in z)";
-        let parse_ast = ast::Expr::parse(source, "<test>").unwrap();
+        let parse_ast = parse_expression(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_if_else_generator_comprehension() {
         let source = "(x if y else y for y in z)";
-        let parse_ast = ast::Expr::parse(source, "<test>").unwrap();
+        let parse_ast = parse_expression(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_bool_op_or() {
         let source = "x or y";
-        let parse_ast = ast::Expr::parse(source, "<test>").unwrap();
+        let parse_ast = parse_expression(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_bool_op_and() {
         let source = "x and y";
-        let parse_ast = ast::Expr::parse(source, "<test>").unwrap();
+        let parse_ast = parse_expression(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_slice() {
         let source = "x[1:2:3]";
-        let parse_ast = ast::Expr::parse(source, "<test>").unwrap();
+        let parse_ast = parse_expression(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
@@ -621,7 +633,7 @@ with (0 as a,): pass
 with (0 as a, 1 as b): pass
 with (0 as a, 1 as b,): pass
 ";
-        insta::assert_debug_snapshot!(ast::Suite::parse(source, "<test>").unwrap());
+        insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
     }
 
     #[test]
@@ -644,7 +656,7 @@ with (0 as a, 1 as b,): pass
             "with a := 0 as x: pass",
             "with (a := 0 as x): pass",
         ] {
-            assert!(ast::Suite::parse(source, "<test>").is_err());
+            assert!(parse_suite(source, "<test>").is_err());
         }
     }
 
@@ -656,7 +668,7 @@ array[0, *indexes, -1] = array_slice
 array[*indexes_to_select, *indexes_to_select]
 array[3:5, *indexes_to_select]
 ";
-        let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
@@ -669,13 +681,13 @@ array[3:5, *indexes_to_select]
         ("OFFSET %d" % offset) if offset else None,
     )
 )"#;
-        let parse_ast = ast::Expr::parse(source, "<test>").unwrap();
+        let parse_ast = parse_expression(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_try() {
-        let parse_ast = ast::Suite::parse(
+        let parse_ast = parse_suite(
             r#"try:
     raise ValueError(1)
 except TypeError as e:
@@ -690,7 +702,7 @@ except OSError as e:
 
     #[test]
     fn test_try_star() {
-        let parse_ast = ast::Suite::parse(
+        let parse_ast = parse_suite(
             r#"try:
     raise ExceptionGroup("eg",
         [ValueError(1), TypeError(2), OSError(3), OSError(4)])
@@ -706,7 +718,7 @@ except* OSError as e:
 
     #[test]
     fn test_dict_unpacking() {
-        let parse_ast = ast::Expr::parse(r#"{"a": "b", **c, "d": "e"}"#, "<test>").unwrap();
+        let parse_ast = parse_expression(r#"{"a": "b", **c, "d": "e"}"#, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
@@ -758,7 +770,7 @@ type X \
 type X[T] \
     = T
 "#;
-        insta::assert_debug_snapshot!(ast::Suite::parse(source, "<test>").unwrap());
+        insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
     }
 
     #[test]
@@ -795,7 +807,7 @@ type = 1
 type = x = 1
 x = type = 1
 "#;
-        insta::assert_debug_snapshot!(ast::Suite::parse(source, "<test>").unwrap());
+        insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
     }
 
     #[test]
@@ -820,7 +832,7 @@ x = 10000
 x = 133333
 "#;
 
-        insta::assert_debug_snapshot!(ast::Suite::parse(source, "<test>").unwrap());
+        insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
     }
 
     #[test]
@@ -846,7 +858,7 @@ if 10 .real:
 y = 100[no]
 y = 100(no)
 "#;
-        assert_debug_snapshot!(ast::Suite::parse(source, "<test>").unwrap());
+        assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
     }
 
     #[test]
@@ -874,7 +886,7 @@ match match:
 match = lambda query: query == event
 print(match(12))
 "#;
-        insta::assert_debug_snapshot!(ast::Suite::parse(source, "<test>").unwrap());
+        insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
     }
 
     #[test]
@@ -1044,13 +1056,13 @@ match w := x,:
     case y as v,:
         z = 0
 "#;
-        let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_match() {
-        let parse_ast = ast::Suite::parse(
+        let parse_ast = parse_suite(
             r#"
 match {"test": 1}:
     case {
@@ -1080,7 +1092,7 @@ match x:
 
     #[test]
     fn test_variadic_generics() {
-        let parse_ast = ast::Suite::parse(
+        let parse_ast = parse_suite(
             r#"
 def args_to_tuple(*args: *Ts) -> Tuple[*Ts]: ...
 "#,
@@ -1091,25 +1103,8 @@ def args_to_tuple(*args: *Ts) -> Tuple[*Ts]: ...
     }
 
     #[test]
-    fn test_parse_constant() {
-        use num_traits::ToPrimitive;
-
-        let c = ast::Constant::parse_without_path("'string'").unwrap();
-        assert_eq!(c.str().unwrap(), "string");
-
-        let c = ast::Constant::parse_without_path("10").unwrap();
-        assert_eq!(c.int().unwrap().to_i32().unwrap(), 10);
-    }
-
-    #[test]
-    fn test_parse_identifier() {
-        let i = ast::Identifier::parse_without_path("test").unwrap();
-        assert_eq!(i.as_str(), "test");
-    }
-
-    #[test]
     fn decorator_ranges() {
-        let parse_ast = ast::Suite::parse(
+        let parse_ast = parse_suite(
             r#"
 @my_decorator
 def test():

@@ -1503,8 +1503,8 @@ impl<'a> Generator<'a> {
 
 #[cfg(test)]
 mod tests {
-    use ruff_python_ast::{Mod, ModModule, Stmt};
-    use ruff_python_parser::{self, Mode, Parse};
+    use ruff_python_ast::{Mod, ModModule};
+    use ruff_python_parser::{self, parse_suite, Mode};
 
     use ruff_source_file::LineEnding;
 
@@ -1515,9 +1515,9 @@ mod tests {
         let indentation = Indentation::default();
         let quote = Quote::default();
         let line_ending = LineEnding::default();
-        let stmt = Stmt::parse(contents, "<filename>").unwrap();
+        let stmt = parse_suite(contents, "<filename>").unwrap();
         let mut generator = Generator::new(&indentation, quote, line_ending);
-        generator.unparse_stmt(&stmt);
+        generator.unparse_suite(&stmt);
         generator.generate()
     }
 
@@ -1527,9 +1527,9 @@ mod tests {
         line_ending: LineEnding,
         contents: &str,
     ) -> String {
-        let stmt = Stmt::parse(contents, "<filename>").unwrap();
+        let stmt = parse_suite(contents, "<filename>").unwrap();
         let mut generator = Generator::new(indentation, quote, line_ending);
-        generator.unparse_stmt(&stmt);
+        generator.unparse_suite(&stmt);
         generator.generate()
     }
 
