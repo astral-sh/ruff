@@ -1,3 +1,4 @@
+use crate::helpers::map_subscript;
 use crate::{self as ast, Constant, Expr, Stmt};
 use bitflags::bitflags;
 
@@ -67,9 +68,9 @@ where
                 keywords,
                 ..
             }) => {
-                // Allow `tuple()` and `list()` calls.
+                // Allow `tuple()`, `list()`, and their generic forms, like `list[int]()`.
                 if keywords.is_empty() && args.len() <= 1 {
-                    if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
+                    if let Expr::Name(ast::ExprName { id, .. }) = map_subscript(func) {
                         let id = id.as_str();
                         if matches!(id, "tuple" | "list") && is_builtin(id) {
                             let [arg] = args.as_slice() else {
