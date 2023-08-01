@@ -7,7 +7,9 @@ use ruff_python_ast::str::is_implicit_concatenation;
 
 use crate::expression::number::{FormatComplex, FormatFloat, FormatInt};
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
-use crate::expression::string::{FormatString, StringLayout, StringPrefix, StringQuotes};
+use crate::expression::string::{
+    AnyString, FormatString, StringLayout, StringPrefix, StringQuotes,
+};
 use crate::prelude::*;
 use crate::FormatNodeRule;
 
@@ -56,7 +58,9 @@ impl FormatNodeRule<ExprConstant> for FormatExprConstant {
                     ExprConstantLayout::Default => StringLayout::Default,
                     ExprConstantLayout::String(layout) => layout,
                 };
-                FormatString::new(item).with_layout(string_layout).fmt(f)
+                FormatString::new(&AnyString::Constant(item))
+                    .with_layout(string_layout)
+                    .fmt(f)
             }
         }
     }

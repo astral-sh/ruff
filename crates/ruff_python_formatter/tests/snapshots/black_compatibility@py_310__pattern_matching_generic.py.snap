@@ -119,21 +119,6 @@ with match() as match:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,12 +1,12 @@
- re.match()
- match = a
- with match() as match:
--    match = f"{match}"
-+    match = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
- 
- re.match()
- match = a
- with match() as match:
--    match = f"{match}"
-+    match = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
- 
- 
- def get_grammars(target_versions: Set[TargetVersion]) -> List[Grammar]:
 @@ -23,11 +23,7 @@
              pygram.python_grammar,
          ]
@@ -147,12 +132,7 @@ with match() as match:
  
      if all(version.is_python2() for version in target_versions):
          # Python 2-only code, so try Python 2 grammars.
-@@ -41,13 +37,11 @@
-     re.match()
-     match = a
-     with match() as match:
--        match = f"{match}"
-+        match = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
+@@ -45,9 +41,7 @@
  
      def test_patma_139(self):
          x = False
@@ -182,18 +162,6 @@ with match() as match:
  
      # At least one of the above branches must have been taken, because every Python
      # version has exactly one of the two 'ASYNC_*' flags
-@@ -99,9 +89,9 @@
- re.match()
- match = a
- with match() as match:
--    match = f"{match}"
-+    match = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
- 
- re.match()
- match = a
- with match() as match:
--    match = f"{match}"
-+    match = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
 ```
 
 ## Ruff Output
@@ -202,12 +170,12 @@ with match() as match:
 re.match()
 match = a
 with match() as match:
-    match = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
+    match = f"{match}"
 
 re.match()
 match = a
 with match() as match:
-    match = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
+    match = f"{match}"
 
 
 def get_grammars(target_versions: Set[TargetVersion]) -> List[Grammar]:
@@ -238,7 +206,7 @@ def get_grammars(target_versions: Set[TargetVersion]) -> List[Grammar]:
     re.match()
     match = a
     with match() as match:
-        match = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
+        match = f"{match}"
 
     def test_patma_139(self):
         x = False
@@ -290,12 +258,12 @@ def lib2to3_parse(src_txt: str, target_versions: Iterable[TargetVersion] = ()) -
 re.match()
 match = a
 with match() as match:
-    match = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
+    match = f"{match}"
 
 re.match()
 match = a
 with match() as match:
-    match = f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
+    match = f"{match}"
 ```
 
 ## Black Output
