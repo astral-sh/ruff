@@ -1138,33 +1138,33 @@ ParameterDef<ParameterType>: ast::ParameterWithDefault = {
 
 UntypedParameter: ast::ParameterWithDefault = {
     <location:@L> <arg:Identifier> <end_location:@R> => {
-        let def = ast::Parameter { arg, annotation: None, range: (location..end_location).into() };
-        ast::ParameterWithDefault { def, default: None, range: (location..end_location).into() }
+        let def = ast::Parameter { name:arg, annotation: None, range: (location..end_location).into() };
+        ast::ParameterWithDefault { parameter:def, default: None, range: (location..end_location).into() }
     },
 };
 StarUntypedParameter: ast::Parameter = {
-    <location:@L> <arg:Identifier> <end_location:@R> => ast::Parameter { arg, annotation: None, range: (location..end_location).into() },
+    <location:@L> <arg:Identifier> <end_location:@R> => ast::Parameter { name:arg, annotation: None, range: (location..end_location).into() },
 };
 
 TypedParameter: ast::ParameterWithDefault = {
     <location:@L> <arg:Identifier> <a:(":" <Test<"all">>)?> <end_location:@R> => {
         let annotation = a.map(Box::new);
-        let def = ast::Parameter { arg, annotation, range: (location..end_location).into() };
-        ast::ParameterWithDefault { def, default: None, range: (location..end_location).into() }
+        let def = ast::Parameter { name:arg, annotation, range: (location..end_location).into() };
+        ast::ParameterWithDefault { parameter:def, default: None, range: (location..end_location).into() }
     },
 };
 
 StarTypedParameter: ast::Parameter = {
     <location:@L> <arg:Identifier> <a:(":" <TestOrStarExpr>)?> <end_location:@R> => {
         let annotation = a.map(Box::new);
-        ast::Parameter { arg, annotation, range: (location..end_location).into() }
+        ast::Parameter { name:arg, annotation, range: (location..end_location).into() }
     },
 };
 
 DoubleStarTypedParameter: ast::Parameter = {
     <location:@L> <arg:Identifier> <a:(":" <Test<"all">>)?> <end_location:@R> => {
         let annotation = a.map(Box::new);
-        ast::Parameter { arg, annotation, range: (location..end_location).into() }
+        ast::Parameter { name:arg, annotation, range: (location..end_location).into() }
     },
 };
 

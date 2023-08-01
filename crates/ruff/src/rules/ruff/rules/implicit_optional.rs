@@ -169,7 +169,7 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
 /// RUF013
 pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) {
     for ParameterWithDefault {
-        def,
+        parameter,
         default,
         range: _,
     } in parameters
@@ -182,7 +182,7 @@ pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) 
         if !is_const_none(default) {
             continue;
         }
-        let Some(annotation) = &def.annotation else {
+        let Some(annotation) = &parameter.annotation else {
             continue;
         };
 

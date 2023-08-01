@@ -19,9 +19,9 @@ Ok(
                     kwonlyargs: [
                         ParameterWithDefault {
                             range: 9..10,
-                            def: Parameter {
+                            parameter: Parameter {
                                 range: 9..10,
-                                arg: Identifier {
+                                name: Identifier {
                                     id: "a",
                                     range: 9..10,
                                 },
@@ -31,9 +31,9 @@ Ok(
                         },
                         ParameterWithDefault {
                             range: 12..13,
-                            def: Parameter {
+                            parameter: Parameter {
                                 range: 12..13,
-                                arg: Identifier {
+                                name: Identifier {
                                     id: "b",
                                     range: 12..13,
                                 },
@@ -43,9 +43,9 @@ Ok(
                         },
                         ParameterWithDefault {
                             range: 15..16,
-                            def: Parameter {
+                            parameter: Parameter {
                                 range: 15..16,
-                                arg: Identifier {
+                                name: Identifier {
                                     id: "c",
                                     range: 15..16,
                                 },

@@ -1355,7 +1355,7 @@ impl<'a> Generator<'a> {
     }
 
     fn unparse_parameter(&mut self, parameter: &Parameter) {
-        self.p_id(&parameter.arg);
+        self.p_id(&parameter.name);
         if let Some(ann) = &parameter.annotation {
             self.p(": ");
             self.unparse_expr(ann, precedence::COMMA);
@@ -1363,7 +1363,7 @@ impl<'a> Generator<'a> {
     }
 
     fn unparse_parameter_with_default(&mut self, parameter_with_default: &ParameterWithDefault) {
-        self.unparse_parameter(&parameter_with_default.def);
+        self.unparse_parameter(&parameter_with_default.parameter);
         if let Some(default) = &parameter_with_default.default {
             self.p("=");
             self.unparse_expr(default, precedence::COMMA);

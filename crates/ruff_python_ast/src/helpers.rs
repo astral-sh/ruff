@@ -370,7 +370,7 @@ where
                         .as_ref()
                         .is_some_and(|expr| any_over_expr(expr, func))
                         || parameter
-                            .def
+                            .parameter
                             .annotation
                             .as_ref()
                             .is_some_and(|expr| any_over_expr(expr, func))
@@ -719,17 +719,17 @@ pub fn includes_arg_name(name: &str, parameters: &Parameters) -> bool {
         .iter()
         .chain(&parameters.args)
         .chain(&parameters.kwonlyargs)
-        .any(|arg| arg.def.arg.as_str() == name)
+        .any(|arg| arg.parameter.name.as_str() == name)
     {
         return true;
     }
     if let Some(arg) = &parameters.vararg {
-        if arg.arg.as_str() == name {
+        if arg.name.as_str() == name {
             return true;
         }
     }
     if let Some(arg) = &parameters.kwarg {
-        if arg.arg.as_str() == name {
+        if arg.name.as_str() == name {
             return true;
         }
     }

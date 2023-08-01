@@ -59,7 +59,7 @@ pub(crate) fn redundant_numeric_union(checker: &mut Checker, parameters: &Parame
         .iter()
         .chain(parameters.posonlyargs.iter())
         .chain(parameters.kwonlyargs.iter())
-        .filter_map(|arg| arg.def.annotation.as_ref())
+        .filter_map(|arg| arg.parameter.annotation.as_ref())
     {
         check_annotation(checker, annotation);
     }

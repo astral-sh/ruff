@@ -17,7 +17,7 @@ expression: parse_ast
                 vararg: Some(
                     Parameter {
                         range: 20..29,
-                        arg: Identifier {
+                        name: Identifier {
                             id: "args",
                             range: 20..24,
                         },

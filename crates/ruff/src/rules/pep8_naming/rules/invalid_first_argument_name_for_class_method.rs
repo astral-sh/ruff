@@ -75,7 +75,7 @@ pub(crate) fn invalid_first_argument_name_for_class_method(
         return None;
     }
     if let Some(ParameterWithDefault {
-        def,
+        parameter,
         default: _,
         range: _,
     }) = parameters
@@ -83,7 +83,7 @@ pub(crate) fn invalid_first_argument_name_for_class_method(
         .first()
         .or_else(|| parameters.args.first())
     {
-        if &def.arg != "cls" {
+        if &parameter.name != "cls" {
             if checker
                 .settings
                 .pep8_naming
@@ -95,7 +95,7 @@ pub(crate) fn invalid_first_argument_name_for_class_method(
             }
             return Some(Diagnostic::new(
                 InvalidFirstArgumentNameForClassMethod,
-                def.range(),
+                parameter.range(),
             ));
         }
     }

@@ -16,9 +16,9 @@ Ok(
                             args: [
                                 ParameterWithDefault {
                                     range: 7..8,
-                                    def: Parameter {
+                                    parameter: Parameter {
                                         range: 7..8,
-                                        arg: Identifier {
+                                        name: Identifier {
                                             id: "a",
                                             range: 7..8,
                                         },
@@ -28,9 +28,9 @@ Ok(
                                 },
                                 ParameterWithDefault {
                                     range: 10..11,
-                                    def: Parameter {
+                                    parameter: Parameter {
                                         range: 10..11,
-                                        arg: Identifier {
+                                        name: Identifier {
                                             id: "b",
                                             range: 10..11,
                                         },
@@ -40,9 +40,9 @@ Ok(
                                 },
                                 ParameterWithDefault {
                                     range: 13..14,
-                                    def: Parameter {
+                                    parameter: Parameter {
                                         range: 13..14,
-                                        arg: Identifier {
+                                        name: Identifier {
                                             id: "c",
                                             range: 13..14,
                                         },

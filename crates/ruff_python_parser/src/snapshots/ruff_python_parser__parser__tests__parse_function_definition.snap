@@ -16,9 +16,9 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 args: [
                     ParameterWithDefault {
                         range: 9..10,
-                        def: Parameter {
+                        parameter: Parameter {
                             range: 9..10,
-                            arg: Identifier {
+                            name: Identifier {
                                 id: "a",
                                 range: 9..10,
                             },
@@ -63,9 +63,9 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 args: [
                     ParameterWithDefault {
                         range: 34..38,
-                        def: Parameter {
+                        parameter: Parameter {
                             range: 34..38,
-                            arg: Identifier {
+                            name: Identifier {
                                 id: "a",
                                 range: 34..35,
                             },
@@ -137,9 +137,9 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 args: [
                     ParameterWithDefault {
                         range: 72..76,
-                        def: Parameter {
+                        parameter: Parameter {
                             range: 72..76,
-                            arg: Identifier {
+                            name: Identifier {
                                 id: "a",
                                 range: 72..73,
                             },
@@ -219,9 +219,9 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 args: [
                     ParameterWithDefault {
                         range: 119..123,
-                        def: Parameter {
+                        parameter: Parameter {
                             range: 119..123,
-                            arg: Identifier {
+                            name: Identifier {
                                 id: "a",
                                 range: 119..120,
                             },
@@ -317,7 +317,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 vararg: Some(
                     Parameter {
                         range: 155..161,
-                        arg: Identifier {
+                        name: Identifier {
                             id: "a",
                             range: 155..156,
                         },
@@ -384,7 +384,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 vararg: Some(
                     Parameter {
                         range: 188..200,
-                        arg: Identifier {
+                        name: Identifier {
                             id: "args",
                             range: 188..192,
                         },
@@ -413,7 +413,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 kwarg: Some(
                     Parameter {
                         range: 204..220,
-                        arg: Identifier {
+                        name: Identifier {
                             id: "kwargs",
                             range: 204..210,
                         },

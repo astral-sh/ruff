@@ -77,7 +77,7 @@ where
             }) => {
                 visitor::walk_expr(self, body);
                 for ParameterWithDefault {
-                    def,
+                    parameter,
                     default: _,
                     range: _,
                 } in parameters
@@ -86,7 +86,7 @@ where
                     .chain(&parameters.args)
                     .chain(&parameters.kwonlyargs)
                 {
-                    self.names.remove(def.arg.as_str());
+                    self.names.remove(parameter.name.as_str());
                 }
             }
             _ => visitor::walk_expr(self, expr),

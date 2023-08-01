@@ -1826,7 +1826,7 @@ impl From<ExceptHandlerExceptHandler> for ExceptHandler {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Parameter {
     pub range: TextRange,
-    pub arg: Identifier,
+    pub name: Identifier,
     pub annotation: Option<Box<Expr>>,
 }
 
@@ -2069,7 +2069,7 @@ pub struct Parameters {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ParameterWithDefault {
     pub range: TextRange,
-    pub def: Parameter,
+    pub parameter: Parameter,
     pub default: Option<Box<Expr>>,
 }
 
@@ -2113,24 +2113,24 @@ fn clone_boxed_expr(expr: &Box<Expr>) -> Box<Expr> {
 
 impl ParameterWithDefault {
     pub fn as_parameter(&self) -> &Parameter {
-        &self.def
+        &self.parameter
     }
 
     pub fn to_parameter(&self) -> (Parameter, Option<Box<Expr>>) {
         let ParameterWithDefault {
             range: _,
-            def,
+            parameter,
             default,
         } = self;
-        (def.clone(), default.as_ref().map(clone_boxed_expr))
+        (parameter.clone(), default.as_ref().map(clone_boxed_expr))
     }
     pub fn into_parameter(self) -> (Parameter, Option<Box<Expr>>) {
         let ParameterWithDefault {
             range: _,
-            def,
+            parameter,
             default,
         } = self;
-        (def, default)
+        (parameter, default)
     }
 }
 

@@ -15,9 +15,9 @@ expression: parse_ast
                         args: [
                             ParameterWithDefault {
                                 range: 7..8,
-                                def: Parameter {
+                                parameter: Parameter {
                                     range: 7..8,
-                                    arg: Identifier {
+                                    name: Identifier {
                                         id: "x",
                                         range: 7..8,
                                     },
@@ -27,9 +27,9 @@ expression: parse_ast
                             },
                             ParameterWithDefault {
                                 range: 10..11,
-                                def: Parameter {
+                                parameter: Parameter {
                                     range: 10..11,
-                                    arg: Identifier {
+                                    name: Identifier {
                                         id: "y",
                                         range: 10..11,
                                     },

@@ -402,7 +402,7 @@ fn is_annotatable_type_alias(value: &Expr, semantic: &SemanticModel) -> bool {
 /// PYI011
 pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, parameters: &Parameters) {
     for ParameterWithDefault {
-        def,
+        parameter,
         default,
         range: _,
     } in parameters
@@ -414,7 +414,7 @@ pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, parameters: 
         let Some(default) = default else {
             continue;
         };
-        if def.annotation.is_some() {
+        if parameter.annotation.is_some() {
             if !is_valid_default_value_with_annotation(
                 default,
                 true,
@@ -439,7 +439,7 @@ pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, parameters: 
 /// PYI014
 pub(crate) fn argument_simple_defaults(checker: &mut Checker, parameters: &Parameters) {
     for ParameterWithDefault {
-        def,
+        parameter,
         default,
         range: _,
     } in parameters
@@ -451,7 +451,7 @@ pub(crate) fn argument_simple_defaults(checker: &mut Checker, parameters: &Param
         let Some(default) = default else {
             continue;
         };
-        if def.annotation.is_none() {
+        if parameter.annotation.is_none() {
             if !is_valid_default_value_with_annotation(
                 default,
                 true,

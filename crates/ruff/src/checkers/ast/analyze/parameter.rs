@@ -8,14 +8,14 @@ use crate::rules::{flake8_builtins, pep8_naming, pycodestyle};
 pub(crate) fn parameter(parameter: &Parameter, checker: &mut Checker) {
     if checker.enabled(Rule::AmbiguousVariableName) {
         if let Some(diagnostic) =
-            pycodestyle::rules::ambiguous_variable_name(&parameter.arg, parameter.range())
+            pycodestyle::rules::ambiguous_variable_name(&parameter.name, parameter.range())
         {
             checker.diagnostics.push(diagnostic);
         }
     }
     if checker.enabled(Rule::InvalidArgumentName) {
         if let Some(diagnostic) = pep8_naming::rules::invalid_argument_name(
-            &parameter.arg,
+            &parameter.name,
             parameter,
             &checker.settings.pep8_naming.ignore_names,
         ) {

@@ -227,7 +227,7 @@ fn function(
         .iter()
         .chain(&parameters.args)
         .chain(&parameters.kwonlyargs)
-        .map(|parameter_with_default| &parameter_with_default.def)
+        .map(|parameter_with_default| &parameter_with_default.parameter)
         .chain(
             iter::once::<Option<&Parameter>>(parameters.vararg.as_deref())
                 .flatten()
@@ -264,7 +264,7 @@ fn method(
         .chain(&parameters.args)
         .chain(&parameters.kwonlyargs)
         .skip(1)
-        .map(|parameter_with_default| &parameter_with_default.def)
+        .map(|parameter_with_default| &parameter_with_default.parameter)
         .chain(
             iter::once::<Option<&Parameter>>(parameters.vararg.as_deref())
                 .flatten()
@@ -295,14 +295,14 @@ fn call<'a>(
 ) {
     diagnostics.extend(parameters.filter_map(|arg| {
         let binding = values
-            .get(arg.arg.as_str())
+            .get(arg.name.as_str())
             .map(|binding_id| semantic.binding(binding_id))?;
         if binding.kind.is_argument()
             && !binding.is_used()
-            && !dummy_variable_rgx.is_match(arg.arg.as_str())
+            && !dummy_variable_rgx.is_match(arg.name.as_str())
         {
             Some(Diagnostic::new(
-                argumentable.check_for(arg.arg.to_string()),
+                argumentable.check_for(arg.name.to_string()),
                 binding.range,
             ))
         } else {
