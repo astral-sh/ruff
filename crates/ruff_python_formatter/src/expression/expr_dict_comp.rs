@@ -1,13 +1,16 @@
-use crate::context::PyFormatContext;
-use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
-use crate::AsFormat;
-use crate::{FormatNodeRule, FormattedIterExt, PyFormatter};
 use ruff_formatter::prelude::{
     format_args, format_with, group, soft_line_break_or_space, space, text,
 };
 use ruff_formatter::{write, Buffer, FormatResult};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::ExprDictComp;
+
+use crate::context::PyFormatContext;
+use crate::expression::parentheses::{
+    parenthesized_with_head_comments, NeedsParentheses, OptionalParentheses,
+};
+use crate::AsFormat;
+use crate::{FormatNodeRule, FormattedIterExt, PyFormatter};
 
 #[derive(Default)]
 pub struct FormatExprDictComp;
@@ -27,10 +30,14 @@ impl FormatNodeRule<ExprDictComp> for FormatExprDictComp {
                 .finish()
         });
 
+        let comments = f.context().comments().clone();
+        let dangling = comments.dangling_comments(item);
+
         write!(
             f,
-            [parenthesized(
+            [parenthesized_with_head_comments(
                 "{",
+                dangling,
                 &group(&format_args!(
                     group(&key.format()),
                     text(":"),

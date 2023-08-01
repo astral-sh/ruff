@@ -1,10 +1,10 @@
-use ruff_python_ast::Ranged;
-
 use ruff_formatter::prelude::tag::Condition;
 use ruff_formatter::{format_args, write, Argument, Arguments};
 use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::Ranged;
 use ruff_python_trivia::{first_non_trivia_token, SimpleToken, SimpleTokenKind, SimpleTokenizer};
 
+use crate::comments::{head_comments, SourceComment};
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::prelude::*;
 
@@ -282,6 +282,75 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatInParenthesesOnlyGroup<'_, 'a
             NodeLevel::Expression(None) | NodeLevel::TopLevel | NodeLevel::CompoundStatement => {
                 Arguments::from(&self.content).fmt(f)
             }
+        }
+    }
+}
+
+/// Formats `content` enclosed by the `left` and `right` parentheses. The implementation also ensures
+/// that expanding the parenthesized expression (or any of its children) doesn't enforce the
+/// optional parentheses around the outer-most expression to materialize.
+pub(crate) fn parenthesized_with_head_comments<'content, 'ast, Content>(
+    left: &'static str,
+    comments: &'content [SourceComment],
+    content: &'content Content,
+    right: &'static str,
+) -> FormatParenthesizedWithHeadComments<'content, 'ast>
+where
+    Content: Format<PyFormatContext<'ast>>,
+{
+    FormatParenthesizedWithHeadComments {
+        left,
+        comments,
+        content: Argument::new(content),
+        right,
+    }
+}
+
+pub(crate) struct FormatParenthesizedWithHeadComments<'content, 'ast> {
+    left: &'static str,
+    comments: &'content [SourceComment],
+    content: Argument<'content, PyFormatContext<'ast>>,
+    right: &'static str,
+}
+
+impl<'ast> Format<PyFormatContext<'ast>> for FormatParenthesizedWithHeadComments<'_, 'ast> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
+        let inner = format_with(|f| {
+            // TODO(charlie): An empty `line_suffix` is causing some expressions to break.
+            // Verify whether this is intended, or a bug in `line_suffix`.
+            if self.comments.is_empty() {
+                group(&format_args![
+                    text(self.left),
+                    &soft_block_indent(&Arguments::from(&self.content)),
+                    text(self.right)
+                ])
+                .fmt(f)
+            } else {
+                group(&format_args![
+                    text(self.left),
+                    &line_suffix(&head_comments(&self.comments)),
+                    &group(&soft_block_indent(&Arguments::from(&self.content))),
+                    text(self.right)
+                ])
+                .fmt(f)
+            }
+        });
+
+        let current_level = f.context().node_level();
+
+        let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
+
+        if let NodeLevel::Expression(Some(group_id)) = current_level {
+            // Use fits expanded if there's an enclosing group that adds the optional parentheses.
+            // This ensures that expanding this parenthesized expression does not expand the optional parentheses group.
+            write!(
+                f,
+                [fits_expanded(&inner)
+                    .with_condition(Some(Condition::if_group_fits_on_line(group_id)))]
+            )
+        } else {
+            // It's not necessary to wrap the content if it is not inside of an optional_parentheses group.
+            write!(f, [inner])
         }
     }
 }

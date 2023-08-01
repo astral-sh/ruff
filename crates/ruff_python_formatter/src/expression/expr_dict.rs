@@ -1,13 +1,16 @@
-use crate::builders::empty_parenthesized_with_dangling_comments;
-use crate::comments::leading_comments;
-use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
-use crate::prelude::*;
-use crate::FormatNodeRule;
 use ruff_formatter::{format_args, write};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::Ranged;
 use ruff_python_ast::{Expr, ExprDict};
 use ruff_text_size::TextRange;
+
+use crate::builders::empty_parenthesized_with_dangling_comments;
+use crate::comments::leading_comments;
+use crate::expression::parentheses::{
+    parenthesized_with_head_comments, NeedsParentheses, OptionalParentheses,
+};
+use crate::prelude::*;
+use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatExprDict;
@@ -64,14 +67,12 @@ impl FormatNodeRule<ExprDict> for FormatExprDict {
 
         debug_assert_eq!(keys.len(), values.len());
 
+        let comments = f.context().comments().clone();
+        let dangling = comments.dangling_comments(item);
+
         if values.is_empty() {
-            let comments = f.context().comments().clone();
-            return empty_parenthesized_with_dangling_comments(
-                text("{"),
-                comments.dangling_comments(item),
-                text("}"),
-            )
-            .fmt(f);
+            return empty_parenthesized_with_dangling_comments(text("{"), dangling, text("}"))
+                .fmt(f);
         }
 
         let format_pairs = format_with(|f| {
@@ -85,7 +86,7 @@ impl FormatNodeRule<ExprDict> for FormatExprDict {
             joiner.finish()
         });
 
-        parenthesized("{", &format_pairs, "}").fmt(f)
+        parenthesized_with_head_comments("{", dangling, &format_pairs, "}").fmt(f)
     }
 
     fn fmt_dangling_comments(&self, _node: &ExprDict, _f: &mut PyFormatter) -> FormatResult<()> {

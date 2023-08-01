@@ -66,8 +66,7 @@ b3 = [
 ]
 
 # Comment placement in non-empty lists
-c1 = [
-    # trailing open bracket
+c1 = [  # trailing open bracket
     # leading item
     1,
     # between
