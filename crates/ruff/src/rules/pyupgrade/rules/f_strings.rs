@@ -355,8 +355,11 @@ pub(crate) fn f_strings(
                 //     " {} "
                 //     "b"
                 // ).format(x)
-                // ^ Get the position of the character before the dot.
                 // ```
+                // ^ Get the position of the character before the dot.
+                //
+                // We know that the expression is a string literal, so we can safely assume that the
+                // dot is the start of an attribute access.
                 break range.start();
             }
             Some((Tok::String { .. }, range)) => {
