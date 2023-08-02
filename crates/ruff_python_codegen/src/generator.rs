@@ -1,6 +1,6 @@
 //! Generate Python source code from an abstract syntax tree (AST).
 
-use ruff_python_ast::ParameterWithDefault;
+use ruff_python_ast::{ParameterWithDefault, TypeParams};
 use std::ops::Deref;
 
 use ruff_python_ast::{
@@ -222,7 +222,9 @@ impl<'a> Generator<'a> {
                 statement!({
                     self.p("def ");
                     self.p_id(name);
-                    self.unparse_type_params(type_params);
+                    if let Some(type_params) = type_params {
+                        self.unparse_type_params(type_params);
+                    }
                     self.p("(");
                     self.unparse_parameters(parameters);
                     self.p(")");
@@ -256,7 +258,9 @@ impl<'a> Generator<'a> {
                 statement!({
                     self.p("async def ");
                     self.p_id(name);
-                    self.unparse_type_params(type_params);
+                    if let Some(type_params) = type_params {
+                        self.unparse_type_params(type_params);
+                    }
                     self.p("(");
                     self.unparse_parameters(parameters);
                     self.p(")");
@@ -289,7 +293,9 @@ impl<'a> Generator<'a> {
                 statement!({
                     self.p("class ");
                     self.p_id(name);
-                    self.unparse_type_params(type_params);
+                    if let Some(type_params) = type_params {
+                        self.unparse_type_params(type_params);
+                    }
                     if let Some(arguments) = arguments {
                         self.p("(");
                         let mut first = true;
@@ -540,7 +546,9 @@ impl<'a> Generator<'a> {
             }) => {
                 self.p("type ");
                 self.unparse_expr(name, precedence::MAX);
-                self.unparse_type_params(type_params);
+                if let Some(type_params) = type_params {
+                    self.unparse_type_params(type_params);
+                }
                 self.p(" = ");
                 self.unparse_expr(value, precedence::ASSIGN);
             }
@@ -853,16 +861,14 @@ impl<'a> Generator<'a> {
         self.body(&ast.body);
     }
 
-    fn unparse_type_params(&mut self, type_params: &Vec<TypeParam>) {
-        if !type_params.is_empty() {
-            self.p("[");
-            let mut first = true;
-            for type_param in type_params {
-                self.p_delim(&mut first, ", ");
-                self.unparse_type_param(type_param);
-            }
-            self.p("]");
+    fn unparse_type_params(&mut self, type_params: &TypeParams) {
+        self.p("[");
+        let mut first = true;
+        for type_param in type_params.iter() {
+            self.p_delim(&mut first, ", ");
+            self.unparse_type_param(type_param);
         }
+        self.p("]");
     }
 
     pub(crate) fn unparse_type_param(&mut self, ast: &TypeParam) {

@@ -1,16 +1,17 @@
 use std::borrow::Cow;
 use std::path::Path;
 
+use num_traits::Zero;
+use smallvec::SmallVec;
+
+use ruff_text_size::TextRange;
+
+use crate::call_path::CallPath;
+use crate::statement_visitor::{walk_body, walk_stmt, StatementVisitor};
 use crate::{
     self as ast, Arguments, Constant, ExceptHandler, Expr, Keyword, MatchCase, Parameters, Pattern,
     Ranged, Stmt, TypeParam,
 };
-use num_traits::Zero;
-use ruff_text_size::TextRange;
-use smallvec::SmallVec;
-
-use crate::call_path::CallPath;
-use crate::statement_visitor::{walk_body, walk_stmt, StatementVisitor};
 
 /// Return `true` if the `Stmt` is a compound statement (as opposed to a simple statement).
 pub const fn is_compound_statement(stmt: &Stmt) -> bool {
@@ -346,6 +347,7 @@ where
     match stmt {
         Stmt::FunctionDef(ast::StmtFunctionDef {
             parameters,
+            type_params,
             body,
             decorator_list,
             returns,
@@ -353,6 +355,7 @@ where
         })
         | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
             parameters,
+            type_params,
             body,
             decorator_list,
             returns,
@@ -385,6 +388,11 @@ where
                         .as_ref()
                         .is_some_and(|expr| any_over_expr(expr, func))
                 })
+                || type_params.as_ref().is_some_and(|type_params| {
+                    type_params
+                        .iter()
+                        .any(|type_param| any_over_type_param(type_param, func))
+                })
                 || body.iter().any(|stmt| any_over_stmt(stmt, func))
                 || decorator_list
                     .iter()
@@ -395,6 +403,7 @@ where
         }
         Stmt::ClassDef(ast::StmtClassDef {
             arguments,
+            type_params,
             body,
             decorator_list,
             ..
@@ -406,6 +415,11 @@ where
                         || keywords
                             .iter()
                             .any(|keyword| any_over_expr(&keyword.value, func))
+                })
+                || type_params.as_ref().is_some_and(|type_params| {
+                    type_params
+                        .iter()
+                        .any(|type_param| any_over_type_param(type_param, func))
                 })
                 || body.iter().any(|stmt| any_over_stmt(stmt, func))
                 || decorator_list
@@ -429,9 +443,11 @@ where
             ..
         }) => {
             any_over_expr(name, func)
-                || type_params
-                    .iter()
-                    .any(|type_param| any_over_type_param(type_param, func))
+                || type_params.as_ref().is_some_and(|type_params| {
+                    type_params
+                        .iter()
+                        .any(|type_param| any_over_type_param(type_param, func))
+                })
                 || any_over_expr(value, func)
         }
         Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
@@ -1271,13 +1287,13 @@ mod tests {
     use std::cell::RefCell;
     use std::vec;
 
-    use crate::{
-        Constant, Expr, ExprConstant, ExprContext, ExprName, Identifier, Stmt, StmtTypeAlias,
-        TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
-    };
     use ruff_text_size::TextRange;
 
     use crate::helpers::{any_over_stmt, any_over_type_param, resolve_imported_module_path};
+    use crate::{
+        Constant, Expr, ExprConstant, ExprContext, ExprName, Identifier, Stmt, StmtTypeAlias,
+        TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, TypeParams,
+    };
 
     #[test]
     fn resolve_import() {
@@ -1351,7 +1367,10 @@ mod tests {
         });
         let type_alias = Stmt::TypeAlias(StmtTypeAlias {
             name: Box::new(name.clone()),
-            type_params: vec![type_var_one, type_var_two],
+            type_params: Some(TypeParams {
+                type_params: vec![type_var_one, type_var_two],
+                range: TextRange::default(),
+            }),
             value: Box::new(constant_three.clone()),
             range: TextRange::default(),
         });

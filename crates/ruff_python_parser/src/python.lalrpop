@@ -1010,14 +1010,14 @@ WithItem<Goal>: ast::WithItem = {
 };
 
 FuncDef: ast::Stmt = {
-     <location:@L> <decorator_list:Decorator*> <is_async:"async"?> "def" <name:Identifier> <type_params:TypeParamList?> <args:Parameters> <r:("->" <Test<"all">>)?> ":" <body:Suite> => {
+     <location:@L> <decorator_list:Decorator*> <is_async:"async"?> "def" <name:Identifier> <type_params:TypeParams?> <args:Parameters> <r:("->" <Test<"all">>)?> ":" <body:Suite> => {
         let args = Box::new(args);
         let returns = r.map(Box::new);
         let end_location = body.last().unwrap().end();
         if is_async.is_some() {
-            ast::StmtAsyncFunctionDef { name, parameters:args, body, decorator_list, returns, type_params: type_params.unwrap_or_default(), range: (location..end_location).into() }.into()
+            ast::StmtAsyncFunctionDef { name, parameters:args, body, decorator_list, returns, type_params, range: (location..end_location).into() }.into()
         } else {
-            ast::StmtFunctionDef { name, parameters:args, body, decorator_list, returns, type_params: type_params.unwrap_or_default(), range: (location..end_location).into() }.into()
+            ast::StmtFunctionDef { name, parameters:args, body, decorator_list, returns, type_params, range: (location..end_location).into() }.into()
         }
     },
 };
@@ -1029,12 +1029,12 @@ TypeAliasName: ast::Expr = {
 }
 
 TypeAliasStatement: ast::Stmt = {
-    <location:@L> "type" <name:TypeAliasName> <type_params:TypeParamList?> "=" <value:Test<"all">> <end_location:@R> => {
+    <location:@L> "type" <name:TypeAliasName> <type_params:TypeParams?> "=" <value:Test<"all">> <end_location:@R> => {
         ast::Stmt::TypeAlias(
             ast::StmtTypeAlias {
                 name: Box::new(name),
                 value: Box::new(value),
-                type_params: type_params.unwrap_or_default(),
+                type_params,
                 range: (location..end_location).into()
             },
         )
@@ -1194,7 +1194,7 @@ KwargParameter<ParameterType>: Option<Box<ast::Parameter>> = {
 };
 
 ClassDef: ast::Stmt = {
-    <location:@L>  <decorator_list:Decorator*> "class" <name:Identifier> <type_params:TypeParamList?> <arguments:Arguments?> ":" <body:Suite> => {
+    <location:@L>  <decorator_list:Decorator*> "class" <name:Identifier> <type_params:TypeParams?> <arguments:Arguments?> ":" <body:Suite> => {
         let end_location = body.last().unwrap().end();
         ast::Stmt::ClassDef(
             ast::StmtClassDef {
@@ -1202,17 +1202,19 @@ ClassDef: ast::Stmt = {
                 arguments,
                 body,
                 decorator_list,
-                type_params: type_params.unwrap_or_default(),
+                type_params,
                 range: (location..end_location).into()
             },
         )
     },
 };
 
-
-TypeParamList: Vec<ast::TypeParam> = {
+TypeParams: ast::TypeParams = {
     <location:@L> "[" <vars:OneOrMore<TypeParam>> ","? "]" <end_location:@R> => {
-        vars
+        ast::TypeParams {
+            type_params: vars,
+            range: (location..end_location).into()
+        }
     }
 };
 

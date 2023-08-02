@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: 3c5459b3b4420f13663b68f1bf78d526b5e5b0249d7877fe70dad50319098ef9
+// sha3: aadf067e37a9f39d450f1403b759a9659c60e697758ddd2b8c2b5fa2d0d73672
 use num_bigint::BigInt;
 use ruff_text_size::TextSize;
 use ruff_python_ast::{self as ast, Ranged, MagicKind};
@@ -134,8 +134,9 @@ mod __parse__Top {
         Variant88(Vec<ast::Stmt>),
         Variant89(ast::Mod),
         Variant90(ast::TypeParam),
-        Variant91(core::option::Option<Vec<ast::TypeParam>>),
-        Variant92(ast::UnaryOp),
+        Variant91(ast::TypeParams),
+        Variant92(core::option::Option<ast::TypeParams>),
+        Variant93(ast::UnaryOp),
     }
     const __ACTION: &[i16] = &[
         // State 0
@@ -18269,13 +18270,23 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant92<
+    fn __pop_Variant91<
+    >(
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
+    ) -> (TextSize, ast::TypeParams, TextSize)
+     {
+        match __symbols.pop() {
+            Some((__l, __Symbol::Variant91(__v), __r)) => (__l, __v, __r),
+            _ => __symbol_type_mismatch()
+        }
+    }
+    fn __pop_Variant93<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, ast::UnaryOp, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant92(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant93(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18369,16 +18380,6 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant91<
-    >(
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize)
-     {
-        match __symbols.pop() {
-            Some((__l, __Symbol::Variant91(__v), __r)) => (__l, __v, __r),
-            _ => __symbol_type_mismatch()
-        }
-    }
     fn __pop_Variant40<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
@@ -18456,6 +18457,16 @@ mod __parse__Top {
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant25(__v), __r)) => (__l, __v, __r),
+            _ => __symbol_type_mismatch()
+        }
+    }
+    fn __pop_Variant92<
+    >(
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
+    ) -> (TextSize, core::option::Option<ast::TypeParams>, TextSize)
+     {
+        match __symbols.pop() {
+            Some((__l, __Symbol::Variant92(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -22026,12 +22037,12 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ClassDef = "class", Identifier, TypeParamList, Arguments, ":", Suite => ActionFn(1712);
+        // ClassDef = "class", Identifier, TypeParams, Arguments, ":", Suite => ActionFn(1712);
         assert!(__symbols.len() >= 6);
         let __sym5 = __pop_Variant24(__symbols);
         let __sym4 = __pop_Variant0(__symbols);
         let __sym3 = __pop_Variant49(__symbols);
-        let __sym2 = __pop_Variant81(__symbols);
+        let __sym2 = __pop_Variant91(__symbols);
         let __sym1 = __pop_Variant22(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
@@ -22069,12 +22080,12 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ClassDef = Decorator+, "class", Identifier, TypeParamList, Arguments, ":", Suite => ActionFn(1714);
+        // ClassDef = Decorator+, "class", Identifier, TypeParams, Arguments, ":", Suite => ActionFn(1714);
         assert!(__symbols.len() >= 7);
         let __sym6 = __pop_Variant24(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
         let __sym4 = __pop_Variant49(__symbols);
-        let __sym3 = __pop_Variant81(__symbols);
+        let __sym3 = __pop_Variant91(__symbols);
         let __sym2 = __pop_Variant22(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant58(__symbols);
@@ -22114,11 +22125,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ClassDef = "class", Identifier, TypeParamList, ":", Suite => ActionFn(1716);
+        // ClassDef = "class", Identifier, TypeParams, ":", Suite => ActionFn(1716);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant24(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
-        let __sym2 = __pop_Variant81(__symbols);
+        let __sym2 = __pop_Variant91(__symbols);
         let __sym1 = __pop_Variant22(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
@@ -22155,11 +22166,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // ClassDef = Decorator+, "class", Identifier, TypeParamList, ":", Suite => ActionFn(1718);
+        // ClassDef = Decorator+, "class", Identifier, TypeParams, ":", Suite => ActionFn(1718);
         assert!(__symbols.len() >= 6);
         let __sym5 = __pop_Variant24(__symbols);
         let __sym4 = __pop_Variant0(__symbols);
-        let __sym3 = __pop_Variant81(__symbols);
+        let __sym3 = __pop_Variant91(__symbols);
         let __sym2 = __pop_Variant22(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant58(__symbols);
@@ -24076,7 +24087,7 @@ mod __parse__Top {
         // Factor<"all"> = UnaryOp, Factor<"all"> => ActionFn(1278);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant14(__symbols);
-        let __sym0 = __pop_Variant92(__symbols);
+        let __sym0 = __pop_Variant93(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
         let __nt = super::__action1278::<>(mode, __sym0, __sym1);
@@ -24110,7 +24121,7 @@ mod __parse__Top {
         // Factor<"no-withitems"> = UnaryOp, Factor<"all"> => ActionFn(1279);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant14(__symbols);
-        let __sym0 = __pop_Variant92(__symbols);
+        let __sym0 = __pop_Variant93(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
         let __nt = super::__action1279::<>(mode, __sym0, __sym1);
@@ -24335,14 +24346,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FuncDef = "async", "def", Identifier, TypeParamList, Parameters, "->", Test<"all">, ":", Suite => ActionFn(1720);
+        // FuncDef = "async", "def", Identifier, TypeParams, Parameters, "->", Test<"all">, ":", Suite => ActionFn(1720);
         assert!(__symbols.len() >= 9);
         let __sym8 = __pop_Variant24(__symbols);
         let __sym7 = __pop_Variant0(__symbols);
         let __sym6 = __pop_Variant14(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
         let __sym4 = __pop_Variant45(__symbols);
-        let __sym3 = __pop_Variant81(__symbols);
+        let __sym3 = __pop_Variant91(__symbols);
         let __sym2 = __pop_Variant22(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
@@ -24384,14 +24395,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FuncDef = Decorator+, "async", "def", Identifier, TypeParamList, Parameters, "->", Test<"all">, ":", Suite => ActionFn(1722);
+        // FuncDef = Decorator+, "async", "def", Identifier, TypeParams, Parameters, "->", Test<"all">, ":", Suite => ActionFn(1722);
         assert!(__symbols.len() >= 10);
         let __sym9 = __pop_Variant24(__symbols);
         let __sym8 = __pop_Variant0(__symbols);
         let __sym7 = __pop_Variant14(__symbols);
         let __sym6 = __pop_Variant0(__symbols);
         let __sym5 = __pop_Variant45(__symbols);
-        let __sym4 = __pop_Variant81(__symbols);
+        let __sym4 = __pop_Variant91(__symbols);
         let __sym3 = __pop_Variant22(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
@@ -24435,12 +24446,12 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FuncDef = "async", "def", Identifier, TypeParamList, Parameters, ":", Suite => ActionFn(1724);
+        // FuncDef = "async", "def", Identifier, TypeParams, Parameters, ":", Suite => ActionFn(1724);
         assert!(__symbols.len() >= 7);
         let __sym6 = __pop_Variant24(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
         let __sym4 = __pop_Variant45(__symbols);
-        let __sym3 = __pop_Variant81(__symbols);
+        let __sym3 = __pop_Variant91(__symbols);
         let __sym2 = __pop_Variant22(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
@@ -24480,12 +24491,12 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FuncDef = Decorator+, "async", "def", Identifier, TypeParamList, Parameters, ":", Suite => ActionFn(1726);
+        // FuncDef = Decorator+, "async", "def", Identifier, TypeParams, Parameters, ":", Suite => ActionFn(1726);
         assert!(__symbols.len() >= 8);
         let __sym7 = __pop_Variant24(__symbols);
         let __sym6 = __pop_Variant0(__symbols);
         let __sym5 = __pop_Variant45(__symbols);
-        let __sym4 = __pop_Variant81(__symbols);
+        let __sym4 = __pop_Variant91(__symbols);
         let __sym3 = __pop_Variant22(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
@@ -24527,14 +24538,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FuncDef = "def", Identifier, TypeParamList, Parameters, "->", Test<"all">, ":", Suite => ActionFn(1728);
+        // FuncDef = "def", Identifier, TypeParams, Parameters, "->", Test<"all">, ":", Suite => ActionFn(1728);
         assert!(__symbols.len() >= 8);
         let __sym7 = __pop_Variant24(__symbols);
         let __sym6 = __pop_Variant0(__symbols);
         let __sym5 = __pop_Variant14(__symbols);
         let __sym4 = __pop_Variant0(__symbols);
         let __sym3 = __pop_Variant45(__symbols);
-        let __sym2 = __pop_Variant81(__symbols);
+        let __sym2 = __pop_Variant91(__symbols);
         let __sym1 = __pop_Variant22(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
@@ -24574,14 +24585,14 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FuncDef = Decorator+, "def", Identifier, TypeParamList, Parameters, "->", Test<"all">, ":", Suite => ActionFn(1730);
+        // FuncDef = Decorator+, "def", Identifier, TypeParams, Parameters, "->", Test<"all">, ":", Suite => ActionFn(1730);
         assert!(__symbols.len() >= 9);
         let __sym8 = __pop_Variant24(__symbols);
         let __sym7 = __pop_Variant0(__symbols);
         let __sym6 = __pop_Variant14(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
         let __sym4 = __pop_Variant45(__symbols);
-        let __sym3 = __pop_Variant81(__symbols);
+        let __sym3 = __pop_Variant91(__symbols);
         let __sym2 = __pop_Variant22(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant58(__symbols);
@@ -24623,12 +24634,12 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FuncDef = "def", Identifier, TypeParamList, Parameters, ":", Suite => ActionFn(1732);
+        // FuncDef = "def", Identifier, TypeParams, Parameters, ":", Suite => ActionFn(1732);
         assert!(__symbols.len() >= 6);
         let __sym5 = __pop_Variant24(__symbols);
         let __sym4 = __pop_Variant0(__symbols);
         let __sym3 = __pop_Variant45(__symbols);
-        let __sym2 = __pop_Variant81(__symbols);
+        let __sym2 = __pop_Variant91(__symbols);
         let __sym1 = __pop_Variant22(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
@@ -24666,12 +24677,12 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // FuncDef = Decorator+, "def", Identifier, TypeParamList, Parameters, ":", Suite => ActionFn(1734);
+        // FuncDef = Decorator+, "def", Identifier, TypeParams, Parameters, ":", Suite => ActionFn(1734);
         assert!(__symbols.len() >= 7);
         let __sym6 = __pop_Variant24(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
         let __sym4 = __pop_Variant45(__symbols);
-        let __sym3 = __pop_Variant81(__symbols);
+        let __sym3 = __pop_Variant91(__symbols);
         let __sym2 = __pop_Variant22(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant58(__symbols);
@@ -29792,11 +29803,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TypeAliasStatement = "type", TypeAliasName, TypeParamList, "=", Test<"all"> => ActionFn(1736);
+        // TypeAliasStatement = "type", TypeAliasName, TypeParams, "=", Test<"all"> => ActionFn(1736);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant14(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
-        let __sym2 = __pop_Variant81(__symbols);
+        let __sym2 = __pop_Variant91(__symbols);
         let __sym1 = __pop_Variant14(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
@@ -29904,7 +29915,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TypeParamList = "[", OneOrMore<TypeParam>, ",", "]" => ActionFn(1462);
+        // TypeParams = "[", OneOrMore<TypeParam>, ",", "]" => ActionFn(1462);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
@@ -29913,7 +29924,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym3.2;
         let __nt = super::__action1462::<>(mode, __sym0, __sym1, __sym2, __sym3);
-        __symbols.push((__start, __Symbol::Variant81(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant91(__nt), __end));
         (4, 260)
     }
     pub(crate) fn __reduce876<
@@ -29924,7 +29935,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TypeParamList = "[", OneOrMore<TypeParam>, "]" => ActionFn(1463);
+        // TypeParams = "[", OneOrMore<TypeParam>, "]" => ActionFn(1463);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant81(__symbols);
@@ -29932,7 +29943,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action1463::<>(mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant81(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant91(__nt), __end));
         (3, 260)
     }
     pub(crate) fn __reduce877<
@@ -29943,12 +29954,12 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TypeParamList? = TypeParamList => ActionFn(284);
-        let __sym0 = __pop_Variant81(__symbols);
+        // TypeParams? = TypeParams => ActionFn(284);
+        let __sym0 = __pop_Variant91(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action284::<>(mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant91(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant92(__nt), __end));
         (1, 261)
     }
     pub(crate) fn __reduce878<
@@ -29959,11 +29970,11 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> (usize, usize)
     {
-        // TypeParamList? =  => ActionFn(285);
+        // TypeParams? =  => ActionFn(285);
         let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
         let __end = __start.clone();
         let __nt = super::__action285::<>(mode, &__start, &__end);
-        __symbols.push((__start, __Symbol::Variant91(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant92(__nt), __end));
         (0, 261)
     }
     pub(crate) fn __reduce879<
@@ -30014,7 +30025,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action201::<>(mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant92(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant93(__nt), __end));
         (1, 263)
     }
     pub(crate) fn __reduce882<
@@ -30030,7 +30041,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action202::<>(mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant92(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant93(__nt), __end));
         (1, 263)
     }
     pub(crate) fn __reduce883<
@@ -30046,7 +30057,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action203::<>(mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant92(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant93(__nt), __end));
         (1, 263)
     }
     pub(crate) fn __reduce884<
@@ -33385,7 +33396,7 @@ fn __action161<
     (_, is_async, _): (TextSize, core::option::Option<token::Tok>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, name, _): (TextSize, ast::Identifier, TextSize),
-    (_, type_params, _): (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
+    (_, type_params, _): (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     (_, args, _): (TextSize, ast::Parameters, TextSize),
     (_, r, _): (TextSize, core::option::Option<ast::Expr>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
@@ -33397,9 +33408,9 @@ fn __action161<
         let returns = r.map(Box::new);
         let end_location = body.last().unwrap().end();
         if is_async.is_some() {
-            ast::StmtAsyncFunctionDef { name, parameters:args, body, decorator_list, returns, type_params: type_params.unwrap_or_default(), range: (location..end_location).into() }.into()
+            ast::StmtAsyncFunctionDef { name, parameters:args, body, decorator_list, returns, type_params, range: (location..end_location).into() }.into()
         } else {
-            ast::StmtFunctionDef { name, parameters:args, body, decorator_list, returns, type_params: type_params.unwrap_or_default(), range: (location..end_location).into() }.into()
+            ast::StmtFunctionDef { name, parameters:args, body, decorator_list, returns, type_params, range: (location..end_location).into() }.into()
         }
     }
 }
@@ -33427,7 +33438,7 @@ fn __action163<
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, name, _): (TextSize, ast::Expr, TextSize),
-    (_, type_params, _): (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
+    (_, type_params, _): (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, value, _): (TextSize, ast::Expr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
@@ -33438,7 +33449,7 @@ fn __action163<
             ast::StmtTypeAlias {
                 name: Box::new(name),
                 value: Box::new(value),
-                type_params: type_params.unwrap_or_default(),
+                type_params,
                 range: (location..end_location).into()
             },
         )
@@ -33561,7 +33572,7 @@ fn __action170<
     (_, decorator_list, _): (TextSize, alloc::vec::Vec<ast::Decorator>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, name, _): (TextSize, ast::Identifier, TextSize),
-    (_, type_params, _): (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
+    (_, type_params, _): (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     (_, arguments, _): (TextSize, core::option::Option<ast::Arguments>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, body, _): (TextSize, ast::Suite, TextSize),
@@ -33575,7 +33586,7 @@ fn __action170<
                 arguments,
                 body,
                 decorator_list,
-                type_params: type_params.unwrap_or_default(),
+                type_params,
                 range: (location..end_location).into()
             },
         )
@@ -33593,10 +33604,13 @@ fn __action171<
     (_, _, _): (TextSize, core::option::Option<token::Tok>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> Vec<ast::TypeParam>
+) -> ast::TypeParams
 {
     {
-        vars
+        ast::TypeParams {
+            type_params: vars,
+            range: (location..end_location).into()
+        }
     }
 }
 
@@ -35226,8 +35240,8 @@ fn __action283<
 fn __action284<
 >(
     mode: Mode,
-    (_, __0, _): (TextSize, Vec<ast::TypeParam>, TextSize),
-) -> core::option::Option<Vec<ast::TypeParam>>
+    (_, __0, _): (TextSize, ast::TypeParams, TextSize),
+) -> core::option::Option<ast::TypeParams>
 {
     Some(__0)
 }
@@ -35239,7 +35253,7 @@ fn __action285<
     mode: Mode,
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> core::option::Option<Vec<ast::TypeParam>>
+) -> core::option::Option<ast::TypeParams>
 {
     None
 }
@@ -41093,7 +41107,7 @@ fn __action641<
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, TextSize, TextSize),
-) -> Vec<ast::TypeParam>
+) -> ast::TypeParams
 {
     let __start0 = __3.0;
     let __end0 = __3.2;
@@ -41123,7 +41137,7 @@ fn __action642<
     __2: (TextSize, Vec<ast::TypeParam>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> Vec<ast::TypeParam>
+) -> ast::TypeParams
 {
     let __start0 = __2.2;
     let __end0 = __3.0;
@@ -41568,7 +41582,7 @@ fn __action657<
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, ast::Identifier, TextSize),
-    __5: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
+    __5: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __6: (TextSize, ast::Parameters, TextSize),
     __7: (TextSize, core::option::Option<ast::Expr>, TextSize),
     __8: (TextSize, token::Tok, TextSize),
@@ -41606,7 +41620,7 @@ fn __action658<
     __1: (TextSize, alloc::vec::Vec<ast::Decorator>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Identifier, TextSize),
-    __4: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
+    __4: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __5: (TextSize, ast::Parameters, TextSize),
     __6: (TextSize, core::option::Option<ast::Expr>, TextSize),
     __7: (TextSize, token::Tok, TextSize),
@@ -44422,7 +44436,7 @@ fn __action757<
     __0: (TextSize, alloc::vec::Vec<ast::Decorator>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
-    __3: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
+    __3: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __4: (TextSize, core::option::Option<ast::Arguments>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
@@ -45650,7 +45664,7 @@ fn __action798<
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Identifier, TextSize),
-    __4: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
+    __4: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __5: (TextSize, ast::Parameters, TextSize),
     __6: (TextSize, core::option::Option<ast::Expr>, TextSize),
     __7: (TextSize, token::Tok, TextSize),
@@ -45688,7 +45702,7 @@ fn __action799<
     __0: (TextSize, alloc::vec::Vec<ast::Decorator>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
-    __3: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
+    __3: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __4: (TextSize, ast::Parameters, TextSize),
     __5: (TextSize, core::option::Option<ast::Expr>, TextSize),
     __6: (TextSize, token::Tok, TextSize),
@@ -49144,7 +49158,7 @@ fn __action921<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
-    __2: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
+    __2: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, ast::Expr, TextSize),
     __5: (TextSize, TextSize, TextSize),
@@ -49261,7 +49275,7 @@ fn __action925<
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> Vec<ast::TypeParam>
+) -> ast::TypeParams
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -49291,7 +49305,7 @@ fn __action926<
     __1: (TextSize, Vec<ast::TypeParam>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> Vec<ast::TypeParam>
+) -> ast::TypeParams
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -53480,7 +53494,7 @@ fn __action1073<
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Identifier, TextSize),
-    __4: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
+    __4: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __5: (TextSize, ast::Parameters, TextSize),
     __6: (TextSize, token::Tok, TextSize),
     __7: (TextSize, ast::Expr, TextSize),
@@ -53519,7 +53533,7 @@ fn __action1074<
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Identifier, TextSize),
-    __4: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
+    __4: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __5: (TextSize, ast::Parameters, TextSize),
     __6: (TextSize, token::Tok, TextSize),
     __7: (TextSize, ast::Suite, TextSize),
@@ -53555,7 +53569,7 @@ fn __action1075<
     __0: (TextSize, alloc::vec::Vec<ast::Decorator>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
-    __3: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
+    __3: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __4: (TextSize, ast::Parameters, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Expr, TextSize),
@@ -53592,7 +53606,7 @@ fn __action1076<
     __0: (TextSize, alloc::vec::Vec<ast::Decorator>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
-    __3: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
+    __3: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __4: (TextSize, ast::Parameters, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
@@ -64235,7 +64249,7 @@ fn __action1457<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
-    __2: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
+    __2: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, ast::Expr, TextSize),
 ) -> ast::Stmt
@@ -64368,7 +64382,7 @@ fn __action1462<
     __1: (TextSize, Vec<ast::TypeParam>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> Vec<ast::TypeParam>
+) -> ast::TypeParams
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -64396,7 +64410,7 @@ fn __action1463<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, Vec<ast::TypeParam>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> Vec<ast::TypeParam>
+) -> ast::TypeParams
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -65355,7 +65369,7 @@ fn __action1500<
     __0: (TextSize, alloc::vec::Vec<ast::Decorator>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
-    __3: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
+    __3: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __4: (TextSize, ast::Arguments, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
@@ -65388,7 +65402,7 @@ fn __action1501<
     __0: (TextSize, alloc::vec::Vec<ast::Decorator>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
-    __3: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
+    __3: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -66070,7 +66084,7 @@ fn __action1528<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Identifier, TextSize),
-    __2: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
+    __2: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __3: (TextSize, ast::Arguments, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, ast::Suite, TextSize),
@@ -66104,7 +66118,7 @@ fn __action1529<
     __0: (TextSize, alloc::vec::Vec<ast::Decorator>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
-    __3: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
+    __3: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __4: (TextSize, ast::Arguments, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
@@ -66136,7 +66150,7 @@ fn __action1530<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Identifier, TextSize),
-    __2: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
+    __2: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -66168,7 +66182,7 @@ fn __action1531<
     __0: (TextSize, alloc::vec::Vec<ast::Decorator>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
-    __3: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
+    __3: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -66199,7 +66213,7 @@ fn __action1532<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
-    __3: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
+    __3: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __4: (TextSize, ast::Parameters, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Expr, TextSize),
@@ -66239,7 +66253,7 @@ fn __action1533<
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Identifier, TextSize),
-    __4: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
+    __4: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __5: (TextSize, ast::Parameters, TextSize),
     __6: (TextSize, token::Tok, TextSize),
     __7: (TextSize, ast::Expr, TextSize),
@@ -66277,7 +66291,7 @@ fn __action1534<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
-    __3: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
+    __3: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __4: (TextSize, ast::Parameters, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
@@ -66313,7 +66327,7 @@ fn __action1535<
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Identifier, TextSize),
-    __4: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
+    __4: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __5: (TextSize, ast::Parameters, TextSize),
     __6: (TextSize, token::Tok, TextSize),
     __7: (TextSize, ast::Suite, TextSize),
@@ -66346,7 +66360,7 @@ fn __action1536<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Identifier, TextSize),
-    __2: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
+    __2: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __3: (TextSize, ast::Parameters, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, ast::Expr, TextSize),
@@ -66384,7 +66398,7 @@ fn __action1537<
     __0: (TextSize, alloc::vec::Vec<ast::Decorator>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
-    __3: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
+    __3: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __4: (TextSize, ast::Parameters, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Expr, TextSize),
@@ -66420,7 +66434,7 @@ fn __action1538<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Identifier, TextSize),
-    __2: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
+    __2: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __3: (TextSize, ast::Parameters, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, ast::Suite, TextSize),
@@ -66454,7 +66468,7 @@ fn __action1539<
     __0: (TextSize, alloc::vec::Vec<ast::Decorator>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
-    __3: (TextSize, core::option::Option<Vec<ast::TypeParam>>, TextSize),
+    __3: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __4: (TextSize, ast::Parameters, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
@@ -71718,7 +71732,7 @@ fn __action1712<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Identifier, TextSize),
-    __2: (TextSize, Vec<ast::TypeParam>, TextSize),
+    __2: (TextSize, ast::TypeParams, TextSize),
     __3: (TextSize, ast::Arguments, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, ast::Suite, TextSize),
@@ -71781,7 +71795,7 @@ fn __action1714<
     __0: (TextSize, alloc::vec::Vec<ast::Decorator>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
-    __3: (TextSize, Vec<ast::TypeParam>, TextSize),
+    __3: (TextSize, ast::TypeParams, TextSize),
     __4: (TextSize, ast::Arguments, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
@@ -71846,7 +71860,7 @@ fn __action1716<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Identifier, TextSize),
-    __2: (TextSize, Vec<ast::TypeParam>, TextSize),
+    __2: (TextSize, ast::TypeParams, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -71905,7 +71919,7 @@ fn __action1718<
     __0: (TextSize, alloc::vec::Vec<ast::Decorator>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
-    __3: (TextSize, Vec<ast::TypeParam>, TextSize),
+    __3: (TextSize, ast::TypeParams, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -71967,7 +71981,7 @@ fn __action1720<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
-    __3: (TextSize, Vec<ast::TypeParam>, TextSize),
+    __3: (TextSize, ast::TypeParams, TextSize),
     __4: (TextSize, ast::Parameters, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Expr, TextSize),
@@ -72042,7 +72056,7 @@ fn __action1722<
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Identifier, TextSize),
-    __4: (TextSize, Vec<ast::TypeParam>, TextSize),
+    __4: (TextSize, ast::TypeParams, TextSize),
     __5: (TextSize, ast::Parameters, TextSize),
     __6: (TextSize, token::Tok, TextSize),
     __7: (TextSize, ast::Expr, TextSize),
@@ -72119,7 +72133,7 @@ fn __action1724<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
-    __3: (TextSize, Vec<ast::TypeParam>, TextSize),
+    __3: (TextSize, ast::TypeParams, TextSize),
     __4: (TextSize, ast::Parameters, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
@@ -72186,7 +72200,7 @@ fn __action1726<
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Identifier, TextSize),
-    __4: (TextSize, Vec<ast::TypeParam>, TextSize),
+    __4: (TextSize, ast::TypeParams, TextSize),
     __5: (TextSize, ast::Parameters, TextSize),
     __6: (TextSize, token::Tok, TextSize),
     __7: (TextSize, ast::Suite, TextSize),
@@ -72254,7 +72268,7 @@ fn __action1728<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Identifier, TextSize),
-    __2: (TextSize, Vec<ast::TypeParam>, TextSize),
+    __2: (TextSize, ast::TypeParams, TextSize),
     __3: (TextSize, ast::Parameters, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, ast::Expr, TextSize),
@@ -72325,7 +72339,7 @@ fn __action1730<
     __0: (TextSize, alloc::vec::Vec<ast::Decorator>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
-    __3: (TextSize, Vec<ast::TypeParam>, TextSize),
+    __3: (TextSize, ast::TypeParams, TextSize),
     __4: (TextSize, ast::Parameters, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Expr, TextSize),
@@ -72398,7 +72412,7 @@ fn __action1732<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Identifier, TextSize),
-    __2: (TextSize, Vec<ast::TypeParam>, TextSize),
+    __2: (TextSize, ast::TypeParams, TextSize),
     __3: (TextSize, ast::Parameters, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, ast::Suite, TextSize),
@@ -72461,7 +72475,7 @@ fn __action1734<
     __0: (TextSize, alloc::vec::Vec<ast::Decorator>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
-    __3: (TextSize, Vec<ast::TypeParam>, TextSize),
+    __3: (TextSize, ast::TypeParams, TextSize),
     __4: (TextSize, ast::Parameters, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
@@ -72526,7 +72540,7 @@ fn __action1736<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
-    __2: (TextSize, Vec<ast::TypeParam>, TextSize),
+    __2: (TextSize, ast::TypeParams, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, ast::Expr, TextSize),
 ) -> ast::Stmt
