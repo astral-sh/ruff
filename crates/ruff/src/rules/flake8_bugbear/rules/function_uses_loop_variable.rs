@@ -1,11 +1,9 @@
-use ruff_python_ast::{self as ast, Arguments, Comprehension, Expr, ExprContext, Ranged, Stmt};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::includes_arg_name;
 use ruff_python_ast::types::Node;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{self as ast, Arguments, Comprehension, Expr, ExprContext, Ranged, Stmt};
 
 use crate::checkers::ast::Checker;
 
@@ -103,7 +101,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                             return false;
                         }
 
-                        if includes_arg_name(&loaded.id, parameters) {
+                        if parameters.includes(&loaded.id) {
                             return false;
                         }
 
@@ -189,7 +187,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                                 return false;
                             }
 
-                            if includes_arg_name(&loaded.id, parameters) {
+                            if parameters.includes(&loaded.id) {
                                 return false;
                             }
 

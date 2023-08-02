@@ -2080,6 +2080,32 @@ pub struct Parameters {
     pub kwarg: Option<Box<Parameter>>,
 }
 
+impl Parameters {
+    /// Returns `true` if a parameter with the given name included in this [`Parameters`].
+    pub fn includes(&self, name: &str) -> bool {
+        if self
+            .posonlyargs
+            .iter()
+            .chain(&self.args)
+            .chain(&self.kwonlyargs)
+            .any(|arg| arg.parameter.name.as_str() == name)
+        {
+            return true;
+        }
+        if let Some(arg) = &self.vararg {
+            if arg.name.as_str() == name {
+                return true;
+            }
+        }
+        if let Some(arg) = &self.kwarg {
+            if arg.name.as_str() == name {
+                return true;
+            }
+        }
+        false
+    }
+}
+
 /// An alternative type of AST `arg`. This is used for each function argument that might have a default value.
 /// Used by `Arguments` original type.
 ///

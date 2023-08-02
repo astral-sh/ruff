@@ -1,13 +1,11 @@
 use std::fmt;
 
-use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Parameters, Ranged, Stmt};
-
 use ruff_diagnostics::{AutofixKind, Violation};
 use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::includes_arg_name;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Parameters, Ranged, Stmt};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -275,9 +273,13 @@ impl<'a> Visitor<'a> for LateBindingVisitor<'a> {
                 // If we're within a nested lambda...
                 if !self.lambdas.is_empty() {
                     // If the name is defined in the current lambda...
-                    if includes_arg_name(id, self.parameters) {
+                    if self.parameters.includes(id) {
                         // And isn't overridden by any nested lambdas...
-                        if !self.lambdas.iter().any(|args| includes_arg_name(id, args)) {
+                        if !self
+                            .lambdas
+                            .iter()
+                            .any(|parameters| parameters.includes(id))
+                        {
                             // Then it's late-bound.
                             self.late_bound = true;
                         }
