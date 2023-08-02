@@ -5,7 +5,7 @@ use ruff_python_parser::{lexer, Mode, Tok};
 use ruff_source_file::Locator;
 use ruff_text_size::TextRange;
 
-use crate::autofix::edits::remove_argument;
+use crate::autofix::edits::{remove_argument, Parentheses};
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
@@ -180,8 +180,13 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                     );
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
                         diagnostic.try_set_fix(|| {
-                            remove_argument(kwarg, &call.arguments, false, checker.locator())
-                                .map(Fix::automatic)
+                            remove_argument(
+                                kwarg,
+                                &call.arguments,
+                                Parentheses::Preserve,
+                                checker.locator(),
+                            )
+                            .map(Fix::automatic)
                         });
                     }
                     checker.diagnostics.push(diagnostic);
@@ -195,8 +200,13 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                     );
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
                         diagnostic.try_set_fix(|| {
-                            remove_argument(arg, &call.arguments, false, checker.locator())
-                                .map(Fix::automatic)
+                            remove_argument(
+                                arg,
+                                &call.arguments,
+                                Parentheses::Preserve,
+                                checker.locator(),
+                            )
+                            .map(Fix::automatic)
                         });
                     }
                     checker.diagnostics.push(diagnostic);
@@ -217,8 +227,13 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                     );
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
                         diagnostic.try_set_fix(|| {
-                            remove_argument(kwarg, &call.arguments, false, checker.locator())
-                                .map(Fix::automatic)
+                            remove_argument(
+                                kwarg,
+                                &call.arguments,
+                                Parentheses::Preserve,
+                                checker.locator(),
+                            )
+                            .map(Fix::automatic)
                         });
                     }
                     checker.diagnostics.push(diagnostic);
@@ -232,8 +247,13 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                     );
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
                         diagnostic.try_set_fix(|| {
-                            remove_argument(arg, &call.arguments, false, checker.locator())
-                                .map(Fix::automatic)
+                            remove_argument(
+                                arg,
+                                &call.arguments,
+                                Parentheses::Preserve,
+                                checker.locator(),
+                            )
+                            .map(Fix::automatic)
                         });
                     }
                     checker.diagnostics.push(diagnostic);

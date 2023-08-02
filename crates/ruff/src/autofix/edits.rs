@@ -69,6 +69,14 @@ pub(crate) fn remove_unused_imports<'a>(
     }
 }
 
+#[derive(Debug, Copy, Clone)]
+pub(crate) enum Parentheses {
+    /// Remove parentheses, if the removed argument is the only argument left.
+    Remove,
+    /// Preserve parentheses, even if the removed argument is the only argument
+    Preserve,
+}
+
 /// Generic function to remove arguments or keyword arguments in function
 /// calls and class definitions. (For classes `args` should be considered
 /// `bases`)
@@ -78,7 +86,7 @@ pub(crate) fn remove_unused_imports<'a>(
 pub(crate) fn remove_argument<T: Ranged>(
     argument: &T,
     arguments: &Arguments,
-    remove_parentheses: bool,
+    parentheses: Parentheses,
     locator: &Locator,
 ) -> Result<Edit> {
     // TODO(sbrugman): Preserve trailing comments.
@@ -150,10 +158,11 @@ pub(crate) fn remove_argument<T: Ranged>(
         }
     } else {
         // Only one argument; remove it (but preserve parentheses, if needed).
-        Ok(if remove_parentheses {
-            Edit::deletion(arguments.start(), arguments.end())
-        } else {
-            Edit::replacement("()".to_string(), arguments.start(), arguments.end())
+        Ok(match parentheses {
+            Parentheses::Remove => Edit::deletion(arguments.start(), arguments.end()),
+            Parentheses::Preserve => {
+                Edit::replacement("()".to_string(), arguments.start(), arguments.end())
+            }
         })
     }
 }

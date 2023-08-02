@@ -5,7 +5,7 @@ use ruff_python_ast::{self as ast, Keyword, Ranged};
 use ruff_python_semantic::{BindingKind, Import};
 use ruff_source_file::Locator;
 
-use crate::autofix::edits::remove_argument;
+use crate::autofix::edits::{remove_argument, Parentheses};
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
@@ -125,7 +125,8 @@ fn convert_inplace_argument_to_assignment(
     );
 
     // Remove the `inplace` argument.
-    let remove_argument = remove_argument(keyword, &call.arguments, false, locator).ok()?;
+    let remove_argument =
+        remove_argument(keyword, &call.arguments, Parentheses::Preserve, locator).ok()?;
 
     Some(Fix::suggested_edits(insert_assignment, [remove_argument]))
 }

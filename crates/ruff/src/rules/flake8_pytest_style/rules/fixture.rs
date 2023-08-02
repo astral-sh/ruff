@@ -14,7 +14,7 @@ use ruff_python_semantic::analyze::visibility::is_abstract;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{TextLen, TextRange};
 
-use crate::autofix::edits::remove_argument;
+use crate::autofix::edits;
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
 
@@ -512,8 +512,13 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &D
                             Diagnostic::new(PytestExtraneousScopeFunction, keyword.range());
                         if checker.patch(diagnostic.kind.rule()) {
                             diagnostic.try_set_fix(|| {
-                                remove_argument(keyword, arguments, false, checker.locator())
-                                    .map(Fix::suggested)
+                                edits::remove_argument(
+                                    keyword,
+                                    arguments,
+                                    edits::Parentheses::Preserve,
+                                    checker.locator(),
+                                )
+                                .map(Fix::suggested)
                             });
                         }
                         checker.diagnostics.push(diagnostic);

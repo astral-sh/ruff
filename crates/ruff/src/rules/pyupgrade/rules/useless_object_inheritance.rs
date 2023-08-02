@@ -2,7 +2,7 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, Ranged};
 
-use crate::autofix::edits::remove_argument;
+use crate::autofix::edits::{remove_argument, Parentheses};
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
@@ -69,7 +69,8 @@ pub(crate) fn useless_object_inheritance(checker: &mut Checker, class_def: &ast:
         );
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.try_set_fix(|| {
-                remove_argument(base, arguments, true, checker.locator()).map(Fix::automatic)
+                remove_argument(base, arguments, Parentheses::Remove, checker.locator())
+                    .map(Fix::automatic)
             });
         }
         checker.diagnostics.push(diagnostic);

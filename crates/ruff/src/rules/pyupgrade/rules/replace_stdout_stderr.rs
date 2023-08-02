@@ -6,7 +6,7 @@ use ruff_python_ast::helpers::find_keyword;
 use ruff_python_ast::{self as ast, Keyword, Ranged};
 use ruff_source_file::Locator;
 
-use crate::autofix::edits::remove_argument;
+use crate::autofix::edits::{remove_argument, Parentheses};
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
@@ -65,7 +65,12 @@ fn generate_fix(
     };
     Ok(Fix::suggested_edits(
         Edit::range_replacement("capture_output=True".to_string(), first.range()),
-        [remove_argument(second, &call.arguments, false, locator)?],
+        [remove_argument(
+            second,
+            &call.arguments,
+            Parentheses::Preserve,
+            locator,
+        )?],
     ))
 }
 
