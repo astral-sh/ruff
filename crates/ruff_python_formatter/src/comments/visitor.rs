@@ -3,7 +3,7 @@ use std::iter::Peekable;
 use ruff_python_ast::{
     Alias, Arguments, Comprehension, Decorator, ElifElseClause, ExceptHandler, Expr, Keyword,
     MatchCase, Mod, Parameter, ParameterWithDefault, Parameters, Pattern, Ranged, Stmt, TypeParam,
-    WithItem,
+    TypeParams, WithItem,
 };
 use ruff_text_size::{TextRange, TextSize};
 
@@ -299,6 +299,13 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast> {
             walk_elif_else_clause(self, elif_else_clause);
         }
         self.finish_node(elif_else_clause);
+    }
+
+    fn visit_type_params(&mut self, type_params: &'ast TypeParams) {
+        if self.start_node(type_params).is_traverse() {
+            walk_type_params(self, type_params);
+        }
+        self.finish_node(type_params);
     }
 
     fn visit_type_param(&mut self, type_param: &'ast TypeParam) {

@@ -54,6 +54,7 @@ groups = {
     "expr": "expression",
     "stmt": "statement",
     "pattern": "pattern",
+    "type_param": "type_param",
     "other": "other",
 }
 
