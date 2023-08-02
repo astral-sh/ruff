@@ -103,16 +103,19 @@ impl<'a> FormatSummaryValues<'a> {
         })
     }
 
+    /// Return the next positional argument.
     fn arg_auto(&mut self) -> Option<&Expr> {
         let idx = self.auto_index;
         self.auto_index += 1;
         self.arg_positional(idx)
     }
 
+    /// Return the positional argument at the given index.
     fn arg_positional(&self, index: usize) -> Option<&Expr> {
         self.args.get(index).copied()
     }
 
+    /// Return the keyword argument with the given name.
     fn arg_keyword(&self, key: &str) -> Option<&Expr> {
         self.kwargs.get(key).copied()
     }
