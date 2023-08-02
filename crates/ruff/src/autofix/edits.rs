@@ -1,14 +1,15 @@
 //! Interface for generating autofix edits from higher-level actions (e.g., "remove an argument").
+
 use anyhow::{bail, Result};
-use ruff_python_ast::{self as ast, ExceptHandler, Expr, Keyword, Ranged, Stmt};
-use ruff_python_parser::{lexer, Mode};
-use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::Edit;
+use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Expr, Keyword, Ranged, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
+use ruff_python_parser::{lexer, Mode};
 use ruff_python_trivia::{has_leading_content, is_python_whitespace, PythonWhitespace};
 use ruff_source_file::{Locator, NewlineWithTrailingNewline};
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::autofix::codemods;
 
@@ -68,108 +69,101 @@ pub(crate) fn remove_unused_imports<'a>(
     }
 }
 
+#[derive(Debug, Copy, Clone)]
+pub(crate) enum Parentheses {
+    /// Remove parentheses, if the removed argument is the only argument left.
+    Remove,
+    /// Preserve parentheses, even if the removed argument is the only argument
+    Preserve,
+}
+
 /// Generic function to remove arguments or keyword arguments in function
 /// calls and class definitions. (For classes `args` should be considered
 /// `bases`)
 ///
 /// Supports the removal of parentheses when this is the only (kw)arg left.
 /// For this behavior, set `remove_parentheses` to `true`.
-///
-/// TODO(charlie): Migrate this signature to take [`Arguments`] rather than
-/// separate args and keywords.
-pub(crate) fn remove_argument(
+pub(crate) fn remove_argument<T: Ranged>(
+    argument: &T,
+    arguments: &Arguments,
+    parentheses: Parentheses,
     locator: &Locator,
-    call_at: TextSize,
-    expr_range: TextRange,
-    args: &[Expr],
-    keywords: &[Keyword],
-    remove_parentheses: bool,
 ) -> Result<Edit> {
     // TODO(sbrugman): Preserve trailing comments.
-    let contents = locator.after(call_at);
+    if arguments.keywords.len() + arguments.args.len() > 1 {
+        let mut fix_start = None;
+        let mut fix_end = None;
 
-    let mut fix_start = None;
-    let mut fix_end = None;
-
-    let n_arguments = keywords.len() + args.len();
-    if n_arguments == 0 {
-        bail!("No arguments or keywords to remove");
-    }
-
-    if n_arguments == 1 {
-        // Case 1: there is only one argument.
-        let mut count = 0u32;
-        for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, call_at).flatten() {
-            if tok.is_lpar() {
-                if count == 0 {
-                    fix_start = Some(if remove_parentheses {
-                        range.start()
-                    } else {
-                        range.start() + TextSize::from(1)
-                    });
-                }
-                count = count.saturating_add(1);
-            }
-
-            if tok.is_rpar() {
-                count = count.saturating_sub(1);
-                if count == 0 {
-                    fix_end = Some(if remove_parentheses {
+        if arguments
+            .args
+            .iter()
+            .map(Expr::start)
+            .chain(arguments.keywords.iter().map(Keyword::start))
+            .any(|location| location > argument.start())
+        {
+            // Case 1: argument or keyword is _not_ the last node, so delete from the start of the
+            // argument to the end of the subsequent comma.
+            let mut seen_comma = false;
+            for (tok, range) in lexer::lex_starts_at(
+                locator.slice(arguments.range()),
+                Mode::Module,
+                arguments.start(),
+            )
+            .flatten()
+            {
+                if seen_comma {
+                    if tok.is_non_logical_newline() {
+                        // Also delete any non-logical newlines after the comma.
+                        continue;
+                    }
+                    fix_end = Some(if tok.is_newline() {
                         range.end()
                     } else {
-                        range.end() - TextSize::from(1)
+                        range.start()
                     });
                     break;
                 }
+                if range.start() == argument.start() {
+                    fix_start = Some(range.start());
+                }
+                if fix_start.is_some() && tok.is_comma() {
+                    seen_comma = true;
+                }
+            }
+        } else {
+            // Case 2: argument or keyword is the last node, so delete from the start of the
+            // previous comma to the end of the argument.
+            for (tok, range) in lexer::lex_starts_at(
+                locator.slice(arguments.range()),
+                Mode::Module,
+                arguments.start(),
+            )
+            .flatten()
+            {
+                if range.start() == argument.start() {
+                    fix_end = Some(argument.end());
+                    break;
+                }
+                if tok.is_comma() {
+                    fix_start = Some(range.start());
+                }
             }
         }
-    } else if args
-        .iter()
-        .map(Expr::start)
-        .chain(keywords.iter().map(Keyword::start))
-        .any(|location| location > expr_range.start())
-    {
-        // Case 2: argument or keyword is _not_ the last node.
-        let mut seen_comma = false;
-        for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, call_at).flatten() {
-            if seen_comma {
-                if tok.is_non_logical_newline() {
-                    // Also delete any non-logical newlines after the comma.
-                    continue;
-                }
-                fix_end = Some(if tok.is_newline() {
-                    range.end()
-                } else {
-                    range.start()
-                });
-                break;
-            }
-            if range.start() == expr_range.start() {
-                fix_start = Some(range.start());
-            }
-            if fix_start.is_some() && tok.is_comma() {
-                seen_comma = true;
+
+        match (fix_start, fix_end) {
+            (Some(start), Some(end)) => Ok(Edit::deletion(start, end)),
+            _ => {
+                bail!("No fix could be constructed")
             }
         }
     } else {
-        // Case 3: argument or keyword is the last node, so we have to find the last
-        // comma in the stmt.
-        for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, call_at).flatten() {
-            if range.start() == expr_range.start() {
-                fix_end = Some(expr_range.end());
-                break;
+        // Only one argument; remove it (but preserve parentheses, if needed).
+        Ok(match parentheses {
+            Parentheses::Remove => Edit::deletion(arguments.start(), arguments.end()),
+            Parentheses::Preserve => {
+                Edit::replacement("()".to_string(), arguments.start(), arguments.end())
             }
-            if tok.is_comma() {
-                fix_start = Some(range.start());
-            }
-        }
-    }
-
-    match (fix_start, fix_end) {
-        (Some(start), Some(end)) => Ok(Edit::deletion(start, end)),
-        _ => {
-            bail!("No fix could be constructed")
-        }
+        })
     }
 }
 
@@ -297,11 +291,11 @@ fn next_stmt_break(semicolon: TextSize, locator: &Locator) -> TextSize {
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
+
     use ruff_python_ast::Ranged;
     use ruff_python_parser::parse_suite;
-    use ruff_text_size::TextSize;
-
     use ruff_source_file::Locator;
+    use ruff_text_size::TextSize;
 
     use crate::autofix::edits::{next_stmt_break, trailing_semicolon};
 

@@ -426,7 +426,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 pyupgrade::rules::super_call_with_parameters(checker, expr, func, args);
             }
             if checker.enabled(Rule::UnnecessaryEncodeUTF8) {
-                pyupgrade::rules::unnecessary_encode_utf8(checker, expr, func, args, keywords);
+                pyupgrade::rules::unnecessary_encode_utf8(checker, call);
             }
             if checker.enabled(Rule::RedundantOpenModes) {
                 pyupgrade::rules::redundant_open_modes(checker, expr);
@@ -441,7 +441,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 pyupgrade::rules::replace_universal_newlines(checker, func, keywords);
             }
             if checker.enabled(Rule::ReplaceStdoutStderr) {
-                pyupgrade::rules::replace_stdout_stderr(checker, expr, func, args, keywords);
+                pyupgrade::rules::replace_stdout_stderr(checker, call);
             }
             if checker.enabled(Rule::OSErrorAlias) {
                 pyupgrade::rules::os_error_alias_call(checker, func);
@@ -677,7 +677,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_debugger::rules::debugger_call(checker, expr, func);
             }
             if checker.enabled(Rule::PandasUseOfInplaceArgument) {
-                pandas_vet::rules::inplace_argument(checker, expr, func, args, keywords);
+                pandas_vet::rules::inplace_argument(checker, call);
             }
             pandas_vet::rules::call(checker, func);
             if checker.enabled(Rule::PandasUseOfDotReadTable) {
