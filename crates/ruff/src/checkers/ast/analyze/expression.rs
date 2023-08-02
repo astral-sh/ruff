@@ -419,6 +419,14 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                                     }
                                 }
                             }
+
+                            if checker.enabled(Rule::BadStringFormatCharacter) {
+                                pylint::rules::bad_string_format_character::call(
+                                    checker,
+                                    val.as_str(),
+                                    location,
+                                );
+                            }
                         }
                     }
                 }
@@ -1024,6 +1032,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                         right,
                         checker.locator,
                     );
+                }
+                if checker.enabled(Rule::BadStringFormatCharacter) {
+                    pylint::rules::bad_string_format_character::percent(checker, expr);
                 }
                 if checker.enabled(Rule::BadStringFormatType) {
                     pylint::rules::bad_string_format_type(checker, expr, right);

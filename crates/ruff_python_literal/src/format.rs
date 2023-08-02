@@ -180,6 +180,7 @@ impl FormatParse for FormatType {
             Some('g') => (Some(Self::GeneralFormat(Case::Lower)), chars.as_str()),
             Some('G') => (Some(Self::GeneralFormat(Case::Upper)), chars.as_str()),
             Some('%') => (Some(Self::Percentage), chars.as_str()),
+            Some(_) => (None, chars.as_str()),
             _ => (None, text),
         }
     }
@@ -283,10 +284,20 @@ impl FormatSpec {
         let (width, text) = parse_number(text)?;
         let (grouping_option, text) = FormatGrouping::parse(text);
         let (precision, text) = parse_precision(text)?;
-        let (format_type, text) = FormatType::parse(text);
-        if !text.is_empty() {
-            return Err(FormatSpecError::InvalidFormatSpecifier);
-        }
+        let (format_type, _text) = if text.is_empty() {
+            (None, text)
+        } else {
+            // If there's any remaining text, we should yield a valid format type and consume it
+            // all.
+            let (format_type, text) = FormatType::parse(text);
+            if format_type.is_none() {
+                return Err(FormatSpecError::InvalidFormatType);
+            }
+            if !text.is_empty() {
+                return Err(FormatSpecError::InvalidFormatSpecifier);
+            }
+            (format_type, text)
+        };
 
         if zero && fill.is_none() {
             fill.replace('0');
@@ -724,6 +735,7 @@ pub enum FormatSpecError {
     DecimalDigitsTooMany,
     PrecisionTooBig,
     InvalidFormatSpecifier,
+    InvalidFormatType,
     UnspecifiedFormat(char, char),
     UnknownFormatCode(char, &'static str),
     PrecisionNotAllowed,
@@ -1274,6 +1286,10 @@ mod tests {
         assert_eq!(
             FormatSpec::parse("d "),
             Err(FormatSpecError::InvalidFormatSpecifier)
+        );
+        assert_eq!(
+            FormatSpec::parse("z"),
+            Err(FormatSpecError::InvalidFormatType)
         );
     }
 
