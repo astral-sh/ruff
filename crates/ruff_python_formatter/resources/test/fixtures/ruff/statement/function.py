@@ -231,3 +231,21 @@ def f42(
     c,
 ):
     pass
+
+
+# Check trailing commas are permitted in funcdef argument list.
+def f(a, ): pass
+def f(*args, ): pass
+def f(**kwds, ): pass
+def f(a, *args, ): pass
+def f(a, **kwds, ): pass
+def f(*args, b, ): pass
+def f(*, b, ): pass
+def f(*args, **kwds, ): pass
+def f(a, *args, b, ): pass
+def f(a, *, b, ): pass
+def f(a, *args, **kwds, ): pass
+def f(*args, b, **kwds, ): pass
+def f(*, b, **kwds, ): pass
+def f(a, *args, b, **kwds, ): pass
+def f(a, *, b, **kwds, ): pass
