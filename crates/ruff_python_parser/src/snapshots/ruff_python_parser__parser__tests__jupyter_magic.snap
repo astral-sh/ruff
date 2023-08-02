@@ -49,14 +49,14 @@ Module(
                 StmtLineMagic {
                     range: 81..88,
                     kind: Help,
-                    value: "a.foo?",
+                    value: "a.foo",
                 },
             ),
             LineMagic(
                 StmtLineMagic {
                     range: 89..100,
                     kind: Help2,
-                    value: "a.foo()??",
+                    value: "a.foo()",
                 },
             ),
             LineMagic(
