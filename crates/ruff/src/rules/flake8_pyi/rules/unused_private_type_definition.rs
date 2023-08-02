@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 use ruff_python_semantic::Scope;
 
 use crate::checkers::ast::Checker;
@@ -216,8 +216,12 @@ pub(crate) fn unused_private_protocol(
         let Some(source) = binding.source else {
             continue;
         };
-        let Stmt::ClassDef(ast::StmtClassDef { name, bases, .. }) =
-            checker.semantic().stmts[source]
+
+        let Stmt::ClassDef(ast::StmtClassDef {
+            name,
+            arguments: Some(Arguments { args: bases, .. }),
+            ..
+        }) = checker.semantic().stmts[source]
         else {
             continue;
         };
@@ -304,8 +308,11 @@ pub(crate) fn unused_private_typed_dict(
         let Some(source) = binding.source else {
             continue;
         };
-        let Stmt::ClassDef(ast::StmtClassDef { name, bases, .. }) =
-            checker.semantic().stmts[source]
+        let Stmt::ClassDef(ast::StmtClassDef {
+            name,
+            arguments: Some(Arguments { args: bases, .. }),
+            ..
+        }) = checker.semantic().stmts[source]
         else {
             continue;
         };

@@ -48,8 +48,7 @@ expression: parse_ast
                 id: "Abcd",
                 range: 59..63,
             },
-            bases: [],
-            keywords: [],
+            arguments: None,
             body: [
                 Pass(
                     StmtPass {

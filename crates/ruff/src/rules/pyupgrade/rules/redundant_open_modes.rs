@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
-use ruff_python_ast::{self as ast, Constant, Expr, Keyword, Ranged};
+use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Keyword, Ranged};
 use ruff_python_parser::{lexer, Mode};
 use ruff_text_size::TextSize;
 
@@ -119,8 +119,12 @@ fn match_open<'a>(
 ) -> Option<(Option<&'a Expr>, &'a [Keyword])> {
     let ast::ExprCall {
         func,
-        args,
-        keywords,
+        arguments:
+            Arguments {
+                args,
+                keywords,
+                range: _,
+            },
         range: _,
     } = expr.as_call_expr()?;
 

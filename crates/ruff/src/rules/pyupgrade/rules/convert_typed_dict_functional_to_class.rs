@@ -1,7 +1,7 @@
 use anyhow::{bail, Result};
 use log::debug;
 use ruff_python_ast::{
-    self as ast, Constant, Expr, ExprContext, Identifier, Keyword, Ranged, Stmt,
+    self as ast, Arguments, Constant, Expr, ExprContext, Identifier, Keyword, Ranged, Stmt,
 };
 use ruff_text_size::TextRange;
 
@@ -77,8 +77,7 @@ fn match_typed_dict_assign<'a>(
     };
     let Expr::Call(ast::ExprCall {
         func,
-        args,
-        keywords,
+        arguments: Arguments { args, keywords, .. },
         range: _,
     }) = value
     else {
@@ -90,7 +89,7 @@ fn match_typed_dict_assign<'a>(
     Some((class_name, args, keywords, func))
 }
 
-/// Generate a `Stmt::AnnAssign` representing the provided property
+/// Generate a [`Stmt::AnnAssign`] representing the provided property
 /// definition.
 fn create_property_assignment_stmt(property: &str, annotation: &Expr) -> Stmt {
     ast::StmtAnnAssign {
@@ -118,14 +117,16 @@ fn create_class_def_stmt(
     total_keyword: Option<&Keyword>,
     base_class: &Expr,
 ) -> Stmt {
-    let keywords = match total_keyword {
-        Some(keyword) => vec![keyword.clone()],
-        None => vec![],
-    };
     ast::StmtClassDef {
         name: Identifier::new(class_name.to_string(), TextRange::default()),
-        bases: vec![base_class.clone()],
-        keywords,
+        arguments: Some(Arguments {
+            args: vec![base_class.clone()],
+            keywords: match total_keyword {
+                Some(keyword) => vec![keyword.clone()],
+                None => vec![],
+            },
+            range: TextRange::default(),
+        }),
         body,
         type_params: vec![],
         decorator_list: vec![],
@@ -217,9 +218,11 @@ fn match_properties_and_total<'a>(
                 values,
                 range: _,
             }) => Ok((properties_from_dict_literal(keys, values)?, total)),
-            Expr::Call(ast::ExprCall { func, keywords, .. }) => {
-                Ok((properties_from_dict_call(func, keywords)?, total))
-            }
+            Expr::Call(ast::ExprCall {
+                func,
+                arguments: Arguments { keywords, .. },
+                ..
+            }) => Ok((properties_from_dict_call(func, keywords)?, total)),
             _ => bail!("Expected `arg` to be `Expr::Dict` or `Expr::Call`"),
         }
     } else if !keywords.is_empty() {

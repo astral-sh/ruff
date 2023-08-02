@@ -1,5 +1,5 @@
 use ruff_python_ast as ast;
-use ruff_python_ast::{Expr, Ranged};
+use ruff_python_ast::{Arguments, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -60,7 +60,12 @@ pub(crate) fn variable_name_task_id(
     };
 
     // If the value is not a call, we can't do anything.
-    let Expr::Call(ast::ExprCall { func, keywords, .. }) = value else {
+    let Expr::Call(ast::ExprCall {
+        func,
+        arguments: Arguments { keywords, .. },
+        ..
+    }) = value
+    else {
         return None;
     };
 

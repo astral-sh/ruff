@@ -340,6 +340,27 @@ impl<'a> From<&'a ast::Constant> for ComparableConstant<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ComparableArguments<'a> {
+    args: Vec<ComparableExpr<'a>>,
+    keywords: Vec<ComparableKeyword<'a>>,
+}
+
+impl<'a> From<&'a ast::Arguments> for ComparableArguments<'a> {
+    fn from(arguments: &'a ast::Arguments) -> Self {
+        Self {
+            args: arguments.args.iter().map(Into::into).collect(),
+            keywords: arguments.keywords.iter().map(Into::into).collect(),
+        }
+    }
+}
+
+impl<'a> From<&'a Box<ast::Arguments>> for ComparableArguments<'a> {
+    fn from(arguments: &'a Box<ast::Arguments>) -> Self {
+        (arguments.as_ref()).into()
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ComparableParameters<'a> {
     posonlyargs: Vec<ComparableParameterWithDefault<'a>>,
     args: Vec<ComparableParameterWithDefault<'a>>,
@@ -583,8 +604,7 @@ pub struct ExprCompare<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprCall<'a> {
     func: Box<ComparableExpr<'a>>,
-    args: Vec<ComparableExpr<'a>>,
-    keywords: Vec<ComparableKeyword<'a>>,
+    arguments: ComparableArguments<'a>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -837,13 +857,11 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
             }),
             ast::Expr::Call(ast::ExprCall {
                 func,
-                args,
-                keywords,
+                arguments,
                 range: _range,
             }) => Self::Call(ExprCall {
                 func: func.into(),
-                args: args.iter().map(Into::into).collect(),
-                keywords: keywords.iter().map(Into::into).collect(),
+                arguments: arguments.into(),
             }),
             ast::Expr::FormattedValue(ast::ExprFormattedValue {
                 value,
@@ -968,8 +986,7 @@ pub struct StmtAsyncFunctionDef<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct StmtClassDef<'a> {
     name: &'a str,
-    bases: Vec<ComparableExpr<'a>>,
-    keywords: Vec<ComparableKeyword<'a>>,
+    arguments: Option<ComparableArguments<'a>>,
     body: Vec<ComparableStmt<'a>>,
     decorator_list: Vec<ComparableDecorator<'a>>,
     type_params: Vec<ComparableTypeParam<'a>>,
@@ -1240,16 +1257,14 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
             }),
             ast::Stmt::ClassDef(ast::StmtClassDef {
                 name,
-                bases,
-                keywords,
+                arguments,
                 body,
                 decorator_list,
                 type_params,
                 range: _range,
             }) => Self::ClassDef(StmtClassDef {
                 name: name.as_str(),
-                bases: bases.iter().map(Into::into).collect(),
-                keywords: keywords.iter().map(Into::into).collect(),
+                arguments: arguments.as_ref().map(Into::into),
                 body: body.iter().map(Into::into).collect(),
                 decorator_list: decorator_list.iter().map(Into::into).collect(),
                 type_params: type_params.iter().map(Into::into).collect(),

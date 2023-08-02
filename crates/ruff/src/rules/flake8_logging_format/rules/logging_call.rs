@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Constant, Expr, Keyword, Operator, Ranged};
+use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Keyword, Operator, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_python_ast::helpers::{find_keyword, CallArguments};
@@ -108,7 +108,11 @@ fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
                 }
             }
         }
-        Expr::Call(ast::ExprCall { func, keywords, .. }) => {
+        Expr::Call(ast::ExprCall {
+            func,
+            arguments: Arguments { keywords, .. },
+            ..
+        }) => {
             if checker
                 .semantic()
                 .resolve_call_path(func)

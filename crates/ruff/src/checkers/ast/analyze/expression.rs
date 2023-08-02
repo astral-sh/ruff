@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Constant, Expr, ExprContext, Operator, Ranged};
+use ruff_python_ast::{self as ast, Arguments, Constant, Expr, ExprContext, Operator, Ranged};
 use ruff_python_literal::cformat::{CFormatError, CFormatErrorType};
 
 use ruff_diagnostics::Diagnostic;
@@ -211,11 +211,14 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                         }
                     }
                     if checker.enabled(Rule::MixedCaseVariableInClassScope) {
-                        if let ScopeKind::Class(ast::StmtClassDef { bases, .. }) =
+                        if let ScopeKind::Class(ast::StmtClassDef { arguments, .. }) =
                             &checker.semantic.scope().kind
                         {
                             pep8_naming::rules::mixed_case_variable_in_class_scope(
-                                checker, expr, id, bases,
+                                checker,
+                                expr,
+                                id,
+                                arguments.as_ref(),
                             );
                         }
                     }
@@ -323,8 +326,12 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
         Expr::Call(
             call @ ast::ExprCall {
                 func,
-                args,
-                keywords,
+                arguments:
+                    Arguments {
+                        args,
+                        keywords,
+                        range: _,
+                    },
                 range: _,
             },
         ) => {

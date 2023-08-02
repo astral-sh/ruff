@@ -1,4 +1,4 @@
-use ruff_python_ast::{Expr, ExprCall, Ranged};
+use ruff_python_ast::{Arguments, Expr, ExprCall, Ranged};
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::builders::empty_parenthesized_with_dangling_comments;
@@ -21,8 +21,12 @@ impl FormatNodeRule<ExprCall> for FormatExprCall {
         let ExprCall {
             range: _,
             func,
-            args,
-            keywords,
+            arguments:
+                Arguments {
+                    args,
+                    keywords,
+                    range: _,
+                },
         } = item;
 
         // We have a case with `f()` without any argument, which is a special case because we can

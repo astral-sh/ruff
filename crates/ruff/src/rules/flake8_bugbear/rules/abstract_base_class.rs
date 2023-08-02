@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Constant, Expr, Keyword, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Keyword, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -139,14 +139,17 @@ pub(crate) fn abstract_base_class(
     checker: &mut Checker,
     stmt: &Stmt,
     name: &str,
-    bases: &[Expr],
-    keywords: &[Keyword],
+    arguments: Option<&Arguments>,
     body: &[Stmt],
 ) {
-    if bases.len() + keywords.len() != 1 {
+    let Some(Arguments { args, keywords, .. }) = arguments else {
+        return;
+    };
+
+    if args.len() + keywords.len() != 1 {
         return;
     }
-    if !is_abc_class(bases, keywords, checker.semantic()) {
+    if !is_abc_class(args, keywords, checker.semantic()) {
         return;
     }
 

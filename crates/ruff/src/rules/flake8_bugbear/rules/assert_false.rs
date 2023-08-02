@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, ExprContext, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Ranged, Stmt};
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
@@ -53,12 +53,15 @@ fn assertion_error(msg: Option<&Expr>) -> Stmt {
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
             })),
-            args: if let Some(msg) = msg {
-                vec![msg.clone()]
-            } else {
-                vec![]
+            arguments: Arguments {
+                args: if let Some(msg) = msg {
+                    vec![msg.clone()]
+                } else {
+                    vec![]
+                },
+                keywords: vec![],
+                range: TextRange::default(),
             },
-            keywords: vec![],
             range: TextRange::default(),
         }))),
         cause: None,

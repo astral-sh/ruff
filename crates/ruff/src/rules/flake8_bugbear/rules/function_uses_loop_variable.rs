@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Comprehension, Expr, ExprContext, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Comprehension, Expr, ExprContext, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -130,8 +130,12 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
         match expr {
             Expr::Call(ast::ExprCall {
                 func,
-                args,
-                keywords,
+                arguments:
+                    Arguments {
+                        args,
+                        keywords,
+                        range: _,
+                    },
                 range: _,
             }) => {
                 match func.as_ref() {

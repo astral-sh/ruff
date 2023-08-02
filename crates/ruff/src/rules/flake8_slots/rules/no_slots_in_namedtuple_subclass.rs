@@ -1,5 +1,5 @@
 use ruff_python_ast as ast;
-use ruff_python_ast::{Expr, StmtClassDef};
+use ruff_python_ast::{Arguments, Expr, StmtClassDef};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -63,7 +63,11 @@ pub(crate) fn no_slots_in_namedtuple_subclass(
     stmt: &Stmt,
     class: &StmtClassDef,
 ) {
-    if class.bases.iter().any(|base| {
+    let Some(Arguments { args: bases, .. }) = class.arguments.as_ref() else {
+        return;
+    };
+
+    if bases.iter().any(|base| {
         let Expr::Call(ast::ExprCall { func, .. }) = base else {
             return false;
         };

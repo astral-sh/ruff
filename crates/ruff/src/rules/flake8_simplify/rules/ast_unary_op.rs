@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, CmpOp, Expr, ExprContext, Ranged, Stmt, UnaryOp};
+use ruff_python_ast::{self as ast, Arguments, CmpOp, Expr, ExprContext, Ranged, Stmt, UnaryOp};
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
@@ -286,8 +286,11 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: UnaryOp, o
             };
             let node1 = ast::ExprCall {
                 func: Box::new(node.into()),
-                args: vec![*operand.clone()],
-                keywords: vec![],
+                arguments: Arguments {
+                    args: vec![*operand.clone()],
+                    keywords: vec![],
+                    range: TextRange::default(),
+                },
                 range: TextRange::default(),
             };
             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(

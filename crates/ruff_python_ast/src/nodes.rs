@@ -158,11 +158,30 @@ impl From<StmtAsyncFunctionDef> for Stmt {
 pub struct StmtClassDef {
     pub range: TextRange,
     pub name: Identifier,
-    pub bases: Vec<Expr>,
-    pub keywords: Vec<Keyword>,
+    pub arguments: Option<Arguments>,
     pub body: Vec<Stmt>,
     pub type_params: Vec<TypeParam>,
     pub decorator_list: Vec<Decorator>,
+}
+
+impl StmtClassDef {
+    /// Return an iterator over the bases of the class.
+    pub fn bases(&self) -> impl Iterator<Item = &Expr> {
+        self.arguments
+            .as_ref()
+            .map(|arguments| &arguments.args)
+            .into_iter()
+            .flatten()
+    }
+
+    /// Return an iterator over the metaclass keywords of the class.
+    pub fn keywords(&self) -> impl Iterator<Item = &Keyword> {
+        self.arguments
+            .as_ref()
+            .map(|arguments| &arguments.keywords)
+            .into_iter()
+            .flatten()
+    }
 }
 
 impl From<StmtClassDef> for Stmt {
@@ -836,8 +855,7 @@ impl From<ExprCompare> for Expr {
 pub struct ExprCall {
     pub range: TextRange,
     pub func: Box<Expr>,
-    pub args: Vec<Expr>,
-    pub keywords: Vec<Keyword>,
+    pub arguments: Arguments,
 }
 
 impl From<ExprCall> for Expr {
@@ -2073,6 +2091,35 @@ pub struct ParameterWithDefault {
     pub default: Option<Box<Expr>>,
 }
 
+/// An AST node used to represent the arguments passed to a function call or class definition.
+///
+/// For example, given:
+/// ```python
+/// foo(1, 2, 3, bar=4, baz=5)
+/// ```
+/// The `Arguments` node would span from the left to right parentheses (inclusive), and contain
+/// the arguments and keyword arguments in the order they appear in the source code.
+///
+/// Similarly, given:
+/// ```python
+/// class Foo(Bar, baz=1, qux=2):
+///     pass
+/// ```
+/// The `Arguments` node would again span from the left to right parentheses (inclusive), and
+/// contain the `Bar` argument and the `baz` and `qux` keyword arguments in the order they
+/// appear in the source code.
+///
+/// In the context of a class definition, the Python-style AST refers to the arguments as `bases`,
+/// as they represent the "explicitly specified base classes", while the keyword arguments are
+/// typically used for `metaclass`, with any additional arguments being passed to the `metaclass`.
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Arguments {
+    pub range: TextRange,
+    pub args: Vec<Expr>,
+    pub keywords: Vec<Keyword>,
+}
+
 pub type Suite = Vec<Stmt>;
 
 impl CmpOp {
@@ -2934,6 +2981,11 @@ impl Ranged for crate::nodes::Decorator {
         self.range
     }
 }
+impl Ranged for crate::nodes::Arguments {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
 impl Ranged for crate::nodes::Parameters {
     fn range(&self) -> TextRange {
         self.range
@@ -2951,9 +3003,9 @@ mod size_assertions {
     use super::*;
     use static_assertions::assert_eq_size;
 
-    assert_eq_size!(Stmt, [u8; 168]);
+    assert_eq_size!(Stmt, [u8; 176]);
     assert_eq_size!(StmtFunctionDef, [u8; 128]);
-    assert_eq_size!(StmtClassDef, [u8; 160]);
+    assert_eq_size!(StmtClassDef, [u8; 168]);
     assert_eq_size!(StmtTry, [u8; 104]);
     assert_eq_size!(Expr, [u8; 80]);
     assert_eq_size!(Constant, [u8; 32]);

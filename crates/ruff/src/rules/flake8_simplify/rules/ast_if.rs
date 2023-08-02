@@ -1,7 +1,7 @@
 use log::error;
 use ruff_python_ast::{
-    self as ast, CmpOp, Constant, ElifElseClause, Expr, ExprContext, Identifier, Ranged, Stmt,
-    StmtIf,
+    self as ast, Arguments, CmpOp, Constant, ElifElseClause, Expr, ExprContext, Identifier, Ranged,
+    Stmt,
 };
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
@@ -314,8 +314,8 @@ fn find_last_nested_if(body: &[Stmt]) -> Option<(&Expr, &Stmt)> {
 }
 
 /// Returns the body, the range of the `if` or `elif` and whether the range is for an `if` or `elif`
-fn nested_if_body(stmt_if: &StmtIf) -> Option<(&[Stmt], TextRange, bool)> {
-    let StmtIf {
+fn nested_if_body(stmt_if: &ast::StmtIf) -> Option<(&[Stmt], TextRange, bool)> {
+    let ast::StmtIf {
         test,
         body,
         elif_else_clauses,
@@ -361,7 +361,11 @@ fn nested_if_body(stmt_if: &StmtIf) -> Option<(&[Stmt], TextRange, bool)> {
 }
 
 /// SIM102
-pub(crate) fn nested_if_statements(checker: &mut Checker, stmt_if: &StmtIf, parent: Option<&Stmt>) {
+pub(crate) fn nested_if_statements(
+    checker: &mut Checker,
+    stmt_if: &ast::StmtIf,
+    parent: Option<&Stmt>,
+) {
     let Some((body, range, is_elif)) = nested_if_body(stmt_if) else {
         return;
     };
@@ -538,8 +542,11 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
                 };
                 let node1 = ast::ExprCall {
                     func: Box::new(node.into()),
-                    args: vec![if_test.clone()],
-                    keywords: vec![],
+                    arguments: Arguments {
+                        args: vec![if_test.clone()],
+                        keywords: vec![],
+                        range: TextRange::default(),
+                    },
                     range: TextRange::default(),
                 };
                 let node2 = ast::StmtReturn {
@@ -692,7 +699,7 @@ fn body_range(branch: &IfElifBranch, locator: &Locator) -> TextRange {
 }
 
 /// SIM114
-pub(crate) fn if_with_same_arms(checker: &mut Checker, locator: &Locator, stmt_if: &StmtIf) {
+pub(crate) fn if_with_same_arms(checker: &mut Checker, locator: &Locator, stmt_if: &ast::StmtIf) {
     let mut branches_iter = if_elif_branches(stmt_if).peekable();
     while let Some(current_branch) = branches_iter.next() {
         let Some(following_branch) = branches_iter.peek() else {
@@ -731,12 +738,12 @@ pub(crate) fn if_with_same_arms(checker: &mut Checker, locator: &Locator, stmt_i
 }
 
 /// SIM116
-pub(crate) fn manual_dict_lookup(checker: &mut Checker, stmt_if: &StmtIf) {
+pub(crate) fn manual_dict_lookup(checker: &mut Checker, stmt_if: &ast::StmtIf) {
     // Throughout this rule:
     // * Each if or elif statement's test must consist of a constant equality check with the same variable.
     // * Each if or elif statement's body must consist of a single `return`.
     // * The else clause must be empty, or a single `return`.
-    let StmtIf {
+    let ast::StmtIf {
         body,
         test,
         elif_else_clauses,
@@ -842,8 +849,8 @@ pub(crate) fn manual_dict_lookup(checker: &mut Checker, stmt_if: &StmtIf) {
 }
 
 /// SIM401
-pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &StmtIf) {
-    let StmtIf {
+pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &ast::StmtIf) {
+    let ast::StmtIf {
         test,
         body,
         elif_else_clauses,
@@ -949,8 +956,11 @@ pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &StmtIf)
     };
     let node3 = ast::ExprCall {
         func: Box::new(node2.into()),
-        args: vec![node1, node],
-        keywords: vec![],
+        arguments: Arguments {
+            args: vec![node1, node],
+            keywords: vec![],
+            range: TextRange::default(),
+        },
         range: TextRange::default(),
     };
     let node4 = expected_var.clone();

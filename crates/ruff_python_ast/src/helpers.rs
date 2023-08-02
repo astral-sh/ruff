@@ -2,8 +2,8 @@ use std::borrow::Cow;
 use std::path::Path;
 
 use crate::{
-    self as ast, Constant, ExceptHandler, Expr, Keyword, MatchCase, Parameters, Pattern, Ranged,
-    Stmt, TypeParam,
+    self as ast, Arguments, Constant, ExceptHandler, Expr, Keyword, MatchCase, Parameters, Pattern,
+    Ranged, Stmt, TypeParam,
 };
 use num_traits::Zero;
 use ruff_text_size::TextRange;
@@ -50,8 +50,7 @@ where
         // Accept empty initializers.
         if let Expr::Call(ast::ExprCall {
             func,
-            args,
-            keywords,
+            arguments: Arguments { args, keywords, .. },
             range: _range,
         }) = expr
         {
@@ -237,8 +236,7 @@ where
         }) => any_over_expr(left, func) || comparators.iter().any(|expr| any_over_expr(expr, func)),
         Expr::Call(ast::ExprCall {
             func: call_func,
-            args,
-            keywords,
+            arguments: Arguments { args, keywords, .. },
             range: _range,
         }) => {
             any_over_expr(call_func, func)
@@ -396,16 +394,19 @@ where
                     .is_some_and(|value| any_over_expr(value, func))
         }
         Stmt::ClassDef(ast::StmtClassDef {
-            bases,
-            keywords,
+            arguments,
             body,
             decorator_list,
             ..
         }) => {
-            bases.iter().any(|expr| any_over_expr(expr, func))
-                || keywords
-                    .iter()
-                    .any(|keyword| any_over_expr(&keyword.value, func))
+            arguments
+                .as_ref()
+                .is_some_and(|Arguments { args, keywords, .. }| {
+                    args.iter().any(|expr| any_over_expr(expr, func))
+                        || keywords
+                            .iter()
+                            .any(|keyword| any_over_expr(&keyword.value, func))
+                })
                 || body.iter().any(|stmt| any_over_stmt(stmt, func))
                 || decorator_list
                     .iter()
@@ -640,6 +641,8 @@ pub fn is_constant_non_singleton(expr: &Expr) -> bool {
 
 /// Return the [`Keyword`] with the given name, if it's present in the list of
 /// [`Keyword`] arguments.
+///
+/// TODO(charlie): Make this an associated function on [`Arguments`].
 pub fn find_keyword<'a>(keywords: &'a [Keyword], keyword_name: &str) -> Option<&'a Keyword> {
     keywords.iter().find(|keyword| {
         let Keyword { arg, .. } = keyword;
@@ -1229,30 +1232,14 @@ impl Truthiness {
                     None
                 }
             }
-            Expr::List(ast::ExprList {
-                elts,
-                range: _range,
-                ..
-            })
-            | Expr::Set(ast::ExprSet {
-                elts,
-                range: _range,
-            })
-            | Expr::Tuple(ast::ExprTuple {
-                elts,
-                range: _range,
-                ..
-            }) => Some(!elts.is_empty()),
-            Expr::Dict(ast::ExprDict {
-                keys,
-                range: _range,
-                ..
-            }) => Some(!keys.is_empty()),
+            Expr::List(ast::ExprList { elts, .. })
+            | Expr::Set(ast::ExprSet { elts, .. })
+            | Expr::Tuple(ast::ExprTuple { elts, .. }) => Some(!elts.is_empty()),
+            Expr::Dict(ast::ExprDict { keys, .. }) => Some(!keys.is_empty()),
             Expr::Call(ast::ExprCall {
                 func,
-                args,
-                keywords,
-                range: _range,
+                arguments: Arguments { args, keywords, .. },
+                ..
             }) => {
                 if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                     if is_iterable_initializer(id.as_str(), |id| is_builtin(id)) {

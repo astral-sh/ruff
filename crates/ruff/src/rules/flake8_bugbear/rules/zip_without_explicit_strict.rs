@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, Keyword, Ranged};
+use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -68,8 +68,7 @@ pub(crate) fn zip_without_explicit_strict(
 fn is_infinite_iterator(arg: &Expr, semantic: &SemanticModel) -> bool {
     let Expr::Call(ast::ExprCall {
         func,
-        args,
-        keywords,
+        arguments: Arguments { args, keywords, .. },
         ..
     }) = &arg
     else {

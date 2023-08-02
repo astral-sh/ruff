@@ -1,7 +1,7 @@
 use std::fmt;
 
-use ruff_python_ast::Decorator;
 use ruff_python_ast::{self as ast, Expr, ParameterWithDefault, Parameters, Ranged, Stmt};
+use ruff_python_ast::{Arguments, Decorator};
 use ruff_text_size::{TextLen, TextRange};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
@@ -476,8 +476,12 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &D
     match &decorator.expression {
         Expr::Call(ast::ExprCall {
             func,
-            args,
-            keywords,
+            arguments:
+                Arguments {
+                    args,
+                    keywords,
+                    range: _,
+                },
             range: _,
         }) => {
             if checker.enabled(Rule::PytestFixtureIncorrectParenthesesStyle) {

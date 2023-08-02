@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Expr, Ranged, Stmt};
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::Diagnostic;
@@ -54,7 +54,11 @@ impl Violation for NonUniqueEnums {
 
 /// PIE796
 pub(crate) fn non_unique_enums(checker: &mut Checker, parent: &Stmt, body: &[Stmt]) {
-    let Stmt::ClassDef(ast::StmtClassDef { bases, .. }) = parent else {
+    let Stmt::ClassDef(ast::StmtClassDef {
+        arguments: Some(Arguments { args: bases, .. }),
+        ..
+    }) = parent
+    else {
         return;
     };
 

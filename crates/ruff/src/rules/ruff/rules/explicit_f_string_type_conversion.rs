@@ -2,7 +2,7 @@ use anyhow::{bail, Result};
 use libcst_native::{
     ConcatenatedString, Expression, FormattedStringContent, FormattedStringExpression,
 };
-use ruff_python_ast::{self as ast, Expr, Ranged};
+use ruff_python_ast::{self as ast, Arguments, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -80,8 +80,12 @@ pub(crate) fn explicit_f_string_type_conversion(
 
         let Expr::Call(ast::ExprCall {
             func,
-            args,
-            keywords,
+            arguments:
+                Arguments {
+                    args,
+                    keywords,
+                    range: _,
+                },
             ..
         }) = value.as_ref()
         else {

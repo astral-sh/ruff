@@ -10,23 +10,28 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 id: "Foo",
                 range: 6..9,
             },
-            bases: [
-                Name(
-                    ExprName {
-                        range: 10..11,
-                        id: "A",
-                        ctx: Load,
-                    },
-                ),
-                Name(
-                    ExprName {
-                        range: 13..14,
-                        id: "B",
-                        ctx: Load,
-                    },
-                ),
-            ],
-            keywords: [],
+            arguments: Some(
+                Arguments {
+                    range: 9..15,
+                    args: [
+                        Name(
+                            ExprName {
+                                range: 10..11,
+                                id: "A",
+                                ctx: Load,
+                            },
+                        ),
+                        Name(
+                            ExprName {
+                                range: 13..14,
+                                id: "B",
+                                ctx: Load,
+                            },
+                        ),
+                    ],
+                    keywords: [],
+                },
+            ),
             body: [
                 FunctionDef(
                     StmtFunctionDef {

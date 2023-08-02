@@ -1,6 +1,6 @@
 use std::fmt;
 
-use ruff_python_ast::{self as ast, Expr, Ranged};
+use ruff_python_ast::{self as ast, Arguments, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -76,8 +76,7 @@ impl Violation for TypeBivariance {
 pub(crate) fn type_bivariance(checker: &mut Checker, value: &Expr) {
     let Expr::Call(ast::ExprCall {
         func,
-        args,
-        keywords,
+        arguments: Arguments { args, keywords, .. },
         ..
     }) = value
     else {

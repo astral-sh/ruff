@@ -1,6 +1,6 @@
 use crate::{
-    self as ast, Alias, Comprehension, Decorator, ExceptHandler, Expr, Keyword, MatchCase, Mod,
-    Parameter, ParameterWithDefault, Parameters, Pattern, Ranged, Stmt, TypeParam,
+    self as ast, Alias, Arguments, Comprehension, Decorator, ExceptHandler, Expr, Keyword,
+    MatchCase, Mod, Parameter, ParameterWithDefault, Parameters, Pattern, Ranged, Stmt, TypeParam,
     TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
 };
 use ruff_text_size::TextRange;
@@ -90,6 +90,7 @@ pub enum AnyNode {
     PatternMatchAs(ast::PatternMatchAs),
     PatternMatchOr(ast::PatternMatchOr),
     Comprehension(Comprehension),
+    Arguments(Arguments),
     Parameters(Parameters),
     Parameter(Parameter),
     ParameterWithDefault(ParameterWithDefault),
@@ -177,6 +178,7 @@ impl AnyNode {
             | AnyNode::PatternMatchAs(_)
             | AnyNode::PatternMatchOr(_)
             | AnyNode::Comprehension(_)
+            | AnyNode::Arguments(_)
             | AnyNode::Parameters(_)
             | AnyNode::Parameter(_)
             | AnyNode::ParameterWithDefault(_)
@@ -264,6 +266,7 @@ impl AnyNode {
             | AnyNode::PatternMatchAs(_)
             | AnyNode::PatternMatchOr(_)
             | AnyNode::Comprehension(_)
+            | AnyNode::Arguments(_)
             | AnyNode::Parameters(_)
             | AnyNode::Parameter(_)
             | AnyNode::ParameterWithDefault(_)
@@ -351,6 +354,7 @@ impl AnyNode {
             | AnyNode::PatternMatchAs(_)
             | AnyNode::PatternMatchOr(_)
             | AnyNode::Comprehension(_)
+            | AnyNode::Arguments(_)
             | AnyNode::Parameters(_)
             | AnyNode::Parameter(_)
             | AnyNode::ParameterWithDefault(_)
@@ -438,6 +442,7 @@ impl AnyNode {
             | AnyNode::ExprLineMagic(_)
             | AnyNode::ExceptHandlerExceptHandler(_)
             | AnyNode::Comprehension(_)
+            | AnyNode::Arguments(_)
             | AnyNode::Parameters(_)
             | AnyNode::Parameter(_)
             | AnyNode::ParameterWithDefault(_)
@@ -525,6 +530,7 @@ impl AnyNode {
             | AnyNode::PatternMatchAs(_)
             | AnyNode::PatternMatchOr(_)
             | AnyNode::Comprehension(_)
+            | AnyNode::Arguments(_)
             | AnyNode::Parameters(_)
             | AnyNode::Parameter(_)
             | AnyNode::ParameterWithDefault(_)
@@ -631,6 +637,7 @@ impl AnyNode {
             Self::PatternMatchAs(node) => AnyNodeRef::PatternMatchAs(node),
             Self::PatternMatchOr(node) => AnyNodeRef::PatternMatchOr(node),
             Self::Comprehension(node) => AnyNodeRef::Comprehension(node),
+            Self::Arguments(node) => AnyNodeRef::Arguments(node),
             Self::Parameters(node) => AnyNodeRef::Parameters(node),
             Self::Parameter(node) => AnyNodeRef::Parameter(node),
             Self::ParameterWithDefault(node) => AnyNodeRef::ParameterWithDefault(node),
@@ -3574,6 +3581,7 @@ impl Ranged for AnyNode {
             AnyNode::PatternMatchAs(node) => node.range(),
             AnyNode::PatternMatchOr(node) => node.range(),
             AnyNode::Comprehension(node) => node.range(),
+            AnyNode::Arguments(node) => node.range(),
             AnyNode::Parameters(node) => node.range(),
             AnyNode::Parameter(node) => node.range(),
             AnyNode::ParameterWithDefault(node) => node.range(),
@@ -3661,6 +3669,7 @@ pub enum AnyNodeRef<'a> {
     PatternMatchAs(&'a ast::PatternMatchAs),
     PatternMatchOr(&'a ast::PatternMatchOr),
     Comprehension(&'a Comprehension),
+    Arguments(&'a Arguments),
     Parameters(&'a Parameters),
     Parameter(&'a Parameter),
     ParameterWithDefault(&'a ParameterWithDefault),
@@ -3747,6 +3756,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::PatternMatchAs(node) => NonNull::from(*node).cast(),
             AnyNodeRef::PatternMatchOr(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Comprehension(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::Arguments(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Parameters(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Parameter(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ParameterWithDefault(node) => NonNull::from(*node).cast(),
@@ -3839,6 +3849,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::PatternMatchAs(_) => NodeKind::PatternMatchAs,
             AnyNodeRef::PatternMatchOr(_) => NodeKind::PatternMatchOr,
             AnyNodeRef::Comprehension(_) => NodeKind::Comprehension,
+            AnyNodeRef::Arguments(_) => NodeKind::Arguments,
             AnyNodeRef::Parameters(_) => NodeKind::Parameters,
             AnyNodeRef::Parameter(_) => NodeKind::Parameter,
             AnyNodeRef::ParameterWithDefault(_) => NodeKind::ParameterWithDefault,
@@ -3926,6 +3937,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::PatternMatchAs(_)
             | AnyNodeRef::PatternMatchOr(_)
             | AnyNodeRef::Comprehension(_)
+            | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Parameters(_)
             | AnyNodeRef::Parameter(_)
             | AnyNodeRef::ParameterWithDefault(_)
@@ -4013,6 +4025,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::PatternMatchAs(_)
             | AnyNodeRef::PatternMatchOr(_)
             | AnyNodeRef::Comprehension(_)
+            | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Parameters(_)
             | AnyNodeRef::Parameter(_)
             | AnyNodeRef::ParameterWithDefault(_)
@@ -4099,6 +4112,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::PatternMatchAs(_)
             | AnyNodeRef::PatternMatchOr(_)
             | AnyNodeRef::Comprehension(_)
+            | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Parameters(_)
             | AnyNodeRef::Parameter(_)
             | AnyNodeRef::ParameterWithDefault(_)
@@ -4186,6 +4200,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprLineMagic(_)
             | AnyNodeRef::ExceptHandlerExceptHandler(_)
             | AnyNodeRef::Comprehension(_)
+            | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Parameters(_)
             | AnyNodeRef::Parameter(_)
             | AnyNodeRef::ParameterWithDefault(_)
@@ -4273,6 +4288,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::PatternMatchAs(_)
             | AnyNodeRef::PatternMatchOr(_)
             | AnyNodeRef::Comprehension(_)
+            | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Parameters(_)
             | AnyNodeRef::Parameter(_)
             | AnyNodeRef::ParameterWithDefault(_)
@@ -4985,6 +5001,7 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::PatternMatchAs(node) => node.range(),
             AnyNodeRef::PatternMatchOr(node) => node.range(),
             AnyNodeRef::Comprehension(node) => node.range(),
+            AnyNodeRef::Arguments(node) => node.range(),
             AnyNodeRef::Parameters(node) => node.range(),
             AnyNodeRef::Parameter(node) => node.range(),
             AnyNodeRef::ParameterWithDefault(node) => node.range(),
@@ -5075,6 +5092,7 @@ pub enum NodeKind {
     PatternMatchOr,
     TypeIgnoreTypeIgnore,
     Comprehension,
+    Arguments,
     Parameters,
     Parameter,
     ParameterWithDefault,

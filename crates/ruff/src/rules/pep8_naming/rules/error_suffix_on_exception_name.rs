@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -45,10 +45,26 @@ impl Violation for ErrorSuffixOnExceptionName {
 /// N818
 pub(crate) fn error_suffix_on_exception_name(
     class_def: &Stmt,
-    bases: &[Expr],
+    arguments: Option<&Arguments>,
     name: &str,
     ignore_names: &[IdentifierPattern],
 ) -> Option<Diagnostic> {
+    if name.ends_with("Error") {
+        return None;
+    }
+
+    if !arguments.is_some_and(|arguments| {
+        arguments.args.iter().any(|base| {
+            if let Expr::Name(ast::ExprName { id, .. }) = &base {
+                id == "Exception" || id.ends_with("Error")
+            } else {
+                false
+            }
+        })
+    }) {
+        return None;
+    }
+
     if ignore_names
         .iter()
         .any(|ignore_name| ignore_name.matches(name))
@@ -56,19 +72,6 @@ pub(crate) fn error_suffix_on_exception_name(
         return None;
     }
 
-    if !bases.iter().any(|base| {
-        if let Expr::Name(ast::ExprName { id, .. }) = &base {
-            id == "Exception" || id.ends_with("Error")
-        } else {
-            false
-        }
-    }) {
-        return None;
-    }
-
-    if name.ends_with("Error") {
-        return None;
-    }
     Some(Diagnostic::new(
         ErrorSuffixOnExceptionName {
             name: name.to_string(),

@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use ruff_python_ast::{self as ast, Constant, Expr, Keyword, Ranged};
+use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Keyword, Ranged};
 use ruff_python_literal::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
@@ -65,7 +65,11 @@ impl<'a> FormatSummaryValues<'a> {
     fn try_from_expr(expr: &'a Expr, locator: &'a Locator) -> Option<Self> {
         let mut extracted_args: Vec<&Expr> = Vec::new();
         let mut extracted_kwargs: FxHashMap<&str, &Expr> = FxHashMap::default();
-        if let Expr::Call(ast::ExprCall { args, keywords, .. }) = expr {
+        if let Expr::Call(ast::ExprCall {
+            arguments: Arguments { args, keywords, .. },
+            ..
+        }) = expr
+        {
             for arg in args {
                 if contains_invalids(locator.slice(arg.range()))
                     || locator.contains_line_break(arg.range())

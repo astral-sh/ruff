@@ -216,18 +216,21 @@ Module(
                                     ctx: Load,
                                 },
                             ),
-                            args: [
-                                Constant(
-                                    ExprConstant {
-                                        range: 716..717,
-                                        value: Int(
-                                            5,
-                                        ),
-                                        kind: None,
-                                    },
-                                ),
-                            ],
-                            keywords: [],
+                            arguments: Arguments {
+                                range: 715..718,
+                                args: [
+                                    Constant(
+                                        ExprConstant {
+                                            range: 716..717,
+                                            value: Int(
+                                                5,
+                                            ),
+                                            kind: None,
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
                         },
                     ),
                     body: [

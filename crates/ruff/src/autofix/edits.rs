@@ -74,6 +74,9 @@ pub(crate) fn remove_unused_imports<'a>(
 ///
 /// Supports the removal of parentheses when this is the only (kw)arg left.
 /// For this behavior, set `remove_parentheses` to `true`.
+///
+/// TODO(charlie): Migrate this signature to take [`Arguments`] rather than
+/// separate args and keywords.
 pub(crate) fn remove_argument(
     locator: &Locator,
     call_at: TextSize,
