@@ -1,10 +1,9 @@
 use num_traits::ToPrimitive;
-use ruff_python_ast::{self as ast, Constant, Expr, Keyword, Operator, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::CallPath;
-use ruff_python_ast::helpers::CallArguments;
+use ruff_python_ast::{self as ast, Constant, Expr, Operator, Ranged};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
@@ -48,19 +47,13 @@ impl Violation for BadFilePermissions {
 }
 
 /// S103
-pub(crate) fn bad_file_permissions(
-    checker: &mut Checker,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
-) {
+pub(crate) fn bad_file_permissions(checker: &mut Checker, call: &ast::ExprCall) {
     if checker
         .semantic()
-        .resolve_call_path(func)
+        .resolve_call_path(&call.func)
         .is_some_and(|call_path| matches!(call_path.as_slice(), ["os", "chmod"]))
     {
-        let call_args = CallArguments::new(args, keywords);
-        if let Some(mode_arg) = call_args.argument("mode", 1) {
+        if let Some(mode_arg) = call.arguments.find_argument("mode", 1) {
             if let Some(int_value) = int_value(mode_arg, checker.semantic()) {
                 if (int_value & WRITE_WORLD > 0) || (int_value & EXECUTE_GROUP > 0) {
                     checker.diagnostics.push(Diagnostic::new(

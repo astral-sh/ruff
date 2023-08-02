@@ -2121,6 +2121,45 @@ pub struct Arguments {
     pub keywords: Vec<Keyword>,
 }
 
+impl Arguments {
+    /// Return the number of positional and keyword arguments.
+    pub fn len(&self) -> usize {
+        self.args.len() + self.keywords.len()
+    }
+
+    /// Return `true` if there are no positional or keyword arguments.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Return the [`Keyword`] with the given name, or `None` if no such [`Keyword`] exists.
+    pub fn find_keyword(&self, keyword_name: &str) -> Option<&Keyword> {
+        self.keywords.iter().find(|keyword| {
+            let Keyword { arg, .. } = keyword;
+            arg.as_ref().is_some_and(|arg| arg == keyword_name)
+        })
+    }
+
+    /// Return the argument with the given name or at the given position, or `None` if no such
+    /// argument exists. Used to retrieve arguments that can be provided _either_ as keyword or
+    /// positional arguments.
+    pub fn find_argument(&self, name: &str, position: usize) -> Option<&Expr> {
+        self.keywords
+            .iter()
+            .find(|keyword| {
+                let Keyword { arg, .. } = keyword;
+                arg.as_ref().is_some_and(|arg| arg == name)
+            })
+            .map(|keyword| &keyword.value)
+            .or_else(|| {
+                self.args
+                    .iter()
+                    .take_while(|expr| !expr.is_starred_expr())
+                    .nth(position)
+            })
+    }
+}
+
 /// An AST node used to represent a sequence of type parameters.
 ///
 /// For example, given:
