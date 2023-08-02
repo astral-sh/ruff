@@ -64,6 +64,8 @@ pub enum Tok {
     /// Token value for a dedent.
     Dedent,
     EndOfFile,
+    /// Token value for a question mark `?`.
+    Question,
     /// Token value for a left parenthesis `(`.
     Lpar,
     /// Token value for a right parenthesis `)`.
@@ -240,6 +242,7 @@ impl fmt::Display for Tok {
             StartModule => f.write_str("StartProgram"),
             StartExpression => f.write_str("StartExpression"),
             EndOfFile => f.write_str("EOF"),
+            Question => f.write_str("'?'"),
             Lpar => f.write_str("'('"),
             Rpar => f.write_str("')'"),
             Lsqb => f.write_str("'['"),
@@ -461,6 +464,8 @@ pub enum TokenKind {
     /// Token value for a dedent.
     Dedent,
     EndOfFile,
+    /// Token value for a question mark `?`.
+    Question,
     /// Token value for a left parenthesis `(`.
     Lpar,
     /// Token value for a right parenthesis `)`.
@@ -783,6 +788,7 @@ impl TokenKind {
             Tok::Indent => TokenKind::Indent,
             Tok::Dedent => TokenKind::Dedent,
             Tok::EndOfFile => TokenKind::EndOfFile,
+            Tok::Question => TokenKind::Question,
             Tok::Lpar => TokenKind::Lpar,
             Tok::Rpar => TokenKind::Rpar,
             Tok::Lsqb => TokenKind::Lsqb,

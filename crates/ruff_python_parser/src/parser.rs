@@ -1180,6 +1180,15 @@ foo = %foo \
 
 % foo
 foo = %foo  # comment
+
+# Help end line magics
+foo?
+foo.bar??
+foo.bar.baz?
+foo[0]??
+foo[0][1]?
+foo.bar[0].baz[1]??
+foo.bar[0].baz[2].egg??
 "#
             .trim(),
             Mode::Jupyter,
