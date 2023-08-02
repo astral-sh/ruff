@@ -2880,6 +2880,34 @@ impl AstNode for Decorator {
         AnyNode::from(self)
     }
 }
+impl AstNode for ast::TypeParams {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::TypeParams(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::TypeParams(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
 impl AstNode for ast::TypeParamTypeVar {
     fn cast(kind: AnyNode) -> Option<Self>
     where
@@ -3529,6 +3557,11 @@ impl From<MatchCase> for AnyNode {
 impl From<Decorator> for AnyNode {
     fn from(node: Decorator) -> Self {
         AnyNode::Decorator(node)
+    }
+}
+impl From<TypeParams> for AnyNode {
+    fn from(node: TypeParams) -> Self {
+        AnyNode::TypeParams(node)
     }
 }
 impl From<TypeParamTypeVar> for AnyNode {
@@ -4804,6 +4837,11 @@ impl<'a> From<&'a Decorator> for AnyNodeRef<'a> {
     }
 }
 
+impl<'a> From<&'a ast::TypeParams> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::TypeParams) -> Self {
+        AnyNodeRef::TypeParams(node)
+    }
+}
 impl<'a> From<&'a TypeParamTypeVar> for AnyNodeRef<'a> {
     fn from(node: &'a TypeParamTypeVar) -> Self {
         AnyNodeRef::TypeParamTypeVar(node)

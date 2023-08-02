@@ -1,10 +1,11 @@
-use ruff_formatter::write;
+use ruff_formatter::{write, Buffer};
 use ruff_python_ast::{Ranged, StmtClassDef};
 use ruff_python_trivia::{lines_after, skip_trailing_trivia};
 
 use crate::comments::{leading_comments, trailing_comments};
 use crate::prelude::*;
 use crate::statement::suite::SuiteKind;
+use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatStmtClassDef;
@@ -16,7 +17,7 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
             name,
             arguments,
             body,
-            type_params: _,
+            type_params,
             decorator_list,
         } = item;
 
@@ -57,6 +58,10 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
         }
 
         write!(f, [text("class"), space(), name.format()])?;
+
+        if let Some(type_params) = type_params.as_deref() {
+            write!(f, [type_params.format()])?;
+        }
 
         if let Some(arguments) = arguments.as_deref() {
             // Drop empty parentheses, e.g., in:

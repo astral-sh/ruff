@@ -80,15 +80,13 @@ impl FormatRule<AnyFunctionDefinition<'_>, PyFormatContext<'_>> for FormatAnyFun
 
         let name = item.name();
 
-        write!(
-            f,
-            [
-                text("def"),
-                space(),
-                name.format(),
-                item.arguments().format(),
-            ]
-        )?;
+        write!(f, [text("def"), space(), name.format()])?;
+
+        if let Some(type_params) = item.type_params() {
+            write!(f, [type_params.format()])?;
+        }
+
+        write!(f, [item.arguments().format()])?;
 
         if let Some(return_annotation) = item.returns() {
             write!(
