@@ -77,12 +77,10 @@ pub(crate) fn builtin_attribute_shadowing(
     if shadows_builtin(name, &checker.settings.flake8_builtins.builtins_ignorelist) {
         // Ignore shadowing within `TypedDict` definitions, since these are only accessible through
         // subscripting and not through attribute access.
-        if class_def.arguments.as_ref().is_some_and(|arguments| {
-            arguments
-                .args
-                .iter()
-                .any(|base| checker.semantic().match_typing_expr(base, "TypedDict"))
-        }) {
+        if class_def
+            .bases()
+            .any(|base| checker.semantic().match_typing_expr(base, "TypedDict"))
+        {
             return;
         }
 

@@ -164,6 +164,26 @@ pub struct StmtClassDef {
     pub decorator_list: Vec<Decorator>,
 }
 
+impl StmtClassDef {
+    /// Return an iterator over the bases of the class.
+    pub fn bases(&self) -> impl Iterator<Item = &Expr> {
+        self.arguments
+            .as_ref()
+            .map(|arguments| &arguments.args)
+            .into_iter()
+            .flatten()
+    }
+
+    /// Return an iterator over the metaclass keywords of the class.
+    pub fn keywords(&self) -> impl Iterator<Item = &Keyword> {
+        self.arguments
+            .as_ref()
+            .map(|arguments| &arguments.keywords)
+            .into_iter()
+            .flatten()
+    }
+}
+
 impl From<StmtClassDef> for Stmt {
     fn from(payload: StmtClassDef) -> Self {
         Stmt::ClassDef(payload)
