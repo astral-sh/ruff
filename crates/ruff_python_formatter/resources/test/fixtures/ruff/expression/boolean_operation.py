@@ -62,3 +62,14 @@ if (
     and [dddddddddddddd, eeeeeeeeee, fffffffffffffff]
 ):
     pass
+
+# Regression test for https://github.com/astral-sh/ruff/issues/6068
+if not (
+    isinstance(aaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbb) or numpy and isinstance(ccccccccccc, dddddd)
+):
+    pass
+
+if not (
+    isinstance(aaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbb) and numpy or isinstance(ccccccccccc, dddddd)
+):
+    pass

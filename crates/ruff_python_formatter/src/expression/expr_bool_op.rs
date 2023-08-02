@@ -6,17 +6,24 @@ use crate::expression::parentheses::{
 use crate::prelude::*;
 use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{BoolOp, ExprBoolOp};
+use ruff_python_ast::{BoolOp, Expr, ExprBoolOp};
 
 #[derive(Default)]
 pub struct FormatExprBoolOp {
     parentheses: Option<Parentheses>,
+    wrap: Option<bool>,
+}
+
+pub struct BoolOpLayout {
+    pub(crate) parentheses: Option<Parentheses>,
+    pub(crate) wrap: Option<bool>,
 }
 
 impl FormatRuleWithOptions<ExprBoolOp, PyFormatContext<'_>> for FormatExprBoolOp {
-    type Options = Option<Parentheses>;
+    type Options = BoolOpLayout;
     fn with_options(mut self, options: Self::Options) -> Self {
-        self.parentheses = options;
+        self.parentheses = options.parentheses;
+        self.wrap = options.wrap;
         self
     }
 }
@@ -37,6 +44,9 @@ impl FormatNodeRule<ExprBoolOp> for FormatExprBoolOp {
                 return Ok(());
             };
 
+            if self.wrap.is_some_and(|value| value) {
+                write!(f, [hard_line_break()])?;
+            }
             write!(f, [in_parentheses_only_group(&first.format())])?;
 
             for value in values {
@@ -51,14 +61,19 @@ impl FormatNodeRule<ExprBoolOp> for FormatExprBoolOp {
                     )?;
                 }
 
-                write!(
-                    f,
-                    [
-                        op.format(),
-                        space(),
-                        in_parentheses_only_group(&value.format())
-                    ]
-                )?;
+                write!(f, [op.format(), space(),])?;
+
+                if let Expr::BoolOp(value) = value {
+                    write!(
+                        f,
+                        [value.format().with_options(BoolOpLayout {
+                            parentheses: None,
+                            wrap: Some(true),
+                        })]
+                    )?;
+                } else {
+                    write!(f, [value.format()])?;
+                }
             }
 
             Ok(())
