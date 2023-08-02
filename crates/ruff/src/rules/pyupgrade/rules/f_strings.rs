@@ -104,16 +104,17 @@ impl<'a> FormatSummaryValues<'a> {
     }
 
     fn arg_auto(&mut self) -> Option<&Expr> {
+        let idx = self.auto_index;
         self.auto_index += 1;
-        self.arg_positional(self.auto_index - 1)
+        self.arg_positional(idx)
     }
 
-    fn arg_positional(&mut self, index: usize) -> Option<&Expr> {
-        self.args.get(index).map(|x| *x)
+    fn arg_positional(&self, index: usize) -> Option<&Expr> {
+        self.args.get(index).map(|a| *a)
     }
 
-    fn arg_keyword(&mut self, key: &str) -> Option<&Expr> {
-        self.kwargs.get(key).map(|x| *x)
+    fn arg_keyword(&self, key: &str) -> Option<&Expr> {
+        self.kwargs.get(key).map(|a| *a)
     }
 }
 
