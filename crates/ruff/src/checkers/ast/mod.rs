@@ -233,11 +233,6 @@ impl<'a> Checker<'a> {
         &self.semantic
     }
 
-    /// Return `true` if the current file is a stub file (`.pyi`).
-    pub(crate) const fn is_stub(&self) -> bool {
-        self.is_stub
-    }
-
     /// The [`Path`] to the file under analysis.
     pub(crate) const fn path(&self) -> &'a Path {
         self.path
