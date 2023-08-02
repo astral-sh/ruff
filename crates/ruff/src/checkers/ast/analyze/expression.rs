@@ -528,19 +528,19 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_bandit::rules::exec_used(checker, func);
             }
             if checker.enabled(Rule::BadFilePermissions) {
-                flake8_bandit::rules::bad_file_permissions(checker, func, args, keywords);
+                flake8_bandit::rules::bad_file_permissions(checker, call);
             }
             if checker.enabled(Rule::RequestWithNoCertValidation) {
                 flake8_bandit::rules::request_with_no_cert_validation(checker, func, keywords);
             }
             if checker.enabled(Rule::UnsafeYAMLLoad) {
-                flake8_bandit::rules::unsafe_yaml_load(checker, func, args, keywords);
+                flake8_bandit::rules::unsafe_yaml_load(checker, call);
             }
             if checker.enabled(Rule::SnmpInsecureVersion) {
                 flake8_bandit::rules::snmp_insecure_version(checker, func, keywords);
             }
             if checker.enabled(Rule::SnmpWeakCryptography) {
-                flake8_bandit::rules::snmp_weak_cryptography(checker, func, args, keywords);
+                flake8_bandit::rules::snmp_weak_cryptography(checker, call);
             }
             if checker.enabled(Rule::Jinja2AutoescapeFalse) {
                 flake8_bandit::rules::jinja2_autoescape_false(checker, func, keywords);
@@ -552,9 +552,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_bandit::rules::hardcoded_sql_expression(checker, expr);
             }
             if checker.enabled(Rule::HashlibInsecureHashFunction) {
-                flake8_bandit::rules::hashlib_insecure_hash_functions(
-                    checker, func, args, keywords,
-                );
+                flake8_bandit::rules::hashlib_insecure_hash_functions(checker, call);
             }
             if checker.enabled(Rule::RequestWithoutTimeout) {
                 flake8_bandit::rules::request_without_timeout(checker, func, keywords);
@@ -765,9 +763,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 pylint::rules::nested_min_max(checker, expr, func, args, keywords);
             }
             if checker.enabled(Rule::PytestPatchWithLambda) {
-                if let Some(diagnostic) =
-                    flake8_pytest_style::rules::patch_with_lambda(func, args, keywords)
-                {
+                if let Some(diagnostic) = flake8_pytest_style::rules::patch_with_lambda(call) {
                     checker.diagnostics.push(diagnostic);
                 }
             }
@@ -788,7 +784,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_pytest_style::rules::raises_call(checker, func, args, keywords);
             }
             if checker.enabled(Rule::PytestFailWithoutMessage) {
-                flake8_pytest_style::rules::fail_call(checker, func, args, keywords);
+                flake8_pytest_style::rules::fail_call(checker, call);
             }
             if checker.enabled(Rule::PairwiseOverZipped) {
                 if checker.settings.target_version >= PythonVersion::Py310 {
@@ -874,10 +870,10 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 Rule::LoggingExcInfo,
                 Rule::LoggingRedundantExcInfo,
             ]) {
-                flake8_logging_format::rules::logging_call(checker, func, args, keywords);
+                flake8_logging_format::rules::logging_call(checker, call);
             }
             if checker.any_enabled(&[Rule::LoggingTooFewArgs, Rule::LoggingTooManyArgs]) {
-                pylint::rules::logging_call(checker, func, args, keywords);
+                pylint::rules::logging_call(checker, call);
             }
             if checker.enabled(Rule::DjangoLocalsInRenderFunction) {
                 flake8_django::rules::locals_in_render_function(checker, func, args, keywords);

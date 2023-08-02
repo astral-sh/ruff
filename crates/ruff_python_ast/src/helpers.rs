@@ -1034,64 +1034,6 @@ pub fn is_docstring_stmt(stmt: &Stmt) -> bool {
     }
 }
 
-/// A representation of a function call's positional and keyword arguments that ignores
-/// starred expressions.
-#[derive(Default)]
-pub struct CallArguments<'a> {
-    args: &'a [Expr],
-    keywords: &'a [Keyword],
-}
-
-impl<'a> CallArguments<'a> {
-    pub fn new(args: &'a [Expr], keywords: &'a [Keyword]) -> Self {
-        Self { args, keywords }
-    }
-
-    /// Get the argument with the given name or position, or `None` if no such
-    /// argument exists.
-    pub fn argument(&self, name: &str, position: usize) -> Option<&'a Expr> {
-        self.keywords
-            .iter()
-            .find(|keyword| {
-                let Keyword { arg, .. } = keyword;
-                arg.as_ref().is_some_and(|arg| arg == name)
-            })
-            .map(|keyword| &keyword.value)
-            .or_else(|| {
-                self.args
-                    .iter()
-                    .take_while(|expr| !expr.is_starred_expr())
-                    .nth(position)
-            })
-    }
-
-    /// Return the number of arguments.
-    pub fn len(&self) -> usize {
-        self.args.len() + self.keywords.len()
-    }
-
-    /// Return `true` if there are no arguments.
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    /// Return the number of positional arguments.
-    pub fn num_args(&self) -> usize {
-        self.args
-            .iter()
-            .take_while(|expr| !expr.is_starred_expr())
-            .count()
-    }
-
-    /// Return the number of keyword arguments.
-    pub fn num_kwargs(&self) -> usize {
-        self.keywords
-            .iter()
-            .filter(|keyword| keyword.arg.is_some())
-            .count()
-    }
-}
-
 /// Check if a node is part of a conditional branch.
 pub fn on_conditional_branch<'a>(parents: &mut impl Iterator<Item = &'a Stmt>) -> bool {
     parents.any(|parent| {
