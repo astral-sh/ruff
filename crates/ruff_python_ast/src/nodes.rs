@@ -2376,6 +2376,10 @@ impl MagicKind {
         };
         len.into()
     }
+
+    pub const fn is_help(self) -> bool {
+        matches!(self, MagicKind::Help | MagicKind::Help2)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

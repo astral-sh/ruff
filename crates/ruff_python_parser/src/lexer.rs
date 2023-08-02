@@ -429,6 +429,31 @@ impl<'source> Lexer<'source> {
                     value.push('\\');
                 }
                 '\n' | '\r' | EOF_CHAR => {
+                    let mut chars = value.chars().rev();
+                    // Check if it's actually a help magic command. The help magic
+                    // command takes priority over any other magic command.
+                    let kind = match [chars.next(), chars.next(), chars.next()] {
+                        [Some('?'), Some('?'), Some(c)] if c != '?' && !c.is_whitespace() => {
+                            if kind.is_help() {
+                                value = value.trim_start_matches([' ', '?']).to_string();
+                            } else {
+                                value.insert_str(0, &kind.to_string());
+                            }
+                            value.pop(); // '?'
+                            value.pop(); // '?'
+                            MagicKind::Help2
+                        }
+                        [Some('?'), Some(c), Some(_) | None] if c != '?' && !c.is_whitespace() => {
+                            if kind.is_help() {
+                                value = value.trim_start_matches([' ', '?']).to_string();
+                            } else {
+                                value.insert_str(0, &kind.to_string());
+                            }
+                            value.pop(); // '?'
+                            MagicKind::Help
+                        }
+                        _ => kind,
+                    };
                     return Tok::MagicCommand { kind, value };
                 }
                 c => {
@@ -1355,6 +1380,105 @@ mod tests {
             ]
         );
     }
+
+    #[test]
+    fn test_jupyter_magic_help_end() {
+        let source = r"
+?foo?
+??   foo?
+??   foo  ?
+?foo??
+??foo??
+???foo?
+???foo??
+??foo???
+???foo???
+?? \
+    foo?
+?? \
+?
+%foo?
+%foo??
+%%foo???"
+            .trim();
+        let tokens = lex_jupyter_source(source);
+        assert_eq!(
+            tokens,
+            [
+                Tok::MagicCommand {
+                    value: "foo".to_string(),
+                    kind: MagicKind::Help,
+                },
+                Tok::Newline,
+                Tok::MagicCommand {
+                    value: "foo".to_string(),
+                    kind: MagicKind::Help,
+                },
+                Tok::Newline,
+                Tok::MagicCommand {
+                    value: "   foo  ?".to_string(),
+                    kind: MagicKind::Help2,
+                },
+                Tok::Newline,
+                Tok::MagicCommand {
+                    value: "foo".to_string(),
+                    kind: MagicKind::Help2,
+                },
+                Tok::Newline,
+                Tok::MagicCommand {
+                    value: "foo".to_string(),
+                    kind: MagicKind::Help2,
+                },
+                Tok::Newline,
+                Tok::MagicCommand {
+                    value: "foo".to_string(),
+                    kind: MagicKind::Help,
+                },
+                Tok::Newline,
+                Tok::MagicCommand {
+                    value: "foo".to_string(),
+                    kind: MagicKind::Help2,
+                },
+                Tok::Newline,
+                Tok::MagicCommand {
+                    value: "foo???".to_string(),
+                    kind: MagicKind::Help2,
+                },
+                Tok::Newline,
+                Tok::MagicCommand {
+                    value: "?foo???".to_string(),
+                    kind: MagicKind::Help2,
+                },
+                Tok::Newline,
+                Tok::MagicCommand {
+                    value: "foo".to_string(),
+                    kind: MagicKind::Help,
+                },
+                Tok::Newline,
+                Tok::MagicCommand {
+                    value: " ?".to_string(),
+                    kind: MagicKind::Help2,
+                },
+                Tok::Newline,
+                Tok::MagicCommand {
+                    value: "%foo".to_string(),
+                    kind: MagicKind::Help,
+                },
+                Tok::Newline,
+                Tok::MagicCommand {
+                    value: "%foo".to_string(),
+                    kind: MagicKind::Help2,
+                },
+                Tok::Newline,
+                Tok::MagicCommand {
+                    value: "foo???".to_string(),
+                    kind: MagicKind::Magic2,
+                },
+                Tok::Newline,
+            ]
+        );
+    }
+
     #[test]
     fn test_jupyter_magic_indentation() {
         let source = r"
