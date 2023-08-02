@@ -24,7 +24,7 @@ use super::helpers::{
 };
 
 /// ## What it does
-/// Checks for parameter-free `@pytest.fixture()` decorators with or without
+/// Checks for argument-free `@pytest.fixture()` decorators with or without
 /// parentheses, depending on the `flake8-pytest-style.fixture-parentheses`
 /// setting.
 ///
@@ -331,11 +331,11 @@ impl AlwaysAutofixableViolation for PytestUselessYieldFixture {
 }
 
 /// ## What it does
-/// Checks for `pytest.mark.usefixtures` applied to fixtures.
+/// Checks for `pytest.mark.usefixtures` decorators applied to `pytest`
+/// fixtures.
 ///
 /// ## Why is this bad?
-/// `pytest.mark.usefixtures` has no effect on fixtures.
-///
+/// The `pytest.mark.usefixtures` decorator has no effect on `pytest` fixtures.
 ///
 /// ## Example
 /// ```python
