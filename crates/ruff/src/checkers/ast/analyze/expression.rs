@@ -372,6 +372,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                             let location = expr.range();
                             match pyflakes::format::FormatSummary::try_from(val.as_ref()) {
                                 Err(e) => {
+                                    println!("error: {}", e);
                                     if checker.enabled(Rule::StringDotFormatInvalidFormat) {
                                         checker.diagnostics.push(Diagnostic::new(
                                             pyflakes::rules::StringDotFormatInvalidFormat {
@@ -418,6 +419,14 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                                         );
                                     }
                                 }
+                            }
+
+                            if checker.enabled(Rule::BadStringFormatCharacter) {
+                                pylint::rules::bad_string_format_character::call(
+                                    checker,
+                                    val.as_str(),
+                                    location,
+                                );
                             }
                         }
                     }
@@ -1025,8 +1034,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                         checker.locator,
                     );
                 }
-                if checker.enabled(Rule::BadFormatCharacter) {
-                    pylint::rules::bad_format_character(checker, expr);
+                if checker.enabled(Rule::BadStringFormatCharacter) {
+                    pylint::rules::bad_string_format_character::percent(checker, expr);
                 }
                 if checker.enabled(Rule::BadStringFormatType) {
                     pylint::rules::bad_string_format_type(checker, expr, right);
@@ -1232,9 +1241,6 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 {
                     checker.diagnostics.push(diagnostic);
                 }
-            }
-            if checker.enabled(Rule::BadFormatCharacter) {
-                pylint::rules::bad_format_character(checker, expr);
             }
             if checker.enabled(Rule::HardcodedTempFile) {
                 if let Some(diagnostic) = flake8_bandit::rules::hardcoded_tmp_directory(
