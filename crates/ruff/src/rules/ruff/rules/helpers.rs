@@ -1,6 +1,6 @@
 use ruff_python_ast::{self as ast, Expr};
 
-use ruff_python_ast::helpers::map_callable;
+use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_semantic::{BindingKind, SemanticModel};
 
 /// Return `true` if the given [`Expr`] is a special class attribute, like `__slots__`.
@@ -28,18 +28,16 @@ pub(super) fn is_dataclass_field(func: &Expr, semantic: &SemanticModel) -> bool 
 
 /// Returns `true` if the given [`Expr`] is a `typing.ClassVar` annotation.
 pub(super) fn is_class_var_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
-    let Expr::Subscript(ast::ExprSubscript { value, .. }) = &annotation else {
-        return false;
-    };
-    semantic.match_typing_expr(value, "ClassVar")
+    // ClassVar can be used either with a subscript `ClassVar[...]` or without (the type is
+    // inferred).
+    semantic.match_typing_expr(map_subscript(annotation), "ClassVar")
 }
 
 /// Returns `true` if the given [`Expr`] is a `typing.Final` annotation.
 pub(super) fn is_final_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
-    let Expr::Subscript(ast::ExprSubscript { value, .. }) = &annotation else {
-        return false;
-    };
-    semantic.match_typing_expr(value, "Final")
+    // Final can be used either with a subscript `Final[...]` or without (the type is
+    // inferred).
+    semantic.match_typing_expr(map_subscript(annotation), "Final")
 }
 
 /// Returns `true` if the given class is a dataclass.
