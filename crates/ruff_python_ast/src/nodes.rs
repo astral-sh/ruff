@@ -5,6 +5,7 @@ use num_bigint::BigInt;
 use ruff_text_size::{TextRange, TextSize};
 use std::fmt;
 use std::fmt::Debug;
+use std::ops::Deref;
 
 /// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
@@ -121,12 +122,12 @@ impl From<StmtLineMagic> for Stmt {
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtFunctionDef {
     pub range: TextRange,
-    pub name: Identifier,
-    pub parameters: Box<Parameters>,
-    pub body: Vec<Stmt>,
     pub decorator_list: Vec<Decorator>,
+    pub name: Identifier,
+    pub type_params: Option<TypeParams>,
+    pub parameters: Box<Parameters>,
     pub returns: Option<Box<Expr>>,
-    pub type_params: Vec<TypeParam>,
+    pub body: Vec<Stmt>,
 }
 
 impl From<StmtFunctionDef> for Stmt {
@@ -139,12 +140,12 @@ impl From<StmtFunctionDef> for Stmt {
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtAsyncFunctionDef {
     pub range: TextRange,
-    pub name: Identifier,
-    pub parameters: Box<Parameters>,
-    pub body: Vec<Stmt>,
     pub decorator_list: Vec<Decorator>,
+    pub name: Identifier,
+    pub type_params: Option<TypeParams>,
+    pub parameters: Box<Parameters>,
     pub returns: Option<Box<Expr>>,
-    pub type_params: Vec<TypeParam>,
+    pub body: Vec<Stmt>,
 }
 
 impl From<StmtAsyncFunctionDef> for Stmt {
@@ -157,12 +158,31 @@ impl From<StmtAsyncFunctionDef> for Stmt {
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtClassDef {
     pub range: TextRange,
-    pub name: Identifier,
-    pub bases: Vec<Expr>,
-    pub keywords: Vec<Keyword>,
-    pub body: Vec<Stmt>,
-    pub type_params: Vec<TypeParam>,
     pub decorator_list: Vec<Decorator>,
+    pub name: Identifier,
+    pub type_params: Option<Box<TypeParams>>,
+    pub arguments: Option<Box<Arguments>>,
+    pub body: Vec<Stmt>,
+}
+
+impl StmtClassDef {
+    /// Return an iterator over the bases of the class.
+    pub fn bases(&self) -> impl Iterator<Item = &Expr> {
+        self.arguments
+            .as_ref()
+            .map(|arguments| &arguments.args)
+            .into_iter()
+            .flatten()
+    }
+
+    /// Return an iterator over the metaclass keywords of the class.
+    pub fn keywords(&self) -> impl Iterator<Item = &Keyword> {
+        self.arguments
+            .as_ref()
+            .map(|arguments| &arguments.keywords)
+            .into_iter()
+            .flatten()
+    }
 }
 
 impl From<StmtClassDef> for Stmt {
@@ -202,7 +222,7 @@ impl From<StmtDelete> for Stmt {
 pub struct StmtTypeAlias {
     pub range: TextRange,
     pub name: Box<Expr>,
-    pub type_params: Vec<TypeParam>,
+    pub type_params: Option<TypeParams>,
     pub value: Box<Expr>,
 }
 
@@ -836,8 +856,7 @@ impl From<ExprCompare> for Expr {
 pub struct ExprCall {
     pub range: TextRange,
     pub func: Box<Expr>,
-    pub args: Vec<Expr>,
-    pub keywords: Vec<Keyword>,
+    pub arguments: Arguments,
 }
 
 impl From<ExprCall> for Expr {
@@ -2061,6 +2080,32 @@ pub struct Parameters {
     pub kwarg: Option<Box<Parameter>>,
 }
 
+impl Parameters {
+    /// Returns `true` if a parameter with the given name included in this [`Parameters`].
+    pub fn includes(&self, name: &str) -> bool {
+        if self
+            .posonlyargs
+            .iter()
+            .chain(&self.args)
+            .chain(&self.kwonlyargs)
+            .any(|arg| arg.parameter.name.as_str() == name)
+        {
+            return true;
+        }
+        if let Some(arg) = &self.vararg {
+            if arg.name.as_str() == name {
+                return true;
+            }
+        }
+        if let Some(arg) = &self.kwarg {
+            if arg.name.as_str() == name {
+                return true;
+            }
+        }
+        false
+    }
+}
+
 /// An alternative type of AST `arg`. This is used for each function argument that might have a default value.
 /// Used by `Arguments` original type.
 ///
@@ -2071,6 +2116,97 @@ pub struct ParameterWithDefault {
     pub range: TextRange,
     pub parameter: Parameter,
     pub default: Option<Box<Expr>>,
+}
+
+/// An AST node used to represent the arguments passed to a function call or class definition.
+///
+/// For example, given:
+/// ```python
+/// foo(1, 2, 3, bar=4, baz=5)
+/// ```
+/// The `Arguments` node would span from the left to right parentheses (inclusive), and contain
+/// the arguments and keyword arguments in the order they appear in the source code.
+///
+/// Similarly, given:
+/// ```python
+/// class Foo(Bar, baz=1, qux=2):
+///     pass
+/// ```
+/// The `Arguments` node would again span from the left to right parentheses (inclusive), and
+/// contain the `Bar` argument and the `baz` and `qux` keyword arguments in the order they
+/// appear in the source code.
+///
+/// In the context of a class definition, the Python-style AST refers to the arguments as `bases`,
+/// as they represent the "explicitly specified base classes", while the keyword arguments are
+/// typically used for `metaclass`, with any additional arguments being passed to the `metaclass`.
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Arguments {
+    pub range: TextRange,
+    pub args: Vec<Expr>,
+    pub keywords: Vec<Keyword>,
+}
+
+impl Arguments {
+    /// Return the number of positional and keyword arguments.
+    pub fn len(&self) -> usize {
+        self.args.len() + self.keywords.len()
+    }
+
+    /// Return `true` if there are no positional or keyword arguments.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Return the [`Keyword`] with the given name, or `None` if no such [`Keyword`] exists.
+    pub fn find_keyword(&self, keyword_name: &str) -> Option<&Keyword> {
+        self.keywords.iter().find(|keyword| {
+            let Keyword { arg, .. } = keyword;
+            arg.as_ref().is_some_and(|arg| arg == keyword_name)
+        })
+    }
+
+    /// Return the argument with the given name or at the given position, or `None` if no such
+    /// argument exists. Used to retrieve arguments that can be provided _either_ as keyword or
+    /// positional arguments.
+    pub fn find_argument(&self, name: &str, position: usize) -> Option<&Expr> {
+        self.keywords
+            .iter()
+            .find(|keyword| {
+                let Keyword { arg, .. } = keyword;
+                arg.as_ref().is_some_and(|arg| arg == name)
+            })
+            .map(|keyword| &keyword.value)
+            .or_else(|| {
+                self.args
+                    .iter()
+                    .take_while(|expr| !expr.is_starred_expr())
+                    .nth(position)
+            })
+    }
+}
+
+/// An AST node used to represent a sequence of type parameters.
+///
+/// For example, given:
+/// ```python
+/// class C[T, U, V]: ...
+/// ```
+/// The `TypeParams` node would span from the left to right brackets (inclusive), and contain
+/// the `T`, `U`, and `V` type parameters in the order they appear in the source code.
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TypeParams {
+    pub range: TextRange,
+    pub type_params: Vec<TypeParam>,
+}
+
+impl Deref for TypeParams {
+    type Target = [TypeParam];
+
+    fn deref(&self) -> &Self::Target {
+        &self.type_params
+    }
 }
 
 pub type Suite = Vec<Stmt>;
@@ -2905,6 +3041,11 @@ impl Ranged for crate::Pattern {
     }
 }
 
+impl Ranged for crate::nodes::TypeParams {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
 impl Ranged for crate::nodes::TypeParamTypeVar {
     fn range(&self) -> TextRange {
         self.range
@@ -2934,6 +3075,11 @@ impl Ranged for crate::nodes::Decorator {
         self.range
     }
 }
+impl Ranged for crate::nodes::Arguments {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
 impl Ranged for crate::nodes::Parameters {
     fn range(&self) -> TextRange {
         self.range
@@ -2951,9 +3097,10 @@ mod size_assertions {
     use super::*;
     use static_assertions::assert_eq_size;
 
-    assert_eq_size!(Stmt, [u8; 168]);
-    assert_eq_size!(StmtFunctionDef, [u8; 128]);
-    assert_eq_size!(StmtClassDef, [u8; 160]);
+    assert_eq_size!(Stmt, [u8; 144]);
+    assert_eq_size!(StmtFunctionDef, [u8; 136]);
+    assert_eq_size!(StmtAsyncFunctionDef, [u8; 136]);
+    assert_eq_size!(StmtClassDef, [u8; 104]);
     assert_eq_size!(StmtTry, [u8; 104]);
     assert_eq_size!(Expr, [u8; 80]);
     assert_eq_size!(Constant, [u8; 32]);

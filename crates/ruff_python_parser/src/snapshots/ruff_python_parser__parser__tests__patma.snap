@@ -1443,8 +1443,11 @@ expression: parse_ast
                             ctx: Load,
                         },
                     ),
-                    args: [],
-                    keywords: [],
+                    arguments: Arguments {
+                        range: 1130..1132,
+                        args: [],
+                        keywords: [],
+                    },
                 },
             ),
             cases: [

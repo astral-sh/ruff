@@ -1,21 +1,19 @@
 use std::fmt;
 
-use ruff_python_ast::Decorator;
-use ruff_python_ast::{self as ast, Expr, ParameterWithDefault, Parameters, Ranged, Stmt};
-use ruff_text_size::{TextLen, TextRange};
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
-use ruff_python_ast::helpers::{find_keyword, includes_arg_name};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::Decorator;
+use ruff_python_ast::{self as ast, Expr, ParameterWithDefault, Parameters, Ranged, Stmt};
 use ruff_python_semantic::analyze::visibility::is_abstract;
 use ruff_python_semantic::SemanticModel;
+use ruff_text_size::{TextLen, TextRange};
 
-use crate::autofix::edits::remove_argument;
+use crate::autofix::edits;
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
 
@@ -476,14 +474,13 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &D
     match &decorator.expression {
         Expr::Call(ast::ExprCall {
             func,
-            args,
-            keywords,
+            arguments,
             range: _,
         }) => {
             if checker.enabled(Rule::PytestFixtureIncorrectParenthesesStyle) {
                 if !checker.settings.flake8_pytest_style.fixture_parentheses
-                    && args.is_empty()
-                    && keywords.is_empty()
+                    && arguments.args.is_empty()
+                    && arguments.keywords.is_empty()
                 {
                     let fix = Fix::automatic(Edit::deletion(func.end(), decorator.end()));
                     pytest_fixture_parentheses(
@@ -497,7 +494,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &D
             }
 
             if checker.enabled(Rule::PytestFixturePositionalArgs) {
-                if !args.is_empty() {
+                if !arguments.args.is_empty() {
                     checker.diagnostics.push(Diagnostic::new(
                         PytestFixturePositionalArgs {
                             function: func_name.to_string(),
@@ -508,19 +505,17 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &D
             }
 
             if checker.enabled(Rule::PytestExtraneousScopeFunction) {
-                if let Some(scope_keyword) = find_keyword(keywords, "scope") {
-                    if keyword_is_literal(scope_keyword, "function") {
+                if let Some(keyword) = arguments.find_keyword("scope") {
+                    if keyword_is_literal(keyword, "function") {
                         let mut diagnostic =
-                            Diagnostic::new(PytestExtraneousScopeFunction, scope_keyword.range());
+                            Diagnostic::new(PytestExtraneousScopeFunction, keyword.range());
                         if checker.patch(diagnostic.kind.rule()) {
                             diagnostic.try_set_fix(|| {
-                                remove_argument(
+                                edits::remove_argument(
+                                    keyword,
+                                    arguments,
+                                    edits::Parentheses::Preserve,
                                     checker.locator(),
-                                    func.end(),
-                                    scope_keyword.range,
-                                    args,
-                                    keywords,
-                                    false,
                                 )
                                 .map(Fix::suggested)
                             });
@@ -644,7 +639,7 @@ fn check_fixture_decorator_name(checker: &mut Checker, decorator: &Decorator) {
 
 /// PT021
 fn check_fixture_addfinalizer(checker: &mut Checker, parameters: &Parameters, body: &[Stmt]) {
-    if !includes_arg_name("request", parameters) {
+    if !parameters.includes("request") {
         return;
     }
 

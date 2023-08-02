@@ -6,10 +6,12 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
     FunctionDef(
         StmtFunctionDef {
             range: 0..20,
+            decorator_list: [],
             name: Identifier {
                 id: "func",
                 range: 4..8,
             },
+            type_params: None,
             parameters: Parameters {
                 range: 8..11,
                 posonlyargs: [],
@@ -31,6 +33,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 kwonlyargs: [],
                 kwarg: None,
             },
+            returns: None,
             body: [
                 Expr(
                     StmtExpr {
@@ -45,18 +48,33 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            decorator_list: [],
-            returns: None,
-            type_params: [],
         },
     ),
     FunctionDef(
         StmtFunctionDef {
             range: 22..53,
+            decorator_list: [],
             name: Identifier {
                 id: "func",
                 range: 26..30,
             },
+            type_params: Some(
+                TypeParams {
+                    range: 30..33,
+                    type_params: [
+                        TypeVar(
+                            TypeParamTypeVar {
+                                range: 31..32,
+                                name: Identifier {
+                                    id: "T",
+                                    range: 31..32,
+                                },
+                                bound: None,
+                            },
+                        ),
+                    ],
+                },
+            ),
             parameters: Parameters {
                 range: 33..39,
                 posonlyargs: [],
@@ -86,6 +104,15 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 kwonlyargs: [],
                 kwarg: None,
             },
+            returns: Some(
+                Name(
+                    ExprName {
+                        range: 43..44,
+                        id: "T",
+                        ctx: Load,
+                    },
+                ),
+            ),
             body: [
                 Expr(
                     StmtExpr {
@@ -100,37 +127,41 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            decorator_list: [],
-            returns: Some(
-                Name(
-                    ExprName {
-                        range: 43..44,
-                        id: "T",
-                        ctx: Load,
-                    },
-                ),
-            ),
-            type_params: [
-                TypeVar(
-                    TypeParamTypeVar {
-                        range: 31..32,
-                        name: Identifier {
-                            id: "T",
-                            range: 31..32,
-                        },
-                        bound: None,
-                    },
-                ),
-            ],
         },
     ),
     FunctionDef(
         StmtFunctionDef {
             range: 55..91,
+            decorator_list: [],
             name: Identifier {
                 id: "func",
                 range: 59..63,
             },
+            type_params: Some(
+                TypeParams {
+                    range: 63..71,
+                    type_params: [
+                        TypeVar(
+                            TypeParamTypeVar {
+                                range: 64..70,
+                                name: Identifier {
+                                    id: "T",
+                                    range: 64..65,
+                                },
+                                bound: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 67..70,
+                                            id: "str",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
             parameters: Parameters {
                 range: 71..77,
                 posonlyargs: [],
@@ -160,6 +191,15 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 kwonlyargs: [],
                 kwarg: None,
             },
+            returns: Some(
+                Name(
+                    ExprName {
+                        range: 81..82,
+                        id: "T",
+                        ctx: Load,
+                    },
+                ),
+            ),
             body: [
                 Expr(
                     StmtExpr {
@@ -174,45 +214,56 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            decorator_list: [],
-            returns: Some(
-                Name(
-                    ExprName {
-                        range: 81..82,
-                        id: "T",
-                        ctx: Load,
-                    },
-                ),
-            ),
-            type_params: [
-                TypeVar(
-                    TypeParamTypeVar {
-                        range: 64..70,
-                        name: Identifier {
-                            id: "T",
-                            range: 64..65,
-                        },
-                        bound: Some(
-                            Name(
-                                ExprName {
-                                    range: 67..70,
-                                    id: "str",
-                                    ctx: Load,
-                                },
-                            ),
-                        ),
-                    },
-                ),
-            ],
         },
     ),
     FunctionDef(
         StmtFunctionDef {
             range: 93..138,
+            decorator_list: [],
             name: Identifier {
                 id: "func",
                 range: 97..101,
             },
+            type_params: Some(
+                TypeParams {
+                    range: 101..118,
+                    type_params: [
+                        TypeVar(
+                            TypeParamTypeVar {
+                                range: 102..117,
+                                name: Identifier {
+                                    id: "T",
+                                    range: 102..103,
+                                },
+                                bound: Some(
+                                    Tuple(
+                                        ExprTuple {
+                                            range: 105..117,
+                                            elts: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 106..109,
+                                                        id: "str",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        range: 111..116,
+                                                        id: "bytes",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
             parameters: Parameters {
                 range: 118..124,
                 posonlyargs: [],
@@ -242,6 +293,15 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 kwonlyargs: [],
                 kwarg: None,
             },
+            returns: Some(
+                Name(
+                    ExprName {
+                        range: 128..129,
+                        id: "T",
+                        ctx: Load,
+                    },
+                ),
+            ),
             body: [
                 Expr(
                     StmtExpr {
@@ -256,60 +316,32 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            decorator_list: [],
-            returns: Some(
-                Name(
-                    ExprName {
-                        range: 128..129,
-                        id: "T",
-                        ctx: Load,
-                    },
-                ),
-            ),
-            type_params: [
-                TypeVar(
-                    TypeParamTypeVar {
-                        range: 102..117,
-                        name: Identifier {
-                            id: "T",
-                            range: 102..103,
-                        },
-                        bound: Some(
-                            Tuple(
-                                ExprTuple {
-                                    range: 105..117,
-                                    elts: [
-                                        Name(
-                                            ExprName {
-                                                range: 106..109,
-                                                id: "str",
-                                                ctx: Load,
-                                            },
-                                        ),
-                                        Name(
-                                            ExprName {
-                                                range: 111..116,
-                                                id: "bytes",
-                                                ctx: Load,
-                                            },
-                                        ),
-                                    ],
-                                    ctx: Load,
-                                },
-                            ),
-                        ),
-                    },
-                ),
-            ],
         },
     ),
     FunctionDef(
         StmtFunctionDef {
             range: 140..171,
+            decorator_list: [],
             name: Identifier {
                 id: "func",
                 range: 144..148,
             },
+            type_params: Some(
+                TypeParams {
+                    range: 148..153,
+                    type_params: [
+                        TypeVarTuple(
+                            TypeParamTypeVarTuple {
+                                range: 149..152,
+                                name: Identifier {
+                                    id: "Ts",
+                                    range: 150..152,
+                                },
+                            },
+                        ),
+                    ],
+                },
+            ),
             parameters: Parameters {
                 range: 153..162,
                 posonlyargs: [],
@@ -341,6 +373,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 kwonlyargs: [],
                 kwarg: None,
             },
+            returns: None,
             body: [
                 Expr(
                     StmtExpr {
@@ -355,28 +388,32 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            decorator_list: [],
-            returns: None,
-            type_params: [
-                TypeVarTuple(
-                    TypeParamTypeVarTuple {
-                        range: 149..152,
-                        name: Identifier {
-                            id: "Ts",
-                            range: 150..152,
-                        },
-                    },
-                ),
-            ],
         },
     ),
     FunctionDef(
         StmtFunctionDef {
             range: 173..230,
+            decorator_list: [],
             name: Identifier {
                 id: "func",
                 range: 177..181,
             },
+            type_params: Some(
+                TypeParams {
+                    range: 181..186,
+                    type_params: [
+                        ParamSpec(
+                            TypeParamParamSpec {
+                                range: 182..185,
+                                name: Identifier {
+                                    id: "P",
+                                    range: 184..185,
+                                },
+                            },
+                        ),
+                    ],
+                },
+            ),
             parameters: Parameters {
                 range: 186..221,
                 posonlyargs: [],
@@ -439,6 +476,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     },
                 ),
             },
+            returns: None,
             body: [
                 Expr(
                     StmtExpr {
@@ -453,28 +491,69 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            decorator_list: [],
-            returns: None,
-            type_params: [
-                ParamSpec(
-                    TypeParamParamSpec {
-                        range: 182..185,
-                        name: Identifier {
-                            id: "P",
-                            range: 184..185,
-                        },
-                    },
-                ),
-            ],
         },
     ),
     FunctionDef(
         StmtFunctionDef {
             range: 232..273,
+            decorator_list: [],
             name: Identifier {
                 id: "func",
                 range: 236..240,
             },
+            type_params: Some(
+                TypeParams {
+                    range: 240..261,
+                    type_params: [
+                        TypeVar(
+                            TypeParamTypeVar {
+                                range: 241..242,
+                                name: Identifier {
+                                    id: "T",
+                                    range: 241..242,
+                                },
+                                bound: None,
+                            },
+                        ),
+                        TypeVar(
+                            TypeParamTypeVar {
+                                range: 244..250,
+                                name: Identifier {
+                                    id: "U",
+                                    range: 244..245,
+                                },
+                                bound: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 247..250,
+                                            id: "str",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ),
+                        TypeVarTuple(
+                            TypeParamTypeVarTuple {
+                                range: 252..255,
+                                name: Identifier {
+                                    id: "Ts",
+                                    range: 253..255,
+                                },
+                            },
+                        ),
+                        ParamSpec(
+                            TypeParamParamSpec {
+                                range: 257..260,
+                                name: Identifier {
+                                    id: "P",
+                                    range: 259..260,
+                                },
+                            },
+                        ),
+                    ],
+                },
+            ),
             parameters: Parameters {
                 range: 261..263,
                 posonlyargs: [],
@@ -483,60 +562,11 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 kwonlyargs: [],
                 kwarg: None,
             },
+            returns: None,
             body: [
                 Pass(
                     StmtPass {
                         range: 269..273,
-                    },
-                ),
-            ],
-            decorator_list: [],
-            returns: None,
-            type_params: [
-                TypeVar(
-                    TypeParamTypeVar {
-                        range: 241..242,
-                        name: Identifier {
-                            id: "T",
-                            range: 241..242,
-                        },
-                        bound: None,
-                    },
-                ),
-                TypeVar(
-                    TypeParamTypeVar {
-                        range: 244..250,
-                        name: Identifier {
-                            id: "U",
-                            range: 244..245,
-                        },
-                        bound: Some(
-                            Name(
-                                ExprName {
-                                    range: 247..250,
-                                    id: "str",
-                                    ctx: Load,
-                                },
-                            ),
-                        ),
-                    },
-                ),
-                TypeVarTuple(
-                    TypeParamTypeVarTuple {
-                        range: 252..255,
-                        name: Identifier {
-                            id: "Ts",
-                            range: 253..255,
-                        },
-                    },
-                ),
-                ParamSpec(
-                    TypeParamParamSpec {
-                        range: 257..260,
-                        name: Identifier {
-                            id: "P",
-                            range: 259..260,
-                        },
                     },
                 ),
             ],

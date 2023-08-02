@@ -122,42 +122,45 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             ctx: Load,
                         },
                     ),
-                    args: [
-                        Starred(
-                            ExprStarred {
-                                range: 93..99,
-                                value: BinOp(
-                                    ExprBinOp {
-                                        range: 94..99,
-                                        left: Name(
-                                            ExprName {
-                                                range: 94..95,
-                                                id: "a",
-                                                ctx: Load,
-                                            },
-                                        ),
-                                        op: Add,
-                                        right: Name(
-                                            ExprName {
-                                                range: 98..99,
-                                                id: "b",
-                                                ctx: Load,
-                                            },
-                                        ),
-                                    },
-                                ),
-                                ctx: Load,
-                            },
-                        ),
-                        Name(
-                            ExprName {
-                                range: 101..102,
-                                id: "c",
-                                ctx: Load,
-                            },
-                        ),
-                    ],
-                    keywords: [],
+                    arguments: Arguments {
+                        range: 92..103,
+                        args: [
+                            Starred(
+                                ExprStarred {
+                                    range: 93..99,
+                                    value: BinOp(
+                                        ExprBinOp {
+                                            range: 94..99,
+                                            left: Name(
+                                                ExprName {
+                                                    range: 94..95,
+                                                    id: "a",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            op: Add,
+                                            right: Name(
+                                                ExprName {
+                                                    range: 98..99,
+                                                    id: "b",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                    ctx: Load,
+                                },
+                            ),
+                            Name(
+                                ExprName {
+                                    range: 101..102,
+                                    id: "c",
+                                    ctx: Load,
+                                },
+                            ),
+                        ],
+                        keywords: [],
+                    },
                 },
             ),
         },
@@ -283,22 +286,25 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                             ctx: Load,
                                         },
                                     ),
-                                    args: [
-                                        UnaryOp(
-                                            ExprUnaryOp {
-                                                range: 225..227,
-                                                op: USub,
-                                                operand: Name(
-                                                    ExprName {
-                                                        range: 226..227,
-                                                        id: "a",
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                    ],
-                                    keywords: [],
+                                    arguments: Arguments {
+                                        range: 224..228,
+                                        args: [
+                                            UnaryOp(
+                                                ExprUnaryOp {
+                                                    range: 225..227,
+                                                    op: USub,
+                                                    operand: Name(
+                                                        ExprName {
+                                                            range: 226..227,
+                                                            id: "a",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                        keywords: [],
+                                    },
                                 },
                             ),
                             op: Mult,
@@ -339,8 +345,11 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                     ctx: Load,
                                 },
                             ),
-                            args: [],
-                            keywords: [],
+                            arguments: Arguments {
+                                range: 270..272,
+                                args: [],
+                                keywords: [],
+                            },
                         },
                     ),
                     attr: Identifier {
@@ -368,16 +377,19 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                     ctx: Load,
                                 },
                             ),
-                            args: [
-                                Tuple(
-                                    ExprTuple {
-                                        range: 298..300,
-                                        elts: [],
-                                        ctx: Load,
-                                    },
-                                ),
-                            ],
-                            keywords: [],
+                            arguments: Arguments {
+                                range: 297..301,
+                                args: [
+                                    Tuple(
+                                        ExprTuple {
+                                            range: 298..300,
+                                            elts: [],
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
                         },
                     ),
                     attr: Identifier {
@@ -405,16 +417,19 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                     ctx: Load,
                                 },
                             ),
-                            args: [
-                                Tuple(
-                                    ExprTuple {
-                                        range: 329..331,
-                                        elts: [],
-                                        ctx: Load,
-                                    },
-                                ),
-                            ],
-                            keywords: [],
+                            arguments: Arguments {
+                                range: 328..333,
+                                args: [
+                                    Tuple(
+                                        ExprTuple {
+                                            range: 329..331,
+                                            elts: [],
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
                         },
                     ),
                     attr: Identifier {
@@ -563,8 +578,11 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                     ctx: Load,
                                 },
                             ),
-                            args: [],
-                            keywords: [],
+                            arguments: Arguments {
+                                range: 476..478,
+                                args: [],
+                                keywords: [],
+                            },
                         },
                     ),
                     slice: Slice(
@@ -771,33 +789,39 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             ctx: Load,
                         },
                     ),
-                    args: [
-                        Call(
-                            ExprCall {
-                                range: 626..635,
-                                func: Name(
-                                    ExprName {
-                                        range: 626..631,
-                                        id: "match",
-                                        ctx: Load,
-                                    },
-                                ),
-                                args: [
-                                    Constant(
-                                        ExprConstant {
-                                            range: 632..634,
-                                            value: Int(
-                                                12,
-                                            ),
-                                            kind: None,
+                    arguments: Arguments {
+                        range: 625..636,
+                        args: [
+                            Call(
+                                ExprCall {
+                                    range: 626..635,
+                                    func: Name(
+                                        ExprName {
+                                            range: 626..631,
+                                            id: "match",
+                                            ctx: Load,
                                         },
                                     ),
-                                ],
-                                keywords: [],
-                            },
-                        ),
-                    ],
-                    keywords: [],
+                                    arguments: Arguments {
+                                        range: 631..635,
+                                        args: [
+                                            Constant(
+                                                ExprConstant {
+                                                    range: 632..634,
+                                                    value: Int(
+                                                        12,
+                                                    ),
+                                                    kind: None,
+                                                },
+                                            ),
+                                        ],
+                                        keywords: [],
+                                    },
+                                },
+                            ),
+                        ],
+                        keywords: [],
+                    },
                 },
             ),
         },

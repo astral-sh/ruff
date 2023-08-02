@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Decorator, Expr, Ranged};
+use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -106,8 +106,12 @@ fn check_mark_parentheses(checker: &mut Checker, decorator: &Decorator, call_pat
     match &decorator.expression {
         Expr::Call(ast::ExprCall {
             func,
-            args,
-            keywords,
+            arguments:
+                Arguments {
+                    args,
+                    keywords,
+                    range: _,
+                },
             range: _,
         }) => {
             if !checker.settings.flake8_pytest_style.mark_parentheses
@@ -134,7 +138,11 @@ fn check_useless_usefixtures(checker: &mut Checker, decorator: &Decorator, call_
 
     let mut has_parameters = false;
 
-    if let Expr::Call(ast::ExprCall { args, keywords, .. }) = &decorator.expression {
+    if let Expr::Call(ast::ExprCall {
+        arguments: Arguments { args, keywords, .. },
+        ..
+    }) = &decorator.expression
+    {
         if !args.is_empty() || !keywords.is_empty() {
             has_parameters = true;
         }

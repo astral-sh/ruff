@@ -1,10 +1,8 @@
-use ruff_python_ast as ast;
-use ruff_python_ast::{Expr, Ranged};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::find_keyword;
+use ruff_python_ast as ast;
 use ruff_python_ast::Constant;
+use ruff_python_ast::{Expr, Ranged};
 
 use crate::checkers::ast::Checker;
 
@@ -60,7 +58,10 @@ pub(crate) fn variable_name_task_id(
     };
 
     // If the value is not a call, we can't do anything.
-    let Expr::Call(ast::ExprCall { func, keywords, .. }) = value else {
+    let Expr::Call(ast::ExprCall {
+        func, arguments, ..
+    }) = value
+    else {
         return None;
     };
 
@@ -74,7 +75,7 @@ pub(crate) fn variable_name_task_id(
     }
 
     // If the call doesn't have a `task_id` keyword argument, we can't do anything.
-    let keyword = find_keyword(keywords, "task_id")?;
+    let keyword = arguments.find_keyword("task_id")?;
 
     // If the keyword argument is not a string, we can't do anything.
     let task_id = match &keyword.value {

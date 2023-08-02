@@ -29,7 +29,7 @@ UP032_0.py:7:1: UP032 [*] Use f-string instead of `format` call
 7 | "{1} {0}".format(a, b)
   | ^^^^^^^^^^^^^^^^^^^^^^ UP032
 8 | 
-9 | "{x.y}".format(x=z)
+9 | "{0} {1} {0}".format(a, b)
   |
   = help: Convert to f-string
 
@@ -40,17 +40,17 @@ UP032_0.py:7:1: UP032 [*] Use f-string instead of `format` call
 7   |-"{1} {0}".format(a, b)
   7 |+f"{b} {a}"
 8 8 | 
-9 9 | "{x.y}".format(x=z)
+9 9 | "{0} {1} {0}".format(a, b)
 10 10 | 
 
 UP032_0.py:9:1: UP032 [*] Use f-string instead of `format` call
    |
  7 | "{1} {0}".format(a, b)
  8 | 
- 9 | "{x.y}".format(x=z)
-   | ^^^^^^^^^^^^^^^^^^^ UP032
+ 9 | "{0} {1} {0}".format(a, b)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP032
 10 | 
-11 | "{.x} {.y}".format(a, b)
+11 | "{x.y}".format(x=z)
    |
    = help: Convert to f-string
 
@@ -58,766 +58,808 @@ UP032_0.py:9:1: UP032 [*] Use f-string instead of `format` call
 6  6  | 
 7  7  | "{1} {0}".format(a, b)
 8  8  | 
-9     |-"{x.y}".format(x=z)
-   9  |+f"{z.y}"
+9     |-"{0} {1} {0}".format(a, b)
+   9  |+f"{a} {b} {a}"
 10 10 | 
-11 11 | "{.x} {.y}".format(a, b)
+11 11 | "{x.y}".format(x=z)
 12 12 | 
 
 UP032_0.py:11:1: UP032 [*] Use f-string instead of `format` call
    |
- 9 | "{x.y}".format(x=z)
+ 9 | "{0} {1} {0}".format(a, b)
 10 | 
-11 | "{.x} {.y}".format(a, b)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^ UP032
+11 | "{x.y}".format(x=z)
+   | ^^^^^^^^^^^^^^^^^^^ UP032
 12 | 
-13 | "{} {}".format(a.b, c.d)
+13 | "{x} {y} {x}".format(x=a, y=b)
    |
    = help: Convert to f-string
 
 ℹ Suggested fix
 8  8  | 
-9  9  | "{x.y}".format(x=z)
+9  9  | "{0} {1} {0}".format(a, b)
 10 10 | 
-11    |-"{.x} {.y}".format(a, b)
-   11 |+f"{a.x} {b.y}"
+11    |-"{x.y}".format(x=z)
+   11 |+f"{z.y}"
 12 12 | 
-13 13 | "{} {}".format(a.b, c.d)
+13 13 | "{x} {y} {x}".format(x=a, y=b)
 14 14 | 
 
 UP032_0.py:13:1: UP032 [*] Use f-string instead of `format` call
    |
-11 | "{.x} {.y}".format(a, b)
+11 | "{x.y}".format(x=z)
 12 | 
-13 | "{} {}".format(a.b, c.d)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^ UP032
+13 | "{x} {y} {x}".format(x=a, y=b)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP032
 14 | 
-15 | "{}".format(a())
+15 | "{.x} {.y}".format(a, b)
    |
    = help: Convert to f-string
 
 ℹ Suggested fix
 10 10 | 
-11 11 | "{.x} {.y}".format(a, b)
+11 11 | "{x.y}".format(x=z)
 12 12 | 
-13    |-"{} {}".format(a.b, c.d)
-   13 |+f"{a.b} {c.d}"
+13    |-"{x} {y} {x}".format(x=a, y=b)
+   13 |+f"{a} {b} {a}"
 14 14 | 
-15 15 | "{}".format(a())
+15 15 | "{.x} {.y}".format(a, b)
 16 16 | 
 
 UP032_0.py:15:1: UP032 [*] Use f-string instead of `format` call
    |
-13 | "{} {}".format(a.b, c.d)
+13 | "{x} {y} {x}".format(x=a, y=b)
 14 | 
-15 | "{}".format(a())
-   | ^^^^^^^^^^^^^^^^ UP032
+15 | "{.x} {.y}".format(a, b)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ UP032
 16 | 
-17 | "{}".format(a.b())
+17 | "{} {}".format(a.b, c.d)
    |
    = help: Convert to f-string
 
 ℹ Suggested fix
 12 12 | 
-13 13 | "{} {}".format(a.b, c.d)
+13 13 | "{x} {y} {x}".format(x=a, y=b)
 14 14 | 
-15    |-"{}".format(a())
-   15 |+f"{a()}"
+15    |-"{.x} {.y}".format(a, b)
+   15 |+f"{a.x} {b.y}"
 16 16 | 
-17 17 | "{}".format(a.b())
+17 17 | "{} {}".format(a.b, c.d)
 18 18 | 
 
 UP032_0.py:17:1: UP032 [*] Use f-string instead of `format` call
    |
-15 | "{}".format(a())
+15 | "{.x} {.y}".format(a, b)
 16 | 
-17 | "{}".format(a.b())
-   | ^^^^^^^^^^^^^^^^^^ UP032
+17 | "{} {}".format(a.b, c.d)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ UP032
 18 | 
-19 | "{}".format(a.b().c())
+19 | "{}".format(a())
    |
    = help: Convert to f-string
 
 ℹ Suggested fix
 14 14 | 
-15 15 | "{}".format(a())
+15 15 | "{.x} {.y}".format(a, b)
 16 16 | 
-17    |-"{}".format(a.b())
-   17 |+f"{a.b()}"
+17    |-"{} {}".format(a.b, c.d)
+   17 |+f"{a.b} {c.d}"
 18 18 | 
-19 19 | "{}".format(a.b().c())
+19 19 | "{}".format(a())
 20 20 | 
 
 UP032_0.py:19:1: UP032 [*] Use f-string instead of `format` call
    |
-17 | "{}".format(a.b())
+17 | "{} {}".format(a.b, c.d)
 18 | 
-19 | "{}".format(a.b().c())
-   | ^^^^^^^^^^^^^^^^^^^^^^ UP032
+19 | "{}".format(a())
+   | ^^^^^^^^^^^^^^^^ UP032
 20 | 
-21 | "hello {}!".format(name)
+21 | "{}".format(a.b())
    |
    = help: Convert to f-string
 
 ℹ Suggested fix
 16 16 | 
-17 17 | "{}".format(a.b())
+17 17 | "{} {}".format(a.b, c.d)
 18 18 | 
-19    |-"{}".format(a.b().c())
-   19 |+f"{a.b().c()}"
+19    |-"{}".format(a())
+   19 |+f"{a()}"
 20 20 | 
-21 21 | "hello {}!".format(name)
+21 21 | "{}".format(a.b())
 22 22 | 
 
 UP032_0.py:21:1: UP032 [*] Use f-string instead of `format` call
    |
-19 | "{}".format(a.b().c())
+19 | "{}".format(a())
 20 | 
-21 | "hello {}!".format(name)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^ UP032
+21 | "{}".format(a.b())
+   | ^^^^^^^^^^^^^^^^^^ UP032
 22 | 
-23 | "{}{b}{}".format(a, c, b=b)
+23 | "{}".format(a.b().c())
    |
    = help: Convert to f-string
 
 ℹ Suggested fix
 18 18 | 
-19 19 | "{}".format(a.b().c())
+19 19 | "{}".format(a())
 20 20 | 
-21    |-"hello {}!".format(name)
-   21 |+f"hello {name}!"
+21    |-"{}".format(a.b())
+   21 |+f"{a.b()}"
 22 22 | 
-23 23 | "{}{b}{}".format(a, c, b=b)
+23 23 | "{}".format(a.b().c())
 24 24 | 
 
 UP032_0.py:23:1: UP032 [*] Use f-string instead of `format` call
    |
-21 | "hello {}!".format(name)
+21 | "{}".format(a.b())
 22 | 
-23 | "{}{b}{}".format(a, c, b=b)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP032
+23 | "{}".format(a.b().c())
+   | ^^^^^^^^^^^^^^^^^^^^^^ UP032
 24 | 
-25 | "{}".format(0x0)
+25 | "hello {}!".format(name)
    |
    = help: Convert to f-string
 
 ℹ Suggested fix
 20 20 | 
-21 21 | "hello {}!".format(name)
+21 21 | "{}".format(a.b())
 22 22 | 
-23    |-"{}{b}{}".format(a, c, b=b)
-   23 |+f"{a}{b}{c}"
+23    |-"{}".format(a.b().c())
+   23 |+f"{a.b().c()}"
 24 24 | 
-25 25 | "{}".format(0x0)
+25 25 | "hello {}!".format(name)
 26 26 | 
 
 UP032_0.py:25:1: UP032 [*] Use f-string instead of `format` call
    |
-23 | "{}{b}{}".format(a, c, b=b)
+23 | "{}".format(a.b().c())
 24 | 
-25 | "{}".format(0x0)
-   | ^^^^^^^^^^^^^^^^ UP032
+25 | "hello {}!".format(name)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ UP032
 26 | 
-27 | "{} {}".format(a, b)
+27 | "{}{b}{}".format(a, c, b=b)
    |
    = help: Convert to f-string
 
 ℹ Suggested fix
 22 22 | 
-23 23 | "{}{b}{}".format(a, c, b=b)
+23 23 | "{}".format(a.b().c())
 24 24 | 
-25    |-"{}".format(0x0)
-   25 |+f"{0x0}"
+25    |-"hello {}!".format(name)
+   25 |+f"hello {name}!"
 26 26 | 
-27 27 | "{} {}".format(a, b)
+27 27 | "{}{b}{}".format(a, c, b=b)
 28 28 | 
 
 UP032_0.py:27:1: UP032 [*] Use f-string instead of `format` call
    |
-25 | "{}".format(0x0)
+25 | "hello {}!".format(name)
 26 | 
-27 | "{} {}".format(a, b)
-   | ^^^^^^^^^^^^^^^^^^^^ UP032
+27 | "{}{b}{}".format(a, c, b=b)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP032
 28 | 
-29 | """{} {}""".format(a, b)
+29 | "{}".format(0x0)
    |
    = help: Convert to f-string
 
 ℹ Suggested fix
 24 24 | 
-25 25 | "{}".format(0x0)
+25 25 | "hello {}!".format(name)
 26 26 | 
-27    |-"{} {}".format(a, b)
-   27 |+f"{a} {b}"
+27    |-"{}{b}{}".format(a, c, b=b)
+   27 |+f"{a}{b}{c}"
 28 28 | 
-29 29 | """{} {}""".format(a, b)
+29 29 | "{}".format(0x0)
 30 30 | 
 
 UP032_0.py:29:1: UP032 [*] Use f-string instead of `format` call
    |
-27 | "{} {}".format(a, b)
+27 | "{}{b}{}".format(a, c, b=b)
 28 | 
-29 | """{} {}""".format(a, b)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^ UP032
+29 | "{}".format(0x0)
+   | ^^^^^^^^^^^^^^^^ UP032
 30 | 
-31 | "foo{}".format(1)
+31 | "{} {}".format(a, b)
    |
    = help: Convert to f-string
 
 ℹ Suggested fix
 26 26 | 
-27 27 | "{} {}".format(a, b)
+27 27 | "{}{b}{}".format(a, c, b=b)
 28 28 | 
-29    |-"""{} {}""".format(a, b)
-   29 |+f"""{a} {b}"""
+29    |-"{}".format(0x0)
+   29 |+f"{0x0}"
 30 30 | 
-31 31 | "foo{}".format(1)
+31 31 | "{} {}".format(a, b)
 32 32 | 
 
 UP032_0.py:31:1: UP032 [*] Use f-string instead of `format` call
    |
-29 | """{} {}""".format(a, b)
+29 | "{}".format(0x0)
 30 | 
-31 | "foo{}".format(1)
-   | ^^^^^^^^^^^^^^^^^ UP032
+31 | "{} {}".format(a, b)
+   | ^^^^^^^^^^^^^^^^^^^^ UP032
 32 | 
-33 | r"foo{}".format(1)
+33 | """{} {}""".format(a, b)
    |
    = help: Convert to f-string
 
 ℹ Suggested fix
 28 28 | 
-29 29 | """{} {}""".format(a, b)
+29 29 | "{}".format(0x0)
 30 30 | 
-31    |-"foo{}".format(1)
-   31 |+f"foo{1}"
+31    |-"{} {}".format(a, b)
+   31 |+f"{a} {b}"
 32 32 | 
-33 33 | r"foo{}".format(1)
+33 33 | """{} {}""".format(a, b)
 34 34 | 
 
 UP032_0.py:33:1: UP032 [*] Use f-string instead of `format` call
    |
-31 | "foo{}".format(1)
+31 | "{} {}".format(a, b)
 32 | 
-33 | r"foo{}".format(1)
-   | ^^^^^^^^^^^^^^^^^^ UP032
+33 | """{} {}""".format(a, b)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ UP032
 34 | 
-35 | x = "{a}".format(a=1)
+35 | "foo{}".format(1)
    |
    = help: Convert to f-string
 
 ℹ Suggested fix
 30 30 | 
-31 31 | "foo{}".format(1)
+31 31 | "{} {}".format(a, b)
 32 32 | 
-33    |-r"foo{}".format(1)
-   33 |+fr"foo{1}"
+33    |-"""{} {}""".format(a, b)
+   33 |+f"""{a} {b}"""
 34 34 | 
-35 35 | x = "{a}".format(a=1)
+35 35 | "foo{}".format(1)
 36 36 | 
 
-UP032_0.py:35:5: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:35:1: UP032 [*] Use f-string instead of `format` call
    |
-33 | r"foo{}".format(1)
+33 | """{} {}""".format(a, b)
 34 | 
-35 | x = "{a}".format(a=1)
-   |     ^^^^^^^^^^^^^^^^^ UP032
+35 | "foo{}".format(1)
+   | ^^^^^^^^^^^^^^^^^ UP032
 36 | 
-37 | print("foo {} ".format(x))
+37 | r"foo{}".format(1)
    |
    = help: Convert to f-string
 
 ℹ Suggested fix
 32 32 | 
-33 33 | r"foo{}".format(1)
+33 33 | """{} {}""".format(a, b)
 34 34 | 
-35    |-x = "{a}".format(a=1)
-   35 |+x = f"{1}"
+35    |-"foo{}".format(1)
+   35 |+f"foo{1}"
 36 36 | 
-37 37 | print("foo {} ".format(x))
+37 37 | r"foo{}".format(1)
 38 38 | 
 
-UP032_0.py:37:7: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:37:1: UP032 [*] Use f-string instead of `format` call
    |
-35 | x = "{a}".format(a=1)
+35 | "foo{}".format(1)
 36 | 
-37 | print("foo {} ".format(x))
-   |       ^^^^^^^^^^^^^^^^^^^ UP032
+37 | r"foo{}".format(1)
+   | ^^^^^^^^^^^^^^^^^^ UP032
 38 | 
-39 | "{a[b]}".format(a=a)
+39 | x = "{a}".format(a=1)
    |
    = help: Convert to f-string
 
 ℹ Suggested fix
 34 34 | 
-35 35 | x = "{a}".format(a=1)
+35 35 | "foo{}".format(1)
 36 36 | 
-37    |-print("foo {} ".format(x))
-   37 |+print(f"foo {x} ")
+37    |-r"foo{}".format(1)
+   37 |+fr"foo{1}"
 38 38 | 
-39 39 | "{a[b]}".format(a=a)
+39 39 | x = "{a}".format(a=1)
 40 40 | 
 
-UP032_0.py:39:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:39:5: UP032 [*] Use f-string instead of `format` call
    |
-37 | print("foo {} ".format(x))
+37 | r"foo{}".format(1)
 38 | 
-39 | "{a[b]}".format(a=a)
-   | ^^^^^^^^^^^^^^^^^^^^ UP032
+39 | x = "{a}".format(a=1)
+   |     ^^^^^^^^^^^^^^^^^ UP032
 40 | 
-41 | "{a.a[b]}".format(a=a)
+41 | print("foo {} ".format(x))
    |
    = help: Convert to f-string
 
 ℹ Suggested fix
 36 36 | 
-37 37 | print("foo {} ".format(x))
+37 37 | r"foo{}".format(1)
 38 38 | 
-39    |-"{a[b]}".format(a=a)
-   39 |+f"{a['b']}"
+39    |-x = "{a}".format(a=1)
+   39 |+x = f"{1}"
 40 40 | 
-41 41 | "{a.a[b]}".format(a=a)
+41 41 | print("foo {} ".format(x))
 42 42 | 
 
-UP032_0.py:41:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:41:7: UP032 [*] Use f-string instead of `format` call
    |
-39 | "{a[b]}".format(a=a)
+39 | x = "{a}".format(a=1)
 40 | 
-41 | "{a.a[b]}".format(a=a)
-   | ^^^^^^^^^^^^^^^^^^^^^^ UP032
+41 | print("foo {} ".format(x))
+   |       ^^^^^^^^^^^^^^^^^^^ UP032
 42 | 
-43 | "{}{{}}{}".format(escaped, y)
+43 | "{a[b]}".format(a=a)
    |
    = help: Convert to f-string
 
 ℹ Suggested fix
 38 38 | 
-39 39 | "{a[b]}".format(a=a)
+39 39 | x = "{a}".format(a=1)
 40 40 | 
-41    |-"{a.a[b]}".format(a=a)
-   41 |+f"{a.a['b']}"
+41    |-print("foo {} ".format(x))
+   41 |+print(f"foo {x} ")
 42 42 | 
-43 43 | "{}{{}}{}".format(escaped, y)
+43 43 | "{a[b]}".format(a=a)
 44 44 | 
 
 UP032_0.py:43:1: UP032 [*] Use f-string instead of `format` call
    |
-41 | "{a.a[b]}".format(a=a)
+41 | print("foo {} ".format(x))
 42 | 
-43 | "{}{{}}{}".format(escaped, y)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP032
+43 | "{a[b]}".format(a=a)
+   | ^^^^^^^^^^^^^^^^^^^^ UP032
 44 | 
-45 | "{}".format(a)
+45 | "{a.a[b]}".format(a=a)
    |
    = help: Convert to f-string
 
 ℹ Suggested fix
 40 40 | 
-41 41 | "{a.a[b]}".format(a=a)
+41 41 | print("foo {} ".format(x))
 42 42 | 
-43    |-"{}{{}}{}".format(escaped, y)
-   43 |+f"{escaped}{{}}{y}"
+43    |-"{a[b]}".format(a=a)
+   43 |+f"{a['b']}"
 44 44 | 
-45 45 | "{}".format(a)
+45 45 | "{a.a[b]}".format(a=a)
 46 46 | 
 
 UP032_0.py:45:1: UP032 [*] Use f-string instead of `format` call
    |
-43 | "{}{{}}{}".format(escaped, y)
+43 | "{a[b]}".format(a=a)
 44 | 
-45 | "{}".format(a)
-   | ^^^^^^^^^^^^^^ UP032
+45 | "{a.a[b]}".format(a=a)
+   | ^^^^^^^^^^^^^^^^^^^^^^ UP032
 46 | 
-47 | '({}={{0!e}})'.format(a)
+47 | "{}{{}}{}".format(escaped, y)
    |
    = help: Convert to f-string
 
 ℹ Suggested fix
 42 42 | 
-43 43 | "{}{{}}{}".format(escaped, y)
+43 43 | "{a[b]}".format(a=a)
 44 44 | 
-45    |-"{}".format(a)
-   45 |+f"{a}"
+45    |-"{a.a[b]}".format(a=a)
+   45 |+f"{a.a['b']}"
 46 46 | 
-47 47 | '({}={{0!e}})'.format(a)
+47 47 | "{}{{}}{}".format(escaped, y)
 48 48 | 
 
 UP032_0.py:47:1: UP032 [*] Use f-string instead of `format` call
    |
-45 | "{}".format(a)
+45 | "{a.a[b]}".format(a=a)
 46 | 
-47 | '({}={{0!e}})'.format(a)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^ UP032
+47 | "{}{{}}{}".format(escaped, y)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP032
 48 | 
-49 | "{[b]}".format(a)
+49 | "{}".format(a)
    |
    = help: Convert to f-string
 
 ℹ Suggested fix
 44 44 | 
-45 45 | "{}".format(a)
+45 45 | "{a.a[b]}".format(a=a)
 46 46 | 
-47    |-'({}={{0!e}})'.format(a)
-   47 |+f'({a}={{0!e}})'
+47    |-"{}{{}}{}".format(escaped, y)
+   47 |+f"{escaped}{{}}{y}"
 48 48 | 
-49 49 | "{[b]}".format(a)
+49 49 | "{}".format(a)
 50 50 | 
 
 UP032_0.py:49:1: UP032 [*] Use f-string instead of `format` call
    |
-47 | '({}={{0!e}})'.format(a)
+47 | "{}{{}}{}".format(escaped, y)
 48 | 
-49 | "{[b]}".format(a)
-   | ^^^^^^^^^^^^^^^^^ UP032
+49 | "{}".format(a)
+   | ^^^^^^^^^^^^^^ UP032
 50 | 
-51 | '{[b]}'.format(a)
+51 | '({}={{0!e}})'.format(a)
    |
    = help: Convert to f-string
 
 ℹ Suggested fix
 46 46 | 
-47 47 | '({}={{0!e}})'.format(a)
+47 47 | "{}{{}}{}".format(escaped, y)
 48 48 | 
-49    |-"{[b]}".format(a)
-   49 |+f"{a['b']}"
+49    |-"{}".format(a)
+   49 |+f"{a}"
 50 50 | 
-51 51 | '{[b]}'.format(a)
+51 51 | '({}={{0!e}})'.format(a)
 52 52 | 
 
 UP032_0.py:51:1: UP032 [*] Use f-string instead of `format` call
    |
-49 | "{[b]}".format(a)
+49 | "{}".format(a)
 50 | 
-51 | '{[b]}'.format(a)
-   | ^^^^^^^^^^^^^^^^^ UP032
+51 | '({}={{0!e}})'.format(a)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ UP032
 52 | 
-53 | """{[b]}""".format(a)
+53 | "{[b]}".format(a)
    |
    = help: Convert to f-string
 
 ℹ Suggested fix
 48 48 | 
-49 49 | "{[b]}".format(a)
+49 49 | "{}".format(a)
 50 50 | 
-51    |-'{[b]}'.format(a)
-   51 |+f'{a["b"]}'
+51    |-'({}={{0!e}})'.format(a)
+   51 |+f'({a}={{0!e}})'
 52 52 | 
-53 53 | """{[b]}""".format(a)
+53 53 | "{[b]}".format(a)
 54 54 | 
 
 UP032_0.py:53:1: UP032 [*] Use f-string instead of `format` call
    |
-51 | '{[b]}'.format(a)
+51 | '({}={{0!e}})'.format(a)
 52 | 
-53 | """{[b]}""".format(a)
-   | ^^^^^^^^^^^^^^^^^^^^^ UP032
+53 | "{[b]}".format(a)
+   | ^^^^^^^^^^^^^^^^^ UP032
 54 | 
-55 | '''{[b]}'''.format(a)
+55 | '{[b]}'.format(a)
    |
    = help: Convert to f-string
 
 ℹ Suggested fix
 50 50 | 
-51 51 | '{[b]}'.format(a)
+51 51 | '({}={{0!e}})'.format(a)
 52 52 | 
-53    |-"""{[b]}""".format(a)
-   53 |+f"""{a["b"]}"""
+53    |-"{[b]}".format(a)
+   53 |+f"{a['b']}"
 54 54 | 
-55 55 | '''{[b]}'''.format(a)
+55 55 | '{[b]}'.format(a)
 56 56 | 
 
 UP032_0.py:55:1: UP032 [*] Use f-string instead of `format` call
    |
-53 | """{[b]}""".format(a)
+53 | "{[b]}".format(a)
 54 | 
-55 | '''{[b]}'''.format(a)
-   | ^^^^^^^^^^^^^^^^^^^^^ UP032
+55 | '{[b]}'.format(a)
+   | ^^^^^^^^^^^^^^^^^ UP032
 56 | 
-57 | "{}".format(
+57 | """{[b]}""".format(a)
    |
    = help: Convert to f-string
 
 ℹ Suggested fix
 52 52 | 
-53 53 | """{[b]}""".format(a)
+53 53 | "{[b]}".format(a)
 54 54 | 
-55    |-'''{[b]}'''.format(a)
-   55 |+f'''{a["b"]}'''
+55    |-'{[b]}'.format(a)
+   55 |+f'{a["b"]}'
 56 56 | 
-57 57 | "{}".format(
-58 58 |     1
+57 57 | """{[b]}""".format(a)
+58 58 | 
 
 UP032_0.py:57:1: UP032 [*] Use f-string instead of `format` call
    |
-55 |   '''{[b]}'''.format(a)
-56 |   
-57 | / "{}".format(
-58 | |     1
-59 | | )
-   | |_^ UP032
-60 |   
-61 |   "123456789 {}".format(
+55 | '{[b]}'.format(a)
+56 | 
+57 | """{[b]}""".format(a)
+   | ^^^^^^^^^^^^^^^^^^^^^ UP032
+58 | 
+59 | '''{[b]}'''.format(a)
    |
    = help: Convert to f-string
 
 ℹ Suggested fix
 54 54 | 
-55 55 | '''{[b]}'''.format(a)
+55 55 | '{[b]}'.format(a)
 56 56 | 
-57    |-"{}".format(
-58    |-    1
-59    |-)
-   57 |+f"{1}"
-60 58 | 
-61 59 | "123456789 {}".format(
-62 60 |     1111111111111111111111111111111111111111111111111111111111111111111111111,
+57    |-"""{[b]}""".format(a)
+   57 |+f"""{a["b"]}"""
+58 58 | 
+59 59 | '''{[b]}'''.format(a)
+60 60 | 
 
-UP032_0.py:61:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:59:1: UP032 [*] Use f-string instead of `format` call
    |
-59 |   )
-60 |   
-61 | / "123456789 {}".format(
-62 | |     1111111111111111111111111111111111111111111111111111111111111111111111111,
-63 | | )
-   | |_^ UP032
-64 |   
-65 |   """
+57 | """{[b]}""".format(a)
+58 | 
+59 | '''{[b]}'''.format(a)
+   | ^^^^^^^^^^^^^^^^^^^^^ UP032
+60 | 
+61 | "{}".format(
    |
    = help: Convert to f-string
 
 ℹ Suggested fix
-58 58 |     1
-59 59 | )
+56 56 | 
+57 57 | """{[b]}""".format(a)
+58 58 | 
+59    |-'''{[b]}'''.format(a)
+   59 |+f'''{a["b"]}'''
 60 60 | 
-61    |-"123456789 {}".format(
-62    |-    1111111111111111111111111111111111111111111111111111111111111111111111111,
+61 61 | "{}".format(
+62 62 |     1
+
+UP032_0.py:61:1: UP032 [*] Use f-string instead of `format` call
+   |
+59 |   '''{[b]}'''.format(a)
+60 |   
+61 | / "{}".format(
+62 | |     1
+63 | | )
+   | |_^ UP032
+64 |   
+65 |   "123456789 {}".format(
+   |
+   = help: Convert to f-string
+
+ℹ Suggested fix
+58 58 | 
+59 59 | '''{[b]}'''.format(a)
+60 60 | 
+61    |-"{}".format(
+62    |-    1
 63    |-)
-   61 |+f"123456789 {1111111111111111111111111111111111111111111111111111111111111111111111111}"
+   61 |+f"{1}"
 64 62 | 
-65 63 | """
-66 64 | {}
+65 63 | "123456789 {}".format(
+66 64 |     1111111111111111111111111111111111111111111111111111111111111111111111111,
 
 UP032_0.py:65:1: UP032 [*] Use f-string instead of `format` call
    |
 63 |   )
 64 |   
-65 | / """
-66 | | {}
-67 | | """.format(1)
-   | |_____________^ UP032
+65 | / "123456789 {}".format(
+66 | |     1111111111111111111111111111111111111111111111111111111111111111111111111,
+67 | | )
+   | |_^ UP032
 68 |   
-69 |   aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = """
+69 |   """
    |
    = help: Convert to f-string
 
 ℹ Suggested fix
-62 62 |     1111111111111111111111111111111111111111111111111111111111111111111111111,
+62 62 |     1
 63 63 | )
 64 64 | 
-   65 |+f"""
-   66 |+{1}
-65 67 | """
-66    |-{}
-67    |-""".format(1)
-68 68 | 
-69 69 | aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = """
-70 70 | {}
+65    |-"123456789 {}".format(
+66    |-    1111111111111111111111111111111111111111111111111111111111111111111111111,
+67    |-)
+   65 |+f"123456789 {1111111111111111111111111111111111111111111111111111111111111111111111111}"
+68 66 | 
+69 67 | """
+70 68 | {}
 
-UP032_0.py:69:85: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:69:1: UP032 [*] Use f-string instead of `format` call
    |
-67 |   """.format(1)
+67 |   )
 68 |   
-69 |   aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = """
-   |  _____________________________________________________________________________________^
+69 | / """
 70 | | {}
-71 | | """.format(
-72 | |     111111
-73 | | )
-   | |_^ UP032
-74 |   
-75 |   "{a}" "{b}".format(a=1, b=1)
+71 | | """.format(1)
+   | |_____________^ UP032
+72 |   
+73 |   aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = """
    |
    = help: Convert to f-string
 
 ℹ Suggested fix
-66 66 | {}
-67 67 | """.format(1)
+66 66 |     1111111111111111111111111111111111111111111111111111111111111111111111111,
+67 67 | )
 68 68 | 
-69    |-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = """
+   69 |+f"""
+   70 |+{1}
+69 71 | """
 70    |-{}
-71    |-""".format(
-72    |-    111111
-73    |-)
-   69 |+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = f"""
-   70 |+{111111}
-   71 |+"""
-74 72 | 
-75 73 | "{a}" "{b}".format(a=1, b=1)
-76 74 | 
+71    |-""".format(1)
+72 72 | 
+73 73 | aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = """
+74 74 | {}
 
-UP032_0.py:75:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:73:85: UP032 [*] Use f-string instead of `format` call
    |
-73 | )
-74 | 
-75 | "{a}" "{b}".format(a=1, b=1)
+71 |   """.format(1)
+72 |   
+73 |   aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = """
+   |  _____________________________________________________________________________________^
+74 | | {}
+75 | | """.format(
+76 | |     111111
+77 | | )
+   | |_^ UP032
+78 |   
+79 |   "{a}" "{b}".format(a=1, b=1)
+   |
+   = help: Convert to f-string
+
+ℹ Suggested fix
+70 70 | {}
+71 71 | """.format(1)
+72 72 | 
+73    |-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = """
+74    |-{}
+75    |-""".format(
+76    |-    111111
+77    |-)
+   73 |+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = f"""
+   74 |+{111111}
+   75 |+"""
+78 76 | 
+79 77 | "{a}" "{b}".format(a=1, b=1)
+80 78 | 
+
+UP032_0.py:79:1: UP032 [*] Use f-string instead of `format` call
+   |
+77 | )
+78 | 
+79 | "{a}" "{b}".format(a=1, b=1)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP032
-76 | 
-77 | (
+80 | 
+81 | (
    |
    = help: Convert to f-string
 
 ℹ Suggested fix
-72 72 |     111111
-73 73 | )
-74 74 | 
-75    |-"{a}" "{b}".format(a=1, b=1)
-   75 |+f"{1}" f"{1}"
-76 76 | 
-77 77 | (
-78 78 |     "{a}"
+76 76 |     111111
+77 77 | )
+78 78 | 
+79    |-"{a}" "{b}".format(a=1, b=1)
+   79 |+f"{1}" f"{1}"
+80 80 | 
+81 81 | (
+82 82 |     "{a}"
 
-UP032_0.py:77:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:81:1: UP032 [*] Use f-string instead of `format` call
    |
-75 |   "{a}" "{b}".format(a=1, b=1)
-76 |   
-77 | / (
-78 | |     "{a}"
-79 | |     "{b}"
-80 | | ).format(a=1, b=1)
+79 |   "{a}" "{b}".format(a=1, b=1)
+80 |   
+81 | / (
+82 | |     "{a}"
+83 | |     "{b}"
+84 | | ).format(a=1, b=1)
    | |__________________^ UP032
-81 |   
-82 |   (
+85 |   
+86 |   (
    |
    = help: Convert to f-string
 
 ℹ Suggested fix
-75 75 | "{a}" "{b}".format(a=1, b=1)
-76 76 | 
-77 77 | (
-78    |-    "{a}"
-79    |-    "{b}"
-80    |-).format(a=1, b=1)
-   78 |+    f"{1}"
-   79 |+    f"{1}"
-   80 |+)
-81 81 | 
-82 82 | (
-83 83 |     "{a}"
-
-UP032_0.py:82:1: UP032 [*] Use f-string instead of `format` call
-   |
-80 |   ).format(a=1, b=1)
-81 |   
-82 | / (
-83 | |     "{a}"
-84 | |     ""
-85 | |     "{b}"
-86 | |     ""
-87 | | ).format(a=1, b=1)
-   | |__________________^ UP032
-88 |   
-89 |   (
-   |
-   = help: Convert to f-string
-
-ℹ Suggested fix
-80 80 | ).format(a=1, b=1)
-81 81 | 
-82 82 | (
-83    |-    "{a}"
+79 79 | "{a}" "{b}".format(a=1, b=1)
+80 80 | 
+81 81 | (
+82    |-    "{a}"
+83    |-    "{b}"
+84    |-).format(a=1, b=1)
+   82 |+    f"{1}"
    83 |+    f"{1}"
-84 84 |     ""
-85    |-    "{b}"
-   85 |+    f"{1}"
-86 86 |     ""
-87    |-).format(a=1, b=1)
-   87 |+)
-88 88 | 
-89 89 | (
-90 90 |     (
+   84 |+)
+85 85 | 
+86 86 | (
+87 87 |     "{a}"
 
-UP032_0.py:90:5: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:86:1: UP032 [*] Use f-string instead of `format` call
    |
-89 |   (
-90 |       (
-   |  _____^
-91 | |         # comment
-92 | |         "{a}"
-93 | |         # comment
-94 | |         "{b}"
-95 | |     )
-96 | |     # comment
-97 | |     .format(a=1, b=1)
-   | |_____________________^ UP032
-98 |   )
+84 |   ).format(a=1, b=1)
+85 |   
+86 | / (
+87 | |     "{a}"
+88 | |     ""
+89 | |     "{b}"
+90 | |     ""
+91 | | ).format(a=1, b=1)
+   | |__________________^ UP032
+92 |   
+93 |   (
    |
    = help: Convert to f-string
 
 ℹ Suggested fix
-89 89 | (
-90 90 |     (
-91 91 |         # comment
-92    |-        "{a}"
-   92 |+        f"{1}"
-93 93 |         # comment
-94    |-        "{b}"
-   94 |+        f"{1}"
-95 95 |     )
-96 96 |     # comment
-97    |-    .format(a=1, b=1)
-   97 |+    
-98 98 | )
-99 99 | 
-100 100 | ###
+84 84 | ).format(a=1, b=1)
+85 85 | 
+86 86 | (
+87    |-    "{a}"
+   87 |+    f"{1}"
+88 88 |     ""
+89    |-    "{b}"
+   89 |+    f"{1}"
+90 90 |     ""
+91    |-).format(a=1, b=1)
+   91 |+)
+92 92 | 
+93 93 | (
+94 94 |     (
 
-UP032_0.py:175:11: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:94:5: UP032 [*] Use f-string instead of `format` call
     |
-174 | def d(osname, version, release):
-175 |     return"{}-{}.{}".format(osname, version, release)
+ 93 |   (
+ 94 |       (
+    |  _____^
+ 95 | |         # comment
+ 96 | |         "{a}"
+ 97 | |         # comment
+ 98 | |         "{b}"
+ 99 | |     )
+100 | |     # comment
+101 | |     .format(a=1, b=1)
+    | |_____________________^ UP032
+102 |   )
+    |
+    = help: Convert to f-string
+
+ℹ Suggested fix
+93  93  | (
+94  94  |     (
+95  95  |         # comment
+96      |-        "{a}"
+    96  |+        f"{1}"
+97  97  |         # comment
+98      |-        "{b}"
+    98  |+        f"{1}"
+99  99  |     )
+100 100 |     # comment
+101     |-    .format(a=1, b=1)
+    101 |+    
+102 102 | )
+103 103 | 
+104 104 | ###
+
+UP032_0.py:177:11: UP032 [*] Use f-string instead of `format` call
+    |
+176 | def d(osname, version, release):
+177 |     return"{}-{}.{}".format(osname, version, release)
     |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP032
     |
     = help: Convert to f-string
 
 ℹ Suggested fix
-172 172 | 
-173 173 | 
-174 174 | def d(osname, version, release):
-175     |-    return"{}-{}.{}".format(osname, version, release)
-    175 |+    return f"{osname}-{version}.{release}"
-176 176 | 
-177 177 | 
-178 178 | def e():
+174 174 | 
+175 175 | 
+176 176 | def d(osname, version, release):
+177     |-    return"{}-{}.{}".format(osname, version, release)
+    177 |+    return f"{osname}-{version}.{release}"
+178 178 | 
+179 179 | 
+180 180 | def e():
 
-UP032_0.py:179:10: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:181:10: UP032 [*] Use f-string instead of `format` call
     |
-178 | def e():
-179 |     yield"{}".format(1)
+180 | def e():
+181 |     yield"{}".format(1)
     |          ^^^^^^^^^^^^^^ UP032
     |
     = help: Convert to f-string
 
 ℹ Suggested fix
-176 176 | 
-177 177 | 
-178 178 | def e():
-179     |-    yield"{}".format(1)
-    179 |+    yield f"{1}"
-180 180 | 
-181 181 | 
-182 182 | assert"{}".format(1)
+178 178 | 
+179 179 | 
+180 180 | def e():
+181     |-    yield"{}".format(1)
+    181 |+    yield f"{1}"
+182 182 | 
+183 183 | 
+184 184 | assert"{}".format(1)
 
-UP032_0.py:182:7: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:184:7: UP032 [*] Use f-string instead of `format` call
     |
-182 | assert"{}".format(1)
+184 | assert"{}".format(1)
     |       ^^^^^^^^^^^^^^ UP032
     |
     = help: Convert to f-string
 
 ℹ Suggested fix
-179 179 |     yield"{}".format(1)
-180 180 | 
-181 181 | 
-182     |-assert"{}".format(1)
-    182 |+assert f"{1}"
+181 181 |     yield"{}".format(1)
+182 182 | 
+183 183 | 
+184     |-assert"{}".format(1)
+    184 |+assert f"{1}"
 
 

@@ -31,8 +31,9 @@ use std::path::Path;
 use itertools::Itertools;
 use log::error;
 use ruff_python_ast::{
-    self as ast, Comprehension, Constant, ElifElseClause, ExceptHandler, Expr, ExprContext,
-    Keyword, Parameter, ParameterWithDefault, Parameters, Pattern, Ranged, Stmt, Suite, UnaryOp,
+    self as ast, Arguments, Comprehension, Constant, ElifElseClause, ExceptHandler, Expr,
+    ExprContext, Keyword, Parameter, ParameterWithDefault, Parameters, Pattern, Ranged, Stmt,
+    Suite, UnaryOp,
 };
 use ruff_text_size::{TextRange, TextSize};
 
@@ -481,8 +482,8 @@ where
 
                 self.semantic.push_scope(ScopeKind::Type);
 
-                for type_param in type_params {
-                    self.visit_type_param(type_param);
+                if let Some(type_params) = type_params {
+                    self.visit_type_params(type_params);
                 }
 
                 for parameter_with_default in parameters
@@ -552,8 +553,7 @@ where
             Stmt::ClassDef(
                 class_def @ ast::StmtClassDef {
                     body,
-                    bases,
-                    keywords,
+                    arguments,
                     decorator_list,
                     type_params,
                     ..
@@ -565,14 +565,12 @@ where
 
                 self.semantic.push_scope(ScopeKind::Type);
 
-                for type_param in type_params {
-                    self.visit_type_param(type_param);
+                if let Some(type_params) = type_params {
+                    self.visit_type_params(type_params);
                 }
-                for expr in bases {
-                    self.visit_expr(expr);
-                }
-                for keyword in keywords {
-                    self.visit_keyword(keyword);
+
+                if let Some(arguments) = arguments {
+                    self.visit_arguments(arguments);
                 }
 
                 let definition = docstrings::extraction::extract_definition(
@@ -598,8 +596,8 @@ where
                 value,
             }) => {
                 self.semantic.push_scope(ScopeKind::Type);
-                for type_param in type_params {
-                    self.visit_type_param(type_param);
+                if let Some(type_params) = type_params {
+                    self.visit_type_params(type_params);
                 }
                 self.visit_expr(value);
                 self.semantic.pop_scope();
@@ -837,8 +835,7 @@ where
         match expr {
             Expr::Call(ast::ExprCall {
                 func,
-                args: _,
-                keywords: _,
+                arguments: _,
                 range: _,
             }) => {
                 if let Expr::Name(ast::ExprName { id, ctx, range: _ }) = func.as_ref() {
@@ -924,8 +921,12 @@ where
             }
             Expr::Call(ast::ExprCall {
                 func,
-                args,
-                keywords,
+                arguments:
+                    Arguments {
+                        args,
+                        keywords,
+                        range: _,
+                    },
                 range: _,
             }) => {
                 self.visit_expr(func);

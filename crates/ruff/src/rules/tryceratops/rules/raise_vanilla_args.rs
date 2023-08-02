@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Constant, Expr, Ranged};
+use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -77,7 +77,11 @@ where
 
 /// TRY003
 pub(crate) fn raise_vanilla_args(checker: &mut Checker, expr: &Expr) {
-    if let Expr::Call(ast::ExprCall { args, .. }) = expr {
+    if let Expr::Call(ast::ExprCall {
+        arguments: Arguments { args, .. },
+        ..
+    }) = expr
+    {
         if let Some(arg) = args.first() {
             if any_string(arg, |part| part.chars().any(char::is_whitespace)) {
                 checker

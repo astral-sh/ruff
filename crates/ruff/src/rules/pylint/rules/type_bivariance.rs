@@ -1,10 +1,9 @@
 use std::fmt;
 
-use ruff_python_ast::{self as ast, Expr, Ranged};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{find_keyword, is_const_true};
+use ruff_python_ast::helpers::is_const_true;
+use ruff_python_ast::{self as ast, Expr, Ranged};
 
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::type_param_name;
@@ -75,20 +74,22 @@ impl Violation for TypeBivariance {
 /// PLC0131
 pub(crate) fn type_bivariance(checker: &mut Checker, value: &Expr) {
     let Expr::Call(ast::ExprCall {
-        func,
-        args,
-        keywords,
-        ..
+        func, arguments, ..
     }) = value
     else {
         return;
     };
 
-    let Some(covariant) = find_keyword(keywords, "covariant").map(|keyword| &keyword.value) else {
+    let Some(covariant) = arguments
+        .find_keyword("covariant")
+        .map(|keyword| &keyword.value)
+    else {
         return;
     };
 
-    let Some(contravariant) = find_keyword(keywords, "contravariant").map(|keyword| &keyword.value)
+    let Some(contravariant) = arguments
+        .find_keyword("contravariant")
+        .map(|keyword| &keyword.value)
     else {
         return;
     };
@@ -119,7 +120,7 @@ pub(crate) fn type_bivariance(checker: &mut Checker, value: &Expr) {
         checker.diagnostics.push(Diagnostic::new(
             TypeBivariance {
                 kind,
-                param_name: type_param_name(args, keywords).map(ToString::to_string),
+                param_name: type_param_name(arguments).map(ToString::to_string),
             },
             func.range(),
         ));

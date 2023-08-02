@@ -1,8 +1,6 @@
-use ruff_python_ast::{self as ast, Expr, Keyword, Ranged};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::find_keyword;
+use ruff_python_ast::{self as ast, Expr, Ranged};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
@@ -45,38 +43,23 @@ impl Violation for DjangoLocalsInRenderFunction {
 }
 
 /// DJ003
-pub(crate) fn locals_in_render_function(
-    checker: &mut Checker,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
-) {
+pub(crate) fn locals_in_render_function(checker: &mut Checker, call: &ast::ExprCall) {
     if !checker
         .semantic()
-        .resolve_call_path(func)
+        .resolve_call_path(&call.func)
         .is_some_and(|call_path| matches!(call_path.as_slice(), ["django", "shortcuts", "render"]))
     {
         return;
     }
 
-    let locals = if args.len() >= 3 {
-        if !is_locals_call(&args[2], checker.semantic()) {
-            return;
+    if let Some(argument) = call.arguments.find_argument("context", 2) {
+        if is_locals_call(argument, checker.semantic()) {
+            checker.diagnostics.push(Diagnostic::new(
+                DjangoLocalsInRenderFunction,
+                argument.range(),
+            ));
         }
-        &args[2]
-    } else if let Some(keyword) = find_keyword(keywords, "context") {
-        if !is_locals_call(&keyword.value, checker.semantic()) {
-            return;
-        }
-        &keyword.value
-    } else {
-        return;
-    };
-
-    checker.diagnostics.push(Diagnostic::new(
-        DjangoLocalsInRenderFunction,
-        locals.range(),
-    ));
+    }
 }
 
 fn is_locals_call(expr: &Expr, semantic: &SemanticModel) -> bool {

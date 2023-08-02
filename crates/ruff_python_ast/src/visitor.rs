@@ -3,9 +3,9 @@
 pub mod preorder;
 
 use crate::{
-    self as ast, Alias, BoolOp, CmpOp, Comprehension, Decorator, ElifElseClause, ExceptHandler,
-    Expr, ExprContext, Keyword, MatchCase, Operator, Parameter, Parameters, Pattern, Stmt,
-    TypeParam, TypeParamTypeVar, UnaryOp, WithItem,
+    self as ast, Alias, Arguments, BoolOp, CmpOp, Comprehension, Decorator, ElifElseClause,
+    ExceptHandler, Expr, ExprContext, Keyword, MatchCase, Operator, Parameter, Parameters, Pattern,
+    Stmt, TypeParam, TypeParamTypeVar, TypeParams, UnaryOp, WithItem,
 };
 
 /// A trait for AST visitors. Visits all nodes in the AST recursively in evaluation-order.
@@ -52,6 +52,9 @@ pub trait Visitor<'a> {
     fn visit_format_spec(&mut self, format_spec: &'a Expr) {
         walk_format_spec(self, format_spec);
     }
+    fn visit_arguments(&mut self, arguments: &'a Arguments) {
+        walk_arguments(self, arguments);
+    }
     fn visit_parameters(&mut self, parameters: &'a Parameters) {
         walk_parameters(self, parameters);
     }
@@ -66,6 +69,9 @@ pub trait Visitor<'a> {
     }
     fn visit_with_item(&mut self, with_item: &'a WithItem) {
         walk_with_item(self, with_item);
+    }
+    fn visit_type_params(&mut self, type_params: &'a TypeParams) {
+        walk_type_params(self, type_params);
     }
     fn visit_type_param(&mut self, type_param: &'a TypeParam) {
         walk_type_param(self, type_param);
@@ -113,8 +119,8 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             for decorator in decorator_list {
                 visitor.visit_decorator(decorator);
             }
-            for type_param in type_params {
-                visitor.visit_type_param(type_param);
+            if let Some(type_params) = type_params {
+                visitor.visit_type_params(type_params);
             }
             visitor.visit_parameters(parameters);
             for expr in returns {
@@ -133,8 +139,8 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             for decorator in decorator_list {
                 visitor.visit_decorator(decorator);
             }
-            for type_param in type_params {
-                visitor.visit_type_param(type_param);
+            if let Some(type_params) = type_params {
+                visitor.visit_type_params(type_params);
             }
             visitor.visit_parameters(parameters);
             for expr in returns {
@@ -143,8 +149,7 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             visitor.visit_body(body);
         }
         Stmt::ClassDef(ast::StmtClassDef {
-            bases,
-            keywords,
+            arguments,
             body,
             decorator_list,
             type_params,
@@ -153,14 +158,11 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             for decorator in decorator_list {
                 visitor.visit_decorator(decorator);
             }
-            for type_param in type_params {
-                visitor.visit_type_param(type_param);
+            if let Some(type_params) = type_params {
+                visitor.visit_type_params(type_params);
             }
-            for expr in bases {
-                visitor.visit_expr(expr);
-            }
-            for keyword in keywords {
-                visitor.visit_keyword(keyword);
+            if let Some(arguments) = arguments {
+                visitor.visit_arguments(arguments);
             }
             visitor.visit_body(body);
         }
@@ -187,8 +189,8 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             value,
         }) => {
             visitor.visit_expr(value);
-            for type_param in type_params {
-                visitor.visit_type_param(type_param);
+            if let Some(type_params) = type_params {
+                visitor.visit_type_params(type_params);
             }
             visitor.visit_expr(name);
         }
@@ -522,17 +524,11 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
         }
         Expr::Call(ast::ExprCall {
             func,
-            args,
-            keywords,
+            arguments,
             range: _range,
         }) => {
             visitor.visit_expr(func);
-            for expr in args {
-                visitor.visit_expr(expr);
-            }
-            for keyword in keywords {
-                visitor.visit_keyword(keyword);
-            }
+            visitor.visit_arguments(arguments);
         }
         Expr::FormattedValue(ast::ExprFormattedValue {
             value, format_spec, ..
@@ -645,6 +641,15 @@ pub fn walk_format_spec<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, format_spe
     visitor.visit_expr(format_spec);
 }
 
+pub fn walk_arguments<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, arguments: &'a Arguments) {
+    for arg in &arguments.args {
+        visitor.visit_expr(arg);
+    }
+    for keyword in &arguments.keywords {
+        visitor.visit_keyword(keyword);
+    }
+}
+
 pub fn walk_parameters<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, parameters: &'a Parameters) {
     // Defaults are evaluated before annotations.
     for arg in &parameters.posonlyargs {
@@ -694,6 +699,12 @@ pub fn walk_with_item<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, with_item: &
     visitor.visit_expr(&with_item.context_expr);
     if let Some(expr) = &with_item.optional_vars {
         visitor.visit_expr(expr);
+    }
+}
+
+pub fn walk_type_params<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, type_params: &'a TypeParams) {
+    for type_param in &type_params.type_params {
+        visitor.visit_type_param(type_param);
     }
 }
 

@@ -21,18 +21,21 @@ expression: parse_ast
                                             ctx: Load,
                                         },
                                     ),
-                                    args: [
-                                        Constant(
-                                            ExprConstant {
-                                                range: 26..27,
-                                                value: Int(
-                                                    1,
-                                                ),
-                                                kind: None,
-                                            },
-                                        ),
-                                    ],
-                                    keywords: [],
+                                    arguments: Arguments {
+                                        range: 25..28,
+                                        args: [
+                                            Constant(
+                                                ExprConstant {
+                                                    range: 26..27,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                    kind: None,
+                                                },
+                                            ),
+                                        ],
+                                        keywords: [],
+                                    },
                                 },
                             ),
                         ),
@@ -73,55 +76,61 @@ expression: parse_ast
                                                     ctx: Load,
                                                 },
                                             ),
-                                            args: [
-                                                JoinedStr(
-                                                    ExprJoinedStr {
-                                                        range: 62..81,
-                                                        values: [
-                                                            Constant(
-                                                                ExprConstant {
-                                                                    range: 64..71,
-                                                                    value: Str(
-                                                                        "caught ",
-                                                                    ),
-                                                                    kind: None,
-                                                                },
-                                                            ),
-                                                            FormattedValue(
-                                                                ExprFormattedValue {
-                                                                    range: 71..80,
-                                                                    value: Call(
-                                                                        ExprCall {
-                                                                            range: 72..79,
-                                                                            func: Name(
-                                                                                ExprName {
-                                                                                    range: 72..76,
-                                                                                    id: "type",
-                                                                                    ctx: Load,
-                                                                                },
-                                                                            ),
-                                                                            args: [
-                                                                                Name(
+                                            arguments: Arguments {
+                                                range: 61..82,
+                                                args: [
+                                                    JoinedStr(
+                                                        ExprJoinedStr {
+                                                            range: 62..81,
+                                                            values: [
+                                                                Constant(
+                                                                    ExprConstant {
+                                                                        range: 64..71,
+                                                                        value: Str(
+                                                                            "caught ",
+                                                                        ),
+                                                                        kind: None,
+                                                                    },
+                                                                ),
+                                                                FormattedValue(
+                                                                    ExprFormattedValue {
+                                                                        range: 71..80,
+                                                                        value: Call(
+                                                                            ExprCall {
+                                                                                range: 72..79,
+                                                                                func: Name(
                                                                                     ExprName {
-                                                                                        range: 77..78,
-                                                                                        id: "e",
+                                                                                        range: 72..76,
+                                                                                        id: "type",
                                                                                         ctx: Load,
                                                                                     },
                                                                                 ),
-                                                                            ],
-                                                                            keywords: [],
-                                                                        },
-                                                                    ),
-                                                                    debug_text: None,
-                                                                    conversion: None,
-                                                                    format_spec: None,
-                                                                },
-                                                            ),
-                                                        ],
-                                                    },
-                                                ),
-                                            ],
-                                            keywords: [],
+                                                                                arguments: Arguments {
+                                                                                    range: 76..79,
+                                                                                    args: [
+                                                                                        Name(
+                                                                                            ExprName {
+                                                                                                range: 77..78,
+                                                                                                id: "e",
+                                                                                                ctx: Load,
+                                                                                            },
+                                                                                        ),
+                                                                                    ],
+                                                                                    keywords: [],
+                                                                                },
+                                                                            },
+                                                                        ),
+                                                                        debug_text: None,
+                                                                        conversion: None,
+                                                                        format_spec: None,
+                                                                    },
+                                                                ),
+                                                            ],
+                                                        },
+                                                    ),
+                                                ],
+                                                keywords: [],
+                                            },
                                         },
                                     ),
                                 },
@@ -161,55 +170,61 @@ expression: parse_ast
                                                     ctx: Load,
                                                 },
                                             ),
-                                            args: [
-                                                JoinedStr(
-                                                    ExprJoinedStr {
-                                                        range: 114..133,
-                                                        values: [
-                                                            Constant(
-                                                                ExprConstant {
-                                                                    range: 116..123,
-                                                                    value: Str(
-                                                                        "caught ",
-                                                                    ),
-                                                                    kind: None,
-                                                                },
-                                                            ),
-                                                            FormattedValue(
-                                                                ExprFormattedValue {
-                                                                    range: 123..132,
-                                                                    value: Call(
-                                                                        ExprCall {
-                                                                            range: 124..131,
-                                                                            func: Name(
-                                                                                ExprName {
-                                                                                    range: 124..128,
-                                                                                    id: "type",
-                                                                                    ctx: Load,
-                                                                                },
-                                                                            ),
-                                                                            args: [
-                                                                                Name(
+                                            arguments: Arguments {
+                                                range: 113..134,
+                                                args: [
+                                                    JoinedStr(
+                                                        ExprJoinedStr {
+                                                            range: 114..133,
+                                                            values: [
+                                                                Constant(
+                                                                    ExprConstant {
+                                                                        range: 116..123,
+                                                                        value: Str(
+                                                                            "caught ",
+                                                                        ),
+                                                                        kind: None,
+                                                                    },
+                                                                ),
+                                                                FormattedValue(
+                                                                    ExprFormattedValue {
+                                                                        range: 123..132,
+                                                                        value: Call(
+                                                                            ExprCall {
+                                                                                range: 124..131,
+                                                                                func: Name(
                                                                                     ExprName {
-                                                                                        range: 129..130,
-                                                                                        id: "e",
+                                                                                        range: 124..128,
+                                                                                        id: "type",
                                                                                         ctx: Load,
                                                                                     },
                                                                                 ),
-                                                                            ],
-                                                                            keywords: [],
-                                                                        },
-                                                                    ),
-                                                                    debug_text: None,
-                                                                    conversion: None,
-                                                                    format_spec: None,
-                                                                },
-                                                            ),
-                                                        ],
-                                                    },
-                                                ),
-                                            ],
-                                            keywords: [],
+                                                                                arguments: Arguments {
+                                                                                    range: 128..131,
+                                                                                    args: [
+                                                                                        Name(
+                                                                                            ExprName {
+                                                                                                range: 129..130,
+                                                                                                id: "e",
+                                                                                                ctx: Load,
+                                                                                            },
+                                                                                        ),
+                                                                                    ],
+                                                                                    keywords: [],
+                                                                                },
+                                                                            },
+                                                                        ),
+                                                                        debug_text: None,
+                                                                        conversion: None,
+                                                                        format_spec: None,
+                                                                    },
+                                                                ),
+                                                            ],
+                                                        },
+                                                    ),
+                                                ],
+                                                keywords: [],
+                                            },
                                         },
                                     ),
                                 },

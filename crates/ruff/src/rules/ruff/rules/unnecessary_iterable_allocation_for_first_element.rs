@@ -5,7 +5,7 @@ use unicode_width::UnicodeWidthStr;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Comprehension, Constant, Expr, Ranged};
+use ruff_python_ast::{self as ast, Arguments, Comprehension, Constant, Expr, Ranged};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{TextRange, TextSize};
 
@@ -151,7 +151,11 @@ struct IterationTarget {
 /// redundant comprehension).
 fn match_iteration_target(expr: &Expr, model: &SemanticModel) -> Option<IterationTarget> {
     let result = match expr {
-        Expr::Call(ast::ExprCall { func, args, .. }) => {
+        Expr::Call(ast::ExprCall {
+            func,
+            arguments: Arguments { args, .. },
+            ..
+        }) => {
             let ast::ExprName { id, .. } = func.as_name_expr()?;
 
             if !matches!(id.as_str(), "tuple" | "list") {

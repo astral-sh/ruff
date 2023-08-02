@@ -1,8 +1,7 @@
-use ruff_python_ast::{self as ast, Decorator, Expr, Ranged};
-use ruff_text_size::TextRange;
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Decorator, Expr, Ranged};
+use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -59,8 +58,7 @@ pub(crate) fn lru_cache_without_parameters(checker: &mut Checker, decorator_list
     for decorator in decorator_list {
         let Expr::Call(ast::ExprCall {
             func,
-            args,
-            keywords,
+            arguments,
             range: _,
         }) = &decorator.expression
         else {
@@ -68,8 +66,8 @@ pub(crate) fn lru_cache_without_parameters(checker: &mut Checker, decorator_list
         };
 
         // Look for, e.g., `import functools; @functools.lru_cache()`.
-        if args.is_empty()
-            && keywords.is_empty()
+        if arguments.args.is_empty()
+            && arguments.keywords.is_empty()
             && checker
                 .semantic()
                 .resolve_call_path(func)
@@ -80,9 +78,9 @@ pub(crate) fn lru_cache_without_parameters(checker: &mut Checker, decorator_list
                 TextRange::new(func.end(), decorator.end()),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                    checker.generator().expr(func),
-                    decorator.expression.range(),
+                diagnostic.set_fix(Fix::automatic(Edit::deletion(
+                    arguments.start(),
+                    arguments.end(),
                 )));
             }
             checker.diagnostics.push(diagnostic);

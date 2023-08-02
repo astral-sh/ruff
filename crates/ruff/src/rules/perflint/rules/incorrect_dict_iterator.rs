@@ -1,8 +1,8 @@
 use std::fmt;
 
 use ruff_python_ast as ast;
-use ruff_python_ast::Expr;
 use ruff_python_ast::Ranged;
+use ruff_python_ast::{Arguments, Expr};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -65,7 +65,12 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, target: &Expr, iter
     let [key, value] = elts.as_slice() else {
         return;
     };
-    let Expr::Call(ast::ExprCall { func, args, .. }) = iter else {
+    let Expr::Call(ast::ExprCall {
+        func,
+        arguments: Arguments { args, .. },
+        ..
+    }) = iter
+    else {
         return;
     };
     if !args.is_empty() {

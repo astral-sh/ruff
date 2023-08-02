@@ -1,5 +1,6 @@
 use ruff_python_ast::{
-    self as ast, Constant, Expr, Operator, ParameterWithDefault, Parameters, Ranged, Stmt, UnaryOp,
+    self as ast, Arguments, Constant, Expr, Operator, ParameterWithDefault, Parameters, Ranged,
+    Stmt, UnaryOp,
 };
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
@@ -368,7 +369,10 @@ fn is_final_assignment(annotation: &Expr, value: &Expr, semantic: &SemanticModel
 }
 
 /// Returns `true` if the a class is an enum, based on its base classes.
-fn is_enum(bases: &[Expr], semantic: &SemanticModel) -> bool {
+fn is_enum(arguments: Option<&Arguments>, semantic: &SemanticModel) -> bool {
+    let Some(Arguments { args: bases, .. }) = arguments else {
+        return false;
+    };
     return bases.iter().any(|expr| {
         semantic.resolve_call_path(expr).is_some_and(|call_path| {
             matches!(
@@ -565,8 +569,8 @@ pub(crate) fn unannotated_assignment_in_stub(
         return;
     }
 
-    if let ScopeKind::Class(ast::StmtClassDef { bases, .. }) = checker.semantic().scope().kind {
-        if is_enum(bases, checker.semantic()) {
+    if let ScopeKind::Class(ast::StmtClassDef { arguments, .. }) = checker.semantic().scope().kind {
+        if is_enum(arguments.as_deref(), checker.semantic()) {
             return;
         }
     }

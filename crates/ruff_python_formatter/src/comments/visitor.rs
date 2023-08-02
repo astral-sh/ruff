@@ -1,8 +1,9 @@
 use std::iter::Peekable;
 
 use ruff_python_ast::{
-    Alias, Comprehension, Decorator, ElifElseClause, ExceptHandler, Expr, Keyword, MatchCase, Mod,
-    Parameter, ParameterWithDefault, Parameters, Pattern, Ranged, Stmt, TypeParam, WithItem,
+    Alias, Arguments, Comprehension, Decorator, ElifElseClause, ExceptHandler, Expr, Keyword,
+    MatchCase, Mod, Parameter, ParameterWithDefault, Parameters, Pattern, Ranged, Stmt, TypeParam,
+    WithItem,
 };
 use ruff_text_size::{TextRange, TextSize};
 
@@ -227,6 +228,13 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast> {
             walk_expr(self, format_spec);
         }
         self.finish_node(format_spec);
+    }
+
+    fn visit_arguments(&mut self, arguments: &'ast Arguments) {
+        if self.start_node(arguments).is_traverse() {
+            walk_arguments(self, arguments);
+        }
+        self.finish_node(arguments);
     }
 
     fn visit_parameters(&mut self, parameters: &'ast Parameters) {

@@ -1,11 +1,10 @@
-use ruff_python_ast::{Expr, Keyword};
-use ruff_text_size::TextRange;
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{has_non_none_keyword, is_const_none};
+use ruff_python_ast::helpers::is_const_none;
+use ruff_python_ast::{self as ast, Ranged};
 
 use crate::checkers::ast::Checker;
+use crate::rules::flake8_datetimez::rules::helpers::has_non_none_keyword;
 
 use super::helpers;
 
@@ -20,16 +19,10 @@ impl Violation for CallDatetimeNowWithoutTzinfo {
 }
 
 /// DTZ005
-pub(crate) fn call_datetime_now_without_tzinfo(
-    checker: &mut Checker,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
-    location: TextRange,
-) {
+pub(crate) fn call_datetime_now_without_tzinfo(checker: &mut Checker, call: &ast::ExprCall) {
     if !checker
         .semantic()
-        .resolve_call_path(func)
+        .resolve_call_path(&call.func)
         .is_some_and(|call_path| matches!(call_path.as_slice(), ["datetime", "datetime", "now"]))
     {
         return;
@@ -40,25 +33,25 @@ pub(crate) fn call_datetime_now_without_tzinfo(
     }
 
     // no args / no args unqualified
-    if args.is_empty() && keywords.is_empty() {
+    if call.arguments.args.is_empty() && call.arguments.keywords.is_empty() {
         checker
             .diagnostics
-            .push(Diagnostic::new(CallDatetimeNowWithoutTzinfo, location));
+            .push(Diagnostic::new(CallDatetimeNowWithoutTzinfo, call.range()));
         return;
     }
 
     // none args
-    if !args.is_empty() && is_const_none(&args[0]) {
+    if call.arguments.args.first().is_some_and(is_const_none) {
         checker
             .diagnostics
-            .push(Diagnostic::new(CallDatetimeNowWithoutTzinfo, location));
+            .push(Diagnostic::new(CallDatetimeNowWithoutTzinfo, call.range()));
         return;
     }
 
     // wrong keywords / none keyword
-    if !keywords.is_empty() && !has_non_none_keyword(keywords, "tz") {
+    if !call.arguments.keywords.is_empty() && !has_non_none_keyword(&call.arguments, "tz") {
         checker
             .diagnostics
-            .push(Diagnostic::new(CallDatetimeNowWithoutTzinfo, location));
+            .push(Diagnostic::new(CallDatetimeNowWithoutTzinfo, call.range()));
     }
 }

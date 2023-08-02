@@ -3,8 +3,8 @@ use std::cmp::Ordering;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{
-    self as ast, Comprehension, Expr, ExprAttribute, ExprBinOp, ExprIfExp, ExprSlice, ExprStarred,
-    MatchCase, Parameters, Ranged,
+    self as ast, Arguments, Comprehension, Expr, ExprAttribute, ExprBinOp, ExprIfExp, ExprSlice,
+    ExprStarred, MatchCase, Parameters, Ranged,
 };
 use ruff_python_trivia::{
     indentation_at_offset, PythonWhitespace, SimpleToken, SimpleTokenKind, SimpleTokenizer,
@@ -46,6 +46,7 @@ pub(super) fn place_comment<'a>(
         AnyNodeRef::Parameters(arguments) => {
             handle_parameters_separator_comment(comment, arguments, locator)
         }
+        AnyNodeRef::Arguments(arguments) => handle_arguments_comment(comment, arguments),
         AnyNodeRef::Comprehension(comprehension) => {
             handle_comprehension_comment(comment, comprehension, locator)
         }
@@ -79,6 +80,9 @@ pub(super) fn place_comment<'a>(
         AnyNodeRef::WithItem(_) => handle_with_item_comment(comment, locator),
         AnyNodeRef::StmtFunctionDef(_) | AnyNodeRef::StmtAsyncFunctionDef(_) => {
             handle_leading_function_with_decorators_comment(comment)
+        }
+        AnyNodeRef::StmtClassDef(class_def) => {
+            handle_leading_class_with_decorators_comment(comment, class_def)
         }
         AnyNodeRef::StmtImportFrom(import_from) => handle_import_from_comment(comment, import_from),
         _ => CommentPlacement::Default(comment),
@@ -843,6 +847,32 @@ fn handle_leading_function_with_decorators_comment(comment: DecoratedComment) ->
     }
 }
 
+/// Handle comments between decorators and the decorated node.
+///
+/// For example, given:
+/// ```python
+/// @dataclass
+/// # comment
+/// class Foo(Bar):
+///     ...
+/// ```
+///
+/// The comment should be attached to the enclosing [`ast::StmtClassDef`] as a dangling node,
+/// as opposed to being treated as a leading comment on `Bar` or similar.
+fn handle_leading_class_with_decorators_comment<'a>(
+    comment: DecoratedComment<'a>,
+    class_def: &'a ast::StmtClassDef,
+) -> CommentPlacement<'a> {
+    if comment.start() < class_def.name.start() {
+        if let Some(decorator) = class_def.decorator_list.last() {
+            if decorator.end() < comment.start() {
+                return CommentPlacement::dangling(class_def, comment);
+            }
+        }
+    }
+    CommentPlacement::Default(comment)
+}
+
 /// Handles comments between `**` and the variable name in dict unpacking
 /// It attaches these to the appropriate value node
 ///
@@ -1103,6 +1133,64 @@ fn find_only_token_in_range(
     let mut tokens = tokens.skip_while(|token| token.kind == SimpleTokenKind::LParen);
     debug_assert_eq!(tokens.next(), None);
     token
+}
+
+/// Attach an enclosed end-of-line comment to a set of [`Arguments`].
+///
+/// For example, given:
+/// ```python
+/// foo(  # comment
+///    bar,
+/// )
+/// ```
+///
+/// The comment will be attached to the [`Arguments`] node as a dangling comment, to ensure
+/// that it remains on the same line as open parenthesis.
+fn handle_arguments_comment<'a>(
+    comment: DecoratedComment<'a>,
+    arguments: &'a Arguments,
+) -> CommentPlacement<'a> {
+    // The comment needs to be on the same line, but before the first argument. For example, we want
+    // to treat this as a dangling comment:
+    // ```python
+    // foo(  # comment
+    //     bar,
+    //     baz,
+    //     qux,
+    // )
+    // ```
+    // However, this should _not_ be treated as a dangling comment:
+    // ```python
+    // foo(bar,  # comment
+    //     baz,
+    //     qux,
+    // )
+    // ```
+    // Thus, we check whether the comment is an end-of-line comment _between_ the start of the
+    // statement and the first argument. If so, the only possible position is immediately following
+    // the open parenthesis.
+    if comment.line_position().is_end_of_line() {
+        let first_argument = match (arguments.args.as_slice(), arguments.keywords.as_slice()) {
+            ([first_arg, ..], [first_keyword, ..]) => {
+                if first_arg.start() < first_keyword.start() {
+                    Some(first_arg.range())
+                } else {
+                    Some(first_keyword.range())
+                }
+            }
+            ([first_arg, ..], []) => Some(first_arg.range()),
+            ([], [first_keyword, ..]) => Some(first_keyword.range()),
+            ([], []) => None,
+        };
+
+        if let Some(first_argument) = first_argument {
+            if arguments.start() < comment.start() && comment.end() < first_argument.start() {
+                return CommentPlacement::dangling(comment.enclosing_node(), comment);
+            }
+        }
+    }
+
+    CommentPlacement::Default(comment)
 }
 
 /// Attach an enclosed end-of-line comment to a [`StmtImportFrom`].

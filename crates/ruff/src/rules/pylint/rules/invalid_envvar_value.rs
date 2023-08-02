@@ -1,8 +1,6 @@
-use ruff_python_ast::{self as ast, Constant, Expr, Keyword, Operator, Ranged};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::find_keyword;
+use ruff_python_ast::{self as ast, Constant, Expr, Operator, Ranged};
 
 use crate::checkers::ast::Checker;
 
@@ -75,22 +73,14 @@ fn is_valid_key(expr: &Expr) -> bool {
 }
 
 /// PLE1507
-pub(crate) fn invalid_envvar_value(
-    checker: &mut Checker,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
-) {
+pub(crate) fn invalid_envvar_value(checker: &mut Checker, call: &ast::ExprCall) {
     if checker
         .semantic()
-        .resolve_call_path(func)
+        .resolve_call_path(&call.func)
         .is_some_and(|call_path| matches!(call_path.as_slice(), ["os", "getenv"]))
     {
         // Find the `key` argument, if it exists.
-        let Some(expr) = args
-            .get(0)
-            .or_else(|| find_keyword(keywords, "key").map(|keyword| &keyword.value))
-        else {
+        let Some(expr) = call.arguments.find_argument("key", 0) else {
             return;
         };
 
