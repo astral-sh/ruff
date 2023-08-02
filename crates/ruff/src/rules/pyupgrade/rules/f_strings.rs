@@ -1,11 +1,12 @@
 use std::borrow::Cow;
 
+use anyhow::{Context, Result};
 use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Keyword, Ranged};
 use ruff_python_literal::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
 use ruff_python_parser::{lexer, Mode, Tok};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
@@ -188,12 +189,15 @@ fn formatted_expr<'a>(expr: &Expr, context: FormatContext, locator: &Locator<'a>
     }
 }
 
-/// Convert a string format call to an f-string.
+/// Convert a string `.format` call to an f-string.
+///
+/// Returns `None` if the string does not require conversion, and `Err` if the conversion
+/// is not possible.
 fn try_convert_to_f_string(
     range: TextRange,
     summary: &mut FormatSummaryValues,
     locator: &Locator,
-) -> Option<String> {
+) -> Result<Option<String>> {
     // Strip the unicode prefix. It's redundant in Python 3, and invalid when used
     // with f-strings.
     let contents = locator.slice(range);
@@ -204,28 +208,22 @@ fn try_convert_to_f_string(
     };
 
     // Remove the leading and trailing quotes.
-    let Some(leading_quote) = leading_quote(contents) else {
-        return None;
-    };
-    let Some(trailing_quote) = trailing_quote(contents) else {
-        return None;
-    };
+    let leading_quote = leading_quote(contents).context("Unable to identify leading quote")?;
+    let trailing_quote = trailing_quote(contents).context("Unable to identify trailing quote")?;
     let contents = &contents[leading_quote.len()..contents.len() - trailing_quote.len()];
     if contents.is_empty() {
-        return None;
+        return Ok(None);
     }
 
     // Parse the format string.
-    let Ok(format_string) = FormatString::from_str(contents) else {
-        return None;
-    };
+    let format_string = FormatString::from_str(contents)?;
 
     if format_string
         .format_parts
         .iter()
         .all(|part| matches!(part, FormatPart::Literal(..)))
     {
-        return None;
+        return Ok(None);
     }
 
     let mut converted = String::with_capacity(contents.len());
@@ -238,12 +236,13 @@ fn try_convert_to_f_string(
             } => {
                 converted.push('{');
 
-                let field = FieldName::parse(&field_name).ok()?;
+                let field = FieldName::parse(&field_name)?;
                 let arg = match field.field_type {
                     FieldType::Auto => summary.arg_auto(),
                     FieldType::Index(index) => summary.arg_positional(index),
                     FieldType::Keyword(name) => summary.arg_keyword(&name),
-                }?;
+                }
+                .context("Unable to parse field")?;
                 converted.push_str(&formatted_expr(
                     arg,
                     if field.parts.is_empty() {
@@ -304,7 +303,7 @@ fn try_convert_to_f_string(
     contents.push_str(leading_quote);
     contents.push_str(&converted);
     contents.push_str(trailing_quote);
-    Some(contents)
+    Ok(Some(contents))
 }
 
 /// UP032
@@ -361,10 +360,14 @@ pub(crate) fn f_strings(
                 break range.start();
             }
             Some((Tok::String { .. }, range)) => {
-                if let Some(fstring) =
-                    try_convert_to_f_string(range, &mut summary, checker.locator())
-                {
-                    patches.push((range, fstring));
+                match try_convert_to_f_string(range, &mut summary, checker.locator()) {
+                    Ok(Some(fstring)) => patches.push((range, fstring)),
+                    // Skip any strings that don't require conversion (e.g., literal segments of an
+                    // implicit concatenation).
+                    Ok(None) => continue,
+                    // If any of the segments fail to convert, then we can't convert the entire
+                    // expression.
+                    Err(_) => return,
                 }
             }
             Some(_) => continue,

@@ -1,6 +1,7 @@
 use itertools::{Itertools, PeekingNext};
 
 use num_traits::{cast::ToPrimitive, FromPrimitive, Signed};
+use std::error::Error;
 use std::ops::Deref;
 use std::{cmp, str::FromStr};
 
@@ -743,6 +744,39 @@ pub enum FormatParseError {
     MissingRightBracket,
     InvalidCharacterAfterRightBracket,
 }
+
+impl std::fmt::Display for FormatParseError {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::UnmatchedBracket => {
+                std::write!(fmt, "unmatched bracket in format string")
+            }
+            Self::MissingStartBracket => {
+                std::write!(fmt, "missing start bracket in format string")
+            }
+            Self::UnescapedStartBracketInLiteral => {
+                std::write!(fmt, "unescaped start bracket in literal")
+            }
+            Self::InvalidFormatSpecifier => {
+                std::write!(fmt, "invalid format specifier")
+            }
+            Self::UnknownConversion => {
+                std::write!(fmt, "unknown conversion")
+            }
+            Self::EmptyAttribute => {
+                std::write!(fmt, "empty attribute")
+            }
+            Self::MissingRightBracket => {
+                std::write!(fmt, "missing right bracket")
+            }
+            Self::InvalidCharacterAfterRightBracket => {
+                std::write!(fmt, "invalid character after right bracket")
+            }
+        }
+    }
+}
+
+impl Error for FormatParseError {}
 
 impl FromStr for FormatSpec {
     type Err = FormatSpecError;

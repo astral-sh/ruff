@@ -187,3 +187,8 @@ async def c():
 
 async def c():
     return "{}".format(1 + await 3)
+
+(
+    "{a}"
+    "{1 + 2}"
+).format(a=1)
