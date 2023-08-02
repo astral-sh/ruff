@@ -83,7 +83,7 @@ impl AlwaysAutofixableViolation for PytestIncorrectMarkParenthesesStyle {
 /// Use instead:
 /// ```python
 /// def test_something():
-///    ...
+///     ...
 /// ```
 ///
 /// ## References
