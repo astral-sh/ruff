@@ -36,6 +36,7 @@ mod tests {
         Path::new("RUF015.py")
     )]
     #[test_case(Rule::InvalidIndexType, Path::new("RUF016.py"))]
+    #[test_case(Rule::TypeAliasAnnotation, Path::new("RUF017.py"))]
     #[cfg_attr(
         feature = "unreachable-code",
         test_case(Rule::UnreachableCode, Path::new("RUF014.py"))
