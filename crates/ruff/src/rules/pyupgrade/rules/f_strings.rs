@@ -110,11 +110,11 @@ impl<'a> FormatSummaryValues<'a> {
     }
 
     fn arg_positional(&self, index: usize) -> Option<&Expr> {
-        self.args.get(index).map(|a| *a)
+        self.args.get(index).copied()
     }
 
     fn arg_keyword(&self, key: &str) -> Option<&Expr> {
-        self.kwargs.get(key).map(|a| *a)
+        self.kwargs.get(key).copied()
     }
 }
 
