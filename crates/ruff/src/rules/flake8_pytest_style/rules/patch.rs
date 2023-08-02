@@ -1,7 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
-use ruff_python_ast::helpers::includes_arg_name;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, Parameters, Ranged};
@@ -30,7 +29,7 @@ where
     fn visit_expr(&mut self, expr: &'b Expr) {
         match expr {
             Expr::Name(ast::ExprName { id, .. }) => {
-                if includes_arg_name(id, self.parameters) {
+                if self.parameters.includes(id) {
                     self.uses_args = true;
                 }
             }

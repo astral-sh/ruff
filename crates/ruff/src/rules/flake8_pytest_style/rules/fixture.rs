@@ -4,7 +4,6 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
-use ruff_python_ast::helpers::includes_arg_name;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
@@ -640,7 +639,7 @@ fn check_fixture_decorator_name(checker: &mut Checker, decorator: &Decorator) {
 
 /// PT021
 fn check_fixture_addfinalizer(checker: &mut Checker, parameters: &Parameters, body: &[Stmt]) {
-    if !includes_arg_name("request", parameters) {
+    if !parameters.includes("request") {
         return;
     }
 

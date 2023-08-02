@@ -9,8 +9,8 @@ use ruff_text_size::TextRange;
 use crate::call_path::CallPath;
 use crate::statement_visitor::{walk_body, walk_stmt, StatementVisitor};
 use crate::{
-    self as ast, Arguments, Constant, ExceptHandler, Expr, MatchCase, Parameters, Pattern, Ranged,
-    Stmt, TypeParam,
+    self as ast, Arguments, Constant, ExceptHandler, Expr, MatchCase, Pattern, Ranged, Stmt,
+    TypeParam,
 };
 
 /// Return `true` if the `Stmt` is a compound statement (as opposed to a simple statement).
@@ -710,30 +710,6 @@ pub fn extract_handled_exceptions(handlers: &[ExceptHandler]) -> Vec<&Expr> {
         }
     }
     handled_exceptions
-}
-
-/// Returns `true` if the given name is included in the given [`Parameters`].
-pub fn includes_arg_name(name: &str, parameters: &Parameters) -> bool {
-    if parameters
-        .posonlyargs
-        .iter()
-        .chain(&parameters.args)
-        .chain(&parameters.kwonlyargs)
-        .any(|arg| arg.parameter.name.as_str() == name)
-    {
-        return true;
-    }
-    if let Some(arg) = &parameters.vararg {
-        if arg.name.as_str() == name {
-            return true;
-        }
-    }
-    if let Some(arg) = &parameters.kwarg {
-        if arg.name.as_str() == name {
-            return true;
-        }
-    }
-    false
 }
 
 /// Given an [`Expr`] that can be callable or not (like a decorator, which could
