@@ -59,6 +59,7 @@ impl AlwaysAutofixableViolation for FString {
 struct FormatSummaryValues<'a> {
     args: Vec<&'a Expr>,
     kwargs: FxHashMap<&'a str, &'a Expr>,
+    auto_index: usize,
 }
 
 impl<'a> FormatSummaryValues<'a> {
@@ -98,27 +99,21 @@ impl<'a> FormatSummaryValues<'a> {
         Some(Self {
             args: extracted_args,
             kwargs: extracted_kwargs,
+            auto_index: 0,
         })
     }
 
-    fn consume_next(&mut self) -> Option<&Expr> {
-        if self.args.is_empty() {
-            None
-        } else {
-            Some(self.args.remove(0))
-        }
+    fn arg_auto(&mut self) -> Option<&Expr> {
+        self.auto_index += 1;
+        self.arg_positional(self.auto_index - 1)
     }
 
-    fn consume_arg(&mut self, index: usize) -> Option<&Expr> {
-        if self.args.len() > index {
-            Some(self.args.remove(index))
-        } else {
-            None
-        }
+    fn arg_positional(&mut self, index: usize) -> Option<&Expr> {
+        self.args.get(index).map(|x| *x)
     }
 
-    fn consume_kwarg(&mut self, key: &str) -> Option<&Expr> {
-        self.kwargs.remove(key)
+    fn arg_keyword(&mut self, key: &str) -> Option<&Expr> {
+        self.kwargs.get(key).map(|x| *x)
     }
 }
 
@@ -250,9 +245,9 @@ fn try_convert_to_f_string(expr: &Expr, locator: &Locator) -> Option<String> {
 
                 let field = FieldName::parse(&field_name).ok()?;
                 let arg = match field.field_type {
-                    FieldType::Auto => summary.consume_next(),
-                    FieldType::Index(index) => summary.consume_arg(index),
-                    FieldType::Keyword(name) => summary.consume_kwarg(&name),
+                    FieldType::Auto => summary.arg_auto(),
+                    FieldType::Index(index) => summary.arg_positional(index),
+                    FieldType::Keyword(name) => summary.arg_keyword(&name),
                 }?;
                 converted.push_str(&formatted_expr(
                     arg,
