@@ -1,9 +1,7 @@
-use ruff_python_ast::{Expr, Keyword, Ranged};
-use ruff_text_size::TextRange;
-
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_true;
+use ruff_python_ast::{self as ast, Keyword, Ranged};
 use ruff_python_semantic::{BindingKind, Import};
 use ruff_source_file::Locator;
 
@@ -52,15 +50,9 @@ impl Violation for PandasUseOfInplaceArgument {
 }
 
 /// PD002
-pub(crate) fn inplace_argument(
-    checker: &mut Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
-) {
+pub(crate) fn inplace_argument(checker: &mut Checker, call: &ast::ExprCall) {
     // If the function was imported from another module, and it's _not_ Pandas, abort.
-    if let Some(call_path) = checker.semantic().resolve_call_path(func) {
+    if let Some(call_path) = checker.semantic().resolve_call_path(&call.func) {
         if !call_path
             .first()
             .and_then(|module| checker.semantic().find_binding(module))
@@ -78,7 +70,7 @@ pub(crate) fn inplace_argument(
     }
 
     let mut seen_star = false;
-    for keyword in keywords.iter().rev() {
+    for keyword in call.arguments.keywords.iter().rev() {
         let Some(arg) = &keyword.arg else {
             seen_star = true;
             continue;
@@ -101,13 +93,9 @@ pub(crate) fn inplace_argument(
                         && checker.semantic().expr_parent().is_none()
                         && !checker.semantic().scope().kind.is_lambda()
                     {
-                        if let Some(fix) = convert_inplace_argument_to_assignment(
-                            checker.locator(),
-                            expr,
-                            keyword.range(),
-                            args,
-                            keywords,
-                        ) {
+                        if let Some(fix) =
+                            convert_inplace_argument_to_assignment(checker.locator(), call, keyword)
+                        {
                             diagnostic.set_fix(fix);
                         }
                     }
@@ -126,22 +114,18 @@ pub(crate) fn inplace_argument(
 /// assignment.
 fn convert_inplace_argument_to_assignment(
     locator: &Locator,
-    expr: &Expr,
-    expr_range: TextRange,
-    args: &[Expr],
-    keywords: &[Keyword],
+    call: &ast::ExprCall,
+    keyword: &Keyword,
 ) -> Option<Fix> {
     // Add the assignment.
-    let call = expr.as_call_expr()?;
     let attr = call.func.as_attribute_expr()?;
     let insert_assignment = Edit::insertion(
         format!("{name} = ", name = locator.slice(attr.value.range())),
-        expr.start(),
+        call.start(),
     );
 
     // Remove the `inplace` argument.
-    let remove_argument =
-        remove_argument(locator, call.func.end(), expr_range, args, keywords, false).ok()?;
+    let remove_argument = remove_argument(keyword, &call.arguments, false, locator).ok()?;
 
     Some(Fix::suggested_edits(insert_assignment, [remove_argument]))
 }

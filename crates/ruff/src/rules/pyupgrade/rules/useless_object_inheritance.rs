@@ -1,7 +1,6 @@
-use ruff_python_ast::{self as ast, Expr, Ranged};
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Expr, Ranged};
 
 use crate::autofix::edits::remove_argument;
 use crate::checkers::ast::Checker;
@@ -51,8 +50,8 @@ pub(crate) fn useless_object_inheritance(checker: &mut Checker, class_def: &ast:
         return;
     };
 
-    for expr in &arguments.args {
-        let Expr::Name(ast::ExprName { id, .. }) = expr else {
+    for base in &arguments.args {
+        let Expr::Name(ast::ExprName { id, .. }) = base else {
             continue;
         };
         if id != "object" {
@@ -66,19 +65,11 @@ pub(crate) fn useless_object_inheritance(checker: &mut Checker, class_def: &ast:
             UselessObjectInheritance {
                 name: class_def.name.to_string(),
             },
-            expr.range(),
+            base.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.try_set_fix(|| {
-                let edit = remove_argument(
-                    checker.locator(),
-                    class_def.name.end(),
-                    expr.range(),
-                    &arguments.args,
-                    &arguments.keywords,
-                    true,
-                )?;
-                Ok(Fix::automatic(edit))
+                remove_argument(base, arguments, true, checker.locator()).map(Fix::automatic)
             });
         }
         checker.diagnostics.push(diagnostic);
