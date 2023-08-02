@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pylint/mod.rs
 ---
-bad_format_character.py:5:1: PLE1300 Unsupported format character 'z'
+bad_string_format_character.py:5:1: PLE1300 Unsupported format character 'z'
   |
 3 | ## Old style formatting
 4 | 
@@ -11,7 +11,7 @@ bad_format_character.py:5:1: PLE1300 Unsupported format character 'z'
 7 | "%s" "%z" % ("hello", "world")  # [bad-format-character]
   |
 
-bad_format_character.py:7:1: PLE1300 Unsupported format character 'z'
+bad_string_format_character.py:7:1: PLE1300 Unsupported format character 'z'
   |
 5 | "%s %z" % ("hello", "world")  # [bad-format-character]
 6 | 
@@ -21,7 +21,7 @@ bad_format_character.py:7:1: PLE1300 Unsupported format character 'z'
 9 | """%s %z""" % ("hello", "world")  # [bad-format-character]
   |
 
-bad_format_character.py:9:1: PLE1300 Unsupported format character 'z'
+bad_string_format_character.py:9:1: PLE1300 Unsupported format character 'z'
    |
  7 | "%s" "%z" % ("hello", "world")  # [bad-format-character]
  8 | 
@@ -31,7 +31,7 @@ bad_format_character.py:9:1: PLE1300 Unsupported format character 'z'
 11 | """%s""" """%z""" % ("hello", "world")  # [bad-format-character]
    |
 
-bad_format_character.py:11:1: PLE1300 Unsupported format character 'z'
+bad_string_format_character.py:11:1: PLE1300 Unsupported format character 'z'
    |
  9 | """%s %z""" % ("hello", "world")  # [bad-format-character]
 10 | 

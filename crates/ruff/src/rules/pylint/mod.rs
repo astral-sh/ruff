@@ -20,7 +20,10 @@ mod tests {
 
     #[test_case(Rule::AssertOnStringLiteral, Path::new("assert_on_string_literal.py"))]
     #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async.py"))]
-    #[test_case(Rule::BadStringFormatCharacter, Path::new("bad_format_character.py"))]
+    #[test_case(
+        Rule::BadStringFormatCharacter,
+        Path::new("bad_string_format_character.py")
+    )]
     #[test_case(Rule::BadStrStripCall, Path::new("bad_str_strip_call.py"))]
     #[test_case(Rule::BadStringFormatType, Path::new("bad_string_format_type.py"))]
     #[test_case(Rule::BidirectionalUnicode, Path::new("bidirectional_unicode.py"))]

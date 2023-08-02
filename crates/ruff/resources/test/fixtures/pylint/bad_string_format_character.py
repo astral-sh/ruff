@@ -16,10 +16,14 @@
 
 "{:*^30s}".format("centered")
 
-## F-strings
+## f-strings
 
 H, W = "hello", "world"
 f"{H} {W}"
 f"{H:s} {W:z}"  # [bad-format-character]
 
 f"{1:z}"  # [bad-format-character]
+
+## False negatives
+
+print(("%" "z") % 1)
