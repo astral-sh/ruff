@@ -60,7 +60,12 @@ pub(crate) fn os_sep_split(checker: &mut Checker, call: &ast::ExprCall) {
         return;
     };
 
-    // Match `.split(os.sep)` or `.split(sep=os.sep)`
+    // Match `.split(os.sep)` or `.split(sep=os.sep)`, but avoid cases in which a `maxsplit` is
+    // specified.
+    if call.arguments.len() != 1 {
+        return;
+    }
+
     let Some(sep) = call.arguments.find_argument("sep", 0) else {
         return;
     };
