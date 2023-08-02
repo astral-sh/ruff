@@ -66,6 +66,29 @@ impl AlwaysAutofixableViolation for PytestIncorrectMarkParenthesesStyle {
     }
 }
 
+/// ## What it does
+/// Checks for parameter-free `@pytest.mark.usefixtures()` decorators.
+///
+/// ## Why is this bad?
+/// Parameter-free `@pytest.mark.usefixtures()` decorators are useless and should be removed.
+///
+///
+/// ## Example
+/// ```python
+/// @pytest.mark.usefixtures()
+/// def test_something():
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def test_something():
+///    ...
+/// ```
+///
+/// ## References
+/// - [`pytest` documentation: `pytest.mark.usefixtures`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-mark-usefixtures)
+
 #[violation]
 pub struct PytestUseFixturesWithoutParameters;
 

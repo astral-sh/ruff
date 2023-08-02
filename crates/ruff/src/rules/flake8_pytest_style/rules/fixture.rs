@@ -330,6 +330,40 @@ impl AlwaysAutofixableViolation for PytestUselessYieldFixture {
     }
 }
 
+/// ## What it does
+/// Checks for `pytest.mark.usefixtures` applied to fixtures.
+///
+/// ## Why is this bad?
+/// `pytest.mark.usefixtures` has no effect on fixtures.
+///
+///
+/// ## Example
+/// ```python
+/// @pytest.fixture()
+/// def a():
+///     pass
+///
+///
+/// @pytest.mark.usefixtures("a")
+/// @pytest.fixture()
+/// def b(a):
+///     pass
+/// ```
+///
+/// Use instead:
+/// ```python
+/// @pytest.fixture()
+/// def a():
+///     pass
+///
+///
+/// @pytest.fixture()
+/// def b(a):
+///     pass
+/// ```
+///
+/// ## References
+/// - [`pytest` documentation: `pytest.mark.usefixtures`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-mark-usefixtures)
 #[violation]
 pub struct PytestErroneousUseFixturesOnFixture;
 
