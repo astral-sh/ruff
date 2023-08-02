@@ -4,12 +4,13 @@ use ruff_python_ast::{self as ast, Constant, Expr, Keyword, Ranged};
 use ruff_python_literal::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
-use ruff_text_size::TextRange;
+use ruff_python_parser::{lexer, Mode, Tok};
+use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::str::{is_implicit_concatenation, leading_quote, trailing_quote};
+use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_source_file::Locator;
 
 use crate::checkers::ast::Checker;
@@ -184,45 +185,20 @@ fn formatted_expr<'a>(expr: &Expr, context: FormatContext, locator: &Locator<'a>
     }
 }
 
-/// Generate an f-string from an [`Expr`].
-fn try_convert_to_f_string(expr: &Expr, locator: &Locator) -> Option<String> {
-    let Expr::Call(ast::ExprCall { func, .. }) = expr else {
-        return None;
-    };
-    let Expr::Attribute(ast::ExprAttribute { value, .. }) = func.as_ref() else {
-        return None;
-    };
-    if !matches!(
-        value.as_ref(),
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(..),
-            ..
-        }),
-    ) {
-        return None;
-    };
-
-    let Some(mut summary) = FormatSummaryValues::try_from_expr(expr, locator) else {
-        return None;
-    };
-
-    let contents = locator.slice(value.range());
-
-    // Skip implicit string concatenations.
-    if is_implicit_concatenation(contents) {
-        return None;
-    }
-
+/// Convert a format call on a string literal to an f-string.
+fn try_convert_to_f_string(
+    locator: &Locator,
+    range: TextRange,
+    summary: &mut FormatSummaryValues,
+) -> Option<String> {
     // Strip the unicode prefix. It's redundant in Python 3, and invalid when used
     // with f-strings.
+    let contents = locator.slice(range);
     let contents = if contents.starts_with('U') || contents.starts_with('u') {
         &contents[1..]
     } else {
         contents
     };
-    if contents.is_empty() {
-        return None;
-    }
 
     // Remove the leading and trailing quotes.
     let Some(leading_quote) = leading_quote(contents) else {
@@ -232,11 +208,22 @@ fn try_convert_to_f_string(expr: &Expr, locator: &Locator) -> Option<String> {
         return None;
     };
     let contents = &contents[leading_quote.len()..contents.len() - trailing_quote.len()];
+    if contents.is_empty() {
+        return None;
+    }
 
     // Parse the format string.
     let Ok(format_string) = FormatString::from_str(contents) else {
         return None;
     };
+
+    if format_string
+        .format_parts
+        .iter()
+        .all(|part| matches!(part, FormatPart::Literal(..)))
+    {
+        return None;
+    }
 
     let mut converted = String::with_capacity(contents.len());
     for part in format_string.format_parts {
@@ -329,16 +316,74 @@ pub(crate) fn f_strings(
         return;
     }
 
-    // Avoid refactoring strings that are implicitly concatenated.
-    if is_implicit_concatenation(checker.locator().slice(template.range())) {
+    let Expr::Call(ast::ExprCall { func, .. }) = expr else {
+        return;
+    };
+
+    let Expr::Attribute(ast::ExprAttribute { value, .. }) = func.as_ref() else {
+        return;
+    };
+
+    if !matches!(
+        value.as_ref(),
+        Expr::Constant(ast::ExprConstant {
+            value: Constant::Str(..),
+            ..
+        }),
+    ) {
+        return;
+    };
+
+    let Some(mut summary) = FormatSummaryValues::try_from_expr(expr, checker.locator()) else {
+        return;
+    };
+    let mut patches: Vec<(TextRange, String)> = vec![];
+    let mut lex = lexer::lex_starts_at(
+        checker.locator().slice(func.range()),
+        Mode::Expression,
+        expr.start(),
+    )
+    .flatten();
+    let end = loop {
+        match lex.next() {
+            Some((Tok::Dot, range)) => {
+                // ```
+                // (
+                //     "a"
+                //     " {} "
+                //     "b"
+                // ).format(x)
+                // ^ Get the position of the character before the dot.
+                // ```
+                break range.end() - TextSize::of('.');
+            }
+            Some((Tok::String { .. }, range)) => {
+                if let Some(fstring) =
+                    try_convert_to_f_string(checker.locator(), range, &mut summary)
+                {
+                    patches.push((range, fstring));
+                }
+            }
+            Some(_) => continue,
+            None => unreachable!("Should break from the `Tok::Dot` arm"),
+        }
+    };
+    if patches.is_empty() {
         return;
     }
 
-    // Currently, the only issue we know of is in LibCST:
-    // https://github.com/Instagram/LibCST/issues/846
-    let Some(mut contents) = try_convert_to_f_string(expr, checker.locator()) else {
-        return;
-    };
+    let mut contents = String::with_capacity(checker.locator().slice(expr.range()).len());
+    let mut prev_end = expr.start();
+    for (range, fstring) in patches {
+        contents.push_str(
+            checker
+                .locator()
+                .slice(TextRange::new(prev_end, range.start())),
+        );
+        contents.push_str(&fstring);
+        prev_end = range.end();
+    }
+    contents.push_str(checker.locator().slice(TextRange::new(prev_end, end)));
 
     // Avoid refactors that exceed the line length limit.
     let col_offset = template.start() - checker.locator().line_start(template.start());

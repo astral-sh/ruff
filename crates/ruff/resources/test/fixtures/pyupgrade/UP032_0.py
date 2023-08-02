@@ -72,6 +72,31 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     111111
 )
 
+"{a}" "{b}".format(a=1, b=1)
+
+(
+    "{a}"
+    "{b}"
+).format(a=1, b=1)
+
+(
+    "{a}"
+    ""
+    "{b}"
+    ""
+).format(a=1, b=1)
+
+(
+    (
+        # comment
+        "{a}"
+        # comment
+        "{b}"
+    )
+    # comment
+    .format(a=1, b=1)
+)
+
 ###
 # Non-errors
 ###
@@ -102,8 +127,6 @@ b"{} {}".format(a, b)
 "{}".format(a["b"])
 
 r'"\N{snowman} {}".format(a)'
-
-"{a}" "{b}".format(a=1, b=1)
 
 "123456789 {}".format(
     11111111111111111111111111111111111111111111111111111111111111111111111111,
