@@ -185,7 +185,7 @@ fn formatted_expr<'a>(expr: &Expr, context: FormatContext, locator: &Locator<'a>
     }
 }
 
-/// Convert a format call on a string literal to an f-string.
+/// Convert a string format call to an f-string.
 fn try_convert_to_f_string(
     locator: &Locator,
     range: TextRange,
