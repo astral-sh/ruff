@@ -965,31 +965,31 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct StmtFunctionDef<'a> {
-    name: &'a str,
-    parameters: ComparableParameters<'a>,
-    body: Vec<ComparableStmt<'a>>,
     decorator_list: Vec<ComparableDecorator<'a>>,
+    name: &'a str,
     type_params: Option<ComparableTypeParams<'a>>,
+    parameters: ComparableParameters<'a>,
     returns: Option<ComparableExpr<'a>>,
+    body: Vec<ComparableStmt<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct StmtAsyncFunctionDef<'a> {
-    name: &'a str,
-    parameters: ComparableParameters<'a>,
-    body: Vec<ComparableStmt<'a>>,
     decorator_list: Vec<ComparableDecorator<'a>>,
+    name: &'a str,
     type_params: Option<ComparableTypeParams<'a>>,
+    parameters: ComparableParameters<'a>,
     returns: Option<ComparableExpr<'a>>,
+    body: Vec<ComparableStmt<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct StmtClassDef<'a> {
+    decorator_list: Vec<ComparableDecorator<'a>>,
     name: &'a str,
+    type_params: Option<ComparableTypeParams<'a>>,
     arguments: Option<ComparableArguments<'a>>,
     body: Vec<ComparableStmt<'a>>,
-    decorator_list: Vec<ComparableDecorator<'a>>,
-    type_params: Option<ComparableTypeParams<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -1019,6 +1019,12 @@ impl<'a> From<&'a ast::TypeParams> for ComparableTypeParams<'a> {
         Self {
             type_params: type_params.iter().map(Into::into).collect(),
         }
+    }
+}
+
+impl<'a> From<&'a Box<ast::TypeParams>> for ComparableTypeParams<'a> {
+    fn from(type_params: &'a Box<ast::TypeParams>) -> Self {
+        type_params.as_ref().into()
     }
 }
 

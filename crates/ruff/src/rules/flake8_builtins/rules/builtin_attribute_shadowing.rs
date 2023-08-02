@@ -132,7 +132,7 @@ fn is_standard_library_override(
     class_def: &ast::StmtClassDef,
     model: &SemanticModel,
 ) -> bool {
-    let Some(Arguments { args: bases, .. }) = class_def.arguments.as_ref() else {
+    let Some(Arguments { args: bases, .. }) = class_def.arguments.as_deref() else {
         return false;
     };
     match name {

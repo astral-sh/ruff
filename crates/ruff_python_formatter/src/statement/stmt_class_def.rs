@@ -58,7 +58,7 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
 
         write!(f, [text("class"), space(), name.format()])?;
 
-        if let Some(arguments) = arguments {
+        if let Some(arguments) = arguments.as_deref() {
             // Drop empty parentheses, e.g., in:
             // ```python
             // class A():

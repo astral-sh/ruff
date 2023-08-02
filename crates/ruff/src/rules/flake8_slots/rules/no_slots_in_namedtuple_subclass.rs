@@ -63,7 +63,7 @@ pub(crate) fn no_slots_in_namedtuple_subclass(
     stmt: &Stmt,
     class: &StmtClassDef,
 ) {
-    let Some(Arguments { args: bases, .. }) = class.arguments.as_ref() else {
+    let Some(Arguments { args: bases, .. }) = class.arguments.as_deref() else {
         return;
     };
 

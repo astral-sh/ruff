@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
+use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::Scope;
 
 use crate::checkers::ast::Checker;
@@ -217,17 +217,12 @@ pub(crate) fn unused_private_protocol(
             continue;
         };
 
-        let Stmt::ClassDef(ast::StmtClassDef {
-            name,
-            arguments: Some(Arguments { args: bases, .. }),
-            ..
-        }) = checker.semantic().stmts[source]
-        else {
+        let Stmt::ClassDef(class_def) = checker.semantic().stmts[source] else {
             continue;
         };
 
-        if !bases
-            .iter()
+        if !class_def
+            .bases()
             .any(|base| checker.semantic().match_typing_expr(base, "Protocol"))
         {
             continue;
@@ -235,7 +230,7 @@ pub(crate) fn unused_private_protocol(
 
         diagnostics.push(Diagnostic::new(
             UnusedPrivateProtocol {
-                name: name.to_string(),
+                name: class_def.name.to_string(),
             },
             binding.range,
         ));
@@ -308,17 +303,12 @@ pub(crate) fn unused_private_typed_dict(
         let Some(source) = binding.source else {
             continue;
         };
-        let Stmt::ClassDef(ast::StmtClassDef {
-            name,
-            arguments: Some(Arguments { args: bases, .. }),
-            ..
-        }) = checker.semantic().stmts[source]
-        else {
+        let Stmt::ClassDef(class_def) = checker.semantic().stmts[source] else {
             continue;
         };
 
-        if !bases
-            .iter()
+        if !class_def
+            .bases()
             .any(|base| checker.semantic().match_typing_expr(base, "TypedDict"))
         {
             continue;
@@ -326,7 +316,7 @@ pub(crate) fn unused_private_typed_dict(
 
         diagnostics.push(Diagnostic::new(
             UnusedPrivateTypedDict {
-                name: name.to_string(),
+                name: class_def.name.to_string(),
             },
             binding.range,
         ));

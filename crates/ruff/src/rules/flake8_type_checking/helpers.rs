@@ -1,6 +1,3 @@
-use ruff_python_ast as ast;
-use ruff_python_ast::Arguments;
-
 use ruff_python_ast::call_path::from_qualified_name;
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_semantic::{Binding, BindingKind, ScopeKind, SemanticModel};
@@ -38,38 +35,31 @@ pub(crate) fn runtime_evaluated(
 }
 
 fn runtime_evaluated_base_class(base_classes: &[String], semantic: &SemanticModel) -> bool {
-    if let ScopeKind::Class(ast::StmtClassDef {
-        arguments: Some(Arguments { args: bases, .. }),
-        ..
-    }) = &semantic.scope().kind
-    {
-        for base in bases {
-            if let Some(call_path) = semantic.resolve_call_path(base) {
-                if base_classes
-                    .iter()
-                    .any(|base_class| from_qualified_name(base_class) == call_path)
-                {
-                    return true;
-                }
-            }
-        }
-    }
-    false
+    let ScopeKind::Class(class_def) = &semantic.scope().kind else {
+        return false;
+    };
+
+    class_def.bases().any(|base| {
+        semantic.resolve_call_path(base).is_some_and(|call_path| {
+            base_classes
+                .iter()
+                .any(|base_class| from_qualified_name(base_class) == call_path)
+        })
+    })
 }
 
 fn runtime_evaluated_decorators(decorators: &[String], semantic: &SemanticModel) -> bool {
-    if let ScopeKind::Class(ast::StmtClassDef { decorator_list, .. }) = &semantic.scope().kind {
-        for decorator in decorator_list {
-            if let Some(call_path) = semantic.resolve_call_path(map_callable(&decorator.expression))
-            {
-                if decorators
+    let ScopeKind::Class(class_def) = &semantic.scope().kind else {
+        return false;
+    };
+
+    class_def.decorator_list.iter().any(|decorator| {
+        semantic
+            .resolve_call_path(map_callable(&decorator.expression))
+            .is_some_and(|call_path| {
+                decorators
                     .iter()
-                    .any(|decorator| from_qualified_name(decorator) == call_path)
-                {
-                    return true;
-                }
-            }
-        }
-    }
-    false
+                    .any(|base_class| from_qualified_name(base_class) == call_path)
+            })
+    })
 }

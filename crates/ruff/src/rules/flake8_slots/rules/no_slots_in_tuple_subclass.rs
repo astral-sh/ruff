@@ -51,7 +51,7 @@ impl Violation for NoSlotsInTupleSubclass {
 
 /// SLOT001
 pub(crate) fn no_slots_in_tuple_subclass(checker: &mut Checker, stmt: &Stmt, class: &StmtClassDef) {
-    let Some(Arguments { args: bases, .. }) = class.arguments.as_ref() else {
+    let Some(Arguments { args: bases, .. }) = class.arguments.as_deref() else {
         return;
     };
 

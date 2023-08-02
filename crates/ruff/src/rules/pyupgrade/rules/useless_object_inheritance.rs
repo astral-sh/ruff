@@ -46,7 +46,7 @@ impl AlwaysAutofixableViolation for UselessObjectInheritance {
 
 /// UP004
 pub(crate) fn useless_object_inheritance(checker: &mut Checker, class_def: &ast::StmtClassDef) {
-    let Some(arguments) = class_def.arguments.as_ref() else {
+    let Some(arguments) = class_def.arguments.as_deref() else {
         return;
     };
 

@@ -119,14 +119,14 @@ fn create_class_def_stmt(
 ) -> Stmt {
     ast::StmtClassDef {
         name: Identifier::new(class_name.to_string(), TextRange::default()),
-        arguments: Some(Arguments {
+        arguments: Some(Box::new(Arguments {
             args: vec![base_class.clone()],
             keywords: match total_keyword {
                 Some(keyword) => vec![keyword.clone()],
                 None => vec![],
             },
             range: TextRange::default(),
-        }),
+        })),
         body,
         type_params: None,
         decorator_list: vec![],

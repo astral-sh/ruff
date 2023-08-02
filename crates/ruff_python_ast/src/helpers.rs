@@ -409,7 +409,7 @@ where
             ..
         }) => {
             arguments
-                .as_ref()
+                .as_deref()
                 .is_some_and(|Arguments { args, keywords, .. }| {
                     args.iter().any(|expr| any_over_expr(expr, func))
                         || keywords
