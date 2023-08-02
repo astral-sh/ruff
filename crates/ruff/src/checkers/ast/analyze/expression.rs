@@ -429,7 +429,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 pyupgrade::rules::unnecessary_encode_utf8(checker, call);
             }
             if checker.enabled(Rule::RedundantOpenModes) {
-                pyupgrade::rules::redundant_open_modes(checker, expr);
+                pyupgrade::rules::redundant_open_modes(checker, call);
             }
             if checker.enabled(Rule::NativeLiterals) {
                 pyupgrade::rules::native_literals(checker, expr, func, args, keywords);
@@ -438,7 +438,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 pyupgrade::rules::open_alias(checker, expr, func);
             }
             if checker.enabled(Rule::ReplaceUniversalNewlines) {
-                pyupgrade::rules::replace_universal_newlines(checker, func, keywords);
+                pyupgrade::rules::replace_universal_newlines(checker, call);
             }
             if checker.enabled(Rule::ReplaceStdoutStderr) {
                 pyupgrade::rules::replace_stdout_stderr(checker, call);
@@ -461,7 +461,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_async::rules::blocking_os_call(checker, expr);
             }
             if checker.any_enabled(&[Rule::Print, Rule::PPrint]) {
-                flake8_print::rules::print_call(checker, func, keywords);
+                flake8_print::rules::print_call(checker, call);
             }
             if checker.any_enabled(&[
                 Rule::SuspiciousPickleUsage,
@@ -513,13 +513,11 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::ZipWithoutExplicitStrict) {
                 if checker.settings.target_version >= PythonVersion::Py310 {
-                    flake8_bugbear::rules::zip_without_explicit_strict(
-                        checker, expr, func, args, keywords,
-                    );
+                    flake8_bugbear::rules::zip_without_explicit_strict(checker, call);
                 }
             }
             if checker.enabled(Rule::NoExplicitStacklevel) {
-                flake8_bugbear::rules::no_explicit_stacklevel(checker, func, keywords);
+                flake8_bugbear::rules::no_explicit_stacklevel(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryDictKwargs) {
                 flake8_pie::rules::unnecessary_dict_kwargs(checker, expr, keywords);
@@ -531,19 +529,19 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_bandit::rules::bad_file_permissions(checker, call);
             }
             if checker.enabled(Rule::RequestWithNoCertValidation) {
-                flake8_bandit::rules::request_with_no_cert_validation(checker, func, keywords);
+                flake8_bandit::rules::request_with_no_cert_validation(checker, call);
             }
             if checker.enabled(Rule::UnsafeYAMLLoad) {
                 flake8_bandit::rules::unsafe_yaml_load(checker, call);
             }
             if checker.enabled(Rule::SnmpInsecureVersion) {
-                flake8_bandit::rules::snmp_insecure_version(checker, func, keywords);
+                flake8_bandit::rules::snmp_insecure_version(checker, call);
             }
             if checker.enabled(Rule::SnmpWeakCryptography) {
                 flake8_bandit::rules::snmp_weak_cryptography(checker, call);
             }
             if checker.enabled(Rule::Jinja2AutoescapeFalse) {
-                flake8_bandit::rules::jinja2_autoescape_false(checker, func, keywords);
+                flake8_bandit::rules::jinja2_autoescape_false(checker, call);
             }
             if checker.enabled(Rule::HardcodedPasswordFuncArg) {
                 flake8_bandit::rules::hardcoded_password_func_arg(checker, keywords);
@@ -555,13 +553,13 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_bandit::rules::hashlib_insecure_hash_functions(checker, call);
             }
             if checker.enabled(Rule::RequestWithoutTimeout) {
-                flake8_bandit::rules::request_without_timeout(checker, func, keywords);
+                flake8_bandit::rules::request_without_timeout(checker, call);
             }
             if checker.enabled(Rule::ParamikoCall) {
                 flake8_bandit::rules::paramiko_call(checker, func);
             }
             if checker.enabled(Rule::LoggingConfigInsecureListen) {
-                flake8_bandit::rules::logging_config_insecure_listen(checker, func, keywords);
+                flake8_bandit::rules::logging_config_insecure_listen(checker, call);
             }
             if checker.any_enabled(&[
                 Rule::SubprocessWithoutShellEqualsTrue,
@@ -572,7 +570,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 Rule::StartProcessWithPartialPath,
                 Rule::UnixCommandWildcardInjection,
             ]) {
-                flake8_bandit::rules::shell_injection(checker, func, args, keywords);
+                flake8_bandit::rules::shell_injection(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryGeneratorList) {
                 flake8_comprehensions::rules::unnecessary_generator_list(
@@ -679,19 +677,13 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             pandas_vet::rules::call(checker, func);
             if checker.enabled(Rule::PandasUseOfDotReadTable) {
-                pandas_vet::rules::use_of_read_table(checker, func, keywords);
+                pandas_vet::rules::use_of_read_table(checker, call);
             }
             if checker.enabled(Rule::PandasUseOfPdMerge) {
                 pandas_vet::rules::use_of_pd_merge(checker, func);
             }
             if checker.enabled(Rule::CallDatetimeWithoutTzinfo) {
-                flake8_datetimez::rules::call_datetime_without_tzinfo(
-                    checker,
-                    func,
-                    args,
-                    keywords,
-                    expr.range(),
-                );
+                flake8_datetimez::rules::call_datetime_without_tzinfo(checker, call);
             }
             if checker.enabled(Rule::CallDatetimeToday) {
                 flake8_datetimez::rules::call_datetime_today(checker, func, expr.range());
@@ -707,30 +699,13 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 );
             }
             if checker.enabled(Rule::CallDatetimeNowWithoutTzinfo) {
-                flake8_datetimez::rules::call_datetime_now_without_tzinfo(
-                    checker,
-                    func,
-                    args,
-                    keywords,
-                    expr.range(),
-                );
+                flake8_datetimez::rules::call_datetime_now_without_tzinfo(checker, call);
             }
             if checker.enabled(Rule::CallDatetimeFromtimestamp) {
-                flake8_datetimez::rules::call_datetime_fromtimestamp(
-                    checker,
-                    func,
-                    args,
-                    keywords,
-                    expr.range(),
-                );
+                flake8_datetimez::rules::call_datetime_fromtimestamp(checker, call);
             }
             if checker.enabled(Rule::CallDatetimeStrptimeWithoutZone) {
-                flake8_datetimez::rules::call_datetime_strptime_without_zone(
-                    checker,
-                    func,
-                    args,
-                    expr.range(),
-                );
+                flake8_datetimez::rules::call_datetime_strptime_without_zone(checker, call);
             }
             if checker.enabled(Rule::CallDateToday) {
                 flake8_datetimez::rules::call_date_today(checker, func, expr.range());
@@ -754,10 +729,10 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 pylint::rules::bad_str_strip_call(checker, func, args);
             }
             if checker.enabled(Rule::InvalidEnvvarDefault) {
-                pylint::rules::invalid_envvar_default(checker, func, args, keywords);
+                pylint::rules::invalid_envvar_default(checker, call);
             }
             if checker.enabled(Rule::InvalidEnvvarValue) {
-                pylint::rules::invalid_envvar_value(checker, func, args, keywords);
+                pylint::rules::invalid_envvar_value(checker, call);
             }
             if checker.enabled(Rule::NestedMinMax) {
                 pylint::rules::nested_min_max(checker, expr, func, args, keywords);
@@ -775,13 +750,13 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 }
             }
             if checker.enabled(Rule::SubprocessPopenPreexecFn) {
-                pylint::rules::subprocess_popen_preexec_fn(checker, func, keywords);
+                pylint::rules::subprocess_popen_preexec_fn(checker, call);
             }
             if checker.any_enabled(&[
                 Rule::PytestRaisesWithoutException,
                 Rule::PytestRaisesTooBroad,
             ]) {
-                flake8_pytest_style::rules::raises_call(checker, func, args, keywords);
+                flake8_pytest_style::rules::raises_call(checker, call);
             }
             if checker.enabled(Rule::PytestFailWithoutMessage) {
                 flake8_pytest_style::rules::fail_call(checker, call);
@@ -855,7 +830,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_use_pathlib::rules::path_constructor_current_directory(checker, expr, func);
             }
             if checker.enabled(Rule::OsSepSplit) {
-                flake8_use_pathlib::rules::os_sep_split(checker, func, args, keywords);
+                flake8_use_pathlib::rules::os_sep_split(checker, call);
             }
             if checker.enabled(Rule::NumpyLegacyRandom) {
                 numpy::rules::legacy_random(checker, func);
@@ -876,7 +851,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 pylint::rules::logging_call(checker, call);
             }
             if checker.enabled(Rule::DjangoLocalsInRenderFunction) {
-                flake8_django::rules::locals_in_render_function(checker, func, args, keywords);
+                flake8_django::rules::locals_in_render_function(checker, call);
             }
             if checker.is_stub && checker.enabled(Rule::UnsupportedMethodCallOnAll) {
                 flake8_pyi::rules::unsupported_method_call_on_all(checker, func);

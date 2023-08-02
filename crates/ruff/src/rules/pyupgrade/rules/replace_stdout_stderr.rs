@@ -2,7 +2,6 @@ use anyhow::Result;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::find_keyword;
 use ruff_python_ast::{self as ast, Keyword, Ranged};
 use ruff_source_file::Locator;
 
@@ -82,10 +81,10 @@ pub(crate) fn replace_stdout_stderr(checker: &mut Checker, call: &ast::ExprCall)
         .is_some_and(|call_path| matches!(call_path.as_slice(), ["subprocess", "run"]))
     {
         // Find `stdout` and `stderr` kwargs.
-        let Some(stdout) = find_keyword(&call.arguments.keywords, "stdout") else {
+        let Some(stdout) = call.arguments.find_keyword("stdout") else {
             return;
         };
-        let Some(stderr) = find_keyword(&call.arguments.keywords, "stderr") else {
+        let Some(stderr) = call.arguments.find_keyword("stderr") else {
             return;
         };
 
