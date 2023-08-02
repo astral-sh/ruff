@@ -220,6 +220,17 @@
         }
       ]
     },
+    "flake8-future-annotations": {
+      "description": "Options for the `flake8-future-annotations` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Flake8FutureAnnotationsOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "flake8-gettext": {
       "description": "Options for the `flake8-gettext` plugin.",
       "anyOf": [
@@ -811,6 +822,19 @@
           ],
           "format": "uint",
           "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8FutureAnnotationsOptions": {
+      "type": "object",
+      "properties": {
+        "require-future-annotations": {
+          "description": "Require `from __future__ import annotations` in all modules where type annotations are used.",
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       },
       "additionalProperties": false

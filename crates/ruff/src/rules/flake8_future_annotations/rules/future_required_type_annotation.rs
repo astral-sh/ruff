@@ -20,6 +20,10 @@ use crate::checkers::ast::Checker;
 /// annotations at evaluation time, making the code compatible with both past
 /// and future Python versions.
 ///
+/// You can also set the `flake8-future-annotations.require-future-annotations`
+/// setting to require all modules with type annotations to have a `from __future__
+/// import annotations` import.
+///
 /// ## Example
 /// ```python
 /// def func(obj: dict[str, int | None]) -> None:
@@ -34,6 +38,9 @@ use crate::checkers::ast::Checker;
 /// def func(obj: dict[str, int | None]) -> None:
 ///     ...
 /// ```
+/// ## Options
+/// - `flake8-future-annotations.require-future-annotations`
+
 #[violation]
 pub struct FutureRequiredTypeAnnotation {
     reason: Reason,
@@ -45,6 +52,9 @@ pub(crate) enum Reason {
     PEP585,
     /// The type annotation is written in PEP 604 style (e.g., `int | None`).
     PEP604,
+    /// Configuration requires all modules with type annotations to have
+    /// a `from __future__ import annotations` import.
+    Config,
 }
 
 impl fmt::Display for Reason {
@@ -52,6 +62,9 @@ impl fmt::Display for Reason {
         match self {
             Reason::PEP585 => fmt.write_str("PEP 585 collection"),
             Reason::PEP604 => fmt.write_str("PEP 604 union"),
+            Reason::Config => fmt.write_str(
+                "an annotation (configured to require `from __future__ import annotations`)",
+            ),
         }
     }
 }

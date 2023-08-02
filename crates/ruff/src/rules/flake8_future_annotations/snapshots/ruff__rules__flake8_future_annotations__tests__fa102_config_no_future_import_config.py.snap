@@ -1,0 +1,48 @@
+---
+source: crates/ruff/src/rules/flake8_future_annotations/mod.rs
+---
+no_future_import_config.py:1:15: FA102 Missing `from __future__ import annotations`, but uses an annotation (configured to require `from __future__ import annotations`)
+  |
+1 | def main(arg: int) -> str:
+  |               ^^^ FA102
+2 |     a: int = 123 + arg
+3 |     b: str = "hello"
+  |
+
+no_future_import_config.py:1:23: FA102 Missing `from __future__ import annotations`, but uses an annotation (configured to require `from __future__ import annotations`)
+  |
+1 | def main(arg: int) -> str:
+  |                       ^^^ FA102
+2 |     a: int = 123 + arg
+3 |     b: str = "hello"
+  |
+
+no_future_import_config.py:2:8: FA102 Missing `from __future__ import annotations`, but uses an annotation (configured to require `from __future__ import annotations`)
+  |
+1 | def main(arg: int) -> str:
+2 |     a: int = 123 + arg
+  |        ^^^ FA102
+3 |     b: str = "hello"
+4 |     c: ObjectType = ObjectType()
+  |
+
+no_future_import_config.py:3:8: FA102 Missing `from __future__ import annotations`, but uses an annotation (configured to require `from __future__ import annotations`)
+  |
+1 | def main(arg: int) -> str:
+2 |     a: int = 123 + arg
+3 |     b: str = "hello"
+  |        ^^^ FA102
+4 |     c: ObjectType = ObjectType()
+5 |     return c(b * a)
+  |
+
+no_future_import_config.py:4:8: FA102 Missing `from __future__ import annotations`, but uses an annotation (configured to require `from __future__ import annotations`)
+  |
+2 |     a: int = 123 + arg
+3 |     b: str = "hello"
+4 |     c: ObjectType = ObjectType()
+  |        ^^^^^^^^^^ FA102
+5 |     return c(b * a)
+  |
+
+

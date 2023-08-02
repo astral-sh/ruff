@@ -9,6 +9,7 @@ use ruff_python_semantic::ScopeKind;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
+use crate::rules::flake8_future_annotations::rules::Reason;
 use crate::rules::{
     flake8_2020, flake8_async, flake8_bandit, flake8_boolean_trap, flake8_bugbear, flake8_builtins,
     flake8_comprehensions, flake8_datetimez, flake8_debugger, flake8_django,
@@ -156,6 +157,24 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                         if checker.enabled(Rule::CollectionsNamedTuple) {
                             flake8_pyi::rules::collections_named_tuple(checker, expr);
                         }
+                    }
+
+                    // Any annotation with a Name, when `require-future-annotations` is enabled
+                    if checker.enabled(Rule::FutureRequiredTypeAnnotation)
+                        && !checker.is_stub
+                        && !checker.semantic.future_annotations()
+                        && checker.semantic.in_annotation()
+                        && !checker.settings.pyupgrade.keep_runtime_typing
+                        && checker
+                            .settings
+                            .flake8_future_annotations
+                            .require_future_annotations
+                    {
+                        flake8_future_annotations::rules::future_required_type_annotation(
+                            checker,
+                            expr,
+                            Reason::Config,
+                        );
                     }
 
                     // Ex) List[...]

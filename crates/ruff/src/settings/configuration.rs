@@ -17,10 +17,10 @@ use crate::line_width::{LineLength, TabSize};
 use crate::rule_selector::RuleSelector;
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
-    flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
-    flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
-    flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
-    pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
+    flake8_copyright, flake8_errmsg, flake8_future_annotations, flake8_gettext,
+    flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style, flake8_quotes,
+    flake8_self, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe,
+    pep8_naming, pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
 };
 use crate::settings::options::Options;
 use crate::settings::types::{
@@ -78,6 +78,7 @@ pub struct Configuration {
     pub flake8_comprehensions: Option<flake8_comprehensions::settings::Options>,
     pub flake8_copyright: Option<flake8_copyright::settings::Options>,
     pub flake8_errmsg: Option<flake8_errmsg::settings::Options>,
+    pub flake8_future_annotations: Option<flake8_future_annotations::settings::Options>,
     pub flake8_gettext: Option<flake8_gettext::settings::Options>,
     pub flake8_implicit_str_concat: Option<flake8_implicit_str_concat::settings::Options>,
     pub flake8_import_conventions: Option<flake8_import_conventions::settings::Options>,
@@ -234,6 +235,7 @@ impl Configuration {
             flake8_comprehensions: options.flake8_comprehensions,
             flake8_copyright: options.flake8_copyright,
             flake8_errmsg: options.flake8_errmsg,
+            flake8_future_annotations: options.flake8_future_annotations,
             flake8_gettext: options.flake8_gettext,
             flake8_implicit_str_concat: options.flake8_implicit_str_concat,
             flake8_import_conventions: options.flake8_import_conventions,
@@ -315,6 +317,9 @@ impl Configuration {
                 .combine(config.flake8_comprehensions),
             flake8_copyright: self.flake8_copyright.combine(config.flake8_copyright),
             flake8_errmsg: self.flake8_errmsg.combine(config.flake8_errmsg),
+            flake8_future_annotations: self
+                .flake8_future_annotations
+                .combine(config.flake8_future_annotations),
             flake8_gettext: self.flake8_gettext.combine(config.flake8_gettext),
             flake8_implicit_str_concat: self
                 .flake8_implicit_str_concat

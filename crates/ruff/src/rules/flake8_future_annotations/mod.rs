@@ -1,5 +1,6 @@
 //! Rules from [flake8-future-annotations](https://pypi.org/project/flake8-future-annotations/).
 pub(crate) mod rules;
+pub mod settings;
 
 #[cfg(test)]
 mod tests {
@@ -9,6 +10,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
+    use crate::rules::flake8_future_annotations;
     use crate::settings::types::PythonVersion;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
@@ -49,6 +51,25 @@ mod tests {
             Path::new("flake8_future_annotations").join(path).as_path(),
             &settings::Settings {
                 target_version: PythonVersion::Py37,
+                ..settings::Settings::for_rule(Rule::FutureRequiredTypeAnnotation)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("no_future_import_config.py"))]
+    #[test_case(Path::new("ok_no_types_whatsoever.py"))]
+    #[test_case(Path::new("ok_uses_future.py"))]
+    fn fa102_config(path: &Path) -> Result<()> {
+        let snapshot = format!("fa102_config_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_future_annotations").join(path).as_path(),
+            &settings::Settings {
+                target_version: PythonVersion::Py311,
+                flake8_future_annotations: flake8_future_annotations::settings::Settings {
+                    require_future_annotations: true,
+                },
                 ..settings::Settings::for_rule(Rule::FutureRequiredTypeAnnotation)
             },
         )?;
