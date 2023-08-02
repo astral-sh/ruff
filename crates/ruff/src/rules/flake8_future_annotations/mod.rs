@@ -21,7 +21,7 @@ mod tests {
     #[test_case(Path::new("no_future_import_uses_lowercase.py"))]
     #[test_case(Path::new("no_future_import_uses_union.py"))]
     #[test_case(Path::new("no_future_import_uses_union_inner.py"))]
-    #[test_case(Path::new("ok_no_types.py"))]
+    #[test_case(Path::new("ok_no_special_types.py"))]
     #[test_case(Path::new("ok_non_simplifiable_types.py"))]
     #[test_case(Path::new("ok_uses_future.py"))]
     #[test_case(Path::new("ok_variable_name.py"))]
@@ -41,7 +41,7 @@ mod tests {
     #[test_case(Path::new("no_future_import_uses_lowercase.py"))]
     #[test_case(Path::new("no_future_import_uses_union.py"))]
     #[test_case(Path::new("no_future_import_uses_union_inner.py"))]
-    #[test_case(Path::new("ok_no_types.py"))]
+    #[test_case(Path::new("ok_no_special_types.py"))]
     #[test_case(Path::new("ok_uses_future.py"))]
     fn fa102(path: &Path) -> Result<()> {
         let snapshot = format!("fa102_{}", path.to_string_lossy());
