@@ -215,8 +215,7 @@ del (
 )  # Completed
 # Done
 
-del (  # dangling end of line comment
-)
+del ()  # dangling end of line comment
 ```
 
 

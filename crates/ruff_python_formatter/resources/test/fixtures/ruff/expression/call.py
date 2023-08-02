@@ -86,3 +86,28 @@ f(
 f(
     a.very_long_function_function_that_is_so_long_that_it_expands_the_parent_but_its_only_a_single_argument()
 )
+
+f( # abc
+)
+
+f( # abc
+    # abc
+)
+
+f(
+    # abc
+)
+
+f ( # abc
+    1
+)
+
+f (
+    # abc
+    1
+)
+
+f (
+    1
+    # abc
+)
