@@ -1,4 +1,4 @@
-use ruff_python_ast::{Arg, Ranged};
+use ruff_python_ast::{Parameter, Ranged};
 
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
@@ -62,16 +62,16 @@ impl Violation for BuiltinArgumentShadowing {
 }
 
 /// A002
-pub(crate) fn builtin_argument_shadowing(checker: &mut Checker, argument: &Arg) {
+pub(crate) fn builtin_argument_shadowing(checker: &mut Checker, parameter: &Parameter) {
     if shadows_builtin(
-        argument.arg.as_str(),
+        parameter.name.as_str(),
         &checker.settings.flake8_builtins.builtins_ignorelist,
     ) {
         checker.diagnostics.push(Diagnostic::new(
             BuiltinArgumentShadowing {
-                name: argument.arg.to_string(),
+                name: parameter.name.to_string(),
             },
-            argument.range(),
+            parameter.range(),
         ));
     }
 }

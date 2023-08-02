@@ -1,7 +1,7 @@
 use std::{fmt, iter};
 
 use regex::Regex;
-use ruff_python_ast::{self as ast, Expr, ExprContext, Ranged, Stmt, WithItem};
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Ranged, Stmt, WithItem};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -174,9 +174,10 @@ impl<'a, 'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'a, 'b> {
             Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
                 // Check for single-target assignments which are of the
                 // form `x = cast(..., x)`.
-                if targets.first().map_or(false, |target| {
-                    assignment_is_cast_expr(value, target, self.context)
-                }) {
+                if targets
+                    .first()
+                    .is_some_and(|target| assignment_is_cast_expr(value, target, self.context))
+                {
                     return;
                 }
                 self.assignment_targets.extend(
@@ -236,7 +237,12 @@ impl<'a, 'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'a, 'b> {
 /// x = cast(int, x)
 /// ```
 fn assignment_is_cast_expr(value: &Expr, target: &Expr, semantic: &SemanticModel) -> bool {
-    let Expr::Call(ast::ExprCall { func, args, .. }) = value else {
+    let Expr::Call(ast::ExprCall {
+        func,
+        arguments: Arguments { args, .. },
+        ..
+    }) = value
+    else {
         return false;
     };
     let Expr::Name(ast::ExprName { id: target_id, .. }) = target else {

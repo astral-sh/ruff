@@ -141,7 +141,7 @@ impl<'a> EmitterContext<'a> {
     pub fn is_jupyter_notebook(&self, name: &str) -> bool {
         self.source_kind
             .get(name)
-            .map_or(false, SourceKind::is_jupyter)
+            .is_some_and(SourceKind::is_jupyter)
     }
 
     pub fn source_kind(&self, name: &str) -> Option<&SourceKind> {

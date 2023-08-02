@@ -1,5 +1,3 @@
-"""A mirror of UP037_1.py, with `from __future__ import annotations`."""
-
 from __future__ import annotations
 
 from typing import (

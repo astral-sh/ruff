@@ -73,7 +73,6 @@ expression: parse_ast
                     ctx: Load,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -146,7 +145,6 @@ expression: parse_ast
                     ctx: Load,
                 },
             ),
-            type_comment: None,
         },
     ),
     Expr(

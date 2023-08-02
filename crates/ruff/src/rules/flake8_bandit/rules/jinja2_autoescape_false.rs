@@ -1,8 +1,6 @@
-use ruff_python_ast::helpers::find_keyword;
-use ruff_python_ast::{self as ast, Constant, Expr, Keyword, Ranged};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Constant, Expr, Ranged};
 
 use crate::checkers::ast::Checker;
 
@@ -59,15 +57,13 @@ impl Violation for Jinja2AutoescapeFalse {
 }
 
 /// S701
-pub(crate) fn jinja2_autoescape_false(checker: &mut Checker, func: &Expr, keywords: &[Keyword]) {
+pub(crate) fn jinja2_autoescape_false(checker: &mut Checker, call: &ast::ExprCall) {
     if checker
         .semantic()
-        .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["jinja2", "Environment"])
-        })
+        .resolve_call_path(&call.func)
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["jinja2", "Environment"]))
     {
-        if let Some(keyword) = find_keyword(keywords, "autoescape") {
+        if let Some(keyword) = call.arguments.find_keyword("autoescape") {
             match &keyword.value {
                 Expr::Constant(ast::ExprConstant {
                     value: Constant::Bool(true),
@@ -91,7 +87,7 @@ pub(crate) fn jinja2_autoescape_false(checker: &mut Checker, func: &Expr, keywor
         } else {
             checker.diagnostics.push(Diagnostic::new(
                 Jinja2AutoescapeFalse { value: false },
-                func.range(),
+                call.func.range(),
             ));
         }
     }

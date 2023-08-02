@@ -1,8 +1,9 @@
 use std::iter::Peekable;
 
 use ruff_python_ast::{
-    Alias, Arg, ArgWithDefault, Arguments, Comprehension, Decorator, ElifElseClause, ExceptHandler,
-    Expr, Keyword, MatchCase, Mod, Pattern, Ranged, Stmt, TypeParam, WithItem,
+    Alias, Arguments, Comprehension, Decorator, ElifElseClause, ExceptHandler, Expr, Keyword,
+    MatchCase, Mod, Parameter, ParameterWithDefault, Parameters, Pattern, Ranged, Stmt, TypeParam,
+    WithItem,
 };
 use ruff_text_size::{TextRange, TextSize};
 
@@ -236,18 +237,25 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast> {
         self.finish_node(arguments);
     }
 
-    fn visit_arg(&mut self, arg: &'ast Arg) {
+    fn visit_parameters(&mut self, parameters: &'ast Parameters) {
+        if self.start_node(parameters).is_traverse() {
+            walk_parameters(self, parameters);
+        }
+        self.finish_node(parameters);
+    }
+
+    fn visit_parameter(&mut self, arg: &'ast Parameter) {
         if self.start_node(arg).is_traverse() {
-            walk_arg(self, arg);
+            walk_parameter(self, arg);
         }
         self.finish_node(arg);
     }
 
-    fn visit_arg_with_default(&mut self, arg_with_default: &'ast ArgWithDefault) {
-        if self.start_node(arg_with_default).is_traverse() {
-            walk_arg_with_default(self, arg_with_default);
+    fn visit_parameter_with_default(&mut self, parameter_with_default: &'ast ParameterWithDefault) {
+        if self.start_node(parameter_with_default).is_traverse() {
+            walk_parameter_with_default(self, parameter_with_default);
         }
-        self.finish_node(arg_with_default);
+        self.finish_node(parameter_with_default);
     }
 
     fn visit_keyword(&mut self, keyword: &'ast Keyword) {
@@ -620,26 +628,26 @@ pub(super) enum CommentPlacement<'a> {
 impl<'a> CommentPlacement<'a> {
     /// Makes `comment` a [leading comment](self#leading-comments) of `node`.
     #[inline]
-    pub(super) fn leading(node: AnyNodeRef<'a>, comment: impl Into<SourceComment>) -> Self {
+    pub(super) fn leading(node: impl Into<AnyNodeRef<'a>>, comment: DecoratedComment) -> Self {
         Self::Leading {
-            node,
+            node: node.into(),
             comment: comment.into(),
         }
     }
 
     /// Makes `comment` a [dangling comment](self::dangling-comments) of `node`.
-    pub(super) fn dangling(node: AnyNodeRef<'a>, comment: impl Into<SourceComment>) -> Self {
+    pub(super) fn dangling(node: impl Into<AnyNodeRef<'a>>, comment: DecoratedComment) -> Self {
         Self::Dangling {
-            node,
+            node: node.into(),
             comment: comment.into(),
         }
     }
 
     /// Makes `comment` a [trailing comment](self::trailing-comments) of `node`.
     #[inline]
-    pub(super) fn trailing(node: AnyNodeRef<'a>, comment: impl Into<SourceComment>) -> Self {
+    pub(super) fn trailing(node: impl Into<AnyNodeRef<'a>>, comment: DecoratedComment) -> Self {
         Self::Trailing {
-            node,
+            node: node.into(),
             comment: comment.into(),
         }
     }

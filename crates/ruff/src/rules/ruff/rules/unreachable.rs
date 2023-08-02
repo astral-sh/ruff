@@ -378,7 +378,7 @@ fn loop_block<'stmt>(
             // For `break` statements we don't want to continue with the
             // loop, but instead with the statement after the loop (i.e.
             // not change anything).
-            !block.stmts.last().map_or(false, Stmt::is_break_stmt)
+            !block.stmts.last().is_some_and(Stmt::is_break_stmt)
         },
     );
     NextBlock::If {
@@ -566,24 +566,14 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                     let _ = (body, handlers, orelse, finalbody); // Silence unused code warnings.
                     self.unconditional_next_block(after)
                 }
-                Stmt::With(StmtWith {
-                    items,
-                    body,
-                    type_comment,
-                    ..
-                })
-                | Stmt::AsyncWith(StmtAsyncWith {
-                    items,
-                    body,
-                    type_comment,
-                    ..
-                }) => {
+                Stmt::With(StmtWith { items, body, .. })
+                | Stmt::AsyncWith(StmtAsyncWith { items, body, .. }) => {
                     // TODO: handle `with` statements, see
                     // <https://docs.python.org/3/reference/compound_stmts.html#the-with-statement>.
                     // I recommend to `try` statements first as `with` can desugar
                     // to a `try` statement.
                     // For now we'll skip over it.
-                    let _ = (items, body, type_comment); // Silence unused code warnings.
+                    let _ = (items, body); // Silence unused code warnings.
                     self.unconditional_next_block(after)
                 }
                 Stmt::Match(StmtMatch { subject, cases, .. }) => {

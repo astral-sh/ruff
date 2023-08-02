@@ -1,12 +1,11 @@
 use anyhow::Result;
-use ruff_python_ast::{Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::find_keyword;
+use ruff_python_ast::{self as ast, Keyword, Ranged};
 use ruff_source_file::Locator;
 
-use crate::autofix::edits::remove_argument;
+use crate::autofix::edits::{remove_argument, Parentheses};
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
@@ -53,12 +52,10 @@ impl AlwaysAutofixableViolation for ReplaceStdoutStderr {
 
 /// Generate a [`Edit`] for a `stdout` and `stderr` [`Keyword`] pair.
 fn generate_fix(
-    locator: &Locator,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
     stdout: &Keyword,
     stderr: &Keyword,
+    call: &ast::ExprCall,
+    locator: &Locator,
 ) -> Result<Fix> {
     let (first, second) = if stdout.start() < stderr.start() {
         (stdout, stderr)
@@ -68,36 +65,26 @@ fn generate_fix(
     Ok(Fix::suggested_edits(
         Edit::range_replacement("capture_output=True".to_string(), first.range()),
         [remove_argument(
+            second,
+            &call.arguments,
+            Parentheses::Preserve,
             locator,
-            func.end(),
-            second.range(),
-            args,
-            keywords,
-            false,
         )?],
     ))
 }
 
 /// UP022
-pub(crate) fn replace_stdout_stderr(
-    checker: &mut Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
-) {
+pub(crate) fn replace_stdout_stderr(checker: &mut Checker, call: &ast::ExprCall) {
     if checker
         .semantic()
-        .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["subprocess", "run"])
-        })
+        .resolve_call_path(&call.func)
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["subprocess", "run"]))
     {
         // Find `stdout` and `stderr` kwargs.
-        let Some(stdout) = find_keyword(keywords, "stdout") else {
+        let Some(stdout) = call.arguments.find_keyword("stdout") else {
             return;
         };
-        let Some(stderr) = find_keyword(keywords, "stderr") else {
+        let Some(stderr) = call.arguments.find_keyword("stderr") else {
             return;
         };
 
@@ -105,24 +92,18 @@ pub(crate) fn replace_stdout_stderr(
         if !checker
             .semantic()
             .resolve_call_path(&stdout.value)
-            .map_or(false, |call_path| {
-                matches!(call_path.as_slice(), ["subprocess", "PIPE"])
-            })
+            .is_some_and(|call_path| matches!(call_path.as_slice(), ["subprocess", "PIPE"]))
             || !checker
                 .semantic()
                 .resolve_call_path(&stderr.value)
-                .map_or(false, |call_path| {
-                    matches!(call_path.as_slice(), ["subprocess", "PIPE"])
-                })
+                .is_some_and(|call_path| matches!(call_path.as_slice(), ["subprocess", "PIPE"]))
         {
             return;
         }
 
-        let mut diagnostic = Diagnostic::new(ReplaceStdoutStderr, expr.range());
+        let mut diagnostic = Diagnostic::new(ReplaceStdoutStderr, call.range());
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.try_set_fix(|| {
-                generate_fix(checker.locator(), func, args, keywords, stdout, stderr)
-            });
+            diagnostic.try_set_fix(|| generate_fix(stdout, stderr, call, checker.locator()));
         }
         checker.diagnostics.push(diagnostic);
     }

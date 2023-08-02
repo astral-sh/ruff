@@ -292,7 +292,7 @@ fn resolve_best_absolute_import<Host: host::Host>(
                     && typings_import
                         .resolved_paths
                         .last()
-                        .map_or(false, |path| path.as_os_str().is_empty())
+                        .is_some_and(|path| path.as_os_str().is_empty())
                 {
                     if typings_import
                         .implicit_imports
@@ -381,9 +381,10 @@ fn resolve_best_absolute_import<Host: host::Host>(
             typeshed_root.display()
         );
         if typeshed_root != execution_environment.root {
-            if best_result_so_far.as_ref().map_or(false, |result| {
-                result.py_typed_info.is_some() && !result.is_partly_resolved
-            }) {
+            if best_result_so_far
+                .as_ref()
+                .is_some_and(|result| result.py_typed_info.is_some() && !result.is_partly_resolved)
+            {
                 return best_result_so_far;
             }
         }

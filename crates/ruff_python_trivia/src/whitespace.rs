@@ -83,32 +83,32 @@ impl PythonWhitespace for str {
 #[cfg(test)]
 mod tests {
     use crate::has_trailing_content;
-    use ruff_python_ast::{Ranged, Suite};
-    use ruff_python_parser::{Parse, ParseError};
+    use ruff_python_ast::Ranged;
+    use ruff_python_parser::{parse_suite, ParseError};
     use ruff_source_file::Locator;
 
     #[test]
     fn trailing_content() -> Result<(), ParseError> {
         let contents = "x = 1";
-        let program = Suite::parse(contents, "<filename>")?;
+        let program = parse_suite(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert!(!has_trailing_content(stmt.end(), &locator));
 
         let contents = "x = 1; y = 2";
-        let program = Suite::parse(contents, "<filename>")?;
+        let program = parse_suite(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert!(has_trailing_content(stmt.end(), &locator));
 
         let contents = "x = 1  ";
-        let program = Suite::parse(contents, "<filename>")?;
+        let program = parse_suite(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert!(!has_trailing_content(stmt.end(), &locator));
 
         let contents = "x = 1  # Comment";
-        let program = Suite::parse(contents, "<filename>")?;
+        let program = parse_suite(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert!(!has_trailing_content(stmt.end(), &locator));
@@ -118,7 +118,7 @@ x = 1
 y = 2
 "#
         .trim();
-        let program = Suite::parse(contents, "<filename>")?;
+        let program = parse_suite(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert!(!has_trailing_content(stmt.end(), &locator));

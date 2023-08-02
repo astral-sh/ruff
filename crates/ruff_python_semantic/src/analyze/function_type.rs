@@ -1,7 +1,6 @@
-use ruff_python_ast::Decorator;
-
 use ruff_python_ast::call_path::from_qualified_name;
 use ruff_python_ast::helpers::map_callable;
+use ruff_python_ast::Decorator;
 
 use crate::model::SemanticModel;
 use crate::scope::{Scope, ScopeKind};
@@ -23,7 +22,7 @@ pub fn classify(
     classmethod_decorators: &[String],
     staticmethod_decorators: &[String],
 ) -> FunctionType {
-    let ScopeKind::Class(scope) = &scope.kind else {
+    let ScopeKind::Class(class_def) = &scope.kind else {
         return FunctionType::Function;
     };
     if decorator_list.iter().any(|decorator| {
@@ -31,7 +30,7 @@ pub fn classify(
         // `@staticmethod`).
         semantic
             .resolve_call_path(map_callable(&decorator.expression))
-            .map_or(false, |call_path| {
+            .is_some_and(|call_path| {
                 matches!(
                     call_path.as_slice(),
                     ["", "staticmethod"] | ["abc", "abstractstaticmethod"]
@@ -43,11 +42,11 @@ pub fn classify(
         FunctionType::StaticMethod
     } else if matches!(name, "__new__" | "__init_subclass__" | "__class_getitem__")
     // Special-case class method, like `__new__`.
-        || scope.bases.iter().any(|expr| {
+        || class_def.bases().any(|expr| {
             // The class itself extends a known metaclass, so all methods are class methods.
             semantic
                 .resolve_call_path(map_callable(expr))
-                .map_or(false, |call_path| {
+                .is_some_and( |call_path| {
                     matches!(call_path.as_slice(), ["", "type"] | ["abc", "ABCMeta"])
                 })
         })
@@ -55,7 +54,7 @@ pub fn classify(
             // The method is decorated with a class method decorator (like `@classmethod`).
             semantic
                 .resolve_call_path(map_callable(&decorator.expression))
-                .map_or(false, |call_path| {
+                .is_some_and( |call_path| {
                     matches!(
                         call_path.as_slice(),
                         ["", "classmethod"] | ["abc", "abstractclassmethod"]

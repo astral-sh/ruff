@@ -31,8 +31,9 @@ use std::path::Path;
 use itertools::Itertools;
 use log::error;
 use ruff_python_ast::{
-    self as ast, Arg, ArgWithDefault, Arguments, Comprehension, Constant, ElifElseClause,
-    ExceptHandler, Expr, ExprContext, Keyword, Pattern, Ranged, Stmt, Suite, UnaryOp,
+    self as ast, Arguments, Comprehension, Constant, ElifElseClause, ExceptHandler, Expr,
+    ExprContext, Keyword, Parameter, ParameterWithDefault, Parameters, Pattern, Ranged, Stmt,
+    Suite, UnaryOp,
 };
 use ruff_text_size::{TextRange, TextSize};
 
@@ -232,6 +233,11 @@ impl<'a> Checker<'a> {
         &self.semantic
     }
 
+    /// Return `true` if the current file is a stub file (`.pyi`).
+    pub(crate) const fn is_stub(&self) -> bool {
+        self.is_stub
+    }
+
     /// The [`Path`] to the file under analysis.
     pub(crate) const fn path(&self) -> &'a Path {
         self.path
@@ -334,7 +340,7 @@ where
                         if alias
                             .asname
                             .as_ref()
-                            .map_or(false, |asname| asname.as_str() == alias.name.as_str())
+                            .is_some_and(|asname| asname.as_str() == alias.name.as_str())
                         {
                             flags |= BindingFlags::EXPLICIT_EXPORT;
                         }
@@ -379,7 +385,7 @@ where
                         if alias
                             .asname
                             .as_ref()
-                            .map_or(false, |asname| asname.as_str() == alias.name.as_str())
+                            .is_some_and(|asname| asname.as_str() == alias.name.as_str())
                         {
                             flags |= BindingFlags::EXPLICIT_EXPORT;
                         }
@@ -450,7 +456,7 @@ where
         match stmt {
             Stmt::FunctionDef(ast::StmtFunctionDef {
                 body,
-                args,
+                parameters,
                 decorator_list,
                 returns,
                 type_params,
@@ -458,7 +464,7 @@ where
             })
             | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
                 body,
-                args,
+                parameters,
                 decorator_list,
                 type_params,
                 returns,
@@ -476,28 +482,28 @@ where
 
                 self.semantic.push_scope(ScopeKind::Type);
 
-                for type_param in type_params {
-                    self.visit_type_param(type_param);
+                if let Some(type_params) = type_params {
+                    self.visit_type_params(type_params);
                 }
 
-                for arg_with_default in args
+                for parameter_with_default in parameters
                     .posonlyargs
                     .iter()
-                    .chain(&args.args)
-                    .chain(&args.kwonlyargs)
+                    .chain(&parameters.args)
+                    .chain(&parameters.kwonlyargs)
                 {
-                    if let Some(expr) = &arg_with_default.def.annotation {
+                    if let Some(expr) = &parameter_with_default.parameter.annotation {
                         if runtime_annotation {
                             self.visit_runtime_annotation(expr);
                         } else {
                             self.visit_annotation(expr);
                         };
                     }
-                    if let Some(expr) = &arg_with_default.default {
+                    if let Some(expr) = &parameter_with_default.default {
                         self.visit_expr(expr);
                     }
                 }
-                if let Some(arg) = &args.vararg {
+                if let Some(arg) = &parameters.vararg {
                     if let Some(expr) = &arg.annotation {
                         if runtime_annotation {
                             self.visit_runtime_annotation(expr);
@@ -506,7 +512,7 @@ where
                         };
                     }
                 }
-                if let Some(arg) = &args.kwarg {
+                if let Some(arg) = &parameters.kwarg {
                     if let Some(expr) = &arg.annotation {
                         if runtime_annotation {
                             self.visit_runtime_annotation(expr);
@@ -547,8 +553,7 @@ where
             Stmt::ClassDef(
                 class_def @ ast::StmtClassDef {
                     body,
-                    bases,
-                    keywords,
+                    arguments,
                     decorator_list,
                     type_params,
                     ..
@@ -560,14 +565,12 @@ where
 
                 self.semantic.push_scope(ScopeKind::Type);
 
-                for type_param in type_params {
-                    self.visit_type_param(type_param);
+                if let Some(type_params) = type_params {
+                    self.visit_type_params(type_params);
                 }
-                for expr in bases {
-                    self.visit_expr(expr);
-                }
-                for keyword in keywords {
-                    self.visit_keyword(keyword);
+
+                if let Some(arguments) = arguments {
+                    self.visit_arguments(arguments);
                 }
 
                 let definition = docstrings::extraction::extract_definition(
@@ -593,8 +596,8 @@ where
                 value,
             }) => {
                 self.semantic.push_scope(ScopeKind::Type);
-                for type_param in type_params {
-                    self.visit_type_param(type_param);
+                if let Some(type_params) = type_params {
+                    self.visit_type_params(type_params);
                 }
                 self.visit_expr(value);
                 self.semantic.pop_scope();
@@ -832,8 +835,7 @@ where
         match expr {
             Expr::Call(ast::ExprCall {
                 func,
-                args: _,
-                keywords: _,
+                arguments: _,
                 range: _,
             }) => {
                 if let Expr::Name(ast::ExprName { id, ctx, range: _ }) = func.as_ref() {
@@ -883,21 +885,21 @@ where
             }
             Expr::Lambda(
                 lambda @ ast::ExprLambda {
-                    args,
+                    parameters,
                     body: _,
                     range: _,
                 },
             ) => {
                 // Visit the default arguments, but avoid the body, which will be deferred.
-                for ArgWithDefault {
+                for ParameterWithDefault {
                     default,
-                    def: _,
+                    parameter: _,
                     range: _,
-                } in args
+                } in parameters
                     .posonlyargs
                     .iter()
-                    .chain(&args.args)
-                    .chain(&args.kwonlyargs)
+                    .chain(&parameters.args)
+                    .chain(&parameters.kwonlyargs)
                 {
                     if let Some(expr) = &default {
                         self.visit_expr(expr);
@@ -919,8 +921,12 @@ where
             }
             Expr::Call(ast::ExprCall {
                 func,
-                args,
-                keywords,
+                arguments:
+                    Arguments {
+                        args,
+                        keywords,
+                        range: _,
+                    },
                 range: _,
             }) => {
                 self.visit_expr(func);
@@ -1098,7 +1104,7 @@ where
                                     arg,
                                     range: _,
                                 } = keyword;
-                                if arg.as_ref().map_or(false, |arg| arg == "type") {
+                                if arg.as_ref().is_some_and(|arg| arg == "type") {
                                     self.visit_type_definition(value);
                                 } else {
                                     self.visit_non_type_definition(value);
@@ -1288,43 +1294,43 @@ where
         }
     }
 
-    fn visit_arguments(&mut self, arguments: &'b Arguments) {
+    fn visit_parameters(&mut self, parameters: &'b Parameters) {
         // Step 1: Binding.
         // Bind, but intentionally avoid walking default expressions, as we handle them
         // upstream.
-        for arg_with_default in &arguments.posonlyargs {
-            self.visit_arg(&arg_with_default.def);
+        for parameter_with_default in &parameters.posonlyargs {
+            self.visit_parameter(&parameter_with_default.parameter);
         }
-        for arg_with_default in &arguments.args {
-            self.visit_arg(&arg_with_default.def);
+        for parameter_with_default in &parameters.args {
+            self.visit_parameter(&parameter_with_default.parameter);
         }
-        if let Some(arg) = &arguments.vararg {
-            self.visit_arg(arg);
+        if let Some(arg) = &parameters.vararg {
+            self.visit_parameter(arg);
         }
-        for arg_with_default in &arguments.kwonlyargs {
-            self.visit_arg(&arg_with_default.def);
+        for parameter_with_default in &parameters.kwonlyargs {
+            self.visit_parameter(&parameter_with_default.parameter);
         }
-        if let Some(arg) = &arguments.kwarg {
-            self.visit_arg(arg);
+        if let Some(arg) = &parameters.kwarg {
+            self.visit_parameter(arg);
         }
 
         // Step 4: Analysis
-        analyze::arguments(arguments, self);
+        analyze::parameters(parameters, self);
     }
 
-    fn visit_arg(&mut self, arg: &'b Arg) {
+    fn visit_parameter(&mut self, parameter: &'b Parameter) {
         // Step 1: Binding.
         // Bind, but intentionally avoid walking the annotation, as we handle it
         // upstream.
         self.add_binding(
-            &arg.arg,
-            arg.identifier(),
+            &parameter.name,
+            parameter.identifier(),
             BindingKind::Argument,
             BindingFlags::empty(),
         );
 
         // Step 4: Analysis
-        analyze::argument(arg, self);
+        analyze::parameter(parameter, self);
     }
 
     fn visit_pattern(&mut self, pattern: &'b Pattern) {
@@ -1775,7 +1781,7 @@ impl<'a> Checker<'a> {
 
                     self.semantic.restore(snapshot);
 
-                    if self.semantic.in_typing_only_annotation() {
+                    if self.semantic.in_annotation() && self.semantic.future_annotations() {
                         if self.enabled(Rule::QuotedAnnotation) {
                             pyupgrade::rules::quoted_annotation(self, value, range);
                         }
@@ -1819,9 +1825,13 @@ impl<'a> Checker<'a> {
                 self.semantic.restore(snapshot);
 
                 match &self.semantic.stmt() {
-                    Stmt::FunctionDef(ast::StmtFunctionDef { body, args, .. })
-                    | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, args, .. }) => {
-                        self.visit_arguments(args);
+                    Stmt::FunctionDef(ast::StmtFunctionDef {
+                        body, parameters, ..
+                    })
+                    | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
+                        body, parameters, ..
+                    }) => {
+                        self.visit_parameters(parameters);
                         self.visit_body(body);
                     }
                     _ => {
@@ -1841,12 +1851,12 @@ impl<'a> Checker<'a> {
                 self.semantic.restore(snapshot);
 
                 if let Expr::Lambda(ast::ExprLambda {
-                    args,
+                    parameters,
                     body,
                     range: _,
                 }) = expr
                 {
-                    self.visit_arguments(args);
+                    self.visit_parameters(parameters);
                     self.visit_expr(body);
                 } else {
                     unreachable!("Expected Expr::Lambda");

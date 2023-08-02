@@ -203,14 +203,17 @@ def f():
 
 
 if True:
+
     def f():
         pass
         # 1
 elif True:
+
     def f():
         pass
         # 2
 else:
+
     def f():
         pass
         # 3

@@ -1,15 +1,14 @@
 use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
-use ruff_python_ast::{self as ast, Constant, Expr, Keyword, Ranged};
-use ruff_python_parser::{lexer, Mode};
-use ruff_text_size::TextSize;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::find_keyword;
+use ruff_python_ast::{self as ast, Constant, Expr, Ranged};
+use ruff_python_parser::{lexer, Mode};
 use ruff_python_semantic::SemanticModel;
 use ruff_source_file::Locator;
+use ruff_text_size::TextSize;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -64,14 +63,15 @@ impl AlwaysAutofixableViolation for RedundantOpenModes {
 }
 
 /// UP015
-pub(crate) fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
-    let Some((mode_param, keywords)) = match_open(expr, checker.semantic()) else {
+pub(crate) fn redundant_open_modes(checker: &mut Checker, call: &ast::ExprCall) {
+    if !is_open_builtin(call.func.as_ref(), checker.semantic()) {
         return;
-    };
-    match mode_param {
+    }
+
+    match call.arguments.find_argument("mode", 1) {
         None => {
-            if !keywords.is_empty() {
-                if let Some(keyword) = find_keyword(keywords, MODE_KEYWORD_ARGUMENT) {
+            if !call.arguments.is_empty() {
+                if let Some(keyword) = call.arguments.find_keyword(MODE_KEYWORD_ARGUMENT) {
                     if let Expr::Constant(ast::ExprConstant {
                         value: Constant::Str(mode_param_value),
                         ..
@@ -79,7 +79,7 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
                     {
                         if let Ok(mode) = OpenMode::from_str(mode_param_value.as_str()) {
                             checker.diagnostics.push(create_check(
-                                expr,
+                                call,
                                 &keyword.value,
                                 mode.replacement_value(),
                                 checker.locator(),
@@ -98,7 +98,7 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
             {
                 if let Ok(mode) = OpenMode::from_str(value.as_str()) {
                     checker.diagnostics.push(create_check(
-                        expr,
+                        call,
                         mode_param,
                         mode.replacement_value(),
                         checker.locator(),
@@ -113,25 +113,12 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
 const OPEN_FUNC_NAME: &str = "open";
 const MODE_KEYWORD_ARGUMENT: &str = "mode";
 
-fn match_open<'a>(
-    expr: &'a Expr,
-    model: &SemanticModel,
-) -> Option<(Option<&'a Expr>, &'a [Keyword])> {
-    let ast::ExprCall {
-        func,
-        args,
-        keywords,
-        range: _,
-    } = expr.as_call_expr()?;
-
-    let ast::ExprName { id, .. } = func.as_name_expr()?;
-
-    if id.as_str() == OPEN_FUNC_NAME && model.is_builtin(id) {
-        // Return the "open mode" parameter and keywords.
-        Some((args.get(1), keywords))
-    } else {
-        None
-    }
+/// Returns `true` if the given `call` is a call to the `open` builtin.
+fn is_open_builtin(func: &Expr, model: &SemanticModel) -> bool {
+    let Some(ast::ExprName { id, .. }) = func.as_name_expr() else {
+        return false;
+    };
+    id.as_str() == OPEN_FUNC_NAME && model.is_builtin(id)
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -176,8 +163,8 @@ impl OpenMode {
     }
 }
 
-fn create_check(
-    expr: &Expr,
+fn create_check<T: Ranged>(
+    expr: &T,
     mode_param: &Expr,
     replacement_value: Option<&str>,
     locator: &Locator,
@@ -204,7 +191,11 @@ fn create_check(
     diagnostic
 }
 
-fn create_remove_param_fix(locator: &Locator, expr: &Expr, mode_param: &Expr) -> Result<Edit> {
+fn create_remove_param_fix<T: Ranged>(
+    locator: &Locator,
+    expr: &T,
+    mode_param: &Expr,
+) -> Result<Edit> {
     let content = locator.slice(expr.range());
     // Find the last comma before mode_param and create a deletion fix
     // starting from the comma and ending after mode_param.

@@ -251,9 +251,9 @@ fn format_import_from(
 /// UP026
 pub(crate) fn deprecated_mock_attribute(checker: &mut Checker, expr: &Expr) {
     if let Expr::Attribute(ast::ExprAttribute { value, .. }) = expr {
-        if collect_call_path(value).map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["mock", "mock"])
-        }) {
+        if collect_call_path(value)
+            .is_some_and(|call_path| matches!(call_path.as_slice(), ["mock", "mock"]))
+        {
             let mut diagnostic = Diagnostic::new(
                 DeprecatedMockImport {
                     reference_type: MockReference::Attribute,
@@ -322,7 +322,7 @@ pub(crate) fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
             level,
             ..
         }) => {
-            if level.map_or(false, |level| level.to_u32() > 0) {
+            if level.is_some_and(|level| level.to_u32() > 0) {
                 return;
             }
 

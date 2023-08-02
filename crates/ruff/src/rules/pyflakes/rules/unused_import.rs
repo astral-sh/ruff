@@ -126,7 +126,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
         };
 
         if checker.rule_is_ignored(Rule::UnusedImport, import.range.start())
-            || import.parent_range.map_or(false, |parent_range| {
+            || import.parent_range.is_some_and(|parent_range| {
                 checker.rule_is_ignored(Rule::UnusedImport, parent_range.start())
             })
         {

@@ -18,9 +18,7 @@ pub fn is_staticmethod(decorator_list: &[Decorator], semantic: &SemanticModel) -
     decorator_list.iter().any(|decorator| {
         semantic
             .resolve_call_path(map_callable(&decorator.expression))
-            .map_or(false, |call_path| {
-                matches!(call_path.as_slice(), ["", "staticmethod"])
-            })
+            .is_some_and(|call_path| matches!(call_path.as_slice(), ["", "staticmethod"]))
     })
 }
 
@@ -29,9 +27,7 @@ pub fn is_classmethod(decorator_list: &[Decorator], semantic: &SemanticModel) ->
     decorator_list.iter().any(|decorator| {
         semantic
             .resolve_call_path(map_callable(&decorator.expression))
-            .map_or(false, |call_path| {
-                matches!(call_path.as_slice(), ["", "classmethod"])
-            })
+            .is_some_and(|call_path| matches!(call_path.as_slice(), ["", "classmethod"]))
     })
 }
 
@@ -54,7 +50,7 @@ pub fn is_abstract(decorator_list: &[Decorator], semantic: &SemanticModel) -> bo
     decorator_list.iter().any(|decorator| {
         semantic
             .resolve_call_path(map_callable(&decorator.expression))
-            .map_or(false, |call_path| {
+            .is_some_and(|call_path| {
                 matches!(
                     call_path.as_slice(),
                     [
@@ -80,7 +76,7 @@ pub fn is_property(
     decorator_list.iter().any(|decorator| {
         semantic
             .resolve_call_path(map_callable(&decorator.expression))
-            .map_or(false, |call_path| {
+            .is_some_and(|call_path| {
                 matches!(
                     call_path.as_slice(),
                     ["", "property"] | ["functools", "cached_property"]
@@ -208,7 +204,7 @@ pub(crate) fn method_visibility(stmt: &Stmt) -> Visibility {
         }) => {
             // Is this a setter or deleter?
             if decorator_list.iter().any(|decorator| {
-                collect_call_path(&decorator.expression).map_or(false, |call_path| {
+                collect_call_path(&decorator.expression).is_some_and(|call_path| {
                     call_path.as_slice() == [name, "setter"]
                         || call_path.as_slice() == [name, "deleter"]
                 })

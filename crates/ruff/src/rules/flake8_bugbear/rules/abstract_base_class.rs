@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Constant, Expr, Keyword, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Keyword, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -106,16 +106,14 @@ impl Violation for EmptyMethodWithoutAbstractDecorator {
 
 fn is_abc_class(bases: &[Expr], keywords: &[Keyword], semantic: &SemanticModel) -> bool {
     keywords.iter().any(|keyword| {
-        keyword.arg.as_ref().map_or(false, |arg| arg == "metaclass")
+        keyword.arg.as_ref().is_some_and(|arg| arg == "metaclass")
             && semantic
                 .resolve_call_path(&keyword.value)
-                .map_or(false, |call_path| {
-                    matches!(call_path.as_slice(), ["abc", "ABCMeta"])
-                })
+                .is_some_and(|call_path| matches!(call_path.as_slice(), ["abc", "ABCMeta"]))
     }) || bases.iter().any(|base| {
-        semantic.resolve_call_path(base).map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["abc", "ABC"])
-        })
+        semantic
+            .resolve_call_path(base)
+            .is_some_and(|call_path| matches!(call_path.as_slice(), ["abc", "ABC"]))
     })
 }
 
@@ -141,14 +139,17 @@ pub(crate) fn abstract_base_class(
     checker: &mut Checker,
     stmt: &Stmt,
     name: &str,
-    bases: &[Expr],
-    keywords: &[Keyword],
+    arguments: Option<&Arguments>,
     body: &[Stmt],
 ) {
-    if bases.len() + keywords.len() != 1 {
+    let Some(Arguments { args, keywords, .. }) = arguments else {
+        return;
+    };
+
+    if args.len() + keywords.len() != 1 {
         return;
     }
-    if !is_abc_class(bases, keywords, checker.semantic()) {
+    if !is_abc_class(args, keywords, checker.semantic()) {
         return;
     }
 

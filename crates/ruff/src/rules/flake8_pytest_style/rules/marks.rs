@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Decorator, Expr, Ranged};
+use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -9,6 +9,37 @@ use crate::registry::{AsRule, Rule};
 
 use super::helpers::get_mark_decorators;
 
+/// ## What it does
+/// Checks for parameter-free `@pytest.mark.<marker>()` decorators with or
+/// without parentheses, depending on the `flake8-pytest-style.mark-parentheses`
+/// setting.
+///
+/// ## Why is this bad?
+/// If a `@pytest.mark.<marker>()` doesn't take any arguments, the parentheses are
+/// optional.
+///
+/// Either removing those unnecessary parentheses _or_ requiring them for all
+/// fixtures is fine, but it's best to be consistent.
+///
+/// ## Example
+/// ```python
+/// @pytest.mark.foo
+/// def test_something():
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// @pytest.mark.foo()
+/// def test_something():
+///     ...
+/// ```
+///
+/// ## Options
+/// - `flake8-pytest-style.mark-parentheses`
+///
+/// ## References
+/// - [`pytest` documentation: Marks](https://docs.pytest.org/en/latest/reference/reference.html#marks)
 #[violation]
 pub struct PytestIncorrectMarkParenthesesStyle {
     mark_name: String,
@@ -75,8 +106,12 @@ fn check_mark_parentheses(checker: &mut Checker, decorator: &Decorator, call_pat
     match &decorator.expression {
         Expr::Call(ast::ExprCall {
             func,
-            args,
-            keywords,
+            arguments:
+                Arguments {
+                    args,
+                    keywords,
+                    range: _,
+                },
             range: _,
         }) => {
             if !checker.settings.flake8_pytest_style.mark_parentheses
@@ -103,7 +138,11 @@ fn check_useless_usefixtures(checker: &mut Checker, decorator: &Decorator, call_
 
     let mut has_parameters = false;
 
-    if let Expr::Call(ast::ExprCall { args, keywords, .. }) = &decorator.expression {
+    if let Expr::Call(ast::ExprCall {
+        arguments: Arguments { args, keywords, .. },
+        ..
+    }) = &decorator.expression
+    {
         if !args.is_empty() || !keywords.is_empty() {
             has_parameters = true;
         }

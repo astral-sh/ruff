@@ -70,7 +70,7 @@ impl Violation for CachedInstanceMethod {
 }
 
 fn is_cache_func(expr: &Expr, semantic: &SemanticModel) -> bool {
-    semantic.resolve_call_path(expr).map_or(false, |call_path| {
+    semantic.resolve_call_path(expr).is_some_and(|call_path| {
         matches!(call_path.as_slice(), ["functools", "lru_cache" | "cache"])
     })
 }

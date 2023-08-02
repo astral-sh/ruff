@@ -79,7 +79,7 @@ pub(crate) fn verbose_log_message(checker: &mut Checker, handlers: &[ExceptHandl
                     // Collect all referenced names in the `logging.exception` call.
                     let names: Vec<&ast::ExprName> = {
                         let mut names = Vec::new();
-                        for arg in &expr.args {
+                        for arg in &expr.arguments.args {
                             let mut visitor = NameVisitor::default();
                             visitor.visit_expr(arg);
                             names.extend(visitor.names);

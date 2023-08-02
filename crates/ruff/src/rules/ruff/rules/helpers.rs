@@ -1,6 +1,6 @@
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Arguments, Expr};
 
-use ruff_python_ast::helpers::map_callable;
+use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_semantic::{BindingKind, SemanticModel};
 
 /// Return `true` if the given [`Expr`] is a special class attribute, like `__slots__`.
@@ -21,25 +21,23 @@ pub(super) fn is_special_attribute(value: &Expr) -> bool {
 
 /// Returns `true` if the given [`Expr`] is a `dataclasses.field` call.
 pub(super) fn is_dataclass_field(func: &Expr, semantic: &SemanticModel) -> bool {
-    semantic.resolve_call_path(func).map_or(false, |call_path| {
-        matches!(call_path.as_slice(), ["dataclasses", "field"])
-    })
+    semantic
+        .resolve_call_path(func)
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["dataclasses", "field"]))
 }
 
 /// Returns `true` if the given [`Expr`] is a `typing.ClassVar` annotation.
 pub(super) fn is_class_var_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
-    let Expr::Subscript(ast::ExprSubscript { value, .. }) = &annotation else {
-        return false;
-    };
-    semantic.match_typing_expr(value, "ClassVar")
+    // ClassVar can be used either with a subscript `ClassVar[...]` or without (the type is
+    // inferred).
+    semantic.match_typing_expr(map_subscript(annotation), "ClassVar")
 }
 
 /// Returns `true` if the given [`Expr`] is a `typing.Final` annotation.
 pub(super) fn is_final_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
-    let Expr::Subscript(ast::ExprSubscript { value, .. }) = &annotation else {
-        return false;
-    };
-    semantic.match_typing_expr(value, "Final")
+    // Final can be used either with a subscript `Final[...]` or without (the type is
+    // inferred).
+    semantic.match_typing_expr(map_subscript(annotation), "Final")
 }
 
 /// Returns `true` if the given class is a dataclass.
@@ -47,16 +45,18 @@ pub(super) fn is_dataclass(class_def: &ast::StmtClassDef, semantic: &SemanticMod
     class_def.decorator_list.iter().any(|decorator| {
         semantic
             .resolve_call_path(map_callable(&decorator.expression))
-            .map_or(false, |call_path| {
-                matches!(call_path.as_slice(), ["dataclasses", "dataclass"])
-            })
+            .is_some_and(|call_path| matches!(call_path.as_slice(), ["dataclasses", "dataclass"]))
     })
 }
 
 /// Returns `true` if the given class is a Pydantic `BaseModel` or `BaseSettings` subclass.
 pub(super) fn is_pydantic_model(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
-    class_def.bases.iter().any(|expr| {
-        semantic.resolve_call_path(expr).map_or(false, |call_path| {
+    let Some(Arguments { args: bases, .. }) = class_def.arguments.as_deref() else {
+        return false;
+    };
+
+    bases.iter().any(|expr| {
+        semantic.resolve_call_path(expr).is_some_and(|call_path| {
             matches!(
                 call_path.as_slice(),
                 ["pydantic", "BaseModel" | "BaseSettings"]
@@ -70,16 +70,16 @@ pub(super) fn is_pydantic_model(class_def: &ast::StmtClassDef, semantic: &Semant
 ///
 /// See: <https://docs.python.org/3.10/reference/datamodel.html#descriptors>
 pub(super) fn is_descriptor_class(func: &Expr, semantic: &SemanticModel) -> bool {
-    semantic.lookup_attribute(func).map_or(false, |id| {
+    semantic.lookup_attribute(func).is_some_and(|id| {
         let BindingKind::ClassDefinition(scope_id) = semantic.binding(id).kind else {
             return false;
         };
 
         // Look for `__get__`, `__set__`, and `__delete__` methods.
         ["__get__", "__set__", "__delete__"].iter().any(|method| {
-            semantic.scopes[scope_id].get(method).map_or(false, |id| {
-                semantic.binding(id).kind.is_function_definition()
-            })
+            semantic.scopes[scope_id]
+                .get(method)
+                .is_some_and(|id| semantic.binding(id).kind.is_function_definition())
         })
     })
 }

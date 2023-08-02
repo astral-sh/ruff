@@ -402,7 +402,7 @@ fn is_docstring_section(
     }
 
     // Determine whether the next line is an underline, e.g., "-----".
-    let next_line_is_underline = next_line.map_or(false, |next_line| {
+    let next_line_is_underline = next_line.is_some_and(|next_line| {
         let next_line = next_line.trim();
         if next_line.is_empty() {
             false

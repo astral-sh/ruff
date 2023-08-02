@@ -48,7 +48,7 @@ pub(crate) fn open_sleep_or_subprocess_call(checker: &mut Checker, expr: &Expr) 
                 .semantic()
                 .resolve_call_path(func)
                 .as_ref()
-                .map_or(false, is_open_sleep_or_subprocess_call)
+                .is_some_and(is_open_sleep_or_subprocess_call)
             {
                 checker.diagnostics.push(Diagnostic::new(
                     OpenSleepOrSubprocessInAsyncFunction,

@@ -117,7 +117,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
             // interfaces, without any AST nodes in between. Right now, we
             // only error when traversing definition boundaries (functions,
             // classes, etc.).
-            if !overloaded_name.map_or(false, |overloaded_name| {
+            if !overloaded_name.is_some_and(|overloaded_name| {
                 flake8_annotations::helpers::is_overload_impl(
                     definition,
                     &overloaded_name,

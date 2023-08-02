@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, Parameters, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -116,14 +116,14 @@ pub(crate) fn non_self_return_type(
     name: &str,
     decorator_list: &[Decorator],
     returns: Option<&Expr>,
-    args: &Arguments,
+    parameters: &Parameters,
     async_: bool,
 ) {
     let ScopeKind::Class(class_def) = checker.semantic().scope().kind else {
         return;
     };
 
-    if args.args.is_empty() && args.posonlyargs.is_empty() {
+    if parameters.args.is_empty() && parameters.posonlyargs.is_empty() {
         return;
     }
 
@@ -186,7 +186,7 @@ pub(crate) fn non_self_return_type(
     match name {
         "__iter__" => {
             if is_iterable(returns, checker.semantic())
-                && is_iterator(&class_def.bases, checker.semantic())
+                && is_iterator(class_def.arguments.as_deref(), checker.semantic())
             {
                 checker.diagnostics.push(Diagnostic::new(
                     NonSelfReturnType {
@@ -199,7 +199,7 @@ pub(crate) fn non_self_return_type(
         }
         "__aiter__" => {
             if is_async_iterable(returns, checker.semantic())
-                && is_async_iterator(&class_def.bases, checker.semantic())
+                && is_async_iterator(class_def.arguments.as_deref(), checker.semantic())
             {
                 checker.diagnostics.push(Diagnostic::new(
                     NonSelfReturnType {
@@ -248,11 +248,14 @@ fn is_self(expr: &Expr, semantic: &SemanticModel) -> bool {
 }
 
 /// Return `true` if the given class extends `collections.abc.Iterator`.
-fn is_iterator(bases: &[Expr], semantic: &SemanticModel) -> bool {
+fn is_iterator(arguments: Option<&Arguments>, semantic: &SemanticModel) -> bool {
+    let Some(Arguments { args: bases, .. }) = arguments else {
+        return false;
+    };
     bases.iter().any(|expr| {
         semantic
             .resolve_call_path(map_subscript(expr))
-            .map_or(false, |call_path| {
+            .is_some_and(|call_path| {
                 matches!(
                     call_path.as_slice(),
                     ["typing", "Iterator"] | ["collections", "abc", "Iterator"]
@@ -265,7 +268,7 @@ fn is_iterator(bases: &[Expr], semantic: &SemanticModel) -> bool {
 fn is_iterable(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_call_path(map_subscript(expr))
-        .map_or(false, |call_path| {
+        .is_some_and(|call_path| {
             matches!(
                 call_path.as_slice(),
                 ["typing", "Iterable" | "Iterator"]
@@ -275,11 +278,14 @@ fn is_iterable(expr: &Expr, semantic: &SemanticModel) -> bool {
 }
 
 /// Return `true` if the given class extends `collections.abc.AsyncIterator`.
-fn is_async_iterator(bases: &[Expr], semantic: &SemanticModel) -> bool {
+fn is_async_iterator(arguments: Option<&Arguments>, semantic: &SemanticModel) -> bool {
+    let Some(Arguments { args: bases, .. }) = arguments else {
+        return false;
+    };
     bases.iter().any(|expr| {
         semantic
             .resolve_call_path(map_subscript(expr))
-            .map_or(false, |call_path| {
+            .is_some_and(|call_path| {
                 matches!(
                     call_path.as_slice(),
                     ["typing", "AsyncIterator"] | ["collections", "abc", "AsyncIterator"]
@@ -292,7 +298,7 @@ fn is_async_iterator(bases: &[Expr], semantic: &SemanticModel) -> bool {
 fn is_async_iterable(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_call_path(map_subscript(expr))
-        .map_or(false, |call_path| {
+        .is_some_and(|call_path| {
             matches!(
                 call_path.as_slice(),
                 ["typing", "AsyncIterable" | "AsyncIterator"]

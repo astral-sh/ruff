@@ -1,8 +1,6 @@
-use ruff_python_ast::{Expr, Keyword, Ranged};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::find_keyword;
+use ruff_python_ast::{self as ast, Ranged};
 
 use crate::checkers::ast::Checker;
 
@@ -38,22 +36,20 @@ impl Violation for NoExplicitStacklevel {
 }
 
 /// B028
-pub(crate) fn no_explicit_stacklevel(checker: &mut Checker, func: &Expr, keywords: &[Keyword]) {
+pub(crate) fn no_explicit_stacklevel(checker: &mut Checker, call: &ast::ExprCall) {
     if !checker
         .semantic()
-        .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["warnings", "warn"])
-        })
+        .resolve_call_path(&call.func)
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["warnings", "warn"]))
     {
         return;
     }
 
-    if find_keyword(keywords, "stacklevel").is_some() {
+    if call.arguments.find_keyword("stacklevel").is_some() {
         return;
     }
 
     checker
         .diagnostics
-        .push(Diagnostic::new(NoExplicitStacklevel, func.range()));
+        .push(Diagnostic::new(NoExplicitStacklevel, call.func.range()));
 }

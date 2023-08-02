@@ -1,9 +1,11 @@
 use std::borrow::Cow;
 
 use bitflags::bitflags;
-use ruff_python_ast::{ExprConstant, Ranged};
+use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::{self as ast, ExprConstant, ExprJoinedStr, Ranged};
 use ruff_python_parser::lexer::{lex_starts_at, LexicalError, LexicalErrorType};
 use ruff_python_parser::{Mode, Tok};
+use ruff_source_file::Locator;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_formatter::{format_args, write, FormatError};
@@ -13,11 +15,62 @@ use crate::comments::{leading_comments, trailing_comments};
 use crate::expression::parentheses::{
     in_parentheses_only_group, in_parentheses_only_soft_line_break_or_space,
 };
+use crate::expression::Expr;
 use crate::prelude::*;
 use crate::QuoteStyle;
 
+#[derive(Copy, Clone)]
+enum Quoting {
+    CanChange,
+    Preserve,
+}
+
+pub(super) enum AnyString<'a> {
+    Constant(&'a ExprConstant),
+    JoinedStr(&'a ExprJoinedStr),
+}
+
+impl<'a> AnyString<'a> {
+    fn quoting(&self, locator: &Locator) -> Quoting {
+        match self {
+            Self::Constant(_) => Quoting::CanChange,
+            Self::JoinedStr(joined_str) => {
+                if joined_str.values.iter().any(|value| match value {
+                    Expr::FormattedValue(ast::ExprFormattedValue { range, .. }) => {
+                        let string_content = locator.slice(*range);
+                        string_content.contains(['"', '\''])
+                    }
+                    _ => false,
+                }) {
+                    Quoting::Preserve
+                } else {
+                    Quoting::CanChange
+                }
+            }
+        }
+    }
+}
+
+impl Ranged for AnyString<'_> {
+    fn range(&self) -> TextRange {
+        match self {
+            Self::Constant(expr) => expr.range(),
+            Self::JoinedStr(expr) => expr.range(),
+        }
+    }
+}
+
+impl<'a> From<&AnyString<'a>> for AnyNodeRef<'a> {
+    fn from(value: &AnyString<'a>) -> Self {
+        match value {
+            AnyString::Constant(expr) => AnyNodeRef::ExprConstant(expr),
+            AnyString::JoinedStr(expr) => AnyNodeRef::ExprJoinedStr(expr),
+        }
+    }
+}
+
 pub(super) struct FormatString<'a> {
-    constant: &'a ExprConstant,
+    string: &'a AnyString<'a>,
     layout: StringLayout,
 }
 
@@ -30,10 +83,12 @@ pub enum StringLayout {
 }
 
 impl<'a> FormatString<'a> {
-    pub(super) fn new(constant: &'a ExprConstant) -> Self {
-        debug_assert!(constant.value.is_str() || constant.value.is_bytes());
+    pub(super) fn new(string: &'a AnyString) -> Self {
+        if let AnyString::Constant(constant) = string {
+            debug_assert!(constant.value.is_str() || constant.value.is_bytes());
+        }
         Self {
-            constant,
+            string,
             layout: StringLayout::Default,
         }
     }
@@ -48,30 +103,33 @@ impl<'a> Format<PyFormatContext<'_>> for FormatString<'a> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         match self.layout {
             StringLayout::Default => {
-                let string_range = self.constant.range();
+                let string_range = self.string.range();
                 let string_content = f.context().locator().slice(string_range);
 
                 if is_implicit_concatenation(string_content) {
-                    in_parentheses_only_group(&FormatStringContinuation::new(self.constant)).fmt(f)
+                    in_parentheses_only_group(&FormatStringContinuation::new(self.string)).fmt(f)
                 } else {
-                    FormatStringPart::new(string_range).fmt(f)
+                    FormatStringPart::new(string_range, self.string.quoting(&f.context().locator()))
+                        .fmt(f)
                 }
             }
             StringLayout::ImplicitConcatenatedBinaryLeftSide => {
-                FormatStringContinuation::new(self.constant).fmt(f)
+                FormatStringContinuation::new(self.string).fmt(f)
             }
         }
     }
 }
 
 struct FormatStringContinuation<'a> {
-    constant: &'a ExprConstant,
+    string: &'a AnyString<'a>,
 }
 
 impl<'a> FormatStringContinuation<'a> {
-    fn new(constant: &'a ExprConstant) -> Self {
-        debug_assert!(constant.value.is_str() || constant.value.is_bytes());
-        Self { constant }
+    fn new(string: &'a AnyString<'a>) -> Self {
+        if let AnyString::Constant(constant) = string {
+            debug_assert!(constant.value.is_str() || constant.value.is_bytes());
+        }
+        Self { string }
     }
 }
 
@@ -79,9 +137,9 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         let comments = f.context().comments().clone();
         let locator = f.context().locator();
-        let mut dangling_comments = comments.dangling_comments(self.constant);
+        let mut dangling_comments = comments.dangling_comments(self.string);
 
-        let string_range = self.constant.range();
+        let string_range = self.string.range();
         let string_content = locator.slice(string_range);
 
         // The AST parses implicit concatenation as a single string.
@@ -155,7 +213,7 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
                     joiner.entry(&format_args![
                         line_suffix_boundary(),
                         leading_comments(leading_part_comments),
-                        FormatStringPart::new(token_range),
+                        FormatStringPart::new(token_range, self.string.quoting(&locator)),
                         trailing_comments(trailing_part_comments)
                     ]);
 
@@ -178,11 +236,15 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
 
 struct FormatStringPart {
     part_range: TextRange,
+    quoting: Quoting,
 }
 
 impl FormatStringPart {
-    const fn new(range: TextRange) -> Self {
-        Self { part_range: range }
+    const fn new(range: TextRange, quoting: Quoting) -> Self {
+        Self {
+            part_range: range,
+            quoting,
+        }
     }
 }
 
@@ -204,10 +266,15 @@ impl Format<PyFormatContext<'_>> for FormatStringPart {
 
         let raw_content = &string_content[relative_raw_content_range];
         let is_raw_string = prefix.is_raw_string();
-        let preferred_quotes = if is_raw_string {
-            preferred_quotes_raw(raw_content, quotes, f.options().quote_style())
-        } else {
-            preferred_quotes(raw_content, quotes, f.options().quote_style())
+        let preferred_quotes = match self.quoting {
+            Quoting::Preserve => quotes,
+            Quoting::CanChange => {
+                if is_raw_string {
+                    preferred_quotes_raw(raw_content, quotes, f.options().quote_style())
+                } else {
+                    preferred_quotes(raw_content, quotes, f.options().quote_style())
+                }
+            }
         };
 
         write!(f, [prefix, preferred_quotes])?;

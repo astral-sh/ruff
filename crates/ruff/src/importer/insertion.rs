@@ -299,12 +299,12 @@ fn match_leading_semicolon(s: &str) -> Option<TextSize> {
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use ruff_python_ast::Suite;
+
     use ruff_python_parser::lexer::LexResult;
-    use ruff_python_parser::Parse;
     use ruff_text_size::TextSize;
 
     use ruff_python_codegen::Stylist;
+    use ruff_python_parser::parse_suite;
     use ruff_source_file::{LineEnding, Locator};
 
     use super::Insertion;
@@ -312,7 +312,7 @@ mod tests {
     #[test]
     fn start_of_file() -> Result<()> {
         fn insert(contents: &str) -> Result<Insertion> {
-            let program = Suite::parse(contents, "<filename>")?;
+            let program = parse_suite(contents, "<filename>")?;
             let tokens: Vec<LexResult> = ruff_python_parser::tokenize(contents);
             let locator = Locator::new(contents);
             let stylist = Stylist::from_tokens(&tokens, &locator);

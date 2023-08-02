@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use ruff_python_ast::{self as ast, Constant, Expr, Keyword, Ranged};
+use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Keyword, Ranged};
 use ruff_python_literal::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
@@ -59,13 +59,18 @@ impl AlwaysAutofixableViolation for FString {
 struct FormatSummaryValues<'a> {
     args: Vec<&'a Expr>,
     kwargs: FxHashMap<&'a str, &'a Expr>,
+    auto_index: usize,
 }
 
 impl<'a> FormatSummaryValues<'a> {
     fn try_from_expr(expr: &'a Expr, locator: &'a Locator) -> Option<Self> {
         let mut extracted_args: Vec<&Expr> = Vec::new();
         let mut extracted_kwargs: FxHashMap<&str, &Expr> = FxHashMap::default();
-        if let Expr::Call(ast::ExprCall { args, keywords, .. }) = expr {
+        if let Expr::Call(ast::ExprCall {
+            arguments: Arguments { args, keywords, .. },
+            ..
+        }) = expr
+        {
             for arg in args {
                 if contains_invalids(locator.slice(arg.range()))
                     || locator.contains_line_break(arg.range())
@@ -98,27 +103,25 @@ impl<'a> FormatSummaryValues<'a> {
         Some(Self {
             args: extracted_args,
             kwargs: extracted_kwargs,
+            auto_index: 0,
         })
     }
 
-    fn consume_next(&mut self) -> Option<&Expr> {
-        if self.args.is_empty() {
-            None
-        } else {
-            Some(self.args.remove(0))
-        }
+    /// Return the next positional argument.
+    fn arg_auto(&mut self) -> Option<&Expr> {
+        let idx = self.auto_index;
+        self.auto_index += 1;
+        self.arg_positional(idx)
     }
 
-    fn consume_arg(&mut self, index: usize) -> Option<&Expr> {
-        if self.args.len() > index {
-            Some(self.args.remove(index))
-        } else {
-            None
-        }
+    /// Return the positional argument at the given index.
+    fn arg_positional(&self, index: usize) -> Option<&Expr> {
+        self.args.get(index).copied()
     }
 
-    fn consume_kwarg(&mut self, key: &str) -> Option<&Expr> {
-        self.kwargs.remove(key)
+    /// Return the keyword argument with the given name.
+    fn arg_keyword(&self, key: &str) -> Option<&Expr> {
+        self.kwargs.get(key).copied()
     }
 }
 
@@ -250,9 +253,9 @@ fn try_convert_to_f_string(expr: &Expr, locator: &Locator) -> Option<String> {
 
                 let field = FieldName::parse(&field_name).ok()?;
                 let arg = match field.field_type {
-                    FieldType::Auto => summary.consume_next(),
-                    FieldType::Index(index) => summary.consume_arg(index),
-                    FieldType::Keyword(name) => summary.consume_kwarg(&name),
+                    FieldType::Auto => summary.arg_auto(),
+                    FieldType::Index(index) => summary.arg_positional(index),
+                    FieldType::Keyword(name) => summary.arg_keyword(&name),
                 }?;
                 converted.push_str(&formatted_expr(
                     arg,
@@ -362,7 +365,7 @@ pub(crate) fn f_strings(
     if existing
         .chars()
         .last()
-        .map_or(false, |char| char.is_ascii_alphabetic())
+        .is_some_and(|char| char.is_ascii_alphabetic())
     {
         contents.insert(0, ' ');
     }

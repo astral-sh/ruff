@@ -1,6 +1,6 @@
 use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
 use ruff_python_ast::helpers::is_compound_statement;
-use ruff_python_ast::{Ranged, Stmt, Suite};
+use ruff_python_ast::{self as ast, Constant, Expr, Ranged, Stmt, Suite};
 use ruff_python_trivia::{lines_after, lines_before, skip_trailing_trivia};
 
 use crate::context::{NodeLevel, WithNodeLevel};
@@ -8,38 +8,40 @@ use crate::prelude::*;
 
 /// Level at which the [`Suite`] appears in the source code.
 #[derive(Copy, Clone, Debug)]
-pub enum SuiteLevel {
+pub enum SuiteKind {
     /// Statements at the module level / top level
     TopLevel,
 
-    /// Statements in a nested body
-    Nested,
-}
+    /// Statements in a function body.
+    Function,
 
-impl SuiteLevel {
-    const fn is_nested(self) -> bool {
-        matches!(self, SuiteLevel::Nested)
-    }
+    /// Statements in a class body.
+    Class,
+
+    /// Statements in any other body (e.g., `if` or `while`).
+    Other,
 }
 
 #[derive(Debug)]
 pub struct FormatSuite {
-    level: SuiteLevel,
+    kind: SuiteKind,
 }
 
 impl Default for FormatSuite {
     fn default() -> Self {
         FormatSuite {
-            level: SuiteLevel::Nested,
+            kind: SuiteKind::Other,
         }
     }
 }
 
 impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
     fn fmt(&self, statements: &Suite, f: &mut PyFormatter) -> FormatResult<()> {
-        let node_level = match self.level {
-            SuiteLevel::TopLevel => NodeLevel::TopLevel,
-            SuiteLevel::Nested => NodeLevel::CompoundStatement,
+        let node_level = match self.kind {
+            SuiteKind::TopLevel => NodeLevel::TopLevel,
+            SuiteKind::Function | SuiteKind::Class | SuiteKind::Other => {
+                NodeLevel::CompoundStatement
+            }
         };
 
         let comments = f.context().comments().clone();
@@ -51,18 +53,73 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
         };
 
         let mut f = WithNodeLevel::new(node_level, f);
-        // First entry has never any separator, doesn't matter which one we take.
-        write!(f, [first.format()])?;
 
+        // Format the first statement in the body, which often has special formatting rules.
         let mut last = first;
+        match self.kind {
+            SuiteKind::Other => {
+                if is_class_or_function_definition(first) && !comments.has_leading_comments(first) {
+                    // Add an empty line for any nested functions or classes defined within
+                    // non-function or class compound statements, e.g., this is stable formatting:
+                    // ```python
+                    // if True:
+                    //
+                    //     def test():
+                    //         ...
+                    // ```
+                    write!(f, [empty_line()])?;
+                }
+                write!(f, [first.format()])?;
+            }
+            SuiteKind::Class if is_docstring(first) => {
+                if !comments.has_leading_comments(first) && lines_before(first.start(), source) > 1
+                {
+                    // Allow up to one empty line before a class docstring, e.g., this is
+                    // stable formatting:
+                    // ```python
+                    // class Test:
+                    //
+                    //     """Docstring"""
+                    // ```
+                    write!(f, [empty_line()])?;
+                }
+                write!(f, [first.format()])?;
+
+                // Enforce an empty line after a class docstring, e.g., these are both stable
+                // formatting:
+                // ```python
+                // class Test:
+                //     """Docstring"""
+                //
+                //     ...
+                //
+                //
+                // class Test:
+                //
+                //     """Docstring"""
+                //
+                //     ...
+                // ```
+                if let Some(second) = iter.next() {
+                    // Format the subsequent statement immediately. This rule takes precedence
+                    // over the rules in the loop below (and most of them won't apply anyway,
+                    // e.g., we know the first statement isn't an import).
+                    write!(f, [empty_line(), second.format()])?;
+                    last = second;
+                }
+            }
+            _ => {
+                write!(f, [first.format()])?;
+            }
+        }
 
         for statement in iter {
             if is_class_or_function_definition(last) || is_class_or_function_definition(statement) {
-                match self.level {
-                    SuiteLevel::TopLevel => {
+                match self.kind {
+                    SuiteKind::TopLevel => {
                         write!(f, [empty_line(), empty_line(), statement.format()])?;
                     }
-                    SuiteLevel::Nested => {
+                    SuiteKind::Function | SuiteKind::Class | SuiteKind::Other => {
                         write!(f, [empty_line(), statement.format()])?;
                     }
                 }
@@ -95,13 +152,12 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 match lines_before(start, source) {
                     0 | 1 => write!(f, [hard_line_break()])?,
                     2 => write!(f, [empty_line()])?,
-                    3.. => {
-                        if self.level.is_nested() {
+                    3.. => match self.kind {
+                        SuiteKind::TopLevel => write!(f, [empty_line(), empty_line()])?,
+                        SuiteKind::Function | SuiteKind::Class | SuiteKind::Other => {
                             write!(f, [empty_line()])?;
-                        } else {
-                            write!(f, [empty_line(), empty_line()])?;
                         }
-                    }
+                    },
                 }
 
                 write!(f, [statement.format()])?;
@@ -166,11 +222,25 @@ const fn is_import_definition(stmt: &Stmt) -> bool {
     matches!(stmt, Stmt::Import(_) | Stmt::ImportFrom(_))
 }
 
+fn is_docstring(stmt: &Stmt) -> bool {
+    let Stmt::Expr(ast::StmtExpr { value, .. }) = stmt else {
+        return false;
+    };
+
+    matches!(
+        value.as_ref(),
+        Expr::Constant(ast::ExprConstant {
+            value: Constant::Str(..),
+            ..
+        })
+    )
+}
+
 impl FormatRuleWithOptions<Suite, PyFormatContext<'_>> for FormatSuite {
-    type Options = SuiteLevel;
+    type Options = SuiteKind;
 
     fn with_options(mut self, options: Self::Options) -> Self {
-        self.level = options;
+        self.kind = options;
         self
     }
 }
@@ -194,15 +264,15 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Suite {
 #[cfg(test)]
 mod tests {
     use ruff_formatter::format;
-    use ruff_python_ast::Suite;
-    use ruff_python_parser::Parse;
+
+    use ruff_python_parser::parse_suite;
 
     use crate::comments::Comments;
     use crate::prelude::*;
-    use crate::statement::suite::SuiteLevel;
+    use crate::statement::suite::SuiteKind;
     use crate::PyFormatOptions;
 
-    fn format_suite(level: SuiteLevel) -> String {
+    fn format_suite(level: SuiteKind) -> String {
         let source = r#"
 a = 10
 
@@ -224,7 +294,7 @@ def trailing_func():
     pass
 "#;
 
-        let statements = Suite::parse(source, "test.py").unwrap();
+        let statements = parse_suite(source, "test.py").unwrap();
 
         let context = PyFormatContext::new(PyFormatOptions::default(), source, Comments::default());
 
@@ -239,7 +309,7 @@ def trailing_func():
 
     #[test]
     fn top_level() {
-        let formatted = format_suite(SuiteLevel::TopLevel);
+        let formatted = format_suite(SuiteKind::TopLevel);
 
         assert_eq!(
             formatted,
@@ -274,7 +344,7 @@ def trailing_func():
 
     #[test]
     fn nested_level() {
-        let formatted = format_suite(SuiteLevel::Nested);
+        let formatted = format_suite(SuiteKind::Other);
 
         assert_eq!(
             formatted,

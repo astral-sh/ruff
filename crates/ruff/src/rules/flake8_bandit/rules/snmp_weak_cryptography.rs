@@ -1,8 +1,6 @@
-use ruff_python_ast::{Expr, Keyword, Ranged};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::CallArguments;
+use ruff_python_ast::{self as ast, Ranged};
 
 use crate::checkers::ast::Checker;
 
@@ -42,23 +40,18 @@ impl Violation for SnmpWeakCryptography {
 }
 
 /// S509
-pub(crate) fn snmp_weak_cryptography(
-    checker: &mut Checker,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
-) {
-    if checker
-        .semantic()
-        .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["pysnmp", "hlapi", "UsmUserData"])
-        })
-    {
-        if CallArguments::new(args, keywords).len() < 3 {
+pub(crate) fn snmp_weak_cryptography(checker: &mut Checker, call: &ast::ExprCall) {
+    if call.arguments.len() < 3 {
+        if checker
+            .semantic()
+            .resolve_call_path(&call.func)
+            .is_some_and(|call_path| {
+                matches!(call_path.as_slice(), ["pysnmp", "hlapi", "UsmUserData"])
+            })
+        {
             checker
                 .diagnostics
-                .push(Diagnostic::new(SnmpWeakCryptography, func.range()));
+                .push(Diagnostic::new(SnmpWeakCryptography, call.func.range()));
         }
     }
 }

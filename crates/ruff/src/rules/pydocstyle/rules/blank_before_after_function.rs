@@ -182,7 +182,7 @@ pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Doc
         if blank_lines_after == 1
             && lines
                 .find(|line| !line.trim_whitespace_start().starts_with('#'))
-                .map_or(false, |line| INNER_FUNCTION_OR_CLASS_REGEX.is_match(&line))
+                .is_some_and(|line| INNER_FUNCTION_OR_CLASS_REGEX.is_match(&line))
         {
             return;
         }

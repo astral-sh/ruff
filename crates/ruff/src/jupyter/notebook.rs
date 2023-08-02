@@ -376,7 +376,7 @@ impl Notebook {
                         1
                     } else {
                         let trailing_newline =
-                            usize::from(string_array.last().map_or(false, |s| s.ends_with('\n')));
+                            usize::from(string_array.last().is_some_and(|s| s.ends_with('\n')));
                         u32::try_from(string_array.len() + trailing_newline).unwrap()
                     }
                 }

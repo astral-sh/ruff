@@ -1,7 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::find_keyword;
-use ruff_python_ast::{Expr, ExprAttribute, Keyword, Ranged};
+use ruff_python_ast::{self as ast, Expr, ExprAttribute, Ranged};
 
 use crate::checkers::ast::Checker;
 
@@ -52,13 +51,8 @@ impl Violation for OsSepSplit {
 }
 
 /// PTH206
-pub(crate) fn os_sep_split(
-    checker: &mut Checker,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
-) {
-    let Expr::Attribute(ExprAttribute { attr, .. }) = func else {
+pub(crate) fn os_sep_split(checker: &mut Checker, call: &ast::ExprCall) {
+    let Expr::Attribute(ExprAttribute { attr, .. }) = call.func.as_ref() else {
         return;
     };
 
@@ -66,28 +60,20 @@ pub(crate) fn os_sep_split(
         return;
     };
 
-    let sep = if !args.is_empty() {
-        // `.split(os.sep)`
-        let [arg] = args else {
-            return;
-        };
-        arg
-    } else if !keywords.is_empty() {
-        // `.split(sep=os.sep)`
-        let Some(keyword) = find_keyword(keywords, "sep") else {
-            return;
-        };
-        &keyword.value
-    } else {
+    // Match `.split(os.sep)` or `.split(sep=os.sep)`, but avoid cases in which a `maxsplit` is
+    // specified.
+    if call.arguments.len() != 1 {
+        return;
+    }
+
+    let Some(sep) = call.arguments.find_argument("sep", 0) else {
         return;
     };
 
     if !checker
         .semantic()
         .resolve_call_path(sep)
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["os", "sep"])
-        })
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["os", "sep"]))
     {
         return;
     }

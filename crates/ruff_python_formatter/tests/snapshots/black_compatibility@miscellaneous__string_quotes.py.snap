@@ -69,25 +69,11 @@ f"\"{a}\"{'hello' * b}\"{c}\""
 ```diff
 --- Black
 +++ Ruff
-@@ -15,16 +15,21 @@
- """Here's a " """
- """Just a normal triple
- quote"""
--f"just a normal {f} string"
--f"""This is a triple-quoted {f}-string"""
--f'MOAR {" ".join([])}'
--f"MOAR {' '.join([])}"
-+f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
-+f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
-+f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
-+f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
- r"raw string ftw"
- r"Date d\'expiration:(.*)"
+@@ -24,7 +24,12 @@
  r'Tricky "quote'
  r"Not-so-tricky \"quote"
--rf"{yay}"
+ rf"{yay}"
 -"\nThe \"quick\"\nbrown fox\njumps over\nthe 'lazy' dog.\n"
-+f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
 +"\n\
 +The \"quick\"\n\
 +brown fox\n\
@@ -97,27 +83,6 @@ f"\"{a}\"{'hello' * b}\"{c}\""
  re.compile(r'[\\"]')
  "x = ''; y = \"\""
  "x = '''; y = \"\""
-@@ -39,14 +44,14 @@
- '\\""'
- "\\''"
- "Lots of \\\\\\\\'quotes'"
--f'{y * " "} \'{z}\''
--f"{{y * \" \"}} '{z}'"
--f'\'{z}\' {y * " "}'
--f"{y * x} '{z}'"
-+f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
-+f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
-+f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
-+f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
- "'{z}' {y * \" \"}"
- "{y * x} '{z}'"
- 
- # We must bail out if changing the quotes would introduce backslashes in f-string
- # expressions. xref: https://github.com/psf/black/issues/2348
--f"\"{b}\"{' ' * (long-len(b)+1)}: \"{sts}\",\n"
--f"\"{a}\"{'hello' * b}\"{c}\""
-+f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
-+f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
 ```
 
 ## Ruff Output
@@ -140,15 +105,15 @@ f"\"{a}\"{'hello' * b}\"{c}\""
 """Here's a " """
 """Just a normal triple
 quote"""
-f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
-f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
-f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
-f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
+f"just a normal {f} string"
+f"""This is a triple-quoted {f}-string"""
+f'MOAR {" ".join([])}'
+f"MOAR {' '.join([])}"
 r"raw string ftw"
 r"Date d\'expiration:(.*)"
 r'Tricky "quote'
 r"Not-so-tricky \"quote"
-f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
+rf"{yay}"
 "\n\
 The \"quick\"\n\
 brown fox\n\
@@ -169,17 +134,17 @@ re.compile(r'[\\"]')
 '\\""'
 "\\''"
 "Lots of \\\\\\\\'quotes'"
-f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
-f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
-f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
-f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
+f'{y * " "} \'{z}\''
+f"{{y * \" \"}} '{z}'"
+f'\'{z}\' {y * " "}'
+f"{y * x} '{z}'"
 "'{z}' {y * \" \"}"
 "{y * x} '{z}'"
 
 # We must bail out if changing the quotes would introduce backslashes in f-string
 # expressions. xref: https://github.com/psf/black/issues/2348
-f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
-f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
+f"\"{b}\"{' ' * (long-len(b)+1)}: \"{sts}\",\n"
+f"\"{a}\"{'hello' * b}\"{c}\""
 ```
 
 ## Black Output

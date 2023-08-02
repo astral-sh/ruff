@@ -1,12 +1,10 @@
-use ruff_python_ast::{Ranged, StmtClassDef};
-use ruff_text_size::TextRange;
-
 use ruff_formatter::write;
-use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
+use ruff_python_ast::{Ranged, StmtClassDef};
+use ruff_python_trivia::{lines_after, skip_trailing_trivia};
 
-use crate::comments::trailing_comments;
-use crate::expression::parentheses::{parenthesized, Parentheses};
+use crate::comments::{leading_comments, trailing_comments};
 use crate::prelude::*;
+use crate::statement::suite::SuiteKind;
 
 #[derive(Default)]
 pub struct FormatStmtClassDef;
@@ -16,43 +14,91 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
         let StmtClassDef {
             range: _,
             name,
-            bases,
-            keywords,
+            arguments,
             body,
             type_params: _,
             decorator_list,
         } = item;
 
-        f.join_with(hard_line_break())
-            .entries(decorator_list.iter().formatted())
-            .finish()?;
+        let comments = f.context().comments().clone();
 
-        if !decorator_list.is_empty() {
-            hard_line_break().fmt(f)?;
+        let dangling_comments = comments.dangling_comments(item);
+        let trailing_definition_comments_start =
+            dangling_comments.partition_point(|comment| comment.line_position().is_own_line());
+
+        let (leading_definition_comments, trailing_definition_comments) =
+            dangling_comments.split_at(trailing_definition_comments_start);
+
+        if let Some(last_decorator) = decorator_list.last() {
+            f.join_with(hard_line_break())
+                .entries(decorator_list.iter().formatted())
+                .finish()?;
+
+            if leading_definition_comments.is_empty() {
+                write!(f, [hard_line_break()])?;
+            } else {
+                // Write any leading definition comments (between last decorator and the header)
+                // while maintaining the right amount of empty lines between the comment
+                // and the last decorator.
+                let decorator_end =
+                    skip_trailing_trivia(last_decorator.end(), f.context().source());
+
+                let leading_line = if lines_after(decorator_end, f.context().source()) <= 1 {
+                    hard_line_break()
+                } else {
+                    empty_line()
+                };
+
+                write!(
+                    f,
+                    [leading_line, leading_comments(leading_definition_comments)]
+                )?;
+            }
         }
 
         write!(f, [text("class"), space(), name.format()])?;
 
-        if !(bases.is_empty() && keywords.is_empty()) {
-            parenthesized(
-                "(",
-                &FormatInheritanceClause {
-                    class_definition: item,
-                },
-                ")",
-            )
-            .fmt(f)?;
+        if let Some(arguments) = arguments.as_deref() {
+            // Drop empty parentheses, e.g., in:
+            // ```python
+            // class A():
+            //     ...
+            // ```
+            //
+            // However, preserve any dangling end-of-line comments, e.g., in:
+            // ```python
+            // class A(  # comment
+            // ):
+            //     ...
+            //
+            // If the arguments contain any dangling own-line comments, we retain the parentheses,
+            // e.g., in:
+            // ```python
+            // class A(  # comment
+            //     # comment
+            // ):
+            //     ...
+            // ```
+            if arguments.args.is_empty()
+                && arguments.keywords.is_empty()
+                && comments
+                    .dangling_comments(arguments)
+                    .iter()
+                    .all(|comment| comment.line_position().is_end_of_line())
+            {
+                let dangling = comments.dangling_comments(arguments);
+                write!(f, [trailing_comments(dangling)])?;
+            } else {
+                write!(f, [arguments.format()])?;
+            }
         }
-
-        let comments = f.context().comments().clone();
-        let trailing_head_comments = comments.dangling_comments(item);
 
         write!(
             f,
             [
                 text(":"),
-                trailing_comments(trailing_head_comments),
-                block_indent(&body.format())
+                trailing_comments(trailing_definition_comments),
+                block_indent(&body.format().with_options(SuiteKind::Class))
             ]
         )
     }
@@ -64,53 +110,5 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
     ) -> FormatResult<()> {
         // handled in fmt_fields
         Ok(())
-    }
-}
-
-struct FormatInheritanceClause<'a> {
-    class_definition: &'a StmtClassDef,
-}
-
-impl Format<PyFormatContext<'_>> for FormatInheritanceClause<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
-        let StmtClassDef {
-            bases,
-            keywords,
-            name,
-            body,
-            ..
-        } = self.class_definition;
-
-        let source = f.context().source();
-
-        let mut joiner = f.join_comma_separated(body.first().unwrap().start());
-
-        if let Some((first, rest)) = bases.split_first() {
-            // Manually handle parentheses for the first expression because the logic in `FormatExpr`
-            // doesn't know that it should disregard the parentheses of the inheritance clause.
-            // ```python
-            // class Test(A) # A is not parenthesized, the parentheses belong to the inheritance clause
-            // class Test((A)) # A is parenthesized
-            // ```
-            // parentheses from the inheritance clause belong to the expression.
-            let tokenizer = SimpleTokenizer::new(source, TextRange::new(name.end(), first.start()))
-                .skip_trivia();
-
-            let left_paren_count = tokenizer
-                .take_while(|token| token.kind() == SimpleTokenKind::LParen)
-                .count();
-
-            // Ignore the first parentheses count
-            let parentheses = if left_paren_count > 1 {
-                Parentheses::Always
-            } else {
-                Parentheses::Never
-            };
-
-            joiner.entry(first, &first.format().with_options(parentheses));
-            joiner.nodes(rest.iter());
-        }
-
-        joiner.nodes(keywords.iter()).finish()
     }
 }

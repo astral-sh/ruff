@@ -1,5 +1,6 @@
 use ruff_python_ast::{
-    self as ast, Arg, ArgWithDefault, Arguments, Constant, Expr, Identifier, Ranged, Stmt,
+    self as ast, Constant, Expr, Identifier, Parameter, ParameterWithDefault, Parameters, Ranged,
+    Stmt,
 };
 use ruff_text_size::TextRange;
 
@@ -67,7 +68,10 @@ pub(crate) fn lambda_assignment(
         return;
     };
 
-    let Expr::Lambda(ast::ExprLambda { args, body, .. }) = value else {
+    let Expr::Lambda(ast::ExprLambda {
+        parameters, body, ..
+    }) = value
+    else {
         return;
     };
 
@@ -87,7 +91,7 @@ pub(crate) fn lambda_assignment(
             let mut indented = String::new();
             for (idx, line) in function(
                 id,
-                args,
+                parameters,
                 body,
                 annotation,
                 checker.semantic(),
@@ -147,13 +151,10 @@ fn extract_types(annotation: &Expr, semantic: &SemanticModel) -> Option<(Vec<Exp
         return None;
     };
 
-    if !semantic
-        .resolve_call_path(value)
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["collections", "abc", "Callable"])
-                || semantic.match_typing_call_path(&call_path, "Callable")
-        })
-    {
+    if !semantic.resolve_call_path(value).is_some_and(|call_path| {
+        matches!(call_path.as_slice(), ["collections", "abc", "Callable"])
+            || semantic.match_typing_call_path(&call_path, "Callable")
+    }) {
         return None;
     }
 
@@ -176,7 +177,7 @@ fn extract_types(annotation: &Expr, semantic: &SemanticModel) -> Option<(Vec<Exp
 
 fn function(
     name: &str,
-    args: &Arguments,
+    parameters: &Parameters,
     body: &Expr,
     annotation: Option<&Expr>,
     semantic: &SemanticModel,
@@ -190,46 +191,45 @@ fn function(
         if let Some((arg_types, return_type)) = extract_types(annotation, semantic) {
             // A `lambda` expression can only have positional and positional-only
             // arguments. The order is always positional-only first, then positional.
-            let new_posonlyargs = args
+            let new_posonlyargs = parameters
                 .posonlyargs
                 .iter()
                 .enumerate()
-                .map(|(idx, arg_with_default)| ArgWithDefault {
-                    def: Arg {
+                .map(|(idx, parameter)| ParameterWithDefault {
+                    parameter: Parameter {
                         annotation: arg_types
                             .get(idx)
                             .map(|arg_type| Box::new(arg_type.clone())),
-                        ..arg_with_default.def.clone()
+                        ..parameter.parameter.clone()
                     },
-                    ..arg_with_default.clone()
+                    ..parameter.clone()
                 })
                 .collect::<Vec<_>>();
-            let new_args = args
+            let new_args = parameters
                 .args
                 .iter()
                 .enumerate()
-                .map(|(idx, arg_with_default)| ArgWithDefault {
-                    def: Arg {
+                .map(|(idx, parameter)| ParameterWithDefault {
+                    parameter: Parameter {
                         annotation: arg_types
                             .get(idx + new_posonlyargs.len())
                             .map(|arg_type| Box::new(arg_type.clone())),
-                        ..arg_with_default.def.clone()
+                        ..parameter.parameter.clone()
                     },
-                    ..arg_with_default.clone()
+                    ..parameter.clone()
                 })
                 .collect::<Vec<_>>();
             let func = Stmt::FunctionDef(ast::StmtFunctionDef {
                 name: Identifier::new(name.to_string(), TextRange::default()),
-                args: Box::new(Arguments {
+                parameters: Box::new(Parameters {
                     posonlyargs: new_posonlyargs,
                     args: new_args,
-                    ..args.clone()
+                    ..parameters.clone()
                 }),
                 body: vec![body],
                 decorator_list: vec![],
                 returns: Some(Box::new(return_type)),
-                type_params: vec![],
-                type_comment: None,
+                type_params: None,
                 range: TextRange::default(),
             });
             return generator.stmt(&func);
@@ -237,12 +237,11 @@ fn function(
     }
     let func = Stmt::FunctionDef(ast::StmtFunctionDef {
         name: Identifier::new(name.to_string(), TextRange::default()),
-        args: Box::new(args.clone()),
+        parameters: Box::new(parameters.clone()),
         body: vec![body],
         decorator_list: vec![],
         returns: None,
-        type_params: vec![],
-        type_comment: None,
+        type_params: None,
         range: TextRange::default(),
     });
     generator.stmt(&func)

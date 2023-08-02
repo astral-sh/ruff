@@ -1,11 +1,10 @@
-use ruff_python_ast::{Expr, Keyword};
-use ruff_text_size::TextRange;
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{has_non_none_keyword, is_const_none};
+use ruff_python_ast::helpers::is_const_none;
+use ruff_python_ast::{self as ast, Ranged};
 
 use crate::checkers::ast::Checker;
+use crate::rules::flake8_datetimez::rules::helpers::has_non_none_keyword;
 
 use super::helpers;
 
@@ -14,9 +13,12 @@ use super::helpers;
 ///
 /// ## Why is this bad?
 /// `datetime` objects are "naive" by default, in that they do not include
-/// timezone information. By providing a `tzinfo`, a `datetime` can be made
-/// timezone "aware". "Naive" objects are easy to understand, but ignore some
-/// aspects of reality, which can lead to subtle bugs.
+/// timezone information. "Naive" objects are easy to understand, but ignore
+/// some aspects of reality, which can lead to subtle bugs. Timezone-aware
+/// `datetime` objects are preferred, as they represent a specific moment in
+/// time, unlike "naive" objects.
+///
+/// By providing a `tzinfo` value, a `datetime` can be made timezone-aware.
 ///
 /// ## Example
 /// ```python
@@ -41,19 +43,11 @@ impl Violation for CallDatetimeWithoutTzinfo {
     }
 }
 
-pub(crate) fn call_datetime_without_tzinfo(
-    checker: &mut Checker,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
-    location: TextRange,
-) {
+pub(crate) fn call_datetime_without_tzinfo(checker: &mut Checker, call: &ast::ExprCall) {
     if !checker
         .semantic()
-        .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["datetime", "datetime"])
-        })
+        .resolve_call_path(&call.func)
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["datetime", "datetime"]))
     {
         return;
     }
@@ -63,17 +57,17 @@ pub(crate) fn call_datetime_without_tzinfo(
     }
 
     // No positional arg: keyword is missing or constant None.
-    if args.len() < 8 && !has_non_none_keyword(keywords, "tzinfo") {
+    if call.arguments.args.len() < 8 && !has_non_none_keyword(&call.arguments, "tzinfo") {
         checker
             .diagnostics
-            .push(Diagnostic::new(CallDatetimeWithoutTzinfo, location));
+            .push(Diagnostic::new(CallDatetimeWithoutTzinfo, call.range()));
         return;
     }
 
     // Positional arg: is constant None.
-    if args.len() >= 8 && is_const_none(&args[7]) {
+    if call.arguments.args.get(7).is_some_and(is_const_none) {
         checker
             .diagnostics
-            .push(Diagnostic::new(CallDatetimeWithoutTzinfo, location));
+            .push(Diagnostic::new(CallDatetimeWithoutTzinfo, call.range()));
     }
 }

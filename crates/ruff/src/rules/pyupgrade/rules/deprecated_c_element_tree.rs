@@ -71,7 +71,7 @@ pub(crate) fn deprecated_c_element_tree(checker: &mut Checker, stmt: &Stmt) {
             level,
             range: _,
         }) => {
-            if level.map_or(false, |level| level.to_u32() > 0) {
+            if level.is_some_and(|level| level.to_u32() > 0) {
                 // Ex) `import .xml.etree.cElementTree as ET`
             } else if let Some(module) = module {
                 if module == "xml.etree.cElementTree" {

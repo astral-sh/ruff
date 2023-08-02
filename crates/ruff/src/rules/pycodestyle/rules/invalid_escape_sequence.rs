@@ -68,7 +68,7 @@ pub(crate) fn invalid_escape_sequence(
     let bytes = body.as_bytes();
     for i in memchr_iter(b'\\', bytes) {
         // If the previous character was also a backslash, skip.
-        if prev.map_or(false, |prev| prev == i - 1) {
+        if prev.is_some_and(|prev| prev == i - 1) {
             prev = None;
             continue;
         }
@@ -142,7 +142,7 @@ pub(crate) fn invalid_escape_sequence(
                     .slice(TextRange::up_to(range.start()))
                     .chars()
                     .last()
-                    .map_or(false, |char| char.is_ascii_alphabetic());
+                    .is_some_and(|char| char.is_ascii_alphabetic());
 
                 diagnostic.set_fix(Fix::automatic(Edit::insertion(
                     if requires_space {

@@ -1,21 +1,20 @@
 use crate::prelude::*;
 use crate::FormatNodeRule;
 use ruff_formatter::write;
-use ruff_python_ast::Arg;
+use ruff_python_ast::Parameter;
 
 #[derive(Default)]
-pub struct FormatArg;
+pub struct FormatParameter;
 
-impl FormatNodeRule<Arg> for FormatArg {
-    fn fmt_fields(&self, item: &Arg, f: &mut PyFormatter) -> FormatResult<()> {
-        let Arg {
+impl FormatNodeRule<Parameter> for FormatParameter {
+    fn fmt_fields(&self, item: &Parameter, f: &mut PyFormatter) -> FormatResult<()> {
+        let Parameter {
             range: _,
-            arg,
+            name,
             annotation,
-            type_comment: _,
         } = item;
 
-        arg.format().fmt(f)?;
+        name.format().fmt(f)?;
 
         if let Some(annotation) = annotation {
             write!(f, [text(":"), space(), annotation.format()])?;

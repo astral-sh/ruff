@@ -31,6 +31,7 @@ expression: parse_ast
                                         kind: None,
                                     },
                                 ),
+                                debug_text: None,
                                 conversion: None,
                                 format_spec: None,
                             },

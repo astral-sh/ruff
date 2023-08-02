@@ -125,7 +125,7 @@ fn convert_f_string_to_regular_string(
         .slice(TextRange::up_to(prefix_range.start()))
         .chars()
         .last()
-        .map_or(false, |char| content.starts_with(char))
+        .is_some_and(|char| content.starts_with(char))
     {
         content.insert(0, ' ');
     }

@@ -1,5 +1,6 @@
 use ruff_python_ast::{
-    self as ast, ArgWithDefault, Arguments, Constant, Expr, Operator, Ranged, Stmt, UnaryOp,
+    self as ast, Arguments, Constant, Expr, Operator, ParameterWithDefault, Parameters, Ranged,
+    Stmt, UnaryOp,
 };
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
@@ -194,7 +195,7 @@ fn is_valid_default_value_with_annotation(
             return allow_container
                 && keys.len() <= 10
                 && keys.iter().zip(values).all(|(k, v)| {
-                    k.as_ref().map_or(false, |k| {
+                    k.as_ref().is_some_and(|k| {
                         is_valid_default_value_with_annotation(k, false, locator, semantic)
                     }) && is_valid_default_value_with_annotation(v, false, locator, semantic)
                 });
@@ -215,7 +216,7 @@ fn is_valid_default_value_with_annotation(
                     if semantic
                         .resolve_call_path(operand)
                         .as_ref()
-                        .map_or(false, is_allowed_negated_math_attribute)
+                        .is_some_and(is_allowed_negated_math_attribute)
                     {
                         return true;
                     }
@@ -264,7 +265,7 @@ fn is_valid_default_value_with_annotation(
             if semantic
                 .resolve_call_path(default)
                 .as_ref()
-                .map_or(false, is_allowed_math_attribute)
+                .is_some_and(is_allowed_math_attribute)
             {
                 return true;
             }
@@ -332,7 +333,7 @@ fn is_type_var_like_call(expr: &Expr, semantic: &SemanticModel) -> bool {
     let Expr::Call(ast::ExprCall { func, .. }) = expr else {
         return false;
     };
-    semantic.resolve_call_path(func).map_or(false, |call_path| {
+    semantic.resolve_call_path(func).is_some_and(|call_path| {
         matches!(
             call_path.as_slice(),
             [
@@ -368,9 +369,12 @@ fn is_final_assignment(annotation: &Expr, value: &Expr, semantic: &SemanticModel
 }
 
 /// Returns `true` if the a class is an enum, based on its base classes.
-fn is_enum(bases: &[Expr], semantic: &SemanticModel) -> bool {
+fn is_enum(arguments: Option<&Arguments>, semantic: &SemanticModel) -> bool {
+    let Some(Arguments { args: bases, .. }) = arguments else {
+        return false;
+    };
     return bases.iter().any(|expr| {
-        semantic.resolve_call_path(expr).map_or(false, |call_path| {
+        semantic.resolve_call_path(expr).is_some_and(|call_path| {
             matches!(
                 call_path.as_slice(),
                 [
@@ -400,21 +404,21 @@ fn is_annotatable_type_alias(value: &Expr, semantic: &SemanticModel) -> bool {
 }
 
 /// PYI011
-pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, arguments: &Arguments) {
-    for ArgWithDefault {
-        def,
+pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, parameters: &Parameters) {
+    for ParameterWithDefault {
+        parameter,
         default,
         range: _,
-    } in arguments
+    } in parameters
         .posonlyargs
         .iter()
-        .chain(&arguments.args)
-        .chain(&arguments.kwonlyargs)
+        .chain(&parameters.args)
+        .chain(&parameters.kwonlyargs)
     {
         let Some(default) = default else {
             continue;
         };
-        if def.annotation.is_some() {
+        if parameter.annotation.is_some() {
             if !is_valid_default_value_with_annotation(
                 default,
                 true,
@@ -437,21 +441,21 @@ pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, arguments: &
 }
 
 /// PYI014
-pub(crate) fn argument_simple_defaults(checker: &mut Checker, arguments: &Arguments) {
-    for ArgWithDefault {
-        def,
+pub(crate) fn argument_simple_defaults(checker: &mut Checker, parameters: &Parameters) {
+    for ParameterWithDefault {
+        parameter,
         default,
         range: _,
-    } in arguments
+    } in parameters
         .posonlyargs
         .iter()
-        .chain(&arguments.args)
-        .chain(&arguments.kwonlyargs)
+        .chain(&parameters.args)
+        .chain(&parameters.kwonlyargs)
     {
         let Some(default) = default else {
             continue;
         };
-        if def.annotation.is_none() {
+        if parameter.annotation.is_none() {
             if !is_valid_default_value_with_annotation(
                 default,
                 true,
@@ -565,8 +569,8 @@ pub(crate) fn unannotated_assignment_in_stub(
         return;
     }
 
-    if let ScopeKind::Class(ast::StmtClassDef { bases, .. }) = checker.semantic().scope().kind {
-        if is_enum(bases, checker.semantic()) {
+    if let ScopeKind::Class(ast::StmtClassDef { arguments, .. }) = checker.semantic().scope().kind {
+        if is_enum(arguments.as_deref(), checker.semantic()) {
             return;
         }
     }

@@ -8,6 +8,7 @@ use crate::comments::{leading_comments, trailing_comments};
 
 use crate::expression::parentheses::{optional_parentheses, Parentheses};
 use crate::prelude::*;
+use crate::statement::suite::SuiteKind;
 use crate::FormatNodeRule;
 
 #[derive(Default)]
@@ -43,7 +44,7 @@ impl FormatRule<AnyFunctionDefinition<'_>, PyFormatContext<'_>> for FormatAnyFun
         let trailing_definition_comments_start =
             dangling_comments.partition_point(|comment| comment.line_position().is_own_line());
 
-        let (leading_function_definition_comments, trailing_definition_comments) =
+        let (leading_definition_comments, trailing_definition_comments) =
             dangling_comments.split_at(trailing_definition_comments_start);
 
         if let Some(last_decorator) = item.decorators().last() {
@@ -51,10 +52,10 @@ impl FormatRule<AnyFunctionDefinition<'_>, PyFormatContext<'_>> for FormatAnyFun
                 .entries(item.decorators().iter().formatted())
                 .finish()?;
 
-            if leading_function_definition_comments.is_empty() {
+            if leading_definition_comments.is_empty() {
                 write!(f, [hard_line_break()])?;
             } else {
-                // Write any leading function comments (between last decorator and function header)
+                // Write any leading definition comments (between last decorator and the header)
                 // while maintaining the right amount of empty lines between the comment
                 // and the last decorator.
                 let decorator_end =
@@ -68,10 +69,7 @@ impl FormatRule<AnyFunctionDefinition<'_>, PyFormatContext<'_>> for FormatAnyFun
 
                 write!(
                     f,
-                    [
-                        leading_line,
-                        leading_comments(leading_function_definition_comments)
-                    ]
+                    [leading_line, leading_comments(leading_definition_comments)]
                 )?;
             }
         }
@@ -111,7 +109,7 @@ impl FormatRule<AnyFunctionDefinition<'_>, PyFormatContext<'_>> for FormatAnyFun
             [
                 text(":"),
                 trailing_comments(trailing_definition_comments),
-                block_indent(&item.body().format())
+                block_indent(&item.body().format().with_options(SuiteKind::Function))
             ]
         )
     }

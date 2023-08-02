@@ -304,7 +304,7 @@ pub fn python_files_in_path(
                 if let Ok(entry) = &result {
                     if entry
                         .file_type()
-                        .map_or(false, |file_type| file_type.is_dir())
+                        .is_some_and(|file_type| file_type.is_dir())
                     {
                         match settings_toml(entry.path()) {
                             Ok(Some(pyproject)) => match resolve_scoped_settings(

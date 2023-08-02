@@ -7,7 +7,9 @@ use ruff_python_ast::str::is_implicit_concatenation;
 
 use crate::expression::number::{FormatComplex, FormatFloat, FormatInt};
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
-use crate::expression::string::{FormatString, StringLayout, StringPrefix, StringQuotes};
+use crate::expression::string::{
+    AnyString, FormatString, StringLayout, StringPrefix, StringQuotes,
+};
 use crate::prelude::*;
 use crate::FormatNodeRule;
 
@@ -56,7 +58,9 @@ impl FormatNodeRule<ExprConstant> for FormatExprConstant {
                     ExprConstantLayout::Default => StringLayout::Default,
                     ExprConstantLayout::String(layout) => layout,
                 };
-                FormatString::new(item).with_layout(string_layout).fmt(f)
+                FormatString::new(&AnyString::Constant(item))
+                    .with_layout(string_layout)
+                    .fmt(f)
             }
         }
     }
@@ -97,7 +101,7 @@ pub(super) fn is_multiline_string(constant: &ExprConstant, source: &str) -> bool
         let quotes =
             StringQuotes::parse(&contents[TextRange::new(prefix.text_len(), contents.text_len())]);
 
-        quotes.map_or(false, StringQuotes::is_triple) && contents.contains(['\n', '\r'])
+        quotes.is_some_and(StringQuotes::is_triple) && contents.contains(['\n', '\r'])
     } else {
         false
     }

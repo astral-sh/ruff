@@ -43,3 +43,104 @@ class TestTrailingComment2: # trailing comment
     pass
 
 
+class Test:
+    """Docstring"""
+
+
+class Test:
+    # comment
+    """Docstring"""
+
+
+class Test:
+    """Docstring"""
+    x = 1
+
+
+class Test:
+    """Docstring"""
+    # comment
+    x = 1
+
+
+class Test:
+
+    """Docstring"""
+
+
+class Test:
+    # comment
+
+    """Docstring"""
+
+
+class Test:
+
+    # comment
+
+    """Docstring"""
+
+
+class Test:
+
+    """Docstring"""
+    x = 1
+
+
+class Test:
+
+    """Docstring"""
+    # comment
+    x = 1
+
+
+class C(): # comment
+    pass
+
+
+class C(  # comment
+):
+    pass
+
+
+class C(
+    # comment
+):
+    pass
+
+
+class C(): # comment
+    pass
+
+
+class C(  # comment
+    # comment
+    1
+):
+    pass
+
+
+class C(
+    1
+    # comment
+):
+    pass
+
+
+@dataclass
+# Copied from transformers.models.clip.modeling_clip.CLIPOutput with CLIP->AltCLIP
+class AltCLIPOutput(ModelOutput):
+    ...
+
+
+@dataclass
+class AltCLIPOutput( # Copied from transformers.models.clip.modeling_clip.CLIPOutput with CLIP->AltCLIP
+):
+    ...
+
+
+@dataclass
+class AltCLIPOutput(
+    # Copied from transformers.models.clip.modeling_clip.CLIPOutput with CLIP->AltCLIP
+):
+    ...

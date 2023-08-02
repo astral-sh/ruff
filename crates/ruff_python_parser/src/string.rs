@@ -11,9 +11,9 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 // we have to do the parsing here, manually.
 use crate::{
     lexer::{LexicalError, LexicalErrorType},
+    parse_expression_starts_at,
     parser::{ParseError, ParseErrorType},
     token::{StringKind, Tok},
-    Parse,
 };
 
 // unicode_name2 does not expose `MAX_NAME_LENGTH`, so we replicate that constant here, fix #3798
@@ -182,11 +182,15 @@ impl<'a> StringParser<'a> {
         };
 
         let mut expression = String::new();
+        // for self-documenting strings we also store the `=` and any trailing space inside
+        // expression (because we want to combine it with any trailing spaces before the equal
+        // sign). the expression_length is the length of the actual expression part that we pass to
+        // `parse_fstring_expr`
+        let mut expression_length = 0;
         let mut spec = None;
         let mut delimiters = Vec::new();
         let mut conversion = ConversionFlag::None;
         let mut self_documenting = false;
-        let mut trailing_seq = String::new();
         let start_location = self.get_pos();
 
         assert_eq!(self.next_char(), Some('{'));
@@ -230,6 +234,8 @@ impl<'a> StringParser<'a> {
                 // match a python 3.8 self documenting expression
                 // format '{' PYTHON_EXPRESSION '=' FORMAT_SPECIFIER? '}'
                 '=' if self.peek() != Some('=') && delimiters.is_empty() => {
+                    expression_length = expression.len();
+                    expression.push(ch);
                     self_documenting = true;
                 }
 
@@ -304,40 +310,28 @@ impl<'a> StringParser<'a> {
                     }
 
                     let ret = if self_documenting {
-                        // TODO: range is wrong but `self_documenting` needs revisiting beyond
-                        // ranges: https://github.com/astral-sh/ruff/issues/5970
-                        vec![
-                            Expr::from(ast::ExprConstant {
-                                value: Constant::Str(expression.clone() + "="),
-                                kind: None,
-                                range: self.range(start_location),
+                        let value =
+                            parse_fstring_expr(&expression[..expression_length], start_location)
+                                .map_err(|e| {
+                                    FStringError::new(
+                                        InvalidExpression(Box::new(e.error)),
+                                        start_location,
+                                    )
+                                })?;
+                        let leading =
+                            &expression[..usize::from(value.range().start() - start_location) - 1];
+                        let trailing =
+                            &expression[usize::from(value.range().end() - start_location) - 1..];
+                        vec![Expr::from(ast::ExprFormattedValue {
+                            value: Box::new(value),
+                            debug_text: Some(ast::DebugText {
+                                leading: leading.to_string(),
+                                trailing: trailing.to_string(),
                             }),
-                            Expr::from(ast::ExprConstant {
-                                value: trailing_seq.into(),
-                                kind: None,
-                                range: self.range(start_location),
-                            }),
-                            Expr::from(ast::ExprFormattedValue {
-                                value: Box::new(
-                                    parse_fstring_expr(&expression, start_location).map_err(
-                                        |e| {
-                                            FStringError::new(
-                                                InvalidExpression(Box::new(e.error)),
-                                                start_location,
-                                            )
-                                        },
-                                    )?,
-                                ),
-                                conversion: if conversion == ConversionFlag::None && spec.is_none()
-                                {
-                                    ConversionFlag::Repr
-                                } else {
-                                    conversion
-                                },
-                                format_spec: spec,
-                                range: self.range(start_location),
-                            }),
-                        ]
+                            conversion,
+                            format_spec: spec,
+                            range: self.range(start_location),
+                        })]
                     } else {
                         vec![Expr::from(ast::ExprFormattedValue {
                             value: Box::new(
@@ -348,6 +342,7 @@ impl<'a> StringParser<'a> {
                                     )
                                 })?,
                             ),
+                            debug_text: None,
                             conversion,
                             format_spec: spec,
                             range: self.range(start_location),
@@ -369,9 +364,7 @@ impl<'a> StringParser<'a> {
                         }
                     }
                 }
-                ' ' if self_documenting => {
-                    trailing_seq.push(ch);
-                }
+                ' ' if self_documenting => expression.push(ch),
                 '\\' => return Err(FStringError::new(UnterminatedString, self.get_pos()).into()),
                 _ => {
                     if self_documenting {
@@ -557,7 +550,7 @@ impl<'a> StringParser<'a> {
 
 fn parse_fstring_expr(source: &str, location: TextSize) -> Result<Expr, ParseError> {
     let fstring_body = format!("({source})");
-    ast::Expr::parse_starts_at(&fstring_body, "<fstring>", location)
+    parse_expression_starts_at(&fstring_body, "<fstring>", location)
 }
 
 fn parse_string(
@@ -792,10 +785,8 @@ impl From<FStringError> for crate::parser::LalrpopError<TextSize, Tok, LexicalEr
 
 #[cfg(test)]
 mod tests {
-    use crate::Parse;
-    use ruff_python_ast as ast;
-
     use super::*;
+    use crate::parser::parse_suite;
 
     fn parse_fstring(source: &str) -> Result<Vec<Expr>, LexicalError> {
         StringParser::new(source, StringKind::FString, false, TextSize::default()).parse()
@@ -933,63 +924,63 @@ mod tests {
     #[test]
     fn test_parse_string_concat() {
         let source = "'Hello ' 'world'";
-        let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_u_string_concat_1() {
         let source = "'Hello ' u'world'";
-        let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_u_string_concat_2() {
         let source = "u'Hello ' 'world'";
-        let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_f_string_concat_1() {
         let source = "'Hello ' f'world'";
-        let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_f_string_concat_2() {
         let source = "'Hello ' f'world'";
-        let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_f_string_concat_3() {
         let source = "'Hello ' f'world{\"!\"}'";
-        let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_u_f_string_concat_1() {
         let source = "u'Hello ' f'world'";
-        let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_u_f_string_concat_2() {
         let source = "u'Hello ' f'world' '!'";
-        let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_string_triple_quotes_with_kind() {
         let source = "u'''Hello, world!'''";
-        let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
@@ -997,7 +988,7 @@ mod tests {
     fn test_single_quoted_byte() {
         // single quote
         let source = r##"b'\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b\x0c\r\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\x7f\x80\x81\x82\x83\x84\x85\x86\x87\x88\x89\x8a\x8b\x8c\x8d\x8e\x8f\x90\x91\x92\x93\x94\x95\x96\x97\x98\x99\x9a\x9b\x9c\x9d\x9e\x9f\xa0\xa1\xa2\xa3\xa4\xa5\xa6\xa7\xa8\xa9\xaa\xab\xac\xad\xae\xaf\xb0\xb1\xb2\xb3\xb4\xb5\xb6\xb7\xb8\xb9\xba\xbb\xbc\xbd\xbe\xbf\xc0\xc1\xc2\xc3\xc4\xc5\xc6\xc7\xc8\xc9\xca\xcb\xcc\xcd\xce\xcf\xd0\xd1\xd2\xd3\xd4\xd5\xd6\xd7\xd8\xd9\xda\xdb\xdc\xdd\xde\xdf\xe0\xe1\xe2\xe3\xe4\xe5\xe6\xe7\xe8\xe9\xea\xeb\xec\xed\xee\xef\xf0\xf1\xf2\xf3\xf4\xf5\xf6\xf7\xf8\xf9\xfa\xfb\xfc\xfd\xfe\xff'"##;
-        let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
@@ -1005,7 +996,7 @@ mod tests {
     fn test_double_quoted_byte() {
         // double quote
         let source = r##"b"\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b\x0c\r\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\x7f\x80\x81\x82\x83\x84\x85\x86\x87\x88\x89\x8a\x8b\x8c\x8d\x8e\x8f\x90\x91\x92\x93\x94\x95\x96\x97\x98\x99\x9a\x9b\x9c\x9d\x9e\x9f\xa0\xa1\xa2\xa3\xa4\xa5\xa6\xa7\xa8\xa9\xaa\xab\xac\xad\xae\xaf\xb0\xb1\xb2\xb3\xb4\xb5\xb6\xb7\xb8\xb9\xba\xbb\xbc\xbd\xbe\xbf\xc0\xc1\xc2\xc3\xc4\xc5\xc6\xc7\xc8\xc9\xca\xcb\xcc\xcd\xce\xcf\xd0\xd1\xd2\xd3\xd4\xd5\xd6\xd7\xd8\xd9\xda\xdb\xdc\xdd\xde\xdf\xe0\xe1\xe2\xe3\xe4\xe5\xe6\xe7\xe8\xe9\xea\xeb\xec\xed\xee\xef\xf0\xf1\xf2\xf3\xf4\xf5\xf6\xf7\xf8\xf9\xfa\xfb\xfc\xfd\xfe\xff""##;
-        let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
@@ -1013,42 +1004,42 @@ mod tests {
     fn test_escape_char_in_byte_literal() {
         // backslash does not escape
         let source = r##"b"omkmok\Xaa""##; // spell-checker:ignore omkmok
-        let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_raw_byte_literal_1() {
         let source = r"rb'\x1z'";
-        let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_raw_byte_literal_2() {
         let source = r"rb'\\'";
-        let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_escape_octet() {
         let source = r##"b'\43a\4\1234'"##;
-        let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_fstring_escaped_newline() {
         let source = r#"f"\n{x}""#;
-        let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_fstring_constant_range() {
         let source = r#"f"aaa{bbb}ccc{ddd}eee""#;
-        let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
@@ -1056,28 +1047,28 @@ mod tests {
     fn test_fstring_unescaped_newline() {
         let source = r#"f"""
 {x}""""#;
-        let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_fstring_escaped_character() {
         let source = r#"f"\\{x}""#;
-        let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_raw_fstring() {
         let source = r#"rf"{x}""#;
-        let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_triple_quoted_raw_fstring() {
         let source = r#"rf"""{x}""""#;
-        let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
@@ -1085,7 +1076,7 @@ mod tests {
     fn test_fstring_line_continuation() {
         let source = r#"rf"\
 {x}""#;
-        let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
@@ -1095,7 +1086,7 @@ mod tests {
             #[test]
             fn $name() {
                 let source = format!(r#""\N{{{0}}}""#, $alias);
-                let parse_ast = ast::Suite::parse(&source, "<test>").unwrap();
+                let parse_ast = parse_suite(&source, "<test>").unwrap();
                 insta::assert_debug_snapshot!(parse_ast);
             }
         )*
