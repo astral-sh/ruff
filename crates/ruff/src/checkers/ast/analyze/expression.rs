@@ -74,9 +74,13 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
 
             // Ex) Union[...]
-            if checker.any_enabled(&[Rule::UnnecessaryLiteralUnion, Rule::DuplicateUnionMember]) {
-                // Determine if the current expression is an union
-                // Avoid duplicate checks if the parent is an `Union[...]` since these rules traverse nested unions
+            if checker.any_enabled(&[
+                Rule::UnnecessaryLiteralUnion,
+                Rule::DuplicateUnionMember,
+                Rule::RedundantLiteralUnion,
+            ]) {
+                // Avoid duplicate checks if the parent is an `Union[...]` since these rules
+                // traverse nested unions.
                 let is_unchecked_union = checker
                     .semantic
                     .expr_grandparent()
@@ -91,6 +95,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     }
                     if checker.enabled(Rule::DuplicateUnionMember) {
                         flake8_pyi::rules::duplicate_union_member(checker, expr);
+                    }
+                    if checker.is_stub && checker.enabled(Rule::RedundantLiteralUnion) {
+                        flake8_pyi::rules::redundant_literal_union(checker, expr);
                     }
                 }
             }
@@ -1080,6 +1087,15 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                         )
                 {
                     flake8_pyi::rules::unnecessary_literal_union(checker, expr);
+                }
+                if checker.enabled(Rule::RedundantLiteralUnion)
+                        // Avoid duplicate checks if the parent is an `|`
+                        && !matches!(
+                            checker.semantic.expr_parent(),
+                            Some(Expr::BinOp(ast::ExprBinOp { op: Operator::BitOr, ..}))
+                        )
+                {
+                    flake8_pyi::rules::redundant_literal_union(checker, expr);
                 }
             }
         }
