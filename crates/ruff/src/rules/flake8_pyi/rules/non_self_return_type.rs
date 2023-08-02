@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Decorator, Expr, Parameters, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, Parameters, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -186,7 +186,7 @@ pub(crate) fn non_self_return_type(
     match name {
         "__iter__" => {
             if is_iterable(returns, checker.semantic())
-                && is_iterator(&class_def.bases, checker.semantic())
+                && is_iterator(class_def.arguments.as_deref(), checker.semantic())
             {
                 checker.diagnostics.push(Diagnostic::new(
                     NonSelfReturnType {
@@ -199,7 +199,7 @@ pub(crate) fn non_self_return_type(
         }
         "__aiter__" => {
             if is_async_iterable(returns, checker.semantic())
-                && is_async_iterator(&class_def.bases, checker.semantic())
+                && is_async_iterator(class_def.arguments.as_deref(), checker.semantic())
             {
                 checker.diagnostics.push(Diagnostic::new(
                     NonSelfReturnType {
@@ -248,7 +248,10 @@ fn is_self(expr: &Expr, semantic: &SemanticModel) -> bool {
 }
 
 /// Return `true` if the given class extends `collections.abc.Iterator`.
-fn is_iterator(bases: &[Expr], semantic: &SemanticModel) -> bool {
+fn is_iterator(arguments: Option<&Arguments>, semantic: &SemanticModel) -> bool {
+    let Some(Arguments { args: bases, .. }) = arguments else {
+        return false;
+    };
     bases.iter().any(|expr| {
         semantic
             .resolve_call_path(map_subscript(expr))
@@ -275,7 +278,10 @@ fn is_iterable(expr: &Expr, semantic: &SemanticModel) -> bool {
 }
 
 /// Return `true` if the given class extends `collections.abc.AsyncIterator`.
-fn is_async_iterator(bases: &[Expr], semantic: &SemanticModel) -> bool {
+fn is_async_iterator(arguments: Option<&Arguments>, semantic: &SemanticModel) -> bool {
+    let Some(Arguments { args: bases, .. }) = arguments else {
+        return false;
+    };
     bases.iter().any(|expr| {
         semantic
             .resolve_call_path(map_subscript(expr))

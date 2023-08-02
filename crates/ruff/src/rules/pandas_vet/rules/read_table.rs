@@ -1,9 +1,7 @@
-use ruff_python_ast as ast;
-use ruff_python_ast::{Constant, Expr, Keyword, Ranged};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::find_keyword;
+use ruff_python_ast as ast;
+use ruff_python_ast::{Constant, Expr, Ranged};
 
 use crate::checkers::ast::Checker;
 
@@ -46,21 +44,24 @@ impl Violation for PandasUseOfDotReadTable {
 }
 
 /// PD012
-pub(crate) fn use_of_read_table(checker: &mut Checker, func: &Expr, keywords: &[Keyword]) {
+pub(crate) fn use_of_read_table(checker: &mut Checker, call: &ast::ExprCall) {
     if checker
         .semantic()
-        .resolve_call_path(func)
+        .resolve_call_path(&call.func)
         .is_some_and(|call_path| matches!(call_path.as_slice(), ["pandas", "read_table"]))
     {
         if let Some(Expr::Constant(ast::ExprConstant {
             value: Constant::Str(value),
             ..
-        })) = find_keyword(keywords, "sep").map(|keyword| &keyword.value)
+        })) = call
+            .arguments
+            .find_keyword("sep")
+            .map(|keyword| &keyword.value)
         {
             if value.as_str() == "," {
                 checker
                     .diagnostics
-                    .push(Diagnostic::new(PandasUseOfDotReadTable, func.range()));
+                    .push(Diagnostic::new(PandasUseOfDotReadTable, call.func.range()));
             }
         }
     }

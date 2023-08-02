@@ -1,4 +1,4 @@
-use crate::{nodes, Expr, Keyword};
+use crate::{nodes, Arguments, Expr, Keyword};
 use ruff_text_size::TextRange;
 
 fn relocate_keyword(keyword: &mut Keyword, location: TextRange) {
@@ -116,8 +116,7 @@ pub fn relocate_expr(expr: &mut Expr, location: TextRange) {
         }
         Expr::Call(nodes::ExprCall {
             func,
-            args,
-            keywords,
+            arguments: Arguments { args, keywords, .. },
             range,
         }) => {
             *range = location;

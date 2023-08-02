@@ -1,8 +1,7 @@
-use ruff_python_ast::{self as ast, Expr, Keyword, Ranged};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{find_keyword, is_const_none};
+use ruff_python_ast::helpers::is_const_none;
+use ruff_python_ast::{self as ast, Arguments, Expr, Ranged};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
@@ -41,24 +40,20 @@ impl Violation for ZipWithoutExplicitStrict {
 }
 
 /// B905
-pub(crate) fn zip_without_explicit_strict(
-    checker: &mut Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-    kwargs: &[Keyword],
-) {
-    if let Expr::Name(ast::ExprName { id, .. }) = func {
+pub(crate) fn zip_without_explicit_strict(checker: &mut Checker, call: &ast::ExprCall) {
+    if let Expr::Name(ast::ExprName { id, .. }) = call.func.as_ref() {
         if id == "zip"
             && checker.semantic().is_builtin("zip")
-            && find_keyword(kwargs, "strict").is_none()
-            && !args
+            && call.arguments.find_keyword("strict").is_none()
+            && !call
+                .arguments
+                .args
                 .iter()
                 .any(|arg| is_infinite_iterator(arg, checker.semantic()))
         {
             checker
                 .diagnostics
-                .push(Diagnostic::new(ZipWithoutExplicitStrict, expr.range()));
+                .push(Diagnostic::new(ZipWithoutExplicitStrict, call.range()));
         }
     }
 }
@@ -68,8 +63,7 @@ pub(crate) fn zip_without_explicit_strict(
 fn is_infinite_iterator(arg: &Expr, semantic: &SemanticModel) -> bool {
     let Expr::Call(ast::ExprCall {
         func,
-        args,
-        keywords,
+        arguments: Arguments { args, keywords, .. },
         ..
     }) = &arg
     else {

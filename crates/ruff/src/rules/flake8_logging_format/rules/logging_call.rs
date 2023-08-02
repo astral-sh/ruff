@@ -1,7 +1,5 @@
-use ruff_python_ast::{self as ast, Constant, Expr, Keyword, Operator, Ranged};
-
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
-use ruff_python_ast::helpers::{find_keyword, CallArguments};
+use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Keyword, Operator, Ranged};
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
 
@@ -108,7 +106,11 @@ fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
                 }
             }
         }
-        Expr::Call(ast::ExprCall { func, keywords, .. }) => {
+        Expr::Call(ast::ExprCall {
+            func,
+            arguments: Arguments { keywords, .. },
+            ..
+        }) => {
             if checker
                 .semantic()
                 .resolve_call_path(func)
@@ -149,13 +151,8 @@ impl LoggingCallType {
 }
 
 /// Check logging calls for violations.
-pub(crate) fn logging_call(
-    checker: &mut Checker,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
-) {
-    let Expr::Attribute(ast::ExprAttribute { value: _, attr, .. }) = func else {
+pub(crate) fn logging_call(checker: &mut Checker, call: &ast::ExprCall) {
+    let Expr::Attribute(ast::ExprAttribute { value: _, attr, .. }) = call.func.as_ref() else {
         return;
     };
 
@@ -163,13 +160,17 @@ pub(crate) fn logging_call(
         return;
     };
 
-    if !logging::is_logger_candidate(func, checker.semantic(), &checker.settings.logger_objects) {
+    if !logging::is_logger_candidate(
+        &call.func,
+        checker.semantic(),
+        &checker.settings.logger_objects,
+    ) {
         return;
     }
 
     // G001 - G004
     let msg_pos = usize::from(matches!(logging_call_type, LoggingCallType::LogCall));
-    if let Some(format_arg) = CallArguments::new(args, keywords).argument("msg", msg_pos) {
+    if let Some(format_arg) = call.arguments.find_argument("msg", msg_pos) {
         check_msg(checker, format_arg);
     }
 
@@ -192,7 +193,7 @@ pub(crate) fn logging_call(
 
     // G101
     if checker.enabled(Rule::LoggingExtraAttrClash) {
-        if let Some(extra) = find_keyword(keywords, "extra") {
+        if let Some(extra) = call.arguments.find_keyword("extra") {
             check_log_record_attr_clash(checker, extra);
         }
     }
@@ -202,7 +203,7 @@ pub(crate) fn logging_call(
         if !checker.semantic().in_exception_handler() {
             return;
         }
-        let Some(exc_info) = logging::exc_info(keywords, checker.semantic()) else {
+        let Some(exc_info) = logging::exc_info(&call.arguments, checker.semantic()) else {
             return;
         };
         if let LoggingCallType::LevelCall(logging_level) = logging_call_type {

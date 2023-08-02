@@ -1,6 +1,6 @@
 //! Generate Python source code from an abstract syntax tree (AST).
 
-use ruff_python_ast::ParameterWithDefault;
+use ruff_python_ast::{ParameterWithDefault, TypeParams};
 use std::ops::Deref;
 
 use ruff_python_ast::{
@@ -222,7 +222,9 @@ impl<'a> Generator<'a> {
                 statement!({
                     self.p("def ");
                     self.p_id(name);
-                    self.unparse_type_params(type_params);
+                    if let Some(type_params) = type_params {
+                        self.unparse_type_params(type_params);
+                    }
                     self.p("(");
                     self.unparse_parameters(parameters);
                     self.p(")");
@@ -256,7 +258,9 @@ impl<'a> Generator<'a> {
                 statement!({
                     self.p("async def ");
                     self.p_id(name);
-                    self.unparse_type_params(type_params);
+                    if let Some(type_params) = type_params {
+                        self.unparse_type_params(type_params);
+                    }
                     self.p("(");
                     self.unparse_parameters(parameters);
                     self.p(")");
@@ -273,8 +277,7 @@ impl<'a> Generator<'a> {
             }
             Stmt::ClassDef(ast::StmtClassDef {
                 name,
-                bases,
-                keywords,
+                arguments,
                 body,
                 decorator_list,
                 type_params,
@@ -290,25 +293,28 @@ impl<'a> Generator<'a> {
                 statement!({
                     self.p("class ");
                     self.p_id(name);
-                    self.unparse_type_params(type_params);
-                    let mut first = true;
-                    for base in bases {
-                        self.p_if(first, "(");
-                        self.p_delim(&mut first, ", ");
-                        self.unparse_expr(base, precedence::MAX);
+                    if let Some(type_params) = type_params {
+                        self.unparse_type_params(type_params);
                     }
-                    for keyword in keywords {
-                        self.p_if(first, "(");
-                        self.p_delim(&mut first, ", ");
-                        if let Some(arg) = &keyword.arg {
-                            self.p_id(arg);
-                            self.p("=");
-                        } else {
-                            self.p("**");
+                    if let Some(arguments) = arguments {
+                        self.p("(");
+                        let mut first = true;
+                        for base in &arguments.args {
+                            self.p_delim(&mut first, ", ");
+                            self.unparse_expr(base, precedence::MAX);
                         }
-                        self.unparse_expr(&keyword.value, precedence::MAX);
+                        for keyword in &arguments.keywords {
+                            self.p_delim(&mut first, ", ");
+                            if let Some(arg) = &keyword.arg {
+                                self.p_id(arg);
+                                self.p("=");
+                            } else {
+                                self.p("**");
+                            }
+                            self.unparse_expr(&keyword.value, precedence::MAX);
+                        }
+                        self.p(")");
                     }
-                    self.p_if(!first, ")");
                     self.p(":");
                 });
                 self.body(body);
@@ -540,7 +546,9 @@ impl<'a> Generator<'a> {
             }) => {
                 self.p("type ");
                 self.unparse_expr(name, precedence::MAX);
-                self.unparse_type_params(type_params);
+                if let Some(type_params) = type_params {
+                    self.unparse_type_params(type_params);
+                }
                 self.p(" = ");
                 self.unparse_expr(value, precedence::ASSIGN);
             }
@@ -853,16 +861,14 @@ impl<'a> Generator<'a> {
         self.body(&ast.body);
     }
 
-    fn unparse_type_params(&mut self, type_params: &Vec<TypeParam>) {
-        if !type_params.is_empty() {
-            self.p("[");
-            let mut first = true;
-            for type_param in type_params {
-                self.p_delim(&mut first, ", ");
-                self.unparse_type_param(type_param);
-            }
-            self.p("]");
+    fn unparse_type_params(&mut self, type_params: &TypeParams) {
+        self.p("[");
+        let mut first = true;
+        for type_param in type_params.iter() {
+            self.p_delim(&mut first, ", ");
+            self.unparse_type_param(type_param);
         }
+        self.p("]");
     }
 
     pub(crate) fn unparse_type_param(&mut self, ast: &TypeParam) {
@@ -1149,8 +1155,7 @@ impl<'a> Generator<'a> {
             }
             Expr::Call(ast::ExprCall {
                 func,
-                args,
-                keywords,
+                arguments,
                 range: _range,
             }) => {
                 self.unparse_expr(func, precedence::MAX);
@@ -1162,18 +1167,18 @@ impl<'a> Generator<'a> {
                         range: _range,
                     })],
                     [],
-                ) = (args.as_slice(), keywords.as_slice())
+                ) = (arguments.args.as_slice(), arguments.keywords.as_slice())
                 {
                     // Ensure that a single generator doesn't get double-parenthesized.
                     self.unparse_expr(elt, precedence::COMMA);
                     self.unparse_comp(generators);
                 } else {
                     let mut first = true;
-                    for arg in args {
+                    for arg in &arguments.args {
                         self.p_delim(&mut first, ", ");
                         self.unparse_expr(arg, precedence::COMMA);
                     }
-                    for kw in keywords {
+                    for kw in &arguments.keywords {
                         self.p_delim(&mut first, ", ");
                         if let Some(arg) = &kw.arg {
                             self.p_id(arg);

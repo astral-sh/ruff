@@ -1,7 +1,7 @@
 use crate::{
-    self as ast, Alias, Comprehension, Decorator, ExceptHandler, Expr, Keyword, MatchCase, Mod,
-    Parameter, ParameterWithDefault, Parameters, Pattern, Ranged, Stmt, TypeParam,
-    TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
+    self as ast, Alias, Arguments, Comprehension, Decorator, ExceptHandler, Expr, Keyword,
+    MatchCase, Mod, Parameter, ParameterWithDefault, Parameters, Pattern, Ranged, Stmt, TypeParam,
+    TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, TypeParams, WithItem,
 };
 use ruff_text_size::TextRange;
 use std::ptr::NonNull;
@@ -90,6 +90,7 @@ pub enum AnyNode {
     PatternMatchAs(ast::PatternMatchAs),
     PatternMatchOr(ast::PatternMatchOr),
     Comprehension(Comprehension),
+    Arguments(Arguments),
     Parameters(Parameters),
     Parameter(Parameter),
     ParameterWithDefault(ParameterWithDefault),
@@ -99,9 +100,10 @@ pub enum AnyNode {
     MatchCase(MatchCase),
     Decorator(Decorator),
     ElifElseClause(ast::ElifElseClause),
-    TypeParamTypeVar(ast::TypeParamTypeVar),
-    TypeParamTypeVarTuple(ast::TypeParamTypeVarTuple),
-    TypeParamParamSpec(ast::TypeParamParamSpec),
+    TypeParams(TypeParams),
+    TypeParamTypeVar(TypeParamTypeVar),
+    TypeParamTypeVarTuple(TypeParamTypeVarTuple),
+    TypeParamParamSpec(TypeParamParamSpec),
 }
 
 impl AnyNode {
@@ -177,6 +179,7 @@ impl AnyNode {
             | AnyNode::PatternMatchAs(_)
             | AnyNode::PatternMatchOr(_)
             | AnyNode::Comprehension(_)
+            | AnyNode::Arguments(_)
             | AnyNode::Parameters(_)
             | AnyNode::Parameter(_)
             | AnyNode::ParameterWithDefault(_)
@@ -185,6 +188,7 @@ impl AnyNode {
             | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
             | AnyNode::Decorator(_)
+            | AnyNode::TypeParams(_)
             | AnyNode::TypeParamTypeVar(_)
             | AnyNode::TypeParamTypeVarTuple(_)
             | AnyNode::TypeParamParamSpec(_)
@@ -264,6 +268,7 @@ impl AnyNode {
             | AnyNode::PatternMatchAs(_)
             | AnyNode::PatternMatchOr(_)
             | AnyNode::Comprehension(_)
+            | AnyNode::Arguments(_)
             | AnyNode::Parameters(_)
             | AnyNode::Parameter(_)
             | AnyNode::ParameterWithDefault(_)
@@ -272,6 +277,7 @@ impl AnyNode {
             | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
             | AnyNode::Decorator(_)
+            | AnyNode::TypeParams(_)
             | AnyNode::TypeParamTypeVar(_)
             | AnyNode::TypeParamTypeVarTuple(_)
             | AnyNode::TypeParamParamSpec(_)
@@ -351,6 +357,7 @@ impl AnyNode {
             | AnyNode::PatternMatchAs(_)
             | AnyNode::PatternMatchOr(_)
             | AnyNode::Comprehension(_)
+            | AnyNode::Arguments(_)
             | AnyNode::Parameters(_)
             | AnyNode::Parameter(_)
             | AnyNode::ParameterWithDefault(_)
@@ -359,6 +366,7 @@ impl AnyNode {
             | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
             | AnyNode::Decorator(_)
+            | AnyNode::TypeParams(_)
             | AnyNode::TypeParamTypeVar(_)
             | AnyNode::TypeParamTypeVarTuple(_)
             | AnyNode::TypeParamParamSpec(_)
@@ -438,6 +446,7 @@ impl AnyNode {
             | AnyNode::ExprLineMagic(_)
             | AnyNode::ExceptHandlerExceptHandler(_)
             | AnyNode::Comprehension(_)
+            | AnyNode::Arguments(_)
             | AnyNode::Parameters(_)
             | AnyNode::Parameter(_)
             | AnyNode::ParameterWithDefault(_)
@@ -446,6 +455,7 @@ impl AnyNode {
             | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
             | AnyNode::Decorator(_)
+            | AnyNode::TypeParams(_)
             | AnyNode::TypeParamTypeVar(_)
             | AnyNode::TypeParamTypeVarTuple(_)
             | AnyNode::TypeParamParamSpec(_)
@@ -525,6 +535,7 @@ impl AnyNode {
             | AnyNode::PatternMatchAs(_)
             | AnyNode::PatternMatchOr(_)
             | AnyNode::Comprehension(_)
+            | AnyNode::Arguments(_)
             | AnyNode::Parameters(_)
             | AnyNode::Parameter(_)
             | AnyNode::ParameterWithDefault(_)
@@ -533,6 +544,7 @@ impl AnyNode {
             | AnyNode::WithItem(_)
             | AnyNode::MatchCase(_)
             | AnyNode::Decorator(_)
+            | AnyNode::TypeParams(_)
             | AnyNode::TypeParamTypeVar(_)
             | AnyNode::TypeParamTypeVarTuple(_)
             | AnyNode::TypeParamParamSpec(_)
@@ -631,6 +643,7 @@ impl AnyNode {
             Self::PatternMatchAs(node) => AnyNodeRef::PatternMatchAs(node),
             Self::PatternMatchOr(node) => AnyNodeRef::PatternMatchOr(node),
             Self::Comprehension(node) => AnyNodeRef::Comprehension(node),
+            Self::Arguments(node) => AnyNodeRef::Arguments(node),
             Self::Parameters(node) => AnyNodeRef::Parameters(node),
             Self::Parameter(node) => AnyNodeRef::Parameter(node),
             Self::ParameterWithDefault(node) => AnyNodeRef::ParameterWithDefault(node),
@@ -639,6 +652,7 @@ impl AnyNode {
             Self::WithItem(node) => AnyNodeRef::WithItem(node),
             Self::MatchCase(node) => AnyNodeRef::MatchCase(node),
             Self::Decorator(node) => AnyNodeRef::Decorator(node),
+            Self::TypeParams(node) => AnyNodeRef::TypeParams(node),
             Self::TypeParamTypeVar(node) => AnyNodeRef::TypeParamTypeVar(node),
             Self::TypeParamTypeVarTuple(node) => AnyNodeRef::TypeParamTypeVarTuple(node),
             Self::TypeParamParamSpec(node) => AnyNodeRef::TypeParamParamSpec(node),
@@ -2613,6 +2627,34 @@ impl AstNode for Comprehension {
         AnyNode::from(self)
     }
 }
+impl AstNode for Arguments {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::Arguments(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::Arguments(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
 impl AstNode for Parameters {
     fn cast(kind: AnyNode) -> Option<Self>
     where
@@ -3444,6 +3486,11 @@ impl From<Comprehension> for AnyNode {
         AnyNode::Comprehension(node)
     }
 }
+impl From<Arguments> for AnyNode {
+    fn from(node: Arguments) -> Self {
+        AnyNode::Arguments(node)
+    }
+}
 impl From<Parameters> for AnyNode {
     fn from(node: Parameters) -> Self {
         AnyNode::Parameters(node)
@@ -3574,6 +3621,7 @@ impl Ranged for AnyNode {
             AnyNode::PatternMatchAs(node) => node.range(),
             AnyNode::PatternMatchOr(node) => node.range(),
             AnyNode::Comprehension(node) => node.range(),
+            AnyNode::Arguments(node) => node.range(),
             AnyNode::Parameters(node) => node.range(),
             AnyNode::Parameter(node) => node.range(),
             AnyNode::ParameterWithDefault(node) => node.range(),
@@ -3582,6 +3630,7 @@ impl Ranged for AnyNode {
             AnyNode::WithItem(node) => node.range(),
             AnyNode::MatchCase(node) => node.range(),
             AnyNode::Decorator(node) => node.range(),
+            AnyNode::TypeParams(node) => node.range(),
             AnyNode::TypeParamTypeVar(node) => node.range(),
             AnyNode::TypeParamTypeVarTuple(node) => node.range(),
             AnyNode::TypeParamParamSpec(node) => node.range(),
@@ -3661,6 +3710,7 @@ pub enum AnyNodeRef<'a> {
     PatternMatchAs(&'a ast::PatternMatchAs),
     PatternMatchOr(&'a ast::PatternMatchOr),
     Comprehension(&'a Comprehension),
+    Arguments(&'a Arguments),
     Parameters(&'a Parameters),
     Parameter(&'a Parameter),
     ParameterWithDefault(&'a ParameterWithDefault),
@@ -3669,9 +3719,10 @@ pub enum AnyNodeRef<'a> {
     WithItem(&'a WithItem),
     MatchCase(&'a MatchCase),
     Decorator(&'a Decorator),
-    TypeParamTypeVar(&'a ast::TypeParamTypeVar),
-    TypeParamTypeVarTuple(&'a ast::TypeParamTypeVarTuple),
-    TypeParamParamSpec(&'a ast::TypeParamParamSpec),
+    TypeParams(&'a TypeParams),
+    TypeParamTypeVar(&'a TypeParamTypeVar),
+    TypeParamTypeVarTuple(&'a TypeParamTypeVarTuple),
+    TypeParamParamSpec(&'a TypeParamParamSpec),
     ElifElseClause(&'a ast::ElifElseClause),
 }
 
@@ -3747,6 +3798,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::PatternMatchAs(node) => NonNull::from(*node).cast(),
             AnyNodeRef::PatternMatchOr(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Comprehension(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::Arguments(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Parameters(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Parameter(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ParameterWithDefault(node) => NonNull::from(*node).cast(),
@@ -3755,6 +3807,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::WithItem(node) => NonNull::from(*node).cast(),
             AnyNodeRef::MatchCase(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Decorator(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::TypeParams(node) => NonNull::from(*node).cast(),
             AnyNodeRef::TypeParamTypeVar(node) => NonNull::from(*node).cast(),
             AnyNodeRef::TypeParamTypeVarTuple(node) => NonNull::from(*node).cast(),
             AnyNodeRef::TypeParamParamSpec(node) => NonNull::from(*node).cast(),
@@ -3839,6 +3892,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::PatternMatchAs(_) => NodeKind::PatternMatchAs,
             AnyNodeRef::PatternMatchOr(_) => NodeKind::PatternMatchOr,
             AnyNodeRef::Comprehension(_) => NodeKind::Comprehension,
+            AnyNodeRef::Arguments(_) => NodeKind::Arguments,
             AnyNodeRef::Parameters(_) => NodeKind::Parameters,
             AnyNodeRef::Parameter(_) => NodeKind::Parameter,
             AnyNodeRef::ParameterWithDefault(_) => NodeKind::ParameterWithDefault,
@@ -3847,6 +3901,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::WithItem(_) => NodeKind::WithItem,
             AnyNodeRef::MatchCase(_) => NodeKind::MatchCase,
             AnyNodeRef::Decorator(_) => NodeKind::Decorator,
+            AnyNodeRef::TypeParams(_) => NodeKind::TypeParams,
             AnyNodeRef::TypeParamTypeVar(_) => NodeKind::TypeParamTypeVar,
             AnyNodeRef::TypeParamTypeVarTuple(_) => NodeKind::TypeParamTypeVarTuple,
             AnyNodeRef::TypeParamParamSpec(_) => NodeKind::TypeParamParamSpec,
@@ -3926,6 +3981,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::PatternMatchAs(_)
             | AnyNodeRef::PatternMatchOr(_)
             | AnyNodeRef::Comprehension(_)
+            | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Parameters(_)
             | AnyNodeRef::Parameter(_)
             | AnyNodeRef::ParameterWithDefault(_)
@@ -3934,6 +3990,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
             | AnyNodeRef::Decorator(_)
+            | AnyNodeRef::TypeParams(_)
             | AnyNodeRef::TypeParamTypeVar(_)
             | AnyNodeRef::TypeParamTypeVarTuple(_)
             | AnyNodeRef::TypeParamParamSpec(_)
@@ -4013,6 +4070,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::PatternMatchAs(_)
             | AnyNodeRef::PatternMatchOr(_)
             | AnyNodeRef::Comprehension(_)
+            | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Parameters(_)
             | AnyNodeRef::Parameter(_)
             | AnyNodeRef::ParameterWithDefault(_)
@@ -4021,6 +4079,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
             | AnyNodeRef::Decorator(_)
+            | AnyNodeRef::TypeParams(_)
             | AnyNodeRef::TypeParamTypeVar(_)
             | AnyNodeRef::TypeParamTypeVarTuple(_)
             | AnyNodeRef::TypeParamParamSpec(_)
@@ -4099,6 +4158,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::PatternMatchAs(_)
             | AnyNodeRef::PatternMatchOr(_)
             | AnyNodeRef::Comprehension(_)
+            | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Parameters(_)
             | AnyNodeRef::Parameter(_)
             | AnyNodeRef::ParameterWithDefault(_)
@@ -4107,6 +4167,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
             | AnyNodeRef::Decorator(_)
+            | AnyNodeRef::TypeParams(_)
             | AnyNodeRef::TypeParamTypeVar(_)
             | AnyNodeRef::TypeParamTypeVarTuple(_)
             | AnyNodeRef::TypeParamParamSpec(_)
@@ -4186,6 +4247,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprLineMagic(_)
             | AnyNodeRef::ExceptHandlerExceptHandler(_)
             | AnyNodeRef::Comprehension(_)
+            | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Parameters(_)
             | AnyNodeRef::Parameter(_)
             | AnyNodeRef::ParameterWithDefault(_)
@@ -4194,6 +4256,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
             | AnyNodeRef::Decorator(_)
+            | AnyNodeRef::TypeParams(_)
             | AnyNodeRef::TypeParamTypeVar(_)
             | AnyNodeRef::TypeParamTypeVarTuple(_)
             | AnyNodeRef::TypeParamParamSpec(_)
@@ -4273,6 +4336,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::PatternMatchAs(_)
             | AnyNodeRef::PatternMatchOr(_)
             | AnyNodeRef::Comprehension(_)
+            | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Parameters(_)
             | AnyNodeRef::Parameter(_)
             | AnyNodeRef::ParameterWithDefault(_)
@@ -4281,6 +4345,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::WithItem(_)
             | AnyNodeRef::MatchCase(_)
             | AnyNodeRef::Decorator(_)
+            | AnyNodeRef::TypeParams(_)
             | AnyNodeRef::TypeParamTypeVar(_)
             | AnyNodeRef::TypeParamTypeVarTuple(_)
             | AnyNodeRef::TypeParamParamSpec(_)
@@ -4877,6 +4942,11 @@ impl<'a> From<&'a Comprehension> for AnyNodeRef<'a> {
         AnyNodeRef::Comprehension(node)
     }
 }
+impl<'a> From<&'a Arguments> for AnyNodeRef<'a> {
+    fn from(node: &'a Arguments) -> Self {
+        AnyNodeRef::Arguments(node)
+    }
+}
 impl<'a> From<&'a Parameters> for AnyNodeRef<'a> {
     fn from(node: &'a Parameters) -> Self {
         AnyNodeRef::Parameters(node)
@@ -4985,6 +5055,7 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::PatternMatchAs(node) => node.range(),
             AnyNodeRef::PatternMatchOr(node) => node.range(),
             AnyNodeRef::Comprehension(node) => node.range(),
+            AnyNodeRef::Arguments(node) => node.range(),
             AnyNodeRef::Parameters(node) => node.range(),
             AnyNodeRef::Parameter(node) => node.range(),
             AnyNodeRef::ParameterWithDefault(node) => node.range(),
@@ -4994,6 +5065,7 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::MatchCase(node) => node.range(),
             AnyNodeRef::Decorator(node) => node.range(),
             AnyNodeRef::ElifElseClause(node) => node.range(),
+            AnyNodeRef::TypeParams(node) => node.range(),
             AnyNodeRef::TypeParamTypeVar(node) => node.range(),
             AnyNodeRef::TypeParamTypeVarTuple(node) => node.range(),
             AnyNodeRef::TypeParamParamSpec(node) => node.range(),
@@ -5075,6 +5147,7 @@ pub enum NodeKind {
     PatternMatchOr,
     TypeIgnoreTypeIgnore,
     Comprehension,
+    Arguments,
     Parameters,
     Parameter,
     ParameterWithDefault,
@@ -5084,6 +5157,7 @@ pub enum NodeKind {
     MatchCase,
     Decorator,
     ElifElseClause,
+    TypeParams,
     TypeParamTypeVar,
     TypeParamTypeVarTuple,
     TypeParamParamSpec,

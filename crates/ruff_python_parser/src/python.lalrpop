@@ -9,7 +9,7 @@ use ruff_python_ast::{self as ast, Ranged, MagicKind};
 use crate::{
     Mode,
     lexer::{LexicalError, LexicalErrorType},
-    function::{ArgumentList, parse_args, validate_pos_params, validate_arguments},
+    function::{ArgumentList, parse_arguments, validate_pos_params, validate_arguments},
     context::set_context,
     string::parse_strings,
     token::{self, StringKind},
@@ -1010,14 +1010,14 @@ WithItem<Goal>: ast::WithItem = {
 };
 
 FuncDef: ast::Stmt = {
-     <location:@L> <decorator_list:Decorator*> <is_async:"async"?> "def" <name:Identifier> <type_params:TypeParamList?> <args:Parameters> <r:("->" <Test<"all">>)?> ":" <body:Suite> => {
+     <location:@L> <decorator_list:Decorator*> <is_async:"async"?> "def" <name:Identifier> <type_params:TypeParams?> <args:Parameters> <r:("->" <Test<"all">>)?> ":" <body:Suite> => {
         let args = Box::new(args);
         let returns = r.map(Box::new);
         let end_location = body.last().unwrap().end();
         if is_async.is_some() {
-            ast::StmtAsyncFunctionDef { name, parameters:args, body, decorator_list, returns, type_params: type_params.unwrap_or_default(), range: (location..end_location).into() }.into()
+            ast::StmtAsyncFunctionDef { name, parameters:args, body, decorator_list, returns, type_params, range: (location..end_location).into() }.into()
         } else {
-            ast::StmtFunctionDef { name, parameters:args, body, decorator_list, returns, type_params: type_params.unwrap_or_default(), range: (location..end_location).into() }.into()
+            ast::StmtFunctionDef { name, parameters:args, body, decorator_list, returns, type_params, range: (location..end_location).into() }.into()
         }
     },
 };
@@ -1029,12 +1029,12 @@ TypeAliasName: ast::Expr = {
 }
 
 TypeAliasStatement: ast::Stmt = {
-    <location:@L> "type" <name:TypeAliasName> <type_params:TypeParamList?> "=" <value:Test<"all">> <end_location:@R> => {
+    <location:@L> "type" <name:TypeAliasName> <type_params:TypeParams?> "=" <value:Test<"all">> <end_location:@R> => {
         ast::Stmt::TypeAlias(
             ast::StmtTypeAlias {
                 name: Box::new(name),
                 value: Box::new(value),
-                type_params: type_params.unwrap_or_default(),
+                type_params,
                 range: (location..end_location).into()
             },
         )
@@ -1194,30 +1194,27 @@ KwargParameter<ParameterType>: Option<Box<ast::Parameter>> = {
 };
 
 ClassDef: ast::Stmt = {
-    <location:@L>  <decorator_list:Decorator*> "class" <name:Identifier> <type_params:TypeParamList?> <a:("(" ArgumentList ")")?> ":" <body:Suite> => {
-        let (bases, keywords) = match a {
-            Some((_, arg, _)) => (arg.args, arg.keywords),
-            None => (vec![], vec![]),
-        };
+    <location:@L>  <decorator_list:Decorator*> "class" <name:Identifier> <type_params:TypeParams?> <arguments:Arguments?> ":" <body:Suite> => {
         let end_location = body.last().unwrap().end();
         ast::Stmt::ClassDef(
             ast::StmtClassDef {
                 name,
-                bases,
-                keywords,
+                arguments: arguments.map(Box::new),
                 body,
                 decorator_list,
-                type_params: type_params.unwrap_or_default(),
+                type_params: type_params.map(Box::new),
                 range: (location..end_location).into()
             },
         )
     },
 };
 
-
-TypeParamList: Vec<ast::TypeParam> = {
+TypeParams: ast::TypeParams = {
     <location:@L> "[" <vars:OneOrMore<TypeParam>> ","? "]" <end_location:@R> => {
-        vars
+        ast::TypeParams {
+            type_params: vars,
+            range: (location..end_location).into()
+        }
     }
 };
 
@@ -1444,9 +1441,9 @@ AtomExpr<Goal>: ast::Expr = {
 
 AtomExpr2<Goal>: ast::Expr = {
     Atom<Goal>,
-    <location:@L> <f:AtomExpr2<"all">> "(" <a:ArgumentList> ")" <end_location:@R> => {
+    <location:@L> <f:AtomExpr2<"all">> <arguments:Arguments> <end_location:@R> => {
         ast::Expr::Call(
-            ast::ExprCall { func: Box::new(f), args: a.args, keywords: a.keywords, range: (location..end_location).into() }
+            ast::ExprCall { func: Box::new(f), arguments, range: (location..end_location).into() }
         )
     },
     <location:@L> <e:AtomExpr2<"all">> "[" <s:SubscriptList> "]" <end_location:@R> => ast::Expr::Subscript(
@@ -1663,10 +1660,14 @@ SingleForComprehension: ast::Comprehension = {
 ExpressionNoCond: ast::Expr = OrTest<"all">;
 ComprehensionIf: ast::Expr = "if" <c:ExpressionNoCond> => c;
 
-ArgumentList: ArgumentList = {
-    <e: Comma<FunctionArgument>> =>? {
-        let arg_list = parse_args(e)?;
-        Ok(arg_list)
+Arguments: ast::Arguments = {
+    <location:@L> "(" <e: Comma<FunctionArgument>> ")" <end_location:@R> =>? {
+        let ArgumentList { args, keywords } = parse_arguments(e)?;
+        Ok(ast::Arguments {
+            args,
+            keywords,
+            range: (location..end_location).into()
+        })
     }
 };
 

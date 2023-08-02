@@ -16,37 +16,40 @@ expression: parse_ast
                             ctx: Load,
                         },
                     ),
-                    args: [
-                        Constant(
-                            ExprConstant {
-                                range: 8..20,
-                                value: Str(
-                                    "positional",
-                                ),
-                                kind: None,
-                            },
-                        ),
-                    ],
-                    keywords: [
-                        Keyword {
-                            range: 22..31,
-                            arg: Some(
-                                Identifier {
-                                    id: "keyword",
-                                    range: 22..29,
-                                },
-                            ),
-                            value: Constant(
+                    arguments: Arguments {
+                        range: 7..32,
+                        args: [
+                            Constant(
                                 ExprConstant {
-                                    range: 30..31,
-                                    value: Int(
-                                        2,
+                                    range: 8..20,
+                                    value: Str(
+                                        "positional",
                                     ),
                                     kind: None,
                                 },
                             ),
-                        },
-                    ],
+                        ],
+                        keywords: [
+                            Keyword {
+                                range: 22..31,
+                                arg: Some(
+                                    Identifier {
+                                        id: "keyword",
+                                        range: 22..29,
+                                    },
+                                ),
+                                value: Constant(
+                                    ExprConstant {
+                                        range: 30..31,
+                                        value: Int(
+                                            2,
+                                        ),
+                                        kind: None,
+                                    },
+                                ),
+                            },
+                        ],
+                    },
                 },
             ),
         },

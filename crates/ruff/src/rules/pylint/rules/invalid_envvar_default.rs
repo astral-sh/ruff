@@ -1,8 +1,6 @@
-use ruff_python_ast::{self as ast, Constant, Expr, Keyword, Operator, Ranged};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::find_keyword;
+use ruff_python_ast::{self as ast, Constant, Expr, Operator, Ranged};
 
 use crate::checkers::ast::Checker;
 
@@ -78,22 +76,14 @@ fn is_valid_default(expr: &Expr) -> bool {
 }
 
 /// PLW1508
-pub(crate) fn invalid_envvar_default(
-    checker: &mut Checker,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
-) {
+pub(crate) fn invalid_envvar_default(checker: &mut Checker, call: &ast::ExprCall) {
     if checker
         .semantic()
-        .resolve_call_path(func)
+        .resolve_call_path(&call.func)
         .is_some_and(|call_path| matches!(call_path.as_slice(), ["os", "getenv"]))
     {
         // Find the `default` argument, if it exists.
-        let Some(expr) = args
-            .get(1)
-            .or_else(|| find_keyword(keywords, "default").map(|keyword| &keyword.value))
-        else {
+        let Some(expr) = call.arguments.find_argument("default", 1) else {
             return;
         };
 

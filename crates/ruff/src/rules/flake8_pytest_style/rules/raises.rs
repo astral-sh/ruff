@@ -1,10 +1,9 @@
-use ruff_python_ast::helpers::{find_keyword, is_compound_statement};
-use ruff_python_ast::{self as ast, Expr, Keyword, Ranged, Stmt, WithItem};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::format_call_path;
 use ruff_python_ast::call_path::from_qualified_name;
+use ruff_python_ast::helpers::is_compound_statement;
+use ruff_python_ast::{self as ast, Expr, Ranged, Stmt, WithItem};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
@@ -91,19 +90,20 @@ const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
     }
 }
 
-pub(crate) fn raises_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
-    if is_pytest_raises(func, checker.semantic()) {
+pub(crate) fn raises_call(checker: &mut Checker, call: &ast::ExprCall) {
+    if is_pytest_raises(&call.func, checker.semantic()) {
         if checker.enabled(Rule::PytestRaisesWithoutException) {
-            if args.is_empty() && keywords.is_empty() {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(PytestRaisesWithoutException, func.range()));
+            if call.arguments.is_empty() {
+                checker.diagnostics.push(Diagnostic::new(
+                    PytestRaisesWithoutException,
+                    call.func.range(),
+                ));
             }
         }
 
         if checker.enabled(Rule::PytestRaisesTooBroad) {
-            let match_keyword = find_keyword(keywords, "match");
-            if let Some(exception) = args.first() {
+            let match_keyword = call.arguments.find_keyword("match");
+            if let Some(exception) = call.arguments.args.first() {
                 if let Some(match_keyword) = match_keyword {
                     if is_empty_or_null_string(&match_keyword.value) {
                         exception_needs_match(checker, exception);

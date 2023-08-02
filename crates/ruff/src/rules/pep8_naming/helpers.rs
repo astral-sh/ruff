@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::str::{is_cased_lowercase, is_cased_uppercase};
@@ -61,10 +61,13 @@ pub(super) fn is_type_var_assignment(stmt: &Stmt, semantic: &SemanticModel) -> b
         .is_some_and(|call_path| matches!(call_path.as_slice(), ["typing", "TypeVar" | "NewType"]))
 }
 
-pub(super) fn is_typed_dict_class(bases: &[Expr], semantic: &SemanticModel) -> bool {
-    bases
-        .iter()
-        .any(|base| semantic.match_typing_expr(base, "TypedDict"))
+pub(super) fn is_typed_dict_class(arguments: Option<&Arguments>, semantic: &SemanticModel) -> bool {
+    arguments.is_some_and(|arguments| {
+        arguments
+            .args
+            .iter()
+            .any(|base| semantic.match_typing_expr(base, "TypedDict"))
+    })
 }
 
 #[cfg(test)]

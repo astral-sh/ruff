@@ -6,7 +6,11 @@
 
 "{1} {0}".format(a, b)
 
+"{0} {1} {0}".format(a, b)
+
 "{x.y}".format(x=z)
+
+"{x} {y} {x}".format(x=a, y=b)
 
 "{.x} {.y}".format(a, b)
 
@@ -84,8 +88,6 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 "}".format(a)
 
 "{} {}".format(*a)
-
-"{0} {0}".format(arg)
 
 "{x} {x}".format(arg)
 
