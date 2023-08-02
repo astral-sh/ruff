@@ -1,15 +1,17 @@
 use std::borrow::Cow;
 
+use anyhow::{Context, Result};
 use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Keyword, Ranged};
 use ruff_python_literal::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
+use ruff_python_parser::{lexer, Mode, Tok};
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::str::{is_implicit_concatenation, leading_quote, trailing_quote};
+use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_source_file::Locator;
 
 use crate::checkers::ast::Checker;
@@ -187,59 +189,42 @@ fn formatted_expr<'a>(expr: &Expr, context: FormatContext, locator: &Locator<'a>
     }
 }
 
-/// Generate an f-string from an [`Expr`].
-fn try_convert_to_f_string(expr: &Expr, locator: &Locator) -> Option<String> {
-    let Expr::Call(ast::ExprCall { func, .. }) = expr else {
-        return None;
-    };
-    let Expr::Attribute(ast::ExprAttribute { value, .. }) = func.as_ref() else {
-        return None;
-    };
-    if !matches!(
-        value.as_ref(),
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(..),
-            ..
-        }),
-    ) {
-        return None;
-    };
-
-    let Some(mut summary) = FormatSummaryValues::try_from_expr(expr, locator) else {
-        return None;
-    };
-
-    let contents = locator.slice(value.range());
-
-    // Skip implicit string concatenations.
-    if is_implicit_concatenation(contents) {
-        return None;
-    }
-
+/// Convert a string `.format` call to an f-string.
+///
+/// Returns `None` if the string does not require conversion, and `Err` if the conversion
+/// is not possible.
+fn try_convert_to_f_string(
+    range: TextRange,
+    summary: &mut FormatSummaryValues,
+    locator: &Locator,
+) -> Result<Option<String>> {
     // Strip the unicode prefix. It's redundant in Python 3, and invalid when used
     // with f-strings.
+    let contents = locator.slice(range);
     let contents = if contents.starts_with('U') || contents.starts_with('u') {
         &contents[1..]
     } else {
         contents
     };
-    if contents.is_empty() {
-        return None;
-    }
 
     // Remove the leading and trailing quotes.
-    let Some(leading_quote) = leading_quote(contents) else {
-        return None;
-    };
-    let Some(trailing_quote) = trailing_quote(contents) else {
-        return None;
-    };
+    let leading_quote = leading_quote(contents).context("Unable to identify leading quote")?;
+    let trailing_quote = trailing_quote(contents).context("Unable to identify trailing quote")?;
     let contents = &contents[leading_quote.len()..contents.len() - trailing_quote.len()];
+    if contents.is_empty() {
+        return Ok(None);
+    }
 
     // Parse the format string.
-    let Ok(format_string) = FormatString::from_str(contents) else {
-        return None;
-    };
+    let format_string = FormatString::from_str(contents)?;
+
+    if format_string
+        .format_parts
+        .iter()
+        .all(|part| matches!(part, FormatPart::Literal(..)))
+    {
+        return Ok(None);
+    }
 
     let mut converted = String::with_capacity(contents.len());
     for part in format_string.format_parts {
@@ -251,12 +236,13 @@ fn try_convert_to_f_string(expr: &Expr, locator: &Locator) -> Option<String> {
             } => {
                 converted.push('{');
 
-                let field = FieldName::parse(&field_name).ok()?;
+                let field = FieldName::parse(&field_name)?;
                 let arg = match field.field_type {
                     FieldType::Auto => summary.arg_auto(),
                     FieldType::Index(index) => summary.arg_positional(index),
                     FieldType::Keyword(name) => summary.arg_keyword(&name),
-                }?;
+                }
+                .context("Unable to parse field")?;
                 converted.push_str(&formatted_expr(
                     arg,
                     if field.parts.is_empty() {
@@ -317,7 +303,7 @@ fn try_convert_to_f_string(expr: &Expr, locator: &Locator) -> Option<String> {
     contents.push_str(leading_quote);
     contents.push_str(&converted);
     contents.push_str(trailing_quote);
-    Some(contents)
+    Ok(Some(contents))
 }
 
 /// UP032
@@ -332,16 +318,81 @@ pub(crate) fn f_strings(
         return;
     }
 
-    // Avoid refactoring strings that are implicitly concatenated.
-    if is_implicit_concatenation(checker.locator().slice(template.range())) {
+    let Expr::Call(ast::ExprCall { func, .. }) = expr else {
+        return;
+    };
+
+    let Expr::Attribute(ast::ExprAttribute { value, .. }) = func.as_ref() else {
+        return;
+    };
+
+    if !matches!(
+        value.as_ref(),
+        Expr::Constant(ast::ExprConstant {
+            value: Constant::Str(..),
+            ..
+        }),
+    ) {
+        return;
+    };
+
+    let Some(mut summary) = FormatSummaryValues::try_from_expr(expr, checker.locator()) else {
+        return;
+    };
+    let mut patches: Vec<(TextRange, String)> = vec![];
+    let mut lex = lexer::lex_starts_at(
+        checker.locator().slice(func.range()),
+        Mode::Expression,
+        expr.start(),
+    )
+    .flatten();
+    let end = loop {
+        match lex.next() {
+            Some((Tok::Dot, range)) => {
+                // ```
+                // (
+                //     "a"
+                //     " {} "
+                //     "b"
+                // ).format(x)
+                // ```
+                // ^ Get the position of the character before the dot.
+                //
+                // We know that the expression is a string literal, so we can safely assume that the
+                // dot is the start of an attribute access.
+                break range.start();
+            }
+            Some((Tok::String { .. }, range)) => {
+                match try_convert_to_f_string(range, &mut summary, checker.locator()) {
+                    Ok(Some(fstring)) => patches.push((range, fstring)),
+                    // Skip any strings that don't require conversion (e.g., literal segments of an
+                    // implicit concatenation).
+                    Ok(None) => continue,
+                    // If any of the segments fail to convert, then we can't convert the entire
+                    // expression.
+                    Err(_) => return,
+                }
+            }
+            Some(_) => continue,
+            None => unreachable!("Should break from the `Tok::Dot` arm"),
+        }
+    };
+    if patches.is_empty() {
         return;
     }
 
-    // Currently, the only issue we know of is in LibCST:
-    // https://github.com/Instagram/LibCST/issues/846
-    let Some(mut contents) = try_convert_to_f_string(expr, checker.locator()) else {
-        return;
-    };
+    let mut contents = String::with_capacity(checker.locator().slice(expr.range()).len());
+    let mut prev_end = expr.start();
+    for (range, fstring) in patches {
+        contents.push_str(
+            checker
+                .locator()
+                .slice(TextRange::new(prev_end, range.start())),
+        );
+        contents.push_str(&fstring);
+        prev_end = range.end();
+    }
+    contents.push_str(checker.locator().slice(TextRange::new(prev_end, end)));
 
     // Avoid refactors that exceed the line length limit.
     let col_offset = template.start() - checker.locator().line_start(template.start());
