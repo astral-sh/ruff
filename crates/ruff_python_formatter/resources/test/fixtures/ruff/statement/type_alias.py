@@ -49,9 +49,10 @@ type X[T] \
     = T
 
 # type leading comment
-type X = (
+type X = ( # trailing open paren comment
     # value leading comment
     int # value trailing comment
+    # leading close paren comment
 ) # type trailing comment
 
 
@@ -60,7 +61,7 @@ type X = (
     # value leading comment
     int # value trailing comment
 
-    # another value trailing comment
+    # leading close paren comment
 )
 
 # type parameters
@@ -68,7 +69,7 @@ type type_params_single_line[aaaaaaaaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbb, ccc
 type type_params_arguments_on_their_own_line[aaaaaaaaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbb, ccccccccccc, ddddddddddddd, eeeeeee] = int
 type type_params_argument_per_line[aaaaaaaaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbb, ccccccccccccccccc, ddddddddddddd, eeeeeeeeeeeeeeee, ffffffffffff] = int
 type type_params_trailing_comma[a, b,] = int
-type type_params_comments[
+type type_params_comments[ # trailing open bracket comment
     # leading comment
     A,
 
@@ -78,7 +79,8 @@ type type_params_comments[
     # another leading comment
     C,
     D, # trailing comment
-] = int
+    # leading close bracket comment
+] = int  # trailing value comment
 type type_params_all_kinds[type_var, *type_var_tuple, **param_spec] = int
 
 # type variable bounds
