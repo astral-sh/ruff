@@ -190,9 +190,9 @@ fn formatted_expr<'a>(expr: &Expr, context: FormatContext, locator: &Locator<'a>
 
 /// Convert a string format call to an f-string.
 fn try_convert_to_f_string(
-    locator: &Locator,
     range: TextRange,
     summary: &mut FormatSummaryValues,
+    locator: &Locator,
 ) -> Option<String> {
     // Strip the unicode prefix. It's redundant in Python 3, and invalid when used
     // with f-strings.
@@ -358,11 +358,11 @@ pub(crate) fn f_strings(
                 // ).format(x)
                 // ^ Get the position of the character before the dot.
                 // ```
-                break range.end() - TextSize::of('.');
+                break range.start();
             }
             Some((Tok::String { .. }, range)) => {
                 if let Some(fstring) =
-                    try_convert_to_f_string(checker.locator(), range, &mut summary)
+                    try_convert_to_f_string(range, &mut summary, checker.locator())
                 {
                     patches.push((range, fstring));
                 }

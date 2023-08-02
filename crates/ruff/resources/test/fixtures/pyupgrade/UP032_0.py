@@ -101,6 +101,22 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     .format(a=1, b=1)
 )
 
+(
+    "{a}"
+    "b"
+).format(a=1)
+
+
+def d(osname, version, release):
+    return"{}-{}.{}".format(osname, version, release)
+
+
+def e():
+    yield"{}".format(1)
+
+
+assert"{}".format(1)
+
 ###
 # Non-errors
 ###
@@ -171,14 +187,3 @@ async def c():
 
 async def c():
     return "{}".format(1 + await 3)
-
-
-def d(osname, version, release):
-    return"{}-{}.{}".format(osname, version, release)
-
-
-def e():
-    yield"{}".format(1)
-
-
-assert"{}".format(1)
