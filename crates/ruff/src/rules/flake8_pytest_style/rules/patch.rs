@@ -1,11 +1,9 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, Ranged};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
-use ruff_python_ast::helpers::{find_keyword, includes_arg_name, CallArguments};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{self as ast, Expr, Parameters, Ranged};
 
 #[violation]
 pub struct PytestPatchWithLambda;
@@ -20,7 +18,7 @@ impl Violation for PytestPatchWithLambda {
 /// Visitor that checks references the argument names in the lambda body.
 #[derive(Debug)]
 struct LambdaBodyVisitor<'a> {
-    arguments: &'a Arguments,
+    parameters: &'a Parameters,
     uses_args: bool,
 }
 
@@ -31,7 +29,7 @@ where
     fn visit_expr(&mut self, expr: &'b Expr) {
         match expr {
             Expr::Name(ast::ExprName { id, .. }) => {
-                if includes_arg_name(id, self.arguments) {
+                if self.parameters.includes(id) {
                     self.uses_args = true;
                 }
             }
@@ -44,27 +42,23 @@ where
     }
 }
 
-fn check_patch_call(
-    call: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
-    new_arg_number: usize,
-) -> Option<Diagnostic> {
-    if find_keyword(keywords, "return_value").is_some() {
+fn check_patch_call(call: &ast::ExprCall, index: usize) -> Option<Diagnostic> {
+    if call.arguments.find_keyword("return_value").is_some() {
         return None;
     }
 
     let ast::ExprLambda {
-        args,
+        parameters,
         body,
         range: _,
-    } = CallArguments::new(args, keywords)
-        .argument("new", new_arg_number)?
+    } = call
+        .arguments
+        .find_argument("new", index)?
         .as_lambda_expr()?;
 
     // Walk the lambda body.
     let mut visitor = LambdaBodyVisitor {
-        arguments: args,
+        parameters,
         uses_args: false,
     };
     visitor.visit_expr(body);
@@ -72,16 +66,13 @@ fn check_patch_call(
     if visitor.uses_args {
         None
     } else {
-        Some(Diagnostic::new(PytestPatchWithLambda, call.range()))
+        Some(Diagnostic::new(PytestPatchWithLambda, call.func.range()))
     }
 }
 
-pub(crate) fn patch_with_lambda(
-    call: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
-) -> Option<Diagnostic> {
-    let call_path = collect_call_path(call)?;
+/// PT008
+pub(crate) fn patch_with_lambda(call: &ast::ExprCall) -> Option<Diagnostic> {
+    let call_path = collect_call_path(&call.func)?;
 
     if matches!(
         call_path.as_slice(),
@@ -95,7 +86,7 @@ pub(crate) fn patch_with_lambda(
             "patch"
         ] | ["unittest", "mock", "patch"]
     ) {
-        check_patch_call(call, args, keywords, 1)
+        check_patch_call(call, 1)
     } else if matches!(
         call_path.as_slice(),
         [
@@ -109,7 +100,7 @@ pub(crate) fn patch_with_lambda(
             "object"
         ] | ["unittest", "mock", "patch", "object"]
     ) {
-        check_patch_call(call, args, keywords, 2)
+        check_patch_call(call, 2)
     } else {
         None
     }

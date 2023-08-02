@@ -125,11 +125,13 @@ Module(
             FunctionDef(
                 StmtFunctionDef {
                     range: 566..626,
+                    decorator_list: [],
                     name: Identifier {
                         id: "foo",
                         range: 570..573,
                     },
-                    args: Arguments {
+                    type_params: None,
+                    parameters: Parameters {
                         range: 573..575,
                         posonlyargs: [],
                         args: [],
@@ -137,6 +139,7 @@ Module(
                         kwonlyargs: [],
                         kwarg: None,
                     },
+                    returns: None,
                     body: [
                         Return(
                             StmtReturn {
@@ -170,10 +173,6 @@ Module(
                             },
                         ),
                     ],
-                    decorator_list: [],
-                    returns: None,
-                    type_params: [],
-                    type_comment: None,
                 },
             ),
             LineMagic(
@@ -217,18 +216,21 @@ Module(
                                     ctx: Load,
                                 },
                             ),
-                            args: [
-                                Constant(
-                                    ExprConstant {
-                                        range: 716..717,
-                                        value: Int(
-                                            5,
-                                        ),
-                                        kind: None,
-                                    },
-                                ),
-                            ],
-                            keywords: [],
+                            arguments: Arguments {
+                                range: 715..718,
+                                args: [
+                                    Constant(
+                                        ExprConstant {
+                                            range: 716..717,
+                                            value: Int(
+                                                5,
+                                            ),
+                                            kind: None,
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
                         },
                     ),
                     body: [
@@ -241,7 +243,6 @@ Module(
                         ),
                     ],
                     orelse: [],
-                    type_comment: None,
                 },
             ),
             Assign(
@@ -263,7 +264,6 @@ Module(
                             value: "pwd",
                         },
                     ),
-                    type_comment: None,
                 },
             ),
             AnnAssign(
@@ -314,7 +314,6 @@ Module(
                             value: "foo     bar",
                         },
                     ),
-                    type_comment: None,
                 },
             ),
             LineMagic(
@@ -343,10 +342,8 @@ Module(
                             value: "foo  # comment",
                         },
                     ),
-                    type_comment: None,
                 },
             ),
         ],
-        type_ignores: [],
     },
 )

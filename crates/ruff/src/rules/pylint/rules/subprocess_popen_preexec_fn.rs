@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{find_keyword, is_const_none};
-use ruff_python_ast::{Expr, Keyword, Ranged};
+use ruff_python_ast::helpers::is_const_none;
+use ruff_python_ast::{self as ast, Ranged};
 
 use crate::checkers::ast::Checker;
 
@@ -48,16 +48,16 @@ impl Violation for SubprocessPopenPreexecFn {
 }
 
 /// PLW1509
-pub(crate) fn subprocess_popen_preexec_fn(checker: &mut Checker, func: &Expr, kwargs: &[Keyword]) {
+pub(crate) fn subprocess_popen_preexec_fn(checker: &mut Checker, call: &ast::ExprCall) {
     if checker
         .semantic()
-        .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["subprocess", "Popen"])
-        })
+        .resolve_call_path(&call.func)
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["subprocess", "Popen"]))
     {
-        if let Some(keyword) =
-            find_keyword(kwargs, "preexec_fn").filter(|keyword| !is_const_none(&keyword.value))
+        if let Some(keyword) = call
+            .arguments
+            .find_keyword("preexec_fn")
+            .filter(|keyword| !is_const_none(&keyword.value))
         {
             checker
                 .diagnostics

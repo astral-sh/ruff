@@ -163,9 +163,8 @@ impl<'a> SemanticModel<'a> {
 
     /// Return `true` if the `Expr` is a reference to `typing.${target}`.
     pub fn match_typing_expr(&self, expr: &Expr, target: &str) -> bool {
-        self.resolve_call_path(expr).map_or(false, |call_path| {
-            self.match_typing_call_path(&call_path, target)
-        })
+        self.resolve_call_path(expr)
+            .is_some_and(|call_path| self.match_typing_call_path(&call_path, target))
     }
 
     /// Return `true` if the call path is a reference to `typing.${target}`.
@@ -245,7 +244,7 @@ impl<'a> SemanticModel<'a> {
     /// Return `true` if `member` is bound as a builtin.
     pub fn is_builtin(&self, member: &str) -> bool {
         self.find_binding(member)
-            .map_or(false, |binding| binding.kind.is_builtin())
+            .is_some_and(|binding| binding.kind.is_builtin())
     }
 
     /// Return `true` if `member` is an "available" symbol, i.e., a symbol that has not been bound
@@ -594,7 +593,12 @@ impl<'a> SemanticModel<'a> {
             return None;
         }
 
-        self.scopes[scope_id].get(qualified_name)
+        let binding_id = self.scopes[scope_id].get(qualified_name)?;
+        if !self.bindings[binding_id].kind.is_submodule_import() {
+            return None;
+        }
+
+        Some(binding_id)
     }
 
     /// Resolves the [`Expr`] to a fully-qualified symbol-name, if `value` resolves to an imported

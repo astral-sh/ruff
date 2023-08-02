@@ -150,8 +150,8 @@ impl<'a> Definitions<'a> {
                         MemberKind::Class => {
                             let parent = &definitions[member.parent];
                             if parent.visibility.is_private()
-                                || exports.map_or(false, |exports| {
-                                    member.name().map_or(false, |name| !exports.contains(&name))
+                                || exports.is_some_and(|exports| {
+                                    member.name().is_some_and(|name| !exports.contains(&name))
                                 })
                             {
                                 Visibility::Private
@@ -180,8 +180,8 @@ impl<'a> Definitions<'a> {
                         MemberKind::Function => {
                             let parent = &definitions[member.parent];
                             if parent.visibility.is_private()
-                                || exports.map_or(false, |exports| {
-                                    member.name().map_or(false, |name| !exports.contains(&name))
+                                || exports.is_some_and(|exports| {
+                                    member.name().is_some_and(|name| !exports.contains(&name))
                                 })
                             {
                                 Visibility::Private

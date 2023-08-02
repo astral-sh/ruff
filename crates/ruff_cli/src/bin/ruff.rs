@@ -31,9 +31,10 @@ pub fn main() -> ExitCode {
     // default for convenience and backwards-compatibility, so we just
     // preprocess the arguments accordingly before passing them to Clap.
     if let Some(arg) = args.get(1) {
-        if arg.to_str().map_or(false, |arg| {
-            !Command::has_subcommand(rewrite_legacy_subcommand(arg))
-        }) && arg != "-h"
+        if arg
+            .to_str()
+            .is_some_and(|arg| !Command::has_subcommand(rewrite_legacy_subcommand(arg)))
+            && arg != "-h"
             && arg != "--help"
             && arg != "-V"
             && arg != "--version"

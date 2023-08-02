@@ -1,8 +1,7 @@
-use ruff_python_ast::{self as ast, Expr, Stmt};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::any_over_expr;
+use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 
 use crate::checkers::ast::Checker;
 
@@ -60,9 +59,13 @@ pub(crate) fn manual_list_copy(checker: &mut Checker, target: &Expr, body: &[Stm
 
     let Expr::Call(ast::ExprCall {
         func,
+        arguments:
+            Arguments {
+                args,
+                keywords,
+                range: _,
+            },
         range,
-        args,
-        keywords,
     }) = value.as_ref()
     else {
         return;
@@ -77,7 +80,7 @@ pub(crate) fn manual_list_copy(checker: &mut Checker, target: &Expr, body: &[Stm
     };
 
     // Only flag direct list copies (e.g., `for x in y: filtered.append(x)`).
-    if !arg.as_name_expr().map_or(false, |arg| arg.id == *id) {
+    if !arg.as_name_expr().is_some_and(|arg| arg.id == *id) {
         return;
     }
 
@@ -89,9 +92,9 @@ pub(crate) fn manual_list_copy(checker: &mut Checker, target: &Expr, body: &[Stm
         return;
     }
 
-    // Avoid, e.g., `for x in y: filtered[x].append(x * x)`.
+    // Avoid, e.g., `for x in y: filtered[x].append(x)`.
     if any_over_expr(value, &|expr| {
-        expr.as_name_expr().map_or(false, |expr| expr.id == *id)
+        expr.as_name_expr().is_some_and(|expr| expr.id == *id)
     }) {
         return;
     }

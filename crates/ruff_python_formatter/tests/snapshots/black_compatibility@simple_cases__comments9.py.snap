@@ -151,7 +151,15 @@ def bar():
 ```diff
 --- Black
 +++ Ruff
-@@ -106,7 +106,6 @@
+@@ -74,7 +74,6 @@
+ @deco1
+ # leading 2
+ @deco2(with_args=True)
+-
+ # leading 3 that already has an empty line
+ @deco3
+ # leading 4
+@@ -106,7 +105,6 @@
          # Another leading comment
          def another_inline():
              pass
@@ -159,7 +167,7 @@ def bar():
      else:
          # More leading comments
          def inline_after_else():
-@@ -121,7 +120,6 @@
+@@ -121,7 +119,6 @@
      # Another leading comment
      def another_top_level_quote_inline_inline():
          pass
@@ -248,7 +256,6 @@ some = statement
 @deco1
 # leading 2
 @deco2(with_args=True)
-
 # leading 3 that already has an empty line
 @deco3
 # leading 4

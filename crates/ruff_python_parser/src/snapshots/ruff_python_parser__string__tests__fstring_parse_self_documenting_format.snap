@@ -3,24 +3,6 @@ source: crates/ruff_python_parser/src/string.rs
 expression: parse_ast
 ---
 [
-    Constant(
-        ExprConstant {
-            range: 2..13,
-            value: Str(
-                "user=",
-            ),
-            kind: None,
-        },
-    ),
-    Constant(
-        ExprConstant {
-            range: 2..13,
-            value: Str(
-                "",
-            ),
-            kind: None,
-        },
-    ),
     FormattedValue(
         ExprFormattedValue {
             range: 2..13,
@@ -29,6 +11,12 @@ expression: parse_ast
                     range: 3..7,
                     id: "user",
                     ctx: Load,
+                },
+            ),
+            debug_text: Some(
+                DebugText {
+                    leading: "",
+                    trailing: "=",
                 },
             ),
             conversion: None,

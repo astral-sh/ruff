@@ -1,12 +1,12 @@
 //! Generate Python source code from an abstract syntax tree (AST).
 
-use ruff_python_ast::ArgWithDefault;
+use ruff_python_ast::{ParameterWithDefault, TypeParams};
 use std::ops::Deref;
 
 use ruff_python_ast::{
-    self as ast, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Constant, ConversionFlag,
-    ExceptHandler, Expr, Identifier, MatchCase, Operator, Pattern, Stmt, Suite, TypeParam,
-    TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
+    self as ast, Alias, BoolOp, CmpOp, Comprehension, Constant, ConversionFlag, DebugText,
+    ExceptHandler, Expr, Identifier, MatchCase, Operator, Parameter, Parameters, Pattern, Stmt,
+    Suite, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
 };
 use ruff_python_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
 
@@ -34,6 +34,7 @@ mod precedence {
     pub(crate) const COMMA: u8 = 21;
     pub(crate) const NAMED_EXPR: u8 = 23;
     pub(crate) const ASSERT: u8 = 23;
+    pub(crate) const COMPREHENSION_ELEMENT: u8 = 27;
     pub(crate) const LAMBDA: u8 = 27;
     pub(crate) const IF_EXP: u8 = 27;
     pub(crate) const COMPREHENSION: u8 = 29;
@@ -204,7 +205,7 @@ impl<'a> Generator<'a> {
         match ast {
             Stmt::FunctionDef(ast::StmtFunctionDef {
                 name,
-                args,
+                parameters,
                 body,
                 returns,
                 decorator_list,
@@ -221,9 +222,11 @@ impl<'a> Generator<'a> {
                 statement!({
                     self.p("def ");
                     self.p_id(name);
-                    self.unparse_type_params(type_params);
+                    if let Some(type_params) = type_params {
+                        self.unparse_type_params(type_params);
+                    }
                     self.p("(");
-                    self.unparse_args(args);
+                    self.unparse_parameters(parameters);
                     self.p(")");
                     if let Some(returns) = returns {
                         self.p(" -> ");
@@ -238,7 +241,7 @@ impl<'a> Generator<'a> {
             }
             Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
                 name,
-                args,
+                parameters,
                 body,
                 returns,
                 decorator_list,
@@ -255,9 +258,11 @@ impl<'a> Generator<'a> {
                 statement!({
                     self.p("async def ");
                     self.p_id(name);
-                    self.unparse_type_params(type_params);
+                    if let Some(type_params) = type_params {
+                        self.unparse_type_params(type_params);
+                    }
                     self.p("(");
-                    self.unparse_args(args);
+                    self.unparse_parameters(parameters);
                     self.p(")");
                     if let Some(returns) = returns {
                         self.p(" -> ");
@@ -272,8 +277,7 @@ impl<'a> Generator<'a> {
             }
             Stmt::ClassDef(ast::StmtClassDef {
                 name,
-                bases,
-                keywords,
+                arguments,
                 body,
                 decorator_list,
                 type_params,
@@ -289,25 +293,28 @@ impl<'a> Generator<'a> {
                 statement!({
                     self.p("class ");
                     self.p_id(name);
-                    self.unparse_type_params(type_params);
-                    let mut first = true;
-                    for base in bases {
-                        self.p_if(first, "(");
-                        self.p_delim(&mut first, ", ");
-                        self.unparse_expr(base, precedence::MAX);
+                    if let Some(type_params) = type_params {
+                        self.unparse_type_params(type_params);
                     }
-                    for keyword in keywords {
-                        self.p_if(first, "(");
-                        self.p_delim(&mut first, ", ");
-                        if let Some(arg) = &keyword.arg {
-                            self.p_id(arg);
-                            self.p("=");
-                        } else {
-                            self.p("**");
+                    if let Some(arguments) = arguments {
+                        self.p("(");
+                        let mut first = true;
+                        for base in &arguments.args {
+                            self.p_delim(&mut first, ", ");
+                            self.unparse_expr(base, precedence::MAX);
                         }
-                        self.unparse_expr(&keyword.value, precedence::MAX);
+                        for keyword in &arguments.keywords {
+                            self.p_delim(&mut first, ", ");
+                            if let Some(arg) = &keyword.arg {
+                                self.p_id(arg);
+                                self.p("=");
+                            } else {
+                                self.p("**");
+                            }
+                            self.unparse_expr(&keyword.value, precedence::MAX);
+                        }
+                        self.p(")");
                     }
-                    self.p_if(!first, ")");
                     self.p(":");
                 });
                 self.body(body);
@@ -539,7 +546,9 @@ impl<'a> Generator<'a> {
             }) => {
                 self.p("type ");
                 self.unparse_expr(name, precedence::MAX);
-                self.unparse_type_params(type_params);
+                if let Some(type_params) = type_params {
+                    self.unparse_type_params(type_params);
+                }
                 self.p(" = ");
                 self.unparse_expr(value, precedence::ASSIGN);
             }
@@ -852,16 +861,14 @@ impl<'a> Generator<'a> {
         self.body(&ast.body);
     }
 
-    fn unparse_type_params(&mut self, type_params: &Vec<TypeParam>) {
-        if !type_params.is_empty() {
-            self.p("[");
-            let mut first = true;
-            for type_param in type_params {
-                self.p_delim(&mut first, ", ");
-                self.unparse_type_param(type_param);
-            }
-            self.p("]");
+    fn unparse_type_params(&mut self, type_params: &TypeParams) {
+        self.p("[");
+        let mut first = true;
+        for type_param in type_params.iter() {
+            self.p_delim(&mut first, ", ");
+            self.unparse_type_param(type_param);
         }
+        self.p("]");
     }
 
     pub(crate) fn unparse_type_param(&mut self, ast: &TypeParam) {
@@ -984,14 +991,14 @@ impl<'a> Generator<'a> {
                 });
             }
             Expr::Lambda(ast::ExprLambda {
-                args,
+                parameters,
                 body,
                 range: _range,
             }) => {
                 group_if!(precedence::LAMBDA, {
-                    let npos = args.args.len() + args.posonlyargs.len();
+                    let npos = parameters.args.len() + parameters.posonlyargs.len();
                     self.p(if npos > 0 { "lambda " } else { "lambda" });
-                    self.unparse_args(args);
+                    self.unparse_parameters(parameters);
                     self.p(": ");
                     self.unparse_expr(body, precedence::LAMBDA);
                 });
@@ -1052,7 +1059,7 @@ impl<'a> Generator<'a> {
                 range: _range,
             }) => {
                 self.p("[");
-                self.unparse_expr(elt, precedence::MAX);
+                self.unparse_expr(elt, precedence::COMPREHENSION_ELEMENT);
                 self.unparse_comp(generators);
                 self.p("]");
             }
@@ -1062,7 +1069,7 @@ impl<'a> Generator<'a> {
                 range: _range,
             }) => {
                 self.p("{");
-                self.unparse_expr(elt, precedence::MAX);
+                self.unparse_expr(elt, precedence::COMPREHENSION_ELEMENT);
                 self.unparse_comp(generators);
                 self.p("}");
             }
@@ -1073,9 +1080,9 @@ impl<'a> Generator<'a> {
                 range: _range,
             }) => {
                 self.p("{");
-                self.unparse_expr(key, precedence::MAX);
+                self.unparse_expr(key, precedence::COMPREHENSION_ELEMENT);
                 self.p(": ");
-                self.unparse_expr(value, precedence::MAX);
+                self.unparse_expr(value, precedence::COMPREHENSION_ELEMENT);
                 self.unparse_comp(generators);
                 self.p("}");
             }
@@ -1085,7 +1092,7 @@ impl<'a> Generator<'a> {
                 range: _range,
             }) => {
                 self.p("(");
-                self.unparse_expr(elt, precedence::COMMA);
+                self.unparse_expr(elt, precedence::COMPREHENSION_ELEMENT);
                 self.unparse_comp(generators);
                 self.p(")");
             }
@@ -1148,8 +1155,7 @@ impl<'a> Generator<'a> {
             }
             Expr::Call(ast::ExprCall {
                 func,
-                args,
-                keywords,
+                arguments,
                 range: _range,
             }) => {
                 self.unparse_expr(func, precedence::MAX);
@@ -1161,18 +1167,18 @@ impl<'a> Generator<'a> {
                         range: _range,
                     })],
                     [],
-                ) = (args.as_slice(), keywords.as_slice())
+                ) = (arguments.args.as_slice(), arguments.keywords.as_slice())
                 {
                     // Ensure that a single generator doesn't get double-parenthesized.
                     self.unparse_expr(elt, precedence::COMMA);
                     self.unparse_comp(generators);
                 } else {
                     let mut first = true;
-                    for arg in args {
+                    for arg in &arguments.args {
                         self.p_delim(&mut first, ", ");
                         self.unparse_expr(arg, precedence::COMMA);
                     }
-                    for kw in keywords {
+                    for kw in &arguments.keywords {
                         self.p_delim(&mut first, ", ");
                         if let Some(arg) = &kw.arg {
                             self.p_id(arg);
@@ -1188,10 +1194,16 @@ impl<'a> Generator<'a> {
             }
             Expr::FormattedValue(ast::ExprFormattedValue {
                 value,
+                debug_text,
                 conversion,
                 format_spec,
                 range: _range,
-            }) => self.unparse_formatted(value, *conversion, format_spec.as_deref()),
+            }) => self.unparse_formatted(
+                value,
+                debug_text.as_ref(),
+                *conversion,
+                format_spec.as_deref(),
+            ),
             Expr::JoinedStr(ast::ExprJoinedStr {
                 values,
                 range: _range,
@@ -1317,42 +1329,47 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_args(&mut self, args: &Arguments) {
+    fn unparse_parameters(&mut self, parameters: &Parameters) {
         let mut first = true;
-        for (i, arg_with_default) in args.posonlyargs.iter().chain(&args.args).enumerate() {
+        for (i, parameter_with_default) in parameters
+            .posonlyargs
+            .iter()
+            .chain(&parameters.args)
+            .enumerate()
+        {
             self.p_delim(&mut first, ", ");
-            self.unparse_arg_with_default(arg_with_default);
-            self.p_if(i + 1 == args.posonlyargs.len(), ", /");
+            self.unparse_parameter_with_default(parameter_with_default);
+            self.p_if(i + 1 == parameters.posonlyargs.len(), ", /");
         }
-        if args.vararg.is_some() || !args.kwonlyargs.is_empty() {
+        if parameters.vararg.is_some() || !parameters.kwonlyargs.is_empty() {
             self.p_delim(&mut first, ", ");
             self.p("*");
         }
-        if let Some(vararg) = &args.vararg {
-            self.unparse_arg(vararg);
+        if let Some(vararg) = &parameters.vararg {
+            self.unparse_parameter(vararg);
         }
-        for kwarg in &args.kwonlyargs {
+        for kwarg in &parameters.kwonlyargs {
             self.p_delim(&mut first, ", ");
-            self.unparse_arg_with_default(kwarg);
+            self.unparse_parameter_with_default(kwarg);
         }
-        if let Some(kwarg) = &args.kwarg {
+        if let Some(kwarg) = &parameters.kwarg {
             self.p_delim(&mut first, ", ");
             self.p("**");
-            self.unparse_arg(kwarg);
+            self.unparse_parameter(kwarg);
         }
     }
 
-    fn unparse_arg(&mut self, arg: &Arg) {
-        self.p_id(&arg.arg);
-        if let Some(ann) = &arg.annotation {
+    fn unparse_parameter(&mut self, parameter: &Parameter) {
+        self.p_id(&parameter.name);
+        if let Some(ann) = &parameter.annotation {
             self.p(": ");
             self.unparse_expr(ann, precedence::COMMA);
         }
     }
 
-    fn unparse_arg_with_default(&mut self, arg_with_default: &ArgWithDefault) {
-        self.unparse_arg(&arg_with_default.def);
-        if let Some(default) = &arg_with_default.default {
+    fn unparse_parameter_with_default(&mut self, parameter_with_default: &ParameterWithDefault) {
+        self.unparse_parameter(&parameter_with_default.parameter);
+        if let Some(default) = &parameter_with_default.default {
             self.p("=");
             self.unparse_expr(default, precedence::COMMA);
         }
@@ -1381,7 +1398,13 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_formatted(&mut self, val: &Expr, conversion: ConversionFlag, spec: Option<&Expr>) {
+    fn unparse_formatted(
+        &mut self,
+        val: &Expr,
+        debug_text: Option<&DebugText>,
+        conversion: ConversionFlag,
+        spec: Option<&Expr>,
+    ) {
         let mut generator = Generator::new(self.indent, self.quote, self.line_ending);
         generator.unparse_expr(val, precedence::FORMATTED_VALUE);
         let brace = if generator.buffer.starts_with('{') {
@@ -1391,7 +1414,16 @@ impl<'a> Generator<'a> {
             "{"
         };
         self.p(brace);
+
+        if let Some(debug_text) = debug_text {
+            self.buffer += debug_text.leading.as_str();
+        }
+
         self.buffer += &generator.buffer;
+
+        if let Some(debug_text) = debug_text {
+            self.buffer += debug_text.trailing.as_str();
+        }
 
         if !conversion.is_none() {
             self.p("!");
@@ -1424,10 +1456,16 @@ impl<'a> Generator<'a> {
             }
             Expr::FormattedValue(ast::ExprFormattedValue {
                 value,
+                debug_text,
                 conversion,
                 format_spec,
                 range: _range,
-            }) => self.unparse_formatted(value, *conversion, format_spec.as_deref()),
+            }) => self.unparse_formatted(
+                value,
+                debug_text.as_ref(),
+                *conversion,
+                format_spec.as_deref(),
+            ),
             _ => unreachable!(),
         }
     }
@@ -1475,8 +1513,8 @@ impl<'a> Generator<'a> {
 
 #[cfg(test)]
 mod tests {
-    use ruff_python_ast::{Mod, ModModule, Stmt};
-    use ruff_python_parser::{self, Mode, Parse};
+    use ruff_python_ast::{Mod, ModModule};
+    use ruff_python_parser::{self, parse_suite, Mode};
 
     use ruff_source_file::LineEnding;
 
@@ -1487,9 +1525,9 @@ mod tests {
         let indentation = Indentation::default();
         let quote = Quote::default();
         let line_ending = LineEnding::default();
-        let stmt = Stmt::parse(contents, "<filename>").unwrap();
+        let stmt = parse_suite(contents, "<filename>").unwrap();
         let mut generator = Generator::new(&indentation, quote, line_ending);
-        generator.unparse_stmt(&stmt);
+        generator.unparse_suite(&stmt);
         generator.generate()
     }
 
@@ -1499,9 +1537,9 @@ mod tests {
         line_ending: LineEnding,
         contents: &str,
     ) -> String {
-        let stmt = Stmt::parse(contents, "<filename>").unwrap();
+        let stmt = parse_suite(contents, "<filename>").unwrap();
         let mut generator = Generator::new(indentation, quote, line_ending);
-        generator.unparse_stmt(&stmt);
+        generator.unparse_suite(&stmt);
         generator.generate()
     }
 
@@ -1570,6 +1608,8 @@ mod tests {
         assert_round_trip!("foo(1)");
         assert_round_trip!("foo(1, 2)");
         assert_round_trip!("foo(x for x in y)");
+        assert_round_trip!("foo([x for x in y])");
+        assert_round_trip!("foo([(x := 2) for x in y])");
         assert_round_trip!("x = yield 1");
         assert_round_trip!("return (yield 1)");
         assert_round_trip!("lambda: (1, 2, 3)");
@@ -1622,8 +1662,8 @@ mod tests {
             r#"def f() -> (int, str):
     pass"#
         );
-        assert_round_trip!("[(await x) async for x in y]");
-        assert_round_trip!("[(await i) for i in b if await c]");
+        assert_round_trip!("[await x async for x in y]");
+        assert_round_trip!("[await i for i in b if await c]");
         assert_round_trip!("(await x async for x in y)");
         assert_round_trip!(
             r#"async def read_data(db):
@@ -1719,6 +1759,18 @@ class Foo:
         pass"#
         );
 
+        assert_round_trip!(r#"[lambda n: n for n in range(10)]"#);
+        assert_round_trip!(r#"[n[0:2] for n in range(10)]"#);
+        assert_round_trip!(r#"[n[0] for n in range(10)]"#);
+        assert_round_trip!(r#"[(n, n * 2) for n in range(10)]"#);
+        assert_round_trip!(r#"[1 if n % 2 == 0 else 0 for n in range(10)]"#);
+        assert_round_trip!(r#"[n % 2 == 0 or 0 for n in range(10)]"#);
+        assert_round_trip!(r#"[(n := 2) for n in range(10)]"#);
+        assert_round_trip!(r#"((n := 2) for n in range(10))"#);
+        assert_round_trip!(r#"[n * 2 for n in range(10)]"#);
+        assert_round_trip!(r#"{n * 2 for n in range(10)}"#);
+        assert_round_trip!(r#"{i: n * 2 for i, n in enumerate(range(10))}"#);
+
         // Type aliases
         assert_round_trip!(r#"type Foo = int | str"#);
         assert_round_trip!(r#"type Foo[T] = list[T]"#);
@@ -1738,6 +1790,15 @@ class Foo:
         assert_eq!(round_trip(r#""he\"llo""#), r#"'he"llo'"#);
         assert_eq!(round_trip(r#"f"abc{'def'}{1}""#), r#"f"abc{'def'}{1}""#);
         assert_eq!(round_trip(r#"f'abc{"def"}{1}'"#), r#"f"abc{'def'}{1}""#);
+    }
+
+    #[test]
+    fn self_documenting_f_string() {
+        assert_round_trip!(r#"f"{ chr(65)  =   }""#);
+        assert_round_trip!(r#"f"{ chr(65)  =   !s}""#);
+        assert_round_trip!(r#"f"{ chr(65)  =   !r}""#);
+        assert_round_trip!(r#"f"{ chr(65)  =   :#x}""#);
+        assert_round_trip!(r#"f"{a=!r:0.05f}""#);
     }
 
     #[test]

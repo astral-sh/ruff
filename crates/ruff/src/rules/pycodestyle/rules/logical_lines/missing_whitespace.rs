@@ -69,7 +69,7 @@ pub(crate) fn missing_whitespace(
                 if !after
                     .chars()
                     .next()
-                    .map_or(false, |c| char::is_whitespace(c) || c == '\\')
+                    .is_some_and(|c| char::is_whitespace(c) || c == '\\')
                 {
                     if let Some(next_token) = iter.peek() {
                         match (kind, next_token.kind()) {

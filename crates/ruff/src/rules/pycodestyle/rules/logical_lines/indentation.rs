@@ -247,7 +247,7 @@ pub(crate) fn indentation(
     }
     let indent_expect = prev_logical_line
         .and_then(|prev_logical_line| prev_logical_line.tokens_trimmed().last())
-        .map_or(false, |t| t.kind() == TokenKind::Colon);
+        .is_some_and(|t| t.kind() == TokenKind::Colon);
 
     if indent_expect && indent_level <= prev_indent_level.unwrap_or(0) {
         diagnostics.push(if logical_line.is_comment_only() {
@@ -256,7 +256,7 @@ pub(crate) fn indentation(
             DiagnosticKind::from(NoIndentedBlock)
         });
     } else if !indent_expect
-        && prev_indent_level.map_or(false, |prev_indent_level| indent_level > prev_indent_level)
+        && prev_indent_level.is_some_and(|prev_indent_level| indent_level > prev_indent_level)
     {
         diagnostics.push(if logical_line.is_comment_only() {
             DiagnosticKind::from(UnexpectedIndentationComment)

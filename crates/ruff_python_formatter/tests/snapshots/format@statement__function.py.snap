@@ -72,6 +72,52 @@ def argument_with_long_type_annotation(
 
 def test(): ...
 
+# Type parameter empty line spacing
+def test[
+    # comment
+    A,
+
+    # another
+
+    B,
+](): ...
+
+
+# Type parameter comments
+def type_param_comments[ # trailing bracket comment
+    # leading comment
+    A,
+
+    # in between comment
+
+    B,
+    # another leading comment
+    C,
+    D, # trailing comment
+    # leading bracket comment
+]():
+    # body comment
+    pass
+
+
+# Note empty type parameters is not valid syntax, e.g.
+# def test[](): ...
+
+
+# Different type parameter wrappings
+
+def single_line[Aaaaaaaaaaaaaaaaaaaaaaaaaaaaa, Bbbbbbbbbbbbbbb, Ccccccccccccccccc]():
+    pass
+
+def params_on_their_own_line[Aaaaaaaaaaaaaaaaaaaaaaaaaaaaa, Bbbbbbbbbbbbbbb, Ccccccccccc, Ddddddddddddd, Eeeeeeee]():
+    pass
+
+def param_per_line[Aaaaaaaaaaaaaaaaaaaaaaaaaaaaa, Bbbbbbbbbbbbbbb, Ccccccccccccccccc, Ddddddddddddd, Eeeeeeeeeeeeeeeee, ffffffffffff]():
+    pass
+
+def single_line_trailing_comma[A, B, C,]():
+    pass
+
 # Comment
 def with_leading_comment(): ...
 
@@ -237,6 +283,24 @@ def f42(
     c,
 ):
     pass
+
+
+# Check trailing commas are permitted in funcdef argument list.
+def f(a, ): pass
+def f(*args, ): pass
+def f(**kwds, ): pass
+def f(a, *args, ): pass
+def f(a, **kwds, ): pass
+def f(*args, b, ): pass
+def f(*, b, ): pass
+def f(*args, **kwds, ): pass
+def f(a, *args, b, ): pass
+def f(a, *, b, ): pass
+def f(a, *args, **kwds, ): pass
+def f(*args, b, **kwds, ): pass
+def f(*, b, **kwds, ): pass
+def f(a, *args, b, **kwds, ): pass
+def f(a, *, b, **kwds, ): pass
 ```
 
 ## Output
@@ -335,6 +399,70 @@ def test():
     ...
 
 
+# Type parameter empty line spacing
+def test[
+    # comment
+    A,
+    # another
+    B,
+]():
+    ...
+
+
+# Type parameter comments
+def type_param_comments[  # trailing bracket comment
+    # leading comment
+    A,
+    # in between comment
+    B,
+    # another leading comment
+    C,
+    D,  # trailing comment
+    # leading bracket comment
+]():
+    # body comment
+    pass
+
+
+# Note empty type parameters is not valid syntax, e.g.
+# def test[](): ...
+
+
+# Different type parameter wrappings
+
+def single_line[Aaaaaaaaaaaaaaaaaaaaaaaaaaaaa, Bbbbbbbbbbbbbbb, Ccccccccccccccccc]():
+    pass
+
+
+def params_on_their_own_line[
+    Aaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+    Bbbbbbbbbbbbbbb,
+    Ccccccccccc,
+    Ddddddddddddd,
+    Eeeeeeee,
+]():
+    pass
+
+
+def param_per_line[
+    Aaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+    Bbbbbbbbbbbbbbb,
+    Ccccccccccccccccc,
+    Ddddddddddddd,
+    Eeeeeeeeeeeeeeeee,
+    ffffffffffff,
+]():
+    pass
+
+
+def single_line_trailing_comma[
+    A,
+    B,
+    C,
+]():
+    pass
+
+
 # Comment
 def with_leading_comment():
     ...
@@ -344,6 +472,7 @@ def with_leading_comment():
 # looking from the position of the if
 # Regression test for https://github.com/python/cpython/blob/ad56340b665c5d8ac1f318964f71697bba41acb7/Lib/logging/__init__.py#L253-L260
 if True:
+
     def f1():
         pass  # a
 else:
@@ -351,6 +480,7 @@ else:
 
 # Here it's actually a trailing comment
 if True:
+
     def f2():
         pass
         # a
@@ -509,6 +639,118 @@ def f42(
     *,  # 5  # 7
     # 6
     c,
+):
+    pass
+
+
+# Check trailing commas are permitted in funcdef argument list.
+def f(
+    a,
+):
+    pass
+
+
+def f(
+    *args,
+):
+    pass
+
+
+def f(
+    **kwds,
+):
+    pass
+
+
+def f(
+    a,
+    *args,
+):
+    pass
+
+
+def f(
+    a,
+    **kwds,
+):
+    pass
+
+
+def f(
+    *args,
+    b,
+):
+    pass
+
+
+def f(
+    *,
+    b,
+):
+    pass
+
+
+def f(
+    *args,
+    **kwds,
+):
+    pass
+
+
+def f(
+    a,
+    *args,
+    b,
+):
+    pass
+
+
+def f(
+    a,
+    *,
+    b,
+):
+    pass
+
+
+def f(
+    a,
+    *args,
+    **kwds,
+):
+    pass
+
+
+def f(
+    *args,
+    b,
+    **kwds,
+):
+    pass
+
+
+def f(
+    *,
+    b,
+    **kwds,
+):
+    pass
+
+
+def f(
+    a,
+    *args,
+    b,
+    **kwds,
+):
+    pass
+
+
+def f(
+    a,
+    *,
+    b,
+    **kwds,
 ):
     pass
 ```

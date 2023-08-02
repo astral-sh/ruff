@@ -1,5 +1,5 @@
 use itertools::izip;
-use ruff_python_ast::{self as ast, CmpOp, Constant, Expr, Ranged};
+use ruff_python_ast::{self as ast, Arguments, CmpOp, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -49,7 +49,11 @@ pub(crate) fn type_comparison(
             continue;
         }
         match right {
-            Expr::Call(ast::ExprCall { func, args, .. }) => {
+            Expr::Call(ast::ExprCall {
+                func,
+                arguments: Arguments { args, .. },
+                ..
+            }) => {
                 if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                     // Ex) `type(False)`
                     if id == "type" && checker.semantic().is_builtin("type") {
@@ -79,8 +83,8 @@ pub(crate) fn type_comparison(
                         && checker
                             .semantic()
                             .resolve_call_path(value)
-                            .map_or(false, |call_path| {
-                                call_path.first().map_or(false, |module| *module == "types")
+                            .is_some_and(|call_path| {
+                                call_path.first().is_some_and(|module| *module == "types")
                             })
                     {
                         checker

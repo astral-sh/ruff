@@ -175,8 +175,7 @@ pub(crate) fn whitespace_before_comment(
             };
 
             if is_inline_comment {
-                if bad_prefix.is_some() || comment.chars().next().map_or(false, char::is_whitespace)
-                {
+                if bad_prefix.is_some() || comment.chars().next().is_some_and(char::is_whitespace) {
                     context.push(NoSpaceAfterInlineComment, range);
                 }
             } else if let Some(bad_prefix) = bad_prefix {

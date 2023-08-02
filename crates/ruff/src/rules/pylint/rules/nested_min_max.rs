@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, Keyword, Ranged};
+use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, Ranged};
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -95,8 +95,12 @@ fn collect_nested_args(min_max: MinMax, args: &[Expr], semantic: &SemanticModel)
         for arg in args {
             if let Expr::Call(ast::ExprCall {
                 func,
-                args,
-                keywords,
+                arguments:
+                    Arguments {
+                        args,
+                        keywords,
+                        range: _,
+                    },
                 range: _,
             }) = arg
             {
@@ -135,14 +139,18 @@ pub(crate) fn nested_min_max(
         return;
     };
 
-    if args.len() == 1
-        && matches!(&args[0], Expr::Call(ast::ExprCall { args, .. }) if args.len() == 1)
+    if matches!(&args, [Expr::Call(ast::ExprCall { arguments: Arguments {args, .. }, .. })] if args.len() == 1)
     {
         return;
     }
 
     if args.iter().any(|arg| {
-        let Expr::Call(ast::ExprCall { func, keywords, .. }) = arg else {
+        let Expr::Call(ast::ExprCall {
+            func,
+            arguments: Arguments { keywords, .. },
+            ..
+        }) = arg
+        else {
             return false;
         };
         MinMax::try_from_call(func.as_ref(), keywords.as_ref(), checker.semantic()) == Some(min_max)
@@ -152,8 +160,11 @@ pub(crate) fn nested_min_max(
             if !checker.indexer().has_comments(expr, checker.locator()) {
                 let flattened_expr = Expr::Call(ast::ExprCall {
                     func: Box::new(func.clone()),
-                    args: collect_nested_args(min_max, args, checker.semantic()),
-                    keywords: keywords.to_owned(),
+                    arguments: Arguments {
+                        args: collect_nested_args(min_max, args, checker.semantic()),
+                        keywords: keywords.to_owned(),
+                        range: TextRange::default(),
+                    },
                     range: TextRange::default(),
                 });
                 diagnostic.set_fix(Fix::suggested(Edit::range_replacement(

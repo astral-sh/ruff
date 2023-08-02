@@ -2,7 +2,7 @@ use ruff_python_ast::{Expr, StmtAssign};
 
 use ruff_formatter::{format_args, write, FormatError};
 
-use crate::context::NodeLevel;
+use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::parentheses::{Parentheses, Parenthesize};
 use crate::expression::{has_own_parentheses, maybe_parenthesize_expression};
 use crate::prelude::*;
@@ -17,7 +17,6 @@ impl FormatNodeRule<StmtAssign> for FormatStmtAssign {
             range: _,
             targets,
             value,
-            type_comment: _,
         } = item;
 
         let (first, rest) = targets.split_first().ok_or(FormatError::syntax_error(
@@ -61,13 +60,10 @@ impl Format<PyFormatContext<'_>> for FormatTargets<'_> {
                 None
             };
 
-            let saved_level = f.context().node_level();
-            f.context_mut()
-                .set_node_level(NodeLevel::Expression(group_id));
-
             let format_first = format_with(|f: &mut PyFormatter| {
-                let result = if can_omit_parentheses {
-                    first.format().with_options(Parentheses::Never).fmt(f)
+                let mut f = WithNodeLevel::new(NodeLevel::Expression(group_id), f);
+                if can_omit_parentheses {
+                    write!(f, [first.format().with_options(Parentheses::Never)])
                 } else {
                     write!(
                         f,
@@ -77,11 +73,7 @@ impl Format<PyFormatContext<'_>> for FormatTargets<'_> {
                             if_group_breaks(&text(")"))
                         ]
                     )
-                };
-
-                f.context_mut().set_node_level(saved_level);
-
-                result
+                }
             });
 
             write!(

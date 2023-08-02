@@ -29,9 +29,7 @@ pub(crate) fn call_date_today(checker: &mut Checker, func: &Expr, location: Text
     if checker
         .semantic()
         .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["datetime", "date", "today"])
-        })
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["datetime", "date", "today"]))
     {
         checker
             .diagnostics

@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_python_parser/src/parser.rs
-expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
+expression: "parse_suite(source, \"<test>\").unwrap()"
 ---
 [
     Assign(
@@ -37,11 +37,13 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                             ctx: Load,
                         },
                     ),
-                    args: [],
-                    keywords: [],
+                    arguments: Arguments {
+                        range: 17..19,
+                        args: [],
+                        keywords: [],
+                    },
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -75,7 +77,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Load,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -109,7 +110,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Load,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -143,7 +143,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Load,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -180,11 +179,13 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                             ctx: Load,
                         },
                     ),
-                    args: [],
-                    keywords: [],
+                    arguments: Arguments {
+                        range: 88..90,
+                        args: [],
+                        keywords: [],
+                    },
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -218,7 +219,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Load,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -255,11 +255,13 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                             ctx: Load,
                         },
                     ),
-                    args: [],
-                    keywords: [],
+                    arguments: Arguments {
+                        range: 165..167,
+                        args: [],
+                        keywords: [],
+                    },
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -294,7 +296,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Load,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -332,38 +333,43 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                             ctx: Load,
                         },
                     ),
-                    args: [
-                        Call(
-                            ExprCall {
-                                range: 221..240,
-                                func: Attribute(
-                                    ExprAttribute {
-                                        range: 221..238,
-                                        value: Constant(
-                                            ExprConstant {
-                                                range: 221..227,
-                                                value: Int(
-                                                    11,
-                                                ),
-                                                kind: None,
+                    arguments: Arguments {
+                        range: 220..241,
+                        args: [
+                            Call(
+                                ExprCall {
+                                    range: 221..240,
+                                    func: Attribute(
+                                        ExprAttribute {
+                                            range: 221..238,
+                                            value: Constant(
+                                                ExprConstant {
+                                                    range: 221..227,
+                                                    value: Int(
+                                                        11,
+                                                    ),
+                                                    kind: None,
+                                                },
+                                            ),
+                                            attr: Identifier {
+                                                id: "bit_length",
+                                                range: 228..238,
                                             },
-                                        ),
-                                        attr: Identifier {
-                                            id: "bit_length",
-                                            range: 228..238,
+                                            ctx: Load,
                                         },
-                                        ctx: Load,
+                                    ),
+                                    arguments: Arguments {
+                                        range: 238..240,
+                                        args: [],
+                                        keywords: [],
                                     },
-                                ),
-                                args: [],
-                                keywords: [],
-                            },
-                        ),
-                    ],
-                    keywords: [],
+                                },
+                            ),
+                        ],
+                        keywords: [],
+                    },
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -400,11 +406,13 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                             ctx: Load,
                         },
                     ),
-                    args: [],
-                    keywords: [],
+                    arguments: Arguments {
+                        range: 263..265,
+                        args: [],
+                        keywords: [],
+                    },
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -441,11 +449,13 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                             ctx: Load,
                         },
                     ),
-                    args: [],
-                    keywords: [],
+                    arguments: Arguments {
+                        range: 287..289,
+                        args: [],
+                        keywords: [],
+                    },
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -479,7 +489,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Load,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -516,11 +525,13 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                             ctx: Load,
                         },
                     ),
-                    args: [],
-                    keywords: [],
+                    arguments: Arguments {
+                        range: 327..329,
+                        args: [],
+                        keywords: [],
+                    },
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -551,7 +562,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ),
                 },
             ),
-            type_comment: None,
         },
     ),
     If(
@@ -627,7 +637,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Load,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -654,19 +663,21 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                             kind: None,
                         },
                     ),
-                    args: [
-                        Name(
-                            ExprName {
-                                range: 388..390,
-                                id: "no",
-                                ctx: Load,
-                            },
-                        ),
-                    ],
-                    keywords: [],
+                    arguments: Arguments {
+                        range: 387..391,
+                        args: [
+                            Name(
+                                ExprName {
+                                    range: 388..390,
+                                    id: "no",
+                                    ctx: Load,
+                                },
+                            ),
+                        ],
+                        keywords: [],
+                    },
                 },
             ),
-            type_comment: None,
         },
     ),
 ]

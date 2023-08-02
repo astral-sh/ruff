@@ -1,10 +1,11 @@
-use ruff_python_ast::{self as ast, Constant, ConversionFlag, Expr};
+use ruff_python_ast::{self as ast, Arguments, Constant, ConversionFlag, Expr};
 use ruff_text_size::TextRange;
 
 /// Wrap an expression in a `FormattedValue` with no special formatting.
 fn to_formatted_value_expr(inner: &Expr) -> Expr {
     let node = ast::ExprFormattedValue {
         value: Box::new(inner.clone()),
+        debug_text: None,
         conversion: ConversionFlag::None,
         format_spec: None,
         range: TextRange::default(),
@@ -28,8 +29,12 @@ fn is_simple_call(expr: &Expr) -> bool {
     match expr {
         Expr::Call(ast::ExprCall {
             func,
-            args,
-            keywords,
+            arguments:
+                Arguments {
+                    args,
+                    keywords,
+                    range: _,
+                },
             range: _,
         }) => args.is_empty() && keywords.is_empty() && is_simple_callee(func),
         _ => false,

@@ -104,7 +104,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
             };
 
             if checker.rule_is_ignored(Rule::RuntimeImportInTypeCheckingBlock, import.range.start())
-                || import.parent_range.map_or(false, |parent_range| {
+                || import.parent_range.is_some_and(|parent_range| {
                     checker.rule_is_ignored(
                         Rule::RuntimeImportInTypeCheckingBlock,
                         parent_range.start(),

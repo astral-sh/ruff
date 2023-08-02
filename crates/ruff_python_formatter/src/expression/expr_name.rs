@@ -36,13 +36,13 @@ impl NeedsParentheses for ExprName {
 
 #[cfg(test)]
 mod tests {
-    use ruff_python_ast::{ModModule, Ranged};
-    use ruff_python_parser::Parse;
+    use ruff_python_ast::Ranged;
+    use ruff_python_parser::parse_program;
     use ruff_text_size::{TextRange, TextSize};
 
     #[test]
     fn name_range_with_comments() {
-        let source = ModModule::parse("a # comment", "file.py").unwrap();
+        let source = parse_program("a # comment", "file.py").unwrap();
 
         let expression_statement = source
             .body

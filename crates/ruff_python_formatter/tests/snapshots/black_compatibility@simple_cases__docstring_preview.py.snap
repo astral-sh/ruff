@@ -62,7 +62,7 @@ def single_quote_docstring_over_line_limit2():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,9 +1,10 @@
+@@ -1,9 +1,11 @@
  def docstring_almost_at_line_limit():
 -    """long docstring................................................................."""
 +    """long docstring.................................................................
@@ -71,42 +71,11 @@ def single_quote_docstring_over_line_limit2():
  
  def docstring_almost_at_line_limit_with_prefix():
 -    f"""long docstring................................................................"""
-+    f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
++    f"""long docstring................................................................
++    """
  
  
  def mulitline_docstring_almost_at_line_limit():
-@@ -14,10 +15,7 @@
- 
- 
- def mulitline_docstring_almost_at_line_limit_with_prefix():
--    f"""long docstring................................................................
--
--    ..................................................................................
--    """
-+    f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
- 
- 
- def docstring_at_line_limit():
-@@ -25,7 +23,7 @@
- 
- 
- def docstring_at_line_limit_with_prefix():
--    f"""long docstring..............................................................."""
-+    f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
- 
- 
- def multiline_docstring_at_line_limit():
-@@ -35,9 +33,7 @@
- 
- 
- def multiline_docstring_at_line_limit_with_prefix():
--    f"""first line----------------------------------------------------------------------
--
--    second line----------------------------------------------------------------------"""
-+    f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
- 
- 
- def single_quote_docstring_over_line_limit():
 ```
 
 ## Ruff Output
@@ -118,7 +87,8 @@ def docstring_almost_at_line_limit():
 
 
 def docstring_almost_at_line_limit_with_prefix():
-    f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
+    f"""long docstring................................................................
+    """
 
 
 def mulitline_docstring_almost_at_line_limit():
@@ -129,7 +99,10 @@ def mulitline_docstring_almost_at_line_limit():
 
 
 def mulitline_docstring_almost_at_line_limit_with_prefix():
-    f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
+    f"""long docstring................................................................
+
+    ..................................................................................
+    """
 
 
 def docstring_at_line_limit():
@@ -137,7 +110,7 @@ def docstring_at_line_limit():
 
 
 def docstring_at_line_limit_with_prefix():
-    f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
+    f"""long docstring..............................................................."""
 
 
 def multiline_docstring_at_line_limit():
@@ -147,7 +120,9 @@ def multiline_docstring_at_line_limit():
 
 
 def multiline_docstring_at_line_limit_with_prefix():
-    f"NOT_YET_IMPLEMENTED_ExprJoinedStr"
+    f"""first line----------------------------------------------------------------------
+
+    second line----------------------------------------------------------------------"""
 
 
 def single_quote_docstring_over_line_limit():

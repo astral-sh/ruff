@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Constant, Expr, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -49,15 +49,18 @@ impl Violation for DjangoAllWithModelForm {
 /// DJ007
 pub(crate) fn all_with_model_form(
     checker: &Checker,
-    bases: &[Expr],
+    arguments: Option<&Arguments>,
     body: &[Stmt],
 ) -> Option<Diagnostic> {
-    if !bases
-        .iter()
-        .any(|base| is_model_form(base, checker.semantic()))
-    {
+    if !arguments.is_some_and(|arguments| {
+        arguments
+            .args
+            .iter()
+            .any(|base| is_model_form(base, checker.semantic()))
+    }) {
         return None;
     }
+
     for element in body {
         let Stmt::ClassDef(ast::StmtClassDef { name, body, .. }) = element else {
             continue;

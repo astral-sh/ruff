@@ -245,8 +245,8 @@ impl Workspace {
                     fix: message.fix.map(|fix| ExpandedFix {
                         message: message.kind.suggestion,
                         edits: fix
-                            .into_edits()
-                            .into_iter()
+                            .edits()
+                            .iter()
                             .map(|edit| ExpandedEdit {
                                 location: source_code.source_location(edit.start()),
                                 end_location: source_code.source_location(edit.end()),

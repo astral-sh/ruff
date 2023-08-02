@@ -66,16 +66,19 @@ expression: parse_ast
                                                 ctx: Load,
                                             },
                                         ),
-                                        args: [
-                                            Name(
-                                                ExprName {
-                                                    range: 68..72,
-                                                    id: "rest",
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                        ],
-                                        keywords: [],
+                                        arguments: Arguments {
+                                            range: 67..73,
+                                            args: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 68..72,
+                                                        id: "rest",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                            keywords: [],
+                                        },
                                     },
                                 ),
                             },
@@ -195,16 +198,19 @@ expression: parse_ast
                                                 ctx: Load,
                                             },
                                         ),
-                                        args: [
-                                            Name(
-                                                ExprName {
-                                                    range: 171..176,
-                                                    id: "label",
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                        ],
-                                        keywords: [],
+                                        arguments: Arguments {
+                                            range: 170..177,
+                                            args: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 171..176,
+                                                        id: "label",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                            keywords: [],
+                                        },
                                     },
                                 ),
                             },
@@ -285,7 +291,6 @@ expression: parse_ast
                                         kind: None,
                                     },
                                 ),
-                                type_comment: None,
                             },
                         ),
                     ],
@@ -364,7 +369,6 @@ expression: parse_ast
                                         kind: None,
                                     },
                                 ),
-                                type_comment: None,
                             },
                         ),
                     ],
@@ -429,7 +433,6 @@ expression: parse_ast
                                         kind: None,
                                     },
                                 ),
-                                type_comment: None,
                             },
                         ),
                     ],

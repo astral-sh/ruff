@@ -106,17 +106,19 @@ class Repository(NamedTuple):
 
 
 REPOSITORIES: list[Repository] = [
+    Repository("DisnakeDev", "disnake", "master"),
     Repository("apache", "airflow", "main", select="ALL"),
-    Repository("bokeh", "bokeh", "branch-3.2", select="ALL"),
+    Repository("bokeh", "bokeh", "branch-3.3", select="ALL"),
     Repository("pypa", "build", "main"),
     Repository("pypa", "cibuildwheel", "main"),
-    Repository("pypa", "setuptools", "main"),
     Repository("pypa", "pip", "main"),
+    Repository("pypa", "setuptools", "main"),
     Repository("python", "mypy", "master"),
-    Repository("DisnakeDev", "disnake", "master"),
+    Repository("python", "typeshed", "main", select="PYI"),
+    Repository("python-poetry", "poetry", "master"),
     Repository("scikit-build", "scikit-build", "main"),
     Repository("scikit-build", "scikit-build-core", "main"),
-    Repository("python", "typeshed", "main", select="PYI"),
+    Repository("tiangolo", "fastapi", "master"),
     Repository("zulip", "zulip", "main", select="ALL"),
 ]
 

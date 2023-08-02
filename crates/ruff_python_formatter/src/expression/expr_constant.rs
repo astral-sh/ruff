@@ -7,9 +7,11 @@ use ruff_python_ast::str::is_implicit_concatenation;
 
 use crate::expression::number::{FormatComplex, FormatFloat, FormatInt};
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
-use crate::expression::string::{FormatString, StringLayout, StringPrefix, StringQuotes};
+use crate::expression::string::{
+    AnyString, FormatString, StringLayout, StringPrefix, StringQuotes,
+};
 use crate::prelude::*;
-use crate::{not_yet_implemented_custom_text, FormatNodeRule};
+use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatExprConstant {
@@ -51,15 +53,14 @@ impl FormatNodeRule<ExprConstant> for FormatExprConstant {
             Constant::Int(_) => FormatInt::new(item).fmt(f),
             Constant::Float(_) => FormatFloat::new(item).fmt(f),
             Constant::Complex { .. } => FormatComplex::new(item).fmt(f),
-            Constant::Str(_) => {
+            Constant::Str(_) | Constant::Bytes(_) => {
                 let string_layout = match self.layout {
                     ExprConstantLayout::Default => StringLayout::Default,
                     ExprConstantLayout::String(layout) => layout,
                 };
-                FormatString::new(item).with_layout(string_layout).fmt(f)
-            }
-            Constant::Bytes(_) => {
-                not_yet_implemented_custom_text(r#"b"NOT_YET_IMPLEMENTED_BYTE_STRING""#).fmt(f)
+                FormatString::new(&AnyString::Constant(item))
+                    .with_layout(string_layout)
+                    .fmt(f)
             }
         }
     }
@@ -79,7 +80,7 @@ impl NeedsParentheses for ExprConstant {
         _parent: AnyNodeRef,
         context: &PyFormatContext,
     ) -> OptionalParentheses {
-        if self.value.is_str() {
+        if self.value.is_str() || self.value.is_bytes() {
             let contents = context.locator().slice(self.range());
             // Don't wrap triple quoted strings
             if is_multiline_string(self, context.source()) || !is_implicit_concatenation(contents) {
@@ -94,13 +95,13 @@ impl NeedsParentheses for ExprConstant {
 }
 
 pub(super) fn is_multiline_string(constant: &ExprConstant, source: &str) -> bool {
-    if constant.value.is_str() {
+    if constant.value.is_str() || constant.value.is_bytes() {
         let contents = &source[constant.range()];
         let prefix = StringPrefix::parse(contents);
         let quotes =
             StringQuotes::parse(&contents[TextRange::new(prefix.text_len(), contents.text_len())]);
 
-        quotes.map_or(false, StringQuotes::is_triple) && contents.contains(['\n', '\r'])
+        quotes.is_some_and(StringQuotes::is_triple) && contents.contains(['\n', '\r'])
     } else {
         false
     }

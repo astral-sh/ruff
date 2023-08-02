@@ -523,6 +523,10 @@ pub(crate) fn not_missing(
     definition: &Definition,
     visibility: Visibility,
 ) -> bool {
+    if checker.is_stub() {
+        return true;
+    }
+
     if visibility.is_private() {
         return true;
     }

@@ -341,21 +341,15 @@ impl<'a> From<&'a ast::Constant> for ComparableConstant<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ComparableArguments<'a> {
-    posonlyargs: Vec<ComparableArgWithDefault<'a>>,
-    args: Vec<ComparableArgWithDefault<'a>>,
-    vararg: Option<ComparableArg<'a>>,
-    kwonlyargs: Vec<ComparableArgWithDefault<'a>>,
-    kwarg: Option<ComparableArg<'a>>,
+    args: Vec<ComparableExpr<'a>>,
+    keywords: Vec<ComparableKeyword<'a>>,
 }
 
 impl<'a> From<&'a ast::Arguments> for ComparableArguments<'a> {
     fn from(arguments: &'a ast::Arguments) -> Self {
         Self {
-            posonlyargs: arguments.posonlyargs.iter().map(Into::into).collect(),
             args: arguments.args.iter().map(Into::into).collect(),
-            vararg: arguments.vararg.as_ref().map(Into::into),
-            kwonlyargs: arguments.kwonlyargs.iter().map(Into::into).collect(),
-            kwarg: arguments.kwarg.as_ref().map(Into::into),
+            keywords: arguments.keywords.iter().map(Into::into).collect(),
         }
     }
 }
@@ -366,39 +360,64 @@ impl<'a> From<&'a Box<ast::Arguments>> for ComparableArguments<'a> {
     }
 }
 
-impl<'a> From<&'a Box<ast::Arg>> for ComparableArg<'a> {
-    fn from(arg: &'a Box<ast::Arg>) -> Self {
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ComparableParameters<'a> {
+    posonlyargs: Vec<ComparableParameterWithDefault<'a>>,
+    args: Vec<ComparableParameterWithDefault<'a>>,
+    vararg: Option<ComparableParameter<'a>>,
+    kwonlyargs: Vec<ComparableParameterWithDefault<'a>>,
+    kwarg: Option<ComparableParameter<'a>>,
+}
+
+impl<'a> From<&'a ast::Parameters> for ComparableParameters<'a> {
+    fn from(parameters: &'a ast::Parameters) -> Self {
+        Self {
+            posonlyargs: parameters.posonlyargs.iter().map(Into::into).collect(),
+            args: parameters.args.iter().map(Into::into).collect(),
+            vararg: parameters.vararg.as_ref().map(Into::into),
+            kwonlyargs: parameters.kwonlyargs.iter().map(Into::into).collect(),
+            kwarg: parameters.kwarg.as_ref().map(Into::into),
+        }
+    }
+}
+
+impl<'a> From<&'a Box<ast::Parameters>> for ComparableParameters<'a> {
+    fn from(parameters: &'a Box<ast::Parameters>) -> Self {
+        (parameters.as_ref()).into()
+    }
+}
+
+impl<'a> From<&'a Box<ast::Parameter>> for ComparableParameter<'a> {
+    fn from(arg: &'a Box<ast::Parameter>) -> Self {
         (arg.as_ref()).into()
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ComparableArg<'a> {
+pub struct ComparableParameter<'a> {
     arg: &'a str,
     annotation: Option<Box<ComparableExpr<'a>>>,
-    type_comment: Option<&'a str>,
 }
 
-impl<'a> From<&'a ast::Arg> for ComparableArg<'a> {
-    fn from(arg: &'a ast::Arg) -> Self {
+impl<'a> From<&'a ast::Parameter> for ComparableParameter<'a> {
+    fn from(arg: &'a ast::Parameter) -> Self {
         Self {
-            arg: arg.arg.as_str(),
+            arg: arg.name.as_str(),
             annotation: arg.annotation.as_ref().map(Into::into),
-            type_comment: arg.type_comment.as_deref(),
         }
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ComparableArgWithDefault<'a> {
-    def: ComparableArg<'a>,
+pub struct ComparableParameterWithDefault<'a> {
+    def: ComparableParameter<'a>,
     default: Option<ComparableExpr<'a>>,
 }
 
-impl<'a> From<&'a ast::ArgWithDefault> for ComparableArgWithDefault<'a> {
-    fn from(arg: &'a ast::ArgWithDefault) -> Self {
+impl<'a> From<&'a ast::ParameterWithDefault> for ComparableParameterWithDefault<'a> {
+    fn from(arg: &'a ast::ParameterWithDefault) -> Self {
         Self {
-            def: (&arg.def).into(),
+            def: (&arg.parameter).into(),
             default: arg.default.as_ref().map(Into::into),
         }
     }
@@ -513,7 +532,7 @@ pub struct ExprUnaryOp<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprLambda<'a> {
-    args: ComparableArguments<'a>,
+    parameters: ComparableParameters<'a>,
     body: Box<ComparableExpr<'a>>,
 }
 
@@ -585,13 +604,13 @@ pub struct ExprCompare<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprCall<'a> {
     func: Box<ComparableExpr<'a>>,
-    args: Vec<ComparableExpr<'a>>,
-    keywords: Vec<ComparableKeyword<'a>>,
+    arguments: ComparableArguments<'a>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprFormattedValue<'a> {
     value: Box<ComparableExpr<'a>>,
+    debug_text: Option<&'a ast::DebugText>,
     conversion: ast::ConversionFlag,
     format_spec: Option<Box<ComparableExpr<'a>>>,
 }
@@ -740,11 +759,11 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 operand: operand.into(),
             }),
             ast::Expr::Lambda(ast::ExprLambda {
-                args,
+                parameters,
                 body,
                 range: _range,
             }) => Self::Lambda(ExprLambda {
-                args: (args.as_ref()).into(),
+                parameters: (parameters.as_ref()).into(),
                 body: body.into(),
             }),
             ast::Expr::IfExp(ast::ExprIfExp {
@@ -838,22 +857,22 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
             }),
             ast::Expr::Call(ast::ExprCall {
                 func,
-                args,
-                keywords,
+                arguments,
                 range: _range,
             }) => Self::Call(ExprCall {
                 func: func.into(),
-                args: args.iter().map(Into::into).collect(),
-                keywords: keywords.iter().map(Into::into).collect(),
+                arguments: arguments.into(),
             }),
             ast::Expr::FormattedValue(ast::ExprFormattedValue {
                 value,
                 conversion,
+                debug_text,
                 format_spec,
                 range: _range,
             }) => Self::FormattedValue(ExprFormattedValue {
                 value: value.into(),
                 conversion: *conversion,
+                debug_text: debug_text.as_ref(),
                 format_spec: format_spec.as_ref().map(Into::into),
             }),
             ast::Expr::JoinedStr(ast::ExprJoinedStr {
@@ -946,34 +965,31 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct StmtFunctionDef<'a> {
-    name: &'a str,
-    args: ComparableArguments<'a>,
-    body: Vec<ComparableStmt<'a>>,
     decorator_list: Vec<ComparableDecorator<'a>>,
-    type_params: Vec<ComparableTypeParam<'a>>,
+    name: &'a str,
+    type_params: Option<ComparableTypeParams<'a>>,
+    parameters: ComparableParameters<'a>,
     returns: Option<ComparableExpr<'a>>,
-    type_comment: Option<&'a str>,
+    body: Vec<ComparableStmt<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct StmtAsyncFunctionDef<'a> {
-    name: &'a str,
-    args: ComparableArguments<'a>,
-    body: Vec<ComparableStmt<'a>>,
     decorator_list: Vec<ComparableDecorator<'a>>,
-    type_params: Vec<ComparableTypeParam<'a>>,
+    name: &'a str,
+    type_params: Option<ComparableTypeParams<'a>>,
+    parameters: ComparableParameters<'a>,
     returns: Option<ComparableExpr<'a>>,
-    type_comment: Option<&'a str>,
+    body: Vec<ComparableStmt<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct StmtClassDef<'a> {
-    name: &'a str,
-    bases: Vec<ComparableExpr<'a>>,
-    keywords: Vec<ComparableKeyword<'a>>,
-    body: Vec<ComparableStmt<'a>>,
     decorator_list: Vec<ComparableDecorator<'a>>,
-    type_params: Vec<ComparableTypeParam<'a>>,
+    name: &'a str,
+    type_params: Option<ComparableTypeParams<'a>>,
+    arguments: Option<ComparableArguments<'a>>,
+    body: Vec<ComparableStmt<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -989,8 +1005,27 @@ pub struct StmtDelete<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct StmtTypeAlias<'a> {
     pub name: Box<ComparableExpr<'a>>,
-    pub type_params: Vec<ComparableTypeParam<'a>>,
+    pub type_params: Option<ComparableTypeParams<'a>>,
     pub value: Box<ComparableExpr<'a>>,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ComparableTypeParams<'a> {
+    pub type_params: Vec<ComparableTypeParam<'a>>,
+}
+
+impl<'a> From<&'a ast::TypeParams> for ComparableTypeParams<'a> {
+    fn from(type_params: &'a ast::TypeParams) -> Self {
+        Self {
+            type_params: type_params.iter().map(Into::into).collect(),
+        }
+    }
+}
+
+impl<'a> From<&'a Box<ast::TypeParams>> for ComparableTypeParams<'a> {
+    fn from(type_params: &'a Box<ast::TypeParams>) -> Self {
+        type_params.as_ref().into()
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -1045,7 +1080,6 @@ pub struct TypeParamTypeVarTuple<'a> {
 pub struct StmtAssign<'a> {
     targets: Vec<ComparableExpr<'a>>,
     value: ComparableExpr<'a>,
-    type_comment: Option<&'a str>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -1069,7 +1103,6 @@ pub struct StmtFor<'a> {
     iter: ComparableExpr<'a>,
     body: Vec<ComparableStmt<'a>>,
     orelse: Vec<ComparableStmt<'a>>,
-    type_comment: Option<&'a str>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -1078,7 +1111,6 @@ pub struct StmtAsyncFor<'a> {
     iter: ComparableExpr<'a>,
     body: Vec<ComparableStmt<'a>>,
     orelse: Vec<ComparableStmt<'a>>,
-    type_comment: Option<&'a str>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -1099,14 +1131,12 @@ pub struct StmtIf<'a> {
 pub struct StmtWith<'a> {
     items: Vec<ComparableWithItem<'a>>,
     body: Vec<ComparableStmt<'a>>,
-    type_comment: Option<&'a str>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct StmtAsyncWith<'a> {
     items: Vec<ComparableWithItem<'a>>,
     body: Vec<ComparableStmt<'a>>,
-    type_comment: Option<&'a str>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -1214,55 +1244,49 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
         match stmt {
             ast::Stmt::FunctionDef(ast::StmtFunctionDef {
                 name,
-                args,
+                parameters,
                 body,
                 decorator_list,
                 returns,
-                type_comment,
                 type_params,
                 range: _range,
             }) => Self::FunctionDef(StmtFunctionDef {
                 name: name.as_str(),
-                args: args.into(),
+                parameters: parameters.into(),
                 body: body.iter().map(Into::into).collect(),
                 decorator_list: decorator_list.iter().map(Into::into).collect(),
                 returns: returns.as_ref().map(Into::into),
-                type_comment: type_comment.as_ref().map(String::as_str),
-                type_params: type_params.iter().map(Into::into).collect(),
+                type_params: type_params.as_ref().map(Into::into),
             }),
             ast::Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
                 name,
-                args,
+                parameters,
                 body,
                 decorator_list,
                 returns,
-                type_comment,
                 type_params,
                 range: _range,
             }) => Self::AsyncFunctionDef(StmtAsyncFunctionDef {
                 name: name.as_str(),
-                args: args.into(),
+                parameters: parameters.into(),
                 body: body.iter().map(Into::into).collect(),
                 decorator_list: decorator_list.iter().map(Into::into).collect(),
                 returns: returns.as_ref().map(Into::into),
-                type_comment: type_comment.as_ref().map(String::as_str),
-                type_params: type_params.iter().map(Into::into).collect(),
+                type_params: type_params.as_ref().map(Into::into),
             }),
             ast::Stmt::ClassDef(ast::StmtClassDef {
                 name,
-                bases,
-                keywords,
+                arguments,
                 body,
                 decorator_list,
                 type_params,
                 range: _range,
             }) => Self::ClassDef(StmtClassDef {
                 name: name.as_str(),
-                bases: bases.iter().map(Into::into).collect(),
-                keywords: keywords.iter().map(Into::into).collect(),
+                arguments: arguments.as_ref().map(Into::into),
                 body: body.iter().map(Into::into).collect(),
                 decorator_list: decorator_list.iter().map(Into::into).collect(),
-                type_params: type_params.iter().map(Into::into).collect(),
+                type_params: type_params.as_ref().map(Into::into),
             }),
             ast::Stmt::Return(ast::StmtReturn {
                 value,
@@ -1283,18 +1307,16 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                 value,
             }) => Self::TypeAlias(StmtTypeAlias {
                 name: name.into(),
-                type_params: type_params.iter().map(Into::into).collect(),
+                type_params: type_params.as_ref().map(Into::into),
                 value: value.into(),
             }),
             ast::Stmt::Assign(ast::StmtAssign {
                 targets,
                 value,
-                type_comment,
                 range: _range,
             }) => Self::Assign(StmtAssign {
                 targets: targets.iter().map(Into::into).collect(),
                 value: value.into(),
-                type_comment: type_comment.as_ref().map(String::as_str),
             }),
             ast::Stmt::AugAssign(ast::StmtAugAssign {
                 target,
@@ -1323,28 +1345,24 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                 iter,
                 body,
                 orelse,
-                type_comment,
                 range: _range,
             }) => Self::For(StmtFor {
                 target: target.into(),
                 iter: iter.into(),
                 body: body.iter().map(Into::into).collect(),
                 orelse: orelse.iter().map(Into::into).collect(),
-                type_comment: type_comment.as_ref().map(String::as_str),
             }),
             ast::Stmt::AsyncFor(ast::StmtAsyncFor {
                 target,
                 iter,
                 body,
                 orelse,
-                type_comment,
                 range: _range,
             }) => Self::AsyncFor(StmtAsyncFor {
                 target: target.into(),
                 iter: iter.into(),
                 body: body.iter().map(Into::into).collect(),
                 orelse: orelse.iter().map(Into::into).collect(),
-                type_comment: type_comment.as_ref().map(String::as_str),
             }),
             ast::Stmt::While(ast::StmtWhile {
                 test,
@@ -1369,22 +1387,18 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
             ast::Stmt::With(ast::StmtWith {
                 items,
                 body,
-                type_comment,
                 range: _range,
             }) => Self::With(StmtWith {
                 items: items.iter().map(Into::into).collect(),
                 body: body.iter().map(Into::into).collect(),
-                type_comment: type_comment.as_ref().map(String::as_str),
             }),
             ast::Stmt::AsyncWith(ast::StmtAsyncWith {
                 items,
                 body,
-                type_comment,
                 range: _range,
             }) => Self::AsyncWith(StmtAsyncWith {
                 items: items.iter().map(Into::into).collect(),
                 body: body.iter().map(Into::into).collect(),
-                type_comment: type_comment.as_ref().map(String::as_str),
             }),
             ast::Stmt::Match(ast::StmtMatch {
                 subject,

@@ -295,7 +295,7 @@ fn convertible(format_string: &CFormatString, params: &Expr) -> bool {
         }
 
         // No equivalent in format.
-        if fmt.mapping_key.as_ref().map_or(false, String::is_empty) {
+        if fmt.mapping_key.as_ref().is_some_and(String::is_empty) {
             return false;
         }
 

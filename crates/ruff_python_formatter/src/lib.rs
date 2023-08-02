@@ -34,6 +34,7 @@ pub(crate) mod other;
 pub(crate) mod pattern;
 mod prelude;
 pub(crate) mod statement;
+pub(crate) mod type_param;
 
 include!("../../ruff_formatter/shared_traits.rs");
 

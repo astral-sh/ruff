@@ -285,7 +285,9 @@ pub(crate) fn lint_path(
                                     .enumerate()
                                     .zip(dest_notebook.cells().iter())
                                 {
-                                    let (Cell::Code(src_code_cell), Cell::Code(dest_code_cell)) = (src_cell, dest_cell) else {
+                                    let (Cell::Code(src_code_cell), Cell::Code(dest_code_cell)) =
+                                        (src_cell, dest_cell)
+                                    else {
                                         continue;
                                     };
                                     TextDiff::from_lines(

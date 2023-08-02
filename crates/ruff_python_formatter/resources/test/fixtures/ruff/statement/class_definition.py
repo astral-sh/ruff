@@ -43,3 +43,166 @@ class TestTrailingComment2: # trailing comment
     pass
 
 
+class TestTrailingComment3[T]: # trailing comment
+    pass
+
+
+class TestTrailingComment4[T](A): # trailing comment
+    pass
+
+
+class Test:
+    """Docstring"""
+
+
+class Test:
+    # comment
+    """Docstring"""
+
+
+class Test:
+    """Docstring"""
+    x = 1
+
+
+class Test:
+    """Docstring"""
+    # comment
+    x = 1
+
+
+class Test:
+
+    """Docstring"""
+
+
+class Test:
+    # comment
+
+    """Docstring"""
+
+
+class Test:
+
+    # comment
+
+    """Docstring"""
+
+
+class Test:
+
+    """Docstring"""
+    x = 1
+
+
+class Test:
+
+    """Docstring"""
+    # comment
+    x = 1
+
+
+class C(): # comment
+    pass
+
+
+class C(  # comment
+):
+    pass
+
+
+class C(
+    # comment
+):
+    pass
+
+
+class C(): # comment
+    pass
+
+
+class C(  # comment
+    # comment
+    1
+):
+    pass
+
+
+class C(
+    1
+    # comment
+):
+    pass
+
+
+@dataclass
+# Copied from transformers.models.clip.modeling_clip.CLIPOutput with CLIP->AltCLIP
+class AltCLIPOutput(ModelOutput):
+    ...
+
+
+@dataclass
+class AltCLIPOutput( # Copied from transformers.models.clip.modeling_clip.CLIPOutput with CLIP->AltCLIP
+):
+    ...
+
+
+@dataclass
+class AltCLIPOutput(
+    # Copied from transformers.models.clip.modeling_clip.CLIPOutput with CLIP->AltCLIP
+):
+    ...
+
+
+class TestTypeParams[Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb, Cccccccccccccccccccccc]:
+    pass
+
+
+class TestTypeParams[Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, *Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb, **Cccccccccccccccccccccc]:
+    pass
+
+
+class TestTypeParams[Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa]:
+    pass
+
+
+class TestTypeParams[*Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa]:
+    pass
+
+
+class TestTypeParams[**Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa]:
+    pass
+
+
+class TestTypeParams[**P, *Ts, T]:
+    pass
+
+
+class TestTypeParams[ # trailing bracket comment
+    # leading comment
+    A,
+
+    # in between comment
+
+    B,
+    # another leading comment
+    C,
+    D, # trailing comment
+    # leading bracket comment
+]:
+    pass
+
+
+
+class TestTypeParams[Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](B, C, D):
+    pass
+
+
+
+class TestTypeParams[Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb, Cccccccccccccccccccccccc, Ddddddddddddddddddddddddd):
+    pass
+
+
+
+class TestTypeParams[A, B, C](meta=Aaaaaaaaaaaaaaaaaaaaaa):
+    pass

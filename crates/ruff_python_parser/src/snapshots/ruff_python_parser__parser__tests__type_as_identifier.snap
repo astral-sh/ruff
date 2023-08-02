@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_python_parser/src/parser.rs
-expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
+expression: "parse_suite(source, \"<test>\").unwrap()"
 ---
 [
     Expr(
@@ -122,42 +122,45 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                             ctx: Load,
                         },
                     ),
-                    args: [
-                        Starred(
-                            ExprStarred {
-                                range: 88..94,
-                                value: BinOp(
-                                    ExprBinOp {
-                                        range: 89..94,
-                                        left: Name(
-                                            ExprName {
-                                                range: 89..90,
-                                                id: "a",
-                                                ctx: Load,
-                                            },
-                                        ),
-                                        op: Add,
-                                        right: Name(
-                                            ExprName {
-                                                range: 93..94,
-                                                id: "b",
-                                                ctx: Load,
-                                            },
-                                        ),
-                                    },
-                                ),
-                                ctx: Load,
-                            },
-                        ),
-                        Name(
-                            ExprName {
-                                range: 96..97,
-                                id: "c",
-                                ctx: Load,
-                            },
-                        ),
-                    ],
-                    keywords: [],
+                    arguments: Arguments {
+                        range: 87..98,
+                        args: [
+                            Starred(
+                                ExprStarred {
+                                    range: 88..94,
+                                    value: BinOp(
+                                        ExprBinOp {
+                                            range: 89..94,
+                                            left: Name(
+                                                ExprName {
+                                                    range: 89..90,
+                                                    id: "a",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            op: Add,
+                                            right: Name(
+                                                ExprName {
+                                                    range: 93..94,
+                                                    id: "b",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                    ctx: Load,
+                                },
+                            ),
+                            Name(
+                                ExprName {
+                                    range: 96..97,
+                                    id: "c",
+                                    ctx: Load,
+                                },
+                            ),
+                        ],
+                        keywords: [],
+                    },
                 },
             ),
         },
@@ -283,22 +286,25 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                                             ctx: Load,
                                         },
                                     ),
-                                    args: [
-                                        UnaryOp(
-                                            ExprUnaryOp {
-                                                range: 214..216,
-                                                op: USub,
-                                                operand: Name(
-                                                    ExprName {
-                                                        range: 215..216,
-                                                        id: "a",
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                    ],
-                                    keywords: [],
+                                    arguments: Arguments {
+                                        range: 213..217,
+                                        args: [
+                                            UnaryOp(
+                                                ExprUnaryOp {
+                                                    range: 214..216,
+                                                    op: USub,
+                                                    operand: Name(
+                                                        ExprName {
+                                                            range: 215..216,
+                                                            id: "a",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                        keywords: [],
+                                    },
                                 },
                             ),
                             op: Mult,
@@ -339,8 +345,11 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                                     ctx: Load,
                                 },
                             ),
-                            args: [],
-                            keywords: [],
+                            arguments: Arguments {
+                                range: 257..259,
+                                args: [],
+                                keywords: [],
+                            },
                         },
                     ),
                     attr: Identifier {
@@ -368,16 +377,19 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                                     ctx: Load,
                                 },
                             ),
-                            args: [
-                                Tuple(
-                                    ExprTuple {
-                                        range: 283..285,
-                                        elts: [],
-                                        ctx: Load,
-                                    },
-                                ),
-                            ],
-                            keywords: [],
+                            arguments: Arguments {
+                                range: 282..286,
+                                args: [
+                                    Tuple(
+                                        ExprTuple {
+                                            range: 283..285,
+                                            elts: [],
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
                         },
                     ),
                     attr: Identifier {
@@ -405,16 +417,19 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                                     ctx: Load,
                                 },
                             ),
-                            args: [
-                                Tuple(
-                                    ExprTuple {
-                                        range: 312..314,
-                                        elts: [],
-                                        ctx: Load,
-                                    },
-                                ),
-                            ],
-                            keywords: [],
+                            arguments: Arguments {
+                                range: 311..316,
+                                args: [
+                                    Tuple(
+                                        ExprTuple {
+                                            range: 312..314,
+                                            elts: [],
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
                         },
                     ),
                     attr: Identifier {
@@ -563,8 +578,11 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                                     ctx: Load,
                                 },
                             ),
-                            args: [],
-                            keywords: [],
+                            arguments: Arguments {
+                                range: 450..452,
+                                args: [],
+                                keywords: [],
+                            },
                         },
                     ),
                     slice: Slice(
@@ -645,20 +663,19 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
             value: Lambda(
                 ExprLambda {
                     range: 507..535,
-                    args: Arguments {
+                    parameters: Parameters {
                         range: 514..519,
                         posonlyargs: [],
                         args: [
-                            ArgWithDefault {
+                            ParameterWithDefault {
                                 range: 514..519,
-                                def: Arg {
+                                parameter: Parameter {
                                     range: 514..519,
-                                    arg: Identifier {
+                                    name: Identifier {
                                         id: "query",
                                         range: 514..519,
                                     },
                                     annotation: None,
-                                    type_comment: None,
                                 },
                                 default: None,
                             },
@@ -693,7 +710,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ),
                 },
             ),
-            type_comment: None,
         },
     ),
     Expr(
@@ -709,33 +725,39 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                             ctx: Load,
                         },
                     ),
-                    args: [
-                        Call(
-                            ExprCall {
-                                range: 542..550,
-                                func: Name(
-                                    ExprName {
-                                        range: 542..546,
-                                        id: "type",
-                                        ctx: Load,
-                                    },
-                                ),
-                                args: [
-                                    Constant(
-                                        ExprConstant {
-                                            range: 547..549,
-                                            value: Int(
-                                                12,
-                                            ),
-                                            kind: None,
+                    arguments: Arguments {
+                        range: 541..551,
+                        args: [
+                            Call(
+                                ExprCall {
+                                    range: 542..550,
+                                    func: Name(
+                                        ExprName {
+                                            range: 542..546,
+                                            id: "type",
+                                            ctx: Load,
                                         },
                                     ),
-                                ],
-                                keywords: [],
-                            },
-                        ),
-                    ],
-                    keywords: [],
+                                    arguments: Arguments {
+                                        range: 546..550,
+                                        args: [
+                                            Constant(
+                                                ExprConstant {
+                                                    range: 547..549,
+                                                    value: Int(
+                                                        12,
+                                                    ),
+                                                    kind: None,
+                                                },
+                                            ),
+                                        ],
+                                        keywords: [],
+                                    },
+                                },
+                            ),
+                        ],
+                        keywords: [],
+                    },
                 },
             ),
         },
@@ -753,16 +775,19 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                             ctx: Load,
                         },
                     ),
-                    args: [
-                        Name(
-                            ExprName {
-                                range: 557..561,
-                                id: "type",
-                                ctx: Load,
-                            },
-                        ),
-                    ],
-                    keywords: [],
+                    arguments: Arguments {
+                        range: 556..562,
+                        args: [
+                            Name(
+                                ExprName {
+                                    range: 557..561,
+                                    id: "type",
+                                    ctx: Load,
+                                },
+                            ),
+                        ],
+                        keywords: [],
+                    },
                 },
             ),
         },
@@ -803,7 +828,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ],
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -828,19 +852,21 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                             ctx: Load,
                         },
                     ),
-                    args: [
-                        Name(
-                            ExprName {
-                                range: 594..595,
-                                id: "b",
-                                ctx: Load,
-                            },
-                        ),
-                    ],
-                    keywords: [],
+                    arguments: Arguments {
+                        range: 593..596,
+                        args: [
+                            Name(
+                                ExprName {
+                                    range: 594..595,
+                                    id: "b",
+                                    ctx: Load,
+                                },
+                            ),
+                        ],
+                        keywords: [],
+                    },
                 },
             ),
-            type_comment: None,
         },
     ),
     Expr(
@@ -856,25 +882,28 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                             ctx: Load,
                         },
                     ),
-                    args: [],
-                    keywords: [
-                        Keyword {
-                            range: 607..614,
-                            arg: Some(
-                                Identifier {
-                                    id: "X",
-                                    range: 607..608,
-                                },
-                            ),
-                            value: Name(
-                                ExprName {
-                                    range: 611..614,
-                                    id: "int",
-                                    ctx: Load,
-                                },
-                            ),
-                        },
-                    ],
+                    arguments: Arguments {
+                        range: 604..616,
+                        args: [],
+                        keywords: [
+                            Keyword {
+                                range: 607..614,
+                                arg: Some(
+                                    Identifier {
+                                        id: "X",
+                                        range: 607..608,
+                                    },
+                                ),
+                                value: Name(
+                                    ExprName {
+                                        range: 611..614,
+                                        id: "int",
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ],
+                    },
                 },
             ),
         },
@@ -900,7 +929,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     kind: None,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -931,7 +959,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     kind: None,
                 },
             ),
-            type_comment: None,
         },
     ),
     Assign(
@@ -962,7 +989,6 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     kind: None,
                 },
             ),
-            type_comment: None,
         },
     ),
 ]

@@ -36,7 +36,6 @@ expression: parse_ast
                     },
                 ),
             ],
-            type_comment: None,
         },
     ),
 ]

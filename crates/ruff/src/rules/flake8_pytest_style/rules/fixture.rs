@@ -1,21 +1,19 @@
 use std::fmt;
 
-use ruff_python_ast::Decorator;
-use ruff_python_ast::{self as ast, ArgWithDefault, Arguments, Expr, Ranged, Stmt};
-use ruff_text_size::{TextLen, TextRange};
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
-use ruff_python_ast::helpers::{find_keyword, includes_arg_name};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::Decorator;
+use ruff_python_ast::{self as ast, Expr, ParameterWithDefault, Parameters, Ranged, Stmt};
 use ruff_python_semantic::analyze::visibility::is_abstract;
 use ruff_python_semantic::SemanticModel;
+use ruff_text_size::{TextLen, TextRange};
 
-use crate::autofix::edits::remove_argument;
+use crate::autofix::edits;
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
 
@@ -24,7 +22,7 @@ use super::helpers::{
 };
 
 /// ## What it does
-/// Checks for parameter-free `@pytest.fixture()` decorators with or without
+/// Checks for argument-free `@pytest.fixture()` decorators with or without
 /// parentheses, depending on the `flake8-pytest-style.fixture-parentheses`
 /// setting.
 ///
@@ -53,7 +51,7 @@ use super::helpers::{
 /// - `flake8-pytest-style.fixture-parentheses`
 ///
 /// ## References
-/// - [API Reference: Fixtures](https://docs.pytest.org/en/latest/reference/reference.html#fixtures-api)
+/// - [`pytest` documentation: API Reference: Fixtures](https://docs.pytest.org/en/latest/reference/reference.html#fixtures-api)
 #[violation]
 pub struct PytestFixtureIncorrectParenthesesStyle {
     expected: Parentheses,
@@ -169,7 +167,7 @@ impl Violation for PytestIncorrectFixtureNameUnderscore {
 /// ```
 ///
 /// ## References
-/// - [API Reference: `pytest.mark.usefixtures`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-mark-usefixtures)
+/// - [`pytest` documentation: `pytest.mark.usefixtures`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-mark-usefixtures)
 #[violation]
 pub struct PytestFixtureParamWithoutValue {
     name: String,
@@ -217,7 +215,7 @@ impl Violation for PytestFixtureParamWithoutValue {
 /// ```
 ///
 /// ## References
-/// - [`yield_fixture` functions](https://docs.pytest.org/en/latest/yieldfixture.html)
+/// - [`pytest` documentation: `yield_fixture` functions](https://docs.pytest.org/en/latest/yieldfixture.html)
 #[violation]
 pub struct PytestDeprecatedYieldFixture;
 
@@ -228,6 +226,49 @@ impl Violation for PytestDeprecatedYieldFixture {
     }
 }
 
+/// ## What it does
+/// Checks for unnecessary `request.addfinalizer` usages in `pytest` fixtures.
+///
+/// ## Why is this bad?
+/// `pytest` offers two ways to perform cleanup in fixture code. The first is
+/// sequential (via the `yield` statement), the second callback-based (via
+/// `request.addfinalizer`).
+///
+/// The sequential approach is more readable and should be preferred, unless
+/// the fixture uses the "factory as fixture" pattern.
+///
+/// ## Example
+/// ```python
+/// @pytest.fixture()
+/// def my_fixture(request):
+///     resource = acquire_resource()
+///     request.addfinalizer(resource.release)
+///     return resource
+/// ```
+///
+/// Use instead:
+/// ```python
+/// @pytest.fixture()
+/// def my_fixture():
+///     resource = acquire_resource()
+///     yield resource
+///     resource.release()
+///
+///
+/// # "factory-as-fixture" pattern
+/// @pytest.fixture()
+/// def my_factory(request):
+///     def create_resource(arg):
+///         resource = acquire_resource(arg)
+///         request.addfinalizer(resource.release)
+///         return resource
+///
+///     return create_resource
+/// ```
+///
+/// ## References
+/// - [`pytest` documentation: Adding finalizers directly](https://docs.pytest.org/en/latest/how-to/fixtures.html#adding-finalizers-directly)
+/// - [`pytest` documentation: Factories as fixtures](https://docs.pytest.org/en/latest/how-to/fixtures.html#factories-as-fixtures)
 #[violation]
 pub struct PytestFixtureFinalizerCallback;
 
@@ -237,7 +278,39 @@ impl Violation for PytestFixtureFinalizerCallback {
         format!("Use `yield` instead of `request.addfinalizer`")
     }
 }
-
+/// ## What it does
+/// Checks for unnecessary `yield` expressions in `pytest` fixtures.
+///
+/// ## Why is this bad?
+/// In `pytest` fixtures, the `yield` expression should only be used for fixtures
+/// that include teardown code, to clean up the fixture after the test function
+/// has finished executing.
+///
+/// ## Example
+/// ```python
+/// @pytest.fixture()
+/// def my_fixture():
+///     resource = acquire_resource()
+///     yield resource
+/// ```
+///
+/// Use instead:
+/// ```python
+/// @pytest.fixture()
+/// def my_fixture_with_teardown():
+///     resource = acquire_resource()
+///     yield resource
+///     resource.release()
+///
+///
+/// @pytest.fixture()
+/// def my_fixture_without_teardown():
+///     resource = acquire_resource()
+///     return resource
+/// ```
+///
+/// ## References
+/// - [`pytest` documentation: Teardown/Cleanup](https://docs.pytest.org/en/latest/how-to/fixtures.html#teardown-cleanup-aka-fixture-finalization)
 #[violation]
 pub struct PytestUselessYieldFixture {
     name: String,
@@ -255,6 +328,40 @@ impl AlwaysAutofixableViolation for PytestUselessYieldFixture {
     }
 }
 
+/// ## What it does
+/// Checks for `pytest.mark.usefixtures` decorators applied to `pytest`
+/// fixtures.
+///
+/// ## Why is this bad?
+/// The `pytest.mark.usefixtures` decorator has no effect on `pytest` fixtures.
+///
+/// ## Example
+/// ```python
+/// @pytest.fixture()
+/// def a():
+///     pass
+///
+///
+/// @pytest.mark.usefixtures("a")
+/// @pytest.fixture()
+/// def b(a):
+///     pass
+/// ```
+///
+/// Use instead:
+/// ```python
+/// @pytest.fixture()
+/// def a():
+///     pass
+///
+///
+/// @pytest.fixture()
+/// def b(a):
+///     pass
+/// ```
+///
+/// ## References
+/// - [`pytest` documentation: `pytest.mark.usefixtures`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-mark-usefixtures)
 #[violation]
 pub struct PytestErroneousUseFixturesOnFixture;
 
@@ -358,7 +465,7 @@ where
                 }
             }
             Expr::Call(ast::ExprCall { func, .. }) => {
-                if collect_call_path(func).map_or(false, |call_path| {
+                if collect_call_path(func).is_some_and(|call_path| {
                     matches!(call_path.as_slice(), ["request", "addfinalizer"])
                 }) {
                     self.addfinalizer_call = Some(expr);
@@ -401,14 +508,13 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &D
     match &decorator.expression {
         Expr::Call(ast::ExprCall {
             func,
-            args,
-            keywords,
+            arguments,
             range: _,
         }) => {
             if checker.enabled(Rule::PytestFixtureIncorrectParenthesesStyle) {
                 if !checker.settings.flake8_pytest_style.fixture_parentheses
-                    && args.is_empty()
-                    && keywords.is_empty()
+                    && arguments.args.is_empty()
+                    && arguments.keywords.is_empty()
                 {
                     let fix = Fix::automatic(Edit::deletion(func.end(), decorator.end()));
                     pytest_fixture_parentheses(
@@ -422,7 +528,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &D
             }
 
             if checker.enabled(Rule::PytestFixturePositionalArgs) {
-                if !args.is_empty() {
+                if !arguments.args.is_empty() {
                     checker.diagnostics.push(Diagnostic::new(
                         PytestFixturePositionalArgs {
                             function: func_name.to_string(),
@@ -433,19 +539,17 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &D
             }
 
             if checker.enabled(Rule::PytestExtraneousScopeFunction) {
-                if let Some(scope_keyword) = find_keyword(keywords, "scope") {
-                    if keyword_is_literal(scope_keyword, "function") {
+                if let Some(keyword) = arguments.find_keyword("scope") {
+                    if keyword_is_literal(keyword, "function") {
                         let mut diagnostic =
-                            Diagnostic::new(PytestExtraneousScopeFunction, scope_keyword.range());
+                            Diagnostic::new(PytestExtraneousScopeFunction, keyword.range());
                         if checker.patch(diagnostic.kind.rule()) {
                             diagnostic.try_set_fix(|| {
-                                remove_argument(
+                                edits::remove_argument(
+                                    keyword,
+                                    arguments,
+                                    edits::Parentheses::Preserve,
                                     checker.locator(),
-                                    func.end(),
-                                    scope_keyword.range,
-                                    args,
-                                    keywords,
-                                    false,
                                 )
                                 .map(Fix::suggested)
                             });
@@ -532,25 +636,25 @@ fn check_fixture_returns(checker: &mut Checker, stmt: &Stmt, name: &str, body: &
 }
 
 /// PT019
-fn check_test_function_args(checker: &mut Checker, arguments: &Arguments) {
-    arguments
+fn check_test_function_args(checker: &mut Checker, parameters: &Parameters) {
+    parameters
         .posonlyargs
         .iter()
-        .chain(&arguments.args)
-        .chain(&arguments.kwonlyargs)
+        .chain(&parameters.args)
+        .chain(&parameters.kwonlyargs)
         .for_each(
-            |ArgWithDefault {
-                 def,
+            |ParameterWithDefault {
+                 parameter,
                  default: _,
                  range: _,
              }| {
-                let name = &def.arg;
+                let name = &parameter.name;
                 if name.starts_with('_') {
                     checker.diagnostics.push(Diagnostic::new(
                         PytestFixtureParamWithoutValue {
                             name: name.to_string(),
                         },
-                        def.range(),
+                        parameter.range(),
                     ));
                 }
             },
@@ -568,8 +672,8 @@ fn check_fixture_decorator_name(checker: &mut Checker, decorator: &Decorator) {
 }
 
 /// PT021
-fn check_fixture_addfinalizer(checker: &mut Checker, args: &Arguments, body: &[Stmt]) {
-    if !includes_arg_name("request", args) {
+fn check_fixture_addfinalizer(checker: &mut Checker, parameters: &Parameters, body: &[Stmt]) {
+    if !parameters.includes("request") {
         return;
     }
 
@@ -621,7 +725,7 @@ pub(crate) fn fixture(
     checker: &mut Checker,
     stmt: &Stmt,
     name: &str,
-    args: &Arguments,
+    parameters: &Parameters,
     decorators: &[Decorator],
     body: &[Stmt],
 ) {
@@ -649,7 +753,7 @@ pub(crate) fn fixture(
         }
 
         if checker.enabled(Rule::PytestFixtureFinalizerCallback) {
-            check_fixture_addfinalizer(checker, args, body);
+            check_fixture_addfinalizer(checker, parameters, body);
         }
 
         if checker.enabled(Rule::PytestUnnecessaryAsyncioMarkOnFixture)
@@ -660,6 +764,6 @@ pub(crate) fn fixture(
     }
 
     if checker.enabled(Rule::PytestFixtureParamWithoutValue) && name.starts_with("test_") {
-        check_test_function_args(checker, args);
+        check_test_function_args(checker, parameters);
     }
 }

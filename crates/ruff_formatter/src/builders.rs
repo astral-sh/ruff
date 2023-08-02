@@ -559,7 +559,7 @@ impl<Context> Format<Context> for LineSuffixBoundary {
 ///
 ///         let recorded = recording.stop();
 ///
-///         let is_labelled = recorded.first().map_or(false, |element| element.has_label(LabelId::of(MyLabels::Main)));
+///         let is_labelled = recorded.first().is_some_and( |element| element.has_label(LabelId::of(MyLabels::Main)));
 ///
 ///         if is_labelled {
 ///             write!(f, [text(" has label `Main`")])

@@ -7,89 +7,85 @@ Ok(
         FunctionDef(
             StmtFunctionDef {
                 range: 0..52,
+                decorator_list: [],
                 name: Identifier {
                     id: "f",
                     range: 4..5,
                 },
-                args: Arguments {
+                type_params: None,
+                parameters: Parameters {
                     range: 5..46,
                     posonlyargs: [],
                     args: [
-                        ArgWithDefault {
+                        ParameterWithDefault {
                             range: 6..7,
-                            def: Arg {
+                            parameter: Parameter {
                                 range: 6..7,
-                                arg: Identifier {
+                                name: Identifier {
                                     id: "a",
                                     range: 6..7,
                                 },
                                 annotation: None,
-                                type_comment: None,
                             },
                             default: None,
                         },
-                        ArgWithDefault {
+                        ParameterWithDefault {
                             range: 9..10,
-                            def: Arg {
+                            parameter: Parameter {
                                 range: 9..10,
-                                arg: Identifier {
+                                name: Identifier {
                                     id: "b",
                                     range: 9..10,
                                 },
                                 annotation: None,
-                                type_comment: None,
                             },
                             default: None,
                         },
-                        ArgWithDefault {
+                        ParameterWithDefault {
                             range: 12..13,
-                            def: Arg {
+                            parameter: Parameter {
                                 range: 12..13,
-                                arg: Identifier {
+                                name: Identifier {
                                     id: "c",
                                     range: 12..13,
                                 },
                                 annotation: None,
-                                type_comment: None,
                             },
                             default: None,
                         },
                     ],
                     vararg: Some(
-                        Arg {
+                        Parameter {
                             range: 16..20,
-                            arg: Identifier {
+                            name: Identifier {
                                 id: "args",
                                 range: 16..20,
                             },
                             annotation: None,
-                            type_comment: None,
                         },
                     ),
                     kwonlyargs: [
-                        ArgWithDefault {
+                        ParameterWithDefault {
                             range: 22..23,
-                            def: Arg {
+                            parameter: Parameter {
                                 range: 22..23,
-                                arg: Identifier {
+                                name: Identifier {
                                     id: "d",
                                     range: 22..23,
                                 },
                                 annotation: None,
-                                type_comment: None,
                             },
                             default: None,
                         },
-                        ArgWithDefault {
+                        ParameterWithDefault {
                             range: 25..29,
-                            def: Arg {
+                            parameter: Parameter {
                                 range: 25..26,
-                                arg: Identifier {
+                                name: Identifier {
                                     id: "e",
                                     range: 25..26,
                                 },
                                 annotation: None,
-                                type_comment: None,
                             },
                             default: Some(
                                 Constant(
@@ -103,16 +99,15 @@ Ok(
                                 ),
                             ),
                         },
-                        ArgWithDefault {
+                        ParameterWithDefault {
                             range: 31..35,
-                            def: Arg {
+                            parameter: Parameter {
                                 range: 31..32,
-                                arg: Identifier {
+                                name: Identifier {
                                     id: "f",
                                     range: 31..32,
                                 },
                                 annotation: None,
-                                type_comment: None,
                             },
                             default: Some(
                                 Constant(
@@ -128,17 +123,17 @@ Ok(
                         },
                     ],
                     kwarg: Some(
-                        Arg {
+                        Parameter {
                             range: 39..45,
-                            arg: Identifier {
+                            name: Identifier {
                                 id: "kwargs",
                                 range: 39..45,
                             },
                             annotation: None,
-                            type_comment: None,
                         },
                     ),
                 },
+                returns: None,
                 body: [
                     Pass(
                         StmtPass {
@@ -146,10 +141,6 @@ Ok(
                         },
                     ),
                 ],
-                decorator_list: [],
-                returns: None,
-                type_params: [],
-                type_comment: None,
             },
         ),
     ],

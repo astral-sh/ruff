@@ -65,7 +65,6 @@ expression: parse_ast
                     ctx: Load,
                 },
             ),
-            type_comment: None,
         },
     ),
 ]

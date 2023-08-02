@@ -1,8 +1,7 @@
-use ruff_python_ast::{Expr, Keyword, Ranged};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{find_keyword, is_const_false};
+use ruff_python_ast::helpers::is_const_false;
+use ruff_python_ast::{self as ast, Ranged};
 
 use crate::checkers::ast::Checker;
 
@@ -46,14 +45,10 @@ impl Violation for RequestWithNoCertValidation {
 }
 
 /// S501
-pub(crate) fn request_with_no_cert_validation(
-    checker: &mut Checker,
-    func: &Expr,
-    keywords: &[Keyword],
-) {
+pub(crate) fn request_with_no_cert_validation(checker: &mut Checker, call: &ast::ExprCall) {
     if let Some(target) = checker
         .semantic()
-        .resolve_call_path(func)
+        .resolve_call_path(&call.func)
         .and_then(|call_path| match call_path.as_slice() {
             ["requests", "get" | "options" | "head" | "post" | "put" | "patch" | "delete"] => {
                 Some("requests")
@@ -63,7 +58,7 @@ pub(crate) fn request_with_no_cert_validation(
             _ => None,
         })
     {
-        if let Some(keyword) = find_keyword(keywords, "verify") {
+        if let Some(keyword) = call.arguments.find_keyword("verify") {
             if is_const_false(&keyword.value) {
                 checker.diagnostics.push(Diagnostic::new(
                     RequestWithNoCertValidation {

@@ -6,18 +6,20 @@ expression: parse_ast
     FunctionDef(
         StmtFunctionDef {
             range: 1..49,
+            decorator_list: [],
             name: Identifier {
                 id: "args_to_tuple",
                 range: 5..18,
             },
-            args: Arguments {
+            type_params: None,
+            parameters: Parameters {
                 range: 18..30,
                 posonlyargs: [],
                 args: [],
                 vararg: Some(
-                    Arg {
+                    Parameter {
                         range: 20..29,
-                        arg: Identifier {
+                        name: Identifier {
                             id: "args",
                             range: 20..24,
                         },
@@ -36,27 +38,11 @@ expression: parse_ast
                                 },
                             ),
                         ),
-                        type_comment: None,
                     },
                 ),
                 kwonlyargs: [],
                 kwarg: None,
             },
-            body: [
-                Expr(
-                    StmtExpr {
-                        range: 46..49,
-                        value: Constant(
-                            ExprConstant {
-                                range: 46..49,
-                                value: Ellipsis,
-                                kind: None,
-                            },
-                        ),
-                    },
-                ),
-            ],
-            decorator_list: [],
             returns: Some(
                 Subscript(
                     ExprSubscript {
@@ -85,8 +71,20 @@ expression: parse_ast
                     },
                 ),
             ),
-            type_params: [],
-            type_comment: None,
+            body: [
+                Expr(
+                    StmtExpr {
+                        range: 46..49,
+                        value: Constant(
+                            ExprConstant {
+                                range: 46..49,
+                                value: Ellipsis,
+                                kind: None,
+                            },
+                        ),
+                    },
+                ),
+            ],
         },
     ),
 ]

@@ -56,7 +56,7 @@ pub(crate) fn reraise_no_cause(checker: &mut Checker, body: &[Stmt]) {
 
     for (range, exc, cause) in raises {
         if cause.is_none() {
-            if exc.map_or(false, Expr::is_call_expr) {
+            if exc.is_some_and(Expr::is_call_expr) {
                 checker
                     .diagnostics
                     .push(Diagnostic::new(ReraiseNoCause, range));

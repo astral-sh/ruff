@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, ArgWithDefault, Constant, Expr, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Constant, Expr, ParameterWithDefault, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -524,8 +524,8 @@ pub(crate) fn definition(
     let is_overridden = visibility::is_override(decorator_list, checker.semantic());
 
     // ANN001, ANN401
-    for ArgWithDefault {
-        def,
+    for ParameterWithDefault {
+        parameter,
         default: _,
         range: _,
     } in arguments
@@ -542,26 +542,29 @@ pub(crate) fn definition(
         )
     {
         // ANN401 for dynamically typed arguments
-        if let Some(annotation) = &def.annotation {
+        if let Some(annotation) = &parameter.annotation {
             has_any_typed_arg = true;
             if checker.enabled(Rule::AnyType) && !is_overridden {
                 check_dynamically_typed(
                     checker,
                     annotation,
-                    || def.arg.to_string(),
+                    || parameter.name.to_string(),
                     &mut diagnostics,
                 );
             }
         } else {
             if !(checker.settings.flake8_annotations.suppress_dummy_args
-                && checker.settings.dummy_variable_rgx.is_match(&def.arg))
+                && checker
+                    .settings
+                    .dummy_variable_rgx
+                    .is_match(&parameter.name))
             {
                 if checker.enabled(Rule::MissingTypeFunctionArgument) {
                     diagnostics.push(Diagnostic::new(
                         MissingTypeFunctionArgument {
-                            name: def.arg.to_string(),
+                            name: parameter.name.to_string(),
                         },
-                        def.range(),
+                        parameter.range(),
                     ));
                 }
             }
@@ -574,18 +577,18 @@ pub(crate) fn definition(
             has_any_typed_arg = true;
             if !checker.settings.flake8_annotations.allow_star_arg_any {
                 if checker.enabled(Rule::AnyType) && !is_overridden {
-                    let name = &arg.arg;
+                    let name = &arg.name;
                     check_dynamically_typed(checker, expr, || format!("*{name}"), &mut diagnostics);
                 }
             }
         } else {
             if !(checker.settings.flake8_annotations.suppress_dummy_args
-                && checker.settings.dummy_variable_rgx.is_match(&arg.arg))
+                && checker.settings.dummy_variable_rgx.is_match(&arg.name))
             {
                 if checker.enabled(Rule::MissingTypeArgs) {
                     diagnostics.push(Diagnostic::new(
                         MissingTypeArgs {
-                            name: arg.arg.to_string(),
+                            name: arg.name.to_string(),
                         },
                         arg.range(),
                     ));
@@ -600,7 +603,7 @@ pub(crate) fn definition(
             has_any_typed_arg = true;
             if !checker.settings.flake8_annotations.allow_star_arg_any {
                 if checker.enabled(Rule::AnyType) && !is_overridden {
-                    let name = &arg.arg;
+                    let name = &arg.name;
                     check_dynamically_typed(
                         checker,
                         expr,
@@ -611,12 +614,12 @@ pub(crate) fn definition(
             }
         } else {
             if !(checker.settings.flake8_annotations.suppress_dummy_args
-                && checker.settings.dummy_variable_rgx.is_match(&arg.arg))
+                && checker.settings.dummy_variable_rgx.is_match(&arg.name))
             {
                 if checker.enabled(Rule::MissingTypeKwargs) {
                     diagnostics.push(Diagnostic::new(
                         MissingTypeKwargs {
-                            name: arg.arg.to_string(),
+                            name: arg.name.to_string(),
                         },
                         arg.range(),
                     ));
@@ -627,8 +630,8 @@ pub(crate) fn definition(
 
     // ANN101, ANN102
     if is_method && !visibility::is_staticmethod(cast::decorator_list(stmt), checker.semantic()) {
-        if let Some(ArgWithDefault {
-            def,
+        if let Some(ParameterWithDefault {
+            parameter,
             default: _,
             range: _,
         }) = arguments
@@ -636,23 +639,23 @@ pub(crate) fn definition(
             .first()
             .or_else(|| arguments.args.first())
         {
-            if def.annotation.is_none() {
+            if parameter.annotation.is_none() {
                 if visibility::is_classmethod(cast::decorator_list(stmt), checker.semantic()) {
                     if checker.enabled(Rule::MissingTypeCls) {
                         diagnostics.push(Diagnostic::new(
                             MissingTypeCls {
-                                name: def.arg.to_string(),
+                                name: parameter.name.to_string(),
                             },
-                            def.range(),
+                            parameter.range(),
                         ));
                     }
                 } else {
                     if checker.enabled(Rule::MissingTypeSelf) {
                         diagnostics.push(Diagnostic::new(
                             MissingTypeSelf {
-                                name: def.arg.to_string(),
+                                name: parameter.name.to_string(),
                             },
-                            def.range(),
+                            parameter.range(),
                         ));
                     }
                 }

@@ -46,6 +46,9 @@ syn = { version = "2.0.15" }
 test-case = { version = "3.0.0" }
 thiserror = { version = "1.0.43" }
 toml = { version = "0.7.2" }
+tracing = "0.1.37"
+tracing-indicatif = "0.3.4"
+tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 wsl = { version = "0.1.0" }
 
 # v1.0.1

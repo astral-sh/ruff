@@ -2,7 +2,7 @@ use std::fmt::{Display, Formatter};
 use std::num::NonZeroUsize;
 
 use colored::{Color, ColoredString, Colorize, Styles};
-use itertools::Itertools;
+
 use ruff_text_size::{TextRange, TextSize};
 use similar::{ChangeTag, TextDiff};
 
@@ -38,12 +38,7 @@ impl Display for Diff<'_> {
         let mut output = String::with_capacity(self.source_code.source_text().len());
         let mut last_end = TextSize::default();
 
-        for edit in self
-            .fix
-            .edits()
-            .iter()
-            .sorted_unstable_by_key(|edit| edit.start())
-        {
+        for edit in self.fix.edits() {
             output.push_str(
                 self.source_code
                     .slice(TextRange::new(last_end, edit.start())),

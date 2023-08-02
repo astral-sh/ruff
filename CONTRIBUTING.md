@@ -69,6 +69,13 @@ and pre-commit to run some validation checks:
 pipx install pre-commit  # or `pip install pre-commit` if you have a virtualenv
 ```
 
+You can optionally install pre-commit hooks to automatically run the validation checks
+when making a commit:
+
+```shell
+pre-commit install
+```
+
 ### Development
 
 After cloning the repository, run Ruff locally from the repository root with:

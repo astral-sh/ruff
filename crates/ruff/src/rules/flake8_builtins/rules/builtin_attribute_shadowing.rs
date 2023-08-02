@@ -1,5 +1,5 @@
 use ruff_python_ast as ast;
-use ruff_python_ast::Decorator;
+use ruff_python_ast::{Arguments, Decorator};
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::Diagnostic;
@@ -78,8 +78,7 @@ pub(crate) fn builtin_attribute_shadowing(
         // Ignore shadowing within `TypedDict` definitions, since these are only accessible through
         // subscripting and not through attribute access.
         if class_def
-            .bases
-            .iter()
+            .bases()
             .any(|base| checker.semantic().match_typing_expr(base, "TypedDict"))
         {
             return;
@@ -133,18 +132,21 @@ fn is_standard_library_override(
     class_def: &ast::StmtClassDef,
     model: &SemanticModel,
 ) -> bool {
+    let Some(Arguments { args: bases, .. }) = class_def.arguments.as_deref() else {
+        return false;
+    };
     match name {
         // Ex) `Event#set`
-        "set" => class_def.bases.iter().any(|base| {
-            model.resolve_call_path(base).map_or(false, |call_path| {
-                matches!(call_path.as_slice(), ["threading", "Event"])
-            })
+        "set" => bases.iter().any(|base| {
+            model
+                .resolve_call_path(base)
+                .is_some_and(|call_path| matches!(call_path.as_slice(), ["threading", "Event"]))
         }),
         // Ex) `Filter#filter`
-        "filter" => class_def.bases.iter().any(|base| {
-            model.resolve_call_path(base).map_or(false, |call_path| {
-                matches!(call_path.as_slice(), ["logging", "Filter"])
-            })
+        "filter" => bases.iter().any(|base| {
+            model
+                .resolve_call_path(base)
+                .is_some_and(|call_path| matches!(call_path.as_slice(), ["logging", "Filter"]))
         }),
         _ => false,
     }

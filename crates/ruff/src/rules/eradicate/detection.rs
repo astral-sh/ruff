@@ -1,8 +1,8 @@
 /// See: [eradicate.py](https://github.com/myint/eradicate/blob/98f199940979c94447a461d50d27862b118b282d/eradicate.py)
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff_python_ast::Suite;
-use ruff_python_parser::Parse;
+
+use ruff_python_parser::parse_suite;
 
 static ALLOWLIST_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
@@ -79,7 +79,7 @@ pub(crate) fn comment_contains_code(line: &str, task_tags: &[String]) -> bool {
     }
 
     // Finally, compile the source code.
-    Suite::parse(&line, "<filename>").is_ok()
+    parse_suite(&line, "<filename>").is_ok()
 }
 
 /// Returns `true` if a line is probably part of some multiline code.

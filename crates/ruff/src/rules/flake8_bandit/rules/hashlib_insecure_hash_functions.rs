@@ -1,8 +1,7 @@
-use ruff_python_ast::{Expr, Keyword, Ranged};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{find_keyword, is_const_false, CallArguments};
+use ruff_python_ast::helpers::is_const_false;
+use ruff_python_ast::{self as ast, Arguments, Ranged};
 
 use crate::checkers::ast::Checker;
 
@@ -60,30 +59,26 @@ impl Violation for HashlibInsecureHashFunction {
 }
 
 /// S324
-pub(crate) fn hashlib_insecure_hash_functions(
-    checker: &mut Checker,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
-) {
-    if let Some(hashlib_call) = checker
-        .semantic()
-        .resolve_call_path(func)
-        .and_then(|call_path| match call_path.as_slice() {
-            ["hashlib", "new"] => Some(HashlibCall::New),
-            ["hashlib", "md4"] => Some(HashlibCall::WeakHash("md4")),
-            ["hashlib", "md5"] => Some(HashlibCall::WeakHash("md5")),
-            ["hashlib", "sha"] => Some(HashlibCall::WeakHash("sha")),
-            ["hashlib", "sha1"] => Some(HashlibCall::WeakHash("sha1")),
-            _ => None,
-        })
+pub(crate) fn hashlib_insecure_hash_functions(checker: &mut Checker, call: &ast::ExprCall) {
+    if let Some(hashlib_call) =
+        checker
+            .semantic()
+            .resolve_call_path(&call.func)
+            .and_then(|call_path| match call_path.as_slice() {
+                ["hashlib", "new"] => Some(HashlibCall::New),
+                ["hashlib", "md4"] => Some(HashlibCall::WeakHash("md4")),
+                ["hashlib", "md5"] => Some(HashlibCall::WeakHash("md5")),
+                ["hashlib", "sha"] => Some(HashlibCall::WeakHash("sha")),
+                ["hashlib", "sha1"] => Some(HashlibCall::WeakHash("sha1")),
+                _ => None,
+            })
     {
-        if !is_used_for_security(keywords) {
+        if !is_used_for_security(&call.arguments) {
             return;
         }
         match hashlib_call {
             HashlibCall::New => {
-                if let Some(name_arg) = CallArguments::new(args, keywords).argument("name", 0) {
+                if let Some(name_arg) = call.arguments.find_argument("name", 0) {
                     if let Some(hash_func_name) = string_literal(name_arg) {
                         // `hashlib.new` accepts both lowercase and uppercase names for hash
                         // functions.
@@ -106,15 +101,16 @@ pub(crate) fn hashlib_insecure_hash_functions(
                     HashlibInsecureHashFunction {
                         string: (*func_name).to_string(),
                     },
-                    func.range(),
+                    call.func.range(),
                 ));
             }
         }
     }
 }
 
-fn is_used_for_security(keywords: &[Keyword]) -> bool {
-    find_keyword(keywords, "usedforsecurity")
+fn is_used_for_security(arguments: &Arguments) -> bool {
+    arguments
+        .find_keyword("usedforsecurity")
         .map_or(true, |keyword| !is_const_false(&keyword.value))
 }
 

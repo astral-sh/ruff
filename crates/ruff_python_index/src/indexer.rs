@@ -228,8 +228,18 @@ impl Indexer {
         offset: TextSize,
         locator: &Locator,
     ) -> Option<TextSize> {
-        // Find the first preceding continuation.
-        let mut continuation = self.find_continuation(locator.line_start(offset), locator)?;
+        // Find the first preceding continuation. If the offset isn't the first non-whitespace
+        // character on the line, then we can't have a continuation.
+        let previous_line_end = locator.line_start(offset);
+        if !locator
+            .slice(TextRange::new(previous_line_end, offset))
+            .chars()
+            .all(is_python_whitespace)
+        {
+            return None;
+        }
+
+        let mut continuation = self.find_continuation(previous_line_end, locator)?;
 
         // Continue searching for continuations, in the unlikely event that we have multiple
         // continuations in a row.

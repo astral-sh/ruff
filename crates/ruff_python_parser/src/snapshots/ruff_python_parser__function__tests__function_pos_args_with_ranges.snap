@@ -7,50 +7,49 @@ Ok(
         FunctionDef(
             StmtFunctionDef {
                 range: 0..20,
+                decorator_list: [],
                 name: Identifier {
                     id: "f",
                     range: 4..5,
                 },
-                args: Arguments {
+                type_params: None,
+                parameters: Parameters {
                     range: 5..14,
                     posonlyargs: [],
                     args: [
-                        ArgWithDefault {
+                        ParameterWithDefault {
                             range: 6..7,
-                            def: Arg {
+                            parameter: Parameter {
                                 range: 6..7,
-                                arg: Identifier {
+                                name: Identifier {
                                     id: "a",
                                     range: 6..7,
                                 },
                                 annotation: None,
-                                type_comment: None,
                             },
                             default: None,
                         },
-                        ArgWithDefault {
+                        ParameterWithDefault {
                             range: 9..10,
-                            def: Arg {
+                            parameter: Parameter {
                                 range: 9..10,
-                                arg: Identifier {
+                                name: Identifier {
                                     id: "b",
                                     range: 9..10,
                                 },
                                 annotation: None,
-                                type_comment: None,
                             },
                             default: None,
                         },
-                        ArgWithDefault {
+                        ParameterWithDefault {
                             range: 12..13,
-                            def: Arg {
+                            parameter: Parameter {
                                 range: 12..13,
-                                arg: Identifier {
+                                name: Identifier {
                                     id: "c",
                                     range: 12..13,
                                 },
                                 annotation: None,
-                                type_comment: None,
                             },
                             default: None,
                         },
@@ -59,6 +58,7 @@ Ok(
                     kwonlyargs: [],
                     kwarg: None,
                 },
+                returns: None,
                 body: [
                     Pass(
                         StmtPass {
@@ -66,10 +66,6 @@ Ok(
                         },
                     ),
                 ],
-                decorator_list: [],
-                returns: None,
-                type_params: [],
-                type_comment: None,
             },
         ),
     ],

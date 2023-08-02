@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -16,7 +16,7 @@ env:
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   PACKAGE_NAME: ruff
-  PYTHON_VERSION: "3.11" # to build abi3 wheels
+  PYTHON_VERSION: "3.11"
 
 jobs:
   determine_changes:
@@ -42,6 +42,7 @@ jobs:
               - "!crates/ruff_formatter/**"
               - "!crates/ruff_dev/**"
               - "!crates/ruff_shrinking/**"
+              - scripts/check_ecosystem.py
 
             formatter:
               - Cargo.toml
@@ -50,7 +51,10 @@ jobs:
               - crates/ruff_formatter/**
               - crates/ruff_python_trivia/**
               - crates/ruff_python_ast/**
-
+              - crates/ruff_source_file/**
+              - crates/ruff_python_index/**
+              - crates/ruff_text_size/**
+              - crates/ruff_python_parser/**
 
   cargo-fmt:
     name: "cargo fmt"
@@ -79,7 +83,7 @@ jobs:
   cargo-test:
     strategy:
       matrix:
-        os: [ ubuntu-latest, windows-latest ]
+        os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     name: "cargo test | ${{ matrix.os }}"
     steps:
@@ -231,7 +235,6 @@ jobs:
       - name: "Run cargo-udeps"
         run: cargo +nightly-2023-06-08 udeps
 
-
   python-package:
     name: "python package"
     runs-on: ubuntu-latest
@@ -331,7 +334,7 @@ jobs:
       - name: "Cache rust"
         uses: Swatinem/rust-cache@v2
       - name: "Formatter progress"
-        run: scripts/formatter_progress.sh
+        run: scripts/formatter_ecosystem_checks.sh
       - name: "Github step summary"
         run: grep "similarity index" target/progress_projects_report.txt | sort > $GITHUB_STEP_SUMMARY
       # CPython is not black formatted, so we run only the stability check
