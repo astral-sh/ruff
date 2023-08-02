@@ -56,7 +56,6 @@ impl TryFrom<&str> for FormatSummary {
             };
 
             let nested = FormatString::from_str(format_spec)?;
-            println!("nested: {:?}", nested);
             for nested_part in nested.format_parts {
                 let FormatPart::Field { field_name, .. } = nested_part else {
                     continue;

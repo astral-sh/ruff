@@ -372,7 +372,6 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                             let location = expr.range();
                             match pyflakes::format::FormatSummary::try_from(val.as_ref()) {
                                 Err(e) => {
-                                    println!("error: {}", e);
                                     if checker.enabled(Rule::StringDotFormatInvalidFormat) {
                                         checker.diagnostics.push(Diagnostic::new(
                                             pyflakes::rules::StringDotFormatInvalidFormat {

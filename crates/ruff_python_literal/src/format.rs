@@ -284,17 +284,20 @@ impl FormatSpec {
         let (width, text) = parse_number(text)?;
         let (grouping_option, text) = FormatGrouping::parse(text);
         let (precision, text) = parse_precision(text)?;
-        let (format_type, new_text) = FormatType::parse(text);
-        match format_type {
-            None if new_text != text => {
+        let (format_type, _text) = if text.is_empty() {
+            (None, text)
+        } else {
+            // If there's any remaining text, we should yield a valid format type and consume it
+            // all.
+            let (format_type, text) = FormatType::parse(text);
+            if format_type.is_none() {
                 return Err(FormatSpecError::InvalidFormatType);
             }
-            _ => (),
-        }
-
-        if !new_text.is_empty() {
-            return Err(FormatSpecError::InvalidFormatSpecifier);
-        }
+            if !text.is_empty() {
+                return Err(FormatSpecError::InvalidFormatSpecifier);
+            }
+            (format_type, text)
+        };
 
         if zero && fill.is_none() {
             fill.replace('0');
