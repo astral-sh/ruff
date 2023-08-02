@@ -662,6 +662,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "052") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::UnannotatedAssignmentInStub),
         (Flake8Pyi, "054") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::NumericLiteralTooLong),
         (Flake8Pyi, "053") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::StringOrBytesTooLong),
+        (Flake8Pyi, "055") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::UnnecessaryTypeUnion),
         (Flake8Pyi, "056") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::UnsupportedMethodCallOnAll),
 
         // flake8-pytest-style
