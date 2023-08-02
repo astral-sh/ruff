@@ -10,7 +10,7 @@ use crate::registry::{AsRule, Rule};
 use super::helpers::get_mark_decorators;
 
 /// ## What it does
-/// Checks for parameter-free `@pytest.mark.<marker>()` decorators with or
+/// Checks for argument-free `@pytest.mark.<marker>()` decorators with or
 /// without parentheses, depending on the `flake8-pytest-style.mark-parentheses`
 /// setting.
 ///
@@ -65,6 +65,30 @@ impl AlwaysAutofixableViolation for PytestIncorrectMarkParenthesesStyle {
         "Add/remove parentheses".to_string()
     }
 }
+
+/// ## What it does
+/// Checks for `@pytest.mark.usefixtures()` decorators that aren't passed any
+/// arguments.
+///
+/// ## Why is this bad?
+/// A `@pytest.mark.usefixtures()` decorator that isn't passed any arguments is
+/// useless and should be removed.
+///
+/// ## Example
+/// ```python
+/// @pytest.mark.usefixtures()
+/// def test_something():
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def test_something():
+///     ...
+/// ```
+///
+/// ## References
+/// - [`pytest` documentation: `pytest.mark.usefixtures`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-mark-usefixtures)
 
 #[violation]
 pub struct PytestUseFixturesWithoutParameters;

@@ -22,7 +22,7 @@ use super::helpers::{
 };
 
 /// ## What it does
-/// Checks for parameter-free `@pytest.fixture()` decorators with or without
+/// Checks for argument-free `@pytest.fixture()` decorators with or without
 /// parentheses, depending on the `flake8-pytest-style.fixture-parentheses`
 /// setting.
 ///
@@ -328,6 +328,40 @@ impl AlwaysAutofixableViolation for PytestUselessYieldFixture {
     }
 }
 
+/// ## What it does
+/// Checks for `pytest.mark.usefixtures` decorators applied to `pytest`
+/// fixtures.
+///
+/// ## Why is this bad?
+/// The `pytest.mark.usefixtures` decorator has no effect on `pytest` fixtures.
+///
+/// ## Example
+/// ```python
+/// @pytest.fixture()
+/// def a():
+///     pass
+///
+///
+/// @pytest.mark.usefixtures("a")
+/// @pytest.fixture()
+/// def b(a):
+///     pass
+/// ```
+///
+/// Use instead:
+/// ```python
+/// @pytest.fixture()
+/// def a():
+///     pass
+///
+///
+/// @pytest.fixture()
+/// def b(a):
+///     pass
+/// ```
+///
+/// ## References
+/// - [`pytest` documentation: `pytest.mark.usefixtures`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-mark-usefixtures)
 #[violation]
 pub struct PytestErroneousUseFixturesOnFixture;
 
