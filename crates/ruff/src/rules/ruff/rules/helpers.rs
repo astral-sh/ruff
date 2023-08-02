@@ -28,18 +28,26 @@ pub(super) fn is_dataclass_field(func: &Expr, semantic: &SemanticModel) -> bool 
 
 /// Returns `true` if the given [`Expr`] is a `typing.ClassVar` annotation.
 pub(super) fn is_class_var_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
-    let Expr::Subscript(ast::ExprSubscript { value, .. }) = &annotation else {
-        return false;
+    // ClassVar can be used either with a subscript `ClassVar[...]` or without (the type is
+    // inferred).
+    let expr = if let Expr::Subscript(ast::ExprSubscript { value, .. }) = &annotation {
+        value
+    } else {
+        annotation
     };
-    semantic.match_typing_expr(value, "ClassVar")
+    semantic.match_typing_expr(expr, "ClassVar")
 }
 
 /// Returns `true` if the given [`Expr`] is a `typing.Final` annotation.
 pub(super) fn is_final_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
-    let Expr::Subscript(ast::ExprSubscript { value, .. }) = &annotation else {
-        return false;
+    // Final can be used either with a subscript `Final[...]` or without (the type is
+    // inferred).
+    let expr = if let Expr::Subscript(ast::ExprSubscript { value, .. }) = &annotation {
+        value
+    } else {
+        annotation
     };
-    semantic.match_typing_expr(value, "Final")
+    semantic.match_typing_expr(expr, "Final")
 }
 
 /// Returns `true` if the given class is a dataclass.
