@@ -2627,6 +2627,34 @@ impl AstNode for Comprehension {
         AnyNode::from(self)
     }
 }
+impl AstNode for Arguments {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::Arguments(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::Arguments(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
 impl AstNode for Parameters {
     fn cast(kind: AnyNode) -> Option<Self>
     where
@@ -3456,6 +3484,11 @@ impl From<ast::PatternMatchOr> for AnyNode {
 impl From<Comprehension> for AnyNode {
     fn from(node: Comprehension) -> Self {
         AnyNode::Comprehension(node)
+    }
+}
+impl From<Arguments> for AnyNode {
+    fn from(node: Arguments) -> Self {
+        AnyNode::Arguments(node)
     }
 }
 impl From<Parameters> for AnyNode {
@@ -4907,6 +4940,11 @@ impl<'a> From<&'a ExceptHandler> for AnyNodeRef<'a> {
 impl<'a> From<&'a Comprehension> for AnyNodeRef<'a> {
     fn from(node: &'a Comprehension) -> Self {
         AnyNodeRef::Comprehension(node)
+    }
+}
+impl<'a> From<&'a Arguments> for AnyNodeRef<'a> {
+    fn from(node: &'a Arguments) -> Self {
+        AnyNodeRef::Arguments(node)
     }
 }
 impl<'a> From<&'a Parameters> for AnyNodeRef<'a> {

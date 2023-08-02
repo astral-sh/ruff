@@ -2617,6 +2617,38 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::Comprehension {
     }
 }
 
+impl FormatRule<ast::Arguments, PyFormatContext<'_>> for crate::other::arguments::FormatArguments {
+    #[inline]
+    fn fmt(
+        &self,
+        node: &ast::Arguments,
+        f: &mut Formatter<PyFormatContext<'_>>,
+    ) -> FormatResult<()> {
+        FormatNodeRule::<ast::Arguments>::fmt(self, node, f)
+    }
+}
+impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::Arguments {
+    type Format<'a> = FormatRefWithRule<
+        'a,
+        ast::Arguments,
+        crate::other::arguments::FormatArguments,
+        PyFormatContext<'ast>,
+    >;
+    fn format(&self) -> Self::Format<'_> {
+        FormatRefWithRule::new(self, crate::other::arguments::FormatArguments::default())
+    }
+}
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::Arguments {
+    type Format = FormatOwnedWithRule<
+        ast::Arguments,
+        crate::other::arguments::FormatArguments,
+        PyFormatContext<'ast>,
+    >;
+    fn into_format(self) -> Self::Format {
+        FormatOwnedWithRule::new(self, crate::other::arguments::FormatArguments::default())
+    }
+}
+
 impl FormatRule<ast::Parameters, PyFormatContext<'_>>
     for crate::other::parameters::FormatParameters
 {
