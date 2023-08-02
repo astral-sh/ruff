@@ -159,10 +159,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     if checker.enabled(Rule::NumpyDeprecatedFunction) {
                         numpy::rules::deprecated_function(checker, expr);
                     }
-                    if checker.is_stub {
-                        if checker.enabled(Rule::CollectionsNamedTuple) {
-                            flake8_pyi::rules::collections_named_tuple(checker, expr);
-                        }
+                    if checker.enabled(Rule::CollectionsNamedTuple) {
+                        flake8_pyi::rules::collections_named_tuple(checker, expr);
                     }
 
                     // Ex) List[...]
@@ -323,10 +321,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::PrivateMemberAccess) {
                 flake8_self::rules::private_member_access(checker, expr);
             }
-            if checker.is_stub {
-                if checker.enabled(Rule::CollectionsNamedTuple) {
-                    flake8_pyi::rules::collections_named_tuple(checker, expr);
-                }
+            if checker.enabled(Rule::CollectionsNamedTuple) {
+                flake8_pyi::rules::collections_named_tuple(checker, expr);
             }
             pandas_vet::rules::attr(checker, attr, value, expr);
         }
@@ -868,7 +864,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::DjangoLocalsInRenderFunction) {
                 flake8_django::rules::locals_in_render_function(checker, call);
             }
-            if checker.is_stub && checker.enabled(Rule::UnsupportedMethodCallOnAll) {
+            if checker.enabled(Rule::UnsupportedMethodCallOnAll) {
                 flake8_pyi::rules::unsupported_method_call_on_all(checker, func);
             }
         }
@@ -1079,35 +1075,33 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     );
                 }
             }
-            if checker.is_stub {
-                if checker.enabled(Rule::DuplicateUnionMember)
-                        && checker.semantic.in_type_definition()
-                        // Avoid duplicate checks if the parent is an `|`
-                        && !matches!(
-                            checker.semantic.expr_parent(),
-                            Some(Expr::BinOp(ast::ExprBinOp { op: Operator::BitOr, ..}))
-                        )
-                {
-                    flake8_pyi::rules::duplicate_union_member(checker, expr);
-                }
-                if checker.enabled(Rule::UnnecessaryLiteralUnion)
-                        // Avoid duplicate checks if the parent is an `|`
-                        && !matches!(
-                            checker.semantic.expr_parent(),
-                            Some(Expr::BinOp(ast::ExprBinOp { op: Operator::BitOr, ..}))
-                        )
-                {
-                    flake8_pyi::rules::unnecessary_literal_union(checker, expr);
-                }
-                if checker.enabled(Rule::RedundantLiteralUnion)
-                        // Avoid duplicate checks if the parent is an `|`
-                        && !matches!(
-                            checker.semantic.expr_parent(),
-                            Some(Expr::BinOp(ast::ExprBinOp { op: Operator::BitOr, ..}))
-                        )
-                {
-                    flake8_pyi::rules::redundant_literal_union(checker, expr);
-                }
+            if checker.enabled(Rule::DuplicateUnionMember)
+                && checker.semantic.in_type_definition()
+                // Avoid duplicate checks if the parent is an `|`
+                && !matches!(
+                    checker.semantic.expr_parent(),
+                    Some(Expr::BinOp(ast::ExprBinOp { op: Operator::BitOr, ..}))
+                )
+            {
+                flake8_pyi::rules::duplicate_union_member(checker, expr);
+            }
+            if checker.enabled(Rule::UnnecessaryLiteralUnion)
+                // Avoid duplicate checks if the parent is an `|`
+                && !matches!(
+                    checker.semantic.expr_parent(),
+                    Some(Expr::BinOp(ast::ExprBinOp { op: Operator::BitOr, ..}))
+                )
+            {
+                flake8_pyi::rules::unnecessary_literal_union(checker, expr);
+            }
+            if checker.enabled(Rule::RedundantLiteralUnion)
+                // Avoid duplicate checks if the parent is an `|`
+                && !matches!(
+                    checker.semantic.expr_parent(),
+                    Some(Expr::BinOp(ast::ExprBinOp { op: Operator::BitOr, ..}))
+                )
+            {
+                flake8_pyi::rules::redundant_literal_union(checker, expr);
             }
         }
         Expr::UnaryOp(ast::ExprUnaryOp {
