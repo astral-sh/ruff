@@ -9,8 +9,8 @@ use ruff_text_size::TextRange;
 use crate::call_path::CallPath;
 use crate::statement_visitor::{walk_body, walk_stmt, StatementVisitor};
 use crate::{
-    self as ast, Arguments, Constant, ExceptHandler, Expr, Keyword, MatchCase, Parameters, Pattern,
-    Ranged, Stmt, TypeParam,
+    self as ast, Arguments, Constant, ExceptHandler, Expr, MatchCase, Parameters, Pattern, Ranged,
+    Stmt, TypeParam,
 };
 
 /// Return `true` if the `Stmt` is a compound statement (as opposed to a simple statement).
@@ -655,17 +655,6 @@ pub fn is_constant_non_singleton(expr: &Expr) -> bool {
     is_constant(expr) && !is_singleton(expr)
 }
 
-/// Return the [`Keyword`] with the given name, if it's present in the list of
-/// [`Keyword`] arguments.
-///
-/// TODO(charlie): Make this an associated function on [`Arguments`].
-pub fn find_keyword<'a>(keywords: &'a [Keyword], keyword_name: &str) -> Option<&'a Keyword> {
-    keywords.iter().find(|keyword| {
-        let Keyword { arg, .. } = keyword;
-        arg.as_ref().is_some_and(|arg| arg == keyword_name)
-    })
-}
-
 /// Return `true` if an [`Expr`] is `None`.
 pub const fn is_const_none(expr: &Expr) -> bool {
     matches!(
@@ -700,14 +689,6 @@ pub const fn is_const_false(expr: &Expr) -> bool {
             ..
         }),
     )
-}
-
-/// Return `true` if a keyword argument is present with a non-`None` value.
-pub fn has_non_none_keyword(keywords: &[Keyword], keyword: &str) -> bool {
-    find_keyword(keywords, keyword).is_some_and(|keyword| {
-        let Keyword { value, .. } = keyword;
-        !is_const_none(value)
-    })
 }
 
 /// Extract the names of all handled exceptions.
