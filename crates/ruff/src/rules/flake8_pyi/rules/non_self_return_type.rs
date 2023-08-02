@@ -186,7 +186,7 @@ pub(crate) fn non_self_return_type(
     match name {
         "__iter__" => {
             if is_iterable(returns, checker.semantic())
-                && is_iterator(class_def.arguments.as_ref(), checker.semantic())
+                && is_iterator(class_def.arguments.as_deref(), checker.semantic())
             {
                 checker.diagnostics.push(Diagnostic::new(
                     NonSelfReturnType {
@@ -199,7 +199,7 @@ pub(crate) fn non_self_return_type(
         }
         "__aiter__" => {
             if is_async_iterable(returns, checker.semantic())
-                && is_async_iterator(class_def.arguments.as_ref(), checker.semantic())
+                && is_async_iterator(class_def.arguments.as_deref(), checker.semantic())
             {
                 checker.diagnostics.push(Diagnostic::new(
                     NonSelfReturnType {

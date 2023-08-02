@@ -218,7 +218,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                                 checker,
                                 expr,
                                 id,
-                                arguments.as_ref(),
+                                arguments.as_deref(),
                             );
                         }
                     }

@@ -160,8 +160,8 @@ pub struct StmtClassDef {
     pub range: TextRange,
     pub decorator_list: Vec<Decorator>,
     pub name: Identifier,
-    pub type_params: Option<TypeParams>,
-    pub arguments: Option<Arguments>,
+    pub type_params: Option<Box<TypeParams>>,
+    pub arguments: Option<Box<Arguments>>,
     pub body: Vec<Stmt>,
 }
 
@@ -3032,9 +3032,10 @@ mod size_assertions {
     use super::*;
     use static_assertions::assert_eq_size;
 
-    assert_eq_size!(Stmt, [u8; 184]);
+    assert_eq_size!(Stmt, [u8; 144]);
     assert_eq_size!(StmtFunctionDef, [u8; 136]);
-    assert_eq_size!(StmtClassDef, [u8; 176]);
+    assert_eq_size!(StmtAsyncFunctionDef, [u8; 136]);
+    assert_eq_size!(StmtClassDef, [u8; 104]);
     assert_eq_size!(StmtTry, [u8; 104]);
     assert_eq_size!(Expr, [u8; 80]);
     assert_eq_size!(Constant, [u8; 32]);

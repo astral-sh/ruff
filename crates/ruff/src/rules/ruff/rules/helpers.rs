@@ -51,7 +51,7 @@ pub(super) fn is_dataclass(class_def: &ast::StmtClassDef, semantic: &SemanticMod
 
 /// Returns `true` if the given class is a Pydantic `BaseModel` or `BaseSettings` subclass.
 pub(super) fn is_pydantic_model(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
-    let Some(Arguments { args: bases, .. }) = class_def.arguments.as_ref() else {
+    let Some(Arguments { args: bases, .. }) = class_def.arguments.as_deref() else {
         return false;
     };
 

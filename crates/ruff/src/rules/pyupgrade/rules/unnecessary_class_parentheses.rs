@@ -40,7 +40,7 @@ impl AlwaysAutofixableViolation for UnnecessaryClassParentheses {
 
 /// UP039
 pub(crate) fn unnecessary_class_parentheses(checker: &mut Checker, class_def: &ast::StmtClassDef) {
-    let Some(arguments) = class_def.arguments.as_ref() else {
+    let Some(arguments) = class_def.arguments.as_deref() else {
         return;
     };
 

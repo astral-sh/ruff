@@ -1199,10 +1199,10 @@ ClassDef: ast::Stmt = {
         ast::Stmt::ClassDef(
             ast::StmtClassDef {
                 name,
-                arguments,
+                arguments: arguments.map(Box::new),
                 body,
                 decorator_list,
-                type_params,
+                type_params: type_params.map(Box::new),
                 range: (location..end_location).into()
             },
         )

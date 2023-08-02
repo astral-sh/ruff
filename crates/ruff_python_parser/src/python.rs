@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: aadf067e37a9f39d450f1403b759a9659c60e697758ddd2b8c2b5fa2d0d73672
+// sha3: f99d8cb29227bfbe1fa07719f655304a9a93fd4715726687ef40c091adbdbad5
 use num_bigint::BigInt;
 use ruff_text_size::TextSize;
 use ruff_python_ast::{self as ast, Ranged, MagicKind};
@@ -33583,10 +33583,10 @@ fn __action170<
         ast::Stmt::ClassDef(
             ast::StmtClassDef {
                 name,
-                arguments,
+                arguments: arguments.map(Box::new),
                 body,
                 decorator_list,
-                type_params,
+                type_params: type_params.map(Box::new),
                 range: (location..end_location).into()
             },
         )

@@ -570,7 +570,7 @@ pub(crate) fn unannotated_assignment_in_stub(
     }
 
     if let ScopeKind::Class(ast::StmtClassDef { arguments, .. }) = checker.semantic().scope().kind {
-        if is_enum(arguments.as_ref(), checker.semantic()) {
+        if is_enum(arguments.as_deref(), checker.semantic()) {
             return;
         }
     }

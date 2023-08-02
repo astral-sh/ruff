@@ -374,15 +374,17 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_django::rules::nullable_model_string_field(checker, body);
             }
             if checker.enabled(Rule::DjangoExcludeWithModelForm) {
-                if let Some(diagnostic) =
-                    flake8_django::rules::exclude_with_model_form(checker, arguments.as_ref(), body)
-                {
+                if let Some(diagnostic) = flake8_django::rules::exclude_with_model_form(
+                    checker,
+                    arguments.as_deref(),
+                    body,
+                ) {
                     checker.diagnostics.push(diagnostic);
                 }
             }
             if checker.enabled(Rule::DjangoAllWithModelForm) {
                 if let Some(diagnostic) =
-                    flake8_django::rules::all_with_model_form(checker, arguments.as_ref(), body)
+                    flake8_django::rules::all_with_model_form(checker, arguments.as_deref(), body)
                 {
                     checker.diagnostics.push(diagnostic);
                 }
@@ -390,7 +392,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::DjangoUnorderedBodyContentInModel) {
                 flake8_django::rules::unordered_body_content_in_model(
                     checker,
-                    arguments.as_ref(),
+                    arguments.as_deref(),
                     body,
                 );
             }
@@ -428,7 +430,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::ErrorSuffixOnExceptionName) {
                 if let Some(diagnostic) = pep8_naming::rules::error_suffix_on_exception_name(
                     stmt,
-                    arguments.as_ref(),
+                    arguments.as_deref(),
                     name,
                     &checker.settings.pep8_naming.ignore_names,
                 ) {
@@ -444,7 +446,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         checker,
                         stmt,
                         name,
-                        arguments.as_ref(),
+                        arguments.as_deref(),
                         body,
                     );
                 }
@@ -485,7 +487,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_builtins::rules::builtin_variable_shadowing(checker, name, name.range());
             }
             if checker.enabled(Rule::DuplicateBases) {
-                pylint::rules::duplicate_bases(checker, name, arguments.as_ref());
+                pylint::rules::duplicate_bases(checker, name, arguments.as_deref());
             }
             if checker.enabled(Rule::NoSlotsInStrSubclass) {
                 flake8_slots::rules::no_slots_in_str_subclass(checker, stmt, class_def);

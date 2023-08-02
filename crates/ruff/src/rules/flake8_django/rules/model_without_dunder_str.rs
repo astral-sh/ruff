@@ -60,7 +60,7 @@ pub(crate) fn model_without_dunder_str(
         ..
     }: &ast::StmtClassDef,
 ) {
-    if !is_non_abstract_model(arguments.as_ref(), body, checker.semantic()) {
+    if !is_non_abstract_model(arguments.as_deref(), body, checker.semantic()) {
         return;
     }
     if has_dunder_method(body) {
