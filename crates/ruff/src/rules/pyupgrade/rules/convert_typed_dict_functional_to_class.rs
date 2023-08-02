@@ -128,7 +128,7 @@ fn create_class_def_stmt(
             range: TextRange::default(),
         }),
         body,
-        type_params: vec![],
+        type_params: None,
         decorator_list: vec![],
         range: TextRange::default(),
     }

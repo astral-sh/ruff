@@ -969,7 +969,7 @@ pub struct StmtFunctionDef<'a> {
     parameters: ComparableParameters<'a>,
     body: Vec<ComparableStmt<'a>>,
     decorator_list: Vec<ComparableDecorator<'a>>,
-    type_params: Vec<ComparableTypeParam<'a>>,
+    type_params: Option<ComparableTypeParams<'a>>,
     returns: Option<ComparableExpr<'a>>,
 }
 
@@ -979,7 +979,7 @@ pub struct StmtAsyncFunctionDef<'a> {
     parameters: ComparableParameters<'a>,
     body: Vec<ComparableStmt<'a>>,
     decorator_list: Vec<ComparableDecorator<'a>>,
-    type_params: Vec<ComparableTypeParam<'a>>,
+    type_params: Option<ComparableTypeParams<'a>>,
     returns: Option<ComparableExpr<'a>>,
 }
 
@@ -989,7 +989,7 @@ pub struct StmtClassDef<'a> {
     arguments: Option<ComparableArguments<'a>>,
     body: Vec<ComparableStmt<'a>>,
     decorator_list: Vec<ComparableDecorator<'a>>,
-    type_params: Vec<ComparableTypeParam<'a>>,
+    type_params: Option<ComparableTypeParams<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -1005,8 +1005,21 @@ pub struct StmtDelete<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct StmtTypeAlias<'a> {
     pub name: Box<ComparableExpr<'a>>,
-    pub type_params: Vec<ComparableTypeParam<'a>>,
+    pub type_params: Option<ComparableTypeParams<'a>>,
     pub value: Box<ComparableExpr<'a>>,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ComparableTypeParams<'a> {
+    pub type_params: Vec<ComparableTypeParam<'a>>,
+}
+
+impl<'a> From<&'a ast::TypeParams> for ComparableTypeParams<'a> {
+    fn from(type_params: &'a ast::TypeParams) -> Self {
+        Self {
+            type_params: type_params.iter().map(Into::into).collect(),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -1237,7 +1250,7 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                 body: body.iter().map(Into::into).collect(),
                 decorator_list: decorator_list.iter().map(Into::into).collect(),
                 returns: returns.as_ref().map(Into::into),
-                type_params: type_params.iter().map(Into::into).collect(),
+                type_params: type_params.as_ref().map(Into::into),
             }),
             ast::Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
                 name,
@@ -1253,7 +1266,7 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                 body: body.iter().map(Into::into).collect(),
                 decorator_list: decorator_list.iter().map(Into::into).collect(),
                 returns: returns.as_ref().map(Into::into),
-                type_params: type_params.iter().map(Into::into).collect(),
+                type_params: type_params.as_ref().map(Into::into),
             }),
             ast::Stmt::ClassDef(ast::StmtClassDef {
                 name,
@@ -1267,7 +1280,7 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                 arguments: arguments.as_ref().map(Into::into),
                 body: body.iter().map(Into::into).collect(),
                 decorator_list: decorator_list.iter().map(Into::into).collect(),
-                type_params: type_params.iter().map(Into::into).collect(),
+                type_params: type_params.as_ref().map(Into::into),
             }),
             ast::Stmt::Return(ast::StmtReturn {
                 value,
@@ -1288,7 +1301,7 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                 value,
             }) => Self::TypeAlias(StmtTypeAlias {
                 name: name.into(),
-                type_params: type_params.iter().map(Into::into).collect(),
+                type_params: type_params.as_ref().map(Into::into),
                 value: value.into(),
             }),
             ast::Stmt::Assign(ast::StmtAssign {

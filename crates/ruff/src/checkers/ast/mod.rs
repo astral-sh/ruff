@@ -482,8 +482,8 @@ where
 
                 self.semantic.push_scope(ScopeKind::Type);
 
-                for type_param in type_params {
-                    self.visit_type_param(type_param);
+                if let Some(type_params) = type_params {
+                    self.visit_type_params(type_params);
                 }
 
                 for parameter_with_default in parameters
@@ -565,8 +565,8 @@ where
 
                 self.semantic.push_scope(ScopeKind::Type);
 
-                for type_param in type_params {
-                    self.visit_type_param(type_param);
+                if let Some(type_params) = type_params {
+                    self.visit_type_params(type_params);
                 }
 
                 if let Some(arguments) = arguments {
@@ -596,8 +596,8 @@ where
                 value,
             }) => {
                 self.semantic.push_scope(ScopeKind::Type);
-                for type_param in type_params {
-                    self.visit_type_param(type_param);
+                if let Some(type_params) = type_params {
+                    self.visit_type_params(type_params);
                 }
                 self.visit_expr(value);
                 self.semantic.pop_scope();

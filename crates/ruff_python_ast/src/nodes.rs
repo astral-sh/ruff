@@ -5,6 +5,7 @@ use num_bigint::BigInt;
 use ruff_text_size::{TextRange, TextSize};
 use std::fmt;
 use std::fmt::Debug;
+use std::ops::Deref;
 
 /// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
@@ -121,12 +122,12 @@ impl From<StmtLineMagic> for Stmt {
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtFunctionDef {
     pub range: TextRange,
-    pub name: Identifier,
-    pub parameters: Box<Parameters>,
-    pub body: Vec<Stmt>,
     pub decorator_list: Vec<Decorator>,
+    pub name: Identifier,
+    pub type_params: Option<TypeParams>,
+    pub parameters: Box<Parameters>,
     pub returns: Option<Box<Expr>>,
-    pub type_params: Vec<TypeParam>,
+    pub body: Vec<Stmt>,
 }
 
 impl From<StmtFunctionDef> for Stmt {
@@ -139,12 +140,12 @@ impl From<StmtFunctionDef> for Stmt {
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtAsyncFunctionDef {
     pub range: TextRange,
-    pub name: Identifier,
-    pub parameters: Box<Parameters>,
-    pub body: Vec<Stmt>,
     pub decorator_list: Vec<Decorator>,
+    pub name: Identifier,
+    pub type_params: Option<TypeParams>,
+    pub parameters: Box<Parameters>,
     pub returns: Option<Box<Expr>>,
-    pub type_params: Vec<TypeParam>,
+    pub body: Vec<Stmt>,
 }
 
 impl From<StmtAsyncFunctionDef> for Stmt {
@@ -157,11 +158,11 @@ impl From<StmtAsyncFunctionDef> for Stmt {
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtClassDef {
     pub range: TextRange,
+    pub decorator_list: Vec<Decorator>,
     pub name: Identifier,
+    pub type_params: Option<TypeParams>,
     pub arguments: Option<Arguments>,
     pub body: Vec<Stmt>,
-    pub type_params: Vec<TypeParam>,
-    pub decorator_list: Vec<Decorator>,
 }
 
 impl StmtClassDef {
@@ -221,7 +222,7 @@ impl From<StmtDelete> for Stmt {
 pub struct StmtTypeAlias {
     pub range: TextRange,
     pub name: Box<Expr>,
-    pub type_params: Vec<TypeParam>,
+    pub type_params: Option<TypeParams>,
     pub value: Box<Expr>,
 }
 
@@ -2120,6 +2121,29 @@ pub struct Arguments {
     pub keywords: Vec<Keyword>,
 }
 
+/// An AST node used to represent a sequence of type parameters.
+///
+/// For example, given:
+/// ```python
+/// class C[T, U, V]: ...
+/// ```
+/// The `TypeParams` node would span from the left to right brackets (inclusive), and contain
+/// the `T`, `U`, and `V` type parameters in the order they appear in the source code.
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TypeParams {
+    pub range: TextRange,
+    pub type_params: Vec<TypeParam>,
+}
+
+impl Deref for TypeParams {
+    type Target = [TypeParam];
+
+    fn deref(&self) -> &Self::Target {
+        &self.type_params
+    }
+}
+
 pub type Suite = Vec<Stmt>;
 
 impl CmpOp {
@@ -2952,6 +2976,11 @@ impl Ranged for crate::Pattern {
     }
 }
 
+impl Ranged for crate::nodes::TypeParams {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
 impl Ranged for crate::nodes::TypeParamTypeVar {
     fn range(&self) -> TextRange {
         self.range
@@ -3003,9 +3032,9 @@ mod size_assertions {
     use super::*;
     use static_assertions::assert_eq_size;
 
-    assert_eq_size!(Stmt, [u8; 176]);
-    assert_eq_size!(StmtFunctionDef, [u8; 128]);
-    assert_eq_size!(StmtClassDef, [u8; 168]);
+    assert_eq_size!(Stmt, [u8; 184]);
+    assert_eq_size!(StmtFunctionDef, [u8; 136]);
+    assert_eq_size!(StmtClassDef, [u8; 176]);
     assert_eq_size!(StmtTry, [u8; 104]);
     assert_eq_size!(Expr, [u8; 80]);
     assert_eq_size!(Constant, [u8; 32]);

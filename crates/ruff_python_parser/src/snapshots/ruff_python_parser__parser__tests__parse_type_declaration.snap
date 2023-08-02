@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_python_parser/src/parser.rs
-expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
+expression: "parse_suite(source, \"<test>\").unwrap()"
 ---
 [
     TypeAlias(
@@ -13,7 +13,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Store,
                 },
             ),
-            type_params: [],
+            type_params: None,
             value: Name(
                 ExprName {
                     range: 10..13,
@@ -33,7 +33,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Store,
                 },
             ),
-            type_params: [],
+            type_params: None,
             value: BinOp(
                 ExprBinOp {
                     range: 23..32,
@@ -66,7 +66,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Store,
                 },
             ),
-            type_params: [],
+            type_params: None,
             value: BinOp(
                 ExprBinOp {
                     range: 42..61,
@@ -101,18 +101,23 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Store,
                 },
             ),
-            type_params: [
-                TypeVar(
-                    TypeParamTypeVar {
-                        range: 69..70,
-                        name: Identifier {
-                            id: "T",
-                            range: 69..70,
-                        },
-                        bound: None,
-                    },
-                ),
-            ],
+            type_params: Some(
+                TypeParams {
+                    range: 68..71,
+                    type_params: [
+                        TypeVar(
+                            TypeParamTypeVar {
+                                range: 69..70,
+                                name: Identifier {
+                                    id: "T",
+                                    range: 69..70,
+                                },
+                                bound: None,
+                            },
+                        ),
+                    ],
+                },
+            ),
             value: BinOp(
                 ExprBinOp {
                     range: 74..88,
@@ -171,18 +176,23 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Store,
                 },
             ),
-            type_params: [
-                TypeVar(
-                    TypeParamTypeVar {
-                        range: 109..110,
-                        name: Identifier {
-                            id: "T",
-                            range: 109..110,
-                        },
-                        bound: None,
-                    },
-                ),
-            ],
+            type_params: Some(
+                TypeParams {
+                    range: 108..111,
+                    type_params: [
+                        TypeVar(
+                            TypeParamTypeVar {
+                                range: 109..110,
+                                name: Identifier {
+                                    id: "T",
+                                    range: 109..110,
+                                },
+                                bound: None,
+                            },
+                        ),
+                    ],
+                },
+            ),
             value: Name(
                 ExprName {
                     range: 114..117,
@@ -202,18 +212,23 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Store,
                 },
             ),
-            type_params: [
-                TypeVar(
-                    TypeParamTypeVar {
-                        range: 125..126,
-                        name: Identifier {
-                            id: "T",
-                            range: 125..126,
-                        },
-                        bound: None,
-                    },
-                ),
-            ],
+            type_params: Some(
+                TypeParams {
+                    range: 124..127,
+                    type_params: [
+                        TypeVar(
+                            TypeParamTypeVar {
+                                range: 125..126,
+                                name: Identifier {
+                                    id: "T",
+                                    range: 125..126,
+                                },
+                                bound: None,
+                            },
+                        ),
+                    ],
+                },
+            ),
             value: BinOp(
                 ExprBinOp {
                     range: 130..146,
@@ -272,36 +287,41 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Store,
                 },
             ),
-            type_params: [
-                TypeVar(
-                    TypeParamTypeVar {
-                        range: 154..155,
-                        name: Identifier {
-                            id: "T",
-                            range: 154..155,
-                        },
-                        bound: None,
-                    },
-                ),
-                TypeVarTuple(
-                    TypeParamTypeVarTuple {
-                        range: 157..160,
-                        name: Identifier {
-                            id: "Ts",
-                            range: 158..160,
-                        },
-                    },
-                ),
-                ParamSpec(
-                    TypeParamParamSpec {
-                        range: 162..165,
-                        name: Identifier {
-                            id: "P",
-                            range: 164..165,
-                        },
-                    },
-                ),
-            ],
+            type_params: Some(
+                TypeParams {
+                    range: 153..166,
+                    type_params: [
+                        TypeVar(
+                            TypeParamTypeVar {
+                                range: 154..155,
+                                name: Identifier {
+                                    id: "T",
+                                    range: 154..155,
+                                },
+                                bound: None,
+                            },
+                        ),
+                        TypeVarTuple(
+                            TypeParamTypeVarTuple {
+                                range: 157..160,
+                                name: Identifier {
+                                    id: "Ts",
+                                    range: 158..160,
+                                },
+                            },
+                        ),
+                        ParamSpec(
+                            TypeParamParamSpec {
+                                range: 162..165,
+                                name: Identifier {
+                                    id: "P",
+                                    range: 164..165,
+                                },
+                            },
+                        ),
+                    ],
+                },
+            ),
             value: Tuple(
                 ExprTuple {
                     range: 169..179,
@@ -343,44 +363,49 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Store,
                 },
             ),
-            type_params: [
-                TypeVar(
-                    TypeParamTypeVar {
-                        range: 187..193,
-                        name: Identifier {
-                            id: "T",
-                            range: 187..188,
-                        },
-                        bound: Some(
-                            Name(
-                                ExprName {
-                                    range: 190..193,
-                                    id: "int",
-                                    ctx: Load,
+            type_params: Some(
+                TypeParams {
+                    range: 186..204,
+                    type_params: [
+                        TypeVar(
+                            TypeParamTypeVar {
+                                range: 187..193,
+                                name: Identifier {
+                                    id: "T",
+                                    range: 187..188,
                                 },
-                            ),
+                                bound: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 190..193,
+                                            id: "int",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                            },
                         ),
-                    },
-                ),
-                TypeVarTuple(
-                    TypeParamTypeVarTuple {
-                        range: 195..198,
-                        name: Identifier {
-                            id: "Ts",
-                            range: 196..198,
-                        },
-                    },
-                ),
-                ParamSpec(
-                    TypeParamParamSpec {
-                        range: 200..203,
-                        name: Identifier {
-                            id: "P",
-                            range: 202..203,
-                        },
-                    },
-                ),
-            ],
+                        TypeVarTuple(
+                            TypeParamTypeVarTuple {
+                                range: 195..198,
+                                name: Identifier {
+                                    id: "Ts",
+                                    range: 196..198,
+                                },
+                            },
+                        ),
+                        ParamSpec(
+                            TypeParamParamSpec {
+                                range: 200..203,
+                                name: Identifier {
+                                    id: "P",
+                                    range: 202..203,
+                                },
+                            },
+                        ),
+                    ],
+                },
+            ),
             value: Tuple(
                 ExprTuple {
                     range: 207..217,
@@ -422,59 +447,64 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Store,
                 },
             ),
-            type_params: [
-                TypeVar(
-                    TypeParamTypeVar {
-                        range: 225..238,
-                        name: Identifier {
-                            id: "T",
-                            range: 225..226,
-                        },
-                        bound: Some(
-                            Tuple(
-                                ExprTuple {
-                                    range: 228..238,
-                                    elts: [
-                                        Name(
-                                            ExprName {
-                                                range: 229..232,
-                                                id: "int",
-                                                ctx: Load,
-                                            },
-                                        ),
-                                        Name(
-                                            ExprName {
-                                                range: 234..237,
-                                                id: "str",
-                                                ctx: Load,
-                                            },
-                                        ),
-                                    ],
-                                    ctx: Load,
+            type_params: Some(
+                TypeParams {
+                    range: 224..249,
+                    type_params: [
+                        TypeVar(
+                            TypeParamTypeVar {
+                                range: 225..238,
+                                name: Identifier {
+                                    id: "T",
+                                    range: 225..226,
                                 },
-                            ),
+                                bound: Some(
+                                    Tuple(
+                                        ExprTuple {
+                                            range: 228..238,
+                                            elts: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 229..232,
+                                                        id: "int",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        range: 234..237,
+                                                        id: "str",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                            },
                         ),
-                    },
-                ),
-                TypeVarTuple(
-                    TypeParamTypeVarTuple {
-                        range: 240..243,
-                        name: Identifier {
-                            id: "Ts",
-                            range: 241..243,
-                        },
-                    },
-                ),
-                ParamSpec(
-                    TypeParamParamSpec {
-                        range: 245..248,
-                        name: Identifier {
-                            id: "P",
-                            range: 247..248,
-                        },
-                    },
-                ),
-            ],
+                        TypeVarTuple(
+                            TypeParamTypeVarTuple {
+                                range: 240..243,
+                                name: Identifier {
+                                    id: "Ts",
+                                    range: 241..243,
+                                },
+                            },
+                        ),
+                        ParamSpec(
+                            TypeParamParamSpec {
+                                range: 245..248,
+                                name: Identifier {
+                                    id: "P",
+                                    range: 247..248,
+                                },
+                            },
+                        ),
+                    ],
+                },
+            ),
             value: Tuple(
                 ExprTuple {
                     range: 252..262,
@@ -516,7 +546,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Store,
                 },
             ),
-            type_params: [],
+            type_params: None,
             value: Name(
                 ExprName {
                     range: 305..308,
@@ -536,7 +566,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Store,
                 },
             ),
-            type_params: [],
+            type_params: None,
             value: Name(
                 ExprName {
                     range: 322..325,
@@ -556,7 +586,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Store,
                 },
             ),
-            type_params: [],
+            type_params: None,
             value: Name(
                 ExprName {
                     range: 338..341,
@@ -576,7 +606,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Store,
                 },
             ),
-            type_params: [],
+            type_params: None,
             value: Name(
                 ExprName {
                     range: 378..382,
@@ -596,7 +626,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Store,
                 },
             ),
-            type_params: [],
+            type_params: None,
             value: Name(
                 ExprName {
                     range: 394..399,
@@ -616,7 +646,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Store,
                 },
             ),
-            type_params: [],
+            type_params: None,
             value: Name(
                 ExprName {
                     range: 411..415,
@@ -636,7 +666,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Store,
                 },
             ),
-            type_params: [],
+            type_params: None,
             value: Name(
                 ExprName {
                     range: 451..454,
@@ -656,7 +686,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Store,
                 },
             ),
-            type_params: [],
+            type_params: None,
             value: Name(
                 ExprName {
                     range: 467..470,
@@ -676,7 +706,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Store,
                 },
             ),
-            type_params: [],
+            type_params: None,
             value: Name(
                 ExprName {
                     range: 483..486,
@@ -696,7 +726,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Store,
                 },
             ),
-            type_params: [],
+            type_params: None,
             value: Name(
                 ExprName {
                     range: 502..505,
@@ -716,18 +746,23 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Store,
                 },
             ),
-            type_params: [
-                TypeVar(
-                    TypeParamTypeVar {
-                        range: 521..522,
-                        name: Identifier {
-                            id: "T",
-                            range: 521..522,
-                        },
-                        bound: None,
-                    },
-                ),
-            ],
+            type_params: Some(
+                TypeParams {
+                    range: 520..523,
+                    type_params: [
+                        TypeVar(
+                            TypeParamTypeVar {
+                                range: 521..522,
+                                name: Identifier {
+                                    id: "T",
+                                    range: 521..522,
+                                },
+                                bound: None,
+                            },
+                        ),
+                    ],
+                },
+            ),
             value: Name(
                 ExprName {
                     range: 526..527,
@@ -747,18 +782,23 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Store,
                 },
             ),
-            type_params: [
-                TypeVar(
-                    TypeParamTypeVar {
-                        range: 542..543,
-                        name: Identifier {
-                            id: "T",
-                            range: 542..543,
-                        },
-                        bound: None,
-                    },
-                ),
-            ],
+            type_params: Some(
+                TypeParams {
+                    range: 541..544,
+                    type_params: [
+                        TypeVar(
+                            TypeParamTypeVar {
+                                range: 542..543,
+                                name: Identifier {
+                                    id: "T",
+                                    range: 542..543,
+                                },
+                                bound: None,
+                            },
+                        ),
+                    ],
+                },
+            ),
             value: Name(
                 ExprName {
                     range: 547..548,
@@ -778,18 +818,23 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
                     ctx: Store,
                 },
             ),
-            type_params: [
-                TypeVar(
-                    TypeParamTypeVar {
-                        range: 556..557,
-                        name: Identifier {
-                            id: "T",
-                            range: 556..557,
-                        },
-                        bound: None,
-                    },
-                ),
-            ],
+            type_params: Some(
+                TypeParams {
+                    range: 555..558,
+                    type_params: [
+                        TypeVar(
+                            TypeParamTypeVar {
+                                range: 556..557,
+                                name: Identifier {
+                                    id: "T",
+                                    range: 556..557,
+                                },
+                                bound: None,
+                            },
+                        ),
+                    ],
+                },
+            ),
             value: Name(
                 ExprName {
                     range: 567..568,
