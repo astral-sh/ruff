@@ -131,7 +131,7 @@ impl<'a> FormatSummaryValues<'a> {
 
 /// Return `true` if the string contains quotes.
 fn contains_quotes(string: &str) -> bool {
-    string.contains('\'') || string.contains('"')
+    string.contains(['\'', '"'])
 }
 
 enum FormatContext {
