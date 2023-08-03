@@ -25,24 +25,14 @@ pub(super) fn place_comment<'a>(
 ) -> CommentPlacement<'a> {
     // Handle comments before and after bodies such as the different branches of an if statement.
     let comment = if comment.line_position().is_own_line() {
-        match handle_own_line_comment_around_body(comment, locator) {
-            CommentPlacement::Default(comment) => comment,
-            placement => {
-                return placement;
-            }
-        }
+        handle_own_line_comment_around_body(comment, locator)
     } else {
-        match handle_end_of_line_comment_around_body(comment, locator) {
-            CommentPlacement::Default(comment) => comment,
-            placement => {
-                return placement;
-            }
-        }
+        handle_end_of_line_comment_around_body(comment, locator)
     };
 
     // Change comment placement depending on the node type. These can be seen as node-specific
     // fixups.
-    match comment.enclosing_node() {
+    comment.then_with(|comment| match comment.enclosing_node() {
         AnyNodeRef::Parameters(arguments) => {
             handle_parameters_separator_comment(comment, arguments, locator)
         }
@@ -88,7 +78,7 @@ pub(super) fn place_comment<'a>(
         }
         AnyNodeRef::StmtImportFrom(import_from) => handle_import_from_comment(comment, import_from),
         _ => CommentPlacement::Default(comment),
-    }
+    })
 }
 
 fn handle_end_of_line_comment_around_body<'a>(
@@ -275,22 +265,18 @@ fn handle_own_line_comment_around_body<'a>(
     }
 
     // Check if we're between bodies and should attach to the following body.
-    let comment = match handle_own_line_comment_between_branches(comment, preceding, locator) {
-        CommentPlacement::Default(comment) => comment,
-        placement => return placement,
-    };
-
-    // Otherwise, there's no following branch or the indentation is too deep, so attach to the
-    // recursively last statement in the preceding body with the matching indentation.
-    let comment = match handle_own_line_comment_after_branch(comment, preceding, locator) {
-        CommentPlacement::Default(comment) => comment,
-        placement => return placement,
-    };
-
-    // If the following node is the first in its body, and there's a non-trivia token between the
-    // comment and the following node (like a parenthesis), then it means the comment is trailing
-    // the preceding node, not leading the following one.
-    handle_own_line_comment_in_clause(comment, preceding, locator)
+    handle_own_line_comment_between_branches(comment, preceding, locator)
+        .then_with(|comment| {
+            // Otherwise, there's no following branch or the indentation is too deep, so attach to the
+            // recursively last statement in the preceding body with the matching indentation.
+            handle_own_line_comment_after_branch(comment, preceding, locator)
+        })
+        .then_with(|comment| {
+            // If the following node is the first in its body, and there's a non-trivia token between the
+            // comment and the following node (like a parenthesis), then it means the comment is trailing
+            // the preceding node, not leading the following one.
+            handle_own_line_comment_in_clause(comment, preceding, locator)
+        })
 }
 
 /// Handles own line comments between two branches of a node.
