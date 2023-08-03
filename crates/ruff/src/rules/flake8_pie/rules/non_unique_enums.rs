@@ -58,7 +58,7 @@ pub(crate) fn non_unique_enums(checker: &mut Checker, parent: &Stmt, body: &[Stm
         return;
     };
 
-    if !parent.bases().any(|expr| {
+    if !parent.bases().iter().any(|expr| {
         checker
             .semantic()
             .resolve_call_path(expr)

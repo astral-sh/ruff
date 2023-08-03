@@ -79,6 +79,7 @@ pub(crate) fn builtin_attribute_shadowing(
         // subscripting and not through attribute access.
         if class_def
             .bases()
+            .iter()
             .any(|base| checker.semantic().match_typing_expr(base, "TypedDict"))
         {
             return;

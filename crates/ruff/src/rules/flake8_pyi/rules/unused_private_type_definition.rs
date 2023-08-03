@@ -223,6 +223,7 @@ pub(crate) fn unused_private_protocol(
 
         if !class_def
             .bases()
+            .iter()
             .any(|base| checker.semantic().match_typing_expr(base, "Protocol"))
         {
             continue;
@@ -309,6 +310,7 @@ pub(crate) fn unused_private_typed_dict(
 
         if !class_def
             .bases()
+            .iter()
             .any(|base| checker.semantic().match_typing_expr(base, "TypedDict"))
         {
             continue;
