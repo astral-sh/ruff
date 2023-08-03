@@ -438,7 +438,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pyupgrade, "037") => (RuleGroup::Unspecified, rules::pyupgrade::rules::QuotedAnnotation),
         (Pyupgrade, "038") => (RuleGroup::Unspecified, rules::pyupgrade::rules::NonPEP604Isinstance),
         (Pyupgrade, "039") => (RuleGroup::Unspecified, rules::pyupgrade::rules::UnnecessaryClassParentheses),
-        (Pyupgrade, "100") => (RuleGroup::Unspecified, rules::pyupgrade::rules::NonPEP695TypeAlias),
+        (Pyupgrade, "040") => (RuleGroup::Unspecified, rules::pyupgrade::rules::NonPEP695TypeAlias),
 
         // pydocstyle
         (Pydocstyle, "100") => (RuleGroup::Unspecified, rules::pydocstyle::rules::UndocumentedPublicModule),
