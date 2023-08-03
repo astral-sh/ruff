@@ -31,3 +31,19 @@ len(
     a for b in c
     # trailing
 )
+
+a = (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    for f in bbbbbbbbbbbbbbb
+    if f not in ccccccccccc
+)
+
+a = (
+    [1, 2, 3,]
+    for f in bbbbbbbbbbbbbbb
+    if f not in ccccccccccc
+)
+
+aaaaaaaaaaaaaaaaaaaaa = (
+    o for o in self.registry.values if o.__class__ is not ModelAdmin
+)

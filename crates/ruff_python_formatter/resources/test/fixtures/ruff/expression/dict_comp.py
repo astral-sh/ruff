@@ -93,3 +93,19 @@ selected_choices = {
 
     x, aaaayaaaayaaaayaaaayaaaayaaaayaaaayaaaayaaaayaaaayaaaayaaaayaaaayaaaay) in z
 }
+
+a = {
+    k: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    for f in bbbbbbbbbbbbbbb
+    if f not in ccccccccccc
+}
+
+a = {
+    k: [1, 2, 3,]
+    for f in bbbbbbbbbbbbbbb
+    if f not in ccccccccccc
+}
+
+aaaaaaaaaaaaaaaaaaaaa = {
+    k: o for o in self.registry.values if o.__class__ is not ModelAdmin
+}

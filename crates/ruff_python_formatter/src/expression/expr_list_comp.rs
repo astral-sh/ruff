@@ -38,7 +38,7 @@ impl FormatNodeRule<ExprListComp> for FormatExprListComp {
                 &group(&format_args![
                     group(&elt.format()),
                     soft_line_break_or_space(),
-                    group(&joined)
+                    &joined
                 ]),
                 "]"
             )]
