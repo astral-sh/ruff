@@ -1,4 +1,9 @@
-use ruff_python_ast::{Expr, ExprName, Ranged, Stmt, StmtAnnAssign, StmtTypeAlias};
+use ruff_python_ast::{
+    visitor::{self, Visitor},
+    Expr, ExprName, ExprSubscript, Identifier, Ranged, Stmt, StmtAnnAssign, StmtAssign,
+    StmtTypeAlias, TypeParam, TypeParamTypeVar,
+};
+use ruff_python_semantic::SemanticModel;
 
 use crate::{registry::AsRule, settings::types::PythonVersion};
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -75,15 +80,78 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
     //              as type params instead
     let mut diagnostic = Diagnostic::new(NonPEP695TypeAlias { name: name.clone() }, stmt.range());
     if checker.patch(diagnostic.kind.rule()) {
+        let mut visitor = TypeVarNameVisitor {
+            names: vec![],
+            semantic: checker.semantic(),
+        };
+        visitor.visit_expr(value);
+
+        let type_params = if visitor.names.is_empty() {
+            None
+        } else {
+            Some(ruff_python_ast::TypeParams {
+                range: TextRange::default(),
+                type_params: visitor
+                    .names
+                    .iter()
+                    .map(|name| {
+                        TypeParam::TypeVar(TypeParamTypeVar {
+                            range: TextRange::default(),
+                            name: Identifier::new(name.id.clone(), TextRange::default()),
+                            bound: None,
+                        })
+                    })
+                    .collect(),
+            })
+        };
+
         diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
             checker.generator().stmt(&Stmt::from(StmtTypeAlias {
                 range: TextRange::default(),
                 name: target.clone(),
-                type_params: None,
+                type_params,
                 value: value.clone(),
             })),
             stmt.range(),
         )));
     }
     checker.diagnostics.push(diagnostic);
+}
+
+struct TypeVarNameVisitor<'a> {
+    names: Vec<&'a ExprName>,
+    semantic: &'a SemanticModel<'a>,
+}
+
+impl<'a> Visitor<'a> for TypeVarNameVisitor<'a> {
+    fn visit_expr(&mut self, expr: &'a Expr) {
+        match expr {
+            Expr::Name(name) if name.ctx.is_load() => {
+                let Some(Some(Stmt::Assign(StmtAssign { value, .. }))) =
+                    self.semantic
+                        .scope()
+                        .get(name.id.as_str())
+                        .map(|binding_id| {
+                            self.semantic
+                                .binding(binding_id)
+                                .source
+                                .map(|node_id| self.semantic.stmts[node_id])
+                        }) else {
+                            return;
+                        };
+
+                // Only support type variables declared as TypeVar['<name>'] for now
+                // Type variables declared with `TypeVar(<name>, ...)` can include more complex features
+                // like bounds and variance
+                let Expr::Subscript(ExprSubscript {value: ref subscript_value, .. })= value.as_ref() else {
+                    return;
+                };
+
+                if self.semantic.match_typing_expr(subscript_value, "TypeVar") {
+                    self.names.push(name);
+                }
+            }
+            _ => visitor::walk_expr(self, expr),
+        }
+    }
 }
