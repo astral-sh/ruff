@@ -15,6 +15,7 @@ export default function SecondarySideBar({
     <SideBar position="right">
       <SideBarEntry
         title="Format (alpha)"
+        position={"right"}
         selected={selected === SecondaryTool.Format}
         onClick={() => onSelected(SecondaryTool.Format)}
       >
@@ -23,6 +24,7 @@ export default function SecondarySideBar({
 
       <SideBarEntry
         title="AST"
+        position={"right"}
         selected={selected === SecondaryTool.AST}
         onClick={() => onSelected(SecondaryTool.AST)}
       >
@@ -31,6 +33,7 @@ export default function SecondarySideBar({
 
       <SideBarEntry
         title="Tokens"
+        position={"right"}
         selected={selected === SecondaryTool.Tokens}
         onClick={() => onSelected(SecondaryTool.Tokens)}
       >
@@ -39,6 +42,7 @@ export default function SecondarySideBar({
 
       <SideBarEntry
         title="Formatter IR"
+        position={"right"}
         selected={selected === SecondaryTool.FIR}
         onClick={() => onSelected(SecondaryTool.FIR)}
       >

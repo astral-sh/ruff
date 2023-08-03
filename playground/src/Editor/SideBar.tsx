@@ -23,6 +23,8 @@ export interface SideBarEntryProps {
   title: string;
   selected: boolean;
   children: ReactNode;
+  position: "left" | "right";
+
   onClick?(): void;
 }
 
@@ -31,13 +33,14 @@ export function SideBarEntry({
   onClick,
   children,
   selected,
+  position,
 }: SideBarEntryProps) {
   return (
     <li
-      title={title}
+      aria-label={title}
       onClick={onClick}
       role="button"
-      className={`py-4 px-2 relative flex items-center flex-col fill-white text-white ${
+      className={`group py-4 px-2 relative flex items-center justify-center flex-col fill-white text-white ${
         selected ? "opacity-100" : "opacity-50 hover:opacity-100"
       }`}
     >
@@ -45,6 +48,25 @@ export function SideBarEntry({
       {selected && (
         <span className="absolute start-0 inset-y-0 bg-white w-0.5"></span>
       )}
+
+      <Tooltip position={position}>{title}</Tooltip>
     </li>
+  );
+}
+
+interface TooltipProps {
+  children: ReactNode;
+  position: "left" | "right";
+}
+
+function Tooltip({ children, position }: TooltipProps) {
+  return (
+    <span
+      className={`z-10 absolute w-100 rounded dark:border-[1px] dark:border-white bg-space dark:bg-white px-2 py-1 hidden text-xs text-white dark:text-black group-hover:flex whitespace-nowrap ${
+        position === "right" ? "right-[52px]" : "left-[52px]"
+      }`}
+    >
+      {children}
+    </span>
   );
 }
