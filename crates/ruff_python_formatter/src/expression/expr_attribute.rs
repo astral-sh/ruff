@@ -4,7 +4,7 @@ use ruff_python_ast::{Constant, Expr, ExprAttribute, ExprConstant};
 
 use crate::comments::{leading_comments, trailing_comments};
 use crate::expression::parentheses::{
-    is_expression_parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
+    NeedsParentheses, OptionalParentheses, Parentheses,
 };
 use crate::prelude::*;
 use crate::FormatNodeRule;
@@ -50,11 +50,8 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
         if needs_parentheses {
             value.format().with_options(Parentheses::Always).fmt(f)?;
         } else if self.fluent_style {
-            // Fluent style: We need to pass the parentheses on to inner attributes or call chains
             match value.as_ref() {
-                Expr::Attribute(expr) => {
-                    expr.format().with_options(self.fluent_style).fmt(f)?;
-                }
+                Expr::Attribute(expr) => expr.format().with_options(self.fluent_style).fmt(f)?,
                 Expr::Call(expr) => {
                     expr.format().with_options(self.fluent_style).fmt(f)?;
                     // Format the dot on its own line
@@ -65,15 +62,7 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
                     // Format the dot on its own line
                     soft_line_break().fmt(f)?;
                 }
-                _ => {
-                    value.format().fmt(f)?;
-                    // TODO: This is inefficient, we already check this in `FormatExpr`.
-                    // TODO 2: This assumes `Parentheses::Preserve`, what's with other parentheses
-                    // kinds
-                    if is_expression_parenthesized(value.as_ref().into(), f.context().source()) {
-                        soft_line_break().fmt(f)?;
-                    }
-                }
+                _ => value.format().fmt(f)?,
             }
         } else {
             value.format().fmt(f)?;
