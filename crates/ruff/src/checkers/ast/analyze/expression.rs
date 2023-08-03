@@ -97,13 +97,11 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     if checker.enabled(Rule::DuplicateUnionMember) {
                         flake8_pyi::rules::duplicate_union_member(checker, expr);
                     }
-                    if checker.is_stub {
-                        if checker.enabled(Rule::RedundantLiteralUnion) {
-                            flake8_pyi::rules::redundant_literal_union(checker, expr);
-                        }
-                        if checker.enabled(Rule::UnnecessaryTypeUnion) {
-                            flake8_pyi::rules::unnecessary_type_union(checker, expr);
-                        }
+                    if checker.enabled(Rule::RedundantLiteralUnion) {
+                        flake8_pyi::rules::redundant_literal_union(checker, expr);
+                    }
+                    if checker.enabled(Rule::UnnecessaryTypeUnion) {
+                        flake8_pyi::rules::unnecessary_type_union(checker, expr);
                     }
                 }
             }

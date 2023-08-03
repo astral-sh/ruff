@@ -27,6 +27,14 @@ PYI055.py:7:4: PYI055 Multiple `type` members in a union. Combine them into one,
 8 | z: Union[type[float], type[complex]]
   |
 
+PYI055.py:8:4: PYI055 Multiple `type` members in a union. Combine them into one, e.g. `type[Union[float, complex]]`
+  |
+6 | x: type[int] | type[str] | type[float]
+7 | y: builtins.type[int] | type[str] | builtins.type[complex]
+8 | z: Union[type[float], type[complex]]
+  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
+  |
+
 PYI055.py:11:15: PYI055 Multiple `type` members in a union. Combine them into one, e.g. `type[int | float]`
    |
 11 | def func(arg: type[int] | str | type[float]) -> None: ...
