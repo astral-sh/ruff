@@ -8,7 +8,7 @@ UP040.py:5:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of th
   | ^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
 6 | x: TypeAlias = int
   |
-  = help: Replace with the `type` keyword
+  = help: Use the `type` keyword
 
 ℹ Fix
 2 2 | from typing import TypeAlias
@@ -27,7 +27,7 @@ UP040.py:6:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of th
 6 | x: TypeAlias = int
   | ^^^^^^^^^^^^^^^^^^ UP040
   |
-  = help: Replace with the `type` keyword
+  = help: Use the `type` keyword
 
 ℹ Fix
 3 3 | 
@@ -46,7 +46,7 @@ UP040.py:11:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
 11 | x: typing.TypeAlias = list[T]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
    |
-   = help: Replace with the `type` keyword
+   = help: Use the `type` keyword
 
 ℹ Fix
 8  8  | 

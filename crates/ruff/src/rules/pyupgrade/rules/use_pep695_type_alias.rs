@@ -38,7 +38,7 @@ impl Violation for NonPEP695TypeAlias {
     }
 
     fn autofix_title(&self) -> Option<String> {
-        Some("Replace with the `type` keyword".to_string())
+        Some("Use the `type` keyword".to_string())
     }
 }
 
