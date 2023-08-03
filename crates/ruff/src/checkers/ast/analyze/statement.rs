@@ -1362,12 +1362,14 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
         }
-        Stmt::AnnAssign(ast::StmtAnnAssign {
-            target,
-            value,
-            annotation,
-            ..
-        }) => {
+        Stmt::AnnAssign(
+            assign_stmt @ ast::StmtAnnAssign {
+                target,
+                value,
+                annotation,
+                ..
+            },
+        ) => {
             if let Some(value) = value {
                 if checker.enabled(Rule::LambdaAssignment) {
                     pycodestyle::rules::lambda_assignment(
@@ -1389,6 +1391,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     value.as_deref(),
                     stmt,
                 );
+            }
+            if checker.enabled(Rule::NonPEP695TypeAlias) {
+                pyupgrade::rules::non_pep695_type_alias(checker, assign_stmt);
             }
             if checker.is_stub {
                 if let Some(value) = value {
