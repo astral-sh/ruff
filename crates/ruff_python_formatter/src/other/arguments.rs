@@ -1,15 +1,13 @@
 use ruff_formatter::write;
-use ruff_python_ast::node::{AnyNodeRef, AstNode};
-use ruff_python_ast::{Arguments, Expr, ExprCall, Ranged};
+use ruff_python_ast::node::AstNode;
+use ruff_python_ast::{Arguments, Expr, Ranged};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::builders::empty_parenthesized_with_dangling_comments;
 use crate::comments::trailing_comments;
 use crate::expression::expr_generator_exp::GeneratorExpParentheses;
-use crate::expression::parentheses::{
-    parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
-};
+use crate::expression::parentheses::{parenthesized, Parentheses};
 use crate::prelude::*;
 use crate::FormatNodeRule;
 
@@ -113,16 +111,6 @@ impl FormatNodeRule<Arguments> for FormatArguments {
     fn fmt_dangling_comments(&self, _node: &Arguments, _f: &mut PyFormatter) -> FormatResult<()> {
         // Handled in `fmt_fields`
         Ok(())
-    }
-}
-
-impl NeedsParentheses for ExprCall {
-    fn needs_parentheses(
-        &self,
-        _parent: AnyNodeRef,
-        context: &PyFormatContext,
-    ) -> OptionalParentheses {
-        self.func.needs_parentheses(self.into(), context)
     }
 }
 

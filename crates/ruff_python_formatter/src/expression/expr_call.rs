@@ -1,6 +1,8 @@
 use ruff_formatter::write;
+use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::ExprCall;
 
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 use crate::FormatNodeRule;
 
@@ -16,5 +18,15 @@ impl FormatNodeRule<ExprCall> for FormatExprCall {
         } = item;
 
         write!(f, [func.format(), arguments.format()])
+    }
+}
+
+impl NeedsParentheses for ExprCall {
+    fn needs_parentheses(
+        &self,
+        _parent: AnyNodeRef,
+        context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        self.func.needs_parentheses(self.into(), context)
     }
 }
