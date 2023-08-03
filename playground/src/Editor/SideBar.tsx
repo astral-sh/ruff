@@ -37,8 +37,8 @@ export function SideBarEntry({
       title={title}
       onClick={onClick}
       role="button"
-      className={`py-4 px-2 relative flex items-center flex-col ${
-        selected ? "fill-white text-white" : "fill-slate-500 text-slate-500"
+      className={`py-4 px-2 relative flex items-center flex-col fill-white text-white ${
+        selected ? "opacity-100" : "opacity-50 hover:opacity-100"
       }`}
     >
       {children}
