@@ -118,3 +118,38 @@ lambda a, /, c: a
     # 4
     None # 5
 )
+
+(
+    lambda
+    # comment
+    *x: x
+)
+
+(
+    lambda
+    # comment 1
+    *
+    # comment 2
+    x:
+    # comment 3
+    x
+)
+
+(
+    lambda # comment 1
+    * # comment 2
+    x: # comment 3
+    x
+)
+
+lambda *x\
+    :x
+
+(
+    lambda
+    # comment
+    *\
+        x: x
+)
+
+
