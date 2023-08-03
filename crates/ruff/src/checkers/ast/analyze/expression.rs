@@ -1115,7 +1115,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 )
             {
                 flake8_pyi::rules::unnecessary_type_union(checker, expr);
-            }  
+            }
         }
         Expr::UnaryOp(ast::ExprUnaryOp {
             op,
