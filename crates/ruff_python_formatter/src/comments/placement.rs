@@ -3,8 +3,8 @@ use std::cmp::Ordering;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{
-    self as ast, Arguments, Comprehension, Expr, ExprAttribute, ExprBinOp, ExprIfExp, ExprSlice,
-    ExprStarred, MatchCase, Parameters, Ranged, TypeParams,
+    self as ast, Comprehension, Expr, ExprAttribute, ExprBinOp, ExprIfExp, ExprSlice, ExprStarred,
+    MatchCase, Parameters, Ranged,
 };
 use ruff_python_trivia::{
     indentation_at_offset, PythonWhitespace, SimpleToken, SimpleTokenKind, SimpleTokenizer,
@@ -46,7 +46,9 @@ pub(super) fn place_comment<'a>(
         AnyNodeRef::Parameters(arguments) => {
             handle_parameters_separator_comment(comment, arguments, locator)
         }
-        AnyNodeRef::Arguments(arguments) => handle_arguments_comment(comment, arguments),
+        AnyNodeRef::Arguments(_) | AnyNodeRef::TypeParams(_) => {
+            handle_bracketed_end_of_line_comment(comment, locator)
+        }
         AnyNodeRef::Comprehension(comprehension) => {
             handle_comprehension_comment(comment, comprehension, locator)
         }
@@ -85,7 +87,6 @@ pub(super) fn place_comment<'a>(
             handle_leading_class_with_decorators_comment(comment, class_def)
         }
         AnyNodeRef::StmtImportFrom(import_from) => handle_import_from_comment(comment, import_from),
-        AnyNodeRef::TypeParams(type_params) => handle_type_params_comment(comment, type_params),
         _ => CommentPlacement::Default(comment),
     }
 }
@@ -607,51 +608,6 @@ fn handle_own_line_comment_after_branch<'a>(
             }
         }
     }
-}
-
-/// Attach an enclosed end-of-line comment to a set of [`TypeParams`].
-///
-/// For example, given:
-/// ```python
-/// type foo[  # comment
-///    bar,
-/// ] = ...
-/// ```
-///
-/// The comment will be attached to the [`TypeParams`] node as a dangling comment, to ensure
-/// that it remains on the same line as open bracket.
-fn handle_type_params_comment<'a>(
-    comment: DecoratedComment<'a>,
-    type_params: &'a TypeParams,
-) -> CommentPlacement<'a> {
-    // The comment needs to be on the same line, but before the first type param. For example, we want
-    // to treat this as a dangling comment:
-    // ```python
-    // type foo[  # comment
-    //     bar,
-    //     baz,
-    //     qux,
-    // ]
-    // ```
-    // However, this should _not_ be treated as a dangling comment:
-    // ```python
-    // type foo[bar,  # comment
-    //     baz,
-    //     qux,
-    // ] = ...
-    // ```
-    // Thus, we check whether the comment is an end-of-line comment _between_ the start of the
-    // statement and the first type param. If so, the only possible position is immediately following
-    // the open parenthesis.
-    if comment.line_position().is_end_of_line() {
-        if let Some(first_type_param) = type_params.type_params.first() {
-            if type_params.start() < comment.start() && comment.end() < first_type_param.start() {
-                return CommentPlacement::dangling(comment.enclosing_node(), comment);
-            }
-        }
-    }
-
-    CommentPlacement::Default(comment)
 }
 
 /// Attaches comments for the positional-only parameters separator `/` or the keywords-only
@@ -1226,9 +1182,10 @@ fn find_only_token_in_range(
     token
 }
 
-/// Attach an enclosed end-of-line comment to a set of [`Arguments`].
+/// Attach an end-of-line comment immediately following an open bracket as a dangling comment on
+/// enclosing node.
 ///
-/// For example, given:
+/// For example, given  the following function call:
 /// ```python
 /// foo(  # comment
 ///    bar,
@@ -1237,47 +1194,36 @@ fn find_only_token_in_range(
 ///
 /// The comment will be attached to the [`Arguments`] node as a dangling comment, to ensure
 /// that it remains on the same line as open parenthesis.
-fn handle_arguments_comment<'a>(
+///
+/// Similarly, given:
+/// ```python
+/// type foo[  # comment
+///    bar,
+/// ] = ...
+/// ```
+///
+/// The comment will be attached to the [`TypeParams`] node as a dangling comment, to ensure
+/// that it remains on the same line as open bracket.
+fn handle_bracketed_end_of_line_comment<'a>(
     comment: DecoratedComment<'a>,
-    arguments: &'a Arguments,
+    locator: &Locator,
 ) -> CommentPlacement<'a> {
-    // The comment needs to be on the same line, but before the first argument. For example, we want
-    // to treat this as a dangling comment:
-    // ```python
-    // foo(  # comment
-    //     bar,
-    //     baz,
-    //     qux,
-    // )
-    // ```
-    // However, this should _not_ be treated as a dangling comment:
-    // ```python
-    // foo(bar,  # comment
-    //     baz,
-    //     qux,
-    // )
-    // ```
-    // Thus, we check whether the comment is an end-of-line comment _between_ the start of the
-    // statement and the first argument. If so, the only possible position is immediately following
-    // the open parenthesis.
     if comment.line_position().is_end_of_line() {
-        let first_argument = match (arguments.args.as_slice(), arguments.keywords.as_slice()) {
-            ([first_arg, ..], [first_keyword, ..]) => {
-                if first_arg.start() < first_keyword.start() {
-                    Some(first_arg.range())
-                } else {
-                    Some(first_keyword.range())
-                }
-            }
-            ([first_arg, ..], []) => Some(first_arg.range()),
-            ([], [first_keyword, ..]) => Some(first_keyword.range()),
-            ([], []) => None,
-        };
+        // Ensure that there are no tokens between the open bracket and the comment.
+        let mut lexer = SimpleTokenizer::new(
+            locator.contents(),
+            TextRange::new(comment.enclosing_node().start(), comment.start()),
+        )
+        .skip_trivia()
+        .skip_while(|t| {
+            matches!(
+                t.kind(),
+                SimpleTokenKind::LParen | SimpleTokenKind::LBrace | SimpleTokenKind::LBracket
+            )
+        });
 
-        if let Some(first_argument) = first_argument {
-            if arguments.start() < comment.start() && comment.end() < first_argument.start() {
-                return CommentPlacement::dangling(comment.enclosing_node(), comment);
-            }
+        if lexer.next().is_none() {
+            return CommentPlacement::dangling(comment.enclosing_node(), comment);
         }
     }
 
