@@ -82,6 +82,7 @@ KNOWN_PARSE_ERRORS = [
     "missing-newline-at-end-of-file",
     "mixed-spaces-and-tabs",
     "no-indented-block",
+    "non-pep695-type-alias",  # requires Python 3.12
     "tab-after-comma",
     "tab-after-keyword",
     "tab-after-operator",
@@ -89,7 +90,6 @@ KNOWN_PARSE_ERRORS = [
     "tab-before-operator",
     "trailing-whitespace",
     "unexpected-indentation",
-    "non-pep695-type-alias",  # requires Python 3.12
 ]
 
 
