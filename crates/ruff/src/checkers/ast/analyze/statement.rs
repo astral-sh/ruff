@@ -75,6 +75,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             returns,
             parameters,
             body,
+            type_params,
             ..
         })
         | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
@@ -83,6 +84,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             returns,
             parameters,
             body,
+            type_params,
             ..
         }) => {
             if checker.enabled(Rule::DjangoNonLeadingReceiverDecorator) {
@@ -153,6 +155,16 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         returns.as_ref().map(AsRef::as_ref),
                         parameters,
                         stmt.is_async_function_def_stmt(),
+                    );
+                }
+                if checker.enabled(Rule::CustomTypeVarReturnType) {
+                    flake8_pyi::rules::custom_type_var_return_type(
+                        checker,
+                        name,
+                        decorator_list,
+                        returns.as_ref().map(AsRef::as_ref),
+                        parameters,
+                        type_params.as_ref(),
                     );
                 }
                 if checker.enabled(Rule::StrOrReprDefinedInStub) {

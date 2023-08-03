@@ -10,6 +10,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
+    use crate::settings::types::PythonVersion;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
@@ -108,6 +109,21 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_pyi").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("PYI019.py"))]
+    #[test_case(Path::new("PYI019.pyi"))]
+    fn custom_type_var_return_type(path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", "PYI019", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_pyi").join(path).as_path(),
+            &settings::Settings {
+                target_version: PythonVersion::Py312,
+                ..settings::Settings::for_rules(vec![Rule::CustomTypeVarReturnType])
+            },
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
