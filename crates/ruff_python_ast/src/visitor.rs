@@ -166,24 +166,18 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             }
             visitor.visit_body(body);
         }
-        Stmt::Return(ast::StmtReturn {
-            value,
-            range: _range,
-        }) => {
+        Stmt::Return(ast::StmtReturn { value, range: _ }) => {
             if let Some(expr) = value {
                 visitor.visit_expr(expr);
             }
         }
-        Stmt::Delete(ast::StmtDelete {
-            targets,
-            range: _range,
-        }) => {
+        Stmt::Delete(ast::StmtDelete { targets, range: _ }) => {
             for expr in targets {
                 visitor.visit_expr(expr);
             }
         }
         Stmt::TypeAlias(ast::StmtTypeAlias {
-            range: _range,
+            range: _,
             name,
             type_params,
             value,
@@ -204,7 +198,7 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             target,
             op,
             value,
-            range: _range,
+            range: _,
         }) => {
             visitor.visit_expr(value);
             visitor.visit_operator(op);
@@ -250,7 +244,7 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             test,
             body,
             orelse,
-            range: _range,
+            range: _,
         }) => {
             visitor.visit_expr(test);
             visitor.visit_body(body);
@@ -260,7 +254,7 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             test,
             body,
             elif_else_clauses,
-            range: _range,
+            range: _,
         }) => {
             visitor.visit_expr(test);
             visitor.visit_body(body);
@@ -286,7 +280,7 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
         Stmt::Match(ast::StmtMatch {
             subject,
             cases,
-            range: _range,
+            range: _,
         }) => {
             visitor.visit_expr(subject);
             for match_case in cases {
@@ -296,7 +290,7 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
         Stmt::Raise(ast::StmtRaise {
             exc,
             cause,
-            range: _range,
+            range: _,
         }) => {
             if let Some(expr) = exc {
                 visitor.visit_expr(expr);
@@ -310,7 +304,7 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             handlers,
             orelse,
             finalbody,
-            range: _range,
+            range: _,
         }) => {
             visitor.visit_body(body);
             for except_handler in handlers {
@@ -324,7 +318,7 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             handlers,
             orelse,
             finalbody,
-            range: _range,
+            range: _,
         }) => {
             visitor.visit_body(body);
             for except_handler in handlers {
@@ -336,17 +330,14 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
         Stmt::Assert(ast::StmtAssert {
             test,
             msg,
-            range: _range,
+            range: _,
         }) => {
             visitor.visit_expr(test);
             if let Some(expr) = msg {
                 visitor.visit_expr(expr);
             }
         }
-        Stmt::Import(ast::StmtImport {
-            names,
-            range: _range,
-        }) => {
+        Stmt::Import(ast::StmtImport { names, range: _ }) => {
             for alias in names {
                 visitor.visit_alias(alias);
             }
@@ -358,10 +349,7 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
         }
         Stmt::Global(_) => {}
         Stmt::Nonlocal(_) => {}
-        Stmt::Expr(ast::StmtExpr {
-            value,
-            range: _range,
-        }) => visitor.visit_expr(value),
+        Stmt::Expr(ast::StmtExpr { value, range: _ }) => visitor.visit_expr(value),
         Stmt::Pass(_) | Stmt::Break(_) | Stmt::Continue(_) | Stmt::LineMagic(_) => {}
     }
 }
@@ -379,7 +367,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
         Expr::BoolOp(ast::ExprBoolOp {
             op,
             values,
-            range: _range,
+            range: _,
         }) => {
             visitor.visit_bool_op(op);
             for expr in values {
@@ -389,7 +377,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
         Expr::NamedExpr(ast::ExprNamedExpr {
             target,
             value,
-            range: _range,
+            range: _,
         }) => {
             visitor.visit_expr(value);
             visitor.visit_expr(target);
@@ -398,7 +386,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
             left,
             op,
             right,
-            range: _range,
+            range: _,
         }) => {
             visitor.visit_expr(left);
             visitor.visit_operator(op);
@@ -407,7 +395,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
         Expr::UnaryOp(ast::ExprUnaryOp {
             op,
             operand,
-            range: _range,
+            range: _,
         }) => {
             visitor.visit_unary_op(op);
             visitor.visit_expr(operand);
@@ -415,7 +403,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
         Expr::Lambda(ast::ExprLambda {
             parameters,
             body,
-            range: _range,
+            range: _,
         }) => {
             visitor.visit_parameters(parameters);
             visitor.visit_expr(body);
@@ -424,7 +412,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
             test,
             body,
             orelse,
-            range: _range,
+            range: _,
         }) => {
             visitor.visit_expr(test);
             visitor.visit_expr(body);
@@ -433,7 +421,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
         Expr::Dict(ast::ExprDict {
             keys,
             values,
-            range: _range,
+            range: _,
         }) => {
             for expr in keys.iter().flatten() {
                 visitor.visit_expr(expr);
@@ -442,10 +430,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
                 visitor.visit_expr(expr);
             }
         }
-        Expr::Set(ast::ExprSet {
-            elts,
-            range: _range,
-        }) => {
+        Expr::Set(ast::ExprSet { elts, range: _ }) => {
             for expr in elts {
                 visitor.visit_expr(expr);
             }
@@ -453,7 +438,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
         Expr::ListComp(ast::ExprListComp {
             elt,
             generators,
-            range: _range,
+            range: _,
         }) => {
             for comprehension in generators {
                 visitor.visit_comprehension(comprehension);
@@ -463,7 +448,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
         Expr::SetComp(ast::ExprSetComp {
             elt,
             generators,
-            range: _range,
+            range: _,
         }) => {
             for comprehension in generators {
                 visitor.visit_comprehension(comprehension);
@@ -474,7 +459,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
             key,
             value,
             generators,
-            range: _range,
+            range: _,
         }) => {
             for comprehension in generators {
                 visitor.visit_comprehension(comprehension);
@@ -485,34 +470,25 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
         Expr::GeneratorExp(ast::ExprGeneratorExp {
             elt,
             generators,
-            range: _range,
+            range: _,
         }) => {
             for comprehension in generators {
                 visitor.visit_comprehension(comprehension);
             }
             visitor.visit_expr(elt);
         }
-        Expr::Await(ast::ExprAwait {
-            value,
-            range: _range,
-        }) => visitor.visit_expr(value),
-        Expr::Yield(ast::ExprYield {
-            value,
-            range: _range,
-        }) => {
+        Expr::Await(ast::ExprAwait { value, range: _ }) => visitor.visit_expr(value),
+        Expr::Yield(ast::ExprYield { value, range: _ }) => {
             if let Some(expr) = value {
                 visitor.visit_expr(expr);
             }
         }
-        Expr::YieldFrom(ast::ExprYieldFrom {
-            value,
-            range: _range,
-        }) => visitor.visit_expr(value),
+        Expr::YieldFrom(ast::ExprYieldFrom { value, range: _ }) => visitor.visit_expr(value),
         Expr::Compare(ast::ExprCompare {
             left,
             ops,
             comparators,
-            range: _range,
+            range: _,
         }) => {
             visitor.visit_expr(left);
             for cmp_op in ops {
@@ -525,7 +501,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
         Expr::Call(ast::ExprCall {
             func,
             arguments,
-            range: _range,
+            range: _,
         }) => {
             visitor.visit_expr(func);
             visitor.visit_arguments(arguments);
@@ -538,10 +514,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
                 visitor.visit_format_spec(expr);
             }
         }
-        Expr::JoinedStr(ast::ExprJoinedStr {
-            values,
-            range: _range,
-        }) => {
+        Expr::JoinedStr(ast::ExprJoinedStr { values, range: _ }) => {
             for expr in values {
                 visitor.visit_expr(expr);
             }
@@ -555,7 +528,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
             value,
             slice,
             ctx,
-            range: _range,
+            range: _,
         }) => {
             visitor.visit_expr(value);
             visitor.visit_expr(slice);
@@ -564,7 +537,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
         Expr::Starred(ast::ExprStarred {
             value,
             ctx,
-            range: _range,
+            range: _,
         }) => {
             visitor.visit_expr(value);
             visitor.visit_expr_context(ctx);
@@ -575,7 +548,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
         Expr::List(ast::ExprList {
             elts,
             ctx,
-            range: _range,
+            range: _,
         }) => {
             for expr in elts {
                 visitor.visit_expr(expr);
@@ -585,7 +558,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
         Expr::Tuple(ast::ExprTuple {
             elts,
             ctx,
-            range: _range,
+            range: _,
         }) => {
             for expr in elts {
                 visitor.visit_expr(expr);
@@ -596,7 +569,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
             lower,
             upper,
             step,
-            range: _range,
+            range: _,
         }) => {
             if let Some(expr) = lower {
                 visitor.visit_expr(expr);
@@ -733,15 +706,11 @@ pub fn walk_match_case<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, match_case:
 
 pub fn walk_pattern<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, pattern: &'a Pattern) {
     match pattern {
-        Pattern::MatchValue(ast::PatternMatchValue {
-            value,
-            range: _range,
-        }) => visitor.visit_expr(value),
+        Pattern::MatchValue(ast::PatternMatchValue { value, .. }) => {
+            visitor.visit_expr(value);
+        }
         Pattern::MatchSingleton(_) => {}
-        Pattern::MatchSequence(ast::PatternMatchSequence {
-            patterns,
-            range: _range,
-        }) => {
+        Pattern::MatchSequence(ast::PatternMatchSequence { patterns, .. }) => {
             for pattern in patterns {
                 visitor.visit_pattern(pattern);
             }
@@ -775,10 +744,7 @@ pub fn walk_pattern<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, pattern: &'a P
                 visitor.visit_pattern(pattern);
             }
         }
-        Pattern::MatchOr(ast::PatternMatchOr {
-            patterns,
-            range: _range,
-        }) => {
+        Pattern::MatchOr(ast::PatternMatchOr { patterns, .. }) => {
             for pattern in patterns {
                 visitor.visit_pattern(pattern);
             }

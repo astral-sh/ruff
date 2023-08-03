@@ -223,7 +223,7 @@ pub fn is_immutable_annotation(expr: &Expr, semantic: &SemanticModel) -> bool {
             left,
             op: Operator::BitOr,
             right,
-            range: _range,
+            range: _,
         }) => is_immutable_annotation(left, semantic) && is_immutable_annotation(right, semantic),
         Expr::Constant(ast::ExprConstant {
             value: Constant::None,
