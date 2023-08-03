@@ -68,7 +68,7 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
         // Nested expressions that are in some outer expression's parentheses may be formatted in
         // fluent style
         let fluent_style = f.context().node_level() == NodeLevel::ParenthesizedExpression
-            && is_fluent_style_call_chain(expression);
+            && is_fluent_style_call_chain(expression, f.context().source());
 
         let format_expr = format_with(|f| match expression {
             Expr::BoolOp(expr) => expr.format().with_options(Some(parentheses)).fmt(f),
@@ -173,18 +173,24 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
         // parentheses, comments or `needs_parentheses`
         let omit_optional_parentheses_result =
             can_omit_optional_parentheses(expression, f.context());
-        if omit_optional_parentheses_result == CanOmitOptionalParentheses::FluentStyle {
-            return match expression {
+        let is_fluent_style = is_fluent_style_call_chain(expression, f.context().source());
+        if is_fluent_style {
+            match expression {
                 Expr::Attribute(expr) => {
-                    parenthesize_if_expands(&group(&expr.format().with_options(true))).fmt(f)
+                    return parenthesize_if_expands(&group(&expr.format().with_options(true)))
+                        .fmt(f)
                 }
                 Expr::Call(expr) => {
-                    parenthesize_if_expands(&group(&expr.format().with_options(true))).fmt(f)
+                    return parenthesize_if_expands(&group(&expr.format().with_options(true)))
+                        .fmt(f)
                 }
                 Expr::Subscript(expr) => {
-                    parenthesize_if_expands(&group(&expr.format().with_options(true))).fmt(f)
+                    return parenthesize_if_expands(&group(&expr.format().with_options(true)))
+                        .fmt(f)
                 }
-                _ => unreachable!("Fluent style can only exist with attribute, call and subscript"),
+                _ => {
+                    // TODO(konstin): We currently can't do call chains that is not the outermost expression
+                }
             };
         }
 
@@ -534,7 +540,7 @@ impl<'input> PreorderVisitor<'input> for CanOmitOptionalParenthesesVisitor<'inpu
 ///     )
 /// ).all()
 /// ```
-fn is_fluent_style_call_chain(mut expr: &Expr) -> bool {
+fn is_fluent_style_call_chain(mut expr: &Expr, source: &str) -> bool {
     let mut attributes_after_parentheses = 0;
     loop {
         match expr {
@@ -549,7 +555,13 @@ fn is_fluent_style_call_chain(mut expr: &Expr) -> bool {
             | Expr::Subscript(ast::ExprSubscript { value: inner, .. }) => {
                 expr = inner;
             }
-            _ => break,
+            _ => {
+                // We to format the following in fluent style: `f2 = (a).w().t(1,)`
+                if is_expression_parenthesized(AnyNodeRef::from(expr), source) {
+                    attributes_after_parentheses += 1;
+                }
+                break;
+            }
         }
     }
     attributes_after_parentheses >= 2

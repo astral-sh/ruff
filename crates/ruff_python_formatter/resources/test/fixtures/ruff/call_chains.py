@@ -124,3 +124,10 @@ g1 = (
     queryset.distinct().order_by(field.name).values_list(field_name_flat_long_long=True)
 )
 
+# TODO(konstin): We currently can't do call chains that is not the outermost expression
+if (
+    not a()
+    .b()
+    .cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc()
+):
+    pass
