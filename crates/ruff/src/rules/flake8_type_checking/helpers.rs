@@ -39,7 +39,7 @@ fn runtime_evaluated_base_class(base_classes: &[String], semantic: &SemanticMode
         return false;
     };
 
-    class_def.bases().any(|base| {
+    class_def.bases().iter().any(|base| {
         semantic.resolve_call_path(base).is_some_and(|call_path| {
             base_classes
                 .iter()

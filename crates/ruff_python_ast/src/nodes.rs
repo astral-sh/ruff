@@ -167,21 +167,19 @@ pub struct StmtClassDef {
 
 impl StmtClassDef {
     /// Return an iterator over the bases of the class.
-    pub fn bases(&self) -> impl Iterator<Item = &Expr> {
-        self.arguments
-            .as_ref()
-            .map(|arguments| &arguments.args)
-            .into_iter()
-            .flatten()
+    pub fn bases(&self) -> &[Expr] {
+        match &self.arguments {
+            Some(arguments) => &arguments.args,
+            None => &[],
+        }
     }
 
     /// Return an iterator over the metaclass keywords of the class.
-    pub fn keywords(&self) -> impl Iterator<Item = &Keyword> {
-        self.arguments
-            .as_ref()
-            .map(|arguments| &arguments.keywords)
-            .into_iter()
-            .flatten()
+    pub fn keywords(&self) -> &[Keyword] {
+        match &self.arguments {
+            Some(arguments) => &arguments.keywords,
+            None => &[],
+        }
     }
 }
 

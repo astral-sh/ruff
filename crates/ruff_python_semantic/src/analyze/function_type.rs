@@ -42,7 +42,7 @@ pub fn classify(
         FunctionType::StaticMethod
     } else if matches!(name, "__new__" | "__init_subclass__" | "__class_getitem__")
     // Special-case class method, like `__new__`.
-        || class_def.bases().any(|expr| {
+        || class_def.bases().iter().any(|expr| {
             // The class itself extends a known metaclass, so all methods are class methods.
             semantic
                 .resolve_call_path(map_callable(expr))
