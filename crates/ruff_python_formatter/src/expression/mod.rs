@@ -171,8 +171,6 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
 
         // Fluent style means we always add parentheses, so we don't need to check for existing
         // parentheses, comments or `needs_parentheses`
-        let omit_optional_parentheses_result =
-            can_omit_optional_parentheses(expression, f.context());
         let is_fluent_style = is_fluent_style_call_chain(expression, f.context().source());
         if is_fluent_style {
             match expression {
@@ -217,17 +215,15 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
             Parenthesize::Optional | Parenthesize::IfBreaks => needs_parentheses,
         };
 
+        let can_omit_optional_parentheses = can_omit_optional_parentheses(expression, f.context());
         match needs_parentheses {
             OptionalParentheses::Multiline if *parenthesize != Parenthesize::IfRequired => {
-                match omit_optional_parentheses_result {
-                    CanOmitOptionalParentheses::Yes | CanOmitOptionalParentheses::FluentStyle => {
-                        optional_parentheses(&expression.format().with_options(Parentheses::Never))
-                            .fmt(f)
-                    }
-                    CanOmitOptionalParentheses::No => parenthesize_if_expands(
-                        &expression.format().with_options(Parentheses::Never),
-                    )
-                    .fmt(f),
+                if can_omit_optional_parentheses {
+                    optional_parentheses(&expression.format().with_options(Parentheses::Never))
+                        .fmt(f)
+                } else {
+                    parenthesize_if_expands(&expression.format().with_options(Parentheses::Never))
+                        .fmt(f)
                 }
             }
             OptionalParentheses::Always => {
@@ -304,24 +300,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Expr {
 /// * The expression contains at least one parenthesized sub expression (optimization to avoid unnecessary work)
 ///
 /// This mimics Black's [`_maybe_split_omitting_optional_parens`](https://github.com/psf/black/blob/d1248ca9beaf0ba526d265f4108836d89cf551b7/src/black/linegen.py#L746-L820)
-fn can_omit_optional_parentheses(
-    expr: &Expr,
-    context: &PyFormatContext,
-) -> CanOmitOptionalParentheses {
+fn can_omit_optional_parentheses(expr: &Expr, context: &PyFormatContext) -> bool {
     let mut visitor = CanOmitOptionalParenthesesVisitor::new(context.source());
     visitor.visit_subexpression(expr);
 
     if visitor.max_priority_count > 1 {
-        if visitor.max_priority == OperatorPriority::Attribute {
-            CanOmitOptionalParentheses::FluentStyle
-        } else {
-            CanOmitOptionalParentheses::No
-        }
+        false
     } else if visitor.max_priority == OperatorPriority::Attribute {
-        CanOmitOptionalParentheses::Yes
+        true
     } else if !visitor.any_parenthesized_expressions {
         // Only use the more complex IR when there is any expression that we can possibly split by
-        CanOmitOptionalParentheses::No
+        false
     } else {
         // Only use the layout if the first or last expression has parentheses of some sort.
         let first_parenthesized = visitor
@@ -330,11 +319,7 @@ fn can_omit_optional_parentheses(
         let last_parenthesized = visitor
             .last
             .is_some_and(|last| has_parentheses(last, visitor.source));
-        if first_parenthesized || last_parenthesized {
-            CanOmitOptionalParentheses::Yes
-        } else {
-            CanOmitOptionalParentheses::No
-        }
+        first_parenthesized || last_parenthesized
     }
 }
 
@@ -346,13 +331,6 @@ struct CanOmitOptionalParenthesesVisitor<'input> {
     last: Option<&'input Expr>,
     first: Option<&'input Expr>,
     source: &'input str,
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) enum CanOmitOptionalParentheses {
-    Yes,
-    No,
-    FluentStyle,
 }
 
 impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
