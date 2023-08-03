@@ -590,7 +590,7 @@ where
                 self.visit_body(body);
             }
             Stmt::TypeAlias(ast::StmtTypeAlias {
-                range: _range,
+                range: _,
                 name,
                 type_params,
                 value,

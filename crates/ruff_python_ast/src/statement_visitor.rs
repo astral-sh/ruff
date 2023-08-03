@@ -76,7 +76,7 @@ pub fn walk_stmt<'a, V: StatementVisitor<'a> + ?Sized>(visitor: &mut V, stmt: &'
             handlers,
             orelse,
             finalbody,
-            range: _range,
+            range: _,
         }) => {
             visitor.visit_body(body);
             for except_handler in handlers {
@@ -90,7 +90,7 @@ pub fn walk_stmt<'a, V: StatementVisitor<'a> + ?Sized>(visitor: &mut V, stmt: &'
             handlers,
             orelse,
             finalbody,
-            range: _range,
+            range: _,
         }) => {
             visitor.visit_body(body);
             for except_handler in handlers {
