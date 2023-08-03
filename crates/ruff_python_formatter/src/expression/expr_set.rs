@@ -2,7 +2,7 @@ use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{ExprSet, Ranged};
 
 use crate::expression::parentheses::{
-    parenthesized_with_head_comments, NeedsParentheses, OptionalParentheses,
+    parenthesized_with_dangling_comments, NeedsParentheses, OptionalParentheses,
 };
 use crate::prelude::*;
 use crate::FormatNodeRule;
@@ -25,7 +25,7 @@ impl FormatNodeRule<ExprSet> for FormatExprSet {
         let comments = f.context().comments().clone();
         let dangling = comments.dangling_comments(item);
 
-        parenthesized_with_head_comments("{", dangling, &joined, "}").fmt(f)
+        parenthesized_with_dangling_comments("{", dangling, &joined, "}").fmt(f)
     }
 
     fn fmt_dangling_comments(&self, _node: &ExprSet, _f: &mut PyFormatter) -> FormatResult<()> {

@@ -56,6 +56,52 @@ impl Format<PyFormatContext<'_>> for FormatLeadingComments<'_> {
     }
 }
 
+/// Formats the leading `comments` of an alternate branch and ensures that it preserves the right
+/// number of empty lines before. The `last_node` is the last node of the preceding body.
+///
+/// For example, `last_node` is the last statement in the if body when formatting the leading
+/// comments of the `else` branch.
+pub(crate) fn leading_alternate_branch_comments<'a, T>(
+    comments: &'a [SourceComment],
+    last_node: Option<T>,
+) -> FormatLeadingAlternateBranchComments<'a>
+where
+    T: Into<AnyNodeRef<'a>>,
+{
+    FormatLeadingAlternateBranchComments {
+        comments,
+        last_node: last_node.map(Into::into),
+    }
+}
+
+pub(crate) struct FormatLeadingAlternateBranchComments<'a> {
+    comments: &'a [SourceComment],
+    last_node: Option<AnyNodeRef<'a>>,
+}
+
+impl Format<PyFormatContext<'_>> for FormatLeadingAlternateBranchComments<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+        if let Some(first_leading) = self.comments.first() {
+            // Leading comments only preserves the lines after the comment but not before.
+            // Insert the necessary lines.
+            if lines_before(first_leading.slice().start(), f.context().source()) > 1 {
+                write!(f, [empty_line()])?;
+            }
+
+            write!(f, [leading_comments(self.comments)])?;
+        } else if let Some(last_preceding) = self.last_node {
+            let full_end = skip_trailing_trivia(last_preceding.end(), f.context().source());
+            // The leading comments formatting ensures that it preserves the right amount of lines after
+            // We need to take care of this ourselves, if there's no leading `else` comment.
+            if lines_after(full_end, f.context().source()) > 1 {
+                write!(f, [empty_line()])?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
 /// Formats the trailing comments of `node`
 pub(crate) fn trailing_node_comments<T>(node: &T) -> FormatTrailingComments
 where
@@ -278,83 +324,5 @@ impl Format<PyFormatContext<'_>> for FormatEmptyLines {
                 write!(f, [hard_line_break()])
             }
         }
-    }
-}
-
-/// Formats the leading `comments` of an alternate branch and ensures that it preserves the right
-/// number of empty lines before. The `last_node` is the last node of the preceding body.
-///
-/// For example, `last_node` is the last statement in the if body when formatting the leading
-/// comments of the `else` branch.
-pub(crate) fn leading_alternate_branch_comments<'a, T>(
-    comments: &'a [SourceComment],
-    last_node: Option<T>,
-) -> FormatLeadingAlternateBranchComments<'a>
-where
-    T: Into<AnyNodeRef<'a>>,
-{
-    FormatLeadingAlternateBranchComments {
-        comments,
-        last_node: last_node.map(Into::into),
-    }
-}
-
-pub(crate) struct FormatLeadingAlternateBranchComments<'a> {
-    comments: &'a [SourceComment],
-    last_node: Option<AnyNodeRef<'a>>,
-}
-
-impl Format<PyFormatContext<'_>> for FormatLeadingAlternateBranchComments<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
-        if let Some(first_leading) = self.comments.first() {
-            // Leading comments only preserves the lines after the comment but not before.
-            // Insert the necessary lines.
-            if lines_before(first_leading.slice().start(), f.context().source()) > 1 {
-                write!(f, [empty_line()])?;
-            }
-
-            write!(f, [leading_comments(self.comments)])?;
-        } else if let Some(last_preceding) = self.last_node {
-            let full_end = skip_trailing_trivia(last_preceding.end(), f.context().source());
-            // The leading comments formatting ensures that it preserves the right amount of lines after
-            // We need to take care of this ourselves, if there's no leading `else` comment.
-            if lines_after(full_end, f.context().source()) > 1 {
-                write!(f, [empty_line()])?;
-            }
-        }
-
-        Ok(())
-    }
-}
-
-/// Formats the dangling comments of `node`.
-pub(crate) fn head_comments<'a>(comments: &'a [SourceComment]) -> FormatHeadComments<'a> {
-    FormatHeadComments { comments }
-}
-
-pub(crate) struct FormatHeadComments<'a> {
-    comments: &'a [SourceComment],
-}
-
-impl Format<PyFormatContext<'_>> for FormatHeadComments<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
-        let mut first = true;
-        for comment in self
-            .comments
-            .iter()
-            .filter(|comment| comment.is_unformatted())
-        {
-            if first {
-                write!(f, [space(), space()])?;
-            }
-
-            write!(f, [format_comment(comment)])?;
-
-            comment.mark_formatted();
-
-            first = false;
-        }
-
-        Ok(())
     }
 }

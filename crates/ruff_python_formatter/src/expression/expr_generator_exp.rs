@@ -4,7 +4,7 @@ use ruff_python_ast::ExprGeneratorExp;
 
 use crate::comments::leading_comments;
 use crate::context::PyFormatContext;
-use crate::expression::parentheses::parenthesized_with_head_comments;
+use crate::expression::parentheses::parenthesized_with_dangling_comments;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 use crate::AsFormat;
@@ -66,7 +66,7 @@ impl FormatNodeRule<ExprGeneratorExp> for FormatExprGeneratorExp {
         } else {
             write!(
                 f,
-                [parenthesized_with_head_comments(
+                [parenthesized_with_dangling_comments(
                     "(",
                     dangling,
                     &format_args!(

@@ -32,3 +32,15 @@ c1 = [ # trailing open bracket
     2, # trailing item
     # leading close bracket
 ] # trailing close bracket
+
+
+[  # end-of-line comment
+]
+
+[  # end-of-line comment
+    # own-line comment
+]
+
+[  # end-of-line comment
+    1
+]

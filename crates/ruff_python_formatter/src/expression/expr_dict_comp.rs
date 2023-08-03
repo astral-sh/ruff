@@ -7,7 +7,7 @@ use ruff_python_ast::ExprDictComp;
 
 use crate::context::PyFormatContext;
 use crate::expression::parentheses::{
-    parenthesized_with_head_comments, NeedsParentheses, OptionalParentheses,
+    parenthesized_with_dangling_comments, NeedsParentheses, OptionalParentheses,
 };
 use crate::AsFormat;
 use crate::{FormatNodeRule, FormattedIterExt, PyFormatter};
@@ -35,7 +35,7 @@ impl FormatNodeRule<ExprDictComp> for FormatExprDictComp {
 
         write!(
             f,
-            [parenthesized_with_head_comments(
+            [parenthesized_with_dangling_comments(
                 "{",
                 dangling,
                 &group(&format_args!(

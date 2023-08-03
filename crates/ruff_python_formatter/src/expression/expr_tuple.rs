@@ -7,7 +7,7 @@ use ruff_python_ast::node::AnyNodeRef;
 
 use crate::builders::{empty_parenthesized_with_dangling_comments, parenthesize_if_expands};
 use crate::expression::parentheses::{
-    parenthesized, parenthesized_with_head_comments, NeedsParentheses, OptionalParentheses,
+    parenthesized_with_dangling_comments, NeedsParentheses, OptionalParentheses,
 };
 use crate::prelude::*;
 
@@ -132,8 +132,7 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                 _ =>
                 // A single element tuple always needs parentheses and a trailing comma, except when inside of a subscript
                 {
-                    let comments = f.context().comments().clone();
-                    parenthesized_with_head_comments(
+                    parenthesized_with_dangling_comments(
                         "(",
                         dangling,
                         &format_args![single.format(), text(",")],
@@ -151,8 +150,7 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                 && !(self.parentheses == TupleParentheses::NeverPreserve
                     && dangling.is_empty()) =>
             {
-                let comments = f.context().comments().clone();
-                parenthesized_with_head_comments("(", dangling, &ExprSequence::new(item), ")")
+                parenthesized_with_dangling_comments("(", dangling, &ExprSequence::new(item), ")")
                     .fmt(f)
             }
             _ => match self.parentheses {

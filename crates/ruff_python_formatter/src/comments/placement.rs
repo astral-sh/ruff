@@ -48,20 +48,8 @@ pub(super) fn place_comment<'a>(
             )
         }
         AnyNodeRef::Keyword(_) => handle_dict_unpacking_comment(comment, locator),
-        AnyNodeRef::ExprDict(expr_dict) => handle_dict_unpacking_comment(comment, locator)
-            .then_ith(|comment| {
-                if let Some(first_item) = expr_dict.values.first() {
-                    handle_bracketed_items_comment(
-                        comment,
-                        BracketedItems {
-                            enclosing_node: expr_dict.range(),
-                            leading_item: first_item.range(),
-                        },
-                    )
-                } else {
-                    CommentPlacement::Default(comment)
-                }
-            }),
+        AnyNodeRef::ExprDict(_) => handle_dict_unpacking_comment(comment, locator)
+            .then_with(|comment| handle_bracketed_end_of_line_comment(comment, locator)),
         AnyNodeRef::ExprIfExp(expr_if) => handle_expr_if_comment(comment, expr_if, locator),
         AnyNodeRef::ExprSlice(expr_slice) => handle_slice_comments(comment, expr_slice, locator),
         AnyNodeRef::ExprStarred(starred) => {
@@ -85,86 +73,14 @@ pub(super) fn place_comment<'a>(
         AnyNodeRef::StmtClassDef(class_def) => {
             handle_leading_class_with_decorators_comment(comment, class_def)
         }
-        AnyNodeRef::StmtImportFrom(import_from) => {
-            if let Some(first_item) = import_from.names.first() {
-                handle_bracketed_items_comment(
-                    comment,
-                    BracketedItems {
-                        enclosing_node: import_from.range(),
-                        leading_item: first_item.range(),
-                    },
-                )
-            } else {
-                CommentPlacement::Default(comment)
-            }
-        }
-        AnyNodeRef::ExprTuple(expr_tuple) => {
-            if let Some(leading_item) = expr_tuple.elts.first() {
-                handle_bracketed_items_comment(
-                    comment,
-                    BracketedItems {
-                        enclosing_node: expr_tuple.range(),
-                        leading_item: leading_item.range(),
-                    },
-                )
-            } else {
-                CommentPlacement::Default(comment)
-            }
-        }
-        AnyNodeRef::ExprList(expr_list) => {
-            if let Some(leading_item) = expr_list.elts.first() {
-                handle_bracketed_items_comment(
-                    comment,
-                    BracketedItems {
-                        enclosing_node: expr_list.range(),
-                        leading_item: leading_item.range(),
-                    },
-                )
-            } else {
-                CommentPlacement::Default(comment)
-            }
-        }
-        AnyNodeRef::ExprSet(expr_set) => {
-            if let Some(leading_item) = expr_set.elts.first() {
-                handle_bracketed_items_comment(
-                    comment,
-                    BracketedItems {
-                        enclosing_node: expr_set.range(),
-                        leading_item: leading_item.range(),
-                    },
-                )
-            } else {
-                CommentPlacement::Default(comment)
-            }
-        }
-        AnyNodeRef::ExprGeneratorExp(expr_generator_exp) => handle_bracketed_items_comment(
-            comment,
-            BracketedItems {
-                enclosing_node: expr_generator_exp.range(),
-                leading_item: expr_generator_exp.elt.range(),
-            },
-        ),
-        AnyNodeRef::ExprListComp(expr_list_comp) => handle_bracketed_items_comment(
-            comment,
-            BracketedItems {
-                enclosing_node: expr_list_comp.range(),
-                leading_item: expr_list_comp.elt.range(),
-            },
-        ),
-        AnyNodeRef::ExprSetComp(expr_set_comp) => handle_bracketed_items_comment(
-            comment,
-            BracketedItems {
-                enclosing_node: expr_set_comp.range(),
-                leading_item: expr_set_comp.elt.range(),
-            },
-        ),
-        AnyNodeRef::ExprDictComp(expr_dict_comp) => handle_bracketed_items_comment(
-            comment,
-            BracketedItems {
-                enclosing_node: expr_dict_comp.range(),
-                leading_item: expr_dict_comp.key.range(),
-            },
-        ),
+        AnyNodeRef::StmtImportFrom(import_from) => handle_import_from_comment(comment, import_from),
+        AnyNodeRef::ExprList(_)
+        | AnyNodeRef::ExprSet(_)
+        | AnyNodeRef::ExprGeneratorExp(_)
+        | AnyNodeRef::ExprListComp(_)
+        | AnyNodeRef::ExprSetComp(_)
+        | AnyNodeRef::ExprDictComp(_)
+        | AnyNodeRef::ExprTuple(_) => handle_bracketed_end_of_line_comment(comment, locator),
         _ => CommentPlacement::Default(comment),
     })
 }
@@ -1304,38 +1220,21 @@ fn handle_bracketed_end_of_line_comment<'a>(
     CommentPlacement::Default(comment)
 }
 
-/// A struct to model syntax that consists of some leading syntax or trivia, followed by a bracket,
-/// followed by an expression or sequence of expressions. In such cases, we want to treat a comment
-/// immediately following the bracket as a dangling comment on the enclosing node, rather than a
-/// leading comment on the first item.
+/// Attach an enclosed end-of-line comment to a [`StmtImportFrom`].
 ///
-/// For example:
-/// ```python
-/// [  # comment
-///   1,
-///   2,
-///   3,
-/// ]
-/// ```
-///
-/// Or:
+/// For example, given:
 /// ```python
 /// from foo import (  # comment
 ///    bar,
 /// )
 /// ```
-#[derive(Debug)]
-struct BracketedItems {
-    /// The containing statement or expression (e.g., the [`ast::ExprList`] or [`ast::StmtImportFrom`]).
-    enclosing_node: TextRange,
-    /// The leading item (e.g., the [`Expr`] or [`ast::Alias`]).
-    leading_item: TextRange,
-}
-
-fn handle_bracketed_items_comment(
-    comment: DecoratedComment,
-    bracketed_items: BracketedItems,
-) -> CommentPlacement {
+///
+/// The comment will be attached to the `StmtImportFrom` node as a dangling comment, to ensure
+/// that it remains on the same line as the `StmtImportFrom` itself.
+fn handle_import_from_comment<'a>(
+    comment: DecoratedComment<'a>,
+    import_from: &'a ast::StmtImportFrom,
+) -> CommentPlacement<'a> {
     // The comment needs to be on the same line, but before the first member. For example, we want
     // to treat this as a dangling comment:
     // ```python
@@ -1356,8 +1255,9 @@ fn handle_bracketed_items_comment(
     // statement and the first member. If so, the only possible position is immediately following
     // the open parenthesis.
     if comment.line_position().is_end_of_line()
-        && bracketed_items.enclosing_node.start() < comment.start()
-        && comment.start() < bracketed_items.leading_item.start()
+        && import_from.names.first().is_some_and(|first_name| {
+            import_from.start() < comment.start() && comment.start() < first_name.start()
+        })
     {
         CommentPlacement::dangling(comment.enclosing_node(), comment)
     } else {

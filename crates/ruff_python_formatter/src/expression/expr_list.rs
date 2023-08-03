@@ -4,7 +4,7 @@ use ruff_python_ast::{ExprList, Ranged};
 
 use crate::builders::empty_parenthesized_with_dangling_comments;
 use crate::expression::parentheses::{
-    parenthesized_with_head_comments, NeedsParentheses, OptionalParentheses,
+    parenthesized_with_dangling_comments, NeedsParentheses, OptionalParentheses,
 };
 use crate::prelude::*;
 use crate::FormatNodeRule;
@@ -34,7 +34,7 @@ impl FormatNodeRule<ExprList> for FormatExprList {
                 .finish()
         });
 
-        parenthesized_with_head_comments("[", dangling, &items, "]").fmt(f)
+        parenthesized_with_dangling_comments("[", dangling, &items, "]").fmt(f)
     }
 
     fn fmt_dangling_comments(&self, _node: &ExprList, _f: &mut PyFormatter) -> FormatResult<()> {

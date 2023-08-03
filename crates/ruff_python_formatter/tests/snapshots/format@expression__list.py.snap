@@ -38,6 +38,18 @@ c1 = [ # trailing open bracket
     2, # trailing item
     # leading close bracket
 ] # trailing close bracket
+
+
+[  # end-of-line comment
+]
+
+[  # end-of-line comment
+    # own-line comment
+]
+
+[  # end-of-line comment
+    1
+]
 ```
 
 ## Output
@@ -73,6 +85,15 @@ c1 = [  # trailing open bracket
     2,  # trailing item
     # leading close bracket
 ]  # trailing close bracket
+
+
+[]  # end-of-line comment
+
+[  # end-of-line comment
+    # own-line comment
+]
+
+[1]  # end-of-line comment
 ```
 
 
