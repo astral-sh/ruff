@@ -130,10 +130,7 @@ impl<'a> FormatSummaryValues<'a> {
 /// Return `true` if the string contains characters that are forbidden by
 /// argument identifiers.
 fn contains_invalids(string: &str) -> bool {
-    string.contains('*')
-        || string.contains('\'')
-        || string.contains('"')
-        || string.contains("await")
+    string.contains('*') || string.contains('\'') || string.contains('"')
 }
 
 enum FormatContext {

@@ -877,8 +877,6 @@ UP032_0.py:118:7: UP032 [*] Use f-string instead of `format` call
     |
 118 | assert"{}".format(1)
     |       ^^^^^^^^^^^^^^ UP032
-119 | 
-120 | ###
     |
     = help: Convert to f-string
 
@@ -889,7 +887,43 @@ UP032_0.py:118:7: UP032 [*] Use f-string instead of `format` call
 118     |-assert"{}".format(1)
     118 |+assert f"{1}"
 119 119 | 
-120 120 | ###
-121 121 | # Non-errors
+120 120 | 
+121 121 | async def c():
+
+UP032_0.py:122:12: UP032 [*] Use f-string instead of `format` call
+    |
+121 | async def c():
+122 |     return "{}".format(await 3)
+    |            ^^^^^^^^^^^^^^^^^^^^ UP032
+    |
+    = help: Convert to f-string
+
+ℹ Suggested fix
+119 119 | 
+120 120 | 
+121 121 | async def c():
+122     |-    return "{}".format(await 3)
+    122 |+    return f"{await 3}"
+123 123 | 
+124 124 | 
+125 125 | async def c():
+
+UP032_0.py:126:12: UP032 [*] Use f-string instead of `format` call
+    |
+125 | async def c():
+126 |     return "{}".format(1 + await 3)
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^ UP032
+    |
+    = help: Convert to f-string
+
+ℹ Suggested fix
+123 123 | 
+124 124 | 
+125 125 | async def c():
+126     |-    return "{}".format(1 + await 3)
+    126 |+    return f"{1 + await 3}"
+127 127 | 
+128 128 | 
+129 129 | ###
 
 
