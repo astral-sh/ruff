@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, ExprContext, Ranged, UnaryOp};
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Ranged, UnaryOp};
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -166,8 +166,11 @@ pub(crate) fn explicit_true_false_in_ifexpr(
             };
             let node1 = ast::ExprCall {
                 func: Box::new(node.into()),
-                args: vec![test.clone()],
-                keywords: vec![],
+                arguments: Arguments {
+                    args: vec![test.clone()],
+                    keywords: vec![],
+                    range: TextRange::default(),
+                },
                 range: TextRange::default(),
             };
             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(

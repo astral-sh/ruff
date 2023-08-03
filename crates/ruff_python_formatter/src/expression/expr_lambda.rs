@@ -1,7 +1,7 @@
 use crate::comments::dangling_node_comments;
 use crate::context::PyFormatContext;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
-use crate::other::arguments::ArgumentsParentheses;
+use crate::other::parameters::ParametersParentheses;
 use crate::AsFormat;
 use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::prelude::{space, text};
@@ -16,18 +16,21 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
     fn fmt_fields(&self, item: &ExprLambda, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprLambda {
             range: _,
-            args,
+            parameters,
             body,
         } = item;
 
         write!(f, [text("lambda")])?;
 
-        if !args.args.is_empty() {
+        if !parameters.args.is_empty() || parameters.vararg.is_some() || parameters.kwarg.is_some()
+        {
             write!(
                 f,
                 [
                     space(),
-                    args.format().with_options(ArgumentsParentheses::Never),
+                    parameters
+                        .format()
+                        .with_options(ParametersParentheses::Never),
                 ]
             )?;
         }
@@ -44,7 +47,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                 //     lambda  # Dangling
                 //     : 1
                 // )
-                dangling_node_comments(args.as_ref())
+                dangling_node_comments(parameters.as_ref())
             ]
         )
     }

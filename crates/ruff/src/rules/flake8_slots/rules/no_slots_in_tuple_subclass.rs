@@ -1,4 +1,4 @@
-use ruff_python_ast::{Stmt, StmtClassDef};
+use ruff_python_ast::{Arguments, Stmt, StmtClassDef};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -51,11 +51,15 @@ impl Violation for NoSlotsInTupleSubclass {
 
 /// SLOT001
 pub(crate) fn no_slots_in_tuple_subclass(checker: &mut Checker, stmt: &Stmt, class: &StmtClassDef) {
-    if class.bases.iter().any(|base| {
+    let Some(Arguments { args: bases, .. }) = class.arguments.as_deref() else {
+        return;
+    };
+
+    if bases.iter().any(|base| {
         checker
             .semantic()
             .resolve_call_path(map_subscript(base))
-            .map_or(false, |call_path| {
+            .is_some_and(|call_path| {
                 matches!(call_path.as_slice(), ["" | "builtins", "tuple"])
                     || checker
                         .semantic()

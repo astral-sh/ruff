@@ -54,16 +54,16 @@ impl Violation for ReimplementedListBuiltin {
 /// PIE807
 pub(crate) fn reimplemented_list_builtin(checker: &mut Checker, expr: &ExprLambda) {
     let ExprLambda {
-        args,
+        parameters,
         body,
         range: _,
     } = expr;
 
-    if args.args.is_empty()
-        && args.kwonlyargs.is_empty()
-        && args.posonlyargs.is_empty()
-        && args.vararg.is_none()
-        && args.kwarg.is_none()
+    if parameters.args.is_empty()
+        && parameters.kwonlyargs.is_empty()
+        && parameters.posonlyargs.is_empty()
+        && parameters.vararg.is_none()
+        && parameters.kwarg.is_none()
     {
         if let Expr::List(ast::ExprList { elts, .. }) = body.as_ref() {
             if elts.is_empty() {

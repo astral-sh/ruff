@@ -1,9 +1,8 @@
 use num_traits::{One, Zero};
-use ruff_python_ast::{self as ast, Constant, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::find_keyword;
+use ruff_python_ast::{self as ast, Constant, Expr, Ranged};
 
 use crate::checkers::ast::Checker;
 
@@ -43,15 +42,15 @@ impl Violation for SnmpInsecureVersion {
 }
 
 /// S508
-pub(crate) fn snmp_insecure_version(checker: &mut Checker, func: &Expr, keywords: &[Keyword]) {
+pub(crate) fn snmp_insecure_version(checker: &mut Checker, call: &ast::ExprCall) {
     if checker
         .semantic()
-        .resolve_call_path(func)
-        .map_or(false, |call_path| {
+        .resolve_call_path(&call.func)
+        .is_some_and(|call_path| {
             matches!(call_path.as_slice(), ["pysnmp", "hlapi", "CommunityData"])
         })
     {
-        if let Some(keyword) = find_keyword(keywords, "mpModel") {
+        if let Some(keyword) = call.arguments.find_keyword("mpModel") {
             if let Expr::Constant(ast::ExprConstant {
                 value: Constant::Int(value),
                 ..

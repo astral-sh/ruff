@@ -57,7 +57,6 @@ fn assignment(obj: &Expr, name: &str, value: &Expr, generator: Generator) -> Str
             range: TextRange::default(),
         })],
         value: Box::new(value.clone()),
-        type_comment: None,
         range: TextRange::default(),
     });
     generator.stmt(&stmt)

@@ -4,14 +4,14 @@ expression: trace
 ---
 - ModModule
   - StmtFunctionDef
-    - Arguments
-      - Arg
-      - Arg
+    - Parameters
+      - Parameter
+      - Parameter
       - ExprConstant
         - Int(34)
-      - Arg
+      - Parameter
       - ExprConstant
         - Int(20)
-      - Arg
+      - Parameter
     - StmtPass
 

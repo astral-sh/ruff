@@ -66,7 +66,7 @@ pub(crate) fn error_instead_of_exception(checker: &mut Checker, handlers: &[Exce
         for expr in calls {
             if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = expr.func.as_ref() {
                 if attr == "error" {
-                    if exc_info(&expr.keywords, checker.semantic()).is_none() {
+                    if exc_info(&expr.arguments, checker.semantic()).is_none() {
                         checker
                             .diagnostics
                             .push(Diagnostic::new(ErrorInsteadOfException, expr.range()));

@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff_python_ast::{self as ast, ArgWithDefault, Stmt};
+use ruff_python_ast::{self as ast, ParameterWithDefault, Stmt};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 
@@ -1695,7 +1695,7 @@ fn common_section(
     }
 
     if checker.enabled(Rule::NoBlankLineBeforeSection) {
-        if !context.previous_line().map_or(false, str::is_empty) {
+        if !context.previous_line().is_some_and(str::is_empty) {
             let mut diagnostic = Diagnostic::new(
                 NoBlankLineBeforeSection {
                     name: context.section_name().to_string(),
@@ -1726,27 +1726,23 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
         return;
     };
 
-    let (Stmt::FunctionDef(ast::StmtFunctionDef {
-        args: arguments, ..
-    })
-    | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-        args: arguments, ..
-    })) = stmt
+    let (Stmt::FunctionDef(ast::StmtFunctionDef { parameters, .. })
+    | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { parameters, .. })) = stmt
     else {
         return;
     };
 
     // Look for arguments that weren't included in the docstring.
     let mut missing_arg_names: FxHashSet<String> = FxHashSet::default();
-    for ArgWithDefault {
-        def,
+    for ParameterWithDefault {
+        parameter,
         default: _,
         range: _,
-    } in arguments
+    } in parameters
         .posonlyargs
         .iter()
-        .chain(&arguments.args)
-        .chain(&arguments.kwonlyargs)
+        .chain(&parameters.args)
+        .chain(&parameters.kwonlyargs)
         .skip(
             // If this is a non-static method, skip `cls` or `self`.
             usize::from(
@@ -1755,7 +1751,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
             ),
         )
     {
-        let arg_name = def.arg.as_str();
+        let arg_name = parameter.name.as_str();
         if !arg_name.starts_with('_') && !docstrings_args.contains(arg_name) {
             missing_arg_names.insert(arg_name.to_string());
         }
@@ -1763,8 +1759,8 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
 
     // Check specifically for `vararg` and `kwarg`, which can be prefixed with a
     // single or double star, respectively.
-    if let Some(arg) = &arguments.vararg {
-        let arg_name = arg.arg.as_str();
+    if let Some(arg) = &parameters.vararg {
+        let arg_name = arg.name.as_str();
         let starred_arg_name = format!("*{arg_name}");
         if !arg_name.starts_with('_')
             && !docstrings_args.contains(arg_name)
@@ -1773,8 +1769,8 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
             missing_arg_names.insert(starred_arg_name);
         }
     }
-    if let Some(arg) = &arguments.kwarg {
-        let arg_name = arg.arg.as_str();
+    if let Some(arg) = &parameters.kwarg {
+        let arg_name = arg.name.as_str();
         let starred_arg_name = format!("**{arg_name}");
         if !arg_name.starts_with('_')
             && !docstrings_args.contains(arg_name)

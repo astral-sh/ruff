@@ -3,23 +3,23 @@ use std::path::Path;
 /// Return `true` if the [`Path`] appears to be that of a Python file.
 pub fn is_python_file(path: &Path) -> bool {
     path.extension()
-        .map_or(false, |ext| ext == "py" || ext == "pyi")
+        .is_some_and(|ext| ext == "py" || ext == "pyi")
 }
 
 /// Return `true` if the [`Path`] is named `pyproject.toml`.
 pub fn is_project_toml(path: &Path) -> bool {
     path.file_name()
-        .map_or(false, |name| name == "pyproject.toml")
+        .is_some_and(|name| name == "pyproject.toml")
 }
 
 /// Return `true` if the [`Path`] appears to be that of a Python interface definition file (`.pyi`).
 pub fn is_python_stub_file(path: &Path) -> bool {
-    path.extension().map_or(false, |ext| ext == "pyi")
+    path.extension().is_some_and(|ext| ext == "pyi")
 }
 
 /// Return `true` if the [`Path`] appears to be that of a Jupyter notebook (`.ipynb`).
 pub fn is_jupyter_notebook(path: &Path) -> bool {
-    path.extension().map_or(false, |ext| ext == "ipynb")
+    path.extension().is_some_and(|ext| ext == "ipynb")
 }
 
 #[cfg(test)]

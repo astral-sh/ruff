@@ -12,7 +12,7 @@ pub(crate) struct ArgumentList {
 }
 
 // Perform validation of function/lambda arguments in a function definition.
-pub(crate) fn validate_arguments(arguments: &ast::Arguments) -> Result<(), LexicalError> {
+pub(crate) fn validate_arguments(arguments: &ast::Parameters) -> Result<(), LexicalError> {
     let mut all_arg_names = FxHashSet::with_capacity_and_hasher(
         arguments.posonlyargs.len()
             + arguments.args.len()
@@ -26,18 +26,18 @@ pub(crate) fn validate_arguments(arguments: &ast::Arguments) -> Result<(), Lexic
     let args = arguments.args.iter();
     let kwonlyargs = arguments.kwonlyargs.iter();
 
-    let vararg: Option<&ast::Arg> = arguments.vararg.as_deref();
-    let kwarg: Option<&ast::Arg> = arguments.kwarg.as_deref();
+    let vararg: Option<&ast::Parameter> = arguments.vararg.as_deref();
+    let kwarg: Option<&ast::Parameter> = arguments.kwarg.as_deref();
 
     for arg in posonlyargs
         .chain(args)
         .chain(kwonlyargs)
-        .map(|arg| &arg.def)
+        .map(|arg| &arg.parameter)
         .chain(vararg)
         .chain(kwarg)
     {
         let range = arg.range;
-        let arg_name = arg.arg.as_str();
+        let arg_name = arg.name.as_str();
         if !all_arg_names.insert(arg_name) {
             return Err(LexicalError {
                 error: LexicalErrorType::DuplicateArgumentError(arg_name.to_string()),
@@ -50,7 +50,10 @@ pub(crate) fn validate_arguments(arguments: &ast::Arguments) -> Result<(), Lexic
 }
 
 pub(crate) fn validate_pos_params(
-    args: &(Vec<ast::ArgWithDefault>, Vec<ast::ArgWithDefault>),
+    args: &(
+        Vec<ast::ParameterWithDefault>,
+        Vec<ast::ParameterWithDefault>,
+    ),
 ) -> Result<(), LexicalError> {
     let (posonlyargs, args) = args;
     #[allow(clippy::skip_while_next)]
@@ -63,7 +66,7 @@ pub(crate) fn validate_pos_params(
     if let Some(invalid) = first_invalid {
         return Err(LexicalError {
             error: LexicalErrorType::DefaultArgumentError,
-            location: invalid.def.range.start(),
+            location: invalid.parameter.range.start(),
         });
     }
     Ok(())
@@ -75,14 +78,18 @@ type FunctionArgument = (
 );
 
 // Parse arguments as supplied during a function/lambda *call*.
-pub(crate) fn parse_args(func_args: Vec<FunctionArgument>) -> Result<ArgumentList, LexicalError> {
+pub(crate) fn parse_arguments(
+    function_arguments: Vec<FunctionArgument>,
+) -> Result<ArgumentList, LexicalError> {
     let mut args = vec![];
     let mut keywords = vec![];
 
-    let mut keyword_names =
-        FxHashSet::with_capacity_and_hasher(func_args.len(), BuildHasherDefault::default());
+    let mut keyword_names = FxHashSet::with_capacity_and_hasher(
+        function_arguments.len(),
+        BuildHasherDefault::default(),
+    );
     let mut double_starred = false;
-    for (name, value) in func_args {
+    for (name, value) in function_arguments {
         if let Some((start, end, name)) = name {
             // Check for duplicate keyword arguments in the call.
             if let Some(keyword_name) = &name {
@@ -133,15 +140,15 @@ const fn is_starred(exp: &ast::Expr) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Parse, ParseErrorType};
-    use ruff_python_ast::{self as ast};
+    use crate::parser::parse_suite;
+    use crate::ParseErrorType;
 
     macro_rules! function_and_lambda {
         ($($name:ident: $code:expr,)*) => {
             $(
                 #[test]
                 fn $name() {
-                    let parse_ast = ast::Suite::parse($code, "<test>");
+                    let parse_ast = crate::parser::parse_suite($code, "<test>");
                     insta::assert_debug_snapshot!(parse_ast);
                 }
             )*
@@ -172,7 +179,7 @@ mod tests {
     }
 
     fn function_parse_error(src: &str) -> LexicalErrorType {
-        let parse_ast = ast::Suite::parse(src, "<test>");
+        let parse_ast = parse_suite(src, "<test>");
         parse_ast
             .map_err(|e| match e.error {
                 ParseErrorType::Lexical(e) => e,

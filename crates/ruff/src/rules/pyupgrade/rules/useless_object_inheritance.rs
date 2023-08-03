@@ -1,9 +1,8 @@
-use ruff_python_ast::{self as ast, Expr, Ranged};
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Expr, Ranged};
 
-use crate::autofix::edits::remove_argument;
+use crate::autofix::edits::{remove_argument, Parentheses};
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
@@ -47,8 +46,12 @@ impl AlwaysAutofixableViolation for UselessObjectInheritance {
 
 /// UP004
 pub(crate) fn useless_object_inheritance(checker: &mut Checker, class_def: &ast::StmtClassDef) {
-    for expr in &class_def.bases {
-        let Expr::Name(ast::ExprName { id, .. }) = expr else {
+    let Some(arguments) = class_def.arguments.as_deref() else {
+        return;
+    };
+
+    for base in &arguments.args {
+        let Expr::Name(ast::ExprName { id, .. }) = base else {
             continue;
         };
         if id != "object" {
@@ -62,19 +65,12 @@ pub(crate) fn useless_object_inheritance(checker: &mut Checker, class_def: &ast:
             UselessObjectInheritance {
                 name: class_def.name.to_string(),
             },
-            expr.range(),
+            base.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.try_set_fix(|| {
-                let edit = remove_argument(
-                    checker.locator(),
-                    class_def.name.end(),
-                    expr.range(),
-                    &class_def.bases,
-                    &class_def.keywords,
-                    true,
-                )?;
-                Ok(Fix::automatic(edit))
+                remove_argument(base, arguments, Parentheses::Remove, checker.locator())
+                    .map(Fix::automatic)
             });
         }
         checker.diagnostics.push(diagnostic);

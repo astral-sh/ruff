@@ -1,13 +1,11 @@
 use std::fmt;
 
-use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Ranged, Stmt};
-
 use ruff_diagnostics::{AutofixKind, Violation};
 use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::includes_arg_name;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Parameters, Ranged, Stmt};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -98,17 +96,25 @@ pub(crate) fn unnecessary_map(
             };
 
             // Only flag, e.g., `map(lambda x: x + 1, iterable)`.
-            let [Expr::Lambda(ast::ExprLambda { args, body, .. }), _] = args else {
+            let [Expr::Lambda(ast::ExprLambda {
+                parameters, body, ..
+            }), _] = args
+            else {
                 return;
             };
 
-            if late_binding(args, body) {
+            if late_binding(parameters, body) {
                 return;
             }
         }
         ObjectType::List | ObjectType::Set => {
             // Only flag, e.g., `list(map(lambda x: x + 1, iterable))`.
-            let [Expr::Call(ast::ExprCall { func, args, .. })] = args else {
+            let [Expr::Call(ast::ExprCall {
+                func,
+                arguments: Arguments { args, .. },
+                ..
+            })] = args
+            else {
                 return;
             };
 
@@ -121,17 +127,25 @@ pub(crate) fn unnecessary_map(
                 return;
             };
 
-            let Expr::Lambda(ast::ExprLambda { args, body, .. }) = argument else {
+            let Expr::Lambda(ast::ExprLambda {
+                parameters, body, ..
+            }) = argument
+            else {
                 return;
             };
 
-            if late_binding(args, body) {
+            if late_binding(parameters, body) {
                 return;
             }
         }
         ObjectType::Dict => {
             // Only flag, e.g., `dict(map(lambda v: (v, v ** 2), values))`.
-            let [Expr::Call(ast::ExprCall { func, args, .. })] = args else {
+            let [Expr::Call(ast::ExprCall {
+                func,
+                arguments: Arguments { args, .. },
+                ..
+            })] = args
+            else {
                 return;
             };
 
@@ -140,7 +154,10 @@ pub(crate) fn unnecessary_map(
                 return;
             };
 
-            let Expr::Lambda(ast::ExprLambda { args, body, .. }) = argument else {
+            let Expr::Lambda(ast::ExprLambda {
+                parameters, body, ..
+            }) = argument
+            else {
                 return;
             };
 
@@ -154,7 +171,7 @@ pub(crate) fn unnecessary_map(
                 return;
             }
 
-            if late_binding(args, body) {
+            if late_binding(parameters, body) {
                 return;
             }
         }
@@ -195,7 +212,7 @@ impl fmt::Display for ObjectType {
     }
 }
 
-/// Returns `true` if the lambda defined by the given arguments and body contains any names that
+/// Returns `true` if the lambda defined by the given parameters and body contains any names that
 /// are late-bound within nested lambdas.
 ///
 /// For example, given:
@@ -212,8 +229,8 @@ impl fmt::Display for ObjectType {
 ///
 /// Would yield an incorrect result, as the `x` in the inner lambda would be bound to the last
 /// value of `x` in the comprehension.
-fn late_binding(args: &Arguments, body: &Expr) -> bool {
-    let mut visitor = LateBindingVisitor::new(args);
+fn late_binding(parameters: &Parameters, body: &Expr) -> bool {
+    let mut visitor = LateBindingVisitor::new(parameters);
     visitor.visit_expr(body);
     visitor.late_bound
 }
@@ -221,17 +238,17 @@ fn late_binding(args: &Arguments, body: &Expr) -> bool {
 #[derive(Debug)]
 struct LateBindingVisitor<'a> {
     /// The arguments to the current lambda.
-    args: &'a Arguments,
+    parameters: &'a Parameters,
     /// The arguments to any lambdas within the current lambda body.
-    lambdas: Vec<&'a Arguments>,
+    lambdas: Vec<&'a Parameters>,
     /// Whether any names within the current lambda body are late-bound within nested lambdas.
     late_bound: bool,
 }
 
 impl<'a> LateBindingVisitor<'a> {
-    fn new(args: &'a Arguments) -> Self {
+    fn new(parameters: &'a Parameters) -> Self {
         Self {
-            args,
+            parameters,
             lambdas: Vec::new(),
             late_bound: false,
         }
@@ -243,8 +260,8 @@ impl<'a> Visitor<'a> for LateBindingVisitor<'a> {
 
     fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
-            Expr::Lambda(ast::ExprLambda { args, .. }) => {
-                self.lambdas.push(args);
+            Expr::Lambda(ast::ExprLambda { parameters, .. }) => {
+                self.lambdas.push(parameters);
                 visitor::walk_expr(self, expr);
                 self.lambdas.pop();
             }
@@ -256,9 +273,13 @@ impl<'a> Visitor<'a> for LateBindingVisitor<'a> {
                 // If we're within a nested lambda...
                 if !self.lambdas.is_empty() {
                     // If the name is defined in the current lambda...
-                    if includes_arg_name(id, self.args) {
+                    if self.parameters.includes(id) {
                         // And isn't overridden by any nested lambdas...
-                        if !self.lambdas.iter().any(|args| includes_arg_name(id, args)) {
+                        if !self
+                            .lambdas
+                            .iter()
+                            .any(|parameters| parameters.includes(id))
+                        {
                             // Then it's late-bound.
                             self.late_bound = true;
                         }

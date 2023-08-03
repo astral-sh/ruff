@@ -1,6 +1,6 @@
 use std::hash::BuildHasherDefault;
 
-use ruff_python_ast::{self as ast, Expr, Ranged};
+use ruff_python_ast::{self as ast, Arguments, Expr, Ranged};
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -51,7 +51,11 @@ impl Violation for DuplicateBases {
 }
 
 /// PLE0241
-pub(crate) fn duplicate_bases(checker: &mut Checker, name: &str, bases: &[Expr]) {
+pub(crate) fn duplicate_bases(checker: &mut Checker, name: &str, arguments: Option<&Arguments>) {
+    let Some(Arguments { args: bases, .. }) = arguments else {
+        return;
+    };
+
     let mut seen: FxHashSet<&str> =
         FxHashSet::with_capacity_and_hasher(bases.len(), BuildHasherDefault::default());
     for base in bases {

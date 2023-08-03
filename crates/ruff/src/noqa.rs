@@ -60,7 +60,7 @@ impl<'a> Directive<'a> {
             if text[..comment_start]
                 .chars()
                 .last()
-                .map_or(false, |c| c != '#')
+                .is_some_and(|c| c != '#')
             {
                 continue;
             }

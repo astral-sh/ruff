@@ -1,7 +1,7 @@
 use log::error;
 use ruff_python_ast::{
-    self as ast, CmpOp, Constant, ElifElseClause, Expr, ExprContext, Identifier, Ranged, Stmt,
-    StmtIf,
+    self as ast, Arguments, CmpOp, Constant, ElifElseClause, Expr, ExprContext, Identifier, Ranged,
+    Stmt,
 };
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
@@ -314,8 +314,8 @@ fn find_last_nested_if(body: &[Stmt]) -> Option<(&Expr, &Stmt)> {
 }
 
 /// Returns the body, the range of the `if` or `elif` and whether the range is for an `if` or `elif`
-fn nested_if_body(stmt_if: &StmtIf) -> Option<(&[Stmt], TextRange, bool)> {
-    let StmtIf {
+fn nested_if_body(stmt_if: &ast::StmtIf) -> Option<(&[Stmt], TextRange, bool)> {
+    let ast::StmtIf {
         test,
         body,
         elif_else_clauses,
@@ -361,7 +361,11 @@ fn nested_if_body(stmt_if: &StmtIf) -> Option<(&[Stmt], TextRange, bool)> {
 }
 
 /// SIM102
-pub(crate) fn nested_if_statements(checker: &mut Checker, stmt_if: &StmtIf, parent: Option<&Stmt>) {
+pub(crate) fn nested_if_statements(
+    checker: &mut Checker,
+    stmt_if: &ast::StmtIf,
+    parent: Option<&Stmt>,
+) {
     let Some((body, range, is_elif)) = nested_if_body(stmt_if) else {
         return;
     };
@@ -538,8 +542,11 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
                 };
                 let node1 = ast::ExprCall {
                     func: Box::new(node.into()),
-                    args: vec![if_test.clone()],
-                    keywords: vec![],
+                    arguments: Arguments {
+                        args: vec![if_test.clone()],
+                        keywords: vec![],
+                        range: TextRange::default(),
+                    },
                     range: TextRange::default(),
                 };
                 let node2 = ast::StmtReturn {
@@ -566,7 +573,6 @@ fn ternary(target_var: &Expr, body_value: &Expr, test: &Expr, orelse_value: &Exp
     let node1 = ast::StmtAssign {
         targets: vec![target_var.clone()],
         value: Box::new(node.into()),
-        type_comment: None,
         range: TextRange::default(),
     };
     node1.into()
@@ -575,9 +581,9 @@ fn ternary(target_var: &Expr, body_value: &Expr, test: &Expr, orelse_value: &Exp
 /// Return `true` if the `Expr` contains a reference to any of the given `${module}.${target}`.
 fn contains_call_path(expr: &Expr, targets: &[&[&str]], semantic: &SemanticModel) -> bool {
     any_over_expr(expr, &|expr| {
-        semantic.resolve_call_path(expr).map_or(false, |call_path| {
-            targets.iter().any(|target| &call_path.as_slice() == target)
-        })
+        semantic
+            .resolve_call_path(expr)
+            .is_some_and(|call_path| targets.iter().any(|target| &call_path.as_slice() == target))
     })
 }
 
@@ -693,7 +699,7 @@ fn body_range(branch: &IfElifBranch, locator: &Locator) -> TextRange {
 }
 
 /// SIM114
-pub(crate) fn if_with_same_arms(checker: &mut Checker, locator: &Locator, stmt_if: &StmtIf) {
+pub(crate) fn if_with_same_arms(checker: &mut Checker, locator: &Locator, stmt_if: &ast::StmtIf) {
     let mut branches_iter = if_elif_branches(stmt_if).peekable();
     while let Some(current_branch) = branches_iter.next() {
         let Some(following_branch) = branches_iter.peek() else {
@@ -732,12 +738,12 @@ pub(crate) fn if_with_same_arms(checker: &mut Checker, locator: &Locator, stmt_i
 }
 
 /// SIM116
-pub(crate) fn manual_dict_lookup(checker: &mut Checker, stmt_if: &StmtIf) {
+pub(crate) fn manual_dict_lookup(checker: &mut Checker, stmt_if: &ast::StmtIf) {
     // Throughout this rule:
     // * Each if or elif statement's test must consist of a constant equality check with the same variable.
     // * Each if or elif statement's body must consist of a single `return`.
     // * The else clause must be empty, or a single `return`.
-    let StmtIf {
+    let ast::StmtIf {
         body,
         test,
         elif_else_clauses,
@@ -768,9 +774,10 @@ pub(crate) fn manual_dict_lookup(checker: &mut Checker, stmt_if: &StmtIf) {
     let [Stmt::Return(ast::StmtReturn { value, range: _ })] = body.as_slice() else {
         return;
     };
-    if value.as_ref().map_or(false, |value| {
-        contains_effect(value, |id| checker.semantic().is_builtin(id))
-    }) {
+    if value
+        .as_ref()
+        .is_some_and(|value| contains_effect(value, |id| checker.semantic().is_builtin(id)))
+    {
         return;
     }
 
@@ -790,7 +797,7 @@ pub(crate) fn manual_dict_lookup(checker: &mut Checker, stmt_if: &StmtIf) {
                 let [Stmt::Return(ast::StmtReturn { value, range: _ })] = body.as_slice() else {
                     return;
                 };
-                if value.as_ref().map_or(false, |value| {
+                if value.as_ref().is_some_and(|value| {
                     contains_effect(value, |id| checker.semantic().is_builtin(id))
                 }) {
                     return;
@@ -816,7 +823,7 @@ pub(crate) fn manual_dict_lookup(checker: &mut Checker, stmt_if: &StmtIf) {
                     return;
                 };
 
-                if value.as_ref().map_or(false, |value| {
+                if value.as_ref().is_some_and(|value| {
                     contains_effect(value, |id| checker.semantic().is_builtin(id))
                 }) {
                     return;
@@ -842,8 +849,8 @@ pub(crate) fn manual_dict_lookup(checker: &mut Checker, stmt_if: &StmtIf) {
 }
 
 /// SIM401
-pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &StmtIf) {
-    let StmtIf {
+pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &ast::StmtIf) {
+    let ast::StmtIf {
         test,
         body,
         elif_else_clauses,
@@ -949,15 +956,17 @@ pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &StmtIf)
     };
     let node3 = ast::ExprCall {
         func: Box::new(node2.into()),
-        args: vec![node1, node],
-        keywords: vec![],
+        arguments: Arguments {
+            args: vec![node1, node],
+            keywords: vec![],
+            range: TextRange::default(),
+        },
         range: TextRange::default(),
     };
     let node4 = expected_var.clone();
     let node5 = ast::StmtAssign {
         targets: vec![node4],
         value: Box::new(node3.into()),
-        type_comment: None,
         range: TextRange::default(),
     };
     let contents = checker.generator().stmt(&node5.into());

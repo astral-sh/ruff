@@ -3,24 +3,6 @@ source: crates/ruff_python_parser/src/string.rs
 expression: parse_ast
 ---
 [
-    Constant(
-        ExprConstant {
-            range: 2..9,
-            value: Str(
-                "x   =",
-            ),
-            kind: None,
-        },
-    ),
-    Constant(
-        ExprConstant {
-            range: 2..9,
-            value: Str(
-                "",
-            ),
-            kind: None,
-        },
-    ),
     FormattedValue(
         ExprFormattedValue {
             range: 2..9,
@@ -31,7 +13,13 @@ expression: parse_ast
                     ctx: Load,
                 },
             ),
-            conversion: Repr,
+            debug_text: Some(
+                DebugText {
+                    leading: "",
+                    trailing: "   =",
+                },
+            ),
+            conversion: None,
             format_spec: None,
         },
     ),

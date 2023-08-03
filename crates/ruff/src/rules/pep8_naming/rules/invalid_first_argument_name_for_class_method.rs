@@ -1,4 +1,4 @@
-use ruff_python_ast::{ArgWithDefault, Arguments, Decorator, Ranged};
+use ruff_python_ast::{Decorator, ParameterWithDefault, Parameters, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -59,7 +59,7 @@ pub(crate) fn invalid_first_argument_name_for_class_method(
     scope: &Scope,
     name: &str,
     decorator_list: &[Decorator],
-    args: &Arguments,
+    parameters: &Parameters,
 ) -> Option<Diagnostic> {
     if !matches!(
         function_type::classify(
@@ -74,13 +74,16 @@ pub(crate) fn invalid_first_argument_name_for_class_method(
     ) {
         return None;
     }
-    if let Some(ArgWithDefault {
-        def,
+    if let Some(ParameterWithDefault {
+        parameter,
         default: _,
         range: _,
-    }) = args.posonlyargs.first().or_else(|| args.args.first())
+    }) = parameters
+        .posonlyargs
+        .first()
+        .or_else(|| parameters.args.first())
     {
-        if &def.arg != "cls" {
+        if &parameter.name != "cls" {
             if checker
                 .settings
                 .pep8_naming
@@ -92,7 +95,7 @@ pub(crate) fn invalid_first_argument_name_for_class_method(
             }
             return Some(Diagnostic::new(
                 InvalidFirstArgumentNameForClassMethod,
-                def.range(),
+                parameter.range(),
             ));
         }
     }

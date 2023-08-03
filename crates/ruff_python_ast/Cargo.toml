@@ -28,6 +28,7 @@ once_cell = { workspace = true }
 rustc-hash = { workspace = true }
 serde = { workspace = true, optional = true }
 smallvec = { workspace = true }
+static_assertions = "1.1.0"
 
 [dev-dependencies]
 insta = { workspace = true }

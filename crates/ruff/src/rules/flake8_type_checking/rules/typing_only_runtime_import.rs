@@ -283,7 +283,7 @@ pub(crate) fn typing_only_runtime_import(
             };
 
             if checker.rule_is_ignored(rule_for(import_type), import.range.start())
-                || import.parent_range.map_or(false, |parent_range| {
+                || import.parent_range.is_some_and(|parent_range| {
                     checker.rule_is_ignored(rule_for(import_type), parent_range.start())
                 })
             {

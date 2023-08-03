@@ -48,7 +48,7 @@ pub(crate) fn blocking_os_call(checker: &mut Checker, expr: &Expr) {
                 .semantic()
                 .resolve_call_path(func)
                 .as_ref()
-                .map_or(false, is_unsafe_os_method)
+                .is_some_and(is_unsafe_os_method)
             {
                 checker
                     .diagnostics

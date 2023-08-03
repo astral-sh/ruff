@@ -10,3 +10,7 @@ def f():
 
 def f():
     global analyze_featuremap_layer, analyze_featuremapcompression_layer, analyze_latencies_post, analyze_motions_layer, analyze_size_model
+
+
+def f():
+    global analyze_featuremap_layer, analyze_featuremapcompression_layer, analyze_latencies_post, analyze_motions_layer, analyze_size_model  # end-of-line comment

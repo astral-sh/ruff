@@ -68,7 +68,7 @@ pub(crate) fn blocking_http_call(checker: &mut Checker, expr: &Expr) {
                 .semantic()
                 .resolve_call_path(func)
                 .as_ref()
-                .map_or(false, is_blocking_http_call)
+                .is_some_and(is_blocking_http_call)
             {
                 checker.diagnostics.push(Diagnostic::new(
                     BlockingHttpCallInAsyncFunction,

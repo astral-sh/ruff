@@ -1,8 +1,6 @@
-use ruff_python_ast::{self as ast, Expr, Ranged};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use smallvec::SmallVec;
+use ruff_python_ast::{self as ast, Expr, Ranged};
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_pyi::helpers::traverse_union;
@@ -44,7 +42,7 @@ impl Violation for UnnecessaryLiteralUnion {
 
 /// PYI030
 pub(crate) fn unnecessary_literal_union<'a>(checker: &mut Checker, expr: &'a Expr) {
-    let mut literal_exprs = SmallVec::<[&Box<Expr>; 1]>::new();
+    let mut literal_exprs = Vec::new();
 
     // Adds a member to `literal_exprs` if it is a `Literal` annotation
     let mut collect_literal_expr = |expr: &'a Expr, _| {

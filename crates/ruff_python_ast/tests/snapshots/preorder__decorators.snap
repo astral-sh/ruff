@@ -5,7 +5,7 @@ expression: trace
 - ModModule
   - StmtFunctionDef
     - ExprName
-    - Arguments
+    - Parameters
     - StmtPass
   - StmtClassDef
     - ExprName

@@ -40,3 +40,4 @@ __all__ = __all__ + ["Hello"]
 
 __all__ = __all__ + multiprocessing.__all__
 
+__all__ = list[str](["Hello", "world"])

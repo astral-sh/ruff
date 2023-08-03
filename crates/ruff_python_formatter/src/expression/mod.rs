@@ -3,12 +3,14 @@ use std::cmp::Ordering;
 use ruff_python_ast as ast;
 use ruff_python_ast::{Expr, Operator};
 
-use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions};
+use ruff_formatter::{
+    write, FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions,
+};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::visitor::preorder::{walk_expr, PreorderVisitor};
 
 use crate::builders::parenthesize_if_expands;
-use crate::context::NodeLevel;
+use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::parentheses::{
     is_expression_parenthesized, optional_parentheses, parenthesized, NeedsParentheses,
     OptionalParentheses, Parentheses, Parenthesize,
@@ -106,21 +108,16 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
         if parenthesize {
             parenthesized("(", &format_expr, ")").fmt(f)
         } else {
-            let saved_level = match f.context().node_level() {
-                saved_level @ (NodeLevel::TopLevel | NodeLevel::CompoundStatement) => {
-                    f.context_mut().set_node_level(NodeLevel::Expression(None));
-                    Some(saved_level)
+            let level = match f.context().node_level() {
+                NodeLevel::TopLevel | NodeLevel::CompoundStatement => NodeLevel::Expression(None),
+                saved_level @ (NodeLevel::Expression(_) | NodeLevel::ParenthesizedExpression) => {
+                    saved_level
                 }
-                NodeLevel::Expression(_) | NodeLevel::ParenthesizedExpression => None,
             };
 
-            let result = Format::fmt(&format_expr, f);
+            let mut f = WithNodeLevel::new(level, f);
 
-            if let Some(saved_level) = saved_level {
-                f.context_mut().set_node_level(saved_level);
-            }
-
-            result
+            write!(f, [format_expr])
         }
     }
 }
@@ -359,8 +356,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             Expr::Call(ast::ExprCall {
                 range: _,
                 func,
-                args: _,
-                keywords: _,
+                arguments: _,
             }) => {
                 self.any_parenthesized_expressions = true;
                 // Only walk the function, the arguments are always parenthesized
@@ -425,10 +421,10 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             // Only use the layout if the first or last expression has parentheses of some sort.
             let first_parenthesized = self
                 .first
-                .map_or(false, |first| has_parentheses(first, self.source));
+                .is_some_and(|first| has_parentheses(first, self.source));
             let last_parenthesized = self
                 .last
-                .map_or(false, |last| has_parentheses(last, self.source));
+                .is_some_and(|last| has_parentheses(last, self.source));
             first_parenthesized || last_parenthesized
         }
     }

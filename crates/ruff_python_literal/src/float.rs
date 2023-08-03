@@ -15,10 +15,10 @@ fn trim_slice<T>(v: &[T], mut trim: impl FnMut(&T) -> bool) -> &[T] {
     // it.take_while_ref(&mut trim).for_each(drop);
     // hmm.. `&mut slice::Iter<_>` is not `Clone`
     // it.by_ref().rev().take_while_ref(&mut trim).for_each(drop);
-    while it.clone().next().map_or(false, &mut trim) {
+    while it.clone().next().is_some_and(&mut trim) {
         it.next();
     }
-    while it.clone().next_back().map_or(false, &mut trim) {
+    while it.clone().next_back().is_some_and(&mut trim) {
         it.next_back();
     }
     it.as_slice()

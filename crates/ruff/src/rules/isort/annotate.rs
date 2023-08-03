@@ -71,7 +71,7 @@ pub(crate) fn annotate_imports<'a>(
                     // import bar  # noqa`).
                     let mut inline = vec![];
                     if names.len() > 1
-                        || names.first().map_or(false, |alias| {
+                        || names.first().is_some_and(|alias| {
                             locator
                                 .contains_line_break(TextRange::new(import.start(), alias.start()))
                         })

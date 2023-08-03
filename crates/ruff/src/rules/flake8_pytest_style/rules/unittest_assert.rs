@@ -2,7 +2,7 @@ use std::hash::BuildHasherDefault;
 
 use anyhow::{anyhow, bail, Result};
 use ruff_python_ast::{
-    self as ast, CmpOp, Constant, Expr, ExprContext, Identifier, Keyword, Stmt, UnaryOp,
+    self as ast, Arguments, CmpOp, Constant, Expr, ExprContext, Identifier, Keyword, Stmt, UnaryOp,
 };
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
@@ -218,7 +218,7 @@ impl UnittestAssert {
         if keywords.iter().any(|kw| {
             kw.arg
                 .as_ref()
-                .map_or(false, |kwarg_name| !arg_spec.contains(&kwarg_name.as_str()))
+                .is_some_and(|kwarg_name| !arg_spec.contains(&kwarg_name.as_str()))
         }) {
             bail!("Unknown keyword argument");
         }
@@ -240,7 +240,7 @@ impl UnittestAssert {
                 if keyword
                     .arg
                     .as_ref()
-                    .map_or(false, |kwarg_name| &kwarg_name == arg_name)
+                    .is_some_and(|kwarg_name| &kwarg_name == arg_name)
                 {
                     Some(&keyword.value)
                 } else {
@@ -355,8 +355,11 @@ impl UnittestAssert {
                 };
                 let node1 = ast::ExprCall {
                     func: Box::new(node.into()),
-                    args: vec![(**obj).clone(), (**cls).clone()],
-                    keywords: vec![],
+                    arguments: Arguments {
+                        args: vec![(**obj).clone(), (**cls).clone()],
+                        keywords: vec![],
+                        range: TextRange::default(),
+                    },
                     range: TextRange::default(),
                 };
                 let isinstance = node1.into();
@@ -396,8 +399,11 @@ impl UnittestAssert {
                 };
                 let node2 = ast::ExprCall {
                     func: Box::new(node1.into()),
-                    args: vec![(**regex).clone(), (**text).clone()],
-                    keywords: vec![],
+                    arguments: Arguments {
+                        args: vec![(**regex).clone(), (**text).clone()],
+                        keywords: vec![],
+                        range: TextRange::default(),
+                    },
                     range: TextRange::default(),
                 };
                 let re_search = node2.into();

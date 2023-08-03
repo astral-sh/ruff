@@ -1,4 +1,4 @@
-use ruff_python_ast::{ArgWithDefault, Arguments, Ranged};
+use ruff_python_ast::{ParameterWithDefault, Parameters, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -57,26 +57,27 @@ impl Violation for MutableArgumentDefault {
 }
 
 /// B006
-pub(crate) fn mutable_argument_default(checker: &mut Checker, arguments: &Arguments) {
+pub(crate) fn mutable_argument_default(checker: &mut Checker, parameters: &Parameters) {
     // Scan in reverse order to right-align zip().
-    for ArgWithDefault {
-        def,
+    for ParameterWithDefault {
+        parameter,
         default,
         range: _,
-    } in arguments
+    } in parameters
         .posonlyargs
         .iter()
-        .chain(&arguments.args)
-        .chain(&arguments.kwonlyargs)
+        .chain(&parameters.args)
+        .chain(&parameters.kwonlyargs)
     {
         let Some(default) = default else {
             continue;
         };
 
         if is_mutable_expr(default, checker.semantic())
-            && !def.annotation.as_ref().map_or(false, |expr| {
-                is_immutable_annotation(expr, checker.semantic())
-            })
+            && !parameter
+                .annotation
+                .as_ref()
+                .is_some_and(|expr| is_immutable_annotation(expr, checker.semantic()))
         {
             checker
                 .diagnostics

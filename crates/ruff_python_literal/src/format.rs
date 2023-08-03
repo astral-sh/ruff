@@ -1,6 +1,7 @@
 use itertools::{Itertools, PeekingNext};
 
 use num_traits::{cast::ToPrimitive, FromPrimitive, Signed};
+use std::error::Error;
 use std::ops::Deref;
 use std::{cmp, str::FromStr};
 
@@ -179,6 +180,7 @@ impl FormatParse for FormatType {
             Some('g') => (Some(Self::GeneralFormat(Case::Lower)), chars.as_str()),
             Some('G') => (Some(Self::GeneralFormat(Case::Upper)), chars.as_str()),
             Some('%') => (Some(Self::Percentage), chars.as_str()),
+            Some(_) => (None, chars.as_str()),
             _ => (None, text),
         }
     }
@@ -282,10 +284,20 @@ impl FormatSpec {
         let (width, text) = parse_number(text)?;
         let (grouping_option, text) = FormatGrouping::parse(text);
         let (precision, text) = parse_precision(text)?;
-        let (format_type, text) = FormatType::parse(text);
-        if !text.is_empty() {
-            return Err(FormatSpecError::InvalidFormatSpecifier);
-        }
+        let (format_type, _text) = if text.is_empty() {
+            (None, text)
+        } else {
+            // If there's any remaining text, we should yield a valid format type and consume it
+            // all.
+            let (format_type, text) = FormatType::parse(text);
+            if format_type.is_none() {
+                return Err(FormatSpecError::InvalidFormatType);
+            }
+            if !text.is_empty() {
+                return Err(FormatSpecError::InvalidFormatSpecifier);
+            }
+            (format_type, text)
+        };
 
         if zero && fill.is_none() {
             fill.replace('0');
@@ -723,6 +735,7 @@ pub enum FormatSpecError {
     DecimalDigitsTooMany,
     PrecisionTooBig,
     InvalidFormatSpecifier,
+    InvalidFormatType,
     UnspecifiedFormat(char, char),
     UnknownFormatCode(char, &'static str),
     PrecisionNotAllowed,
@@ -743,6 +756,39 @@ pub enum FormatParseError {
     MissingRightBracket,
     InvalidCharacterAfterRightBracket,
 }
+
+impl std::fmt::Display for FormatParseError {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::UnmatchedBracket => {
+                std::write!(fmt, "unmatched bracket in format string")
+            }
+            Self::MissingStartBracket => {
+                std::write!(fmt, "missing start bracket in format string")
+            }
+            Self::UnescapedStartBracketInLiteral => {
+                std::write!(fmt, "unescaped start bracket in literal")
+            }
+            Self::InvalidFormatSpecifier => {
+                std::write!(fmt, "invalid format specifier")
+            }
+            Self::UnknownConversion => {
+                std::write!(fmt, "unknown conversion")
+            }
+            Self::EmptyAttribute => {
+                std::write!(fmt, "empty attribute")
+            }
+            Self::MissingRightBracket => {
+                std::write!(fmt, "missing right bracket")
+            }
+            Self::InvalidCharacterAfterRightBracket => {
+                std::write!(fmt, "invalid character after right bracket")
+            }
+        }
+    }
+}
+
+impl Error for FormatParseError {}
 
 impl FromStr for FormatSpec {
     type Err = FormatSpecError;
@@ -1240,6 +1286,10 @@ mod tests {
         assert_eq!(
             FormatSpec::parse("d "),
             Err(FormatSpecError::InvalidFormatSpecifier)
+        );
+        assert_eq!(
+            FormatSpec::parse("z"),
+            Err(FormatSpecError::InvalidFormatType)
         );
     }
 

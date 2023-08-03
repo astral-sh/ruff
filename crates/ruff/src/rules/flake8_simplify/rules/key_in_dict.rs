@@ -1,5 +1,5 @@
 use anyhow::Result;
-use ruff_python_ast::{self as ast, CmpOp, Expr, Ranged};
+use ruff_python_ast::{self as ast, Arguments, CmpOp, Expr, Ranged};
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::Edit;
@@ -71,8 +71,7 @@ fn key_in_dict(
 ) {
     let Expr::Call(ast::ExprCall {
         func,
-        args,
-        keywords,
+        arguments: Arguments { args, keywords, .. },
         range: _,
     }) = &right
     else {
@@ -96,7 +95,7 @@ fn key_in_dict(
     // ```
     if value
         .as_name_expr()
-        .map_or(false, |name| matches!(name.id.as_str(), "self"))
+        .is_some_and(|name| matches!(name.id.as_str(), "self"))
     {
         return;
     }

@@ -3,12 +3,12 @@ name: Benchmark
 on:
   pull_request:
     paths:
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - 'rust-toolchain'
-      - 'crates/**'
-      - '!crates/ruff_dev'
-      - '!crates/ruff_shrinking'
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain"
+      - "crates/**"
+      - "!crates/ruff_dev"
+      - "!crates/ruff_shrinking"
 
   workflow_dispatch:
 
@@ -22,7 +22,7 @@ jobs:
     name: "Run | ${{ matrix.os }}"
     strategy:
       matrix:
-        os: [ ubuntu-latest, windows-latest ]
+        os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
 
     steps:
