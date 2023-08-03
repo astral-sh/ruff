@@ -28,15 +28,11 @@ impl FormatNodeRule<ExprCall> for FormatExprCall {
             arguments,
         } = item;
 
-        if self.fluent_style {
-            match func.as_ref() {
-                Expr::Attribute(expr) => expr.format().with_options(self.fluent_style).fmt(f)?,
-                Expr::Call(expr) => expr.format().with_options(self.fluent_style).fmt(f)?,
-                Expr::Subscript(expr) => expr.format().with_options(self.fluent_style).fmt(f)?,
-                _ => func.format().fmt(f)?,
-            }
-        } else {
-            func.format().fmt(f)?;
+        match func.as_ref() {
+            Expr::Attribute(expr) => expr.format().with_options(self.fluent_style).fmt(f)?,
+            Expr::Call(expr) => expr.format().with_options(self.fluent_style).fmt(f)?,
+            Expr::Subscript(expr) => expr.format().with_options(self.fluent_style).fmt(f)?,
+            _ => func.format().fmt(f)?,
         }
 
         write!(f, [arguments.format()])

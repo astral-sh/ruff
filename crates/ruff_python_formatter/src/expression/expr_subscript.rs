@@ -40,17 +40,11 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
             "A subscript expression can only have a single dangling comment, the one after the bracket"
         );
 
-        let format_value = format_with(|f| {
-            if self.fluent_style {
-                match value.as_ref() {
-                    Expr::Attribute(expr) => expr.format().with_options(self.fluent_style).fmt(f),
-                    Expr::Call(expr) => expr.format().with_options(self.fluent_style).fmt(f),
-                    Expr::Subscript(expr) => expr.format().with_options(self.fluent_style).fmt(f),
-                    _ => value.format().fmt(f),
-                }
-            } else {
-                value.format().fmt(f)
-            }
+        let format_value = format_with(|f| match value.as_ref() {
+            Expr::Attribute(expr) => expr.format().with_options(self.fluent_style).fmt(f),
+            Expr::Call(expr) => expr.format().with_options(self.fluent_style).fmt(f),
+            Expr::Subscript(expr) => expr.format().with_options(self.fluent_style).fmt(f),
+            _ => value.format().fmt(f),
         });
 
         if let NodeLevel::Expression(Some(_)) = f.context().node_level() {

@@ -3,9 +3,7 @@ use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{Constant, Expr, ExprAttribute, ExprConstant};
 
 use crate::comments::{leading_comments, trailing_comments};
-use crate::expression::parentheses::{
-    NeedsParentheses, OptionalParentheses, Parentheses,
-};
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parentheses};
 use crate::prelude::*;
 use crate::FormatNodeRule;
 
@@ -49,23 +47,25 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
 
         if needs_parentheses {
             value.format().with_options(Parentheses::Always).fmt(f)?;
-        } else if self.fluent_style {
+        } else {
             match value.as_ref() {
                 Expr::Attribute(expr) => expr.format().with_options(self.fluent_style).fmt(f)?,
                 Expr::Call(expr) => {
                     expr.format().with_options(self.fluent_style).fmt(f)?;
-                    // Format the dot on its own line
-                    soft_line_break().fmt(f)?;
+                    if self.fluent_style {
+                        // Format the dot on its own line
+                        soft_line_break().fmt(f)?;
+                    }
                 }
                 Expr::Subscript(expr) => {
                     expr.format().with_options(self.fluent_style).fmt(f)?;
-                    // Format the dot on its own line
-                    soft_line_break().fmt(f)?;
+                    if self.fluent_style {
+                        // Format the dot on its own line
+                        soft_line_break().fmt(f)?;
+                    }
                 }
                 _ => value.format().fmt(f)?,
             }
-        } else {
-            value.format().fmt(f)?;
         }
 
         if comments.has_trailing_own_line_comments(value.as_ref()) {
