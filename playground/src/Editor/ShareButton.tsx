@@ -22,9 +22,7 @@ export default function ShareButton({ onShare }: { onShare?: () => void }) {
       >
         Share
       </span>
-      <span aria-hidden="false">
-        Copied!
-      </span>
+      <span aria-hidden="false">Copied!</span>
     </AstralButton>
   ) : (
     <AstralButton

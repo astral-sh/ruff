@@ -16,6 +16,7 @@ export default function PrimarySideBar({
     <SideBar position="left">
       <SideBarEntry
         title="Source"
+        position={"left"}
         onClick={() => onSelectTool("Source")}
         selected={selected == "Source"}
       >
@@ -24,6 +25,7 @@ export default function PrimarySideBar({
 
       <SideBarEntry
         title="Settings"
+        position={"left"}
         onClick={() => onSelectTool("Settings")}
         selected={selected == "Settings"}
       >
