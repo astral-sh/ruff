@@ -67,13 +67,13 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
 
         // All expressions that can have parentheses can be in fluent style. We need to exclude top
         // expressions since they don't get parenthesized
-        let call_chain_layout = if !matches!(
+        let call_chain_layout = if matches!(
             f.context().node_level(),
             NodeLevel::CompoundStatement | NodeLevel::TopLevel
         ) {
-            CallChainLayout::from_expression(expression, f.context().source())
-        } else {
             CallChainLayout::Default
+        } else {
+            CallChainLayout::from_expression(expression, f.context().source())
         };
 
         let format_expr = format_with(|f| match expression {

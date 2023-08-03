@@ -51,7 +51,7 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
         } else {
             match value.as_ref() {
                 Expr::Attribute(expr) => {
-                    expr.format().with_options(self.call_chain_layout).fmt(f)?
+                    expr.format().with_options(self.call_chain_layout).fmt(f)?;
                 }
                 Expr::Call(expr) => {
                     expr.format().with_options(self.call_chain_layout).fmt(f)?;
