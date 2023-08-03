@@ -143,47 +143,51 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if checker.enabled(Rule::StubBodyMultipleStatements) {
                     flake8_pyi::rules::stub_body_multiple_statements(checker, stmt, body);
                 }
-                if checker.enabled(Rule::AnyEqNeAnnotation) {
-                    flake8_pyi::rules::any_eq_ne_annotation(checker, name, parameters);
-                }
-                if checker.enabled(Rule::NonSelfReturnType) {
-                    flake8_pyi::rules::non_self_return_type(
-                        checker,
-                        stmt,
-                        name,
-                        decorator_list,
-                        returns.as_ref().map(AsRef::as_ref),
-                        parameters,
-                        stmt.is_async_function_def_stmt(),
-                    );
-                }
-                if checker.enabled(Rule::CustomTypeVarReturnType) {
-                    flake8_pyi::rules::custom_type_var_return_type(
-                        checker,
-                        name,
-                        decorator_list,
-                        returns.as_ref().map(AsRef::as_ref),
-                        parameters,
-                        type_params.as_ref(),
-                    );
-                }
+            }
+            if checker.enabled(Rule::AnyEqNeAnnotation) {
+                flake8_pyi::rules::any_eq_ne_annotation(checker, name, parameters);
+            }
+            if checker.enabled(Rule::NonSelfReturnType) {
+                flake8_pyi::rules::non_self_return_type(
+                    checker,
+                    stmt,
+                    name,
+                    decorator_list,
+                    returns.as_ref().map(AsRef::as_ref),
+                    parameters,
+                    stmt.is_async_function_def_stmt(),
+                );
+            }
+            if checker.enabled(Rule::CustomTypeVarReturnType) {
+                flake8_pyi::rules::custom_type_var_return_type(
+                    checker,
+                    name,
+                    decorator_list,
+                    returns.as_ref().map(AsRef::as_ref),
+                    parameters,
+                    type_params.as_ref(),
+                );
+            }
+            if checker.is_stub {
                 if checker.enabled(Rule::StrOrReprDefinedInStub) {
                     flake8_pyi::rules::str_or_repr_defined_in_stub(checker, stmt);
                 }
+            }
+            if checker.is_stub || checker.settings.target_version >= PythonVersion::Py311 {
                 if checker.enabled(Rule::NoReturnArgumentAnnotationInStub) {
                     flake8_pyi::rules::no_return_argument_annotation(checker, parameters);
                 }
-                if checker.enabled(Rule::BadExitAnnotation) {
-                    flake8_pyi::rules::bad_exit_annotation(
-                        checker,
-                        stmt.is_async_function_def_stmt(),
-                        name,
-                        parameters,
-                    );
-                }
-                if checker.enabled(Rule::RedundantNumericUnion) {
-                    flake8_pyi::rules::redundant_numeric_union(checker, parameters);
-                }
+            }
+            if checker.enabled(Rule::BadExitAnnotation) {
+                flake8_pyi::rules::bad_exit_annotation(
+                    checker,
+                    stmt.is_async_function_def_stmt(),
+                    name,
+                    parameters,
+                );
+            }
+            if checker.enabled(Rule::RedundantNumericUnion) {
+                flake8_pyi::rules::redundant_numeric_union(checker, parameters);
             }
             if checker.enabled(Rule::DunderFunctionName) {
                 if let Some(diagnostic) = pep8_naming::rules::dunder_function_name(
@@ -470,9 +474,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if checker.enabled(Rule::PassInClassBody) {
                     flake8_pyi::rules::pass_in_class_body(checker, stmt, body);
                 }
-                if checker.enabled(Rule::EllipsisInNonEmptyClassBody) {
-                    flake8_pyi::rules::ellipsis_in_non_empty_class_body(checker, stmt, body);
-                }
+            }
+            if checker.enabled(Rule::EllipsisInNonEmptyClassBody) {
+                flake8_pyi::rules::ellipsis_in_non_empty_class_body(checker, stmt, body);
             }
             if checker.enabled(Rule::PytestIncorrectMarkParenthesesStyle) {
                 flake8_pytest_style::rules::marks(checker, decorator_list);
@@ -1407,13 +1411,13 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         );
                     }
                 }
-                if checker.semantic.match_typing_expr(annotation, "TypeAlias") {
-                    if checker.enabled(Rule::SnakeCaseTypeAlias) {
-                        flake8_pyi::rules::snake_case_type_alias(checker, target);
-                    }
-                    if checker.enabled(Rule::TSuffixedTypeAlias) {
-                        flake8_pyi::rules::t_suffixed_type_alias(checker, target);
-                    }
+            }
+            if checker.semantic.match_typing_expr(annotation, "TypeAlias") {
+                if checker.enabled(Rule::SnakeCaseTypeAlias) {
+                    flake8_pyi::rules::snake_case_type_alias(checker, target);
+                }
+                if checker.enabled(Rule::TSuffixedTypeAlias) {
+                    flake8_pyi::rules::t_suffixed_type_alias(checker, target);
                 }
             }
         }

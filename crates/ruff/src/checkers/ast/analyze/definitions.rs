@@ -30,8 +30,8 @@ pub(crate) fn definitions(checker: &mut Checker) {
         Rule::MissingTypeKwargs,
         Rule::MissingTypeSelf,
     ]);
-    let enforce_stubs = checker.is_stub
-        && checker.any_enabled(&[Rule::DocstringInStub, Rule::IterMethodReturnIterable]);
+    let enforce_stubs = checker.is_stub && checker.enabled(Rule::DocstringInStub);
+    let enforce_stubs_and_runtime = checker.enabled(Rule::IterMethodReturnIterable);
     let enforce_docstrings = checker.any_enabled(&[
         Rule::BlankLineAfterLastSection,
         Rule::BlankLineAfterSummary,
@@ -81,7 +81,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
         Rule::UndocumentedPublicPackage,
     ]);
 
-    if !enforce_annotations && !enforce_docstrings && !enforce_stubs {
+    if !enforce_annotations && !enforce_docstrings && !enforce_stubs && !enforce_stubs_and_runtime {
         return;
     }
 
@@ -141,6 +141,8 @@ pub(crate) fn definitions(checker: &mut Checker) {
             if checker.enabled(Rule::DocstringInStub) {
                 flake8_pyi::rules::docstring_in_stubs(checker, docstring);
             }
+        }
+        if enforce_stubs_and_runtime {
             if checker.enabled(Rule::IterMethodReturnIterable) {
                 flake8_pyi::rules::iter_method_return_iterable(checker, definition);
             }

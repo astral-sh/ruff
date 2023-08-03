@@ -1,4 +1,38 @@
 ---
 source: crates/ruff/src/rules/flake8_pyi/mod.rs
 ---
+PYI019.py:7:62: PYI019 Methods like `__new__` should return `typing.Self` instead of a custom `TypeVar`
+  |
+6 | class BadClass:
+7 |     def __new__(cls: type[_S], *args: str, **kwargs: int) -> _S: ...  # PYI019
+  |                                                              ^^ PYI019
+  |
+
+PYI019.py:10:54: PYI019 Methods like `bad_instance_method` should return `typing.Self` instead of a custom `TypeVar`
+   |
+10 |     def bad_instance_method(self: _S, arg: bytes) -> _S: ...  # PYI019
+   |                                                      ^^ PYI019
+   |
+
+PYI019.py:14:54: PYI019 Methods like `bad_class_method` should return `typing.Self` instead of a custom `TypeVar`
+   |
+13 |     @classmethod
+14 |     def bad_class_method(cls: type[_S], arg: int) -> _S: ...  # PYI019
+   |                                                      ^^ PYI019
+   |
+
+PYI019.py:35:63: PYI019 Methods like `__new__` should return `typing.Self` instead of a custom `TypeVar`
+   |
+33 | # Python > 3.12
+34 | class PEP695BadDunderNew[T]:
+35 |   def __new__[S](cls: type[S], *args: Any, ** kwargs: Any) -> S: ...  # PYI019
+   |                                                               ^ PYI019
+   |
+
+PYI019.py:38:46: PYI019 Methods like `generic_instance_method` should return `typing.Self` instead of a custom `TypeVar`
+   |
+38 |   def generic_instance_method[S](self: S) -> S: ...  # PYI019
+   |                                              ^ PYI019
+   |
+
 
