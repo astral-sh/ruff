@@ -8,7 +8,8 @@ use crate::{checkers::ast::Checker, rules::flake8_pyi::helpers::traverse_union};
 /// Checks for the presence of multiple `type`s in a union.
 ///
 /// ## Why is this bad?
-/// TODO
+/// The `type` built-in function accepts unions, and it is
+/// clearer to explicitly specify them as a single `type`.
 ///
 /// ## Example
 /// ```python
