@@ -9,16 +9,16 @@ from typing import (
 
 just_literals_pipe_union: TypeAlias = (
     Literal[True] | Literal["idk"]
-)  # not PYI042 (not a stubfile)
+)  # PYI042, since not camel case
 PublicAliasT: TypeAlias = str | int
 PublicAliasT2: TypeAlias = Union[str, bytes]
 _ABCDEFGHIJKLMNOPQRST: TypeAlias = typing.Any
 _PrivateAliasS: TypeAlias = Literal["I", "guess", "this", "is", "okay"]
 _PrivateAliasS2: TypeAlias = Annotated[str, "also okay"]
 
-snake_case_alias1: TypeAlias = str | int  # not PYI042 (not a stubfile)
-_snake_case_alias2: TypeAlias = Literal["whatever"]  # not PYI042 (not a stubfile)
-Snake_case_alias: TypeAlias = int | float  # not PYI042 (not a stubfile)
+snake_case_alias1: TypeAlias = str | int  # PYI042, since not camel case
+_snake_case_alias2: TypeAlias = Literal["whatever"]  # PYI042, since not camel case
+Snake_case_alias: TypeAlias = int | float  # PYI042, since not camel case
 
 # check that this edge case doesn't crash
 _: TypeAlias = str | int

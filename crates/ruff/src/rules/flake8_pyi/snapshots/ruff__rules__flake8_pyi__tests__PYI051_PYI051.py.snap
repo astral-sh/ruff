@@ -1,4 +1,24 @@
 ---
 source: crates/ruff/src/rules/flake8_pyi/mod.rs
 ---
+PYI051.py:4:18: PYI051 `Literal["foo"]` is redundant in a union with `str`
+  |
+2 | from typing import Literal, TypeAlias, Union
+3 | 
+4 | A: str | Literal["foo"]
+  |                  ^^^^^ PYI051
+5 | B: TypeAlias = typing.Union[Literal[b"bar", b"foo"], bytes, str]
+6 | C: TypeAlias = typing.Union[Literal[5], int, typing.Union[Literal["foo"], str]]
+  |
+
+PYI051.py:9:31: PYI051 `Literal[1J]` is redundant in a union with `complex`
+   |
+ 7 | D: TypeAlias = typing.Union[Literal[b"str_bytes", 42], bytes, int]
+ 8 | 
+ 9 | def func(x: complex | Literal[1J], y: Union[Literal[3.14], float]): ...
+   |                               ^^ PYI051
+10 | 
+11 | # OK
+   |
+
 

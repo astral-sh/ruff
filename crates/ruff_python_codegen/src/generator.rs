@@ -322,10 +322,7 @@ impl<'a> Generator<'a> {
                     self.newlines(2);
                 }
             }
-            Stmt::Return(ast::StmtReturn {
-                value,
-                range: _range,
-            }) => {
+            Stmt::Return(ast::StmtReturn { value, range: _ }) => {
                 statement!({
                     if let Some(expr) = value {
                         self.p("return ");
@@ -335,10 +332,7 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Stmt::Delete(ast::StmtDelete {
-                targets,
-                range: _range,
-            }) => {
+            Stmt::Delete(ast::StmtDelete { targets, range: _ }) => {
                 statement!({
                     self.p("del ");
                     let mut first = true;
@@ -361,7 +355,7 @@ impl<'a> Generator<'a> {
                 target,
                 op,
                 value,
-                range: _range,
+                range: _,
             }) => {
                 statement!({
                     self.unparse_expr(target, precedence::AUG_ASSIGN);
@@ -390,7 +384,7 @@ impl<'a> Generator<'a> {
                 annotation,
                 value,
                 simple,
-                range: _range,
+                range: _,
             }) => {
                 statement!({
                     let need_parens = matches!(target.as_ref(), Expr::Name(_)) && !simple;
@@ -453,7 +447,7 @@ impl<'a> Generator<'a> {
                 test,
                 body,
                 orelse,
-                range: _range,
+                range: _,
             }) => {
                 statement!({
                     self.p("while ");
@@ -472,7 +466,7 @@ impl<'a> Generator<'a> {
                 test,
                 body,
                 elif_else_clauses,
-                range: _range,
+                range: _,
             }) => {
                 statement!({
                     self.p("if ");
@@ -523,7 +517,7 @@ impl<'a> Generator<'a> {
             Stmt::Match(ast::StmtMatch {
                 subject,
                 cases,
-                range: _range,
+                range: _,
             }) => {
                 statement!({
                     self.p("match ");
@@ -540,7 +534,7 @@ impl<'a> Generator<'a> {
             }
             Stmt::TypeAlias(ast::StmtTypeAlias {
                 name,
-                range: _range,
+                range: _,
                 type_params,
                 value,
             }) => {
@@ -555,7 +549,7 @@ impl<'a> Generator<'a> {
             Stmt::Raise(ast::StmtRaise {
                 exc,
                 cause,
-                range: _range,
+                range: _,
             }) => {
                 statement!({
                     self.p("raise");
@@ -574,7 +568,7 @@ impl<'a> Generator<'a> {
                 handlers,
                 orelse,
                 finalbody,
-                range: _range,
+                range: _,
             }) => {
                 statement!({
                     self.p("try:");
@@ -605,7 +599,7 @@ impl<'a> Generator<'a> {
                 handlers,
                 orelse,
                 finalbody,
-                range: _range,
+                range: _,
             }) => {
                 statement!({
                     self.p("try:");
@@ -634,7 +628,7 @@ impl<'a> Generator<'a> {
             Stmt::Assert(ast::StmtAssert {
                 test,
                 msg,
-                range: _range,
+                range: _,
             }) => {
                 statement!({
                     self.p("assert ");
@@ -645,10 +639,7 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Stmt::Import(ast::StmtImport {
-                names,
-                range: _range,
-            }) => {
+            Stmt::Import(ast::StmtImport { names, range: _ }) => {
                 statement!({
                     self.p("import ");
                     let mut first = true;
@@ -662,7 +653,7 @@ impl<'a> Generator<'a> {
                 module,
                 names,
                 level,
-                range: _range,
+                range: _,
             }) => {
                 statement!({
                     self.p("from ");
@@ -680,10 +671,7 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Stmt::Global(ast::StmtGlobal {
-                names,
-                range: _range,
-            }) => {
+            Stmt::Global(ast::StmtGlobal { names, range: _ }) => {
                 statement!({
                     self.p("global ");
                     let mut first = true;
@@ -693,10 +681,7 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Stmt::Nonlocal(ast::StmtNonlocal {
-                names,
-                range: _range,
-            }) => {
+            Stmt::Nonlocal(ast::StmtNonlocal { names, range: _ }) => {
                 statement!({
                     self.p("nonlocal ");
                     let mut first = true;
@@ -706,10 +691,7 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Stmt::Expr(ast::StmtExpr {
-                value,
-                range: _range,
-            }) => {
+            Stmt::Expr(ast::StmtExpr { value, range: _ }) => {
                 statement!({
                     self.unparse_expr(value, precedence::EXPR);
                 });
@@ -743,7 +725,7 @@ impl<'a> Generator<'a> {
                 type_,
                 name,
                 body,
-                range: _range,
+                range: _,
             }) => {
                 self.p("except");
                 if star {
@@ -765,22 +747,13 @@ impl<'a> Generator<'a> {
 
     fn unparse_pattern(&mut self, ast: &Pattern) {
         match ast {
-            Pattern::MatchValue(ast::PatternMatchValue {
-                value,
-                range: _range,
-            }) => {
+            Pattern::MatchValue(ast::PatternMatchValue { value, range: _ }) => {
                 self.unparse_expr(value, precedence::MAX);
             }
-            Pattern::MatchSingleton(ast::PatternMatchSingleton {
-                value,
-                range: _range,
-            }) => {
+            Pattern::MatchSingleton(ast::PatternMatchSingleton { value, range: _ }) => {
                 self.unparse_constant(value);
             }
-            Pattern::MatchSequence(ast::PatternMatchSequence {
-                patterns,
-                range: _range,
-            }) => {
+            Pattern::MatchSequence(ast::PatternMatchSequence { patterns, range: _ }) => {
                 self.p("[");
                 let mut first = true;
                 for pattern in patterns {
@@ -793,7 +766,7 @@ impl<'a> Generator<'a> {
                 keys,
                 patterns,
                 rest,
-                range: _range,
+                range: _,
             }) => {
                 self.p("{");
                 let mut first = true;
@@ -811,10 +784,7 @@ impl<'a> Generator<'a> {
                 self.p("}");
             }
             Pattern::MatchClass(_) => {}
-            Pattern::MatchStar(ast::PatternMatchStar {
-                name,
-                range: _range,
-            }) => {
+            Pattern::MatchStar(ast::PatternMatchStar { name, range: _ }) => {
                 self.p("*");
                 if let Some(name) = name {
                     self.p_id(name);
@@ -825,7 +795,7 @@ impl<'a> Generator<'a> {
             Pattern::MatchAs(ast::PatternMatchAs {
                 pattern,
                 name,
-                range: _range,
+                range: _,
             }) => {
                 if let Some(pattern) = pattern {
                     self.unparse_pattern(pattern);
@@ -837,10 +807,7 @@ impl<'a> Generator<'a> {
                     self.p("_");
                 }
             }
-            Pattern::MatchOr(ast::PatternMatchOr {
-                patterns,
-                range: _range,
-            }) => {
+            Pattern::MatchOr(ast::PatternMatchOr { patterns, range: _ }) => {
                 let mut first = true;
                 for pattern in patterns {
                     self.p_delim(&mut first, " | ");
@@ -918,7 +885,7 @@ impl<'a> Generator<'a> {
             Expr::BoolOp(ast::ExprBoolOp {
                 op,
                 values,
-                range: _range,
+                range: _,
             }) => {
                 let (op, prec) = opprec!(bin, op, BoolOp, And("and", AND), Or("or", OR));
                 group_if!(prec, {
@@ -932,7 +899,7 @@ impl<'a> Generator<'a> {
             Expr::NamedExpr(ast::ExprNamedExpr {
                 target,
                 value,
-                range: _range,
+                range: _,
             }) => {
                 group_if!(precedence::NAMED_EXPR, {
                     self.unparse_expr(target, precedence::NAMED_EXPR);
@@ -944,7 +911,7 @@ impl<'a> Generator<'a> {
                 left,
                 op,
                 right,
-                range: _range,
+                range: _,
             }) => {
                 let rassoc = matches!(op, Operator::Pow);
                 let (op, prec) = opprec!(
@@ -974,7 +941,7 @@ impl<'a> Generator<'a> {
             Expr::UnaryOp(ast::ExprUnaryOp {
                 op,
                 operand,
-                range: _range,
+                range: _,
             }) => {
                 let (op, prec) = opprec!(
                     un,
@@ -993,7 +960,7 @@ impl<'a> Generator<'a> {
             Expr::Lambda(ast::ExprLambda {
                 parameters,
                 body,
-                range: _range,
+                range: _,
             }) => {
                 group_if!(precedence::LAMBDA, {
                     let npos = parameters.args.len() + parameters.posonlyargs.len();
@@ -1007,7 +974,7 @@ impl<'a> Generator<'a> {
                 test,
                 body,
                 orelse,
-                range: _range,
+                range: _,
             }) => {
                 group_if!(precedence::IF_EXP, {
                     self.unparse_expr(body, precedence::IF_EXP + 1);
@@ -1020,7 +987,7 @@ impl<'a> Generator<'a> {
             Expr::Dict(ast::ExprDict {
                 keys,
                 values,
-                range: _range,
+                range: _,
             }) => {
                 self.p("{");
                 let mut first = true;
@@ -1037,10 +1004,7 @@ impl<'a> Generator<'a> {
                 }
                 self.p("}");
             }
-            Expr::Set(ast::ExprSet {
-                elts,
-                range: _range,
-            }) => {
+            Expr::Set(ast::ExprSet { elts, range: _ }) => {
                 if elts.is_empty() {
                     self.p("set()");
                 } else {
@@ -1056,7 +1020,7 @@ impl<'a> Generator<'a> {
             Expr::ListComp(ast::ExprListComp {
                 elt,
                 generators,
-                range: _range,
+                range: _,
             }) => {
                 self.p("[");
                 self.unparse_expr(elt, precedence::COMPREHENSION_ELEMENT);
@@ -1066,7 +1030,7 @@ impl<'a> Generator<'a> {
             Expr::SetComp(ast::ExprSetComp {
                 elt,
                 generators,
-                range: _range,
+                range: _,
             }) => {
                 self.p("{");
                 self.unparse_expr(elt, precedence::COMPREHENSION_ELEMENT);
@@ -1077,7 +1041,7 @@ impl<'a> Generator<'a> {
                 key,
                 value,
                 generators,
-                range: _range,
+                range: _,
             }) => {
                 self.p("{");
                 self.unparse_expr(key, precedence::COMPREHENSION_ELEMENT);
@@ -1089,26 +1053,20 @@ impl<'a> Generator<'a> {
             Expr::GeneratorExp(ast::ExprGeneratorExp {
                 elt,
                 generators,
-                range: _range,
+                range: _,
             }) => {
                 self.p("(");
                 self.unparse_expr(elt, precedence::COMPREHENSION_ELEMENT);
                 self.unparse_comp(generators);
                 self.p(")");
             }
-            Expr::Await(ast::ExprAwait {
-                value,
-                range: _range,
-            }) => {
+            Expr::Await(ast::ExprAwait { value, range: _ }) => {
                 group_if!(precedence::AWAIT, {
                     self.p("await ");
                     self.unparse_expr(value, precedence::MAX);
                 });
             }
-            Expr::Yield(ast::ExprYield {
-                value,
-                range: _range,
-            }) => {
+            Expr::Yield(ast::ExprYield { value, range: _ }) => {
                 group_if!(precedence::YIELD, {
                     self.p("yield");
                     if let Some(value) = value {
@@ -1117,10 +1075,7 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Expr::YieldFrom(ast::ExprYieldFrom {
-                value,
-                range: _range,
-            }) => {
+            Expr::YieldFrom(ast::ExprYieldFrom { value, range: _ }) => {
                 group_if!(precedence::YIELD_FROM, {
                     self.p("yield from ");
                     self.unparse_expr(value, precedence::MAX);
@@ -1130,7 +1085,7 @@ impl<'a> Generator<'a> {
                 left,
                 ops,
                 comparators,
-                range: _range,
+                range: _,
             }) => {
                 group_if!(precedence::CMP, {
                     let new_lvl = precedence::CMP + 1;
@@ -1156,7 +1111,7 @@ impl<'a> Generator<'a> {
             Expr::Call(ast::ExprCall {
                 func,
                 arguments,
-                range: _range,
+                range: _,
             }) => {
                 self.unparse_expr(func, precedence::MAX);
                 self.p("(");
@@ -1164,7 +1119,7 @@ impl<'a> Generator<'a> {
                     [Expr::GeneratorExp(ast::ExprGeneratorExp {
                         elt,
                         generators,
-                        range: _range,
+                        range: _,
                     })],
                     [],
                 ) = (arguments.args.as_slice(), arguments.keywords.as_slice())
@@ -1197,23 +1152,20 @@ impl<'a> Generator<'a> {
                 debug_text,
                 conversion,
                 format_spec,
-                range: _range,
+                range: _,
             }) => self.unparse_formatted(
                 value,
                 debug_text.as_ref(),
                 *conversion,
                 format_spec.as_deref(),
             ),
-            Expr::JoinedStr(ast::ExprJoinedStr {
-                values,
-                range: _range,
-            }) => {
+            Expr::JoinedStr(ast::ExprJoinedStr { values, range: _ }) => {
                 self.unparse_joinedstr(values, false);
             }
             Expr::Constant(ast::ExprConstant {
                 value,
                 kind,
-                range: _range,
+                range: _,
             }) => {
                 if let Some(kind) = kind {
                     self.p(kind);
@@ -1273,7 +1225,7 @@ impl<'a> Generator<'a> {
                 lower,
                 upper,
                 step,
-                range: _range,
+                range: _,
             }) => {
                 if let Some(lower) = lower {
                     self.unparse_expr(lower, precedence::SLICE);
@@ -1448,10 +1400,7 @@ impl<'a> Generator<'a> {
                     unreachable!()
                 }
             }
-            Expr::JoinedStr(ast::ExprJoinedStr {
-                values,
-                range: _range,
-            }) => {
+            Expr::JoinedStr(ast::ExprJoinedStr { values, range: _ }) => {
                 self.unparse_joinedstr(values, is_spec);
             }
             Expr::FormattedValue(ast::ExprFormattedValue {
@@ -1459,7 +1408,7 @@ impl<'a> Generator<'a> {
                 debug_text,
                 conversion,
                 format_spec,
-                range: _range,
+                range: _,
             }) => self.unparse_formatted(
                 value,
                 debug_text.as_ref(),

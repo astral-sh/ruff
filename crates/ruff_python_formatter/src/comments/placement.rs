@@ -4,7 +4,7 @@ use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{
     self as ast, Arguments, Comprehension, Expr, ExprAttribute, ExprBinOp, ExprIfExp, ExprSlice,
-    ExprStarred, MatchCase, Parameters, Ranged,
+    ExprStarred, MatchCase, Parameters, Ranged, TypeParams,
 };
 use ruff_python_trivia::{
     indentation_at_offset, PythonWhitespace, SimpleToken, SimpleTokenKind, SimpleTokenizer,
@@ -85,6 +85,7 @@ pub(super) fn place_comment<'a>(
             handle_leading_class_with_decorators_comment(comment, class_def)
         }
         AnyNodeRef::StmtImportFrom(import_from) => handle_import_from_comment(comment, import_from),
+        AnyNodeRef::TypeParams(type_params) => handle_type_params_comment(comment, type_params),
         _ => CommentPlacement::Default(comment),
     }
 }
@@ -561,6 +562,51 @@ fn handle_own_line_comment_after_branch<'a>(
             }
         }
     }
+}
+
+/// Attach an enclosed end-of-line comment to a set of [`TypeParams`].
+///
+/// For example, given:
+/// ```python
+/// type foo[  # comment
+///    bar,
+/// ] = ...
+/// ```
+///
+/// The comment will be attached to the [`TypeParams`] node as a dangling comment, to ensure
+/// that it remains on the same line as open bracket.
+fn handle_type_params_comment<'a>(
+    comment: DecoratedComment<'a>,
+    type_params: &'a TypeParams,
+) -> CommentPlacement<'a> {
+    // The comment needs to be on the same line, but before the first type param. For example, we want
+    // to treat this as a dangling comment:
+    // ```python
+    // type foo[  # comment
+    //     bar,
+    //     baz,
+    //     qux,
+    // ]
+    // ```
+    // However, this should _not_ be treated as a dangling comment:
+    // ```python
+    // type foo[bar,  # comment
+    //     baz,
+    //     qux,
+    // ] = ...
+    // ```
+    // Thus, we check whether the comment is an end-of-line comment _between_ the start of the
+    // statement and the first type param. If so, the only possible position is immediately following
+    // the open parenthesis.
+    if comment.line_position().is_end_of_line() {
+        if let Some(first_type_param) = type_params.type_params.first() {
+            if type_params.start() < comment.start() && comment.end() < first_type_param.start() {
+                return CommentPlacement::dangling(comment.enclosing_node(), comment);
+            }
+        }
+    }
+
+    CommentPlacement::Default(comment)
 }
 
 /// Attaches comments for the positional-only parameters separator `/` or the keywords-only

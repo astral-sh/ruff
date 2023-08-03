@@ -66,6 +66,52 @@ def argument_with_long_type_annotation(
 
 def test(): ...
 
+# Type parameter empty line spacing
+def test[
+    # comment
+    A,
+
+    # another
+
+    B,
+](): ...
+
+
+# Type parameter comments
+def type_param_comments[ # trailing bracket comment
+    # leading comment
+    A,
+
+    # in between comment
+
+    B,
+    # another leading comment
+    C,
+    D, # trailing comment
+    # leading bracket comment
+]():
+    # body comment
+    pass
+
+
+# Note empty type parameters is not valid syntax, e.g.
+# def test[](): ...
+
+
+# Different type parameter wrappings
+
+def single_line[Aaaaaaaaaaaaaaaaaaaaaaaaaaaaa, Bbbbbbbbbbbbbbb, Ccccccccccccccccc]():
+    pass
+
+def params_on_their_own_line[Aaaaaaaaaaaaaaaaaaaaaaaaaaaaa, Bbbbbbbbbbbbbbb, Ccccccccccc, Ddddddddddddd, Eeeeeeee]():
+    pass
+
+def param_per_line[Aaaaaaaaaaaaaaaaaaaaaaaaaaaaa, Bbbbbbbbbbbbbbb, Ccccccccccccccccc, Ddddddddddddd, Eeeeeeeeeeeeeeeee, ffffffffffff]():
+    pass
+
+def single_line_trailing_comma[A, B, C,]():
+    pass
+
 # Comment
 def with_leading_comment(): ...
 

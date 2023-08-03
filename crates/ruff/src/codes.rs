@@ -191,6 +191,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "E1142") => (RuleGroup::Unspecified, rules::pylint::rules::AwaitOutsideAsync),
         (Pylint, "E1205") => (RuleGroup::Unspecified, rules::pylint::rules::LoggingTooManyArgs),
         (Pylint, "E1206") => (RuleGroup::Unspecified, rules::pylint::rules::LoggingTooFewArgs),
+        (Pylint, "E1300") => (RuleGroup::Unspecified, rules::pylint::rules::BadStringFormatCharacter),
         (Pylint, "E1307") => (RuleGroup::Unspecified, rules::pylint::rules::BadStringFormatType),
         (Pylint, "E1310") => (RuleGroup::Unspecified, rules::pylint::rules::BadStrStripCall),
         (Pylint, "E1507") => (RuleGroup::Unspecified, rules::pylint::rules::InvalidEnvvarValue),
@@ -438,6 +439,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pyupgrade, "037") => (RuleGroup::Unspecified, rules::pyupgrade::rules::QuotedAnnotation),
         (Pyupgrade, "038") => (RuleGroup::Unspecified, rules::pyupgrade::rules::NonPEP604Isinstance),
         (Pyupgrade, "039") => (RuleGroup::Unspecified, rules::pyupgrade::rules::UnnecessaryClassParentheses),
+        (Pyupgrade, "040") => (RuleGroup::Unspecified, rules::pyupgrade::rules::NonPEP695TypeAlias),
 
         // pydocstyle
         (Pydocstyle, "100") => (RuleGroup::Unspecified, rules::pydocstyle::rules::UndocumentedPublicModule),
@@ -636,6 +638,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "016") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::DuplicateUnionMember),
         (Flake8Pyi, "017") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::ComplexAssignmentInStub),
         (Flake8Pyi, "018") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::UnusedPrivateTypeVar),
+        (Flake8Pyi, "019") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::CustomTypeVarReturnType),
         (Flake8Pyi, "020") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::QuotedAnnotationInStub),
         (Flake8Pyi, "021") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::DocstringInStub),
         (Flake8Pyi, "024") => (RuleGroup::Unspecified, rules::flake8_pyi::rules::CollectionsNamedTuple),

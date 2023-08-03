@@ -41,19 +41,24 @@ if [ ! -d "$dir/warehouse" ]; then
   git clone --filter=tree:0 https://github.com/pypi/warehouse "$dir/warehouse"
   git -C "$dir/warehouse" checkout fe6455c0a946e81f61d72edc1049f536d8bba903
 fi
-# django project
+# zulip, a django user
 if [ ! -d "$dir/zulip" ]; then
   git clone --filter=tree:0 https://github.com/zulip/zulip "$dir/zulip"
   git -C "$dir/zulip" checkout 6cb080c4479546a7f5cb017fcddea56605910b48
+fi
+# cpython itself
+if [ ! -d "$dir/cpython" ]; then
+  git clone --filter=tree:0 https://github.com/python/cpython "$dir/cpython"
+  git -C "$dir/cpython" checkout 45de31db9cc9be945702f3a7ca35bbb9f98476af
 fi
 
 # Uncomment if you want to update the hashes
 # for i in "$dir"/*/; do git -C "$i" switch main && git -C "$i" pull && echo "# $(basename "$i") $(git -C "$i" rev-parse HEAD)"; done
 
 time cargo run --bin ruff_dev -- format-dev --stability-check --error-file "$target/progress_projects_errors.txt" \
-  --multi-project "$dir" >"$target/progress_projects_report.txt" || (
+  --log-file "$target/progress_projects_log.txt" --files-with-errors 25 --multi-project "$dir" || (
   echo "Ecosystem check failed"
-  cat "$target/progress_projects_report.txt"
+  cat "$target/progress_projects_log.txt"
   exit 1
 )
-grep "similarity index" "$target/progress_projects_report.txt" | sort
+grep "similarity index" "$target/progress_projects_log.txt" | sort

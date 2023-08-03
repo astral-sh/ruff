@@ -117,6 +117,17 @@ def e():
 
 assert"{}".format(1)
 
+
+async def c():
+    return "{}".format(await 3)
+
+
+async def c():
+    return "{}".format(1 + await 3)
+
+
+"{}".format(1 * 2)
+
 ###
 # Non-errors
 ###
@@ -181,14 +192,9 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     ]
 )
 
-async def c():
-    return "{}".format(await 3)
-
-
-async def c():
-    return "{}".format(1 + await 3)
-
 (
     "{a}"
     "{1 + 2}"
 ).format(a=1)
+
+"{}".format(**c)

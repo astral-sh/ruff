@@ -34,6 +34,7 @@ pub(crate) mod other;
 pub(crate) mod pattern;
 mod prelude;
 pub(crate) mod statement;
+pub(crate) mod type_param;
 
 include!("../../ruff_formatter/shared_traits.rs");
 
@@ -187,6 +188,7 @@ impl Format<PyFormatContext<'_>> for NotYetImplemented {
 pub(crate) struct NotYetImplementedCustomText(&'static str);
 
 /// Formats a placeholder for nodes that have not yet been implemented
+#[allow(dead_code)]
 pub(crate) const fn not_yet_implemented_custom_text(
     text: &'static str,
 ) -> NotYetImplementedCustomText {
