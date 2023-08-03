@@ -70,24 +70,16 @@ pub fn lines_after(offset: TextSize, code: &str) -> u32 {
     newlines
 }
 
-/// Returns the position after skipping any trailing trivia up to, but not including the newline character.
-pub fn skip_trailing_trivia(offset: TextSize, code: &str) -> TextSize {
-    let tokenizer = SimpleTokenizer::starts_at(offset, code);
-
-    for token in tokenizer {
-        match token.kind() {
-            SimpleTokenKind::Whitespace
-            | SimpleTokenKind::Comment
-            | SimpleTokenKind::Continuation => {
-                // No op
-            }
-            _ => {
-                return token.start();
-            }
-        }
-    }
-
-    offset
+/// Counts the empty lines after `offset`, ignoring any trailing trivia on the same line as
+/// `offset`.
+pub fn lines_after_ignoring_trivia(offset: TextSize, code: &str) -> usize {
+    SimpleTokenizer::starts_at(offset, code)
+        .skip_while(|token| token.kind != SimpleTokenKind::Newline && token.kind.is_trivia())
+        .take_while(|token| {
+            token.kind == SimpleTokenKind::Newline || token.kind == SimpleTokenKind::Whitespace
+        })
+        .filter(|token| token.kind == SimpleTokenKind::Newline)
+        .count()
 }
 
 fn is_identifier_start(c: char) -> bool {
