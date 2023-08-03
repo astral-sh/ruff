@@ -4,7 +4,7 @@ use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{
     self as ast, Arguments, Comprehension, Expr, ExprAttribute, ExprBinOp, ExprIfExp, ExprSlice,
-    ExprStarred, MatchCase, Parameters, Ranged, Stmt, TypeParams,
+    ExprStarred, MatchCase, Parameters, Ranged, TypeParams,
 };
 use ruff_python_trivia::{
     indentation_at_offset, PythonWhitespace, SimpleToken, SimpleTokenKind, SimpleTokenizer,
@@ -23,9 +23,9 @@ pub(super) fn place_comment<'a>(
     comment: DecoratedComment<'a>,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    // Handle comments before and after bodies such as the different branches of an if statement
+    // Handle comments before and after bodies such as the different branches of an if statement.
     let comment = if comment.line_position().is_own_line() {
-        match handle_own_line_comment_after_body(comment, locator) {
+        match handle_own_line_comment_around_body(comment, locator) {
             CommentPlacement::Default(comment) => comment,
             placement => {
                 return placement;
@@ -85,24 +85,6 @@ pub(super) fn place_comment<'a>(
             handle_leading_class_with_decorators_comment(comment, class_def)
         }
         AnyNodeRef::StmtImportFrom(import_from) => handle_import_from_comment(comment, import_from),
-        AnyNodeRef::StmtWhile(stmt_while) => {
-            handle_terminal_comment(comment, &TerminalExpression::from(stmt_while), locator)
-        }
-        AnyNodeRef::StmtIf(stmt_if) => {
-            handle_terminal_comment(comment, &TerminalExpression::from(stmt_if), locator)
-        }
-        AnyNodeRef::StmtFor(stmt_for) => {
-            handle_terminal_comment(comment, &TerminalExpression::from(stmt_for), locator)
-        }
-        AnyNodeRef::StmtAsyncFor(stmt_for) => {
-            handle_terminal_comment(comment, &TerminalExpression::from(stmt_for), locator)
-        }
-        AnyNodeRef::StmtWith(stmt_with) => {
-            handle_terminal_comment(comment, &TerminalExpression::from(stmt_with), locator)
-        }
-        AnyNodeRef::StmtAsyncWith(stmt_with) => {
-            handle_terminal_comment(comment, &TerminalExpression::from(stmt_with), locator)
-        }
         AnyNodeRef::TypeParams(type_params) => handle_type_params_comment(comment, type_params),
         _ => CommentPlacement::Default(comment),
     }
@@ -240,7 +222,9 @@ fn is_first_statement_in_body(statement: AnyNodeRef, has_body: AnyNodeRef) -> bo
     }
 }
 
-/// Handles own line comments after a body, either at the end or between bodies.
+/// Handles own-line comments around a body (at the end of the body, at the end of the header
+/// preceding the body, or between bodies):
+///
 /// ```python
 /// for x in y:
 ///     pass
@@ -250,8 +234,14 @@ fn is_first_statement_in_body(statement: AnyNodeRef, has_body: AnyNodeRef) -> bo
 ///     print("I have no comments")
 ///     # This should be a trailing comment of the print
 /// # This is a trailing comment of the entire statement
+///
+/// if (
+///     True
+///     # This should be a trailing comment of `True` and not a leading comment of `pass`
+/// ):
+///     pass
 /// ```
-fn handle_own_line_comment_after_body<'a>(
+fn handle_own_line_comment_around_body<'a>(
     comment: DecoratedComment<'a>,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
@@ -283,16 +273,23 @@ fn handle_own_line_comment_after_body<'a>(
         return CommentPlacement::Default(comment);
     }
 
-    // Check if we're between bodies and should attach to the following body. If that is not the
-    // case, either because there is no following branch or because the indentation is too deep,
-    // attach to the recursively last statement in the preceding body with the matching indentation.
-    match handle_own_line_comment_between_branches(comment, preceding, locator) {
-        CommentPlacement::Default(comment) => {
-            // Knowing the comment is not between branches, handle comments after the last branch
-            handle_own_line_comment_after_branch(comment, preceding, locator)
-        }
-        placement => placement,
-    }
+    // Check if we're between bodies and should attach to the following body.
+    let comment = match handle_own_line_comment_between_branches(comment, preceding, locator) {
+        CommentPlacement::Default(comment) => comment,
+        placement => return placement,
+    };
+
+    // Otherwise, there's no following branch or the indentation is too deep, so attach to the
+    // recursively last statement in the preceding body with the matching indentation.
+    let comment = match handle_own_line_comment_after_branch(comment, preceding, locator) {
+        CommentPlacement::Default(comment) => comment,
+        placement => return placement,
+    };
+
+    // If the following node is the first in its body, and there's a non-trivia token between the
+    // comment and the following node (like a parenthesis), then it means the comment is trailing
+    // the preceding node, not leading the following one.
+    handle_own_line_comment_in_clause(comment, preceding, locator)
 }
 
 /// Handles own line comments between two branches of a node.
@@ -390,6 +387,36 @@ fn handle_own_line_comment_between_branches<'a>(
             }
         }
     }
+}
+
+/// Handles own-line comments at the end of a clause, immediately preceding a body:
+/// ```python
+/// if (
+///     True
+///     # This should be a trailing comment of `True` and not a leading comment of `pass`
+/// ):
+///     pass
+/// ```
+fn handle_own_line_comment_in_clause<'a>(
+    comment: DecoratedComment<'a>,
+    preceding: AnyNodeRef<'a>,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    if let Some(following) = comment.following_node() {
+        if is_first_statement_in_body(following, comment.enclosing_node())
+            && SimpleTokenizer::new(
+                locator.contents(),
+                TextRange::new(comment.end(), following.start()),
+            )
+            .skip_trivia()
+            .next()
+            .is_some()
+        {
+            return CommentPlacement::trailing(preceding, comment);
+        }
+    }
+
+    CommentPlacement::Default(comment)
 }
 
 /// Handles leading comments in front of a match case or a trailing comment of the `match` statement.
@@ -646,123 +673,6 @@ fn handle_parameters_separator_comment<'a>(
     );
     if placement.is_some() {
         return CommentPlacement::dangling(comment.enclosing_node(), comment);
-    }
-
-    CommentPlacement::Default(comment)
-}
-
-/// A struct to model an expression embedded within a statement which immediately precedes a colon
-/// and a subsequent body.
-///
-/// For example, given:
-/// ```python
-/// if True:
-///     pass
-/// ```
-///
-/// `True` would be the `expr`, and `pass` would be the only statement in the `body`.
-///
-/// Or, given:
-/// ```python
-/// for x in range(10):
-///     pass
-/// ```
-///
-/// `x in range(10)` would be the `expr`, and `pass` would be the only statement in the `body`.
-#[derive(Debug)]
-struct TerminalExpression<'a> {
-    /// The test or iterable expression.
-    expr: &'a Expr,
-    /// The body of the statement.
-    body: &'a [Stmt],
-}
-
-impl<'a> From<&'a ast::StmtIf> for TerminalExpression<'a> {
-    fn from(stmt: &'a ast::StmtIf) -> Self {
-        Self {
-            expr: &stmt.test,
-            body: &stmt.body,
-        }
-    }
-}
-
-impl<'a> From<&'a ast::StmtWhile> for TerminalExpression<'a> {
-    fn from(stmt: &'a ast::StmtWhile) -> Self {
-        Self {
-            expr: &stmt.test,
-            body: &stmt.body,
-        }
-    }
-}
-
-impl<'a> From<&'a ast::StmtFor> for TerminalExpression<'a> {
-    fn from(stmt: &'a ast::StmtFor) -> Self {
-        Self {
-            expr: &stmt.iter,
-            body: &stmt.body,
-        }
-    }
-}
-
-impl<'a> From<&'a ast::StmtAsyncFor> for TerminalExpression<'a> {
-    fn from(stmt: &'a ast::StmtAsyncFor) -> Self {
-        Self {
-            expr: &stmt.iter,
-            body: &stmt.body,
-        }
-    }
-}
-
-impl<'a> From<&'a ast::StmtWith> for TerminalExpression<'a> {
-    fn from(stmt: &'a ast::StmtWith) -> Self {
-        let item = stmt.items.last().unwrap();
-        Self {
-            expr: item.optional_vars.as_deref().unwrap_or(&item.context_expr),
-            body: &stmt.body,
-        }
-    }
-}
-
-impl<'a> From<&'a ast::StmtAsyncWith> for TerminalExpression<'a> {
-    fn from(stmt: &'a ast::StmtAsyncWith) -> Self {
-        let item = stmt.items.last().unwrap();
-        Self {
-            expr: item.optional_vars.as_deref().unwrap_or(&item.context_expr),
-            body: &stmt.body,
-        }
-    }
-}
-
-/// Mark `# comment` as a trailing comment on the test (`True`) in:
-/// ```python
-/// while (
-///     True
-///     # comment
-/// ):
-///     pass
-/// ```
-fn handle_terminal_comment<'a>(
-    comment: DecoratedComment<'a>,
-    terminal: &TerminalExpression<'a>,
-    locator: &Locator,
-) -> CommentPlacement<'a> {
-    // The comment needs to be positioned after the expression, but before the body...
-    if comment.start() > terminal.expr.end()
-        && terminal
-            .body
-            .first()
-            .is_some_and(|first| first.start() > comment.end())
-    {
-        // It _also_ needs to be positioned before the colon...
-        if let Some(colon) = SimpleTokenizer::starts_at(terminal.expr.end(), locator.contents())
-            .skip_trivia()
-            .skip_while(|token| token.kind == SimpleTokenKind::RParen)
-            .find(|token| token.kind == SimpleTokenKind::Colon)
-        {
-            if comment.end() < colon.start() {
-                return CommentPlacement::trailing(terminal.expr, comment);
-            }
-        }
     }
 
     CommentPlacement::Default(comment)
@@ -1562,7 +1472,7 @@ fn last_child_in_body(node: AnyNodeRef) -> Option<AnyNodeRef> {
         | AnyNodeRef::StmtClassDef(ast::StmtClassDef { body, .. })
         | AnyNodeRef::StmtWith(ast::StmtWith { body, .. })
         | AnyNodeRef::StmtAsyncWith(ast::StmtAsyncWith { body, .. })
-        | AnyNodeRef::MatchCase(ast::MatchCase { body, .. })
+        | AnyNodeRef::MatchCase(MatchCase { body, .. })
         | AnyNodeRef::ExceptHandlerExceptHandler(ast::ExceptHandlerExceptHandler {
             body, ..
         })
