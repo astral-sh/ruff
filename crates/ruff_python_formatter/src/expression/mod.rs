@@ -199,7 +199,7 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                     ))
                     .fmt(f)
                 }
-                // `call_chain_layout` check we're in one of the above
+                // `call_chain_layout` checks we're in one of the above
                 _ => unreachable!(),
             };
         }
