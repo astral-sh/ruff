@@ -24,26 +24,26 @@ use crate::checkers::ast::Checker;
 /// type ListOfInt = list[int]
 /// ```
 #[violation]
-pub struct TypeAliasAnnotation {
+pub struct NonPEP695TypeAlias {
     name: String,
 }
 
-impl Violation for TypeAliasAnnotation {
+impl Violation for NonPEP695TypeAlias {
     const AUTOFIX: AutofixKind = AutofixKind::Always;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TypeAliasAnnotation { name } = self;
-        format!("Type alias `{name}` uses `TypeAlias` annotation instead of the `type` keyword.")
+        let NonPEP695TypeAlias { name } = self;
+        format!("Type alias `{name}` uses `TypeAlias` annotation instead of the `type` keyword")
     }
 
     fn autofix_title(&self) -> Option<String> {
-        Some("Use the `type` keyword instead".to_string())
+        Some("Replace with the `type` keyword".to_string())
     }
 }
 
-/// RUF017
-pub(crate) fn type_alias_annotation(checker: &mut Checker, stmt: &StmtAnnAssign) {
+/// UP100
+pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign) {
     let StmtAnnAssign {
         target,
         annotation,
@@ -71,9 +71,9 @@ pub(crate) fn type_alias_annotation(checker: &mut Checker, stmt: &StmtAnnAssign)
         return;
     };
 
-    // todo(zanie): We should check for generic type variables used in the value and define them
+    // TODO(zanie): We should check for generic type variables used in the value and define them
     //              as type params instead
-    let mut diagnostic = Diagnostic::new(TypeAliasAnnotation { name: name.clone() }, stmt.range());
+    let mut diagnostic = Diagnostic::new(NonPEP695TypeAlias { name: name.clone() }, stmt.range());
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
             checker.generator().stmt(&Stmt::from(StmtTypeAlias {

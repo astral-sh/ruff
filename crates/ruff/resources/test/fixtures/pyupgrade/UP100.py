@@ -1,12 +1,12 @@
 import typing
 from typing import TypeAlias
 
-# RUF017
+# UP100
 x: typing.TypeAlias = int
 x: TypeAlias = int
 
 
-# RUF017 with generics (todo)
+# UP100 with generics (todo)
 T = typing.TypeVar["T"]
 x: typing.TypeAlias = list[T]
 

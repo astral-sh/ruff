@@ -89,6 +89,32 @@ mod tests {
     }
 
     #[test]
+    fn non_pep695_type_alias_not_applied_py311() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyupgrade/UP100.py"),
+            &settings::Settings {
+                target_version: PythonVersion::Py311,
+                ..settings::Settings::for_rule(Rule::NonPEP695TypeAlias)
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn non_pep695_type_alias_py312() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyupgrade/UP100.py"),
+            &settings::Settings {
+                target_version: PythonVersion::Py312,
+                ..settings::Settings::for_rule(Rule::NonPEP695TypeAlias)
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn future_annotations_keep_runtime_typing_p37() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pyupgrade/future_annotations.py"),

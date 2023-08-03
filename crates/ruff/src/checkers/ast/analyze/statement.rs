@@ -1376,8 +1376,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     stmt,
                 );
             }
-            if checker.enabled(Rule::TypeAliasAnnotation) {
-                ruff::rules::type_alias_annotation(checker, assign_stmt);
+            if checker.enabled(Rule::NonPEP695TypeAlias) {
+                pyupgrade::rules::non_pep695_type_alias(checker, assign_stmt);
             }
             if checker.is_stub {
                 if let Some(value) = value {
