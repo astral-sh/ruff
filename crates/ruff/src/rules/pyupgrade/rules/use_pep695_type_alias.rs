@@ -42,7 +42,7 @@ impl Violation for NonPEP695TypeAlias {
     }
 }
 
-/// UP100
+/// UP040
 pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign) {
     let StmtAnnAssign {
         target,
