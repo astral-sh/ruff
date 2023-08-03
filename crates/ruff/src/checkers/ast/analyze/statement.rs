@@ -158,13 +158,13 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     );
                 }
                 if checker.enabled(Rule::CustomTypeVarReturnType) {
-                    flake8_pyi::rules::custom_typevar_return_type(
+                    flake8_pyi::rules::custom_type_var_return_type(
                         checker,
                         name,
                         decorator_list,
                         returns.as_ref().map(AsRef::as_ref),
-                        args,
-                        type_params,
+                        parameters,
+                        type_params.as_ref(),
                     );
                 }
                 if checker.enabled(Rule::StrOrReprDefinedInStub) {
