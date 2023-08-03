@@ -89,6 +89,7 @@ KNOWN_PARSE_ERRORS = [
     "tab-before-operator",
     "trailing-whitespace",
     "unexpected-indentation",
+    "non-pep695-type-alias",  # requires Python 3.12
 ]
 
 
