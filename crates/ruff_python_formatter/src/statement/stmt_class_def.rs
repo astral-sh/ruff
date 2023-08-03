@@ -64,28 +64,48 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
         }
 
         if let Some(arguments) = arguments.as_deref() {
-            // Drop empty parentheses, e.g., in:
+            // Drop empty the arguments node entirely (i.e., remove the parentheses) if it is empty,
+            // e.g., given:
             // ```python
             // class A():
             //     ...
             // ```
             //
-            // However, preserve any dangling end-of-line comments, e.g., in:
+            // Format as:
+            // ```python
+            // class A:
+            //     ...
+            // ```
+            //
+            // However, preserve any dangling end-of-line comments, e.g., given:
             // ```python
             // class A(  # comment
             // ):
             //     ...
             //
-            // If the arguments contain any dangling own-line comments, we retain the parentheses,
-            // e.g., in:
+            // Format as:
+            // ```python
+            // class A:  # comment
+            //     ...
+            // ```
+            //
+            // However, the arguments contain any dangling own-line comments, we retain the
+            // parentheses, e.g., given:
             // ```python
             // class A(  # comment
             //     # comment
             // ):
             //     ...
             // ```
-            if arguments.args.is_empty()
-                && arguments.keywords.is_empty()
+            //
+            // Format as:
+            // ```python
+            // class A(  # comment
+            //     # comment
+            // ):
+            //     ...
+            // ```
+            if arguments.is_empty()
                 && comments
                     .dangling_comments(arguments)
                     .iter()
