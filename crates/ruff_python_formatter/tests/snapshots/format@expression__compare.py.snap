@@ -65,6 +65,58 @@ return 1 == 2 and (
         >= c
     )
 ]
+
+def f():
+    return (
+        unicodedata.normalize("NFKC", s1).casefold()
+        == unicodedata.normalize("NFKC", s2).casefold()
+    )
+
+# Call expressions with trailing attributes.
+
+ct_match = (
+    aaaaaaaaaaact_id == self.get_content_type(obj=rel_obj, using=instance._state.db).id
+)
+
+ct_match = (
+    {aaaaaaaaaaaaaaaa} == self.get_content_type(obj=rel_obj, using=instance._state.db).id
+)
+
+ct_match = (
+    (aaaaaaaaaaaaaaaa) == self.get_content_type(obj=rel_obj, using=instance._state.db).id
+)
+
+ct_match = aaaaaaaaaaact_id == self.get_content_type(
+    obj=rel_obj, using=instance._state.db
+)
+
+# Call expressions with trailing subscripts.
+
+ct_match = (
+    aaaaaaaaaaact_id == self.get_content_type(obj=rel_obj, using=instance._state.db)[id]
+)
+
+ct_match = (
+    {aaaaaaaaaaaaaaaa} == self.get_content_type(obj=rel_obj, using=instance._state.db)[id]
+)
+
+ct_match = (
+    (aaaaaaaaaaaaaaaa) == self.get_content_type(obj=rel_obj, using=instance._state.db)[id]
+)
+
+# Subscripts expressions with trailing attributes.
+
+ct_match = (
+    aaaaaaaaaaact_id == self.get_content_type[obj, rel_obj, using, instance._state.db].id
+)
+
+ct_match = (
+    {aaaaaaaaaaaaaaaa} == self.get_content_type[obj, rel_obj, using, instance._state.db].id
+)
+
+ct_match = (
+    (aaaaaaaaaaaaaaaa) == self.get_content_type[obj, rel_obj, using, instance._state.db].id
+)
 ```
 
 ## Output
@@ -171,6 +223,60 @@ return 1 == 2 and (
         >= c
     )
 ]
+
+
+def f():
+    return unicodedata.normalize("NFKC", s1).casefold() == unicodedata.normalize(
+        "NFKC", s2
+    ).casefold()
+
+
+# Call expressions with trailing attributes.
+
+ct_match = (
+    aaaaaaaaaaact_id == self.get_content_type(obj=rel_obj, using=instance._state.db).id
+)
+
+ct_match = {aaaaaaaaaaaaaaaa} == self.get_content_type(
+    obj=rel_obj, using=instance._state.db
+).id
+
+ct_match = (aaaaaaaaaaaaaaaa) == self.get_content_type(
+    obj=rel_obj, using=instance._state.db
+).id
+
+ct_match = aaaaaaaaaaact_id == self.get_content_type(
+    obj=rel_obj, using=instance._state.db
+)
+
+# Call expressions with trailing subscripts.
+
+ct_match = (
+    aaaaaaaaaaact_id == self.get_content_type(obj=rel_obj, using=instance._state.db)[id]
+)
+
+ct_match = {
+    aaaaaaaaaaaaaaaa
+} == self.get_content_type(obj=rel_obj, using=instance._state.db)[id]
+
+ct_match = (
+    aaaaaaaaaaaaaaaa
+) == self.get_content_type(obj=rel_obj, using=instance._state.db)[id]
+
+# Subscripts expressions with trailing attributes.
+
+ct_match = (
+    aaaaaaaaaaact_id
+    == self.get_content_type[obj, rel_obj, using, instance._state.db].id
+)
+
+ct_match = {
+    aaaaaaaaaaaaaaaa
+} == self.get_content_type[obj, rel_obj, using, instance._state.db].id
+
+ct_match = (
+    aaaaaaaaaaaaaaaa
+) == self.get_content_type[obj, rel_obj, using, instance._state.db].id
 ```
 
 
