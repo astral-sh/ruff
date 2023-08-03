@@ -1,5 +1,10 @@
 import SideBar, { SideBarEntry } from "./SideBar";
-import { FormatIcon, StructureIcon, TokensIcon } from "./Icons";
+import {
+  FormatIcon,
+  FormatterIRIcon,
+  StructureIcon,
+  TokensIcon,
+} from "./Icons";
 import { SecondaryTool } from "./SecondaryPanel";
 
 interface RightSideBarProps {
@@ -42,7 +47,7 @@ export default function SecondarySideBar({
         selected={selected === SecondaryTool.FIR}
         onClick={() => onSelected(SecondaryTool.FIR)}
       >
-        FIR
+        <FormatterIRIcon />
       </SideBarEntry>
     </SideBar>
   );
