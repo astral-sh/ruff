@@ -127,11 +127,11 @@ impl<'a> Visitor<'a> for TypeVarNameVisitor<'a> {
     fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
             Expr::Name(name) if name.ctx.is_load() => {
-                let Some(Some(Stmt::Assign(StmtAssign { value, .. }))) =
+                let Some(Stmt::Assign(StmtAssign { value, .. })) =
                     self.semantic
                         .scope()
                         .get(name.id.as_str())
-                        .map(|binding_id| {
+                        .and_then(|binding_id| {
                             self.semantic
                                 .binding(binding_id)
                                 .source
