@@ -193,16 +193,6 @@ class C:
 ```diff
 --- Black
 +++ Ruff
-@@ -28,8 +28,8 @@
-                     while (
-                         # Just a comment
-                         call()
-+                    ):
-                         # Another
--                    ):
-                         print(i)
-         xxxxxxxxxxxxxxxx = Yyyy2YyyyyYyyyyy(
-             push_manager=context.request.resource_manager,
 @@ -110,19 +110,20 @@
              value, is_going_to_be="too long to fit in a single line", srsly=True
          ), "Not what we expected"
@@ -293,8 +283,8 @@ class C:
                     while (
                         # Just a comment
                         call()
-                    ):
                         # Another
+                    ):
                         print(i)
         xxxxxxxxxxxxxxxx = Yyyy2YyyyyYyyyyy(
             push_manager=context.request.resource_manager,

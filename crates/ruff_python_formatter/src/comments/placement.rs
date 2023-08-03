@@ -23,9 +23,9 @@ pub(super) fn place_comment<'a>(
     comment: DecoratedComment<'a>,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    // Handle comments before and after bodies such as the different branches of an if statement
+    // Handle comments before and after bodies such as the different branches of an if statement.
     let comment = if comment.line_position().is_own_line() {
-        match handle_own_line_comment_after_body(comment, locator) {
+        match handle_own_line_comment_around_body(comment, locator) {
             CommentPlacement::Default(comment) => comment,
             placement => {
                 return placement;
@@ -222,7 +222,9 @@ fn is_first_statement_in_body(statement: AnyNodeRef, has_body: AnyNodeRef) -> bo
     }
 }
 
-/// Handles own line comments after a body, either at the end or between bodies.
+/// Handles own-line comments around a body (at the end of the body, at the end of the header
+/// preceding the body, or between bodies):
+///
 /// ```python
 /// for x in y:
 ///     pass
@@ -232,8 +234,14 @@ fn is_first_statement_in_body(statement: AnyNodeRef, has_body: AnyNodeRef) -> bo
 ///     print("I have no comments")
 ///     # This should be a trailing comment of the print
 /// # This is a trailing comment of the entire statement
+///
+/// if (
+///     True
+///     # This should be a trailing comment of `True` and not a leading comment of `pass`
+/// ):
+///     pass
 /// ```
-fn handle_own_line_comment_after_body<'a>(
+fn handle_own_line_comment_around_body<'a>(
     comment: DecoratedComment<'a>,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
@@ -265,16 +273,23 @@ fn handle_own_line_comment_after_body<'a>(
         return CommentPlacement::Default(comment);
     }
 
-    // Check if we're between bodies and should attach to the following body. If that is not the
-    // case, either because there is no following branch or because the indentation is too deep,
-    // attach to the recursively last statement in the preceding body with the matching indentation.
-    match handle_own_line_comment_between_branches(comment, preceding, locator) {
-        CommentPlacement::Default(comment) => {
-            // Knowing the comment is not between branches, handle comments after the last branch
-            handle_own_line_comment_after_branch(comment, preceding, locator)
-        }
-        placement => placement,
-    }
+    // Check if we're between bodies and should attach to the following body.
+    let comment = match handle_own_line_comment_between_branches(comment, preceding, locator) {
+        CommentPlacement::Default(comment) => comment,
+        placement => return placement,
+    };
+
+    // Otherwise, there's no following branch or the indentation is too deep, so attach to the
+    // recursively last statement in the preceding body with the matching indentation.
+    let comment = match handle_own_line_comment_after_branch(comment, preceding, locator) {
+        CommentPlacement::Default(comment) => comment,
+        placement => return placement,
+    };
+
+    // If the following node is the first in its body, and there's a non-trivia token between the
+    // comment and the following node (like a parenthesis), then it means the comment is trailing
+    // the preceding node, not leading the following one.
+    handle_own_line_comment_in_clause(comment, preceding, locator)
 }
 
 /// Handles own line comments between two branches of a node.
@@ -372,6 +387,36 @@ fn handle_own_line_comment_between_branches<'a>(
             }
         }
     }
+}
+
+/// Handles own-line comments at the end of a clause, immediately preceding a body:
+/// ```python
+/// if (
+///     True
+///     # This should be a trailing comment of `True` and not a leading comment of `pass`
+/// ):
+///     pass
+/// ```
+fn handle_own_line_comment_in_clause<'a>(
+    comment: DecoratedComment<'a>,
+    preceding: AnyNodeRef<'a>,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    if let Some(following) = comment.following_node() {
+        if is_first_statement_in_body(following, comment.enclosing_node())
+            && SimpleTokenizer::new(
+                locator.contents(),
+                TextRange::new(comment.end(), following.start()),
+            )
+            .skip_trivia()
+            .next()
+            .is_some()
+        {
+            return CommentPlacement::trailing(preceding, comment);
+        }
+    }
+
+    CommentPlacement::Default(comment)
 }
 
 /// Handles leading comments in front of a match case or a trailing comment of the `match` statement.
@@ -1427,7 +1472,7 @@ fn last_child_in_body(node: AnyNodeRef) -> Option<AnyNodeRef> {
         | AnyNodeRef::StmtClassDef(ast::StmtClassDef { body, .. })
         | AnyNodeRef::StmtWith(ast::StmtWith { body, .. })
         | AnyNodeRef::StmtAsyncWith(ast::StmtAsyncWith { body, .. })
-        | AnyNodeRef::MatchCase(ast::MatchCase { body, .. })
+        | AnyNodeRef::MatchCase(MatchCase { body, .. })
         | AnyNodeRef::ExceptHandlerExceptHandler(ast::ExceptHandlerExceptHandler {
             body, ..
         })
