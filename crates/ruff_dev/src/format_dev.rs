@@ -184,12 +184,19 @@ pub(crate) struct Args {
     /// Write all errors to this file in addition to stdout. Only used in multi-project mode.
     #[arg(long)]
     pub(crate) error_file: Option<PathBuf>,
+    /// Write all log messages (same as cli) to this file
+    #[arg(long)]
+    pub(crate) log_file: Option<PathBuf>,
+    /// Assert that there are exactly this many input files with errors. This catches regressions
+    /// (or improvements) in the parser.
+    #[arg(long)]
+    pub(crate) files_with_errors: Option<u32>,
     #[clap(flatten)]
     pub(crate) log_level_args: LogLevelArgs,
 }
 
 pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
-    setup_logging(&args.log_level_args);
+    setup_logging(&args.log_level_args, args.log_file.as_deref())?;
 
     let all_success = if args.multi_project {
         format_dev_multi_project(args)?
@@ -202,12 +209,23 @@ pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
         }
         info!(
             parent: None,
-            "Found {} stability errors in {} files (similarity index {:.3}) in {:.2}s",
+            "Done: {} stability errors, {} files, similarity index {:.3}), took {:.2}s, {} input files contained syntax errors ",
             error_count,
             result.file_count,
             result.statistics.similarity_index(),
             result.duration.as_secs_f32(),
+            result.syntax_error_in_input,
         );
+
+        if let Some(files_with_errors) = args.files_with_errors {
+            if result.syntax_error_in_input != files_with_errors {
+                error!(
+                    "Expected {files_with_errors} input files with errors, found {}",
+                    result.syntax_error_in_input
+                );
+                return Ok(ExitCode::FAILURE);
+            }
+        }
 
         error_count == 0
     };
@@ -218,7 +236,7 @@ pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
     }
 }
 
-fn setup_logging(log_level_args: &LogLevelArgs) {
+fn setup_logging(log_level_args: &LogLevelArgs, log_file: Option<&Path>) -> io::Result<()> {
     // Custom translation since we need the tracing type for `EnvFilter`
     let log_level = match LogLevel::from(log_level_args) {
         LogLevel::Default => tracing::Level::INFO,
@@ -236,17 +254,25 @@ fn setup_logging(log_level_args: &LogLevelArgs) {
     let indicitif_compatible_writer_layer = tracing_subscriber::fmt::layer()
         .with_writer(indicatif_layer.get_stderr_writer())
         .with_target(false);
+    let log_layer = log_file.map(File::create).transpose()?.map(|log_file| {
+        tracing_subscriber::fmt::layer()
+            .with_writer(log_file)
+            .with_ansi(false)
+    });
     tracing_subscriber::registry()
         .with(filter_layer)
         .with(indicitif_compatible_writer_layer)
         .with(indicatif_layer)
+        .with(log_layer)
         .init();
+    Ok(())
 }
 
 /// Checks a directory of projects
 fn format_dev_multi_project(args: &Args) -> anyhow::Result<bool> {
     let mut total_errors = 0;
     let mut total_files = 0;
+    let mut total_syntax_error_in_input = 0;
     let start = Instant::now();
 
     let mut project_paths = Vec::new();
@@ -277,20 +303,23 @@ fn format_dev_multi_project(args: &Args) -> anyhow::Result<bool> {
     };
 
     for project_path in project_paths {
-        info!(parent: None, "Starting {}", project_path.display());
+        debug!(parent: None, "Starting {}", project_path.display());
 
         match format_dev_project(&[project_path.clone()], args.stability_check, args.write) {
             Ok(result) => {
                 total_errors += result.error_count();
                 total_files += result.file_count;
+                total_syntax_error_in_input += result.syntax_error_in_input;
 
                 info!(
                     parent: None,
-                    "Finished {}: {} files, similarity index {:.3}, {:.2}s",
+                    "Finished {}: {} stability errors, {} files, similarity index {:.3}), took {:.2}s, {} input files contained syntax errors ",
                     project_path.display(),
+                    result.error_count(),
                     result.file_count,
                     result.statistics.similarity_index(),
                     result.duration.as_secs_f32(),
+                    result.syntax_error_in_input,
                 );
                 if result.error_count() > 0 {
                     error!(
@@ -320,9 +349,19 @@ fn format_dev_multi_project(args: &Args) -> anyhow::Result<bool> {
 
     info!(
         parent: None,
-        "{total_errors} stability errors in {total_files} files in {}s",
-        duration.as_secs_f32()
+        "Finished: {total_errors} stability errors, {total_files} files, tool {}s, {total_syntax_error_in_input} input files contained syntax errors ",
+        duration.as_secs_f32(),
     );
+
+    if let Some(files_with_errors) = args.files_with_errors {
+        if total_syntax_error_in_input != files_with_errors {
+            error!(
+                "Expected {files_with_errors} input files with errors, found {}",
+                total_syntax_error_in_input
+            );
+            return Ok(false);
+        }
+    }
 
     Ok(total_errors == 0)
 }
@@ -368,12 +407,27 @@ fn format_dev_project(
 
     let mut statistics = Statistics::default();
     let mut formatted_counter = 0;
+    let mut syntax_error_in_input = 0;
     let mut diagnostics = Vec::new();
     for (result, file) in results {
         formatted_counter += 1;
         match result {
             Ok(statistics_file) => statistics += statistics_file,
-            Err(error) => diagnostics.push(Diagnostic { file, error }),
+            Err(error) => {
+                match error {
+                    CheckFileError::SyntaxErrorInInput(error) => {
+                        // This is not our error
+                        debug!(
+                            parent: None,
+                            "Syntax error in {}: {}",
+                            file.display(),
+                            error
+                        );
+                        syntax_error_in_input += 1;
+                    }
+                    _ => diagnostics.push(Diagnostic { file, error }),
+                }
+            }
         }
     }
 
@@ -384,6 +438,7 @@ fn format_dev_project(
         file_count: formatted_counter,
         diagnostics,
         statistics,
+        syntax_error_in_input,
     })
 }
 
@@ -408,19 +463,7 @@ fn format_dir_entry(
     // Handle panics (mostly in `debug_assert!`)
     let result =
         match catch_unwind(|| format_dev_file(&file, stability_check, write, options.clone())) {
-            Ok(result) => match result {
-                Err(CheckFileError::SyntaxErrorInInput(error)) => {
-                    // We don't care about this error, only log it
-                    info!(
-                        parent: None,
-                        "Syntax error in {}: {}",
-                        file.display(),
-                        error
-                    );
-                    Ok(Statistics::default())
-                }
-                _ => result,
-            },
+            Ok(result) => result,
             Err(panic) => {
                 if let Some(message) = panic.downcast_ref::<String>() {
                     Err(CheckFileError::Panic {
@@ -472,6 +515,7 @@ struct CheckRepoResult {
     file_count: usize,
     diagnostics: Vec<Diagnostic>,
     statistics: Statistics,
+    syntax_error_in_input: u32,
 }
 
 impl CheckRepoResult {

@@ -336,7 +336,7 @@ jobs:
       - name: "Formatter progress"
         run: scripts/formatter_ecosystem_checks.sh
       - name: "Github step summary"
-        run: grep "similarity index" target/progress_projects_report.txt | sort > $GITHUB_STEP_SUMMARY
+        run: grep "similarity index" target/progress_projects_log.txt | sort > $GITHUB_STEP_SUMMARY
       # CPython is not black formatted, so we run only the stability check
       - name: "Clone CPython 3.10"
         run: git clone --branch 3.10 --depth 1 https://github.com/python/cpython.git crates/ruff/resources/test/cpython
