@@ -55,6 +55,7 @@ jobs:
               - crates/ruff_python_index/**
               - crates/ruff_text_size/**
               - crates/ruff_python_parser/**
+              - crates/ruff_dev/**
 
   cargo-fmt:
     name: "cargo fmt"
