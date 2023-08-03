@@ -47,9 +47,21 @@ pub(super) fn place_comment<'a>(
                 locator,
             )
         }
-        AnyNodeRef::ExprDict(_) | AnyNodeRef::Keyword(_) => {
-            handle_dict_unpacking_comment(comment, locator)
-        }
+        AnyNodeRef::Keyword(_) => handle_dict_unpacking_comment(comment, locator),
+        AnyNodeRef::ExprDict(expr_dict) => handle_dict_unpacking_comment(comment, locator)
+            .then_ith(|comment| {
+                if let Some(first_item) = expr_dict.values.first() {
+                    handle_bracketed_items_comment(
+                        comment,
+                        BracketedItems {
+                            enclosing_node: expr_dict.range(),
+                            leading_item: first_item.range(),
+                        },
+                    )
+                } else {
+                    CommentPlacement::Default(comment)
+                }
+            }),
         AnyNodeRef::ExprIfExp(expr_if) => handle_expr_if_comment(comment, expr_if, locator),
         AnyNodeRef::ExprSlice(expr_slice) => handle_slice_comments(comment, expr_slice, locator),
         AnyNodeRef::ExprStarred(starred) => {

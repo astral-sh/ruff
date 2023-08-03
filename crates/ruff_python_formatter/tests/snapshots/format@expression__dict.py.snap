@@ -70,9 +70,8 @@ x={  # dangling end of line comment
 ## Output
 ```py
 # before
-{
-    # open
-    key: value  # key  # colon  # value
+{  # open# key# colon
+    key: value  # value
 }  # close
 # after
 
