@@ -74,7 +74,8 @@ impl<'a> FormatSummaryValues<'a> {
         }) = expr
         {
             for arg in args {
-                if contains_invalids(locator.slice(arg.range()))
+                if matches!(arg, Expr::Starred(..))
+                    || contains_quotes(locator.slice(arg.range()))
                     || locator.contains_line_break(arg.range())
                 {
                     return None;
@@ -87,14 +88,15 @@ impl<'a> FormatSummaryValues<'a> {
                     value,
                     range: _,
                 } = keyword;
-                if let Some(key) = arg {
-                    if contains_invalids(locator.slice(value.range()))
-                        || locator.contains_line_break(value.range())
-                    {
-                        return None;
-                    }
-                    extracted_kwargs.insert(key, value);
+                let Some(key) = arg else {
+                    return None;
+                };
+                if contains_quotes(locator.slice(value.range()))
+                    || locator.contains_line_break(value.range())
+                {
+                    return None;
                 }
+                extracted_kwargs.insert(key, value);
             }
         }
 
@@ -127,10 +129,9 @@ impl<'a> FormatSummaryValues<'a> {
     }
 }
 
-/// Return `true` if the string contains characters that are forbidden by
-/// argument identifiers.
-fn contains_invalids(string: &str) -> bool {
-    string.contains('*') || string.contains('\'') || string.contains('"')
+/// Return `true` if the string contains quotes.
+fn contains_quotes(string: &str) -> bool {
+    string.contains('\'') || string.contains('"')
 }
 
 enum FormatContext {
