@@ -14,7 +14,7 @@ export default function ThemeButton({
   return (
     <AstralButton
       type="button"
-      className="ml-4 sm:ml-0 shadow-sm"
+      className="ml-4 sm:ml-0 dark:shadow-copied"
       onClick={() => onChange(theme === "light" ? "dark" : "light")}
     >
       <span className="sr-only">
@@ -28,7 +28,7 @@ export default function ThemeButton({
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
-        className="stroke-black hover:stroke-radiate hover:fill-black fill-radiate"
+        className="stroke-black hover:stroke-white hover:fill-black fill-radiate"
       >
         <g className="dark:opacity-0">
           <path d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"></path>

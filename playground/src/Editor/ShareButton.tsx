@@ -14,7 +14,7 @@ export default function ShareButton({ onShare }: { onShare?: () => void }) {
   return copied ? (
     <AstralButton
       type="button"
-      className="relative flex-none leading-6 py-1.5 px-3 cursor-auto shadow-copied"
+      className="relative flex-none leading-6 py-1.5 px-3 cursor-auto dark:shadow-copied"
     >
       <span
         className="absolute inset-0 flex items-center justify-center invisible"
@@ -22,7 +22,7 @@ export default function ShareButton({ onShare }: { onShare?: () => void }) {
       >
         Share
       </span>
-      <span className="" aria-hidden="false">
+      <span aria-hidden="false">
         Copied!
       </span>
     </AstralButton>
