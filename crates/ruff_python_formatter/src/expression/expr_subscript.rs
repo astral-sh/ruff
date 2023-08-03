@@ -7,19 +7,20 @@ use crate::context::PyFormatContext;
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::expr_tuple::TupleParentheses;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
+use crate::expression::CallChainLayout;
 use crate::prelude::*;
 use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatExprSubscript {
-    fluent_style: bool,
+    call_chain_layout: CallChainLayout,
 }
 
 impl FormatRuleWithOptions<ExprSubscript, PyFormatContext<'_>> for FormatExprSubscript {
-    type Options = bool;
+    type Options = CallChainLayout;
 
     fn with_options(mut self, options: Self::Options) -> Self {
-        self.fluent_style = options;
+        self.call_chain_layout = options;
         self
     }
 }
@@ -41,9 +42,9 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
         );
 
         let format_value = format_with(|f| match value.as_ref() {
-            Expr::Attribute(expr) => expr.format().with_options(self.fluent_style).fmt(f),
-            Expr::Call(expr) => expr.format().with_options(self.fluent_style).fmt(f),
-            Expr::Subscript(expr) => expr.format().with_options(self.fluent_style).fmt(f),
+            Expr::Attribute(expr) => expr.format().with_options(self.call_chain_layout).fmt(f),
+            Expr::Call(expr) => expr.format().with_options(self.call_chain_layout).fmt(f),
+            Expr::Subscript(expr) => expr.format().with_options(self.call_chain_layout).fmt(f),
             _ => value.format().fmt(f),
         });
 

@@ -65,10 +65,16 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
     fn fmt(&self, expression: &Expr, f: &mut PyFormatter) -> FormatResult<()> {
         let parentheses = self.parentheses;
 
-        // Nested expressions that are in some outer expression's parentheses may be formatted in
-        // fluent style
-        let fluent_style = f.context().node_level() == NodeLevel::ParenthesizedExpression
-            && is_fluent_style_call_chain(expression, f.context().source());
+        // All expressions that can have parentheses can be in fluent style. We need to exclude top
+        // expressions since they don't get parenthesized
+        let call_chain_layout = if !matches!(
+            f.context().node_level(),
+            NodeLevel::CompoundStatement | NodeLevel::TopLevel
+        ) {
+            CallChainLayout::from_expression(expression, f.context().source())
+        } else {
+            CallChainLayout::Default
+        };
 
         let format_expr = format_with(|f| match expression {
             Expr::BoolOp(expr) => expr.format().with_options(Some(parentheses)).fmt(f),
@@ -87,12 +93,12 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             Expr::Yield(expr) => expr.format().fmt(f),
             Expr::YieldFrom(expr) => expr.format().fmt(f),
             Expr::Compare(expr) => expr.format().with_options(Some(parentheses)).fmt(f),
-            Expr::Call(expr) => expr.format().with_options(fluent_style).fmt(f),
+            Expr::Call(expr) => expr.format().with_options(call_chain_layout).fmt(f),
             Expr::FormattedValue(expr) => expr.format().fmt(f),
             Expr::JoinedStr(expr) => expr.format().fmt(f),
             Expr::Constant(expr) => expr.format().fmt(f),
-            Expr::Attribute(expr) => expr.format().with_options(fluent_style).fmt(f),
-            Expr::Subscript(expr) => expr.format().with_options(fluent_style).fmt(f),
+            Expr::Attribute(expr) => expr.format().with_options(call_chain_layout).fmt(f),
+            Expr::Subscript(expr) => expr.format().with_options(call_chain_layout).fmt(f),
             Expr::Starred(expr) => expr.format().fmt(f),
             Expr::Name(expr) => expr.format().fmt(f),
             Expr::List(expr) => expr.format().fmt(f),
@@ -128,7 +134,7 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             //     queryset.distinct().order_by(field.name).values_list(field_name_flat_long_long=True)
             // )
             // ```
-            if fluent_style {
+            if call_chain_layout == CallChainLayout::Fluent {
                 write!(f, [group(&format_expr)])
             } else {
                 write!(f, [format_expr])
@@ -169,32 +175,38 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
             parenthesize,
         } = self;
 
-        // Fluent style means we always add parentheses, so we don't need to check for existing
-        // parentheses, comments or `needs_parentheses`
-        let is_fluent_style = is_fluent_style_call_chain(expression, f.context().source());
-        if is_fluent_style {
+        // Fluent style means that when we break we always add parentheses, so we don't need the
+        // checks below for existing parentheses, comments or `needs_parentheses`
+        if CallChainLayout::from_expression(expression, f.context().source())
+            == CallChainLayout::Fluent
+        {
             match expression {
                 Expr::Attribute(expr) => {
-                    return parenthesize_if_expands(&group(&expr.format().with_options(true)))
-                        .fmt(f)
+                    return parenthesize_if_expands(&group(
+                        &expr.format().with_options(CallChainLayout::Fluent),
+                    ))
+                    .fmt(f)
                 }
                 Expr::Call(expr) => {
-                    return parenthesize_if_expands(&group(&expr.format().with_options(true)))
-                        .fmt(f)
+                    return parenthesize_if_expands(&group(
+                        &expr.format().with_options(CallChainLayout::Fluent),
+                    ))
+                    .fmt(f)
                 }
                 Expr::Subscript(expr) => {
-                    return parenthesize_if_expands(&group(&expr.format().with_options(true)))
-                        .fmt(f)
+                    return parenthesize_if_expands(&group(
+                        &expr.format().with_options(CallChainLayout::Fluent),
+                    ))
+                    .fmt(f)
                 }
-                _ => {
-                    // TODO(konstin): We currently can't do call chains that is not the outermost expression
-                }
+                // `call_chain_layout` check we're in one of the above
+                _ => unreachable!(),
             };
         }
 
         let comments = f.context().comments();
         let preserve_parentheses = parenthesize.is_optional()
-            && is_expression_parenthesized(AnyNodeRef::from(*expression), f.context().source());
+            && is_expression_parenthesized((*expression).into(), f.context().source());
 
         let has_comments = comments.has_leading_comments(*expression)
             || comments.has_trailing_own_line_comments(*expression);
@@ -485,18 +497,13 @@ impl<'input> PreorderVisitor<'input> for CanOmitOptionalParenthesesVisitor<'inpu
     }
 }
 
-/// Returns `true` if this expression is a call chain that should be formatted in fluent style.
-///
 /// A call chain consists only of attribute access (`.` operator), function/method calls and
 /// subscripts. We use fluent style for the call chain if there are at least two attribute dots
 /// after call parentheses or subscript brackets. In case of fluent style the parentheses/bracket
 /// will close on the previous line and the dot gets its own line, otherwise the line will start
 /// with the closing parentheses/bracket and the dot follows immediately after.
 ///
-/// We only use this check if we're already in a parenthesized context, otherwise refer to
-/// [`CanOmitOptionalParentheses`].
-///
-/// Below, the left hand side of addition has only a single attribute access after a call, the
+/// Below, the left hand side of the addition has only a single attribute access after a call, the
 /// second `.filter`. The first `.filter` is a call, but it doesn't follow a call. The right hand
 /// side has two, the `.limit_results` after the call and the `.filter` after the subscript, so it
 /// gets formatted in fluent style. The outer expression we assign to `blogs` has zero since the
@@ -518,31 +525,44 @@ impl<'input> PreorderVisitor<'input> for CanOmitOptionalParenthesesVisitor<'inpu
 ///     )
 /// ).all()
 /// ```
-fn is_fluent_style_call_chain(mut expr: &Expr, source: &str) -> bool {
-    let mut attributes_after_parentheses = 0;
-    loop {
-        match expr {
-            Expr::Attribute(ast::ExprAttribute { value, .. }) => {
-                // `f().x` | `data[:100].T`
-                if matches!(value.as_ref(), Expr::Call(_) | Expr::Subscript(_)) {
-                    attributes_after_parentheses += 1;
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub enum CallChainLayout {
+    #[default]
+    Default,
+    Fluent,
+}
+
+impl CallChainLayout {
+    pub(crate) fn from_expression(mut expr: &Expr, source: &str) -> Self {
+        let mut attributes_after_parentheses = 0;
+        loop {
+            match expr {
+                Expr::Attribute(ast::ExprAttribute { value, .. }) => {
+                    // `f().x` | `data[:100].T`
+                    if matches!(value.as_ref(), Expr::Call(_) | Expr::Subscript(_)) {
+                        attributes_after_parentheses += 1;
+                    }
+                    expr = value;
                 }
-                expr = value;
-            }
-            Expr::Call(ast::ExprCall { func: inner, .. })
-            | Expr::Subscript(ast::ExprSubscript { value: inner, .. }) => {
-                expr = inner;
-            }
-            _ => {
-                // We to format the following in fluent style: `f2 = (a).w().t(1,)`
-                if is_expression_parenthesized(AnyNodeRef::from(expr), source) {
-                    attributes_after_parentheses += 1;
+                Expr::Call(ast::ExprCall { func: inner, .. })
+                | Expr::Subscript(ast::ExprSubscript { value: inner, .. }) => {
+                    expr = inner;
                 }
-                break;
+                _ => {
+                    // We to format the following in fluent style: `f2 = (a).w().t(1,)`
+                    if is_expression_parenthesized(AnyNodeRef::from(expr), source) {
+                        attributes_after_parentheses += 1;
+                    }
+                    break;
+                }
             }
         }
+        if attributes_after_parentheses < 2 {
+            CallChainLayout::Default
+        } else {
+            CallChainLayout::Fluent
+        }
     }
-    attributes_after_parentheses >= 2
 }
 
 fn has_parentheses(expr: &Expr, source: &str) -> bool {

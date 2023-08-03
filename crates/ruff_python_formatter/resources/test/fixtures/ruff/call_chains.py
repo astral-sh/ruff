@@ -124,10 +124,31 @@ g1 = (
     queryset.distinct().order_by(field.name).values_list(field_name_flat_long_long=True)
 )
 
-# TODO(konstin): We currently can't do call chains that is not the outermost expression
+# Fluent style in subexpressions
 if (
     not a()
     .b()
     .cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc()
 ):
     pass
+h2 = (
+    bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    + ccccccccccccccccccccccccc()
+    .dddddddddddddddddddddd()
+    .eeeeeeeeee()
+    .ffffffffffffffffffffff()
+)
+
+# Parentheses aren't allowed on statement level, don't use fluent style here
+if True:
+    (alias).filter(content_typeold_content_type).update(
+        content_typenew_contesadfasfdant_type
+    )
+
+zero(
+    one,
+).two(
+    three,
+).four(
+    five,
+)

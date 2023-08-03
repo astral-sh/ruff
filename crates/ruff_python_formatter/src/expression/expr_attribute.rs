@@ -4,19 +4,20 @@ use ruff_python_ast::{Constant, Expr, ExprAttribute, ExprConstant};
 
 use crate::comments::{leading_comments, trailing_comments};
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parentheses};
+use crate::expression::CallChainLayout;
 use crate::prelude::*;
 use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatExprAttribute {
-    fluent_style: bool,
+    call_chain_layout: CallChainLayout,
 }
 
 impl FormatRuleWithOptions<ExprAttribute, PyFormatContext<'_>> for FormatExprAttribute {
-    type Options = bool;
+    type Options = CallChainLayout;
 
     fn with_options(mut self, options: Self::Options) -> Self {
-        self.fluent_style = options;
+        self.call_chain_layout = options;
         self
     }
 }
@@ -49,17 +50,19 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
             value.format().with_options(Parentheses::Always).fmt(f)?;
         } else {
             match value.as_ref() {
-                Expr::Attribute(expr) => expr.format().with_options(self.fluent_style).fmt(f)?,
+                Expr::Attribute(expr) => {
+                    expr.format().with_options(self.call_chain_layout).fmt(f)?
+                }
                 Expr::Call(expr) => {
-                    expr.format().with_options(self.fluent_style).fmt(f)?;
-                    if self.fluent_style {
+                    expr.format().with_options(self.call_chain_layout).fmt(f)?;
+                    if self.call_chain_layout == CallChainLayout::Fluent {
                         // Format the dot on its own line
                         soft_line_break().fmt(f)?;
                     }
                 }
                 Expr::Subscript(expr) => {
-                    expr.format().with_options(self.fluent_style).fmt(f)?;
-                    if self.fluent_style {
+                    expr.format().with_options(self.call_chain_layout).fmt(f)?;
+                    if self.call_chain_layout == CallChainLayout::Fluent {
                         // Format the dot on its own line
                         soft_line_break().fmt(f)?;
                     }
@@ -72,7 +75,7 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
             hard_line_break().fmt(f)?;
         }
 
-        if self.fluent_style {
+        if self.call_chain_layout == CallChainLayout::Fluent {
             // Fluent style has line breaks before the dot
             // ```python
             // blogs3 = (

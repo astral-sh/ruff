@@ -1,3 +1,4 @@
+use crate::expression::CallChainLayout;
 use ruff_formatter::{write, FormatRuleWithOptions};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{Expr, ExprCall};
@@ -8,14 +9,14 @@ use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatExprCall {
-    fluent_style: bool,
+    call_chain_layout: CallChainLayout,
 }
 
 impl FormatRuleWithOptions<ExprCall, PyFormatContext<'_>> for FormatExprCall {
-    type Options = bool;
+    type Options = CallChainLayout;
 
     fn with_options(mut self, options: Self::Options) -> Self {
-        self.fluent_style = options;
+        self.call_chain_layout = options;
         self
     }
 }
@@ -29,9 +30,9 @@ impl FormatNodeRule<ExprCall> for FormatExprCall {
         } = item;
 
         match func.as_ref() {
-            Expr::Attribute(expr) => expr.format().with_options(self.fluent_style).fmt(f)?,
-            Expr::Call(expr) => expr.format().with_options(self.fluent_style).fmt(f)?,
-            Expr::Subscript(expr) => expr.format().with_options(self.fluent_style).fmt(f)?,
+            Expr::Attribute(expr) => expr.format().with_options(self.call_chain_layout).fmt(f)?,
+            Expr::Call(expr) => expr.format().with_options(self.call_chain_layout).fmt(f)?,
+            Expr::Subscript(expr) => expr.format().with_options(self.call_chain_layout).fmt(f)?,
             _ => func.format().fmt(f)?,
         }
 
