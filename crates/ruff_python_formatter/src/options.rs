@@ -3,7 +3,7 @@ use ruff_formatter::{FormatOptions, IndentStyle, LineWidth};
 use std::ffi::OsStr;
 use std::path::Path;
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum SourceType {
     /// A `.py` file
