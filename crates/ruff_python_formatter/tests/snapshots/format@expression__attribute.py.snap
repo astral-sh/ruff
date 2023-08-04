@@ -112,7 +112,9 @@ x6 = (
     a.b
 )
 
-
+# regression: https://github.com/astral-sh/ruff/issues/6181
+(#
+()).a
 ```
 
 ## Output
@@ -200,6 +202,12 @@ x6 = (
     # Check assumption with enclosing nodes
     a.b
 )
+
+# regression: https://github.com/astral-sh/ruff/issues/6181
+(
+    #
+    ()
+).a
 ```
 
 

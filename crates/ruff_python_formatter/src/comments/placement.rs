@@ -998,10 +998,14 @@ fn handle_attribute_comment<'a>(
     comment: DecoratedComment<'a>,
     attribute: &'a ast::ExprAttribute,
 ) -> CommentPlacement<'a> {
-    debug_assert!(
-        comment.preceding_node().is_some(),
-        "The enclosing node an attribute expression, expected to be at least after the name"
-    );
+    if comment.preceding_node().is_none() {
+        // ```text
+        // (    value)   .   attr
+        //  ^^^^ we're in this range
+        // ```
+
+        return CommentPlacement::leading(attribute.value.as_ref(), comment);
+    }
 
     // ```text
     // value   .   attr
