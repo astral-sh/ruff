@@ -521,6 +521,24 @@ impl CallChainLayout {
     }
 }
 
+/// Determine whether to actually apply fluent layout in attribute, call and subscript formatting
+pub(crate) fn format_call_chain_layout<'a>(
+    f: &mut PyFormatter,
+    layout: CallChainLayout,
+    item: impl Into<AnyNodeRef<'a>>,
+) -> CallChainLayout {
+    match layout {
+        CallChainLayout::Default => {
+            if f.context().node_level().is_parenthesized() {
+                CallChainLayout::from_expression(item.into(), f.context().source())
+            } else {
+                CallChainLayout::NonFluent
+            }
+        }
+        layout @ (CallChainLayout::Fluent | CallChainLayout::NonFluent) => layout,
+    }
+}
+
 fn has_parentheses(expr: &Expr, source: &str) -> bool {
     has_own_parentheses(expr) || is_expression_parenthesized(AnyNodeRef::from(expr), source)
 }
@@ -576,23 +594,5 @@ impl From<ast::Operator> for OperatorPriority {
             Operator::BitXor => OperatorPriority::BitwiseXor,
             Operator::BitAnd => OperatorPriority::BitwiseAnd,
         }
-    }
-}
-
-/// Determine whether to actually apply fluent layout in attribute, call and subscript formatting
-pub(crate) fn format_call_chain_layout<'a>(
-    f: &mut PyFormatter,
-    layout: CallChainLayout,
-    item: impl Into<AnyNodeRef<'a>>,
-) -> CallChainLayout {
-    match layout {
-        CallChainLayout::Default => {
-            if f.context().node_level().is_parenthesized() {
-                CallChainLayout::from_expression(item.into(), f.context().source())
-            } else {
-                CallChainLayout::NonFluent
-            }
-        }
-        layout @ (CallChainLayout::Fluent | CallChainLayout::NonFluent) => layout,
     }
 }
