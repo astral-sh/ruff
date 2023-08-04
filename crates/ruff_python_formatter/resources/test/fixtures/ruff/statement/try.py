@@ -138,3 +138,11 @@ else:  # 7 preceding: last in body, following: fist in alt body, enclosing: exc
     print(3)  # 8 preceding: last in body, following: fist in alt body, enclosing: try
 finally:  # 9 preceding: last in body, following: fist in alt body, enclosing: try
     print(3)  # 10 preceding: last in body, following: any, enclosing: try
+
+try:
+    pass
+except (
+    ZeroDivisionError
+    # comment
+):
+    pass

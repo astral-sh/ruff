@@ -3,7 +3,7 @@ use std::iter;
 
 use itertools::Either::{Left, Right};
 use itertools::Itertools;
-use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr, ExprContext, Ranged, UnaryOp};
+use ruff_python_ast::{self as ast, Arguments, BoolOp, CmpOp, Expr, ExprContext, Ranged, UnaryOp};
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
 
@@ -315,8 +315,12 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
         // Verify that this is an `isinstance` call.
         let Expr::Call(ast::ExprCall {
             func,
-            args,
-            keywords,
+            arguments:
+                Arguments {
+                    args,
+                    keywords,
+                    range: _,
+                },
             range: _,
         }) = &call
         else {
@@ -351,7 +355,11 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
         if indices.len() > 1 {
             // Grab the target used in each duplicate `isinstance` call (e.g., `obj` in
             // `isinstance(obj, int)`).
-            let target = if let Expr::Call(ast::ExprCall { args, .. }) = &values[indices[0]] {
+            let target = if let Expr::Call(ast::ExprCall {
+                arguments: Arguments { args, .. },
+                ..
+            }) = &values[indices[0]]
+            {
                 args.get(0).expect("`isinstance` should have two arguments")
             } else {
                 unreachable!("Indices should only contain `isinstance` calls")
@@ -374,7 +382,11 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                         .iter()
                         .map(|index| &values[*index])
                         .map(|expr| {
-                            let Expr::Call(ast::ExprCall { args, .. }) = expr else {
+                            let Expr::Call(ast::ExprCall {
+                                arguments: Arguments { args, .. },
+                                ..
+                            }) = expr
+                            else {
                                 unreachable!("Indices should only contain `isinstance` calls")
                             };
                             args.get(1).expect("`isinstance` should have two arguments")
@@ -405,8 +417,11 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                     };
                     let node2 = ast::ExprCall {
                         func: Box::new(node1.into()),
-                        args: vec![target.clone(), node.into()],
-                        keywords: vec![],
+                        arguments: Arguments {
+                            args: vec![target.clone(), node.into()],
+                            keywords: vec![],
+                            range: TextRange::default(),
+                        },
                         range: TextRange::default(),
                     };
                     let call = node2.into();

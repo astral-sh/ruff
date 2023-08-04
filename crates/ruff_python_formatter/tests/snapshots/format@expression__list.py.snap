@@ -27,14 +27,36 @@ b3 = [
     aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjfsaahflakjslhdfkjalhdskjfa,
     aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjfsaahflakjslhdfkjalhdskjfa
 ]
+
+# Comment placement in non-empty lists
+c1 = [ # trailing open bracket
+    # leading item
+    1,
+
+    # between
+
+    2, # trailing item
+    # leading close bracket
+] # trailing close bracket
+
+
+[  # end-of-line comment
+]
+
+[  # end-of-line comment
+    # own-line comment
+]
+
+[  # end-of-line comment
+    1
+]
 ```
 
 ## Output
 ```py
 # Dangling comment placement in empty lists
 # Regression test for https://github.com/python/cpython/blob/03160630319ca26dcbbad65225da4248e54c45ec/Tools/c-analyzer/c_analyzer/datafiles.py#L14-L16
-a1 = [  # a
-]
+a1 = []  # a
 a2 = [  # a
     # b
 ]
@@ -54,6 +76,24 @@ b3 = [
     aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjfsaahflakjslhdfkjalhdskjfa,
     aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjfsaahflakjslhdfkjalhdskjfa,
 ]
+
+# Comment placement in non-empty lists
+c1 = [  # trailing open bracket
+    # leading item
+    1,
+    # between
+    2,  # trailing item
+    # leading close bracket
+]  # trailing close bracket
+
+
+[]  # end-of-line comment
+
+[  # end-of-line comment
+    # own-line comment
+]
+
+[1]  # end-of-line comment
 ```
 
 

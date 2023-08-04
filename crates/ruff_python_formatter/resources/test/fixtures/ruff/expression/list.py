@@ -21,3 +21,26 @@ b3 = [
     aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjfsaahflakjslhdfkjalhdskjfa,
     aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjfsaahflakjslhdfkjalhdskjfa
 ]
+
+# Comment placement in non-empty lists
+c1 = [ # trailing open bracket
+    # leading item
+    1,
+
+    # between
+
+    2, # trailing item
+    # leading close bracket
+] # trailing close bracket
+
+
+[  # end-of-line comment
+]
+
+[  # end-of-line comment
+    # own-line comment
+]
+
+[  # end-of-line comment
+    1
+]

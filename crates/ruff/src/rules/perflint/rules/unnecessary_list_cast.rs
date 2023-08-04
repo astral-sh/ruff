@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
@@ -54,17 +54,21 @@ impl AlwaysAutofixableViolation for UnnecessaryListCast {
 pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr) {
     let Expr::Call(ast::ExprCall {
         func,
-        args,
+        arguments:
+            Arguments {
+                args,
+                keywords: _,
+                range: _,
+            },
         range: list_range,
-        ..
     }) = iter
     else {
         return;
     };
 
-    if args.len() != 1 {
+    let [arg] = args.as_slice() else {
         return;
-    }
+    };
 
     let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else {
         return;
@@ -74,7 +78,7 @@ pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr) {
         return;
     }
 
-    match &args[0] {
+    match arg {
         Expr::Tuple(ast::ExprTuple {
             range: iterable_range,
             ..

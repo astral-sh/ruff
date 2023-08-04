@@ -3426,7 +3426,7 @@ mod tests {
     }
 
     #[test]
-    fn type_alias_annotations() {
+    fn use_pep695_type_aliass() {
         flakes(
             r#"
         from typing_extensions import TypeAlias

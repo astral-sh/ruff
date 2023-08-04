@@ -6,35 +6,44 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
     ClassDef(
         StmtClassDef {
             range: 0..98,
+            decorator_list: [],
             name: Identifier {
                 id: "Foo",
                 range: 6..9,
             },
-            bases: [
-                Name(
-                    ExprName {
-                        range: 10..11,
-                        id: "A",
-                        ctx: Load,
-                    },
-                ),
-                Name(
-                    ExprName {
-                        range: 13..14,
-                        id: "B",
-                        ctx: Load,
-                    },
-                ),
-            ],
-            keywords: [],
+            type_params: None,
+            arguments: Some(
+                Arguments {
+                    range: 9..15,
+                    args: [
+                        Name(
+                            ExprName {
+                                range: 10..11,
+                                id: "A",
+                                ctx: Load,
+                            },
+                        ),
+                        Name(
+                            ExprName {
+                                range: 13..14,
+                                id: "B",
+                                ctx: Load,
+                            },
+                        ),
+                    ],
+                    keywords: [],
+                },
+            ),
             body: [
                 FunctionDef(
                     StmtFunctionDef {
                         range: 18..44,
+                        decorator_list: [],
                         name: Identifier {
                             id: "__init__",
                             range: 22..30,
                         },
+                        type_params: None,
                         parameters: Parameters {
                             range: 30..36,
                             posonlyargs: [],
@@ -56,6 +65,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             kwonlyargs: [],
                             kwarg: None,
                         },
+                        returns: None,
                         body: [
                             Pass(
                                 StmtPass {
@@ -63,18 +73,17 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                 },
                             ),
                         ],
-                        decorator_list: [],
-                        returns: None,
-                        type_params: [],
                     },
                 ),
                 FunctionDef(
                     StmtFunctionDef {
                         range: 46..98,
+                        decorator_list: [],
                         name: Identifier {
                             id: "method_with_default",
                             range: 50..69,
                         },
+                        type_params: None,
                         parameters: Parameters {
                             range: 69..90,
                             posonlyargs: [],
@@ -118,6 +127,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             kwonlyargs: [],
                             kwarg: None,
                         },
+                        returns: None,
                         body: [
                             Pass(
                                 StmtPass {
@@ -125,14 +135,9 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                 },
                             ),
                         ],
-                        decorator_list: [],
-                        returns: None,
-                        type_params: [],
                     },
                 ),
             ],
-            type_params: [],
-            decorator_list: [],
         },
     ),
 ]

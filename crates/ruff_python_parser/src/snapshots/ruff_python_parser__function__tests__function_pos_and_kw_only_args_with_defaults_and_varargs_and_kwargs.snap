@@ -7,10 +7,12 @@ Ok(
         FunctionDef(
             StmtFunctionDef {
                 range: 0..52,
+                decorator_list: [],
                 name: Identifier {
                     id: "f",
                     range: 4..5,
                 },
+                type_params: None,
                 parameters: Parameters {
                     range: 5..46,
                     posonlyargs: [],
@@ -131,6 +133,7 @@ Ok(
                         },
                     ),
                 },
+                returns: None,
                 body: [
                     Pass(
                         StmtPass {
@@ -138,9 +141,6 @@ Ok(
                         },
                     ),
                 ],
-                decorator_list: [],
-                returns: None,
-                type_params: [],
             },
         ),
     ],

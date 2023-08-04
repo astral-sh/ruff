@@ -6,7 +6,9 @@ use ruff_formatter::{format_args, write, FormatRuleWithOptions};
 use ruff_python_ast::node::AnyNodeRef;
 
 use crate::builders::{empty_parenthesized_with_dangling_comments, parenthesize_if_expands};
-use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
+use crate::expression::parentheses::{
+    parenthesized_with_dangling_comments, NeedsParentheses, OptionalParentheses,
+};
 use crate::prelude::*;
 
 #[derive(Eq, PartialEq, Debug, Default)]
@@ -30,7 +32,6 @@ pub enum TupleParentheses {
     Preserve,
 
     /// Handle the special cases where we don't include parentheses at all.
-    ///
     ///
     /// Black never formats tuple targets of for loops with parentheses if inside a comprehension.
     /// For example, tuple targets will always be formatted on the same line, except when an element supports
@@ -104,6 +105,9 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
             ctx: _,
         } = item;
 
+        let comments = f.context().comments().clone();
+        let dangling = comments.dangling_comments(item);
+
         // Handle the edge cases of an empty tuple and a tuple with one element
         //
         // there can be dangling comments, and they can be in two
@@ -116,13 +120,8 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
         // In all other cases comments get assigned to a list element
         match elts.as_slice() {
             [] => {
-                let comments = f.context().comments().clone();
-                return empty_parenthesized_with_dangling_comments(
-                    text("("),
-                    comments.dangling_comments(item),
-                    text(")"),
-                )
-                .fmt(f);
+                return empty_parenthesized_with_dangling_comments(text("("), dangling, text(")"))
+                    .fmt(f);
             }
             [single] => match self.parentheses {
                 TupleParentheses::Preserve
@@ -133,7 +132,13 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                 _ =>
                 // A single element tuple always needs parentheses and a trailing comma, except when inside of a subscript
                 {
-                    parenthesized("(", &format_args![single.format(), text(",")], ")").fmt(f)
+                    parenthesized_with_dangling_comments(
+                        "(",
+                        dangling,
+                        &format_args![single.format(), text(",")],
+                        ")",
+                    )
+                    .fmt(f)
                 }
             },
             // If the tuple has parentheses, we generally want to keep them. The exception are for
@@ -142,9 +147,11 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
             // Unlike other expression parentheses, tuple parentheses are part of the range of the
             // tuple itself.
             _ if is_parenthesized(*range, elts, f.context().source())
-                && self.parentheses != TupleParentheses::NeverPreserve =>
+                && !(self.parentheses == TupleParentheses::NeverPreserve
+                    && dangling.is_empty()) =>
             {
-                parenthesized("(", &ExprSequence::new(item), ")").fmt(f)
+                parenthesized_with_dangling_comments("(", dangling, &ExprSequence::new(item), ")")
+                    .fmt(f)
             }
             _ => match self.parentheses {
                 TupleParentheses::Never => {

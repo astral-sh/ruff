@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -92,9 +92,13 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, target: &Expr, bo
 
     let Expr::Call(ast::ExprCall {
         func,
+        arguments:
+            Arguments {
+                args,
+                keywords,
+                range: _,
+            },
         range,
-        args,
-        keywords,
     }) = value.as_ref()
     else {
         return;

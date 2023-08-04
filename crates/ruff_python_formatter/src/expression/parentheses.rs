@@ -1,10 +1,10 @@
-use ruff_python_ast::Ranged;
-
 use ruff_formatter::prelude::tag::Condition;
 use ruff_formatter::{format_args, write, Argument, Arguments};
 use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::Ranged;
 use ruff_python_trivia::{first_non_trivia_token, SimpleToken, SimpleTokenKind, SimpleTokenizer};
 
+use crate::comments::{dangling_comments, SourceComment};
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::prelude::*;
 
@@ -110,6 +110,26 @@ where
 {
     FormatParenthesized {
         left,
+        comments: &[],
+        content: Argument::new(content),
+        right,
+    }
+}
+
+/// Formats `content` enclosed by the `left` and `right` parentheses, along with any dangling
+/// comments that on the parentheses themselves.
+pub(crate) fn parenthesized_with_dangling_comments<'content, 'ast, Content>(
+    left: &'static str,
+    comments: &'content [SourceComment],
+    content: &'content Content,
+    right: &'static str,
+) -> FormatParenthesized<'content, 'ast>
+where
+    Content: Format<PyFormatContext<'ast>>,
+{
+    FormatParenthesized {
+        left,
+        comments,
         content: Argument::new(content),
         right,
     }
@@ -117,6 +137,7 @@ where
 
 pub(crate) struct FormatParenthesized<'content, 'ast> {
     left: &'static str,
+    comments: &'content [SourceComment],
     content: Argument<'content, PyFormatContext<'ast>>,
     right: &'static str,
 }
@@ -124,12 +145,22 @@ pub(crate) struct FormatParenthesized<'content, 'ast> {
 impl<'ast> Format<PyFormatContext<'ast>> for FormatParenthesized<'_, 'ast> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
         let inner = format_with(|f| {
-            group(&format_args![
-                text(self.left),
-                &soft_block_indent(&Arguments::from(&self.content)),
-                text(self.right)
-            ])
-            .fmt(f)
+            if self.comments.is_empty() {
+                group(&format_args![
+                    text(self.left),
+                    &soft_block_indent(&Arguments::from(&self.content)),
+                    text(self.right)
+                ])
+                .fmt(f)
+            } else {
+                group(&format_args![
+                    text(self.left),
+                    &line_suffix(&dangling_comments(self.comments)),
+                    &group(&soft_block_indent(&Arguments::from(&self.content))),
+                    text(self.right)
+                ])
+                .fmt(f)
+            }
         });
 
         let current_level = f.context().node_level();

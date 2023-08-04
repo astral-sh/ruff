@@ -1,8 +1,7 @@
-use ruff_python_ast::{self as ast, Expr, Ranged, Stmt};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{find_keyword, is_const_true};
+use ruff_python_ast::helpers::is_const_true;
+use ruff_python_ast::{self as ast, Expr, Ranged, Stmt};
 use ruff_python_semantic::analyze::logging;
 
 use crate::checkers::ast::Checker;
@@ -94,7 +93,10 @@ pub(crate) fn blind_except(
     // If the exception is logged, don't flag an error.
     if body.iter().any(|stmt| {
         if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = stmt {
-            if let Expr::Call(ast::ExprCall { func, keywords, .. }) = value.as_ref() {
+            if let Expr::Call(ast::ExprCall {
+                func, arguments, ..
+            }) = value.as_ref()
+            {
                 if logging::is_logger_candidate(
                     func,
                     checker.semantic(),
@@ -106,7 +108,7 @@ pub(crate) fn blind_except(
                             return true;
                         }
                         if attr == "error" {
-                            if let Some(keyword) = find_keyword(keywords, "exc_info") {
+                            if let Some(keyword) = arguments.find_keyword("exc_info") {
                                 if is_const_true(&keyword.value) {
                                     return true;
                                 }

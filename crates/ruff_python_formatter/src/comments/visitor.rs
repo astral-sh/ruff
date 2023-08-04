@@ -1,8 +1,9 @@
 use std::iter::Peekable;
 
 use ruff_python_ast::{
-    Alias, Comprehension, Decorator, ElifElseClause, ExceptHandler, Expr, Keyword, MatchCase, Mod,
-    Parameter, ParameterWithDefault, Parameters, Pattern, Ranged, Stmt, TypeParam, WithItem,
+    Alias, Arguments, Comprehension, Decorator, ElifElseClause, ExceptHandler, Expr, Keyword,
+    MatchCase, Mod, Parameter, ParameterWithDefault, Parameters, Pattern, Ranged, Stmt, TypeParam,
+    TypeParams, WithItem,
 };
 use ruff_text_size::{TextRange, TextSize};
 
@@ -229,6 +230,13 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast> {
         self.finish_node(format_spec);
     }
 
+    fn visit_arguments(&mut self, arguments: &'ast Arguments) {
+        if self.start_node(arguments).is_traverse() {
+            walk_arguments(self, arguments);
+        }
+        self.finish_node(arguments);
+    }
+
     fn visit_parameters(&mut self, parameters: &'ast Parameters) {
         if self.start_node(parameters).is_traverse() {
             walk_parameters(self, parameters);
@@ -291,6 +299,13 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast> {
             walk_elif_else_clause(self, elif_else_clause);
         }
         self.finish_node(elif_else_clause);
+    }
+
+    fn visit_type_params(&mut self, type_params: &'ast TypeParams) {
+        if self.start_node(type_params).is_traverse() {
+            walk_type_params(self, type_params);
+        }
+        self.finish_node(type_params);
     }
 
     fn visit_type_param(&mut self, type_param: &'ast TypeParam) {
@@ -641,6 +656,17 @@ impl<'a> CommentPlacement<'a> {
         Self::Trailing {
             node: node.into(),
             comment: comment.into(),
+        }
+    }
+
+    /// Chains the placement with the given function.
+    ///
+    /// Returns `self` when the placement is non-[`CommentPlacement::Default`]. Otherwise, calls the
+    /// function with the comment and returns the result.
+    pub(super) fn then_with<F: FnOnce(DecoratedComment<'a>) -> Self>(self, f: F) -> Self {
+        match self {
+            Self::Default(comment) => f(comment),
+            _ => self,
         }
     }
 }

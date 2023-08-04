@@ -155,4 +155,11 @@ E721.py:42:8: E721 Do not compare types, use `isinstance()`
 44 | #: Okay
    |
 
+E721.py:63:8: E721 Do not compare types, use `isinstance()`
+   |
+62 | #: E721
+63 | assert type(res) is int
+   |        ^^^^^^^^^^^^^^^^ E721
+   |
+
 

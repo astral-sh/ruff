@@ -6,25 +6,6 @@ expression: parse_ast
     FunctionDef(
         StmtFunctionDef {
             range: 0..34,
-            name: Identifier {
-                id: "test",
-                range: 18..22,
-            },
-            parameters: Parameters {
-                range: 22..24,
-                posonlyargs: [],
-                args: [],
-                vararg: None,
-                kwonlyargs: [],
-                kwarg: None,
-            },
-            body: [
-                Pass(
-                    StmtPass {
-                        range: 30..34,
-                    },
-                ),
-            ],
             decorator_list: [
                 Decorator {
                     range: 0..13,
@@ -37,27 +18,32 @@ expression: parse_ast
                     ),
                 },
             ],
+            name: Identifier {
+                id: "test",
+                range: 18..22,
+            },
+            type_params: None,
+            parameters: Parameters {
+                range: 22..24,
+                posonlyargs: [],
+                args: [],
+                vararg: None,
+                kwonlyargs: [],
+                kwarg: None,
+            },
             returns: None,
-            type_params: [],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 30..34,
+                    },
+                ),
+            ],
         },
     ),
     ClassDef(
         StmtClassDef {
             range: 36..73,
-            name: Identifier {
-                id: "Abcd",
-                range: 59..63,
-            },
-            bases: [],
-            keywords: [],
-            body: [
-                Pass(
-                    StmtPass {
-                        range: 69..73,
-                    },
-                ),
-            ],
-            type_params: [],
             decorator_list: [
                 Decorator {
                     range: 36..52,
@@ -69,6 +55,19 @@ expression: parse_ast
                         },
                     ),
                 },
+            ],
+            name: Identifier {
+                id: "Abcd",
+                range: 59..63,
+            },
+            type_params: None,
+            arguments: None,
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 69..73,
+                    },
+                ),
             ],
         },
     ),

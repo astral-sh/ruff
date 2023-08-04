@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, Ranged};
+use ruff_python_ast::{self as ast, Arguments, Expr, Ranged};
 use ruff_python_parser::{lexer, Tok};
 use ruff_text_size::{TextRange, TextSize};
 
@@ -48,31 +48,37 @@ impl AlwaysAutofixableViolation for UnnecessaryParenOnRaiseException {
 
 /// RSE102
 pub(crate) fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: &Expr) {
-    if let Expr::Call(ast::ExprCall {
+    let Expr::Call(ast::ExprCall {
         func,
-        args,
-        keywords,
+        arguments:
+            Arguments {
+                args,
+                keywords,
+                range: _,
+            },
         range: _,
     }) = expr
-    {
-        if args.is_empty() && keywords.is_empty() {
-            // `raise func()` still requires parentheses; only `raise Class()` does not.
-            if checker
-                .semantic()
-                .lookup_attribute(func)
-                .is_some_and(|id| checker.semantic().binding(id).kind.is_function_definition())
-            {
-                return;
-            }
+    else {
+        return;
+    };
 
-            let range = match_parens(func.end(), checker.locator(), checker.source_type)
-                .expect("Expected call to include parentheses");
-            let mut diagnostic = Diagnostic::new(UnnecessaryParenOnRaiseException, range);
-            if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::automatic(Edit::deletion(func.end(), range.end())));
-            }
-            checker.diagnostics.push(diagnostic);
+    if args.is_empty() && keywords.is_empty() {
+        // `raise func()` still requires parentheses; only `raise Class()` does not.
+        if checker
+            .semantic()
+            .lookup_attribute(func)
+            .is_some_and(|id| checker.semantic().binding(id).kind.is_function_definition())
+        {
+            return;
         }
+
+        let range = match_parens(func.end(), checker.locator(), checker.source_type)
+            .expect("Expected call to include parentheses");
+        let mut diagnostic = Diagnostic::new(UnnecessaryParenOnRaiseException, range);
+        if checker.patch(diagnostic.kind.rule()) {
+            diagnostic.set_fix(Fix::automatic(Edit::deletion(func.end(), range.end())));
+        }
+        checker.diagnostics.push(diagnostic);
     }
 }
 

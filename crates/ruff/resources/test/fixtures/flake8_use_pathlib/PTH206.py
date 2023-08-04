@@ -18,3 +18,5 @@ file_name.split(os.sep)
 
 # OK
 "foo/bar/".split("/")
+"foo/bar/".split(os.sep, 1)
+"foo/bar/".split(1, sep=os.sep)

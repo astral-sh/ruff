@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Constant, Expr, Ranged};
+use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Ranged};
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -103,7 +103,12 @@ pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Ex
     }
 
     // Ex) `os.environ.get('foo')`, `os.getenv('foo')`
-    let Expr::Call(ast::ExprCall { func, args, .. }) = expr else {
+    let Expr::Call(ast::ExprCall {
+        func,
+        arguments: Arguments { args, .. },
+        ..
+    }) = expr
+    else {
         return;
     };
     let Some(arg) = args.get(0) else {
@@ -200,8 +205,7 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
 pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
     let Expr::Call(ast::ExprCall {
         func,
-        args,
-        keywords,
+        arguments: Arguments { args, keywords, .. },
         range: _,
     }) = expr
     else {

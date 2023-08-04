@@ -75,6 +75,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             returns,
             parameters,
             body,
+            type_params,
             ..
         })
         | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
@@ -83,6 +84,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             returns,
             parameters,
             body,
+            type_params,
             ..
         }) => {
             if checker.enabled(Rule::DjangoNonLeadingReceiverDecorator) {
@@ -141,37 +143,51 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if checker.enabled(Rule::StubBodyMultipleStatements) {
                     flake8_pyi::rules::stub_body_multiple_statements(checker, stmt, body);
                 }
-                if checker.enabled(Rule::AnyEqNeAnnotation) {
-                    flake8_pyi::rules::any_eq_ne_annotation(checker, name, parameters);
-                }
-                if checker.enabled(Rule::NonSelfReturnType) {
-                    flake8_pyi::rules::non_self_return_type(
-                        checker,
-                        stmt,
-                        name,
-                        decorator_list,
-                        returns.as_ref().map(AsRef::as_ref),
-                        parameters,
-                        stmt.is_async_function_def_stmt(),
-                    );
-                }
+            }
+            if checker.enabled(Rule::AnyEqNeAnnotation) {
+                flake8_pyi::rules::any_eq_ne_annotation(checker, name, parameters);
+            }
+            if checker.enabled(Rule::NonSelfReturnType) {
+                flake8_pyi::rules::non_self_return_type(
+                    checker,
+                    stmt,
+                    name,
+                    decorator_list,
+                    returns.as_ref().map(AsRef::as_ref),
+                    parameters,
+                    stmt.is_async_function_def_stmt(),
+                );
+            }
+            if checker.enabled(Rule::CustomTypeVarReturnType) {
+                flake8_pyi::rules::custom_type_var_return_type(
+                    checker,
+                    name,
+                    decorator_list,
+                    returns.as_ref().map(AsRef::as_ref),
+                    parameters,
+                    type_params.as_ref(),
+                );
+            }
+            if checker.is_stub {
                 if checker.enabled(Rule::StrOrReprDefinedInStub) {
                     flake8_pyi::rules::str_or_repr_defined_in_stub(checker, stmt);
                 }
+            }
+            if checker.is_stub || checker.settings.target_version >= PythonVersion::Py311 {
                 if checker.enabled(Rule::NoReturnArgumentAnnotationInStub) {
                     flake8_pyi::rules::no_return_argument_annotation(checker, parameters);
                 }
-                if checker.enabled(Rule::BadExitAnnotation) {
-                    flake8_pyi::rules::bad_exit_annotation(
-                        checker,
-                        stmt.is_async_function_def_stmt(),
-                        name,
-                        parameters,
-                    );
-                }
-                if checker.enabled(Rule::RedundantNumericUnion) {
-                    flake8_pyi::rules::redundant_numeric_union(checker, parameters);
-                }
+            }
+            if checker.enabled(Rule::BadExitAnnotation) {
+                flake8_pyi::rules::bad_exit_annotation(
+                    checker,
+                    stmt.is_async_function_def_stmt(),
+                    name,
+                    parameters,
+                );
+            }
+            if checker.enabled(Rule::RedundantNumericUnion) {
+                flake8_pyi::rules::redundant_numeric_union(checker, parameters);
             }
             if checker.enabled(Rule::DunderFunctionName) {
                 if let Some(diagnostic) = pep8_naming::rules::dunder_function_name(
@@ -363,8 +379,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
         Stmt::ClassDef(
             class_def @ ast::StmtClassDef {
                 name,
-                bases,
-                keywords,
+                arguments,
                 type_params: _,
                 decorator_list,
                 body,
@@ -375,21 +390,27 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_django::rules::nullable_model_string_field(checker, body);
             }
             if checker.enabled(Rule::DjangoExcludeWithModelForm) {
-                if let Some(diagnostic) =
-                    flake8_django::rules::exclude_with_model_form(checker, bases, body)
-                {
+                if let Some(diagnostic) = flake8_django::rules::exclude_with_model_form(
+                    checker,
+                    arguments.as_deref(),
+                    body,
+                ) {
                     checker.diagnostics.push(diagnostic);
                 }
             }
             if checker.enabled(Rule::DjangoAllWithModelForm) {
                 if let Some(diagnostic) =
-                    flake8_django::rules::all_with_model_form(checker, bases, body)
+                    flake8_django::rules::all_with_model_form(checker, arguments.as_deref(), body)
                 {
                     checker.diagnostics.push(diagnostic);
                 }
             }
             if checker.enabled(Rule::DjangoUnorderedBodyContentInModel) {
-                flake8_django::rules::unordered_body_content_in_model(checker, bases, body);
+                flake8_django::rules::unordered_body_content_in_model(
+                    checker,
+                    arguments.as_deref(),
+                    body,
+                );
             }
             if !checker.source_type.is_stub() {
                 if checker.enabled(Rule::DjangoModelWithoutDunderStr) {
@@ -425,7 +446,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::ErrorSuffixOnExceptionName) {
                 if let Some(diagnostic) = pep8_naming::rules::error_suffix_on_exception_name(
                     stmt,
-                    bases,
+                    arguments.as_deref(),
                     name,
                     &checker.settings.pep8_naming.ignore_names,
                 ) {
@@ -438,7 +459,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     Rule::EmptyMethodWithoutAbstractDecorator,
                 ]) {
                     flake8_bugbear::rules::abstract_base_class(
-                        checker, stmt, name, bases, keywords, body,
+                        checker,
+                        stmt,
+                        name,
+                        arguments.as_deref(),
+                        body,
                     );
                 }
             }
@@ -449,9 +474,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if checker.enabled(Rule::PassInClassBody) {
                     flake8_pyi::rules::pass_in_class_body(checker, stmt, body);
                 }
-                if checker.enabled(Rule::EllipsisInNonEmptyClassBody) {
-                    flake8_pyi::rules::ellipsis_in_non_empty_class_body(checker, stmt, body);
-                }
+            }
+            if checker.enabled(Rule::EllipsisInNonEmptyClassBody) {
+                flake8_pyi::rules::ellipsis_in_non_empty_class_body(checker, stmt, body);
             }
             if checker.enabled(Rule::PytestIncorrectMarkParenthesesStyle) {
                 flake8_pytest_style::rules::marks(checker, decorator_list);
@@ -478,7 +503,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_builtins::rules::builtin_variable_shadowing(checker, name, name.range());
             }
             if checker.enabled(Rule::DuplicateBases) {
-                pylint::rules::duplicate_bases(checker, name, bases);
+                pylint::rules::duplicate_bases(checker, name, arguments.as_deref());
             }
             if checker.enabled(Rule::NoSlotsInStrSubclass) {
                 flake8_slots::rules::no_slots_in_str_subclass(checker, stmt, class_def);
@@ -1337,12 +1362,14 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
         }
-        Stmt::AnnAssign(ast::StmtAnnAssign {
-            target,
-            value,
-            annotation,
-            ..
-        }) => {
+        Stmt::AnnAssign(
+            assign_stmt @ ast::StmtAnnAssign {
+                target,
+                value,
+                annotation,
+                ..
+            },
+        ) => {
             if let Some(value) = value {
                 if checker.enabled(Rule::LambdaAssignment) {
                     pycodestyle::rules::lambda_assignment(
@@ -1365,6 +1392,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     stmt,
                 );
             }
+            if checker.enabled(Rule::NonPEP695TypeAlias) {
+                pyupgrade::rules::non_pep695_type_alias(checker, assign_stmt);
+            }
             if checker.source_type.is_stub() {
                 if let Some(value) = value {
                     if checker.enabled(Rule::AssignmentDefaultInStub) {
@@ -1386,13 +1416,13 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         );
                     }
                 }
-                if checker.semantic.match_typing_expr(annotation, "TypeAlias") {
-                    if checker.enabled(Rule::SnakeCaseTypeAlias) {
-                        flake8_pyi::rules::snake_case_type_alias(checker, target);
-                    }
-                    if checker.enabled(Rule::TSuffixedTypeAlias) {
-                        flake8_pyi::rules::t_suffixed_type_alias(checker, target);
-                    }
+            }
+            if checker.semantic.match_typing_expr(annotation, "TypeAlias") {
+                if checker.enabled(Rule::SnakeCaseTypeAlias) {
+                    flake8_pyi::rules::snake_case_type_alias(checker, target);
+                }
+                if checker.enabled(Rule::TSuffixedTypeAlias) {
+                    flake8_pyi::rules::t_suffixed_type_alias(checker, target);
                 }
             }
         }

@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Constant, Decorator, Expr, ExprContext, Ranged};
+use ruff_python_ast::{self as ast, Arguments, Constant, Decorator, Expr, ExprContext, Ranged};
 use ruff_python_parser::{lexer, Tok};
 use ruff_text_size::TextRange;
 
@@ -428,7 +428,11 @@ fn handle_value_rows(
 pub(crate) fn parametrize(checker: &mut Checker, decorators: &[Decorator]) {
     for decorator in decorators {
         if is_pytest_parametrize(decorator, checker.semantic()) {
-            if let Expr::Call(ast::ExprCall { args, .. }) = &decorator.expression {
+            if let Expr::Call(ast::ExprCall {
+                arguments: Arguments { args, .. },
+                ..
+            }) = &decorator.expression
+            {
                 if checker.enabled(Rule::PytestParametrizeNamesWrongType) {
                     if let Some(names) = args.get(0) {
                         check_names(checker, decorator, names);

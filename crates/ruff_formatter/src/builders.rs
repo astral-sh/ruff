@@ -478,7 +478,7 @@ impl<Context> std::fmt::Debug for LineSuffix<'_, Context> {
 }
 
 /// Inserts a boundary for line suffixes that forces the printer to print all pending line suffixes.
-/// Helpful if a line sufix shouldn't pass a certain point.
+/// Helpful if a line suffix shouldn't pass a certain point.
 ///
 /// ## Examples
 ///

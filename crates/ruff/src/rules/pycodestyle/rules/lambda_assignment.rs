@@ -229,7 +229,7 @@ fn function(
                 body: vec![body],
                 decorator_list: vec![],
                 returns: Some(Box::new(return_type)),
-                type_params: vec![],
+                type_params: None,
                 range: TextRange::default(),
             });
             return generator.stmt(&func);
@@ -241,7 +241,7 @@ fn function(
         body: vec![body],
         decorator_list: vec![],
         returns: None,
-        type_params: vec![],
+        type_params: None,
         range: TextRange::default(),
     });
     generator.stmt(&func)

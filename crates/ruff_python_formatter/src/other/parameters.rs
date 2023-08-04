@@ -278,9 +278,9 @@ pub(crate) struct ArgumentSeparator {
     pub(crate) following_start: TextSize,
 }
 
-/// Finds slash and star in `f(a, /, b, *, c)`
+/// Finds slash and star in `f(a, /, b, *, c)` or `lambda a, /, b, *, c: 1`.
 ///
-/// Returns slash and star
+/// Returns the location of the slash and star separators, if any.
 pub(crate) fn find_argument_separators(
     contents: &str,
     parameters: &Parameters,
@@ -347,14 +347,21 @@ pub(crate) fn find_argument_separators(
         } else {
             let mut tokens = SimpleTokenizer::new(contents, parameters.range).skip_trivia();
 
-            let lparen = tokens
+            let lparen_or_star = tokens
                 .next()
                 .expect("The function definition can't end here");
-            debug_assert!(lparen.kind() == SimpleTokenKind::LParen, "{lparen:?}");
-            let star = tokens
-                .next()
-                .expect("The function definition can't end here");
+
+            // In a function definition, the first token should always be a `(`; in a lambda
+            // definition, it _can't_ be a `(`.
+            let star = if lparen_or_star.kind == SimpleTokenKind::LParen {
+                tokens
+                    .next()
+                    .expect("The function definition can't end here")
+            } else {
+                lparen_or_star
+            };
             debug_assert!(star.kind() == SimpleTokenKind::Star, "{star:?}");
+
             Some(ArgumentSeparator {
                 preceding_end: parameters.range.start(),
                 separator: star.range,

@@ -1,5 +1,6 @@
 use ruff_python_ast::{
-    self as ast, CmpOp, Comprehension, Constant, Expr, ExprContext, Ranged, Stmt, UnaryOp,
+    self as ast, Arguments, CmpOp, Comprehension, Constant, Expr, ExprContext, Ranged, Stmt,
+    UnaryOp,
 };
 use ruff_text_size::TextRange;
 
@@ -394,8 +395,11 @@ fn return_stmt(id: &str, test: &Expr, target: &Expr, iter: &Expr, generator: Gen
     };
     let node2 = ast::ExprCall {
         func: Box::new(node1.into()),
-        args: vec![node.into()],
-        keywords: vec![],
+        arguments: Arguments {
+            args: vec![node.into()],
+            keywords: vec![],
+            range: TextRange::default(),
+        },
         range: TextRange::default(),
     };
     let node3 = ast::StmtReturn {

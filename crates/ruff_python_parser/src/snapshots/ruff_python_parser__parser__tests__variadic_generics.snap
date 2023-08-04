@@ -6,10 +6,12 @@ expression: parse_ast
     FunctionDef(
         StmtFunctionDef {
             range: 1..49,
+            decorator_list: [],
             name: Identifier {
                 id: "args_to_tuple",
                 range: 5..18,
             },
+            type_params: None,
             parameters: Parameters {
                 range: 18..30,
                 posonlyargs: [],
@@ -41,21 +43,6 @@ expression: parse_ast
                 kwonlyargs: [],
                 kwarg: None,
             },
-            body: [
-                Expr(
-                    StmtExpr {
-                        range: 46..49,
-                        value: Constant(
-                            ExprConstant {
-                                range: 46..49,
-                                value: Ellipsis,
-                                kind: None,
-                            },
-                        ),
-                    },
-                ),
-            ],
-            decorator_list: [],
             returns: Some(
                 Subscript(
                     ExprSubscript {
@@ -84,7 +71,20 @@ expression: parse_ast
                     },
                 ),
             ),
-            type_params: [],
+            body: [
+                Expr(
+                    StmtExpr {
+                        range: 46..49,
+                        value: Constant(
+                            ExprConstant {
+                                range: 46..49,
+                                value: Ellipsis,
+                                kind: None,
+                            },
+                        ),
+                    },
+                ),
+            ],
         },
     ),
 ]

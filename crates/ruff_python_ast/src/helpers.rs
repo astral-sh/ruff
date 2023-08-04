@@ -1,16 +1,17 @@
 use std::borrow::Cow;
 use std::path::Path;
 
-use crate::{
-    self as ast, Constant, ExceptHandler, Expr, Keyword, MatchCase, Parameters, Pattern, Ranged,
-    Stmt, TypeParam,
-};
 use num_traits::Zero;
-use ruff_text_size::TextRange;
 use smallvec::SmallVec;
+
+use ruff_text_size::TextRange;
 
 use crate::call_path::CallPath;
 use crate::statement_visitor::{walk_body, walk_stmt, StatementVisitor};
+use crate::{
+    self as ast, Arguments, Constant, ExceptHandler, Expr, MatchCase, Pattern, Ranged, Stmt,
+    TypeParam,
+};
 
 /// Return `true` if the `Stmt` is a compound statement (as opposed to a simple statement).
 pub const fn is_compound_statement(stmt: &Stmt) -> bool {
@@ -50,9 +51,8 @@ where
         // Accept empty initializers.
         if let Expr::Call(ast::ExprCall {
             func,
-            args,
-            keywords,
-            range: _range,
+            arguments: Arguments { args, keywords, .. },
+            range: _,
         }) = expr
         {
             // Ex) `list()`
@@ -126,18 +126,15 @@ where
     }
     match expr {
         Expr::BoolOp(ast::ExprBoolOp {
-            values,
-            range: _range,
-            ..
+            values, range: _, ..
         })
-        | Expr::JoinedStr(ast::ExprJoinedStr {
-            values,
-            range: _range,
-        }) => values.iter().any(|expr| any_over_expr(expr, func)),
+        | Expr::JoinedStr(ast::ExprJoinedStr { values, range: _ }) => {
+            values.iter().any(|expr| any_over_expr(expr, func))
+        }
         Expr::NamedExpr(ast::ExprNamedExpr {
             target,
             value,
-            range: _range,
+            range: _,
         }) => any_over_expr(target, func) || any_over_expr(value, func),
         Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
             any_over_expr(left, func) || any_over_expr(right, func)
@@ -148,44 +145,35 @@ where
             test,
             body,
             orelse,
-            range: _range,
+            range: _,
         }) => any_over_expr(test, func) || any_over_expr(body, func) || any_over_expr(orelse, func),
         Expr::Dict(ast::ExprDict {
             keys,
             values,
-            range: _range,
+            range: _,
         }) => values
             .iter()
             .chain(keys.iter().flatten())
             .any(|expr| any_over_expr(expr, func)),
-        Expr::Set(ast::ExprSet {
-            elts,
-            range: _range,
-        })
-        | Expr::List(ast::ExprList {
-            elts,
-            range: _range,
-            ..
-        })
-        | Expr::Tuple(ast::ExprTuple {
-            elts,
-            range: _range,
-            ..
-        }) => elts.iter().any(|expr| any_over_expr(expr, func)),
+        Expr::Set(ast::ExprSet { elts, range: _ })
+        | Expr::List(ast::ExprList { elts, range: _, .. })
+        | Expr::Tuple(ast::ExprTuple { elts, range: _, .. }) => {
+            elts.iter().any(|expr| any_over_expr(expr, func))
+        }
         Expr::ListComp(ast::ExprListComp {
             elt,
             generators,
-            range: _range,
+            range: _,
         })
         | Expr::SetComp(ast::ExprSetComp {
             elt,
             generators,
-            range: _range,
+            range: _,
         })
         | Expr::GeneratorExp(ast::ExprGeneratorExp {
             elt,
             generators,
-            range: _range,
+            range: _,
         }) => {
             any_over_expr(elt, func)
                 || generators.iter().any(|generator| {
@@ -198,7 +186,7 @@ where
             key,
             value,
             generators,
-            range: _range,
+            range: _,
         }) => {
             any_over_expr(key, func)
                 || any_over_expr(value, func)
@@ -208,28 +196,15 @@ where
                         || generator.ifs.iter().any(|expr| any_over_expr(expr, func))
                 })
         }
-        Expr::Await(ast::ExprAwait {
-            value,
-            range: _range,
-        })
-        | Expr::YieldFrom(ast::ExprYieldFrom {
-            value,
-            range: _range,
-        })
+        Expr::Await(ast::ExprAwait { value, range: _ })
+        | Expr::YieldFrom(ast::ExprYieldFrom { value, range: _ })
         | Expr::Attribute(ast::ExprAttribute {
-            value,
-            range: _range,
-            ..
+            value, range: _, ..
         })
         | Expr::Starred(ast::ExprStarred {
-            value,
-            range: _range,
-            ..
+            value, range: _, ..
         }) => any_over_expr(value, func),
-        Expr::Yield(ast::ExprYield {
-            value,
-            range: _range,
-        }) => value
+        Expr::Yield(ast::ExprYield { value, range: _ }) => value
             .as_ref()
             .is_some_and(|value| any_over_expr(value, func)),
         Expr::Compare(ast::ExprCompare {
@@ -237,9 +212,8 @@ where
         }) => any_over_expr(left, func) || comparators.iter().any(|expr| any_over_expr(expr, func)),
         Expr::Call(ast::ExprCall {
             func: call_func,
-            args,
-            keywords,
-            range: _range,
+            arguments: Arguments { args, keywords, .. },
+            range: _,
         }) => {
             any_over_expr(call_func, func)
                 || args.iter().any(|expr| any_over_expr(expr, func))
@@ -262,7 +236,7 @@ where
             lower,
             upper,
             step,
-            range: _range,
+            range: _,
         }) => {
             lower
                 .as_ref()
@@ -297,15 +271,11 @@ where
     F: Fn(&Expr) -> bool,
 {
     match pattern {
-        Pattern::MatchValue(ast::PatternMatchValue {
-            value,
-            range: _range,
-        }) => any_over_expr(value, func),
+        Pattern::MatchValue(ast::PatternMatchValue { value, range: _ }) => {
+            any_over_expr(value, func)
+        }
         Pattern::MatchSingleton(_) => false,
-        Pattern::MatchSequence(ast::PatternMatchSequence {
-            patterns,
-            range: _range,
-        }) => patterns
+        Pattern::MatchSequence(ast::PatternMatchSequence { patterns, range: _ }) => patterns
             .iter()
             .any(|pattern| any_over_pattern(pattern, func)),
         Pattern::MatchMapping(ast::PatternMatchMapping { keys, patterns, .. }) => {
@@ -332,10 +302,7 @@ where
         Pattern::MatchAs(ast::PatternMatchAs { pattern, .. }) => pattern
             .as_ref()
             .is_some_and(|pattern| any_over_pattern(pattern, func)),
-        Pattern::MatchOr(ast::PatternMatchOr {
-            patterns,
-            range: _range,
-        }) => patterns
+        Pattern::MatchOr(ast::PatternMatchOr { patterns, range: _ }) => patterns
             .iter()
             .any(|pattern| any_over_pattern(pattern, func)),
     }
@@ -348,6 +315,7 @@ where
     match stmt {
         Stmt::FunctionDef(ast::StmtFunctionDef {
             parameters,
+            type_params,
             body,
             decorator_list,
             returns,
@@ -355,6 +323,7 @@ where
         })
         | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
             parameters,
+            type_params,
             body,
             decorator_list,
             returns,
@@ -387,6 +356,11 @@ where
                         .as_ref()
                         .is_some_and(|expr| any_over_expr(expr, func))
                 })
+                || type_params.as_ref().is_some_and(|type_params| {
+                    type_params
+                        .iter()
+                        .any(|type_param| any_over_type_param(type_param, func))
+                })
                 || body.iter().any(|stmt| any_over_stmt(stmt, func))
                 || decorator_list
                     .iter()
@@ -396,31 +370,36 @@ where
                     .is_some_and(|value| any_over_expr(value, func))
         }
         Stmt::ClassDef(ast::StmtClassDef {
-            bases,
-            keywords,
+            arguments,
+            type_params,
             body,
             decorator_list,
             ..
         }) => {
-            bases.iter().any(|expr| any_over_expr(expr, func))
-                || keywords
-                    .iter()
-                    .any(|keyword| any_over_expr(&keyword.value, func))
+            arguments
+                .as_deref()
+                .is_some_and(|Arguments { args, keywords, .. }| {
+                    args.iter().any(|expr| any_over_expr(expr, func))
+                        || keywords
+                            .iter()
+                            .any(|keyword| any_over_expr(&keyword.value, func))
+                })
+                || type_params.as_ref().is_some_and(|type_params| {
+                    type_params
+                        .iter()
+                        .any(|type_param| any_over_type_param(type_param, func))
+                })
                 || body.iter().any(|stmt| any_over_stmt(stmt, func))
                 || decorator_list
                     .iter()
                     .any(|decorator| any_over_expr(&decorator.expression, func))
         }
-        Stmt::Return(ast::StmtReturn {
-            value,
-            range: _range,
-        }) => value
+        Stmt::Return(ast::StmtReturn { value, range: _ }) => value
             .as_ref()
             .is_some_and(|value| any_over_expr(value, func)),
-        Stmt::Delete(ast::StmtDelete {
-            targets,
-            range: _range,
-        }) => targets.iter().any(|expr| any_over_expr(expr, func)),
+        Stmt::Delete(ast::StmtDelete { targets, range: _ }) => {
+            targets.iter().any(|expr| any_over_expr(expr, func))
+        }
         Stmt::TypeAlias(ast::StmtTypeAlias {
             name,
             type_params,
@@ -428,9 +407,11 @@ where
             ..
         }) => {
             any_over_expr(name, func)
-                || type_params
-                    .iter()
-                    .any(|type_param| any_over_type_param(type_param, func))
+                || type_params.as_ref().is_some_and(|type_params| {
+                    type_params
+                        .iter()
+                        .any(|type_param| any_over_type_param(type_param, func))
+                })
                 || any_over_expr(value, func)
         }
         Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
@@ -474,13 +455,13 @@ where
             test,
             body,
             orelse,
-            range: _range,
+            range: _,
         }) => any_over_expr(test, func) || any_over_body(body, func) || any_over_body(orelse, func),
         Stmt::If(ast::StmtIf {
             test,
             body,
             elif_else_clauses,
-            range: _range,
+            range: _,
         }) => {
             any_over_expr(test, func)
                 || any_over_body(body, func)
@@ -505,7 +486,7 @@ where
         Stmt::Raise(ast::StmtRaise {
             exc,
             cause,
-            range: _range,
+            range: _,
         }) => {
             exc.as_ref().is_some_and(|value| any_over_expr(value, func))
                 || cause
@@ -517,14 +498,14 @@ where
             handlers,
             orelse,
             finalbody,
-            range: _range,
+            range: _,
         })
         | Stmt::TryStar(ast::StmtTryStar {
             body,
             handlers,
             orelse,
             finalbody,
-            range: _range,
+            range: _,
         }) => {
             any_over_body(body, func)
                 || handlers.iter().any(|handler| {
@@ -542,7 +523,7 @@ where
         Stmt::Assert(ast::StmtAssert {
             test,
             msg,
-            range: _range,
+            range: _,
         }) => {
             any_over_expr(test, func)
                 || msg.as_ref().is_some_and(|value| any_over_expr(value, func))
@@ -550,7 +531,7 @@ where
         Stmt::Match(ast::StmtMatch {
             subject,
             cases,
-            range: _range,
+            range: _,
         }) => {
             any_over_expr(subject, func)
                 || cases.iter().any(|case| {
@@ -558,7 +539,7 @@ where
                         pattern,
                         guard,
                         body,
-                        range: _range,
+                        range: _,
                     } = case;
                     any_over_pattern(pattern, func)
                         || guard.as_ref().is_some_and(|expr| any_over_expr(expr, func))
@@ -569,10 +550,7 @@ where
         Stmt::ImportFrom(_) => false,
         Stmt::Global(_) => false,
         Stmt::Nonlocal(_) => false,
-        Stmt::Expr(ast::StmtExpr {
-            value,
-            range: _range,
-        }) => any_over_expr(value, func),
+        Stmt::Expr(ast::StmtExpr { value, range: _ }) => any_over_expr(value, func),
         Stmt::Pass(_) | Stmt::Break(_) | Stmt::Continue(_) => false,
         Stmt::LineMagic(_) => false,
     }
@@ -638,15 +616,6 @@ pub fn is_constant_non_singleton(expr: &Expr) -> bool {
     is_constant(expr) && !is_singleton(expr)
 }
 
-/// Return the [`Keyword`] with the given name, if it's present in the list of
-/// [`Keyword`] arguments.
-pub fn find_keyword<'a>(keywords: &'a [Keyword], keyword_name: &str) -> Option<&'a Keyword> {
-    keywords.iter().find(|keyword| {
-        let Keyword { arg, .. } = keyword;
-        arg.as_ref().is_some_and(|arg| arg == keyword_name)
-    })
-}
-
 /// Return `true` if an [`Expr`] is `None`.
 pub const fn is_const_none(expr: &Expr) -> bool {
     matches!(
@@ -683,14 +652,6 @@ pub const fn is_const_false(expr: &Expr) -> bool {
     )
 }
 
-/// Return `true` if a keyword argument is present with a non-`None` value.
-pub fn has_non_none_keyword(keywords: &[Keyword], keyword: &str) -> bool {
-    find_keyword(keywords, keyword).is_some_and(|keyword| {
-        let Keyword { value, .. } = keyword;
-        !is_const_none(value)
-    })
-}
-
 /// Extract the names of all handled exceptions.
 pub fn extract_handled_exceptions(handlers: &[ExceptHandler]) -> Vec<&Expr> {
     let mut handled_exceptions = Vec::new();
@@ -710,30 +671,6 @@ pub fn extract_handled_exceptions(handlers: &[ExceptHandler]) -> Vec<&Expr> {
         }
     }
     handled_exceptions
-}
-
-/// Returns `true` if the given name is included in the given [`Parameters`].
-pub fn includes_arg_name(name: &str, parameters: &Parameters) -> bool {
-    if parameters
-        .posonlyargs
-        .iter()
-        .chain(&parameters.args)
-        .chain(&parameters.kwonlyargs)
-        .any(|arg| arg.parameter.name.as_str() == name)
-    {
-        return true;
-    }
-    if let Some(arg) = &parameters.vararg {
-        if arg.name.as_str() == name {
-            return true;
-        }
-    }
-    if let Some(arg) = &parameters.kwarg {
-        if arg.name.as_str() == name {
-            return true;
-        }
-    }
-    false
 }
 
 /// Given an [`Expr`] that can be callable or not (like a decorator, which could
@@ -959,7 +896,7 @@ where
             Stmt::Raise(ast::StmtRaise {
                 exc,
                 cause,
-                range: _range,
+                range: _,
             }) => {
                 self.raises
                     .push((stmt.range(), exc.as_deref(), cause.as_deref()));
@@ -998,11 +935,7 @@ where
 
 /// Return `true` if a `Stmt` is a docstring.
 pub fn is_docstring_stmt(stmt: &Stmt) -> bool {
-    if let Stmt::Expr(ast::StmtExpr {
-        value,
-        range: _range,
-    }) = stmt
-    {
+    if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = stmt {
         matches!(
             value.as_ref(),
             Expr::Constant(ast::ExprConstant {
@@ -1015,75 +948,13 @@ pub fn is_docstring_stmt(stmt: &Stmt) -> bool {
     }
 }
 
-/// A representation of a function call's positional and keyword arguments that ignores
-/// starred expressions.
-#[derive(Default)]
-pub struct CallArguments<'a> {
-    args: &'a [Expr],
-    keywords: &'a [Keyword],
-}
-
-impl<'a> CallArguments<'a> {
-    pub fn new(args: &'a [Expr], keywords: &'a [Keyword]) -> Self {
-        Self { args, keywords }
-    }
-
-    /// Get the argument with the given name or position, or `None` if no such
-    /// argument exists.
-    pub fn argument(&self, name: &str, position: usize) -> Option<&'a Expr> {
-        self.keywords
-            .iter()
-            .find(|keyword| {
-                let Keyword { arg, .. } = keyword;
-                arg.as_ref().is_some_and(|arg| arg == name)
-            })
-            .map(|keyword| &keyword.value)
-            .or_else(|| {
-                self.args
-                    .iter()
-                    .take_while(|expr| !expr.is_starred_expr())
-                    .nth(position)
-            })
-    }
-
-    /// Return the number of arguments.
-    pub fn len(&self) -> usize {
-        self.args.len() + self.keywords.len()
-    }
-
-    /// Return `true` if there are no arguments.
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    /// Return the number of positional arguments.
-    pub fn num_args(&self) -> usize {
-        self.args
-            .iter()
-            .take_while(|expr| !expr.is_starred_expr())
-            .count()
-    }
-
-    /// Return the number of keyword arguments.
-    pub fn num_kwargs(&self) -> usize {
-        self.keywords
-            .iter()
-            .filter(|keyword| keyword.arg.is_some())
-            .count()
-    }
-}
-
 /// Check if a node is part of a conditional branch.
 pub fn on_conditional_branch<'a>(parents: &mut impl Iterator<Item = &'a Stmt>) -> bool {
     parents.any(|parent| {
         if matches!(parent, Stmt::If(_) | Stmt::While(_) | Stmt::Match(_)) {
             return true;
         }
-        if let Stmt::Expr(ast::StmtExpr {
-            value,
-            range: _range,
-        }) = parent
-        {
+        if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = parent {
             if value.is_if_exp_expr() {
                 return true;
             }
@@ -1208,10 +1079,7 @@ impl Truthiness {
                 Constant::Complex { real, imag } => Some(*real != 0.0 || *imag != 0.0),
                 Constant::Ellipsis => Some(true),
             },
-            Expr::JoinedStr(ast::ExprJoinedStr {
-                values,
-                range: _range,
-            }) => {
+            Expr::JoinedStr(ast::ExprJoinedStr { values, range: _ }) => {
                 if values.is_empty() {
                     Some(false)
                 } else if values.iter().any(|value| {
@@ -1229,30 +1097,14 @@ impl Truthiness {
                     None
                 }
             }
-            Expr::List(ast::ExprList {
-                elts,
-                range: _range,
-                ..
-            })
-            | Expr::Set(ast::ExprSet {
-                elts,
-                range: _range,
-            })
-            | Expr::Tuple(ast::ExprTuple {
-                elts,
-                range: _range,
-                ..
-            }) => Some(!elts.is_empty()),
-            Expr::Dict(ast::ExprDict {
-                keys,
-                range: _range,
-                ..
-            }) => Some(!keys.is_empty()),
+            Expr::List(ast::ExprList { elts, .. })
+            | Expr::Set(ast::ExprSet { elts, .. })
+            | Expr::Tuple(ast::ExprTuple { elts, .. }) => Some(!elts.is_empty()),
+            Expr::Dict(ast::ExprDict { keys, .. }) => Some(!keys.is_empty()),
             Expr::Call(ast::ExprCall {
                 func,
-                args,
-                keywords,
-                range: _range,
+                arguments: Arguments { args, keywords, .. },
+                ..
             }) => {
                 if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                     if is_iterable_initializer(id.as_str(), |id| is_builtin(id)) {
@@ -1284,13 +1136,13 @@ mod tests {
     use std::cell::RefCell;
     use std::vec;
 
-    use crate::{
-        Constant, Expr, ExprConstant, ExprContext, ExprName, Identifier, Stmt, StmtTypeAlias,
-        TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
-    };
     use ruff_text_size::TextRange;
 
     use crate::helpers::{any_over_stmt, any_over_type_param, resolve_imported_module_path};
+    use crate::{
+        Constant, Expr, ExprConstant, ExprContext, ExprName, Identifier, Stmt, StmtTypeAlias,
+        TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, TypeParams,
+    };
 
     #[test]
     fn resolve_import() {
@@ -1364,7 +1216,10 @@ mod tests {
         });
         let type_alias = Stmt::TypeAlias(StmtTypeAlias {
             name: Box::new(name.clone()),
-            type_params: vec![type_var_one, type_var_two],
+            type_params: Some(TypeParams {
+                type_params: vec![type_var_one, type_var_two],
+                range: TextRange::default(),
+            }),
             value: Box::new(constant_three.clone()),
             range: TextRange::default(),
         });

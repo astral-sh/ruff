@@ -25,3 +25,9 @@ len(
      # trailing
     )
 )
+
+len(
+    # leading
+    a for b in c
+    # trailing
+)

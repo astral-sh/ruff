@@ -248,14 +248,12 @@ f4 = (  # end-of-line
 )  # trailing
 
 # Comments in other tuples
-g1 = (
-    # a
+g1 = (  # a
     # b
     1,  # c
     # d
 )  # e
-g2 = (
-    # a
+g2 = (  # a
     # b
     1,  # c
     # d

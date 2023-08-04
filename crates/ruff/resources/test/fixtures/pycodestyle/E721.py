@@ -58,3 +58,6 @@ assert type(res) == type(None)
 types = StrEnum
 if x == types.X:
     pass
+
+#: E721
+assert type(res) is int

@@ -1,12 +1,11 @@
-use ruff_python_ast::{self as ast, Constant, Expr, Keyword, Ranged};
-use ruff_python_parser::{lexer, Tok};
-use ruff_text_size::TextRange;
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Keyword, Ranged};
+use ruff_python_parser::{lexer, Tok};
 use ruff_source_file::Locator;
+use ruff_text_size::TextRange;
 
-use crate::autofix::edits::remove_argument;
+use crate::autofix::edits::{remove_argument, Parentheses};
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 use crate::source_kind::PySourceType;
@@ -96,23 +95,21 @@ enum EncodingArg<'a> {
 
 /// Return the encoding argument to an `encode` call, if it can be determined to be a
 /// UTF-8-equivalent encoding.
-fn match_encoding_arg<'a>(args: &'a [Expr], kwargs: &'a [Keyword]) -> Option<EncodingArg<'a>> {
-    match (args.len(), kwargs.len()) {
+fn match_encoding_arg(arguments: &Arguments) -> Option<EncodingArg> {
+    match (arguments.args.as_slice(), arguments.keywords.as_slice()) {
         // Ex `"".encode()`
-        (0, 0) => return Some(EncodingArg::Empty),
+        ([], []) => return Some(EncodingArg::Empty),
         // Ex `"".encode(encoding)`
-        (1, 0) => {
-            let arg = &args[0];
+        ([arg], []) => {
             if is_utf8_encoding_arg(arg) {
                 return Some(EncodingArg::Positional(arg));
             }
         }
         // Ex `"".encode(kwarg=kwarg)`
-        (0, 1) => {
-            let kwarg = &kwargs[0];
-            if kwarg.arg.as_ref().is_some_and(|arg| arg == "encoding") {
-                if is_utf8_encoding_arg(&kwarg.value) {
-                    return Some(EncodingArg::Keyword(kwarg));
+        ([], [keyword]) => {
+            if keyword.arg.as_ref().is_some_and(|arg| arg == "encoding") {
+                if is_utf8_encoding_arg(&keyword.value) {
+                    return Some(EncodingArg::Keyword(keyword));
                 }
             }
         }
@@ -123,7 +120,11 @@ fn match_encoding_arg<'a>(args: &'a [Expr], kwargs: &'a [Keyword]) -> Option<Enc
 }
 
 /// Return a [`Fix`] replacing the call to encode with a byte string.
-fn replace_with_bytes_literal(locator: &Locator, expr: &Expr, source_type: PySourceType) -> Fix {
+fn replace_with_bytes_literal<T: Ranged>(
+    locator: &Locator,
+    expr: &T,
+    source_type: PySourceType,
+) -> Fix {
     // Build up a replacement string by prefixing all string tokens with `b`.
     let contents = locator.slice(expr.range());
     let mut replacement = String::with_capacity(contents.len() + 1);
@@ -152,14 +153,8 @@ fn replace_with_bytes_literal(locator: &Locator, expr: &Expr, source_type: PySou
 }
 
 /// UP012
-pub(crate) fn unnecessary_encode_utf8(
-    checker: &mut Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-    kwargs: &[Keyword],
-) {
-    let Some(variable) = match_encoded_variable(func) else {
+pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCall) {
+    let Some(variable) = match_encoded_variable(&call.func) else {
         return;
     };
     match variable {
@@ -168,19 +163,19 @@ pub(crate) fn unnecessary_encode_utf8(
             ..
         }) => {
             // Ex) `"str".encode()`, `"str".encode("utf-8")`
-            if let Some(encoding_arg) = match_encoding_arg(args, kwargs) {
+            if let Some(encoding_arg) = match_encoding_arg(&call.arguments) {
                 if literal.is_ascii() {
                     // Ex) Convert `"foo".encode()` to `b"foo"`.
                     let mut diagnostic = Diagnostic::new(
                         UnnecessaryEncodeUTF8 {
                             reason: Reason::BytesLiteral,
                         },
-                        expr.range(),
+                        call.range(),
                     );
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
                         diagnostic.set_fix(replace_with_bytes_literal(
                             checker.locator(),
-                            expr,
+                            call,
                             checker.source_type,
                         ));
                     }
@@ -192,17 +187,15 @@ pub(crate) fn unnecessary_encode_utf8(
                         UnnecessaryEncodeUTF8 {
                             reason: Reason::DefaultArgument,
                         },
-                        expr.range(),
+                        call.range(),
                     );
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
                         diagnostic.try_set_fix(|| {
                             remove_argument(
+                                kwarg,
+                                &call.arguments,
+                                Parentheses::Preserve,
                                 checker.locator(),
-                                func.end(),
-                                kwarg.range(),
-                                args,
-                                kwargs,
-                                false,
                                 checker.source_type,
                             )
                             .map(Fix::automatic)
@@ -215,17 +208,15 @@ pub(crate) fn unnecessary_encode_utf8(
                         UnnecessaryEncodeUTF8 {
                             reason: Reason::DefaultArgument,
                         },
-                        expr.range(),
+                        call.range(),
                     );
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
                         diagnostic.try_set_fix(|| {
                             remove_argument(
+                                arg,
+                                &call.arguments,
+                                Parentheses::Preserve,
                                 checker.locator(),
-                                func.end(),
-                                arg.range(),
-                                args,
-                                kwargs,
-                                false,
                                 checker.source_type,
                             )
                             .map(Fix::automatic)
@@ -237,7 +228,7 @@ pub(crate) fn unnecessary_encode_utf8(
         }
         // Ex) `f"foo{bar}".encode("utf-8")`
         Expr::JoinedStr(_) => {
-            if let Some(encoding_arg) = match_encoding_arg(args, kwargs) {
+            if let Some(encoding_arg) = match_encoding_arg(&call.arguments) {
                 if let EncodingArg::Keyword(kwarg) = encoding_arg {
                     // Ex) Convert `f"unicode text©".encode(encoding="utf-8")` to
                     // `f"unicode text©".encode()`.
@@ -245,17 +236,15 @@ pub(crate) fn unnecessary_encode_utf8(
                         UnnecessaryEncodeUTF8 {
                             reason: Reason::DefaultArgument,
                         },
-                        expr.range(),
+                        call.range(),
                     );
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
                         diagnostic.try_set_fix(|| {
                             remove_argument(
+                                kwarg,
+                                &call.arguments,
+                                Parentheses::Preserve,
                                 checker.locator(),
-                                func.end(),
-                                kwarg.range(),
-                                args,
-                                kwargs,
-                                false,
                                 checker.source_type,
                             )
                             .map(Fix::automatic)
@@ -268,17 +257,15 @@ pub(crate) fn unnecessary_encode_utf8(
                         UnnecessaryEncodeUTF8 {
                             reason: Reason::DefaultArgument,
                         },
-                        expr.range(),
+                        call.range(),
                     );
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
                         diagnostic.try_set_fix(|| {
                             remove_argument(
+                                arg,
+                                &call.arguments,
+                                Parentheses::Preserve,
                                 checker.locator(),
-                                func.end(),
-                                arg.range(),
-                                args,
-                                kwargs,
-                                false,
                                 checker.source_type,
                             )
                             .map(Fix::automatic)

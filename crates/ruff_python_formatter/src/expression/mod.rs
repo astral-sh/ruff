@@ -356,8 +356,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             Expr::Call(ast::ExprCall {
                 range: _,
                 func,
-                args: _,
-                keywords: _,
+                arguments: _,
             }) => {
                 self.any_parenthesized_expressions = true;
                 // Only walk the function, the arguments are always parenthesized

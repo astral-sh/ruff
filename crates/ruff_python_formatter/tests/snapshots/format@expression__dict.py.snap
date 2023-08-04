@@ -70,8 +70,7 @@ x={  # dangling end of line comment
 ## Output
 ```py
 # before
-{
-    # open
+{  # open
     key: value  # key  # colon  # value
 }  # close
 # after
@@ -130,8 +129,7 @@ a = {
     3: True,
 }
 
-x = {  # dangling end of line comment
-}
+x = {}  # dangling end of line comment
 ```
 
 

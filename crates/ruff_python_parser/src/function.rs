@@ -78,14 +78,18 @@ type FunctionArgument = (
 );
 
 // Parse arguments as supplied during a function/lambda *call*.
-pub(crate) fn parse_args(func_args: Vec<FunctionArgument>) -> Result<ArgumentList, LexicalError> {
+pub(crate) fn parse_arguments(
+    function_arguments: Vec<FunctionArgument>,
+) -> Result<ArgumentList, LexicalError> {
     let mut args = vec![];
     let mut keywords = vec![];
 
-    let mut keyword_names =
-        FxHashSet::with_capacity_and_hasher(func_args.len(), BuildHasherDefault::default());
+    let mut keyword_names = FxHashSet::with_capacity_and_hasher(
+        function_arguments.len(),
+        BuildHasherDefault::default(),
+    );
     let mut double_starred = false;
-    for (name, value) in func_args {
+    for (name, value) in function_arguments {
         if let Some((start, end, name)) = name {
             // Check for duplicate keyword arguments in the call.
             if let Some(keyword_name) = &name {

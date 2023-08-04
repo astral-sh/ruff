@@ -2,10 +2,7 @@ use std::cmp::Ordering;
 
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::{
-    self as ast, Comprehension, Expr, ExprAttribute, ExprBinOp, ExprIfExp, ExprSlice, ExprStarred,
-    MatchCase, Parameters, Ranged,
-};
+use ruff_python_ast::{self as ast, Comprehension, Expr, MatchCase, Parameters, Ranged};
 use ruff_python_trivia::{
     indentation_at_offset, PythonWhitespace, SimpleToken, SimpleTokenKind, SimpleTokenizer,
 };
@@ -23,28 +20,21 @@ pub(super) fn place_comment<'a>(
     comment: DecoratedComment<'a>,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    // Handle comments before and after bodies such as the different branches of an if statement
+    // Handle comments before and after bodies such as the different branches of an if statement.
     let comment = if comment.line_position().is_own_line() {
-        match handle_own_line_comment_after_body(comment, locator) {
-            CommentPlacement::Default(comment) => comment,
-            placement => {
-                return placement;
-            }
-        }
+        handle_own_line_comment_around_body(comment, locator)
     } else {
-        match handle_end_of_line_comment_around_body(comment, locator) {
-            CommentPlacement::Default(comment) => comment,
-            placement => {
-                return placement;
-            }
-        }
+        handle_end_of_line_comment_around_body(comment, locator)
     };
 
     // Change comment placement depending on the node type. These can be seen as node-specific
     // fixups.
-    match comment.enclosing_node() {
+    comment.then_with(|comment| match comment.enclosing_node() {
         AnyNodeRef::Parameters(arguments) => {
             handle_parameters_separator_comment(comment, arguments, locator)
+        }
+        AnyNodeRef::Arguments(_) | AnyNodeRef::TypeParams(_) => {
+            handle_bracketed_end_of_line_comment(comment, locator)
         }
         AnyNodeRef::Comprehension(comprehension) => {
             handle_comprehension_comment(comment, comprehension, locator)
@@ -57,9 +47,9 @@ pub(super) fn place_comment<'a>(
                 locator,
             )
         }
-        AnyNodeRef::ExprDict(_) | AnyNodeRef::Keyword(_) => {
-            handle_dict_unpacking_comment(comment, locator)
-        }
+        AnyNodeRef::Keyword(_) => handle_dict_unpacking_comment(comment, locator),
+        AnyNodeRef::ExprDict(_) => handle_dict_unpacking_comment(comment, locator)
+            .then_with(|comment| handle_bracketed_end_of_line_comment(comment, locator)),
         AnyNodeRef::ExprIfExp(expr_if) => handle_expr_if_comment(comment, expr_if, locator),
         AnyNodeRef::ExprSlice(expr_slice) => handle_slice_comments(comment, expr_slice, locator),
         AnyNodeRef::ExprStarred(starred) => {
@@ -80,9 +70,19 @@ pub(super) fn place_comment<'a>(
         AnyNodeRef::StmtFunctionDef(_) | AnyNodeRef::StmtAsyncFunctionDef(_) => {
             handle_leading_function_with_decorators_comment(comment)
         }
+        AnyNodeRef::StmtClassDef(class_def) => {
+            handle_leading_class_with_decorators_comment(comment, class_def)
+        }
         AnyNodeRef::StmtImportFrom(import_from) => handle_import_from_comment(comment, import_from),
+        AnyNodeRef::ExprList(_)
+        | AnyNodeRef::ExprSet(_)
+        | AnyNodeRef::ExprGeneratorExp(_)
+        | AnyNodeRef::ExprListComp(_)
+        | AnyNodeRef::ExprSetComp(_)
+        | AnyNodeRef::ExprDictComp(_)
+        | AnyNodeRef::ExprTuple(_) => handle_bracketed_end_of_line_comment(comment, locator),
         _ => CommentPlacement::Default(comment),
-    }
+    })
 }
 
 fn handle_end_of_line_comment_around_body<'a>(
@@ -217,7 +217,9 @@ fn is_first_statement_in_body(statement: AnyNodeRef, has_body: AnyNodeRef) -> bo
     }
 }
 
-/// Handles own line comments after a body, either at the end or between bodies.
+/// Handles own-line comments around a body (at the end of the body, at the end of the header
+/// preceding the body, or between bodies):
+///
 /// ```python
 /// for x in y:
 ///     pass
@@ -227,8 +229,14 @@ fn is_first_statement_in_body(statement: AnyNodeRef, has_body: AnyNodeRef) -> bo
 ///     print("I have no comments")
 ///     # This should be a trailing comment of the print
 /// # This is a trailing comment of the entire statement
+///
+/// if (
+///     True
+///     # This should be a trailing comment of `True` and not a leading comment of `pass`
+/// ):
+///     pass
 /// ```
-fn handle_own_line_comment_after_body<'a>(
+fn handle_own_line_comment_around_body<'a>(
     comment: DecoratedComment<'a>,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
@@ -260,16 +268,19 @@ fn handle_own_line_comment_after_body<'a>(
         return CommentPlacement::Default(comment);
     }
 
-    // Check if we're between bodies and should attach to the following body. If that is not the
-    // case, either because there is no following branch or because the indentation is too deep,
-    // attach to the recursively last statement in the preceding body with the matching indentation.
-    match handle_own_line_comment_between_branches(comment, preceding, locator) {
-        CommentPlacement::Default(comment) => {
-            // Knowing the comment is not between branches, handle comments after the last branch
+    // Check if we're between bodies and should attach to the following body.
+    handle_own_line_comment_between_branches(comment, preceding, locator)
+        .then_with(|comment| {
+            // Otherwise, there's no following branch or the indentation is too deep, so attach to the
+            // recursively last statement in the preceding body with the matching indentation.
             handle_own_line_comment_after_branch(comment, preceding, locator)
-        }
-        placement => placement,
-    }
+        })
+        .then_with(|comment| {
+            // If the following node is the first in its body, and there's a non-trivia token between the
+            // comment and the following node (like a parenthesis), then it means the comment is trailing
+            // the preceding node, not leading the following one.
+            handle_own_line_comment_in_clause(comment, preceding, locator)
+        })
 }
 
 /// Handles own line comments between two branches of a node.
@@ -367,6 +378,36 @@ fn handle_own_line_comment_between_branches<'a>(
             }
         }
     }
+}
+
+/// Handles own-line comments at the end of a clause, immediately preceding a body:
+/// ```python
+/// if (
+///     True
+///     # This should be a trailing comment of `True` and not a leading comment of `pass`
+/// ):
+///     pass
+/// ```
+fn handle_own_line_comment_in_clause<'a>(
+    comment: DecoratedComment<'a>,
+    preceding: AnyNodeRef<'a>,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    if let Some(following) = comment.following_node() {
+        if is_first_statement_in_body(following, comment.enclosing_node())
+            && SimpleTokenizer::new(
+                locator.contents(),
+                TextRange::new(comment.end(), following.start()),
+            )
+            .skip_trivia()
+            .next()
+            .is_some()
+        {
+            return CommentPlacement::trailing(preceding, comment);
+        }
+    }
+
+    CommentPlacement::Default(comment)
 }
 
 /// Handles leading comments in front of a match case or a trailing comment of the `match` statement.
@@ -596,7 +637,7 @@ fn handle_parameters_separator_comment<'a>(
 /// ```
 fn handle_trailing_binary_expression_left_or_operator_comment<'a>(
     comment: DecoratedComment<'a>,
-    binary_expression: &'a ExprBinOp,
+    binary_expression: &'a ast::ExprBinOp,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
     // Only if there's a preceding node (in which case, the preceding node is `left`).
@@ -760,10 +801,10 @@ fn handle_module_level_own_line_comment_before_class_or_function_comment<'a>(
 /// ```
 fn handle_slice_comments<'a>(
     comment: DecoratedComment<'a>,
-    expr_slice: &'a ExprSlice,
+    expr_slice: &'a ast::ExprSlice,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    let ExprSlice {
+    let ast::ExprSlice {
         range: _,
         lower,
         upper,
@@ -843,8 +884,34 @@ fn handle_leading_function_with_decorators_comment(comment: DecoratedComment) ->
     }
 }
 
+/// Handle comments between decorators and the decorated node.
+///
+/// For example, given:
+/// ```python
+/// @dataclass
+/// # comment
+/// class Foo(Bar):
+///     ...
+/// ```
+///
+/// The comment should be attached to the enclosing [`ast::StmtClassDef`] as a dangling node,
+/// as opposed to being treated as a leading comment on `Bar` or similar.
+fn handle_leading_class_with_decorators_comment<'a>(
+    comment: DecoratedComment<'a>,
+    class_def: &'a ast::StmtClassDef,
+) -> CommentPlacement<'a> {
+    if comment.start() < class_def.name.start() {
+        if let Some(decorator) = class_def.decorator_list.last() {
+            if decorator.end() < comment.start() {
+                return CommentPlacement::dangling(class_def, comment);
+            }
+        }
+    }
+    CommentPlacement::Default(comment)
+}
+
 /// Handles comments between `**` and the variable name in dict unpacking
-/// It attaches these to the appropriate value node
+/// It attaches these to the appropriate value node.
 ///
 /// ```python
 /// {
@@ -882,7 +949,7 @@ fn handle_dict_unpacking_comment<'a>(
 
     // if the remaining tokens from the previous node are exactly `**`,
     // re-assign the comment to the one that follows the stars
-    let mut count = 0;
+    let mut count = 0u32;
 
     // we start from the preceding node but we skip its token
     if let Some(token) = tokens.next() {
@@ -929,7 +996,7 @@ fn handle_dict_unpacking_comment<'a>(
 /// ```
 fn handle_attribute_comment<'a>(
     comment: DecoratedComment<'a>,
-    attribute: &'a ExprAttribute,
+    attribute: &'a ast::ExprAttribute,
 ) -> CommentPlacement<'a> {
     debug_assert!(
         comment.preceding_node().is_some(),
@@ -976,10 +1043,10 @@ fn handle_attribute_comment<'a>(
 /// happens if the comments are in a weird position but it also doesn't hurt handling it.
 fn handle_expr_if_comment<'a>(
     comment: DecoratedComment<'a>,
-    expr_if: &'a ExprIfExp,
+    expr_if: &'a ast::ExprIfExp,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    let ExprIfExp {
+    let ast::ExprIfExp {
         range: _,
         test,
         body,
@@ -1033,7 +1100,7 @@ fn handle_expr_if_comment<'a>(
 /// ```
 fn handle_trailing_expression_starred_star_end_of_line_comment<'a>(
     comment: DecoratedComment<'a>,
-    starred: &'a ExprStarred,
+    starred: &'a ast::ExprStarred,
 ) -> CommentPlacement<'a> {
     if comment.line_position().is_own_line() {
         return CommentPlacement::Default(comment);
@@ -1103,6 +1170,54 @@ fn find_only_token_in_range(
     let mut tokens = tokens.skip_while(|token| token.kind == SimpleTokenKind::LParen);
     debug_assert_eq!(tokens.next(), None);
     token
+}
+
+/// Attach an end-of-line comment immediately following an open bracket as a dangling comment on
+/// enclosing node.
+///
+/// For example, given  the following function call:
+/// ```python
+/// foo(  # comment
+///    bar,
+/// )
+/// ```
+///
+/// The comment will be attached to the [`Arguments`] node as a dangling comment, to ensure
+/// that it remains on the same line as open parenthesis.
+///
+/// Similarly, given:
+/// ```python
+/// type foo[  # comment
+///    bar,
+/// ] = ...
+/// ```
+///
+/// The comment will be attached to the [`TypeParams`] node as a dangling comment, to ensure
+/// that it remains on the same line as open bracket.
+fn handle_bracketed_end_of_line_comment<'a>(
+    comment: DecoratedComment<'a>,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    if comment.line_position().is_end_of_line() {
+        // Ensure that there are no tokens between the open bracket and the comment.
+        let mut lexer = SimpleTokenizer::new(
+            locator.contents(),
+            TextRange::new(comment.enclosing_node().start(), comment.start()),
+        )
+        .skip_trivia()
+        .skip_while(|t| {
+            matches!(
+                t.kind(),
+                SimpleTokenKind::LParen | SimpleTokenKind::LBrace | SimpleTokenKind::LBracket
+            )
+        });
+
+        if lexer.next().is_none() {
+            return CommentPlacement::dangling(comment.enclosing_node(), comment);
+        }
+    }
+
+    CommentPlacement::Default(comment)
 }
 
 /// Attach an enclosed end-of-line comment to a [`StmtImportFrom`].
@@ -1293,7 +1408,7 @@ fn last_child_in_body(node: AnyNodeRef) -> Option<AnyNodeRef> {
         | AnyNodeRef::StmtClassDef(ast::StmtClassDef { body, .. })
         | AnyNodeRef::StmtWith(ast::StmtWith { body, .. })
         | AnyNodeRef::StmtAsyncWith(ast::StmtAsyncWith { body, .. })
-        | AnyNodeRef::MatchCase(ast::MatchCase { body, .. })
+        | AnyNodeRef::MatchCase(MatchCase { body, .. })
         | AnyNodeRef::ExceptHandlerExceptHandler(ast::ExceptHandlerExceptHandler {
             body, ..
         })

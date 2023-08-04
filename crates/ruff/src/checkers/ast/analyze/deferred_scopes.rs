@@ -218,19 +218,17 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
             }
         }
 
-        if checker.source_type.is_stub() {
-            if checker.enabled(Rule::UnusedPrivateTypeVar) {
-                flake8_pyi::rules::unused_private_type_var(checker, scope, &mut diagnostics);
-            }
-            if checker.enabled(Rule::UnusedPrivateProtocol) {
-                flake8_pyi::rules::unused_private_protocol(checker, scope, &mut diagnostics);
-            }
-            if checker.enabled(Rule::UnusedPrivateTypeAlias) {
-                flake8_pyi::rules::unused_private_type_alias(checker, scope, &mut diagnostics);
-            }
-            if checker.enabled(Rule::UnusedPrivateTypedDict) {
-                flake8_pyi::rules::unused_private_typed_dict(checker, scope, &mut diagnostics);
-            }
+        if checker.enabled(Rule::UnusedPrivateTypeVar) {
+            flake8_pyi::rules::unused_private_type_var(checker, scope, &mut diagnostics);
+        }
+        if checker.enabled(Rule::UnusedPrivateProtocol) {
+            flake8_pyi::rules::unused_private_protocol(checker, scope, &mut diagnostics);
+        }
+        if checker.enabled(Rule::UnusedPrivateTypeAlias) {
+            flake8_pyi::rules::unused_private_type_alias(checker, scope, &mut diagnostics);
+        }
+        if checker.enabled(Rule::UnusedPrivateTypedDict) {
+            flake8_pyi::rules::unused_private_typed_dict(checker, scope, &mut diagnostics);
         }
 
         if matches!(

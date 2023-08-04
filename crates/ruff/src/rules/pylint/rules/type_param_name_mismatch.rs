@@ -1,9 +1,8 @@
 use std::fmt;
 
-use ruff_python_ast::{self as ast, Expr, Ranged};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Expr, Ranged};
 
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::type_param_name;
@@ -68,16 +67,13 @@ pub(crate) fn type_param_name_mismatch(checker: &mut Checker, value: &Expr, targ
     };
 
     let Expr::Call(ast::ExprCall {
-        func,
-        args,
-        keywords,
-        ..
+        func, arguments, ..
     }) = value
     else {
         return;
     };
 
-    let Some(param_name) = type_param_name(args, keywords) else {
+    let Some(param_name) = type_param_name(arguments) else {
         return;
     };
 

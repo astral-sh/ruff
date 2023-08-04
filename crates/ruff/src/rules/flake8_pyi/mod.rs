@@ -10,6 +10,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
+    use crate::settings::types::PythonVersion;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
@@ -101,11 +102,30 @@ mod tests {
     #[test_case(Rule::UnusedPrivateTypeAlias, Path::new("PYI047.pyi"))]
     #[test_case(Rule::UnusedPrivateTypedDict, Path::new("PYI049.py"))]
     #[test_case(Rule::UnusedPrivateTypedDict, Path::new("PYI049.pyi"))]
+    #[test_case(Rule::RedundantLiteralUnion, Path::new("PYI051.py"))]
+    #[test_case(Rule::RedundantLiteralUnion, Path::new("PYI051.pyi"))]
+    #[test_case(Rule::UnnecessaryTypeUnion, Path::new("PYI055.py"))]
+    #[test_case(Rule::UnnecessaryTypeUnion, Path::new("PYI055.pyi"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_pyi").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("PYI019.py"))]
+    #[test_case(Path::new("PYI019.pyi"))]
+    fn custom_type_var_return_type(path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", "PYI019", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_pyi").join(path).as_path(),
+            &settings::Settings {
+                target_version: PythonVersion::Py312,
+                ..settings::Settings::for_rules(vec![Rule::CustomTypeVarReturnType])
+            },
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

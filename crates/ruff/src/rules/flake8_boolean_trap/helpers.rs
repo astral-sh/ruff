@@ -28,6 +28,8 @@ pub(super) fn is_allowed_func_call(name: &str) -> bool {
             | "index"
             | "insert"
             | "int"
+            | "is_"
+            | "is_not"
             | "param"
             | "pop"
             | "remove"

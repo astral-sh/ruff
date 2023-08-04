@@ -1,10 +1,9 @@
 use std::fmt;
 
-use ruff_python_ast::{self as ast, Expr, Ranged};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{find_keyword, is_const_true};
+use ruff_python_ast::helpers::is_const_true;
+use ruff_python_ast::{self as ast, Expr, Ranged};
 
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::type_param_name;
@@ -66,22 +65,23 @@ impl Violation for TypeNameIncorrectVariance {
 /// PLC0105
 pub(crate) fn type_name_incorrect_variance(checker: &mut Checker, value: &Expr) {
     let Expr::Call(ast::ExprCall {
-        func,
-        args,
-        keywords,
-        ..
+        func, arguments, ..
     }) = value
     else {
         return;
     };
 
-    let Some(param_name) = type_param_name(args, keywords) else {
+    let Some(param_name) = type_param_name(arguments) else {
         return;
     };
 
-    let covariant = find_keyword(keywords, "covariant").map(|keyword| &keyword.value);
+    let covariant = arguments
+        .find_keyword("covariant")
+        .map(|keyword| &keyword.value);
 
-    let contravariant = find_keyword(keywords, "contravariant").map(|keyword| &keyword.value);
+    let contravariant = arguments
+        .find_keyword("contravariant")
+        .map(|keyword| &keyword.value);
 
     if !mismatch(param_name, covariant, contravariant) {
         return;

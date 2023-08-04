@@ -2617,6 +2617,38 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::Comprehension {
     }
 }
 
+impl FormatRule<ast::Arguments, PyFormatContext<'_>> for crate::other::arguments::FormatArguments {
+    #[inline]
+    fn fmt(
+        &self,
+        node: &ast::Arguments,
+        f: &mut Formatter<PyFormatContext<'_>>,
+    ) -> FormatResult<()> {
+        FormatNodeRule::<ast::Arguments>::fmt(self, node, f)
+    }
+}
+impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::Arguments {
+    type Format<'a> = FormatRefWithRule<
+        'a,
+        ast::Arguments,
+        crate::other::arguments::FormatArguments,
+        PyFormatContext<'ast>,
+    >;
+    fn format(&self) -> Self::Format<'_> {
+        FormatRefWithRule::new(self, crate::other::arguments::FormatArguments::default())
+    }
+}
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::Arguments {
+    type Format = FormatOwnedWithRule<
+        ast::Arguments,
+        crate::other::arguments::FormatArguments,
+        PyFormatContext<'ast>,
+    >;
+    fn into_format(self) -> Self::Format {
+        FormatOwnedWithRule::new(self, crate::other::arguments::FormatArguments::default())
+    }
+}
+
 impl FormatRule<ast::Parameters, PyFormatContext<'_>>
     for crate::other::parameters::FormatParameters
 {
@@ -2904,6 +2936,166 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ElifElseClause {
         FormatOwnedWithRule::new(
             self,
             crate::other::elif_else_clause::FormatElifElseClause::default(),
+        )
+    }
+}
+
+impl FormatRule<ast::TypeParams, PyFormatContext<'_>>
+    for crate::type_param::type_params::FormatTypeParams
+{
+    #[inline]
+    fn fmt(
+        &self,
+        node: &ast::TypeParams,
+        f: &mut Formatter<PyFormatContext<'_>>,
+    ) -> FormatResult<()> {
+        FormatNodeRule::<ast::TypeParams>::fmt(self, node, f)
+    }
+}
+impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::TypeParams {
+    type Format<'a> = FormatRefWithRule<
+        'a,
+        ast::TypeParams,
+        crate::type_param::type_params::FormatTypeParams,
+        PyFormatContext<'ast>,
+    >;
+    fn format(&self) -> Self::Format<'_> {
+        FormatRefWithRule::new(
+            self,
+            crate::type_param::type_params::FormatTypeParams::default(),
+        )
+    }
+}
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::TypeParams {
+    type Format = FormatOwnedWithRule<
+        ast::TypeParams,
+        crate::type_param::type_params::FormatTypeParams,
+        PyFormatContext<'ast>,
+    >;
+    fn into_format(self) -> Self::Format {
+        FormatOwnedWithRule::new(
+            self,
+            crate::type_param::type_params::FormatTypeParams::default(),
+        )
+    }
+}
+
+impl FormatRule<ast::TypeParamTypeVar, PyFormatContext<'_>>
+    for crate::type_param::type_param_type_var::FormatTypeParamTypeVar
+{
+    #[inline]
+    fn fmt(
+        &self,
+        node: &ast::TypeParamTypeVar,
+        f: &mut Formatter<PyFormatContext<'_>>,
+    ) -> FormatResult<()> {
+        FormatNodeRule::<ast::TypeParamTypeVar>::fmt(self, node, f)
+    }
+}
+impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::TypeParamTypeVar {
+    type Format<'a> = FormatRefWithRule<
+        'a,
+        ast::TypeParamTypeVar,
+        crate::type_param::type_param_type_var::FormatTypeParamTypeVar,
+        PyFormatContext<'ast>,
+    >;
+    fn format(&self) -> Self::Format<'_> {
+        FormatRefWithRule::new(
+            self,
+            crate::type_param::type_param_type_var::FormatTypeParamTypeVar::default(),
+        )
+    }
+}
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::TypeParamTypeVar {
+    type Format = FormatOwnedWithRule<
+        ast::TypeParamTypeVar,
+        crate::type_param::type_param_type_var::FormatTypeParamTypeVar,
+        PyFormatContext<'ast>,
+    >;
+    fn into_format(self) -> Self::Format {
+        FormatOwnedWithRule::new(
+            self,
+            crate::type_param::type_param_type_var::FormatTypeParamTypeVar::default(),
+        )
+    }
+}
+
+impl FormatRule<ast::TypeParamTypeVarTuple, PyFormatContext<'_>>
+    for crate::type_param::type_param_type_var_tuple::FormatTypeParamTypeVarTuple
+{
+    #[inline]
+    fn fmt(
+        &self,
+        node: &ast::TypeParamTypeVarTuple,
+        f: &mut Formatter<PyFormatContext<'_>>,
+    ) -> FormatResult<()> {
+        FormatNodeRule::<ast::TypeParamTypeVarTuple>::fmt(self, node, f)
+    }
+}
+impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::TypeParamTypeVarTuple {
+    type Format<'a> = FormatRefWithRule<
+        'a,
+        ast::TypeParamTypeVarTuple,
+        crate::type_param::type_param_type_var_tuple::FormatTypeParamTypeVarTuple,
+        PyFormatContext<'ast>,
+    >;
+    fn format(&self) -> Self::Format<'_> {
+        FormatRefWithRule::new(
+            self,
+            crate::type_param::type_param_type_var_tuple::FormatTypeParamTypeVarTuple::default(),
+        )
+    }
+}
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::TypeParamTypeVarTuple {
+    type Format = FormatOwnedWithRule<
+        ast::TypeParamTypeVarTuple,
+        crate::type_param::type_param_type_var_tuple::FormatTypeParamTypeVarTuple,
+        PyFormatContext<'ast>,
+    >;
+    fn into_format(self) -> Self::Format {
+        FormatOwnedWithRule::new(
+            self,
+            crate::type_param::type_param_type_var_tuple::FormatTypeParamTypeVarTuple::default(),
+        )
+    }
+}
+
+impl FormatRule<ast::TypeParamParamSpec, PyFormatContext<'_>>
+    for crate::type_param::type_param_param_spec::FormatTypeParamParamSpec
+{
+    #[inline]
+    fn fmt(
+        &self,
+        node: &ast::TypeParamParamSpec,
+        f: &mut Formatter<PyFormatContext<'_>>,
+    ) -> FormatResult<()> {
+        FormatNodeRule::<ast::TypeParamParamSpec>::fmt(self, node, f)
+    }
+}
+impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::TypeParamParamSpec {
+    type Format<'a> = FormatRefWithRule<
+        'a,
+        ast::TypeParamParamSpec,
+        crate::type_param::type_param_param_spec::FormatTypeParamParamSpec,
+        PyFormatContext<'ast>,
+    >;
+    fn format(&self) -> Self::Format<'_> {
+        FormatRefWithRule::new(
+            self,
+            crate::type_param::type_param_param_spec::FormatTypeParamParamSpec::default(),
+        )
+    }
+}
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::TypeParamParamSpec {
+    type Format = FormatOwnedWithRule<
+        ast::TypeParamParamSpec,
+        crate::type_param::type_param_param_spec::FormatTypeParamParamSpec,
+        PyFormatContext<'ast>,
+    >;
+    fn into_format(self) -> Self::Format {
+        FormatOwnedWithRule::new(
+            self,
+            crate::type_param::type_param_param_spec::FormatTypeParamParamSpec::default(),
         )
     }
 }

@@ -1,20 +1,16 @@
 use std::fmt;
 
 use ruff_python_ast as ast;
-use ruff_python_ast::helpers::find_keyword;
-use ruff_python_ast::{CmpOp, Constant, Expr, Keyword};
-
+use ruff_python_ast::{Arguments, CmpOp, Constant, Expr};
 use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::{ScopeKind, SemanticModel};
 
 use crate::settings::Settings;
 
 /// Returns the value of the `name` parameter to, e.g., a `TypeVar` constructor.
-pub(super) fn type_param_name<'a>(args: &'a [Expr], keywords: &'a [Keyword]) -> Option<&'a str> {
+pub(super) fn type_param_name(arguments: &Arguments) -> Option<&str> {
     // Handle both `TypeVar("T")` and `TypeVar(name="T")`.
-    let name_param = find_keyword(keywords, "name")
-        .map(|keyword| &keyword.value)
-        .or_else(|| args.get(0))?;
+    let name_param = arguments.find_argument("name", 0)?;
     if let Expr::Constant(ast::ExprConstant {
         value: Constant::Str(name),
         ..

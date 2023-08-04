@@ -81,7 +81,7 @@ fn process_documentation(documentation: &str, out: &mut String) {
     // a non-CommonMark-compliant Markdown parser, which doesn't support code
     // tags in link definitions
     // (see https://github.com/Python-Markdown/markdown/issues/280).
-    let documentation = Regex::new(r"\[`(.*?)`]($|[^\[])").unwrap().replace_all(
+    let documentation = Regex::new(r"\[`([^`]*?)`]($|[^\[])").unwrap().replace_all(
         documentation,
         |caps: &Captures| {
             format!(

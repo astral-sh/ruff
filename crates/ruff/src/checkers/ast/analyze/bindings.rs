@@ -56,13 +56,11 @@ pub(crate) fn bindings(checker: &mut Checker) {
                 checker.diagnostics.push(diagnostic);
             }
         }
-        if checker.source_type.is_stub() {
-            if checker.enabled(Rule::UnaliasedCollectionsAbcSetImport) {
-                if let Some(diagnostic) =
-                    flake8_pyi::rules::unaliased_collections_abc_set_import(checker, binding)
-                {
-                    checker.diagnostics.push(diagnostic);
-                }
+        if checker.enabled(Rule::UnaliasedCollectionsAbcSetImport) {
+            if let Some(diagnostic) =
+                flake8_pyi::rules::unaliased_collections_abc_set_import(checker, binding)
+            {
+                checker.diagnostics.push(diagnostic);
             }
         }
     }

@@ -64,8 +64,7 @@ where
             }
             Expr::Call(ast::ExprCall {
                 func,
-                args,
-                keywords,
+                arguments: ast::Arguments { args, keywords, .. },
                 ..
             }) => {
                 // Allow `tuple()`, `list()`, and their generic forms, like `list[int]()`.

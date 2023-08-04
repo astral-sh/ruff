@@ -3,6 +3,23 @@ use ruff_python_ast::{Ranged, Stmt};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
+/// ## What it does
+/// Checks for incorrect import of pytest.
+///
+/// ## Why is this bad?
+/// `pytest` should be imported as `import pytest` and its members should be accessed in the form of
+/// `pytest.xxx.yyy` for consistency and to make it easier for linting tools to analyze the code.
+///
+/// ## Example
+/// ```python
+/// import pytest as pt
+/// from pytest import fixture
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import pytest
+/// ```
 #[violation]
 pub struct PytestIncorrectPytestImport;
 
