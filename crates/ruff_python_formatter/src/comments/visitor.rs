@@ -658,6 +658,17 @@ impl<'a> CommentPlacement<'a> {
             comment: comment.into(),
         }
     }
+
+    /// Chains the placement with the given function.
+    ///
+    /// Returns `self` when the placement is non-[`CommentPlacement::Default`]. Otherwise, calls the
+    /// function with the comment and returns the result.
+    pub(super) fn then_with<F: FnOnce(DecoratedComment<'a>) -> Self>(self, f: F) -> Self {
+        match self {
+            Self::Default(comment) => f(comment),
+            _ => self,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
