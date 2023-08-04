@@ -20,16 +20,6 @@ E721.py:5:4: E721 Do not compare types, use `isinstance()`
 7 | #: E721
   |
 
-E721.py:10:4: E721 Do not compare types, use `isinstance()`
-   |
- 8 | import types
- 9 | 
-10 | if res == types.IntType:
-   |    ^^^^^^^^^^^^^^^^^^^^ E721
-11 |     pass
-12 | #: E721
-   |
-
 E721.py:15:4: E721 Do not compare types, use `isinstance()`
    |
 13 | import types
