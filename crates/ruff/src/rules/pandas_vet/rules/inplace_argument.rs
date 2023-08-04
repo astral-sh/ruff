@@ -135,7 +135,7 @@ fn convert_inplace_argument_to_assignment(
         &call.arguments,
         Parentheses::Preserve,
         locator,
-        checker.source_type,
+        source_type,
     )
     .ok()?;
 

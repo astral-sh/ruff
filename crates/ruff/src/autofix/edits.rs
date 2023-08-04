@@ -137,7 +137,7 @@ pub(crate) fn remove_argument<T: Ranged>(
             // previous comma to the end of the argument.
             for (tok, range) in lexer::lex_starts_at(
                 locator.slice(arguments.range()),
-                Mode::Module,
+                source_type.as_mode(),
                 arguments.start(),
             )
             .flatten()
