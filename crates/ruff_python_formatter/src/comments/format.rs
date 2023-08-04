@@ -152,12 +152,10 @@ impl Format<PyFormatContext<'_>> for FormatTrailingComments<'_> {
                 write!(
                     f,
                     [
-                        line_suffix(&format_with(|f| {
-                            write!(
-                                f,
-                                [empty_lines(lines_before_comment), format_comment(trailing)]
-                            )
-                        })),
+                        line_suffix(&format_args![
+                            empty_lines(lines_before_comment),
+                            format_comment(trailing)
+                        ]),
                         expand_parent()
                     ]
                 )?;
