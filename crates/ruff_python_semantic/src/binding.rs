@@ -11,8 +11,8 @@ use ruff_text_size::TextRange;
 
 use crate::context::ExecutionContext;
 use crate::model::SemanticModel;
-use crate::node::NodeId;
 use crate::reference::ResolvedReferenceId;
+use crate::statements::StatementId;
 use crate::ScopeId;
 
 #[derive(Debug, Clone)]
@@ -24,7 +24,7 @@ pub struct Binding<'a> {
     /// The context in which the [`Binding`] was created.
     pub context: ExecutionContext,
     /// The statement in which the [`Binding`] was defined.
-    pub source: Option<NodeId>,
+    pub source: Option<StatementId>,
     /// The references to the [`Binding`].
     pub references: Vec<ResolvedReferenceId>,
     /// The exceptions that were handled when the [`Binding`] was defined.
