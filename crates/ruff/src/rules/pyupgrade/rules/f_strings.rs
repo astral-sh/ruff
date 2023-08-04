@@ -318,11 +318,11 @@ pub(crate) fn f_strings(
         return;
     }
 
-    let Expr::Call(ast::ExprCall { func, .. }) = expr else {
+    let Expr::Call(ast::ExprCall { func, arguments, .. }) = expr else {
         return;
     };
 
-    let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
+    let Expr::Attribute(ast::ExprAttribute { value, .. }) = func.as_ref() else {
         return;
     };
 
@@ -433,7 +433,7 @@ pub(crate) fn f_strings(
         && !checker
             .indexer()
             .comment_ranges()
-            .intersects(TextRange::new(attr.end(), expr.end()))
+            .intersects(arguments.range())
     {
         diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
             contents,
