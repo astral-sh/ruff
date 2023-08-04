@@ -31,7 +31,7 @@ impl Ranged for KeyValuePair<'_> {
 }
 
 impl Format<PyFormatContext<'_>> for KeyValuePair<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         if let Some(key) = self.key {
             write!(
                 f,

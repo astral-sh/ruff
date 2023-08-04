@@ -255,7 +255,7 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Operator {
 }
 
 impl FormatRule<Operator, PyFormatContext<'_>> for FormatOperator {
-    fn fmt(&self, item: &Operator, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+    fn fmt(&self, item: &Operator, f: &mut PyFormatter) -> FormatResult<()> {
         let operator = match item {
             Operator::Add => "+",
             Operator::Sub => "-",

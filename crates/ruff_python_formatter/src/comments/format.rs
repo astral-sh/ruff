@@ -80,7 +80,7 @@ pub(crate) struct FormatLeadingAlternateBranchComments<'a> {
 }
 
 impl Format<PyFormatContext<'_>> for FormatLeadingAlternateBranchComments<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         if let Some(first_leading) = self.comments.first() {
             // Leading comments only preserves the lines after the comment but not before.
             // Insert the necessary lines.
@@ -121,7 +121,7 @@ pub(crate) enum FormatTrailingComments<'a> {
 }
 
 impl Format<PyFormatContext<'_>> for FormatTrailingComments<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let comments = f.context().comments().clone();
 
         let trailing_comments = match self {
@@ -243,7 +243,7 @@ struct FormatComment<'a> {
 }
 
 impl Format<PyFormatContext<'_>> for FormatComment<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let slice = self.comment.slice();
         let comment_text = slice.text(SourceCode::new(f.context().source()));
 

@@ -31,6 +31,7 @@ pub(crate) mod expr_generator_exp;
 pub(crate) mod expr_if_exp;
 pub(crate) mod expr_joined_str;
 pub(crate) mod expr_lambda;
+pub(crate) mod expr_line_magic;
 pub(crate) mod expr_list;
 pub(crate) mod expr_list_comp;
 pub(crate) mod expr_name;
@@ -147,7 +148,7 @@ pub(crate) struct MaybeParenthesizeExpression<'a> {
 }
 
 impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let MaybeParenthesizeExpression {
             expression,
             parent,

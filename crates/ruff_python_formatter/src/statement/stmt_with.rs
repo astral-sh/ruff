@@ -68,7 +68,7 @@ impl<'a> From<&AnyStatementWith<'a>> for AnyNodeRef<'a> {
 }
 
 impl Format<PyFormatContext<'_>> for AnyStatementWith<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let comments = f.context().comments().clone();
         let dangling_comments = comments.dangling_comments(self);
 

@@ -77,7 +77,7 @@ impl<'a> From<&AnyExpressionYield<'a>> for AnyNodeRef<'a> {
 }
 
 impl Format<PyFormatContext<'_>> for AnyExpressionYield<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let keyword = if self.is_yield_from() {
             "yield from"
         } else {
