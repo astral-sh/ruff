@@ -73,7 +73,7 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
                 .format()
                 .with_options(BoolOpLayout {
                     parentheses: Some(parentheses),
-                    wrap: Some(true),
+                    wrap: None,
                 })
                 .fmt(f),
             Expr::NamedExpr(expr) => expr.format().fmt(f),

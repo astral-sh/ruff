@@ -180,8 +180,7 @@ def test():
             ", %s unmodified" % unmodified_count if collected["unmodified"] else ""
         ),
         "post_processed": (
-            collected["post_processed"]
-            and ", %s post-processed" % post_processed_count
+            collected["post_processed"] and ", %s post-processed" % post_processed_count
             or ""
         ),
     }

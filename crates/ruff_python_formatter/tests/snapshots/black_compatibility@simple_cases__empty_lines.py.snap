@@ -104,61 +104,7 @@ def g():
 ```diff
 --- Black
 +++ Ruff
-@@ -21,27 +21,38 @@
-     prev = leaf.prev_sibling
-     if not prev:
-         prevp = preceding_leaf(p)
--        if not prevp or prevp.type in OPENING_BRACKETS:
-+        if (
-+            not prevp
-+            or prevp.type in OPENING_BRACKETS
-+        ):
-             return NO
- 
-         if prevp.type == token.EQUAL:
--            if prevp.parent and prevp.parent.type in {
--                syms.typedargslist,
--                syms.varargslist,
--                syms.parameters,
--                syms.arglist,
--                syms.argument,
--            }:
-+            if (
-+                prevp.parent
-+                and prevp.parent.type
-+                in {
-+                    syms.typedargslist,
-+                    syms.varargslist,
-+                    syms.parameters,
-+                    syms.arglist,
-+                    syms.argument,
-+                }
-+            ):
-                 return NO
- 
-         elif prevp.type == token.DOUBLESTAR:
--            if prevp.parent and prevp.parent.type in {
--                syms.typedargslist,
--                syms.varargslist,
--                syms.parameters,
--                syms.arglist,
--                syms.dictsetmaker,
--            }:
-+            if (
-+                prevp.parent
-+                and prevp.parent.type
-+                in {
-+                    syms.typedargslist,
-+                    syms.varargslist,
-+                    syms.parameters,
-+                    syms.arglist,
-+                    syms.dictsetmaker,
-+                }
-+            ):
-                 return NO
- 
- 
-@@ -49,7 +60,6 @@
+@@ -49,7 +49,6 @@
  # SECTION BECAUSE SECTIONS
  ###############################################################################
  
@@ -166,39 +112,6 @@ def g():
  def g():
      NO = ""
      SPACE = " "
-@@ -73,17 +83,24 @@
-     if not prev:
-         prevp = preceding_leaf(p)
- 
--        if not prevp or prevp.type in OPENING_BRACKETS:
-+        if (
-+            not prevp
-+            or prevp.type in OPENING_BRACKETS
-+        ):
-             # Start of the line or a bracketed expression.
-             # More than one line for the comment.
-             return NO
- 
-         if prevp.type == token.EQUAL:
--            if prevp.parent and prevp.parent.type in {
--                syms.typedargslist,
--                syms.varargslist,
--                syms.parameters,
--                syms.arglist,
--                syms.argument,
--            }:
-+            if (
-+                prevp.parent
-+                and prevp.parent.type
-+                in {
-+                    syms.typedargslist,
-+                    syms.varargslist,
-+                    syms.parameters,
-+                    syms.arglist,
-+                    syms.argument,
-+                }
-+            ):
-                 return NO
 ```
 
 ## Ruff Output
@@ -227,38 +140,27 @@ def f():
     prev = leaf.prev_sibling
     if not prev:
         prevp = preceding_leaf(p)
-        if (
-            not prevp
-            or prevp.type in OPENING_BRACKETS
-        ):
+        if not prevp or prevp.type in OPENING_BRACKETS:
             return NO
 
         if prevp.type == token.EQUAL:
-            if (
-                prevp.parent
-                and prevp.parent.type
-                in {
-                    syms.typedargslist,
-                    syms.varargslist,
-                    syms.parameters,
-                    syms.arglist,
-                    syms.argument,
-                }
-            ):
+            if prevp.parent and prevp.parent.type in {
+                syms.typedargslist,
+                syms.varargslist,
+                syms.parameters,
+                syms.arglist,
+                syms.argument,
+            }:
                 return NO
 
         elif prevp.type == token.DOUBLESTAR:
-            if (
-                prevp.parent
-                and prevp.parent.type
-                in {
-                    syms.typedargslist,
-                    syms.varargslist,
-                    syms.parameters,
-                    syms.arglist,
-                    syms.dictsetmaker,
-                }
-            ):
+            if prevp.parent and prevp.parent.type in {
+                syms.typedargslist,
+                syms.varargslist,
+                syms.parameters,
+                syms.arglist,
+                syms.dictsetmaker,
+            }:
                 return NO
 
 
@@ -289,26 +191,19 @@ def g():
     if not prev:
         prevp = preceding_leaf(p)
 
-        if (
-            not prevp
-            or prevp.type in OPENING_BRACKETS
-        ):
+        if not prevp or prevp.type in OPENING_BRACKETS:
             # Start of the line or a bracketed expression.
             # More than one line for the comment.
             return NO
 
         if prevp.type == token.EQUAL:
-            if (
-                prevp.parent
-                and prevp.parent.type
-                in {
-                    syms.typedargslist,
-                    syms.varargslist,
-                    syms.parameters,
-                    syms.arglist,
-                    syms.argument,
-                }
-            ):
+            if prevp.parent and prevp.parent.type in {
+                syms.typedargslist,
+                syms.varargslist,
+                syms.parameters,
+                syms.arglist,
+                syms.argument,
+            }:
                 return NO
 ```
 

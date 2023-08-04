@@ -121,28 +121,22 @@ if (
     ...
 
 
-if (
-    [2222, 333]
-    and [
-        aaaaaaaaaaaaa,
-        bbbbbbbbbbbbbbbbbbbb,
-        cccccccccccccccccccc,
-        dddddddddddddddddddd,
-        eeeeeeeeee,
-    ]
-):
+if [2222, 333] and [
+    aaaaaaaaaaaaa,
+    bbbbbbbbbbbbbbbbbbbb,
+    cccccccccccccccccccc,
+    dddddddddddddddddddd,
+    eeeeeeeeee,
+]:
     ...
 
-if (
-    [
-        aaaaaaaaaaaaa,
-        bbbbbbbbbbbbbbbbbbbb,
-        cccccccccccccccccccc,
-        dddddddddddddddddddd,
-        eeeeeeeeee,
-    ]
-    and [2222, 333]
-):
+if [
+    aaaaaaaaaaaaa,
+    bbbbbbbbbbbbbbbbbbbb,
+    cccccccccccccccccccc,
+    dddddddddddddddddddd,
+    eeeeeeeeee,
+] and [2222, 333]:
     pass
 
 # Break right only applies for boolean operations with a left and right side
@@ -163,8 +157,7 @@ if not (
     pass
 
 if not (
-    isinstance(aaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbb)
-    and numpy
+    isinstance(aaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbb) and numpy
     or isinstance(ccccccccccc, dddddd)
 ):
     pass

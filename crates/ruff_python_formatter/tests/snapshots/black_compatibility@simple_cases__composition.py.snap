@@ -227,7 +227,7 @@ class C:
 
          assert expected(
              value, is_going_to_be="too long to fit in a single line", srsly=True
-@@ -153,7 +155,8 @@
+@@ -153,7 +154,8 @@
              " because it's too long"
          )
 
@@ -237,7 +237,7 @@ class C:
          %3d           0 LOAD_FAST                1 (x)
                        2 LOAD_CONST               1 (1)
                        4 COMPARE_OP               2 (==)
-@@ -161,8 +164,8 @@
+@@ -161,8 +163,8 @@
                        8 STORE_ATTR               0 (x)
                       10 LOAD_CONST               0 (None)
                       12 RETURN_VALUE
@@ -310,8 +310,7 @@ class C:
             22
         ]
         assignment = (
-            some.rather.elaborate.rule()
-            and another.rule.ending_with.index[123]
+            some.rather.elaborate.rule() and another.rule.ending_with.index[123]
         )
 
     def easy_asserts(self) -> None:
