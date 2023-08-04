@@ -1077,41 +1077,28 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 }
             }
 
+            // Avoid duplicate checks if the parent is an `|` since these rules
+            // traverse nested unions.
+            let is_unchecked_union = !matches!(
+                checker.semantic.expr_parent(),
+                Some(Expr::BinOp(ast::ExprBinOp {
+                    op: Operator::BitOr,
+                    ..
+                }))
+            );
             if checker.enabled(Rule::DuplicateUnionMember)
                 && checker.semantic.in_type_definition()
-                // Avoid duplicate checks if the parent is an `|`
-                && !matches!(
-                    checker.semantic.expr_parent(),
-                    Some(Expr::BinOp(ast::ExprBinOp { op: Operator::BitOr, ..}))
-                )
+                && is_unchecked_union
             {
                 flake8_pyi::rules::duplicate_union_member(checker, expr);
             }
-            if checker.enabled(Rule::UnnecessaryLiteralUnion)
-                // Avoid duplicate checks if the parent is an `|`
-                && !matches!(
-                    checker.semantic.expr_parent(),
-                    Some(Expr::BinOp(ast::ExprBinOp { op: Operator::BitOr, ..}))
-                )
-            {
+            if checker.enabled(Rule::UnnecessaryLiteralUnion) && is_unchecked_union {
                 flake8_pyi::rules::unnecessary_literal_union(checker, expr);
             }
-            if checker.enabled(Rule::RedundantLiteralUnion)
-                // Avoid duplicate checks if the parent is an `|`
-                && !matches!(
-                    checker.semantic.expr_parent(),
-                    Some(Expr::BinOp(ast::ExprBinOp { op: Operator::BitOr, ..}))
-                )
-            {
+            if checker.enabled(Rule::RedundantLiteralUnion) && is_unchecked_union {
                 flake8_pyi::rules::redundant_literal_union(checker, expr);
             }
-            if checker.enabled(Rule::UnnecessaryTypeUnion)
-              // Avoid duplicate checks if the parent is an `|`
-                && !matches!(
-                    checker.semantic.expr_parent(),
-                    Some(Expr::BinOp(ast::ExprBinOp { op: Operator::BitOr, ..}))
-                )
-            {
+            if checker.enabled(Rule::UnnecessaryTypeUnion) && is_unchecked_union {
                 flake8_pyi::rules::unnecessary_type_union(checker, expr);
             }
         }

@@ -36,7 +36,7 @@ impl Violation for UnnecessaryTypeUnion {
         };
 
         format!(
-            "Multiple `type` members in a union. Combine them into one, e.g. `type[{union_str}]`"
+            "Multiple `type` members in a union. Combine them into one, e.g., `type[{union_str}]`."
         )
     }
 }
@@ -56,11 +56,11 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
         let Some(subscript) = expr.as_subscript_expr() else {
             return;
         };
-        let Some(call_path) = checker.semantic().resolve_call_path(subscript.value.as_ref()) else {
-            return;
-        };
-
-        if matches!(call_path.as_slice(), ["" | "builtins", "type"]) {
+        if checker
+            .semantic()
+            .resolve_call_path(subscript.value.as_ref())
+            .is_some_and(|call_path| matches!(call_path.as_slice(), ["" | "builtins", "type"]))
+        {
             type_exprs.push(&subscript.slice);
         }
     };

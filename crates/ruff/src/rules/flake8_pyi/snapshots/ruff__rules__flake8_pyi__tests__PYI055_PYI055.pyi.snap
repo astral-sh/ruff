@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_pyi/mod.rs
 ---
-PYI055.pyi:5:4: PYI055 Multiple `type` members in a union. Combine them into one, e.g. `type[int | str | complex]`
+PYI055.pyi:5:4: PYI055 Multiple `type` members in a union. Combine them into one, e.g., `type[int | str | complex]`.
   |
 5 | w: builtins.type[int] | builtins.type[str] | builtins.type[complex]
   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
@@ -9,7 +9,7 @@ PYI055.pyi:5:4: PYI055 Multiple `type` members in a union. Combine them into one
 7 | y: builtins.type[int] | type[str] | builtins.type[complex]
   |
 
-PYI055.pyi:6:4: PYI055 Multiple `type` members in a union. Combine them into one, e.g. `type[int | str | float]`
+PYI055.pyi:6:4: PYI055 Multiple `type` members in a union. Combine them into one, e.g., `type[int | str | float]`.
   |
 5 | w: builtins.type[int] | builtins.type[str] | builtins.type[complex]
 6 | x: type[int] | type[str] | type[float]
@@ -18,29 +18,39 @@ PYI055.pyi:6:4: PYI055 Multiple `type` members in a union. Combine them into one
 8 | z: Union[type[float], type[complex]]
   |
 
-PYI055.pyi:7:4: PYI055 Multiple `type` members in a union. Combine them into one, e.g. `type[int | str | complex]`
+PYI055.pyi:7:4: PYI055 Multiple `type` members in a union. Combine them into one, e.g., `type[int | str | complex]`.
   |
 5 | w: builtins.type[int] | builtins.type[str] | builtins.type[complex]
 6 | x: type[int] | type[str] | type[float]
 7 | y: builtins.type[int] | type[str] | builtins.type[complex]
   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
 8 | z: Union[type[float], type[complex]]
+9 | z: Union[type[float, int], type[complex]]
   |
 
-PYI055.pyi:8:4: PYI055 Multiple `type` members in a union. Combine them into one, e.g. `type[Union[float, complex]]`
+PYI055.pyi:8:4: PYI055 Multiple `type` members in a union. Combine them into one, e.g., `type[Union[float, complex]]`.
   |
 6 | x: type[int] | type[str] | type[float]
 7 | y: builtins.type[int] | type[str] | builtins.type[complex]
 8 | z: Union[type[float], type[complex]]
   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
+9 | z: Union[type[float, int], type[complex]]
   |
 
-PYI055.pyi:11:15: PYI055 Multiple `type` members in a union. Combine them into one, e.g. `type[int | float]`
+PYI055.pyi:9:4: PYI055 Multiple `type` members in a union. Combine them into one, e.g., `type[Union[float, int, complex]]`.
+  |
+7 | y: builtins.type[int] | type[str] | builtins.type[complex]
+8 | z: Union[type[float], type[complex]]
+9 | z: Union[type[float, int], type[complex]]
+  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
+  |
+
+PYI055.pyi:12:15: PYI055 Multiple `type` members in a union. Combine them into one, e.g., `type[int | float]`.
    |
-11 | def func(arg: type[int] | str | type[float]) -> None: ...
+12 | def func(arg: type[int] | str | type[float]) -> None: ...
    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI055
-12 | 
-13 | # OK
+13 | 
+14 | # OK
    |
 
 
