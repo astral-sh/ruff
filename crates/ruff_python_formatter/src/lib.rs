@@ -2,7 +2,7 @@ use crate::comments::{
     dangling_node_comments, leading_node_comments, trailing_node_comments, Comments,
 };
 use crate::context::PyFormatContext;
-pub use crate::options::{MagicTrailingComma, PyFormatOptions, QuoteStyle, SourceType};
+pub use crate::options::{MagicTrailingComma, PyFormatOptions, QuoteStyle};
 use ruff_formatter::format_element::tag;
 use ruff_formatter::prelude::{
     dynamic_text, source_position, source_text_slice, text, ContainsNewlines, Formatter, Tag,
@@ -324,7 +324,7 @@ with [
         // Parse the AST.
         let source_path = "code_inline.py";
         let python_ast = parse_tokens(tokens, Mode::Module, source_path).unwrap();
-        let options = PyFormatOptions::from_extension(Path::new(source_path)).unwrap();
+        let options = PyFormatOptions::from_extension(Path::new(source_path));
         let formatted = format_node(&python_ast, &comment_ranges, src, options).unwrap();
 
         // Uncomment the `dbg` to print the IR.

@@ -835,9 +835,8 @@ impl BlackOptions {
         Self::from_toml(&fs::read_to_string(&path)?, repo)
     }
 
-    fn to_py_format_options(&self, file: &Path) -> Option<PyFormatOptions> {
-        let mut options = PyFormatOptions::from_extension(file)?;
-        options
+    fn to_py_format_options(&self, file: &Path) -> PyFormatOptions {
+        PyFormatOptions::from_extension(file)
             .with_line_width(
                 LineWidth::try_from(self.line_length).expect("Invalid line length limit"),
             )
@@ -845,8 +844,7 @@ impl BlackOptions {
                 MagicTrailingComma::Ignore
             } else {
                 MagicTrailingComma::Respect
-            });
-        Some(options)
+            })
     }
 }
 

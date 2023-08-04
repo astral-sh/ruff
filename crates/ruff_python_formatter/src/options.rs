@@ -1,32 +1,7 @@
 use ruff_formatter::printer::{LineEnding, PrinterOptions};
 use ruff_formatter::{FormatOptions, IndentStyle, LineWidth};
-use std::ffi::OsStr;
+use ruff_python_ast::PySourceType;
 use std::path::Path;
-
-#[derive(Copy, Clone, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum SourceType {
-    /// A `.py` file
-    Py,
-    /// A `.pyi` file
-    Pyi,
-}
-
-impl SourceType {
-    pub fn from_path(path: &Path) -> Option<Self> {
-        match path.extension().and_then(OsStr::to_str) {
-            Some("py") => Some(Self::Py),
-            Some("pyi") => Some(Self::Pyi),
-            _ => None,
-        }
-    }
-}
-
-impl Default for SourceType {
-    fn default() -> Self {
-        Self::Py
-    }
-}
 
 #[derive(Clone, Debug)]
 #[cfg_attr(
@@ -36,7 +11,7 @@ impl Default for SourceType {
 )]
 pub struct PyFormatOptions {
     /// Whether we're in a `.py` file or `.pyi` file, which have different rules
-    source_type: SourceType,
+    source_type: PySourceType,
 
     /// Specifies the indent style:
     /// * Either a tab
@@ -61,7 +36,7 @@ fn default_line_width() -> LineWidth {
 impl Default for PyFormatOptions {
     fn default() -> Self {
         Self {
-            source_type: SourceType::default(),
+            source_type: PySourceType::default(),
             indent_style: IndentStyle::Space(4),
             line_width: LineWidth::try_from(88).unwrap(),
             quote_style: QuoteStyle::default(),
@@ -72,11 +47,11 @@ impl Default for PyFormatOptions {
 
 impl PyFormatOptions {
     /// Otherwise sets the defaults. Returns none if the extension is unknown
-    pub fn from_extension(path: &Path) -> Option<Self> {
-        Some(Self::from_source_type(SourceType::from_path(path)?))
+    pub fn from_extension(path: &Path) -> Self {
+        Self::from_source_type(PySourceType::from(path))
     }
 
-    pub fn from_source_type(source_type: SourceType) -> Self {
+    pub fn from_source_type(source_type: PySourceType) -> Self {
         Self {
             source_type,
             ..Self::default()
@@ -96,17 +71,17 @@ impl PyFormatOptions {
         self
     }
 
-    pub fn with_magic_trailing_comma(&mut self, trailing_comma: MagicTrailingComma) -> &mut Self {
+    pub fn with_magic_trailing_comma(mut self, trailing_comma: MagicTrailingComma) -> Self {
         self.magic_trailing_comma = trailing_comma;
         self
     }
 
-    pub fn with_indent_style(&mut self, indent_style: IndentStyle) -> &mut Self {
+    pub fn with_indent_style(mut self, indent_style: IndentStyle) -> Self {
         self.indent_style = indent_style;
         self
     }
 
-    pub fn with_line_width(&mut self, line_width: LineWidth) -> &mut Self {
+    pub fn with_line_width(mut self, line_width: LineWidth) -> Self {
         self.line_width = line_width;
         self
     }

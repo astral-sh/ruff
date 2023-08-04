@@ -52,7 +52,7 @@ fn benchmark_formatter(criterion: &mut Criterion) {
             &case,
             |b, case| {
                 b.iter(|| {
-                    let options = PyFormatOptions::from_extension(Path::new(case.name())).unwrap();
+                    let options = PyFormatOptions::from_extension(Path::new(case.name()));
                     format_module(case.code(), options).expect("Formatting to succeed")
                 });
             },

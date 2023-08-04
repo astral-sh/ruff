@@ -17,7 +17,7 @@ fn black_compatibility() {
             let reader = BufReader::new(options_file);
             serde_json::from_reader(reader).expect("Options to be a valid Json file")
         } else {
-            PyFormatOptions::from_extension(input_path).unwrap()
+            PyFormatOptions::from_extension(input_path)
         };
 
         let printed = format_module(&content, options.clone()).unwrap_or_else(|err| {
@@ -106,7 +106,7 @@ fn format() {
     let test_file = |input_path: &Path| {
         let content = fs::read_to_string(input_path).unwrap();
 
-        let options = PyFormatOptions::from_extension(input_path).unwrap();
+        let options = PyFormatOptions::from_extension(input_path);
         let printed = format_module(&content, options.clone()).expect("Formatting to succeed");
         let formatted_code = printed.as_code();
 

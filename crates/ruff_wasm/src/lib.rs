@@ -21,6 +21,7 @@ use ruff::rules::{
 use ruff::settings::configuration::Configuration;
 use ruff::settings::options::Options;
 use ruff::settings::{defaults, flags, Settings};
+use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_python_formatter::{format_module, format_node, PyFormatOptions, SourceType};
 use ruff_python_index::{CommentRangesBuilder, Indexer};
@@ -263,7 +264,7 @@ impl Workspace {
 
     pub fn format(&self, contents: &str) -> Result<String, Error> {
         // TODO(konstin): Add an options for py/pyi to the UI (1/2)
-        let options = PyFormatOptions::from_source_type(SourceType::default());
+        let options = PyFormatOptions::from_source_type(PySourceType::default());
         let printed = format_module(contents, options).map_err(into_error)?;
 
         Ok(printed.into_code())
@@ -281,7 +282,7 @@ impl Workspace {
         let module = parse_tokens(tokens, Mode::Module, ".").map_err(into_error)?;
 
         // TODO(konstin): Add an options for py/pyi to the UI (2/2)
-        let options = PyFormatOptions::from_source_type(SourceType::default());
+        let options = PyFormatOptions::from_source_type(PySourceType::default());
         let formatted =
             format_node(&module, &comment_ranges, contents, options).map_err(into_error)?;
 

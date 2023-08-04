@@ -57,7 +57,7 @@ pub fn format_and_debug_print(input: &str, cli: &Cli, source_type: &Path) -> Res
     let python_ast =
         parse_tokens(tokens, Mode::Module, "<filename>").context("Syntax error in input")?;
 
-    let options = PyFormatOptions::from_extension(source_type).unwrap();
+    let options = PyFormatOptions::from_extension(source_type);
     let formatted = format_node(&python_ast, &comment_ranges, input, options)
         .context("Failed to format node")?;
     if cli.print_ir {

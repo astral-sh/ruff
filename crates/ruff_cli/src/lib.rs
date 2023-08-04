@@ -165,7 +165,7 @@ fn format(files: &[PathBuf]) -> Result<ExitStatus> {
         // Check if we should read from stdin
         [path] if path == Path::new("-") => {
             let unformatted = read_from_stdin()?;
-            let options = PyFormatOptions::from_extension(Path::new("stdin.py")).unwrap();
+            let options = PyFormatOptions::from_extension(Path::new("stdin.py"));
             let formatted = format_module(&unformatted, options)?;
             stdout().lock().write_all(formatted.as_code().as_bytes())?;
         }
@@ -173,8 +173,7 @@ fn format(files: &[PathBuf]) -> Result<ExitStatus> {
             for file in files {
                 let unformatted = std::fs::read_to_string(file)
                     .with_context(|| format!("Could not read {}: ", file.display()))?;
-                let options = PyFormatOptions::from_extension(file)
-                    .context("Unknown file extension, expected .py or .pyi")?;
+                let options = PyFormatOptions::from_extension(file);
                 let formatted = format_module(&unformatted, options)?;
                 std::fs::write(file, formatted.as_code().as_bytes())
                     .with_context(|| format!("Could not write to {}, exiting", file.display()))?;
