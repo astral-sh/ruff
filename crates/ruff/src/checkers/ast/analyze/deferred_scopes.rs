@@ -115,7 +115,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                             branch_detection::different_forks(
                                 left,
                                 right,
-                                &checker.semantic.statements,
+                                checker.semantic.statements(),
                             )
                         })
                     }) {
@@ -172,12 +172,14 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                             continue;
                         }
 
+                        let Some(source) = shadowed.source else {
+                            continue;
+                        };
+
                         // If this is an overloaded function, abort.
                         if shadowed.kind.is_function_definition()
                             && visibility::is_overload(
-                                cast::decorator_list(
-                                    checker.semantic.statements[shadowed.source.unwrap()],
-                                ),
+                                cast::decorator_list(checker.semantic.statement(source)),
                                 &checker.semantic,
                             )
                         {
@@ -202,7 +204,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                             branch_detection::different_forks(
                                 left,
                                 right,
-                                &checker.semantic.statements,
+                                checker.semantic.statements(),
                             )
                         })
                     }) {

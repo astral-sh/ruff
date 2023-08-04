@@ -326,9 +326,9 @@ pub(crate) fn unused_variable(checker: &Checker, scope: &Scope, diagnostics: &mu
         let mut diagnostic = Diagnostic::new(UnusedVariable { name }, range);
         if checker.patch(diagnostic.kind.rule()) {
             if let Some(source) = source {
-                let stmt = checker.semantic().statements[source];
-                let parent = checker.semantic().statements.parent(stmt);
-                if let Some(fix) = remove_unused_variable(stmt, parent, range, checker) {
+                let statement = checker.semantic().statement(source);
+                let parent = checker.semantic().parent_statement(statement);
+                if let Some(fix) = remove_unused_variable(statement, parent, range, checker) {
                     diagnostic.set_fix(fix);
                 }
             }

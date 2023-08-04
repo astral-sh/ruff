@@ -185,7 +185,7 @@ impl<'a> Binding<'a> {
     /// Returns the range of the binding's parent.
     pub fn parent_range(&self, semantic: &SemanticModel) -> Option<TextRange> {
         self.source
-            .map(|node_id| semantic.statements[node_id])
+            .map(|statement_id| semantic.statement(statement_id))
             .and_then(|parent| {
                 if parent.is_import_from_stmt() {
                     Some(parent.range())

@@ -31,7 +31,7 @@ pub struct SemanticModel<'a> {
     module_path: Option<&'a [String]>,
 
     /// Stack of all visited statements.
-    pub statements: Nodes<'a, Stmt>,
+    statements: Nodes<'a, Stmt>,
 
     /// The identifier of the current statement.
     statement_id: Option<NodeId>,
@@ -917,6 +917,29 @@ impl<'a> SemanticModel<'a> {
             }
         }
         None
+    }
+
+    /// Return the [`Nodes`] vector of all statements.
+    pub const fn statements(&self) -> &Nodes<'a, Stmt> {
+        &self.statements
+    }
+
+    /// Return the [`NodeId`] corresponding to the given [`Stmt`].
+    #[inline]
+    pub fn statement_id(&self, statement: &Stmt) -> Option<NodeId> {
+        self.statements.node_id(statement)
+    }
+
+    /// Return the [`Stmt]` corresponding to the given [`NodeId`].
+    #[inline]
+    pub fn statement(&self, statement_id: NodeId) -> &'a Stmt {
+        self.statements[statement_id]
+    }
+
+    /// Given a [`Stmt`], return its parent, if any.
+    #[inline]
+    pub fn parent_statement(&self, statement: &'a Stmt) -> Option<&'a Stmt> {
+        self.statements.parent(statement)
     }
 
     /// Set the [`Globals`] for the current [`Scope`].
