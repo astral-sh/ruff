@@ -285,3 +285,20 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatInParenthesesOnlyGroup<'_, 'a
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::expression::parentheses::is_expression_parenthesized;
+    use ruff_python_ast::node::AnyNodeRef;
+    use ruff_python_parser::parse_expression;
+
+    #[test]
+    fn test_has_parentheses() {
+        let expression = r#"(b().c("")).d()"#;
+        let expr = parse_expression(expression, "<filename>").unwrap();
+        assert!(!is_expression_parenthesized(
+            AnyNodeRef::from(&expr),
+            expression
+        ));
+    }
+}

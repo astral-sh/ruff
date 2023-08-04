@@ -150,3 +150,6 @@ zero(
 ).four(
     five,
 )
+
+a = (b().c("asdfasfaefinitive Guidddddde to Django: Web Developfdddddddment Done Rdddight")).d()
+a = b().c("asdfasfaefinitive Guidddddde to Django: Web Developfdddddddment Done Rdddight").d()
