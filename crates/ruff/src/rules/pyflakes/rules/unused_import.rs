@@ -1,10 +1,11 @@
+use std::borrow::Cow;
+
 use anyhow::Result;
 use rustc_hash::FxHashMap;
-use std::borrow::Cow;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::{AnyImport, Exceptions, Imported, NodeId, Scope};
+use ruff_python_semantic::{AnyImport, Exceptions, Imported, Scope, StatementId};
 use ruff_text_size::TextRange;
 
 use crate::autofix;
@@ -98,8 +99,9 @@ impl Violation for UnusedImport {
 
 pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut Vec<Diagnostic>) {
     // Collect all unused imports by statement.
-    let mut unused: FxHashMap<(NodeId, Exceptions), Vec<ImportBinding>> = FxHashMap::default();
-    let mut ignored: FxHashMap<(NodeId, Exceptions), Vec<ImportBinding>> = FxHashMap::default();
+    let mut unused: FxHashMap<(StatementId, Exceptions), Vec<ImportBinding>> = FxHashMap::default();
+    let mut ignored: FxHashMap<(StatementId, Exceptions), Vec<ImportBinding>> =
+        FxHashMap::default();
 
     for binding_id in scope.binding_ids() {
         let binding = checker.semantic().binding(binding_id);
@@ -225,7 +227,11 @@ struct ImportBinding<'a> {
 }
 
 /// Generate a [`Fix`] to remove unused imports from a statement.
-fn fix_imports(checker: &Checker, statement_id: NodeId, imports: &[ImportBinding]) -> Result<Fix> {
+fn fix_imports(
+    checker: &Checker,
+    statement_id: StatementId,
+    imports: &[ImportBinding],
+) -> Result<Fix> {
     let statement = checker.semantic().statement(statement_id);
     let parent = checker.semantic().parent_statement(statement);
 

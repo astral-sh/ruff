@@ -1,105 +1,94 @@
-use std::ops::{Index, IndexMut};
+use std::ops::Index;
 
 use ruff_index::{newtype_index, IndexVec};
+use ruff_python_ast::Stmt;
 use rustc_hash::FxHashMap;
 
 use ruff_python_ast::types::RefEquality;
 
-/// Id uniquely identifying an AST node in a program.
+/// Id uniquely identifying a statement AST node.
 ///
-/// Using a `u32` is sufficient because Ruff only supports parsing documents with a size of max `u32::max`
-/// and it is impossible to have more nodes than characters in the file. We use a `NonZeroU32` to
-/// take advantage of memory layout optimizations.
+/// Using a `u32` is sufficient because Ruff only supports parsing documents with a size of max
+/// `u32::max` and it is impossible to have more nodes than characters in the file. We use a
+/// `NonZeroU32` to take advantage of memory layout optimizations.
 #[newtype_index]
 #[derive(Ord, PartialOrd)]
-pub struct NodeId;
+pub struct StatementId;
 
-/// A [`Node`] represents an AST node in a program, along with a pointer to its parent (if any).
+/// A [`Stmt`] AST node, along with a pointer to its parent statement (if any).
 #[derive(Debug)]
-struct Node<'a, T> {
+struct StatementWithParent<'a> {
     /// A pointer to the AST node.
-    node: &'a T,
+    statement: &'a Stmt,
     /// The ID of the parent of this node, if any.
-    parent: Option<NodeId>,
+    parent: Option<StatementId>,
     /// The depth of this node in the tree.
     depth: u32,
 }
 
-/// The nodes of a program indexed by [`NodeId`]
-#[derive(Debug)]
-pub struct Nodes<'a, T> {
-    nodes: IndexVec<NodeId, Node<'a, T>>,
-    node_to_id: FxHashMap<RefEquality<'a, T>, NodeId>,
+/// The statements of a program indexed by [`StatementId`]
+#[derive(Debug, Default)]
+pub struct Statements<'a> {
+    statements: IndexVec<StatementId, StatementWithParent<'a>>,
+    statement_to_id: FxHashMap<RefEquality<'a, Stmt>, StatementId>,
 }
 
-impl<'a, T> Default for Nodes<'a, T> {
-    fn default() -> Self {
-        Self {
-            nodes: IndexVec::default(),
-            node_to_id: FxHashMap::default(),
-        }
-    }
-}
-
-impl<'a, T> Nodes<'a, T> {
-    /// Inserts a new node into the node tree and returns its unique id.
+impl<'a> Statements<'a> {
+    /// Inserts a new statement into the statement vector and returns its unique ID.
     ///
-    /// Panics if a node with the same pointer already exists.
-    pub(crate) fn insert(&mut self, node: &'a T, parent: Option<NodeId>) -> NodeId {
-        let next_id = self.nodes.next_index();
-        if let Some(existing_id) = self.node_to_id.insert(RefEquality(node), next_id) {
-            panic!("Node already exists with id {existing_id:?}");
+    /// Panics if a statement with the same pointer already exists.
+    pub(crate) fn insert(
+        &mut self,
+        statement: &'a Stmt,
+        parent: Option<StatementId>,
+    ) -> StatementId {
+        let next_id = self.statements.next_index();
+        if let Some(existing_id) = self.statement_to_id.insert(RefEquality(statement), next_id) {
+            panic!("Statements already exists with ID: {existing_id:?}");
         }
-        self.nodes.push(Node {
-            node,
+        self.statements.push(StatementWithParent {
+            statement,
             parent,
-            depth: parent.map_or(0, |parent| self.nodes[parent].depth + 1),
+            depth: parent.map_or(0, |parent| self.statements[parent].depth + 1),
         })
     }
 
-    /// Returns the [`NodeId`] of the given node.
+    /// Returns the [`StatementId`] of the given statement.
     #[inline]
-    pub fn node_id(&self, node: &'a T) -> Option<NodeId> {
-        self.node_to_id.get(&RefEquality(node)).copied()
+    pub fn statement_id(&self, statement: &'a Stmt) -> Option<StatementId> {
+        self.statement_to_id.get(&RefEquality(statement)).copied()
     }
 
-    /// Return the [`NodeId`] of the parent node.
+    /// Return the [`StatementId`] of the parent statement.
     #[inline]
-    pub fn parent_id(&self, node_id: NodeId) -> Option<NodeId> {
-        self.nodes[node_id].parent
+    pub fn parent_id(&self, statement_id: StatementId) -> Option<StatementId> {
+        self.statements[statement_id].parent
     }
 
-    /// Return the parent of the given node.
-    pub fn parent(&self, node: &'a T) -> Option<&'a T> {
-        let node_id = self.node_to_id.get(&RefEquality(node))?;
-        let parent_id = self.nodes[*node_id].parent?;
+    /// Return the parent of the given statement.
+    pub fn parent(&self, statement: &'a Stmt) -> Option<&'a Stmt> {
+        let statement_id = self.statement_to_id.get(&RefEquality(statement))?;
+        let parent_id = self.statements[*statement_id].parent?;
         Some(self[parent_id])
     }
 
-    /// Return the depth of the node.
+    /// Return the depth of the statement.
     #[inline]
-    pub(crate) fn depth(&self, node_id: NodeId) -> u32 {
-        self.nodes[node_id].depth
+    pub(crate) fn depth(&self, id: StatementId) -> u32 {
+        self.statements[id].depth
     }
 
-    /// Returns an iterator over all [`NodeId`] ancestors, starting from the given [`NodeId`].
-    pub(crate) fn ancestor_ids(&self, node_id: NodeId) -> impl Iterator<Item = NodeId> + '_ {
-        std::iter::successors(Some(node_id), |&node_id| self.nodes[node_id].parent)
-    }
-}
-
-impl<'a, T> Index<NodeId> for Nodes<'a, T> {
-    type Output = &'a T;
-
-    #[inline]
-    fn index(&self, index: NodeId) -> &Self::Output {
-        &self.nodes[index].node
+    /// Returns an iterator over all [`StatementId`] ancestors, starting from the given [`StatementId`].
+    pub(crate) fn ancestor_ids(&self, id: StatementId) -> impl Iterator<Item = StatementId> + '_ {
+        std::iter::successors(Some(id), |&id| self.statements[id].parent)
     }
 }
 
-impl<'a, T> IndexMut<NodeId> for Nodes<'a, T> {
+impl<'a> Index<StatementId> for Statements<'a> {
+    type Output = &'a Stmt;
+
     #[inline]
-    fn index_mut(&mut self, index: NodeId) -> &mut Self::Output {
-        &mut self.nodes[index].node
+    fn index(&self, index: StatementId) -> &Self::Output {
+        &self.statements[index].statement
     }
 }

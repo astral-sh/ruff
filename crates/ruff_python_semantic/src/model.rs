@@ -25,6 +25,7 @@ use crate::reference::{
 };
 use crate::scope::{Scope, ScopeId, ScopeKind, Scopes};
 use crate::statements::{StatementId, Statements};
+use crate::Imported;
 
 /// A semantic model for a Python module, to enable querying the module's semantic information.
 pub struct SemanticModel<'a> {
@@ -920,20 +921,20 @@ impl<'a> SemanticModel<'a> {
         None
     }
 
-    /// Return the [`Nodes`] vector of all statements.
-    pub const fn statements(&self) -> &Nodes<'a, Stmt> {
+    /// Return the [`Statements`] vector of all statements.
+    pub const fn statements(&self) -> &Statements<'a> {
         &self.statements
     }
 
-    /// Return the [`NodeId`] corresponding to the given [`Stmt`].
+    /// Return the [`StatementId`] corresponding to the given [`Stmt`].
     #[inline]
-    pub fn statement_id(&self, statement: &Stmt) -> Option<NodeId> {
-        self.statements.node_id(statement)
+    pub fn statement_id(&self, statement: &Stmt) -> Option<StatementId> {
+        self.statements.statement_id(statement)
     }
 
-    /// Return the [`Stmt]` corresponding to the given [`NodeId`].
+    /// Return the [`Stmt]` corresponding to the given [`StatementId`].
     #[inline]
-    pub fn statement(&self, statement_id: NodeId) -> &'a Stmt {
+    pub fn statement(&self, statement_id: StatementId) -> &'a Stmt {
         self.statements[statement_id]
     }
 

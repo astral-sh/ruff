@@ -1,11 +1,12 @@
-use anyhow::Result;
-use ruff_text_size::TextRange;
-use rustc_hash::FxHashMap;
 use std::borrow::Cow;
+
+use anyhow::Result;
+use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::{AnyImport, Imported, NodeId, ResolvedReferenceId, Scope};
+use ruff_python_semantic::{AnyImport, Imported, ResolvedReferenceId, Scope, StatementId};
+use ruff_text_size::TextRange;
 
 use crate::autofix;
 use crate::checkers::ast::Checker;
@@ -70,8 +71,8 @@ pub(crate) fn runtime_import_in_type_checking_block(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     // Collect all runtime imports by statement.
-    let mut errors_by_statement: FxHashMap<NodeId, Vec<ImportBinding>> = FxHashMap::default();
-    let mut ignores_by_statement: FxHashMap<NodeId, Vec<ImportBinding>> = FxHashMap::default();
+    let mut errors_by_statement: FxHashMap<StatementId, Vec<ImportBinding>> = FxHashMap::default();
+    let mut ignores_by_statement: FxHashMap<StatementId, Vec<ImportBinding>> = FxHashMap::default();
 
     for binding_id in scope.binding_ids() {
         let binding = checker.semantic().binding(binding_id);
@@ -192,7 +193,11 @@ struct ImportBinding<'a> {
 }
 
 /// Generate a [`Fix`] to remove runtime imports from a type-checking block.
-fn fix_imports(checker: &Checker, statement_id: NodeId, imports: &[ImportBinding]) -> Result<Fix> {
+fn fix_imports(
+    checker: &Checker,
+    statement_id: StatementId,
+    imports: &[ImportBinding],
+) -> Result<Fix> {
     let statement = checker.semantic().statement(statement_id);
     let parent = checker.semantic().parent_statement(statement);
 

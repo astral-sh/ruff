@@ -89,7 +89,7 @@ fn descendant_of<'a>(
     node_tree: &Statements<'a>,
 ) -> bool {
     ancestors.iter().any(|ancestor| {
-        node_tree.node_id(ancestor).is_some_and(|ancestor| {
+        node_tree.statement_id(ancestor).is_some_and(|ancestor| {
             common_ancestor(stmt, ancestor, Some(stop), node_tree).is_some()
         })
     })
