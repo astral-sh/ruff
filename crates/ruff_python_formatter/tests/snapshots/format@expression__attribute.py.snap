@@ -143,10 +143,10 @@ a = Namespace()
 
 
 (
-    a.
+    a.  # trailing dot comment
     # comment
     # in between
-    b  # trailing dot comment  # trailing identifier comment
+    b  # trailing identifier comment
 )
 
 
@@ -157,10 +157,10 @@ a.aaaaaaaaaaaaaaaaaaaaa.lllllllllllllllllllllllllllloooooooooong.chaaaaaaaaaaaaa
 # chain if and only if we need them, that is if there are own line comments inside
 # the chain.
 x1 = (
-    a.b.
+    a.b.  # comment 2
     # comment 1
     # comment 3
-    c.d  # comment 2
+    c.d
 )
 
 x20 = a.b

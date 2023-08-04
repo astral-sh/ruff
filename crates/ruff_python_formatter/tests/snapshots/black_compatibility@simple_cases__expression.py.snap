@@ -300,40 +300,7 @@ last_call()
  )  # note: no trailing comma pre-3.6
  call(*gidgets[:2])
  call(a, *gidgets[:2])
-@@ -208,24 +209,14 @@
- what_is_up_with_those_new_coord_names = (coord_names | set(vars_to_create)) - set(
-     vars_to_remove
- )
--result = (
--    session.query(models.Customer.id)
--    .filter(
--        models.Customer.account_id == account_id, models.Customer.email == email_address
--    )
--    .order_by(models.Customer.id.asc())
--    .all()
--)
--result = (
--    session.query(models.Customer.id)
--    .filter(
--        models.Customer.account_id == account_id, models.Customer.email == email_address
--    )
--    .order_by(
--        models.Customer.id.asc(),
--    )
--    .all()
--)
-+result = session.query(models.Customer.id).filter(
-+    models.Customer.account_id == account_id, models.Customer.email == email_address
-+).order_by(models.Customer.id.asc()).all()
-+result = session.query(models.Customer.id).filter(
-+    models.Customer.account_id == account_id, models.Customer.email == email_address
-+).order_by(
-+    models.Customer.id.asc(),
-+).all()
- Ø = set()
- authors.łukasz.say_thanks()
- mapping = {
-@@ -328,13 +319,18 @@
+@@ -328,13 +329,18 @@
  ):
      return True
  if (
@@ -355,7 +322,7 @@ last_call()
      ^ aaaaaaaa.i << aaaaaaaa.k >> aaaaaaaa.l**aaaaaaaa.m // aaaaaaaa.n
  ):
      return True
-@@ -342,7 +338,8 @@
+@@ -342,7 +348,8 @@
      ~aaaaaaaaaaaaaaaa.a
      + aaaaaaaaaaaaaaaa.b
      - aaaaaaaaaaaaaaaa.c * aaaaaaaaaaaaaaaa.d @ aaaaaaaaaaaaaaaa.e
@@ -581,14 +548,24 @@ what_is_up_with_those_new_coord_names = (coord_names + set(vars_to_create)) + se
 what_is_up_with_those_new_coord_names = (coord_names | set(vars_to_create)) - set(
     vars_to_remove
 )
-result = session.query(models.Customer.id).filter(
-    models.Customer.account_id == account_id, models.Customer.email == email_address
-).order_by(models.Customer.id.asc()).all()
-result = session.query(models.Customer.id).filter(
-    models.Customer.account_id == account_id, models.Customer.email == email_address
-).order_by(
-    models.Customer.id.asc(),
-).all()
+result = (
+    session.query(models.Customer.id)
+    .filter(
+        models.Customer.account_id == account_id, models.Customer.email == email_address
+    )
+    .order_by(models.Customer.id.asc())
+    .all()
+)
+result = (
+    session.query(models.Customer.id)
+    .filter(
+        models.Customer.account_id == account_id, models.Customer.email == email_address
+    )
+    .order_by(
+        models.Customer.id.asc(),
+    )
+    .all()
+)
 Ø = set()
 authors.łukasz.say_thanks()
 mapping = {

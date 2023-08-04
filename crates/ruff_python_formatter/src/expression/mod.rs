@@ -1,13 +1,12 @@
 use std::cmp::Ordering;
 
-use ruff_python_ast as ast;
-use ruff_python_ast::{Expr, Operator};
-
 use ruff_formatter::{
     write, FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions,
 };
+use ruff_python_ast as ast;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::visitor::preorder::{walk_expr, PreorderVisitor};
+use ruff_python_ast::{Expr, Operator};
 
 use crate::builders::parenthesize_if_expands;
 use crate::context::{NodeLevel, WithNodeLevel};
@@ -70,7 +69,7 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
         let format_expr = format_with(|f| match expression {
             Expr::BoolOp(expr) => expr.format().with_options(Some(parentheses)).fmt(f),
             Expr::NamedExpr(expr) => expr.format().fmt(f),
-            Expr::BinOp(expr) => expr.format().with_options(Some(parentheses)).fmt(f),
+            Expr::BinOp(expr) => expr.format().fmt(f),
             Expr::UnaryOp(expr) => expr.format().fmt(f),
             Expr::Lambda(expr) => expr.format().fmt(f),
             Expr::IfExp(expr) => expr.format().fmt(f),
@@ -100,9 +99,10 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
 
         let parenthesize = match parentheses {
             Parentheses::Preserve => {
-                is_expression_parenthesized(AnyNodeRef::from(expression), f.context().source())
+                is_expression_parenthesized(expression.into(), f.context().source())
             }
             Parentheses::Always => true,
+            // Fluent style means we already have parentheses
             Parentheses::Never => false,
         };
 
@@ -157,7 +157,7 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
 
         let comments = f.context().comments();
         let preserve_parentheses = parenthesize.is_optional()
-            && is_expression_parenthesized(AnyNodeRef::from(*expression), f.context().source());
+            && is_expression_parenthesized((*expression).into(), f.context().source());
 
         let has_comments = comments.has_leading_comments(*expression)
             || comments.has_trailing_own_line_comments(*expression);
@@ -178,9 +178,10 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
             Parenthesize::Optional | Parenthesize::IfBreaks => needs_parentheses,
         };
 
+        let can_omit_optional_parentheses = can_omit_optional_parentheses(expression, f.context());
         match needs_parentheses {
             OptionalParentheses::Multiline if *parenthesize != Parenthesize::IfRequired => {
-                if can_omit_optional_parentheses(expression, f.context()) {
+                if can_omit_optional_parentheses {
                     optional_parentheses(&expression.format().with_options(Parentheses::Never))
                         .fmt(f)
                 } else {
@@ -265,7 +266,24 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Expr {
 fn can_omit_optional_parentheses(expr: &Expr, context: &PyFormatContext) -> bool {
     let mut visitor = CanOmitOptionalParenthesesVisitor::new(context.source());
     visitor.visit_subexpression(expr);
-    visitor.can_omit()
+
+    if visitor.max_priority_count > 1 {
+        false
+    } else if visitor.max_priority == OperatorPriority::Attribute {
+        true
+    } else if !visitor.any_parenthesized_expressions {
+        // Only use the more complex IR when there is any expression that we can possibly split by
+        false
+    } else {
+        // Only use the layout if the first or last expression has parentheses of some sort.
+        let first_parenthesized = visitor
+            .first
+            .is_some_and(|first| has_parentheses(first, visitor.source));
+        let last_parenthesized = visitor
+            .last
+            .is_some_and(|last| has_parentheses(last, visitor.source));
+        first_parenthesized || last_parenthesized
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -365,8 +383,10 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 self.last = Some(expr);
                 return;
             }
-            Expr::Subscript(_) => {
-                // Don't walk the value. Splitting before the value looks weird.
+            Expr::Subscript(ast::ExprSubscript { value, .. }) => {
+                self.any_parenthesized_expressions = true;
+                // Only walk the function, the subscript is always parenthesized
+                self.visit_expr(value);
                 // Don't walk the slice, because the slice is always parenthesized.
                 return;
             }
@@ -409,26 +429,6 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
 
         walk_expr(self, expr);
     }
-
-    fn can_omit(self) -> bool {
-        if self.max_priority_count > 1 {
-            false
-        } else if self.max_priority == OperatorPriority::Attribute {
-            true
-        } else if !self.any_parenthesized_expressions {
-            // Only use the more complex IR when there is any expression that we can possibly split by
-            false
-        } else {
-            // Only use the layout if the first or last expression has parentheses of some sort.
-            let first_parenthesized = self
-                .first
-                .is_some_and(|first| has_parentheses(first, self.source));
-            let last_parenthesized = self
-                .last
-                .is_some_and(|last| has_parentheses(last, self.source));
-            first_parenthesized || last_parenthesized
-        }
-    }
 }
 
 impl<'input> PreorderVisitor<'input> for CanOmitOptionalParenthesesVisitor<'input> {
@@ -444,6 +444,124 @@ impl<'input> PreorderVisitor<'input> for CanOmitOptionalParenthesesVisitor<'inpu
 
         if self.first.is_none() {
             self.first = Some(expr);
+        }
+    }
+}
+
+/// A call chain consists only of attribute access (`.` operator), function/method calls and
+/// subscripts. We use fluent style for the call chain if there are at least two attribute dots
+/// after call parentheses or subscript brackets. In case of fluent style the parentheses/bracket
+/// will close on the previous line and the dot gets its own line, otherwise the line will start
+/// with the closing parentheses/bracket and the dot follows immediately after.
+///
+/// Below, the left hand side of the addition has only a single attribute access after a call, the
+/// second `.filter`. The first `.filter` is a call, but it doesn't follow a call. The right hand
+/// side has two, the `.limit_results` after the call and the `.filter` after the subscript, so it
+/// gets formatted in fluent style. The outer expression we assign to `blogs` has zero since the
+/// `.all` follows attribute parentheses and not call parentheses.
+///
+/// ```python
+/// blogs = (
+///     Blog.objects.filter(
+///         entry__headline__contains="Lennon",
+///     ).filter(
+///         entry__pub_date__year=2008,
+///     )
+///     + Blog.objects.filter(
+///         entry__headline__contains="McCartney",
+///     )
+///     .limit_results[:10]
+///     .filter(
+///         entry__pub_date__year=2010,
+///     )
+/// ).all()
+/// ```
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub enum CallChainLayout {
+    /// The root of a call chain
+    #[default]
+    Default,
+
+    /// A nested call chain element that uses fluent style.
+    Fluent,
+
+    /// A nested call chain element not using fluent style.
+    NonFluent,
+}
+
+impl CallChainLayout {
+    pub(crate) fn from_expression(mut expr: AnyNodeRef, source: &str) -> Self {
+        let mut attributes_after_parentheses = 0;
+        loop {
+            match expr {
+                AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, .. }) => {
+                    expr = AnyNodeRef::from(value.as_ref());
+                    // ```
+                    // f().g
+                    // ^^^ value
+                    // data[:100].T`
+                    // ^^^^^^^^^^ value
+                    // ```
+                    if matches!(value.as_ref(), Expr::Call(_) | Expr::Subscript(_)) {
+                        attributes_after_parentheses += 1;
+                    } else if is_expression_parenthesized(expr, source) {
+                        // `(a).b`. We preserve these parentheses so don't recurse
+                        attributes_after_parentheses += 1;
+                        break;
+                    }
+                }
+                // ```
+                // f()
+                // ^^^ expr
+                // ^ func
+                // data[:100]
+                // ^^^^^^^^^^ expr
+                // ^^^^ value
+                // ```
+                AnyNodeRef::ExprCall(ast::ExprCall { func: inner, .. })
+                | AnyNodeRef::ExprSubscript(ast::ExprSubscript { value: inner, .. }) => {
+                    expr = AnyNodeRef::from(inner.as_ref());
+                }
+                _ => {
+                    // We to format the following in fluent style:
+                    // ```
+                    // f2 = (a).w().t(1,)
+                    //       ^ expr
+                    // ```
+                    if is_expression_parenthesized(expr, source) {
+                        attributes_after_parentheses += 1;
+                    }
+                    break;
+                }
+            }
+            // We preserve these parentheses so don't recurse
+            if is_expression_parenthesized(expr, source) {
+                break;
+            }
+        }
+        if attributes_after_parentheses < 2 {
+            CallChainLayout::NonFluent
+        } else {
+            CallChainLayout::Fluent
+        }
+    }
+
+    /// Determine whether to actually apply fluent layout in attribute, call and subscript
+    /// formatting
+    pub(crate) fn apply_in_node<'a>(
+        self,
+        item: impl Into<AnyNodeRef<'a>>,
+        f: &mut PyFormatter,
+    ) -> CallChainLayout {
+        match self {
+            CallChainLayout::Default => {
+                if f.context().node_level().is_parenthesized() {
+                    CallChainLayout::from_expression(item.into(), f.context().source())
+                } else {
+                    CallChainLayout::NonFluent
+                }
+            }
+            layout @ (CallChainLayout::Fluent | CallChainLayout::NonFluent) => layout,
         }
     }
 }
