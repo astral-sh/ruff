@@ -84,7 +84,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 // traverse nested unions.
                 let is_unchecked_union = checker
                     .semantic
-                    .expr_grandparent()
+                    .current_expression_grandparent()
                     .and_then(Expr::as_subscript_expr)
                     .map_or(true, |parent| {
                         !checker.semantic.match_typing_expr(&parent.value, "Union")
@@ -206,11 +206,16 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 }
                 ExprContext::Store => {
                     if checker.enabled(Rule::NonLowercaseVariableInFunction) {
-                        if checker.semantic.scope().kind.is_any_function() {
+                        if checker.semantic.current_scope().kind.is_any_function() {
                             // Ignore globals.
-                            if !checker.semantic.scope().get(id).is_some_and(|binding_id| {
-                                checker.semantic.binding(binding_id).is_global()
-                            }) {
+                            if !checker
+                                .semantic
+                                .current_scope()
+                                .get(id)
+                                .is_some_and(|binding_id| {
+                                    checker.semantic.binding(binding_id).is_global()
+                                })
+                            {
                                 pep8_naming::rules::non_lowercase_variable_in_function(
                                     checker, expr, id,
                                 );
@@ -219,7 +224,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     }
                     if checker.enabled(Rule::MixedCaseVariableInClassScope) {
                         if let ScopeKind::Class(ast::StmtClassDef { arguments, .. }) =
-                            &checker.semantic.scope().kind
+                            &checker.semantic.current_scope().kind
                         {
                             pep8_naming::rules::mixed_case_variable_in_class_scope(
                                 checker,
@@ -230,7 +235,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                         }
                     }
                     if checker.enabled(Rule::MixedCaseVariableInGlobalScope) {
-                        if matches!(checker.semantic.scope().kind, ScopeKind::Module) {
+                        if matches!(checker.semantic.current_scope().kind, ScopeKind::Module) {
                             pep8_naming::rules::mixed_case_variable_in_global_scope(
                                 checker, expr, id,
                             );
@@ -243,7 +248,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                             checker.diagnostics.push(diagnostic);
                         }
                     }
-                    if let ScopeKind::Class(class_def) = checker.semantic.scope().kind {
+                    if let ScopeKind::Class(class_def) = checker.semantic.current_scope().kind {
                         if checker.enabled(Rule::BuiltinAttributeShadowing) {
                             flake8_builtins::rules::builtin_attribute_shadowing(
                                 checker, class_def, id, *range,
@@ -668,7 +673,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_comprehensions::rules::unnecessary_map(
                     checker,
                     expr,
-                    checker.semantic.expr_parent(),
+                    checker.semantic.current_expression_parent(),
                     func,
                     args,
                 );
@@ -1082,7 +1087,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             // Avoid duplicate checks if the parent is an `|` since these rules
             // traverse nested unions.
             let is_unchecked_union = !matches!(
-                checker.semantic.expr_parent(),
+                checker.semantic.current_expression_parent(),
                 Some(Expr::BinOp(ast::ExprBinOp {
                     op: Operator::BitOr,
                     ..

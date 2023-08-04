@@ -63,7 +63,7 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
         return;
     }
 
-    if !checker.semantic().scope().kind.is_class() {
+    if !checker.semantic().current_scope().kind.is_class() {
         return;
     }
 
@@ -96,11 +96,12 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
         stmt.identifier(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        let stmt = checker.semantic().stmt();
-        let parent = checker.semantic().stmt_parent();
+        let stmt = checker.semantic().current_statement();
+        let parent = checker.semantic().current_statement_parent();
         let edit = delete_stmt(stmt, parent, checker.locator(), checker.indexer());
         diagnostic.set_fix(
-            Fix::automatic(edit).isolate(checker.isolation(checker.semantic().stmt_parent())),
+            Fix::automatic(edit)
+                .isolate(checker.isolation(checker.semantic().current_statement_parent())),
         );
     }
     checker.diagnostics.push(diagnostic);

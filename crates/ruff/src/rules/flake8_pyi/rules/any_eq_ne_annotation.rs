@@ -66,7 +66,7 @@ pub(crate) fn any_eq_ne_annotation(checker: &mut Checker, name: &str, parameters
         return;
     };
 
-    if !checker.semantic().scope().kind.is_class() {
+    if !checker.semantic().current_scope().kind.is_class() {
         return;
     }
 

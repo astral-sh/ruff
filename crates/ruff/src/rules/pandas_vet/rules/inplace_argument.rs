@@ -85,8 +85,8 @@ pub(crate) fn inplace_argument(checker: &mut Checker, call: &ast::ExprCall) {
                     // 2. The call is part of a larger expression (we're converting an expression to a
                     //    statement, and expressions can't contain statements).
                     if !seen_star
-                        && checker.semantic().stmt().is_expr_stmt()
-                        && checker.semantic().expr_parent().is_none()
+                        && checker.semantic().current_statement().is_expr_stmt()
+                        && checker.semantic().current_expression_parent().is_none()
                     {
                         if let Some(fix) = convert_inplace_argument_to_assignment(
                             call,

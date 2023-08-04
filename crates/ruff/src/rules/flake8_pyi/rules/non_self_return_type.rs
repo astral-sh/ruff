@@ -119,7 +119,7 @@ pub(crate) fn non_self_return_type(
     parameters: &Parameters,
     async_: bool,
 ) {
-    let ScopeKind::Class(class_def) = checker.semantic().scope().kind else {
+    let ScopeKind::Class(class_def) = checker.semantic().current_scope().kind else {
         return;
     };
 

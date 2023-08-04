@@ -124,8 +124,8 @@ fn fix_py2_block(checker: &Checker, stmt_if: &StmtIf, branch: &IfElifBranch) -> 
         BranchKind::If => match stmt_if.elif_else_clauses.first() {
             // If we have a lone `if`, delete as statement (insert pass in parent if required)
             None => {
-                let stmt = checker.semantic().stmt();
-                let parent = checker.semantic().stmt_parent();
+                let stmt = checker.semantic().current_statement();
+                let parent = checker.semantic().current_statement_parent();
                 let edit = delete_stmt(stmt, parent, checker.locator(), checker.indexer());
                 Some(Fix::suggested(edit))
             }

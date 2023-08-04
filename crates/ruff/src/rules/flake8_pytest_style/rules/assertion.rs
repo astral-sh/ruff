@@ -246,8 +246,8 @@ pub(crate) fn unittest_assertion(
                 if checker.patch(diagnostic.kind.rule()) {
                     // We're converting an expression to a statement, so avoid applying the fix if
                     // the assertion is part of a larger expression.
-                    if checker.semantic().stmt().is_expr_stmt()
-                        && checker.semantic().expr_parent().is_none()
+                    if checker.semantic().current_statement().is_expr_stmt()
+                        && checker.semantic().current_expression_parent().is_none()
                         && !checker.indexer().comment_ranges().intersects(expr.range())
                     {
                         if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {

@@ -63,7 +63,7 @@ fn matches_string_format_expression(expr: &Expr, model: &SemanticModel) -> bool 
         }) => {
             // Only evaluate the full BinOp, not the nested components.
             if model
-                .expr_parent()
+                .current_expression_parent()
                 .map_or(true, |parent| !parent.is_bin_op_expr())
             {
                 if any_over_expr(expr, &has_string_literal) {

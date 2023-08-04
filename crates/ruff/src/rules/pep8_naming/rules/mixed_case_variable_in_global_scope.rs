@@ -75,7 +75,7 @@ pub(crate) fn mixed_case_variable_in_global_scope(checker: &mut Checker, expr: &
         return;
     }
 
-    let parent = checker.semantic().stmt();
+    let parent = checker.semantic().current_statement();
     if helpers::is_named_tuple_assignment(parent, checker.semantic()) {
         return;
     }

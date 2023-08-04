@@ -122,14 +122,14 @@ pub(crate) fn unnecessary_builtin_import(
     );
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {
-            let stmt = checker.semantic().stmt();
-            let parent = checker.semantic().stmt_parent();
+            let statement = checker.semantic().current_statement();
+            let parent = checker.semantic().current_statement_parent();
             let edit = autofix::edits::remove_unused_imports(
                 unused_imports
                     .iter()
                     .map(|alias| &alias.name)
                     .map(ruff_python_ast::Identifier::as_str),
-                stmt,
+                statement,
                 parent,
                 checker.locator(),
                 checker.stylist(),

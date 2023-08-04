@@ -77,7 +77,7 @@ pub(crate) fn private_member_access(checker: &mut Checker, expr: &Expr) {
 
             // Ignore accesses on instances within special methods (e.g., `__eq__`).
             if let ScopeKind::Function(ast::StmtFunctionDef { name, .. }) =
-                checker.semantic().scope().kind
+                checker.semantic().current_scope().kind
             {
                 if matches!(
                     name.as_str(),

@@ -143,7 +143,7 @@ pub(crate) fn unexpected_special_method_signature(
     decorator_list: &[Decorator],
     parameters: &Parameters,
 ) {
-    if !checker.semantic().scope().kind.is_class() {
+    if !checker.semantic().current_scope().kind.is_class() {
         return;
     }
 

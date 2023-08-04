@@ -43,7 +43,7 @@ impl Violation for OpenFileWithContextHandler {
 /// Return `true` if the current expression is nested in an `await
 /// exit_stack.enter_async_context` call.
 fn match_async_exit_stack(semantic: &SemanticModel) -> bool {
-    let Some(expr) = semantic.expr_grandparent() else {
+    let Some(expr) = semantic.current_expression_grandparent() else {
         return false;
     };
     let Expr::Await(ast::ExprAwait { value, range: _ }) = expr else {
@@ -58,7 +58,7 @@ fn match_async_exit_stack(semantic: &SemanticModel) -> bool {
     if attr != "enter_async_context" {
         return false;
     }
-    for parent in semantic.parents() {
+    for parent in semantic.current_statements() {
         if let Stmt::With(ast::StmtWith { items, .. }) = parent {
             for item in items {
                 if let Expr::Call(ast::ExprCall { func, .. }) = &item.context_expr {
@@ -77,7 +77,7 @@ fn match_async_exit_stack(semantic: &SemanticModel) -> bool {
 /// Return `true` if the current expression is nested in an
 /// `exit_stack.enter_context` call.
 fn match_exit_stack(semantic: &SemanticModel) -> bool {
-    let Some(expr) = semantic.expr_parent() else {
+    let Some(expr) = semantic.current_expression_parent() else {
         return false;
     };
     let Expr::Call(ast::ExprCall { func, .. }) = expr else {
@@ -89,7 +89,7 @@ fn match_exit_stack(semantic: &SemanticModel) -> bool {
     if attr != "enter_context" {
         return false;
     }
-    for parent in semantic.parents() {
+    for parent in semantic.current_statements() {
         if let Stmt::With(ast::StmtWith { items, .. }) = parent {
             for item in items {
                 if let Expr::Call(ast::ExprCall { func, .. }) = &item.context_expr {
@@ -133,7 +133,7 @@ pub(crate) fn open_file_with_context_handler(checker: &mut Checker, func: &Expr)
     }
 
     // Ex) `with open("foo.txt") as f: ...`
-    if checker.semantic().stmt().is_with_stmt() {
+    if checker.semantic().current_statement().is_with_stmt() {
         return;
     }
 

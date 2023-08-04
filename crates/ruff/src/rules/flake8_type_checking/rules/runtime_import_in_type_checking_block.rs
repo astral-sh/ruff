@@ -93,7 +93,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
                     .is_runtime()
             })
         {
-            let Some(stmt_id) = binding.source else {
+            let Some(statement_id) = binding.source else {
                 continue;
             };
 
@@ -113,20 +113,23 @@ pub(crate) fn runtime_import_in_type_checking_block(
                 })
             {
                 ignores_by_statement
-                    .entry(stmt_id)
+                    .entry(statement_id)
                     .or_default()
                     .push(import);
             } else {
-                errors_by_statement.entry(stmt_id).or_default().push(import);
+                errors_by_statement
+                    .entry(statement_id)
+                    .or_default()
+                    .push(import);
             }
         }
     }
 
     // Generate a diagnostic for every import, but share a fix across all imports within the same
     // statement (excluding those that are ignored).
-    for (stmt_id, imports) in errors_by_statement {
+    for (statement_id, imports) in errors_by_statement {
         let fix = if checker.patch(Rule::RuntimeImportInTypeCheckingBlock) {
-            fix_imports(checker, stmt_id, &imports).ok()
+            fix_imports(checker, statement_id, &imports).ok()
         } else {
             None
         };
@@ -189,9 +192,9 @@ struct ImportBinding<'a> {
 }
 
 /// Generate a [`Fix`] to remove runtime imports from a type-checking block.
-fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[ImportBinding]) -> Result<Fix> {
-    let stmt = checker.semantic().stmts[stmt_id];
-    let parent = checker.semantic().stmts.parent(stmt);
+fn fix_imports(checker: &Checker, statement_id: NodeId, imports: &[ImportBinding]) -> Result<Fix> {
+    let statement = checker.semantic().statements[statement_id];
+    let parent = checker.semantic().statements.parent(statement);
     let member_names: Vec<Cow<'_, str>> = imports
         .iter()
         .map(|ImportBinding { import, .. }| import.member_name())
@@ -209,7 +212,7 @@ fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[ImportBinding]) ->
     // Step 1) Remove the import.
     let remove_import_edit = autofix::edits::remove_unused_imports(
         member_names.iter().map(AsRef::as_ref),
-        stmt,
+        statement,
         parent,
         checker.locator(),
         checker.stylist(),
@@ -219,7 +222,7 @@ fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[ImportBinding]) ->
     // Step 2) Add the import to the top-level.
     let add_import_edit = checker.importer().runtime_import_edit(
         &ImportedMembers {
-            statement: stmt,
+            statement,
             names: member_names.iter().map(AsRef::as_ref).collect(),
         },
         at,

@@ -35,7 +35,7 @@ pub(crate) fn runtime_evaluated(
 }
 
 fn runtime_evaluated_base_class(base_classes: &[String], semantic: &SemanticModel) -> bool {
-    let ScopeKind::Class(class_def) = &semantic.scope().kind else {
+    let ScopeKind::Class(class_def) = &semantic.current_scope().kind else {
         return false;
     };
 
@@ -49,7 +49,7 @@ fn runtime_evaluated_base_class(base_classes: &[String], semantic: &SemanticMode
 }
 
 fn runtime_evaluated_decorators(decorators: &[String], semantic: &SemanticModel) -> bool {
-    let ScopeKind::Class(class_def) = &semantic.scope().kind else {
+    let ScopeKind::Class(class_def) = &semantic.current_scope().kind else {
         return false;
     };
 

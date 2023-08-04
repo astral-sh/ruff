@@ -149,7 +149,7 @@ pub(crate) fn native_literals(
     if checker.semantic().in_f_string() {
         if checker
             .semantic()
-            .expr_ancestors()
+            .current_expressions()
             .filter(|expr| expr.is_joined_str_expr())
             .count()
             > 1
