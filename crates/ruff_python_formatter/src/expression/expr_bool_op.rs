@@ -44,10 +44,10 @@ impl FormatNodeRule<ExprBoolOp> for FormatExprBoolOp {
                 return Ok(());
             };
 
-            if self.wrap.is_some_and(|value| value) {
-                write!(f, [hard_line_break()])?;
-            }
             write!(f, [in_parentheses_only_group(&first.format())])?;
+            if self.wrap.is_some_and(|value| value) {
+                write!(f, [&hard_line_break()])?;
+            }
 
             for value in values {
                 let leading_value_comments = comments.leading_comments(value);

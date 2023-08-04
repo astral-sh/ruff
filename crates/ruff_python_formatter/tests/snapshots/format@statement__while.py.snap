@@ -57,7 +57,11 @@ while aVeryLongConditionThatSpillsOverToTheNextLineBecauseItIsExtremelyLongAndGo
 else:
     ...
 
-while some_condition(unformatted, args) and anotherCondition or aThirdCondition:  # comment
+while (
+    some_condition(unformatted, args)
+    and anotherCondition
+    or aThirdCondition
+):  # comment
     print("Do something")
 
 

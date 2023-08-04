@@ -68,6 +68,17 @@ if (
     and [dddddddddddddd, eeeeeeeeee, fffffffffffffff]
 ):
     pass
+
+# Regression test for https://github.com/astral-sh/ruff/issues/6068
+if not (
+    isinstance(aaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbb) or numpy and isinstance(ccccccccccc, dddddd)
+):
+    pass
+
+if not (
+    isinstance(aaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbb) and numpy or isinstance(ccccccccccc, dddddd)
+):
+    pass
 ```
 
 ## Output
@@ -110,22 +121,28 @@ if (
     ...
 
 
-if [2222, 333] and [
-    aaaaaaaaaaaaa,
-    bbbbbbbbbbbbbbbbbbbb,
-    cccccccccccccccccccc,
-    dddddddddddddddddddd,
-    eeeeeeeeee,
-]:
+if (
+    [2222, 333]
+    and [
+        aaaaaaaaaaaaa,
+        bbbbbbbbbbbbbbbbbbbb,
+        cccccccccccccccccccc,
+        dddddddddddddddddddd,
+        eeeeeeeeee,
+    ]
+):
     ...
 
-if [
-    aaaaaaaaaaaaa,
-    bbbbbbbbbbbbbbbbbbbb,
-    cccccccccccccccccccc,
-    dddddddddddddddddddd,
-    eeeeeeeeee,
-] and [2222, 333]:
+if (
+    [
+        aaaaaaaaaaaaa,
+        bbbbbbbbbbbbbbbbbbbb,
+        cccccccccccccccccccc,
+        dddddddddddddddddddd,
+        eeeeeeeeee,
+    ]
+    and [2222, 333]
+):
     pass
 
 # Break right only applies for boolean operations with a left and right side
@@ -134,6 +151,21 @@ if (
     and bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
     and ccccccccccccccccc
     and [dddddddddddddd, eeeeeeeeee, fffffffffffffff]
+):
+    pass
+
+# Regression test for https://github.com/astral-sh/ruff/issues/6068
+if not (
+    isinstance(aaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbb)
+    or numpy
+    and isinstance(ccccccccccc, dddddd)
+):
+    pass
+
+if not (
+    isinstance(aaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbb)
+    and numpy
+    or isinstance(ccccccccccc, dddddd)
 ):
     pass
 ```

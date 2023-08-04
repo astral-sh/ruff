@@ -196,7 +196,7 @@ class C:
 @@ -110,19 +110,20 @@
              value, is_going_to_be="too long to fit in a single line", srsly=True
          ), "Not what we expected"
- 
+
 -        assert {
 -            key1: value1,
 -            key2: value2,
@@ -224,20 +224,20 @@ class C:
 +            }
 +            == expected
 +        ), "Not what we expected and the message is too long to fit in one line"
- 
+
          assert expected(
              value, is_going_to_be="too long to fit in a single line", srsly=True
-@@ -153,7 +154,8 @@
+@@ -153,7 +155,8 @@
              " because it's too long"
          )
- 
+
 -        dis_c_instance_method = """\
 +        dis_c_instance_method = (
 +            """\
          %3d           0 LOAD_FAST                1 (x)
                        2 LOAD_CONST               1 (1)
                        4 COMPARE_OP               2 (==)
-@@ -161,8 +163,8 @@
+@@ -161,8 +164,8 @@
                        8 STORE_ATTR               0 (x)
                       10 LOAD_CONST               0 (None)
                       12 RETURN_VALUE
@@ -246,7 +246,7 @@ class C:
 +        """
 +            % (_C.__init__.__code__.co_firstlineno + 1,)
          )
- 
+
          assert (
 ```
 
@@ -310,7 +310,8 @@ class C:
             22
         ]
         assignment = (
-            some.rather.elaborate.rule() and another.rule.ending_with.index[123]
+            some.rather.elaborate.rule()
+            and another.rule.ending_with.index[123]
         )
 
     def easy_asserts(self) -> None:
@@ -623,5 +624,3 @@ class C:
             }
         )
 ```
-
-

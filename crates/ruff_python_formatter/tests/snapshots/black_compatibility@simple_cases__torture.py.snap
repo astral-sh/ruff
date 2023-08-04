@@ -50,7 +50,7 @@ assert (
  )  #
  
  assert sort_by_dependency(
-@@ -25,9 +25,7 @@
+@@ -25,30 +25,32 @@
  class A:
      def foo(self):
          for _ in range(10):
@@ -61,6 +61,49 @@ assert (
  
  
  def test(self, othr):
+-    return 1 == 2 and (
+-        name,
+-        description,
+-        self.default,
+-        self.selected,
+-        self.auto_generated,
+-        self.parameters,
+-        self.meta_data,
+-        self.schedule,
+-    ) == (
+-        name,
+-        description,
+-        othr.default,
+-        othr.selected,
+-        othr.auto_generated,
+-        othr.parameters,
+-        othr.meta_data,
+-        othr.schedule,
++    return (
++        1 == 2
++        and (
++            name,
++            description,
++            self.default,
++            self.selected,
++            self.auto_generated,
++            self.parameters,
++            self.meta_data,
++            self.schedule,
++        )
++        == (
++            name,
++            description,
++            othr.default,
++            othr.selected,
++            othr.auto_generated,
++            othr.parameters,
++            othr.meta_data,
++            othr.schedule,
++        )
+     )
+ 
+ 
 ```
 
 ## Ruff Output
@@ -97,24 +140,28 @@ class A:
 
 
 def test(self, othr):
-    return 1 == 2 and (
-        name,
-        description,
-        self.default,
-        self.selected,
-        self.auto_generated,
-        self.parameters,
-        self.meta_data,
-        self.schedule,
-    ) == (
-        name,
-        description,
-        othr.default,
-        othr.selected,
-        othr.auto_generated,
-        othr.parameters,
-        othr.meta_data,
-        othr.schedule,
+    return (
+        1 == 2
+        and (
+            name,
+            description,
+            self.default,
+            self.selected,
+            self.auto_generated,
+            self.parameters,
+            self.meta_data,
+            self.schedule,
+        )
+        == (
+            name,
+            description,
+            othr.default,
+            othr.selected,
+            othr.auto_generated,
+            othr.parameters,
+            othr.meta_data,
+            othr.schedule,
+        )
     )
 
 
