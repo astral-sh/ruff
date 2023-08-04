@@ -7,7 +7,7 @@ use crate::context::PyFormatContext;
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::expr_tuple::TupleParentheses;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
-use crate::expression::{format_call_chain_layout, CallChainLayout};
+use crate::expression::CallChainLayout;
 use crate::prelude::*;
 use crate::FormatNodeRule;
 
@@ -34,7 +34,7 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
             ctx: _,
         } = item;
 
-        let call_chain_layout = format_call_chain_layout(f, self.call_chain_layout, item);
+        let call_chain_layout = self.call_chain_layout.apply_in_node(item, f);
 
         let comments = f.context().comments().clone();
         let dangling_comments = comments.dangling_comments(item.as_any_node_ref());

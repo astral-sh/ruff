@@ -1,4 +1,4 @@
-use crate::expression::{format_call_chain_layout, CallChainLayout};
+use crate::expression::CallChainLayout;
 use ruff_formatter::FormatRuleWithOptions;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{Expr, ExprCall};
@@ -29,7 +29,7 @@ impl FormatNodeRule<ExprCall> for FormatExprCall {
             arguments,
         } = item;
 
-        let call_chain_layout = format_call_chain_layout(f, self.call_chain_layout, item);
+        let call_chain_layout = self.call_chain_layout.apply_in_node(item, f);
 
         let fmt_inner = format_with(|f| {
             match func.as_ref() {

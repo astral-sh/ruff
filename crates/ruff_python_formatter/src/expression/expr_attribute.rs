@@ -4,7 +4,7 @@ use ruff_python_ast::{Constant, Expr, ExprAttribute, ExprConstant};
 
 use crate::comments::{leading_comments, trailing_comments};
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parentheses};
-use crate::expression::{format_call_chain_layout, CallChainLayout};
+use crate::expression::CallChainLayout;
 use crate::prelude::*;
 use crate::FormatNodeRule;
 
@@ -31,7 +31,7 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
             ctx: _,
         } = item;
 
-        let call_chain_layout = format_call_chain_layout(f, self.call_chain_layout, item);
+        let call_chain_layout = self.call_chain_layout.apply_in_node(item, f);
 
         let needs_parentheses = matches!(
             value.as_ref(),
