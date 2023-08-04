@@ -401,6 +401,7 @@ impl<'source> Lexer<'source> {
     /// Lex a single magic command.
     fn lex_magic_command(&mut self, kind: MagicKind) -> Tok {
         let mut value = String::new();
+        let mut previous_char_is_whitespace = false;
 
         loop {
             match self.cursor.first() {
@@ -428,35 +429,43 @@ impl<'source> Lexer<'source> {
                     self.cursor.bump();
                     value.push('\\');
                 }
+                '?' => {
+                    self.cursor.bump();
+                    let mut question_count: u8 = 1;
+                    while self.cursor.eat_char('?') {
+                        question_count += 1;
+                    }
+
+                    // The help end magic command is valid if it has 1 or 2 question marks.
+                    if question_count <= 2
+                        && !previous_char_is_whitespace
+                        && !value.is_empty()
+                        && matches!(self.cursor.first(), '\n' | '\r' | EOF_CHAR)
+                    {
+                        if kind.is_help() {
+                            value = value.trim_start_matches([' ', '?']).to_string();
+                        } else {
+                            value.insert_str(0, &kind.to_string());
+                        }
+                        let kind = match question_count {
+                            1 => MagicKind::Help,
+                            2 => MagicKind::Help2,
+                            _ => unreachable!("`question_count` is always 1 or 2"),
+                        };
+                        return Tok::MagicCommand { kind, value };
+                    } else {
+                        // Not a help end magic command, so continue with the lexing.
+                        value.reserve(question_count as usize);
+                        for _ in 0..question_count {
+                            value.push('?');
+                        }
+                    }
+                }
                 '\n' | '\r' | EOF_CHAR => {
-                    let mut chars = value.chars().rev();
-                    // Check if it's actually a help magic command. The help magic
-                    // command takes priority over any other magic command.
-                    let kind = match [chars.next(), chars.next(), chars.next()] {
-                        [Some('?'), Some('?'), Some(c)] if c != '?' && !c.is_whitespace() => {
-                            if kind.is_help() {
-                                value = value.trim_start_matches([' ', '?']).to_string();
-                            } else {
-                                value.insert_str(0, &kind.to_string());
-                            }
-                            value.pop(); // '?'
-                            value.pop(); // '?'
-                            MagicKind::Help2
-                        }
-                        [Some('?'), Some(c), Some(_) | None] if c != '?' && !c.is_whitespace() => {
-                            if kind.is_help() {
-                                value = value.trim_start_matches([' ', '?']).to_string();
-                            } else {
-                                value.insert_str(0, &kind.to_string());
-                            }
-                            value.pop(); // '?'
-                            MagicKind::Help
-                        }
-                        _ => kind,
-                    };
                     return Tok::MagicCommand { kind, value };
                 }
                 c => {
+                    previous_char_is_whitespace = c.is_whitespace();
                     self.cursor.bump();
                     value.push(c);
                 }
@@ -1397,6 +1406,7 @@ mod tests {
     foo?
 ?? \
 ?
+????
 %foo?
 %foo??
 %%foo???"
@@ -1457,6 +1467,11 @@ mod tests {
                 Tok::Newline,
                 Tok::MagicCommand {
                     value: " ?".to_string(),
+                    kind: MagicKind::Help2,
+                },
+                Tok::Newline,
+                Tok::MagicCommand {
+                    value: "??".to_string(),
                     kind: MagicKind::Help2,
                 },
                 Tok::Newline,
