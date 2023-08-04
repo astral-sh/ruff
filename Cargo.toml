@@ -4,7 +4,7 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-rust-version = "1.70"
+rust-version = "1.71"
 homepage = "https://beta.ruff.rs/docs"
 documentation = "https://beta.ruff.rs/docs"
 repository = "https://github.com/astral-sh/ruff"
