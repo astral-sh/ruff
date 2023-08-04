@@ -32,7 +32,7 @@ smallvec = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-ruff_formatter = { path = "../ruff_formatter", features = ["serde"]}
+ruff_formatter = { path = "../ruff_formatter", features = ["serde"] }
 
 insta = { workspace = true, features = ["glob"] }
 serde = { workspace = true }
@@ -43,8 +43,8 @@ similar = { workspace = true }
 name = "ruff_python_formatter_fixtures"
 path = "tests/fixtures.rs"
 test = true
-required-features = [ "serde" ]
+required-features = ["serde"]
 
 [features]
-serde = ["dep:serde", "ruff_formatter/serde", "ruff_source_file/serde"]
+serde = ["dep:serde", "ruff_formatter/serde", "ruff_source_file/serde", "ruff_python_ast/serde"]
 default = ["serde"]
