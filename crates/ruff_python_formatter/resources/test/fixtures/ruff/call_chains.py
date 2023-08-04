@@ -114,8 +114,11 @@ e2 = (1 + 2)().w().t()
 e3 = (1 + 2)[1].w().t()
 
 # Treat preserved parentheses correctly
-f1 = a.w().t(1,)
-f2 = (a).w().t(1,)
+f1 = (b().c()).d(1,)
+f2 = b().c().d(1,)
+f3 = (b).c().d(1,)
+f4 = (a)(b).c(1,)
+f5 = (a.b()).c(1,)
 
 # Indent in the parentheses without breaking
 g1 = (
@@ -151,5 +154,4 @@ zero(
     five,
 )
 
-a = (b().c("asdfasfaefinitive Guidddddde to Django: Web Developfdddddddment Done Rdddight")).d()
-a = b().c("asdfasfaefinitive Guidddddde to Django: Web Developfdddddddment Done Rdddight").d()
+

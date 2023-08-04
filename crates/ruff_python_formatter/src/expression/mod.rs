@@ -494,23 +494,48 @@ impl CallChainLayout {
         loop {
             match expr {
                 AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, .. }) => {
-                    // `f().x` | `data[:100].T`
+                    expr = AnyNodeRef::from(value.as_ref());
+                    // ```
+                    // f().g
+                    // ^^^ value
+                    // data[:100].T`
+                    // ^^^^^^^^^^ value
+                    // ```
                     if matches!(value.as_ref(), Expr::Call(_) | Expr::Subscript(_)) {
                         attributes_after_parentheses += 1;
+                    } else if is_expression_parenthesized(expr, source) {
+                        // `(a).b`. We preserve these parentheses so don't recurse
+                        attributes_after_parentheses += 1;
+                        break;
                     }
-                    expr = AnyNodeRef::from(value.as_ref());
                 }
+                // ```
+                // f()
+                // ^^^ expr
+                // ^ func
+                // data[:100]
+                // ^^^^^^^^^^ expr
+                // ^^^^ value
+                // ```
                 AnyNodeRef::ExprCall(ast::ExprCall { func: inner, .. })
                 | AnyNodeRef::ExprSubscript(ast::ExprSubscript { value: inner, .. }) => {
                     expr = AnyNodeRef::from(inner.as_ref());
                 }
                 _ => {
-                    // We to format the following in fluent style: `f2 = (a).w().t(1,)`
+                    // We to format the following in fluent style:
+                    // ```
+                    // f2 = (a).w().t(1,)
+                    //       ^ expr
+                    // ```
                     if is_expression_parenthesized(expr, source) {
                         attributes_after_parentheses += 1;
                     }
                     break;
                 }
+            }
+            // We preserve these parentheses so don't recurse
+            if is_expression_parenthesized(expr, source) {
+                break;
             }
         }
         if attributes_after_parentheses < 2 {

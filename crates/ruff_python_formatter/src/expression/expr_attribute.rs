@@ -3,7 +3,9 @@ use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{Constant, Expr, ExprAttribute, ExprConstant};
 
 use crate::comments::{leading_comments, trailing_comments};
-use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parentheses};
+use crate::expression::parentheses::{
+    is_expression_parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
+};
 use crate::expression::CallChainLayout;
 use crate::prelude::*;
 use crate::FormatNodeRule;
@@ -50,7 +52,7 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
 
         if needs_parentheses {
             value.format().with_options(Parentheses::Always).fmt(f)?;
-        } else {
+        } else if call_chain_layout == CallChainLayout::Fluent {
             match value.as_ref() {
                 Expr::Attribute(expr) => {
                     expr.format().with_options(call_chain_layout).fmt(f)?;
@@ -69,8 +71,19 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
                         soft_line_break().fmt(f)?;
                     }
                 }
-                _ => value.format().fmt(f)?,
+                _ => {
+                    // This matches [`CallChainLayout::from_expression`]
+                    if is_expression_parenthesized(value.as_ref().into(), f.context().source()) {
+                        value.format().with_options(Parentheses::Always).fmt(f)?;
+                        // Format the dot on its own line
+                        soft_line_break().fmt(f)?;
+                    } else {
+                        value.format().fmt(f)?;
+                    }
+                }
             }
+        } else {
+            value.format().fmt(f)?;
         }
 
         if comments.has_trailing_own_line_comments(value.as_ref()) {
