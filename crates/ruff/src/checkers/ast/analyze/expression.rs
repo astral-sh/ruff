@@ -341,6 +341,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             },
         ) => {
             if checker.any_enabled(&[
+                // pylint
+                Rule::BadStringFormatCharacter,
                 // pyflakes
                 Rule::StringDotFormatInvalidFormat,
                 Rule::StringDotFormatExtraNamedArguments,
@@ -1134,12 +1136,14 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_simplify::rules::double_negation(checker, expr, *op, operand);
             }
         }
-        Expr::Compare(ast::ExprCompare {
-            left,
-            ops,
-            comparators,
-            range: _,
-        }) => {
+        Expr::Compare(
+            compare @ ast::ExprCompare {
+                left,
+                ops,
+                comparators,
+                range: _,
+            },
+        ) => {
             let check_none_comparisons = checker.enabled(Rule::NoneComparison);
             let check_true_false_comparisons = checker.enabled(Rule::TrueFalseComparison);
             if check_none_comparisons || check_true_false_comparisons {
@@ -1157,7 +1161,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 pyflakes::rules::invalid_literal_comparison(checker, left, ops, comparators, expr);
             }
             if checker.enabled(Rule::TypeComparison) {
-                pycodestyle::rules::type_comparison(checker, expr, ops, comparators);
+                pycodestyle::rules::type_comparison(checker, compare);
             }
             if checker.any_enabled(&[
                 Rule::SysVersionCmpStr3,

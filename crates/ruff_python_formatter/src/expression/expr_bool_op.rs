@@ -98,7 +98,7 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for BoolOp {
 }
 
 impl FormatRule<BoolOp, PyFormatContext<'_>> for FormatBoolOp {
-    fn fmt(&self, item: &BoolOp, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+    fn fmt(&self, item: &BoolOp, f: &mut PyFormatter) -> FormatResult<()> {
         let operator = match item {
             BoolOp::And => "and",
             BoolOp::Or => "or",

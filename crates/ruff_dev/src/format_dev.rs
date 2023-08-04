@@ -209,7 +209,7 @@ pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
         }
         info!(
             parent: None,
-            "Done: {} stability errors, {} files, similarity index {:.3}), took {:.2}s, {} input files contained syntax errors ",
+            "Done: {} stability errors, {} files, similarity index {:.5}), took {:.2}s, {} input files contained syntax errors ",
             error_count,
             result.file_count,
             result.statistics.similarity_index(),
@@ -313,7 +313,7 @@ fn format_dev_multi_project(args: &Args) -> anyhow::Result<bool> {
 
                 info!(
                     parent: None,
-                    "Finished {}: {} stability errors, {} files, similarity index {:.3}), took {:.2}s, {} input files contained syntax errors ",
+                    "Finished {}: {} stability errors, {} files, similarity index {:.5}), took {:.2}s, {} input files contained syntax errors ",
                     project_path.display(),
                     result.error_count(),
                     result.file_count,
@@ -376,10 +376,10 @@ fn format_dev_project(
 
     // TODO(konstin): The assumptions between this script (one repo) and ruff (pass in a bunch of
     // files) mismatch.
-    let options = BlackOptions::from_file(&files[0])?.to_py_format_options();
+    let black_options = BlackOptions::from_file(&files[0])?;
     debug!(
         parent: None,
-        "Options for {}: {options:?}",
+        "Options for {}: {black_options:?}",
         files[0].display()
     );
 
@@ -398,7 +398,7 @@ fn format_dev_project(
         paths
             .into_par_iter()
             .map(|dir_entry| {
-                let result = format_dir_entry(dir_entry, stability_check, write, &options);
+                let result = format_dir_entry(dir_entry, stability_check, write, &black_options);
                 pb_span.pb_inc(1);
                 result
             })
@@ -447,7 +447,7 @@ fn format_dir_entry(
     dir_entry: Result<DirEntry, ignore::Error>,
     stability_check: bool,
     write: bool,
-    options: &PyFormatOptions,
+    options: &BlackOptions,
 ) -> anyhow::Result<(Result<Statistics, CheckFileError>, PathBuf), Error> {
     let dir_entry = match dir_entry.context("Iterating the files in the repository failed") {
         Ok(dir_entry) => dir_entry,
@@ -460,27 +460,27 @@ fn format_dir_entry(
     }
 
     let file = dir_entry.path().to_path_buf();
+    let options = options.to_py_format_options(&file);
     // Handle panics (mostly in `debug_assert!`)
-    let result =
-        match catch_unwind(|| format_dev_file(&file, stability_check, write, options.clone())) {
-            Ok(result) => result,
-            Err(panic) => {
-                if let Some(message) = panic.downcast_ref::<String>() {
-                    Err(CheckFileError::Panic {
-                        message: message.clone(),
-                    })
-                } else if let Some(&message) = panic.downcast_ref::<&str>() {
-                    Err(CheckFileError::Panic {
-                        message: message.to_string(),
-                    })
-                } else {
-                    Err(CheckFileError::Panic {
-                        // This should not happen, but it can
-                        message: "(Panic didn't set a string message)".to_string(),
-                    })
-                }
+    let result = match catch_unwind(|| format_dev_file(&file, stability_check, write, options)) {
+        Ok(result) => result,
+        Err(panic) => {
+            if let Some(message) = panic.downcast_ref::<String>() {
+                Err(CheckFileError::Panic {
+                    message: message.clone(),
+                })
+            } else if let Some(&message) = panic.downcast_ref::<&str>() {
+                Err(CheckFileError::Panic {
+                    message: message.to_string(),
+                })
+            } else {
+                Err(CheckFileError::Panic {
+                    // This should not happen, but it can
+                    message: "(Panic didn't set a string message)".to_string(),
+                })
             }
-        };
+        }
+    };
     Ok((result, file))
 }
 
@@ -833,9 +833,8 @@ impl BlackOptions {
         Self::from_toml(&fs::read_to_string(&path)?, repo)
     }
 
-    fn to_py_format_options(&self) -> PyFormatOptions {
-        let mut options = PyFormatOptions::default();
-        options
+    fn to_py_format_options(&self, file: &Path) -> PyFormatOptions {
+        PyFormatOptions::from_extension(file)
             .with_line_width(
                 LineWidth::try_from(self.line_length).expect("Invalid line length limit"),
             )
@@ -843,8 +842,7 @@ impl BlackOptions {
                 MagicTrailingComma::Ignore
             } else {
                 MagicTrailingComma::Respect
-            });
-        options
+            })
     }
 }
 
@@ -868,7 +866,7 @@ mod tests {
         "};
         let options = BlackOptions::from_toml(toml, Path::new("pyproject.toml"))
             .unwrap()
-            .to_py_format_options();
+            .to_py_format_options(Path::new("code_inline.py"));
         assert_eq!(options.line_width(), LineWidth::try_from(119).unwrap());
         assert!(matches!(
             options.magic_trailing_comma(),
@@ -887,7 +885,7 @@ mod tests {
         "#};
         let options = BlackOptions::from_toml(toml, Path::new("pyproject.toml"))
             .unwrap()
-            .to_py_format_options();
+            .to_py_format_options(Path::new("code_inline.py"));
         assert_eq!(options.line_width(), LineWidth::try_from(130).unwrap());
         assert!(matches!(
             options.magic_trailing_comma(),

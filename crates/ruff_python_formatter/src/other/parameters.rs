@@ -225,7 +225,7 @@ struct CommentsAroundText<'a> {
 }
 
 impl Format<PyFormatContext<'_>> for CommentsAroundText<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         if self.comments.is_empty() {
             text(self.text).fmt(f)
         } else {

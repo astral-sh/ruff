@@ -5,9 +5,7 @@ use ruff_python_ast::{
 };
 use smallvec::SmallVec;
 
-use ruff_formatter::{
-    format_args, write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions,
-};
+use ruff_formatter::{format_args, write, FormatOwnedWithRule, FormatRefWithRule};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
 use ruff_python_ast::str::is_implicit_concatenation;
 
@@ -19,23 +17,11 @@ use crate::expression::parentheses::{
     NeedsParentheses, OptionalParentheses,
 };
 use crate::expression::string::StringLayout;
-use crate::expression::Parentheses;
 use crate::prelude::*;
 use crate::FormatNodeRule;
 
 #[derive(Default)]
-pub struct FormatExprBinOp {
-    parentheses: Option<Parentheses>,
-}
-
-impl FormatRuleWithOptions<ExprBinOp, PyFormatContext<'_>> for FormatExprBinOp {
-    type Options = Option<Parentheses>;
-
-    fn with_options(mut self, options: Self::Options) -> Self {
-        self.parentheses = options;
-        self
-    }
-}
+pub struct FormatExprBinOp;
 
 impl FormatNodeRule<ExprBinOp> for FormatExprBinOp {
     fn fmt_fields(&self, item: &ExprBinOp, f: &mut PyFormatter) -> FormatResult<()> {
@@ -255,7 +241,7 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Operator {
 }
 
 impl FormatRule<Operator, PyFormatContext<'_>> for FormatOperator {
-    fn fmt(&self, item: &Operator, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+    fn fmt(&self, item: &Operator, f: &mut PyFormatter) -> FormatResult<()> {
         let operator = match item {
             Operator::Add => "+",
             Operator::Sub => "-",

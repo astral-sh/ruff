@@ -20,6 +20,7 @@ pub(crate) mod stmt_global;
 pub(crate) mod stmt_if;
 pub(crate) mod stmt_import;
 pub(crate) mod stmt_import_from;
+pub(crate) mod stmt_line_magic;
 pub(crate) mod stmt_match;
 pub(crate) mod stmt_nonlocal;
 pub(crate) mod stmt_pass;

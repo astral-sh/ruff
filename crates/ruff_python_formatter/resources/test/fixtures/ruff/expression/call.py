@@ -52,7 +52,7 @@ f(
     hey_this_is_a_very_long_call=1, it_has_funny_attributes_asdf_asdf=1, too_long_for_the_line=1, really=True
 )
 
-# TODO(konstin): Call chains/fluent interface (https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#call-chains)
+# Call chains/fluent interface (https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#call-chains)
 result = (
     session.query(models.Customer.id)
     .filter(

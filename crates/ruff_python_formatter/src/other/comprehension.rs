@@ -109,7 +109,7 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
 struct ExprTupleWithoutParentheses<'a>(&'a Expr);
 
 impl Format<PyFormatContext<'_>> for ExprTupleWithoutParentheses<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         match self.0 {
             Expr::Tuple(expr_tuple) => expr_tuple
                 .format()

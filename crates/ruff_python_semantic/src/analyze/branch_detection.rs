@@ -10,7 +10,7 @@ fn common_ancestor(
     left: NodeId,
     right: NodeId,
     stop: Option<NodeId>,
-    node_tree: &Nodes,
+    node_tree: &Nodes<Stmt>,
 ) -> Option<NodeId> {
     if stop.is_some_and(|stop| left == stop || right == stop) {
         return None;
@@ -86,7 +86,7 @@ fn descendant_of<'a>(
     stmt: NodeId,
     ancestors: &[&'a Stmt],
     stop: NodeId,
-    node_tree: &Nodes<'a>,
+    node_tree: &Nodes<'a, Stmt>,
 ) -> bool {
     ancestors.iter().any(|ancestor| {
         node_tree.node_id(ancestor).is_some_and(|ancestor| {
@@ -97,7 +97,7 @@ fn descendant_of<'a>(
 
 /// Return `true` if `left` and `right` are on different branches of an `if` or
 /// `try` statement.
-pub fn different_forks(left: NodeId, right: NodeId, node_tree: &Nodes) -> bool {
+pub fn different_forks(left: NodeId, right: NodeId, node_tree: &Nodes<Stmt>) -> bool {
     if let Some(ancestor) = common_ancestor(left, right, None, node_tree) {
         for items in alternatives(node_tree[ancestor]) {
             let l = descendant_of(left, &items, ancestor, node_tree);

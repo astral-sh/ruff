@@ -13,7 +13,7 @@ use ruff_text_size::TextRange;
 struct ExprTupleWithoutParentheses<'a>(&'a Expr);
 
 impl Format<PyFormatContext<'_>> for ExprTupleWithoutParentheses<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         match self.0 {
             Expr::Tuple(expr_tuple) => expr_tuple
                 .format()
@@ -98,7 +98,7 @@ impl<'a> From<&AnyStatementFor<'a>> for AnyNodeRef<'a> {
 }
 
 impl Format<PyFormatContext<'_>> for AnyStatementFor<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let target = self.target();
         let iter = self.iter();
         let body = self.body();

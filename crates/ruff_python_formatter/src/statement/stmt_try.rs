@@ -100,11 +100,7 @@ impl FormatRuleWithOptions<ExceptHandler, PyFormatContext<'_>> for FormatExceptH
 }
 
 impl FormatRule<ExceptHandler, PyFormatContext<'_>> for FormatExceptHandler {
-    fn fmt(
-        &self,
-        item: &ExceptHandler,
-        f: &mut Formatter<PyFormatContext<'_>>,
-    ) -> FormatResult<()> {
+    fn fmt(&self, item: &ExceptHandler, f: &mut PyFormatter) -> FormatResult<()> {
         match item {
             ExceptHandler::ExceptHandler(x) => {
                 x.format().with_options(self.except_handler_kind).fmt(f)
@@ -126,7 +122,7 @@ impl<'ast> AsFormat<PyFormatContext<'ast>> for ExceptHandler {
     }
 }
 impl Format<PyFormatContext<'_>> for AnyStatementTry<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let comments_info = f.context().comments().clone();
         let mut dangling_comments = comments_info.dangling_comments(self);
         let body = self.body();

@@ -198,3 +198,7 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 ).format(a=1)
 
 "{}".format(**c)
+
+"{}".format(
+    1  # comment
+)

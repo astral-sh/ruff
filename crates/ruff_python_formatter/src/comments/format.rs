@@ -3,7 +3,7 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_formatter::{format_args, write, FormatError, SourceCode};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
-use ruff_python_trivia::{lines_after, lines_before, skip_trailing_trivia};
+use ruff_python_trivia::{lines_after, lines_after_ignoring_trivia, lines_before};
 
 use crate::comments::SourceComment;
 use crate::context::NodeLevel;
@@ -80,7 +80,7 @@ pub(crate) struct FormatLeadingAlternateBranchComments<'a> {
 }
 
 impl Format<PyFormatContext<'_>> for FormatLeadingAlternateBranchComments<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         if let Some(first_leading) = self.comments.first() {
             // Leading comments only preserves the lines after the comment but not before.
             // Insert the necessary lines.
@@ -90,10 +90,9 @@ impl Format<PyFormatContext<'_>> for FormatLeadingAlternateBranchComments<'_> {
 
             write!(f, [leading_comments(self.comments)])?;
         } else if let Some(last_preceding) = self.last_node {
-            let full_end = skip_trailing_trivia(last_preceding.end(), f.context().source());
             // The leading comments formatting ensures that it preserves the right amount of lines after
             // We need to take care of this ourselves, if there's no leading `else` comment.
-            if lines_after(full_end, f.context().source()) > 1 {
+            if lines_after_ignoring_trivia(last_preceding.end(), f.context().source()) > 1 {
                 write!(f, [empty_line()])?;
             }
         }
@@ -121,7 +120,7 @@ pub(crate) enum FormatTrailingComments<'a> {
 }
 
 impl Format<PyFormatContext<'_>> for FormatTrailingComments<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let comments = f.context().comments().clone();
 
         let trailing_comments = match self {
@@ -152,12 +151,10 @@ impl Format<PyFormatContext<'_>> for FormatTrailingComments<'_> {
                 write!(
                     f,
                     [
-                        line_suffix(&format_with(|f| {
-                            write!(
-                                f,
-                                [empty_lines(lines_before_comment), format_comment(trailing)]
-                            )
-                        })),
+                        line_suffix(&format_args![
+                            empty_lines(lines_before_comment),
+                            format_comment(trailing)
+                        ]),
                         expand_parent()
                     ]
                 )?;
@@ -243,7 +240,7 @@ struct FormatComment<'a> {
 }
 
 impl Format<PyFormatContext<'_>> for FormatComment<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let slice = self.comment.slice();
         let comment_text = slice.text(SourceCode::new(f.context().source()));
 

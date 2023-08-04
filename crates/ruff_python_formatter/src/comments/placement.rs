@@ -29,7 +29,7 @@ pub(super) fn place_comment<'a>(
 
     // Change comment placement depending on the node type. These can be seen as node-specific
     // fixups.
-    comment.then_with(|comment| match comment.enclosing_node() {
+    comment.or_else(|comment| match comment.enclosing_node() {
         AnyNodeRef::Parameters(arguments) => {
             handle_parameters_separator_comment(comment, arguments, locator)
         }
@@ -49,7 +49,7 @@ pub(super) fn place_comment<'a>(
         }
         AnyNodeRef::Keyword(_) => handle_dict_unpacking_comment(comment, locator),
         AnyNodeRef::ExprDict(_) => handle_dict_unpacking_comment(comment, locator)
-            .then_with(|comment| handle_bracketed_end_of_line_comment(comment, locator)),
+            .or_else(|comment| handle_bracketed_end_of_line_comment(comment, locator)),
         AnyNodeRef::ExprIfExp(expr_if) => handle_expr_if_comment(comment, expr_if, locator),
         AnyNodeRef::ExprSlice(expr_slice) => handle_slice_comments(comment, expr_slice, locator),
         AnyNodeRef::ExprStarred(starred) => {
@@ -270,12 +270,12 @@ fn handle_own_line_comment_around_body<'a>(
 
     // Check if we're between bodies and should attach to the following body.
     handle_own_line_comment_between_branches(comment, preceding, locator)
-        .then_with(|comment| {
+        .or_else(|comment| {
             // Otherwise, there's no following branch or the indentation is too deep, so attach to the
             // recursively last statement in the preceding body with the matching indentation.
             handle_own_line_comment_after_branch(comment, preceding, locator)
         })
-        .then_with(|comment| {
+        .or_else(|comment| {
             // If the following node is the first in its body, and there's a non-trivia token between the
             // comment and the following node (like a parenthesis), then it means the comment is trailing
             // the preceding node, not leading the following one.
@@ -998,10 +998,14 @@ fn handle_attribute_comment<'a>(
     comment: DecoratedComment<'a>,
     attribute: &'a ast::ExprAttribute,
 ) -> CommentPlacement<'a> {
-    debug_assert!(
-        comment.preceding_node().is_some(),
-        "The enclosing node an attribute expression, expected to be at least after the name"
-    );
+    if comment.preceding_node().is_none() {
+        // ```text
+        // (    value)   .   attr
+        //  ^^^^ we're in this range
+        // ```
+
+        return CommentPlacement::leading(attribute.value.as_ref(), comment);
+    }
 
     // ```text
     // value   .   attr
@@ -1012,7 +1016,7 @@ fn handle_attribute_comment<'a>(
             .contains(comment.slice().start())
     );
     if comment.line_position().is_end_of_line() {
-        // Attach to node with b
+        // Attach as trailing comment to a. The specific placement is only relevant for fluent style
         // ```python
         // x322 = (
         //     a
@@ -1020,7 +1024,7 @@ fn handle_attribute_comment<'a>(
         //     b
         // )
         // ```
-        CommentPlacement::trailing(comment.enclosing_node(), comment)
+        CommentPlacement::trailing(attribute.value.as_ref(), comment)
     } else {
         CommentPlacement::dangling(attribute, comment)
     }

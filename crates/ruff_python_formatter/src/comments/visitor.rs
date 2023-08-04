@@ -663,7 +663,7 @@ impl<'a> CommentPlacement<'a> {
     ///
     /// Returns `self` when the placement is non-[`CommentPlacement::Default`]. Otherwise, calls the
     /// function with the comment and returns the result.
-    pub(super) fn then_with<F: FnOnce(DecoratedComment<'a>) -> Self>(self, f: F) -> Self {
+    pub(super) fn or_else<F: FnOnce(DecoratedComment<'a>) -> Self>(self, f: F) -> Self {
         match self {
             Self::Default(comment) => f(comment),
             _ => self,

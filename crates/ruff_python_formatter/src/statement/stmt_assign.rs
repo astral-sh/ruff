@@ -50,7 +50,7 @@ struct FormatTargets<'a> {
 }
 
 impl Format<PyFormatContext<'_>> for FormatTargets<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         if let Some((first, rest)) = self.targets.split_first() {
             let can_omit_parentheses = has_own_parentheses(first);
 

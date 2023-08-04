@@ -1,6 +1,6 @@
 use ruff_formatter::{write, Buffer};
 use ruff_python_ast::{Ranged, StmtClassDef};
-use ruff_python_trivia::{lines_after, skip_trailing_trivia};
+use ruff_python_trivia::lines_after_ignoring_trivia;
 
 use crate::comments::{leading_comments, trailing_comments};
 use crate::prelude::*;
@@ -41,14 +41,13 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
                 // Write any leading definition comments (between last decorator and the header)
                 // while maintaining the right amount of empty lines between the comment
                 // and the last decorator.
-                let decorator_end =
-                    skip_trailing_trivia(last_decorator.end(), f.context().source());
-
-                let leading_line = if lines_after(decorator_end, f.context().source()) <= 1 {
-                    hard_line_break()
-                } else {
-                    empty_line()
-                };
+                let leading_line =
+                    if lines_after_ignoring_trivia(last_decorator.end(), f.context().source()) <= 1
+                    {
+                        hard_line_break()
+                    } else {
+                        empty_line()
+                    };
 
                 write!(
                     f,

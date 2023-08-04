@@ -287,7 +287,7 @@ d={'a':1,
          # fmt: on
          goes + here,
          andhere,
-@@ -80,38 +94,36 @@
+@@ -80,38 +94,42 @@
  
  def import_as_names():
      # fmt: off
@@ -330,14 +330,19 @@ d={'a':1,
 -        .filter(models.Customer.account_id == account_id,
 -                models.Customer.email == email_address)\
 -        .order_by(models.Customer.id.asc())\
--        .all()
-+    result = session.query(models.Customer.id).filter(
-+        models.Customer.account_id == account_id, models.Customer.email == email_address
-+    ).order_by(models.Customer.id.asc()).all()
++    result = (
++        session.query(models.Customer.id)
++        .filter(
++            models.Customer.account_id == account_id,
++            models.Customer.email == email_address,
++        )
++        .order_by(models.Customer.id.asc())
+         .all()
++    )
      # fmt: on
  
  
-@@ -132,10 +144,10 @@
+@@ -132,10 +150,10 @@
      """Another known limitation."""
      # fmt: on
      # fmt: off
@@ -352,7 +357,7 @@ d={'a':1,
      # fmt: on
      # fmt: off
      # ...but comments still get reformatted even though they should not be
-@@ -153,9 +165,7 @@
+@@ -153,9 +171,7 @@
              )
          )
          # fmt: off
@@ -363,7 +368,7 @@ d={'a':1,
          # fmt: on
      _type_comment_re = re.compile(
          r"""
-@@ -178,7 +188,7 @@
+@@ -178,7 +194,7 @@
          $
          """,
          # fmt: off
@@ -372,7 +377,7 @@ d={'a':1,
          # fmt: on
      )
  
-@@ -216,8 +226,7 @@
+@@ -216,8 +232,7 @@
      xxxxxxxxxx_xxxxxxxxxxx_xxxxxxx_xxxxxxxxx=5,
  )
  # fmt: off
@@ -512,9 +517,15 @@ def yield_expr():
 
 def example(session):
     # fmt: off
-    result = session.query(models.Customer.id).filter(
-        models.Customer.account_id == account_id, models.Customer.email == email_address
-    ).order_by(models.Customer.id.asc()).all()
+    result = (
+        session.query(models.Customer.id)
+        .filter(
+            models.Customer.account_id == account_id,
+            models.Customer.email == email_address,
+        )
+        .order_by(models.Customer.id.asc())
+        .all()
+    )
     # fmt: on
 
 

@@ -9,7 +9,7 @@ use ruff_python_parser::{lexer, Mode, Tok};
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_source_file::Locator;
@@ -42,14 +42,16 @@ use crate::rules::pyupgrade::helpers::curly_escape;
 #[violation]
 pub struct FString;
 
-impl AlwaysAutofixableViolation for FString {
+impl Violation for FString {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use f-string instead of `format` call")
     }
 
-    fn autofix_title(&self) -> String {
-        "Convert to f-string".to_string()
+    fn autofix_title(&self) -> Option<String> {
+        Some("Convert to f-string".to_string())
     }
 }
 
@@ -316,7 +318,7 @@ pub(crate) fn f_strings(
         return;
     }
 
-    let Expr::Call(ast::ExprCall { func, .. }) = expr else {
+    let Expr::Call(ast::ExprCall { func, arguments, .. }) = expr else {
         return;
     };
 
@@ -420,7 +422,19 @@ pub(crate) fn f_strings(
     }
 
     let mut diagnostic = Diagnostic::new(FString, expr.range());
-    if checker.patch(diagnostic.kind.rule()) {
+
+    // Avoid autofix if there are comments within the call:
+    // ```
+    // "{}".format(
+    //     0,  # 0
+    // )
+    // ```
+    if checker.patch(diagnostic.kind.rule())
+        && !checker
+            .indexer()
+            .comment_ranges()
+            .intersects(arguments.range())
+    {
         diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
             contents,
             expr.range(),
