@@ -422,6 +422,13 @@ pub(crate) fn f_strings(
     }
 
     let mut diagnostic = Diagnostic::new(FString, expr.range());
+
+    // Avoid autofix if there are comments within the call:
+    // ```
+    // "{}".format(
+    //     0,  # 0
+    // )
+    // ```
     if checker.patch(diagnostic.kind.rule())
         && !checker
             .indexer()
