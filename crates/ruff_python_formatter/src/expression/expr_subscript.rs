@@ -34,6 +34,17 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
             ctx: _,
         } = item;
 
+        let call_chain_layout = match self.call_chain_layout {
+            CallChainLayout::Default => {
+                if f.context().node_level().is_parenthesized() {
+                    CallChainLayout::from_expression(AnyNodeRef::from(item), f.context().source())
+                } else {
+                    CallChainLayout::NonFluent
+                }
+            }
+            layout @ (CallChainLayout::Fluent | CallChainLayout::NonFluent) => layout,
+        };
+
         let comments = f.context().comments().clone();
         let dangling_comments = comments.dangling_comments(item.as_any_node_ref());
         debug_assert!(
@@ -42,9 +53,9 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
         );
 
         let format_value = format_with(|f| match value.as_ref() {
-            Expr::Attribute(expr) => expr.format().with_options(self.call_chain_layout).fmt(f),
-            Expr::Call(expr) => expr.format().with_options(self.call_chain_layout).fmt(f),
-            Expr::Subscript(expr) => expr.format().with_options(self.call_chain_layout).fmt(f),
+            Expr::Attribute(expr) => expr.format().with_options(call_chain_layout).fmt(f),
+            Expr::Call(expr) => expr.format().with_options(call_chain_layout).fmt(f),
+            Expr::Subscript(expr) => expr.format().with_options(call_chain_layout).fmt(f),
             _ => value.format().fmt(f),
         });
 
@@ -91,10 +102,16 @@ impl NeedsParentheses for ExprSubscript {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,
-        _context: &PyFormatContext,
+        context: &PyFormatContext,
     ) -> OptionalParentheses {
         {
-            OptionalParentheses::Never
+            if CallChainLayout::from_expression(self.into(), context.source())
+                == CallChainLayout::Fluent
+            {
+                OptionalParentheses::Multiline
+            } else {
+                self.value.needs_parentheses(self.into(), context)
+            }
         }
     }
 }

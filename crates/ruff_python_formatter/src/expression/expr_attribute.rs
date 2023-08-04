@@ -31,6 +31,17 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
             ctx: _,
         } = item;
 
+        let call_chain_layout = match self.call_chain_layout {
+            CallChainLayout::Default => {
+                if f.context().node_level().is_parenthesized() {
+                    CallChainLayout::from_expression(AnyNodeRef::from(item), f.context().source())
+                } else {
+                    CallChainLayout::NonFluent
+                }
+            }
+            layout @ (CallChainLayout::Fluent | CallChainLayout::NonFluent) => layout,
+        };
+
         let needs_parentheses = matches!(
             value.as_ref(),
             Expr::Constant(ExprConstant {
@@ -51,18 +62,18 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
         } else {
             match value.as_ref() {
                 Expr::Attribute(expr) => {
-                    expr.format().with_options(self.call_chain_layout).fmt(f)?;
+                    expr.format().with_options(call_chain_layout).fmt(f)?;
                 }
                 Expr::Call(expr) => {
-                    expr.format().with_options(self.call_chain_layout).fmt(f)?;
-                    if self.call_chain_layout == CallChainLayout::Fluent {
+                    expr.format().with_options(call_chain_layout).fmt(f)?;
+                    if call_chain_layout == CallChainLayout::Fluent {
                         // Format the dot on its own line
                         soft_line_break().fmt(f)?;
                     }
                 }
                 Expr::Subscript(expr) => {
-                    expr.format().with_options(self.call_chain_layout).fmt(f)?;
-                    if self.call_chain_layout == CallChainLayout::Fluent {
+                    expr.format().with_options(call_chain_layout).fmt(f)?;
+                    if call_chain_layout == CallChainLayout::Fluent {
                         // Format the dot on its own line
                         soft_line_break().fmt(f)?;
                     }
@@ -75,7 +86,7 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
             hard_line_break().fmt(f)?;
         }
 
-        if self.call_chain_layout == CallChainLayout::Fluent {
+        if call_chain_layout == CallChainLayout::Fluent {
             // Fluent style has line breaks before the dot
             // ```python
             // blogs3 = (
@@ -139,7 +150,11 @@ impl NeedsParentheses for ExprAttribute {
         context: &PyFormatContext,
     ) -> OptionalParentheses {
         // Checks if there are any own line comments in an attribute chain (a.b.c).
-        if context
+        if CallChainLayout::from_expression(self.into(), context.source())
+            == CallChainLayout::Fluent
+        {
+            OptionalParentheses::Multiline
+        } else if context
             .comments()
             .dangling_comments(self)
             .iter()

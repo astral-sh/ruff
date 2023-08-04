@@ -65,17 +65,6 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
     fn fmt(&self, expression: &Expr, f: &mut PyFormatter) -> FormatResult<()> {
         let parentheses = self.parentheses;
 
-        // All expressions that can have parentheses can be in fluent style. We need to exclude top
-        // expressions since they don't get parenthesized
-        let call_chain_layout = if matches!(
-            f.context().node_level(),
-            NodeLevel::CompoundStatement | NodeLevel::TopLevel
-        ) {
-            CallChainLayout::Default
-        } else {
-            CallChainLayout::from_expression(expression, f.context().source())
-        };
-
         let format_expr = format_with(|f| match expression {
             Expr::BoolOp(expr) => expr.format().with_options(Some(parentheses)).fmt(f),
             Expr::NamedExpr(expr) => expr.format().fmt(f),
@@ -93,12 +82,12 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             Expr::Yield(expr) => expr.format().fmt(f),
             Expr::YieldFrom(expr) => expr.format().fmt(f),
             Expr::Compare(expr) => expr.format().with_options(Some(parentheses)).fmt(f),
-            Expr::Call(expr) => expr.format().with_options(call_chain_layout).fmt(f),
+            Expr::Call(expr) => expr.format().fmt(f),
             Expr::FormattedValue(expr) => expr.format().fmt(f),
             Expr::JoinedStr(expr) => expr.format().fmt(f),
             Expr::Constant(expr) => expr.format().fmt(f),
-            Expr::Attribute(expr) => expr.format().with_options(call_chain_layout).fmt(f),
-            Expr::Subscript(expr) => expr.format().with_options(call_chain_layout).fmt(f),
+            Expr::Attribute(expr) => expr.format().fmt(f),
+            Expr::Subscript(expr) => expr.format().fmt(f),
             Expr::Starred(expr) => expr.format().fmt(f),
             Expr::Name(expr) => expr.format().fmt(f),
             Expr::List(expr) => expr.format().fmt(f),
@@ -128,17 +117,7 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
 
             let mut f = WithNodeLevel::new(level, f);
 
-            // Allow to indent the parentheses while
-            // ```python
-            // g1 = (
-            //     queryset.distinct().order_by(field.name).values_list(field_name_flat_long_long=True)
-            // )
-            // ```
-            if call_chain_layout == CallChainLayout::Fluent {
-                write!(f, [group(&format_expr)])
-            } else {
-                write!(f, [format_expr])
-            }
+            write!(f, [format_expr])
         }
     }
 }
@@ -174,35 +153,6 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
             parent,
             parenthesize,
         } = self;
-
-        // Fluent style means that when we break we always add parentheses, so we don't need the
-        // checks below for existing parentheses, comments or `needs_parentheses`
-        if CallChainLayout::from_expression(expression, f.context().source())
-            == CallChainLayout::Fluent
-        {
-            match expression {
-                Expr::Attribute(expr) => {
-                    return parenthesize_if_expands(&group(
-                        &expr.format().with_options(CallChainLayout::Fluent),
-                    ))
-                    .fmt(f)
-                }
-                Expr::Call(expr) => {
-                    return parenthesize_if_expands(&group(
-                        &expr.format().with_options(CallChainLayout::Fluent),
-                    ))
-                    .fmt(f)
-                }
-                Expr::Subscript(expr) => {
-                    return parenthesize_if_expands(&group(
-                        &expr.format().with_options(CallChainLayout::Fluent),
-                    ))
-                    .fmt(f)
-                }
-                // `call_chain_layout` checks we're in one of the above
-                _ => unreachable!(),
-            };
-        }
 
         let comments = f.context().comments();
         let preserve_parentheses = parenthesize.is_optional()
@@ -527,30 +477,36 @@ impl<'input> PreorderVisitor<'input> for CanOmitOptionalParenthesesVisitor<'inpu
 /// ```
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum CallChainLayout {
+    /// The root of a call chain
     #[default]
     Default,
+
+    /// A nested call chain element that uses fluent style.
     Fluent,
+
+    /// A nested call chain element not using fluent style.
+    NonFluent,
 }
 
 impl CallChainLayout {
-    pub(crate) fn from_expression(mut expr: &Expr, source: &str) -> Self {
+    pub(crate) fn from_expression(mut expr: AnyNodeRef, source: &str) -> Self {
         let mut attributes_after_parentheses = 0;
         loop {
             match expr {
-                Expr::Attribute(ast::ExprAttribute { value, .. }) => {
+                AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, .. }) => {
                     // `f().x` | `data[:100].T`
                     if matches!(value.as_ref(), Expr::Call(_) | Expr::Subscript(_)) {
                         attributes_after_parentheses += 1;
                     }
-                    expr = value;
+                    expr = AnyNodeRef::from(value.as_ref());
                 }
-                Expr::Call(ast::ExprCall { func: inner, .. })
-                | Expr::Subscript(ast::ExprSubscript { value: inner, .. }) => {
-                    expr = inner;
+                AnyNodeRef::ExprCall(ast::ExprCall { func: inner, .. })
+                | AnyNodeRef::ExprSubscript(ast::ExprSubscript { value: inner, .. }) => {
+                    expr = AnyNodeRef::from(inner.as_ref());
                 }
                 _ => {
                     // We to format the following in fluent style: `f2 = (a).w().t(1,)`
-                    if is_expression_parenthesized(AnyNodeRef::from(expr), source) {
+                    if is_expression_parenthesized(expr, source) {
                         attributes_after_parentheses += 1;
                     }
                     break;
@@ -558,7 +514,7 @@ impl CallChainLayout {
             }
         }
         if attributes_after_parentheses < 2 {
-            CallChainLayout::Default
+            CallChainLayout::NonFluent
         } else {
             CallChainLayout::Fluent
         }
