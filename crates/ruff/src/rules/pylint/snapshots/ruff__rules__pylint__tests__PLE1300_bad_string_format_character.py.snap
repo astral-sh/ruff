@@ -41,4 +41,14 @@ bad_string_format_character.py:11:1: PLE1300 Unsupported format character 'z'
 13 | ## New style formatting
    |
 
+bad_string_format_character.py:15:1: PLE1300 Unsupported format character 'y'
+   |
+13 | ## New style formatting
+14 | 
+15 | "{:s} {:y}".format("hello", "world")  # [bad-format-character]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLE1300
+16 | 
+17 | "{:*^30s}".format("centered")
+   |
+
 
