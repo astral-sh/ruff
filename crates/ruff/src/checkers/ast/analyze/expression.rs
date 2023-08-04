@@ -341,6 +341,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             },
         ) => {
             if checker.any_enabled(&[
+                // pylint
+                Rule::BadStringFormatCharacter,
                 // pyflakes
                 Rule::StringDotFormatInvalidFormat,
                 Rule::StringDotFormatExtraNamedArguments,
