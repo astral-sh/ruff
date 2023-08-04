@@ -86,3 +86,10 @@ selected_choices = {
     k: str(v)
     for vvvvvvvvvvvvvvvvvvvvvvv in value if str(v) not in self.choices.field.empty_values
 }
+
+{
+    k: v
+    for (  # foo
+
+    x, aaaayaaaayaaaayaaaayaaaayaaaayaaaayaaaayaaaayaaaayaaaayaaaayaaaayaaaay) in z
+}

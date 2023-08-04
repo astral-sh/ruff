@@ -1,12 +1,14 @@
+use ruff_formatter::{format_args, write, Buffer, FormatResult, FormatRuleWithOptions};
+use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::ExprGeneratorExp;
+
+use crate::comments::leading_comments;
 use crate::context::PyFormatContext;
-use crate::expression::parentheses::parenthesized;
+use crate::expression::parentheses::parenthesized_with_dangling_comments;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 use crate::AsFormat;
 use crate::{FormatNodeRule, PyFormatter};
-use ruff_formatter::{format_args, write, Buffer, FormatResult, FormatRuleWithOptions};
-use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::ExprGeneratorExp;
 
 #[derive(Eq, PartialEq, Debug, Default)]
 pub enum GeneratorExpParentheses {
@@ -48,10 +50,14 @@ impl FormatNodeRule<ExprGeneratorExp> for FormatExprGeneratorExp {
                 .finish()
         });
 
+        let comments = f.context().comments().clone();
+        let dangling = comments.dangling_comments(item);
+
         if self.parentheses == GeneratorExpParentheses::StripIfOnlyFunctionArg {
             write!(
                 f,
                 [
+                    leading_comments(dangling),
                     group(&elt.format()),
                     soft_line_break_or_space(),
                     group(&joined),
@@ -60,8 +66,9 @@ impl FormatNodeRule<ExprGeneratorExp> for FormatExprGeneratorExp {
         } else {
             write!(
                 f,
-                [parenthesized(
+                [parenthesized_with_dangling_comments(
                     "(",
+                    dangling,
                     &format_args!(
                         group(&elt.format()),
                         soft_line_break_or_space(),
@@ -71,6 +78,15 @@ impl FormatNodeRule<ExprGeneratorExp> for FormatExprGeneratorExp {
                 )]
             )
         }
+    }
+
+    fn fmt_dangling_comments(
+        &self,
+        _node: &ExprGeneratorExp,
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        // Handled as part of `fmt_fields`
+        Ok(())
     }
 }
 

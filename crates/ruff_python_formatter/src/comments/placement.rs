@@ -2,10 +2,7 @@ use std::cmp::Ordering;
 
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::{
-    self as ast, Comprehension, Expr, ExprAttribute, ExprBinOp, ExprIfExp, ExprSlice, ExprStarred,
-    MatchCase, Parameters, Ranged,
-};
+use ruff_python_ast::{self as ast, Comprehension, Expr, MatchCase, Parameters, Ranged};
 use ruff_python_trivia::{
     indentation_at_offset, PythonWhitespace, SimpleToken, SimpleTokenKind, SimpleTokenizer,
 };
@@ -50,9 +47,9 @@ pub(super) fn place_comment<'a>(
                 locator,
             )
         }
-        AnyNodeRef::ExprDict(_) | AnyNodeRef::Keyword(_) => {
-            handle_dict_unpacking_comment(comment, locator)
-        }
+        AnyNodeRef::Keyword(_) => handle_dict_unpacking_comment(comment, locator),
+        AnyNodeRef::ExprDict(_) => handle_dict_unpacking_comment(comment, locator)
+            .then_with(|comment| handle_bracketed_end_of_line_comment(comment, locator)),
         AnyNodeRef::ExprIfExp(expr_if) => handle_expr_if_comment(comment, expr_if, locator),
         AnyNodeRef::ExprSlice(expr_slice) => handle_slice_comments(comment, expr_slice, locator),
         AnyNodeRef::ExprStarred(starred) => {
@@ -77,6 +74,13 @@ pub(super) fn place_comment<'a>(
             handle_leading_class_with_decorators_comment(comment, class_def)
         }
         AnyNodeRef::StmtImportFrom(import_from) => handle_import_from_comment(comment, import_from),
+        AnyNodeRef::ExprList(_)
+        | AnyNodeRef::ExprSet(_)
+        | AnyNodeRef::ExprGeneratorExp(_)
+        | AnyNodeRef::ExprListComp(_)
+        | AnyNodeRef::ExprSetComp(_)
+        | AnyNodeRef::ExprDictComp(_)
+        | AnyNodeRef::ExprTuple(_) => handle_bracketed_end_of_line_comment(comment, locator),
         _ => CommentPlacement::Default(comment),
     })
 }
@@ -633,7 +637,7 @@ fn handle_parameters_separator_comment<'a>(
 /// ```
 fn handle_trailing_binary_expression_left_or_operator_comment<'a>(
     comment: DecoratedComment<'a>,
-    binary_expression: &'a ExprBinOp,
+    binary_expression: &'a ast::ExprBinOp,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
     // Only if there's a preceding node (in which case, the preceding node is `left`).
@@ -797,10 +801,10 @@ fn handle_module_level_own_line_comment_before_class_or_function_comment<'a>(
 /// ```
 fn handle_slice_comments<'a>(
     comment: DecoratedComment<'a>,
-    expr_slice: &'a ExprSlice,
+    expr_slice: &'a ast::ExprSlice,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    let ExprSlice {
+    let ast::ExprSlice {
         range: _,
         lower,
         upper,
@@ -907,7 +911,7 @@ fn handle_leading_class_with_decorators_comment<'a>(
 }
 
 /// Handles comments between `**` and the variable name in dict unpacking
-/// It attaches these to the appropriate value node
+/// It attaches these to the appropriate value node.
 ///
 /// ```python
 /// {
@@ -945,7 +949,7 @@ fn handle_dict_unpacking_comment<'a>(
 
     // if the remaining tokens from the previous node are exactly `**`,
     // re-assign the comment to the one that follows the stars
-    let mut count = 0;
+    let mut count = 0u32;
 
     // we start from the preceding node but we skip its token
     if let Some(token) = tokens.next() {
@@ -992,7 +996,7 @@ fn handle_dict_unpacking_comment<'a>(
 /// ```
 fn handle_attribute_comment<'a>(
     comment: DecoratedComment<'a>,
-    attribute: &'a ExprAttribute,
+    attribute: &'a ast::ExprAttribute,
 ) -> CommentPlacement<'a> {
     debug_assert!(
         comment.preceding_node().is_some(),
@@ -1039,10 +1043,10 @@ fn handle_attribute_comment<'a>(
 /// happens if the comments are in a weird position but it also doesn't hurt handling it.
 fn handle_expr_if_comment<'a>(
     comment: DecoratedComment<'a>,
-    expr_if: &'a ExprIfExp,
+    expr_if: &'a ast::ExprIfExp,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    let ExprIfExp {
+    let ast::ExprIfExp {
         range: _,
         test,
         body,
@@ -1096,7 +1100,7 @@ fn handle_expr_if_comment<'a>(
 /// ```
 fn handle_trailing_expression_starred_star_end_of_line_comment<'a>(
     comment: DecoratedComment<'a>,
-    starred: &'a ExprStarred,
+    starred: &'a ast::ExprStarred,
 ) -> CommentPlacement<'a> {
     if comment.line_position().is_own_line() {
         return CommentPlacement::Default(comment);

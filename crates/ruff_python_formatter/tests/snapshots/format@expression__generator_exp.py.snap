@@ -31,6 +31,12 @@ len(
      # trailing
     )
 )
+
+len(
+    # leading
+    a for b in c
+    # trailing
+)
 ```
 
 ## Output
@@ -56,6 +62,13 @@ f((1) for _ in (a))
 
 # black keeps these atm, but intends to remove them in the future:
 # https://github.com/psf/black/issues/2943
+len(
+    # leading
+    a
+    for b in c
+    # trailing
+)
+
 len(
     # leading
     a

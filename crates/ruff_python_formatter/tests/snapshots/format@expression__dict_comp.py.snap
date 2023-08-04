@@ -92,6 +92,13 @@ selected_choices = {
     k: str(v)
     for vvvvvvvvvvvvvvvvvvvvvvv in value if str(v) not in self.choices.field.empty_values
 }
+
+{
+    k: v
+    for (  # foo
+
+    x, aaaayaaaayaaaayaaaayaaaayaaaayaaaayaaaayaaaayaaaayaaaayaaaayaaaayaaaay) in z
+}
 ```
 
 ## Output
@@ -201,11 +208,9 @@ selected_choices = {
 }
 
 # Leading
-{
-    # Leading
+{  # Leading
     k: v  # Trailing
-    for a, a, a, a, a, a, a, a, a, a, (
-        # Trailing
+    for a, a, a, a, a, a, a, a, a, a, (  # Trailing
         a,
         a,
         a,
@@ -240,6 +245,11 @@ selected_choices = {
     k: str(v)
     for vvvvvvvvvvvvvvvvvvvvvvv in value
     if str(v) not in self.choices.field.empty_values
+}
+
+{
+    k: v
+    for (x, aaaayaaaayaaaayaaaayaaaayaaaayaaaayaaaayaaaayaaaayaaaayaaaayaaaayaaaay) in z  # foo
 }
 ```
 
