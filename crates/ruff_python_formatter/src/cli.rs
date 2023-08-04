@@ -8,8 +8,10 @@ use ruff_python_parser::lexer::lex;
 use ruff_python_parser::{parse_tokens, Mode};
 
 use ruff_formatter::SourceCode;
+use ruff_python_ast::Ranged;
 use ruff_python_index::CommentRangesBuilder;
 
+use crate::comments::Comments;
 use crate::{format_node, PyFormatOptions};
 
 #[derive(ValueEnum, Clone, Debug)]
@@ -68,6 +70,29 @@ pub fn format_and_debug_print(input: &str, cli: &Cli) -> Result<String> {
         println!("{}", formatted.document().display(SourceCode::new(input)));
     }
     if cli.print_comments {
+        // Print preceding, following and enclosing nodes
+        let decorated_comments = Comments::collect_decorated_comments(
+            &python_ast,
+            SourceCode::new(input),
+            &comment_ranges,
+        );
+        for comment in decorated_comments {
+            println!(
+                "{:?} {:?} {:?} {:?} {:?}",
+                comment.slice().range(),
+                comment
+                    .preceding_node()
+                    .map(|node| (node.kind(), node.range())),
+                comment
+                    .following_node()
+                    .map(|node| (node.kind(), node.range())),
+                (
+                    comment.enclosing_node().kind(),
+                    comment.enclosing_node().range()
+                ),
+                comment.slice().text(SourceCode::new(input)),
+            );
+        }
         println!(
             "{:#?}",
             formatted.context().comments().debug(SourceCode::new(input))

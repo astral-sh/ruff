@@ -105,7 +105,9 @@ use ruff_python_index::CommentRanges;
 use crate::comments::debug::{DebugComment, DebugComments};
 use crate::comments::map::MultiMap;
 use crate::comments::node_key::NodeRefEqualityKey;
-use crate::comments::visitor::CommentsVisitor;
+use crate::comments::visitor::{
+    CommentsBuilder, CommentsVisitor, DecoratedComment, DecoratedCommentsCollector,
+};
 
 mod debug;
 mod format;
@@ -262,10 +264,23 @@ impl<'a> Comments<'a> {
         let map = if comment_ranges.is_empty() {
             CommentsMap::new()
         } else {
-            CommentsVisitor::new(source_code, comment_ranges).visit(root)
+            let mut builder = CommentsBuilder::default();
+            CommentsVisitor::new(source_code, comment_ranges, &mut builder).visit(root);
+            builder.finish()
         };
 
         Self::new(map)
+    }
+
+    /// Extracts the comments from the AST.
+    pub(crate) fn collect_decorated_comments(
+        root: &'a Mod,
+        source_code: SourceCode<'a>,
+        comment_ranges: &'a CommentRanges,
+    ) -> Vec<DecoratedComment<'a>> {
+        let mut builder = DecoratedCommentsCollector::default();
+        CommentsVisitor::new(source_code, comment_ranges, &mut builder).visit(root);
+        builder.finish()
     }
 
     #[inline]
