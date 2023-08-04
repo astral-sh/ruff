@@ -97,7 +97,27 @@ comparison_with_itself.py:20:1: PLR0124 Name compared with itself, consider repl
 20 | foo not in foo
    | ^^^ PLR0124
 21 | 
-22 | # Non-errors.
+22 | id(foo) == id(foo)
+   |
+
+comparison_with_itself.py:22:1: PLR0124 Name compared with itself, consider replacing `id(foo) == id(foo)`
+   |
+20 | foo not in foo
+21 | 
+22 | id(foo) == id(foo)
+   | ^^^^^^^ PLR0124
+23 | 
+24 | len(foo) == len(foo)
+   |
+
+comparison_with_itself.py:24:1: PLR0124 Name compared with itself, consider replacing `len(foo) == len(foo)`
+   |
+22 | id(foo) == id(foo)
+23 | 
+24 | len(foo) == len(foo)
+   | ^^^^^^^^ PLR0124
+25 | 
+26 | # Non-errors.
    |
 
 

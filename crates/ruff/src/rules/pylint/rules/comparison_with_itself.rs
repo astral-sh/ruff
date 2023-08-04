@@ -1,8 +1,8 @@
 use itertools::Itertools;
-use ruff_python_ast::{CmpOp, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{CmpOp, Expr, Ranged};
 
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::CmpOpExt;
@@ -51,17 +51,64 @@ pub(crate) fn comparison_with_itself(
         .tuple_windows()
         .zip(ops)
     {
-        if let (Expr::Name(left), Expr::Name(right)) = (left, right) {
-            if left.id == right.id {
+        match (left, right) {
+            // Ex) `foo == foo`
+            (Expr::Name(left_name), Expr::Name(right_name)) if left_name.id == right_name.id => {
                 checker.diagnostics.push(Diagnostic::new(
                     ComparisonWithItself {
-                        left: left.id.to_string(),
+                        left: checker.generator().expr(left),
                         op: *op,
-                        right: right.id.to_string(),
+                        right: checker.generator().expr(right),
                     },
-                    left.range(),
+                    left_name.range(),
                 ));
             }
+            // Ex) `id(foo) == id(foo)`
+            (Expr::Call(left_call), Expr::Call(right_call)) => {
+                // Both calls must take a single argument, of the same name.
+                if !left_call.arguments.keywords.is_empty()
+                    || !right_call.arguments.keywords.is_empty()
+                {
+                    continue;
+                }
+                let [Expr::Name(left_arg)] = left_call.arguments.args.as_slice() else {
+                    continue;
+                };
+                let [Expr::Name(right_right)] = right_call.arguments.args.as_slice() else {
+                    continue;
+                };
+                if left_arg.id != right_right.id {
+                    continue;
+                }
+
+                // Both calls must be to the same function.
+                let Expr::Name(left_func) = left_call.func.as_ref() else {
+                    continue;
+                };
+                let Expr::Name(right_func) = right_call.func.as_ref() else {
+                    continue;
+                };
+                if left_func.id != right_func.id {
+                    continue;
+                }
+
+                // The call must be to pure function, like `id`.
+                if matches!(
+                    left_func.id.as_str(),
+                    "id" | "len" | "type" | "int" | "bool" | "str" | "repr" | "bytes"
+                ) && checker.semantic().is_builtin(&left_func.id)
+                {
+                    checker.diagnostics.push(Diagnostic::new(
+                        ComparisonWithItself {
+                            left: checker.generator().expr(left),
+                            op: *op,
+                            right: checker.generator().expr(right),
+                        },
+                        left_call.range(),
+                    ));
+                }
+            }
+            _ => {}
         }
     }
 }
