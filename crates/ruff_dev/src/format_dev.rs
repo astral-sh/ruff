@@ -209,7 +209,7 @@ pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
         }
         info!(
             parent: None,
-            "Done: {} stability errors, {} files, similarity index {:.3}), took {:.2}s, {} input files contained syntax errors ",
+            "Done: {} stability errors, {} files, similarity index {:.5}), took {:.2}s, {} input files contained syntax errors ",
             error_count,
             result.file_count,
             result.statistics.similarity_index(),
@@ -313,7 +313,7 @@ fn format_dev_multi_project(args: &Args) -> anyhow::Result<bool> {
 
                 info!(
                     parent: None,
-                    "Finished {}: {} stability errors, {} files, similarity index {:.3}), took {:.2}s, {} input files contained syntax errors ",
+                    "Finished {}: {} stability errors, {} files, similarity index {:.5}), took {:.2}s, {} input files contained syntax errors ",
                     project_path.display(),
                     result.error_count(),
                     result.file_count,
