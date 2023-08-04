@@ -106,4 +106,6 @@ x6 = (
     a.b
 )
 
-
+# regression: https://github.com/astral-sh/ruff/issues/6181
+(#
+()).a
