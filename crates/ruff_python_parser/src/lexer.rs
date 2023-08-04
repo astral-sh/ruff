@@ -437,29 +437,32 @@ impl<'source> Lexer<'source> {
                     }
 
                     // The help end magic command is valid if it has 1 or 2 question marks.
-                    if question_count <= 2
-                        && !previous_char_is_whitespace
-                        && !value.is_empty()
-                        && matches!(self.cursor.first(), '\n' | '\r' | EOF_CHAR)
+                    // If the `value` is empty i.e., we are at the start of the line,
+                    // then we can't be sure if it is a help end magic command or not.
+                    if question_count > 2
+                        || previous_char_is_whitespace
+                        || value.is_empty()
+                        || !matches!(self.cursor.first(), '\n' | '\r' | EOF_CHAR)
                     {
-                        if kind.is_help() {
-                            value = value.trim_start_matches([' ', '?']).to_string();
-                        } else {
-                            value.insert_str(0, &kind.to_string());
-                        }
-                        let kind = match question_count {
-                            1 => MagicKind::Help,
-                            2 => MagicKind::Help2,
-                            _ => unreachable!("`question_count` is always 1 or 2"),
-                        };
-                        return Tok::MagicCommand { kind, value };
-                    } else {
                         // Not a help end magic command, so continue with the lexing.
                         value.reserve(question_count as usize);
                         for _ in 0..question_count {
                             value.push('?');
                         }
+                        continue;
                     }
+
+                    if kind.is_help() {
+                        value = value.trim_start_matches([' ', '?']).to_string();
+                    } else {
+                        value.insert_str(0, &kind.to_string());
+                    }
+                    let kind = match question_count {
+                        1 => MagicKind::Help,
+                        2 => MagicKind::Help2,
+                        _ => unreachable!("`question_count` is always 1 or 2"),
+                    };
+                    return Tok::MagicCommand { kind, value };
                 }
                 '\n' | '\r' | EOF_CHAR => {
                     return Tok::MagicCommand { kind, value };
