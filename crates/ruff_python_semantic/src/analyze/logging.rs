@@ -49,7 +49,13 @@ pub fn is_logger_candidate(
     // logger names.
     if let Some(call_path) = collect_call_path(value) {
         if let Some(tail) = call_path.last() {
-            if tail.starts_with("log") || tail.ends_with("logger") || tail.ends_with("logging") {
+            if tail.starts_with("log")
+                || tail.ends_with("logger")
+                || tail.ends_with("logging")
+                || tail.starts_with("LOG")
+                || tail.ends_with("LOGGER")
+                || tail.ends_with("LOGGING")
+            {
                 return true;
             }
         }
