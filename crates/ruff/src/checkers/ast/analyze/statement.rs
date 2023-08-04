@@ -173,7 +173,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     flake8_pyi::rules::str_or_repr_defined_in_stub(checker, stmt);
                 }
             }
-            if checker.source_type.is_stub() || checker.settings.target_version >= PythonVersion::Py311 {
+            if checker.source_type.is_stub()
+                || checker.settings.target_version >= PythonVersion::Py311
+            {
                 if checker.enabled(Rule::NoReturnArgumentAnnotationInStub) {
                     flake8_pyi::rules::no_return_argument_annotation(checker, parameters);
                 }
