@@ -57,3 +57,19 @@ selected_choices = [
 # Tuples with BinOp
 [i for i in (aaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb, ccccccccccccccccccccc)]
 [(aaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb, ccccccccccccccccccccc) for i in b]
+
+a = [
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    for f in bbbbbbbbbbbbbbb
+    if f not in ccccccccccc
+]
+
+a = [
+    [1, 2, 3,]
+    for f in bbbbbbbbbbbbbbb
+    if f not in ccccccccccc
+]
+
+aaaaaaaaaaaaaaaaaaaaa = [
+    o for o in self.registry.values if o.__class__ is not ModelAdmin
+]

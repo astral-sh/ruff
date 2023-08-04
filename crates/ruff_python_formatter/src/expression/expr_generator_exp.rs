@@ -60,7 +60,7 @@ impl FormatNodeRule<ExprGeneratorExp> for FormatExprGeneratorExp {
                     leading_comments(dangling),
                     group(&elt.format()),
                     soft_line_break_or_space(),
-                    group(&joined),
+                    &joined
                 ]
             )
         } else {
@@ -69,11 +69,11 @@ impl FormatNodeRule<ExprGeneratorExp> for FormatExprGeneratorExp {
                 [parenthesized_with_dangling_comments(
                     "(",
                     dangling,
-                    &format_args!(
+                    &group(&format_args!(
                         group(&elt.format()),
                         soft_line_break_or_space(),
-                        group(&joined)
-                    ),
+                        &joined
+                    )),
                     ")"
                 )]
             )
