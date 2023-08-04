@@ -1,7 +1,6 @@
-use crate::expression::CallChainLayout;
-use ruff_formatter::{write, FormatRuleWithOptions};
+use crate::expression::{format_call_chain_layout, CallChainLayout};
+use ruff_formatter::FormatRuleWithOptions;
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::Expr::Call;
 use ruff_python_ast::{Expr, ExprCall};
 
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
@@ -30,16 +29,7 @@ impl FormatNodeRule<ExprCall> for FormatExprCall {
             arguments,
         } = item;
 
-        let call_chain_layout = match self.call_chain_layout {
-            CallChainLayout::Default => {
-                if f.context().node_level().is_parenthesized() {
-                    CallChainLayout::from_expression(AnyNodeRef::from(item), f.context().source())
-                } else {
-                    CallChainLayout::NonFluent
-                }
-            }
-            layout @ (CallChainLayout::Fluent | CallChainLayout::NonFluent) => layout,
-        };
+        let call_chain_layout = format_call_chain_layout(f, self.call_chain_layout, item);
 
         let fmt_inner = format_with(|f| {
             match func.as_ref() {

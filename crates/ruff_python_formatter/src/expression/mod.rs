@@ -578,3 +578,21 @@ impl From<ast::Operator> for OperatorPriority {
         }
     }
 }
+
+/// Determine whether to actually apply fluent layout in attribute, call and subscript formatting
+pub(crate) fn format_call_chain_layout<'a>(
+    f: &mut PyFormatter,
+    layout: CallChainLayout,
+    item: impl Into<AnyNodeRef<'a>>,
+) -> CallChainLayout {
+    match layout {
+        CallChainLayout::Default => {
+            if f.context().node_level().is_parenthesized() {
+                CallChainLayout::from_expression(item.into(), f.context().source())
+            } else {
+                CallChainLayout::NonFluent
+            }
+        }
+        layout @ (CallChainLayout::Fluent | CallChainLayout::NonFluent) => layout,
+    }
+}
