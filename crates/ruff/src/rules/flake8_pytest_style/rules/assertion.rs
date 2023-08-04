@@ -248,7 +248,6 @@ pub(crate) fn unittest_assertion(
                     // the assertion is part of a larger expression.
                     if checker.semantic().stmt().is_expr_stmt()
                         && checker.semantic().expr_parent().is_none()
-                        && !checker.semantic().scope().kind.is_lambda()
                         && !checker.indexer().comment_ranges().intersects(expr.range())
                     {
                         if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {

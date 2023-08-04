@@ -37,7 +37,7 @@ pub struct SemanticModel<'a> {
     stmt_id: Option<NodeId>,
 
     /// Stack of all visited expressions.
-    pub exprs: Nodes<'a, Expr>,
+    exprs: Nodes<'a, Expr>,
 
     /// The identifier of the current expression.
     expr_id: Option<NodeId>,
@@ -845,7 +845,7 @@ impl<'a> SemanticModel<'a> {
 
     /// Return the parent `Expr` of the current `Expr`, if any.
     pub fn expr_parent(&self) -> Option<&'a Expr> {
-        self.expr_ancestors().nth(0)
+        self.expr_ancestors().next()
     }
 
     /// Return the grandparent `Expr` of the current `Expr`, if any.
@@ -1063,6 +1063,7 @@ impl<'a> SemanticModel<'a> {
         Snapshot {
             scope_id: self.scope_id,
             stmt_id: self.stmt_id,
+            expr_id: self.expr_id,
             definition_id: self.definition_id,
             flags: self.flags,
         }
@@ -1073,11 +1074,13 @@ impl<'a> SemanticModel<'a> {
         let Snapshot {
             scope_id,
             stmt_id,
+            expr_id,
             definition_id,
             flags,
         } = snapshot;
         self.scope_id = scope_id;
         self.stmt_id = stmt_id;
+        self.expr_id = expr_id;
         self.definition_id = definition_id;
         self.flags = flags;
     }
@@ -1491,6 +1494,7 @@ impl SemanticModelFlags {
 pub struct Snapshot {
     scope_id: ScopeId,
     stmt_id: Option<NodeId>,
+    expr_id: Option<NodeId>,
     definition_id: DefinitionId,
     flags: SemanticModelFlags,
 }

@@ -68,7 +68,7 @@ pub(crate) fn compare_to_empty_string(
     if checker
         .semantic()
         .expr_ancestors()
-        .any(|parent| parent.is_subscript_expr())
+        .any(Expr::is_subscript_expr)
     {
         return;
     }
