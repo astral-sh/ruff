@@ -2,7 +2,7 @@ use crate::comments::{
     dangling_node_comments, leading_node_comments, trailing_node_comments, Comments,
 };
 use crate::context::PyFormatContext;
-pub use crate::options::{MagicTrailingComma, PyFormatOptions, QuoteStyle};
+pub use crate::options::{MagicTrailingComma, PyFormatOptions, QuoteStyle, SourceType};
 use ruff_formatter::format_element::tag;
 use ruff_formatter::prelude::{
     dynamic_text, source_position, source_text_slice, text, ContainsNewlines, Formatter, Tag,
@@ -255,6 +255,7 @@ mod tests {
     use ruff_python_index::CommentRangesBuilder;
     use ruff_python_parser::lexer::lex;
     use ruff_python_parser::{parse_tokens, Mode};
+    use std::path::Path;
 
     /// Very basic test intentionally kept very similar to the CLI
     #[test]
@@ -321,15 +322,10 @@ with [
         let comment_ranges = comment_ranges.finish();
 
         // Parse the AST.
-        let python_ast = parse_tokens(tokens, Mode::Module, "<filename>").unwrap();
-
-        let formatted = format_node(
-            &python_ast,
-            &comment_ranges,
-            src,
-            PyFormatOptions::default(),
-        )
-        .unwrap();
+        let source_path = "code_inline.py";
+        let python_ast = parse_tokens(tokens, Mode::Module, source_path).unwrap();
+        let options = PyFormatOptions::from_extension(Path::new(source_path)).unwrap();
+        let formatted = format_node(&python_ast, &comment_ranges, src, options).unwrap();
 
         // Uncomment the `dbg` to print the IR.
         // Use `dbg_write!(f, []) instead of `write!(f, [])` in your formatting code to print some IR

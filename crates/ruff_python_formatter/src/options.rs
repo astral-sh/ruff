@@ -1,5 +1,32 @@
 use ruff_formatter::printer::{LineEnding, PrinterOptions};
 use ruff_formatter::{FormatOptions, IndentStyle, LineWidth};
+use std::ffi::OsStr;
+use std::path::Path;
+
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum SourceType {
+    /// A `.py` file
+    Py,
+    /// A `.pyi` file
+    Pyi,
+}
+
+impl SourceType {
+    pub fn from_path(path: &Path) -> Option<Self> {
+        match path.extension().and_then(OsStr::to_str) {
+            Some("py") => Some(Self::Py),
+            Some("pyi") => Some(Self::Pyi),
+            _ => None,
+        }
+    }
+}
+
+impl Default for SourceType {
+    fn default() -> Self {
+        Self::Py
+    }
+}
 
 #[derive(Clone, Debug)]
 #[cfg_attr(
@@ -8,6 +35,9 @@ use ruff_formatter::{FormatOptions, IndentStyle, LineWidth};
     serde(default)
 )]
 pub struct PyFormatOptions {
+    /// Whether we're in a `.py` file or `.pyi` file, which have different rules
+    source_type: SourceType,
+
     /// Specifies the indent style:
     /// * Either a tab
     /// * or a specific amount of spaces
@@ -28,7 +58,31 @@ fn default_line_width() -> LineWidth {
     LineWidth::try_from(88).unwrap()
 }
 
+impl Default for PyFormatOptions {
+    fn default() -> Self {
+        Self {
+            source_type: SourceType::default(),
+            indent_style: IndentStyle::Space(4),
+            line_width: LineWidth::try_from(88).unwrap(),
+            quote_style: QuoteStyle::default(),
+            magic_trailing_comma: MagicTrailingComma::default(),
+        }
+    }
+}
+
 impl PyFormatOptions {
+    /// Otherwise sets the defaults. Returns none if the extension is unknown
+    pub fn from_extension(path: &Path) -> Option<Self> {
+        Some(Self::from_source_type(SourceType::from_path(path)?))
+    }
+
+    pub fn from_source_type(source_type: SourceType) -> Self {
+        Self {
+            source_type,
+            ..Self::default()
+        }
+    }
+
     pub fn magic_trailing_comma(&self) -> MagicTrailingComma {
         self.magic_trailing_comma
     }
@@ -73,17 +127,6 @@ impl FormatOptions for PyFormatOptions {
             print_width: self.line_width.into(),
             line_ending: LineEnding::LineFeed,
             indent_style: self.indent_style,
-        }
-    }
-}
-
-impl Default for PyFormatOptions {
-    fn default() -> Self {
-        Self {
-            indent_style: IndentStyle::Space(4),
-            line_width: LineWidth::try_from(88).unwrap(),
-            quote_style: QuoteStyle::default(),
-            magic_trailing_comma: MagicTrailingComma::default(),
         }
     }
 }

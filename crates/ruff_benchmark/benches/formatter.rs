@@ -1,6 +1,7 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use ruff_benchmark::{TestCase, TestCaseSpeed, TestFile, TestFileDownloadError};
 use ruff_python_formatter::{format_module, PyFormatOptions};
+use std::path::Path;
 use std::time::Duration;
 
 #[cfg(target_os = "windows")]
@@ -51,8 +52,8 @@ fn benchmark_formatter(criterion: &mut Criterion) {
             &case,
             |b, case| {
                 b.iter(|| {
-                    format_module(case.code(), PyFormatOptions::default())
-                        .expect("Formatting to succeed")
+                    let options = PyFormatOptions::from_extension(Path::new(case.name())).unwrap();
+                    format_module(case.code(), options).expect("Formatting to succeed")
                 });
             },
         );

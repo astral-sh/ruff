@@ -161,25 +161,21 @@ fn format(files: &[PathBuf]) -> Result<ExitStatus> {
         internal use only."
     );
 
-    let format_code = |code: &str| {
-        // dummy, to check that the function was actually called
-        let contents = code.replace("# DEL", "");
-        // real formatting that is currently a passthrough
-        format_module(&contents, PyFormatOptions::default())
-    };
-
     match &files {
         // Check if we should read from stdin
         [path] if path == Path::new("-") => {
             let unformatted = read_from_stdin()?;
-            let formatted = format_code(&unformatted)?;
+            let options = PyFormatOptions::from_extension(Path::new("stdin.py")).unwrap();
+            let formatted = format_module(&unformatted, options)?;
             stdout().lock().write_all(formatted.as_code().as_bytes())?;
         }
         _ => {
             for file in files {
                 let unformatted = std::fs::read_to_string(file)
                     .with_context(|| format!("Could not read {}: ", file.display()))?;
-                let formatted = format_code(&unformatted)?;
+                let options = PyFormatOptions::from_extension(file)
+                    .context("Unknown file extension, expected .py or .pyi")?;
+                let formatted = format_module(&unformatted, options)?;
                 std::fs::write(file, formatted.as_code().as_bytes())
                     .with_context(|| format!("Could not write to {}, exiting", file.display()))?;
             }

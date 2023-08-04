@@ -52,15 +52,13 @@ pub(crate) fn type_comparison(checker: &mut Checker, compare: &ast::ExprCompare)
         }
 
         // Left-hand side must be, e.g., `type(obj)`.
-        let Expr::Call(ast::ExprCall {
-            func,  ..
-        }) = left else {
+        let Expr::Call(ast::ExprCall { func, .. }) = left else {
             continue;
         };
 
         let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else {
-                continue;
-            };
+            continue;
+        };
 
         if !(id == "type" && checker.semantic().is_builtin("type")) {
             continue;

@@ -22,7 +22,7 @@ use ruff::settings::configuration::Configuration;
 use ruff::settings::options::Options;
 use ruff::settings::{defaults, flags, Settings};
 use ruff_python_codegen::Stylist;
-use ruff_python_formatter::{format_module, format_node, PyFormatOptions};
+use ruff_python_formatter::{format_module, format_node, PyFormatOptions, SourceType};
 use ruff_python_index::{CommentRangesBuilder, Indexer};
 use ruff_source_file::{Locator, SourceLocation};
 
@@ -262,7 +262,9 @@ impl Workspace {
     }
 
     pub fn format(&self, contents: &str) -> Result<String, Error> {
-        let printed = format_module(contents, PyFormatOptions::default()).map_err(into_error)?;
+        // TODO(konstin): Add an options for py/pyi to the UI (1/2)
+        let options = PyFormatOptions::from_source_type(SourceType::default());
+        let printed = format_module(contents, options).map_err(into_error)?;
 
         Ok(printed.into_code())
     }
@@ -278,13 +280,10 @@ impl Workspace {
         let comment_ranges = comment_ranges.finish();
         let module = parse_tokens(tokens, Mode::Module, ".").map_err(into_error)?;
 
-        let formatted = format_node(
-            &module,
-            &comment_ranges,
-            contents,
-            PyFormatOptions::default(),
-        )
-        .map_err(into_error)?;
+        // TODO(konstin): Add an options for py/pyi to the UI (2/2)
+        let options = PyFormatOptions::from_source_type(SourceType::default());
+        let formatted =
+            format_node(&module, &comment_ranges, contents, options).map_err(into_error)?;
 
         Ok(format!("{formatted}"))
     }
