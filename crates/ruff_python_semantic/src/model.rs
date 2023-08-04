@@ -31,7 +31,7 @@ pub struct SemanticModel<'a> {
     module_path: Option<&'a [String]>,
 
     /// Stack of all visited statements.
-    pub stmts: Nodes<'a>,
+    pub stmts: Nodes<'a, Stmt>,
 
     /// The identifier of the current statement.
     stmt_id: Option<NodeId>,
@@ -129,7 +129,7 @@ impl<'a> SemanticModel<'a> {
         Self {
             typing_modules,
             module_path: module.path(),
-            stmts: Nodes::default(),
+            stmts: Nodes::<Stmt>::default(),
             stmt_id: None,
             exprs: Vec::default(),
             scopes: Scopes::default(),
