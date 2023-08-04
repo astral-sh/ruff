@@ -460,9 +460,7 @@ fn format_dir_entry(
     }
 
     let file = dir_entry.path().to_path_buf();
-    let options = options
-        .to_py_format_options(&file)
-        .context("Unknown file extension, expected .py or .pyi")?;
+    let options = options.to_py_format_options(&file);
     // Handle panics (mostly in `debug_assert!`)
     let result = match catch_unwind(|| format_dev_file(&file, stability_check, write, options)) {
         Ok(result) => result,
@@ -868,8 +866,7 @@ mod tests {
         "};
         let options = BlackOptions::from_toml(toml, Path::new("pyproject.toml"))
             .unwrap()
-            .to_py_format_options(Path::new("code_inline.py"))
-            .unwrap();
+            .to_py_format_options(Path::new("code_inline.py"));
         assert_eq!(options.line_width(), LineWidth::try_from(119).unwrap());
         assert!(matches!(
             options.magic_trailing_comma(),
@@ -888,8 +885,7 @@ mod tests {
         "#};
         let options = BlackOptions::from_toml(toml, Path::new("pyproject.toml"))
             .unwrap()
-            .to_py_format_options(Path::new("code_inline.py"))
-            .unwrap();
+            .to_py_format_options(Path::new("code_inline.py"));
         assert_eq!(options.line_width(), LineWidth::try_from(130).unwrap());
         assert!(matches!(
             options.magic_trailing_comma(),
