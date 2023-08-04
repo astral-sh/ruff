@@ -71,16 +71,19 @@ impl PyFormatOptions {
         self
     }
 
+    #[must_use]
     pub fn with_magic_trailing_comma(mut self, trailing_comma: MagicTrailingComma) -> Self {
         self.magic_trailing_comma = trailing_comma;
         self
     }
 
+    #[must_use]
     pub fn with_indent_style(mut self, indent_style: IndentStyle) -> Self {
         self.indent_style = indent_style;
         self
     }
 
+    #[must_use]
     pub fn with_line_width(mut self, line_width: LineWidth) -> Self {
         self.line_width = line_width;
         self
