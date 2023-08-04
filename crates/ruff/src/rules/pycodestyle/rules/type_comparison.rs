@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_none;
@@ -40,16 +41,32 @@ impl Violation for TypeComparison {
 }
 
 /// E721
-pub(crate) fn type_comparison(
-    checker: &mut Checker,
-    expr: &Expr,
-    ops: &[CmpOp],
-    comparators: &[Expr],
-) {
-    for (op, right) in ops.iter().zip(comparators) {
+pub(crate) fn type_comparison(checker: &mut Checker, compare: &ast::ExprCompare) {
+    for ((left, right), op) in std::iter::once(compare.left.as_ref())
+        .chain(compare.comparators.iter())
+        .tuple_windows()
+        .zip(compare.ops.iter())
+    {
         if !matches!(op, CmpOp::Is | CmpOp::IsNot | CmpOp::Eq | CmpOp::NotEq) {
             continue;
         }
+
+        // Left-hand side must be, e.g., `type(obj)`.
+        let Expr::Call(ast::ExprCall {
+            func,  ..
+        }) = left else {
+            continue;
+        };
+
+        let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else {
+                continue;
+            };
+
+        if !(id == "type" && checker.semantic().is_builtin("type")) {
+            continue;
+        }
+
+        // Right-hand side must be, e.g., `type(1)` or `int`.
         match right {
             Expr::Call(ast::ExprCall {
                 func, arguments, ..
@@ -68,7 +85,7 @@ pub(crate) fn type_comparison(
                     {
                         checker
                             .diagnostics
-                            .push(Diagnostic::new(TypeComparison, expr.range()));
+                            .push(Diagnostic::new(TypeComparison, compare.range()));
                     }
                 }
             }
@@ -76,12 +93,12 @@ pub(crate) fn type_comparison(
                 // Ex) `type(obj) is types.NoneType`
                 if checker
                     .semantic()
-                    .resolve_call_path(value)
+                    .resolve_call_path(value.as_ref())
                     .is_some_and(|call_path| matches!(call_path.as_slice(), ["types", ..]))
                 {
                     checker
                         .diagnostics
-                        .push(Diagnostic::new(TypeComparison, expr.range()));
+                        .push(Diagnostic::new(TypeComparison, compare.range()));
                 }
             }
             Expr::Name(ast::ExprName { id, .. }) => {
@@ -93,7 +110,7 @@ pub(crate) fn type_comparison(
                 {
                     checker
                         .diagnostics
-                        .push(Diagnostic::new(TypeComparison, expr.range()));
+                        .push(Diagnostic::new(TypeComparison, compare.range()));
                 }
             }
             _ => {}
