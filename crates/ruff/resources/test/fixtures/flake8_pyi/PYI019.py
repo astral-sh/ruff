@@ -15,6 +15,10 @@ class BadClass:
 
 
     @classmethod
+    def bad_posonly_class_method(cls: type[_S], /) -> _S: ...  # PYI019
+
+
+    @classmethod
     def excluded_edge_case(cls: Type[_S], arg: int) -> _S: ...  # Ok
 
 
