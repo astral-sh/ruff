@@ -17,7 +17,7 @@ impl<'a> FormatInt<'a> {
 }
 
 impl Format<PyFormatContext<'_>> for FormatInt<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let range = self.constant.range();
         let content = f.context().locator().slice(range);
 
@@ -42,7 +42,7 @@ impl<'a> FormatFloat<'a> {
 }
 
 impl Format<PyFormatContext<'_>> for FormatFloat<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let range = self.constant.range();
         let content = f.context().locator().slice(range);
 
@@ -67,7 +67,7 @@ impl<'a> FormatComplex<'a> {
 }
 
 impl Format<PyFormatContext<'_>> for FormatComplex<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let range = self.constant.range();
         let content = f.context().locator().slice(range);
 

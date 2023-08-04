@@ -101,7 +101,7 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for CmpOp {
 }
 
 impl FormatRule<CmpOp, PyFormatContext<'_>> for FormatCmpOp {
-    fn fmt(&self, item: &CmpOp, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+    fn fmt(&self, item: &CmpOp, f: &mut PyFormatter) -> FormatResult<()> {
         let operator = match item {
             CmpOp::Eq => "==",
             CmpOp::NotEq => "!=",

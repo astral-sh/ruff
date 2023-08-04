@@ -33,11 +33,7 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
 pub struct FormatAnyFunctionDef;
 
 impl FormatRule<AnyFunctionDefinition<'_>, PyFormatContext<'_>> for FormatAnyFunctionDef {
-    fn fmt(
-        &self,
-        item: &AnyFunctionDefinition<'_>,
-        f: &mut Formatter<PyFormatContext<'_>>,
-    ) -> FormatResult<()> {
+    fn fmt(&self, item: &AnyFunctionDefinition<'_>, f: &mut PyFormatter) -> FormatResult<()> {
         let comments = f.context().comments().clone();
 
         let dangling_comments = comments.dangling_comments(item);

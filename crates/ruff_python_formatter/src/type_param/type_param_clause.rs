@@ -13,7 +13,7 @@ pub(crate) struct FormatTypeParamsClause<'a> {
 
 /// Formats a sequence of [`TypeParam`] nodes.
 impl Format<PyFormatContext<'_>> for FormatTypeParamsClause<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         if self.type_params.is_empty() {
             return Ok(());
         }

@@ -61,7 +61,7 @@ groups = {
 
 def group_for_node(node: str) -> str:
     for group in groups:
-        if node.startswith(group.title()):
+        if node.startswith(group.title().replace("_", "")):
             return group
     else:
         return "other"
@@ -98,7 +98,7 @@ for group, group_nodes in nodes_grouped.items():
 
             impl FormatNodeRule<{node}> for Format{node} {{
                 fn fmt_fields(&self, item: &{node}, f: &mut PyFormatter) -> FormatResult<()> {{
-                    write!(f, [verbatim_text(item.range)])
+                    write!(f, [verbatim_text(item)])
                 }}
             }}
             """.strip()  # noqa: E501
@@ -112,8 +112,7 @@ generated = """//! This is a generated file. Don't modify it by hand! Run `crate
 #![allow(unknown_lints, clippy::default_constructed_unit_structs)]
 
 use crate::context::PyFormatContext;
-use crate::{AsFormat, FormatNodeRule, IntoFormat};
-use ruff_formatter::formatter::Formatter;
+use crate::{AsFormat, FormatNodeRule, IntoFormat, PyFormatter};
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule, FormatResult, FormatRule};
 use ruff_python_ast as ast;
 
@@ -127,7 +126,7 @@ for node in nodes:
             fn fmt(
                 &self,
                 node: &ast::{node},
-                f: &mut Formatter<PyFormatContext<'_>>,
+                f: &mut PyFormatter,
             ) -> FormatResult<()> {{
                 FormatNodeRule::<ast::{node}>::fmt(self, node, f)
             }}

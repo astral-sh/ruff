@@ -100,7 +100,7 @@ impl<'a> FormatString<'a> {
 }
 
 impl<'a> Format<PyFormatContext<'_>> for FormatString<'a> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         match self.layout {
             StringLayout::Default => {
                 let string_range = self.string.range();
@@ -134,7 +134,7 @@ impl<'a> FormatStringContinuation<'a> {
 }
 
 impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let comments = f.context().comments().clone();
         let locator = f.context().locator();
         let mut dangling_comments = comments.dangling_comments(self.string);
@@ -249,7 +249,7 @@ impl FormatStringPart {
 }
 
 impl Format<PyFormatContext<'_>> for FormatStringPart {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let string_content = f.context().locator().slice(self.part_range);
 
         let prefix = StringPrefix::parse(string_content);
@@ -344,7 +344,7 @@ impl StringPrefix {
 }
 
 impl Format<PyFormatContext<'_>> for StringPrefix {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         // Retain the casing for the raw prefix:
         // https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#r-strings-and-r-strings
         if self.contains(StringPrefix::RAW) {
@@ -550,7 +550,7 @@ impl StringQuotes {
 }
 
 impl Format<PyFormatContext<'_>> for StringQuotes {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let quotes = match (self.style, self.triple) {
             (QuoteStyle::Single, false) => "'",
             (QuoteStyle::Single, true) => "'''",
