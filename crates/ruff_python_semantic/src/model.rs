@@ -36,8 +36,11 @@ pub struct SemanticModel<'a> {
     /// The identifier of the current statement.
     stmt_id: Option<NodeId>,
 
-    /// Stack of current expressions.
-    exprs: Vec<&'a Expr>,
+    /// Stack of all visited expressions.
+    pub exprs: Nodes<'a, Expr>,
+
+    /// The identifier of the current expression.
+    expr_id: Option<NodeId>,
 
     /// Stack of all scopes, along with the identifier of the current scope.
     pub scopes: Scopes<'a>,
@@ -131,7 +134,8 @@ impl<'a> SemanticModel<'a> {
             module_path: module.path(),
             stmts: Nodes::<Stmt>::default(),
             stmt_id: None,
-            exprs: Vec::default(),
+            exprs: Nodes::<Expr>::default(),
+            expr_id: None,
             scopes: Scopes::default(),
             scope_id: ScopeId::global(),
             definitions: Definitions::for_module(module),
@@ -783,16 +787,15 @@ impl<'a> SemanticModel<'a> {
         self.stmt_id = self.stmts.parent_id(node_id);
     }
 
-    /// Push an [`Expr`] onto the stack.
+    /// Push a [`Expr`] onto the stack.
     pub fn push_expr(&mut self, expr: &'a Expr) {
-        self.exprs.push(expr);
+        self.expr_id = Some(self.exprs.insert(expr, self.expr_id));
     }
 
     /// Pop the current [`Expr`] off the stack.
     pub fn pop_expr(&mut self) {
-        self.exprs
-            .pop()
-            .expect("Attempted to pop without expression");
+        let node_id = self.expr_id.expect("Attempted to pop without expression");
+        self.expr_id = self.exprs.parent_id(node_id);
     }
 
     /// Push a [`Scope`] with the given [`ScopeKind`] onto the stack.
@@ -836,22 +839,32 @@ impl<'a> SemanticModel<'a> {
 
     /// Return the current `Expr`.
     pub fn expr(&self) -> Option<&'a Expr> {
-        self.exprs.iter().last().copied()
+        let node_id = self.expr_id?;
+        Some(self.exprs[node_id])
     }
 
-    /// Return the parent `Expr` of the current `Expr`.
+    /// Return the parent `Expr` of the current `Expr`, if any.
     pub fn expr_parent(&self) -> Option<&'a Expr> {
-        self.exprs.iter().rev().nth(1).copied()
+        self.expr_ancestors().nth(0)
     }
 
-    /// Return the grandparent `Expr` of the current `Expr`.
+    /// Return the grandparent `Expr` of the current `Expr`, if any.
     pub fn expr_grandparent(&self) -> Option<&'a Expr> {
-        self.exprs.iter().rev().nth(2).copied()
+        self.expr_ancestors().nth(1)
     }
 
     /// Return an [`Iterator`] over the current `Expr` parents.
-    pub fn expr_ancestors(&self) -> impl Iterator<Item = &&Expr> {
-        self.exprs.iter().rev().skip(1)
+    pub fn expr_ancestors(&self) -> impl Iterator<Item = &'a Expr> + '_ {
+        self.expr_id
+            .iter()
+            .copied()
+            .flat_map(|id| {
+                self.exprs
+                    .ancestor_ids(id)
+                    .skip(1)
+                    .map(|id| &self.exprs[id])
+            })
+            .copied()
     }
 
     /// Returns a reference to the global scope
