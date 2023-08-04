@@ -1,7 +1,7 @@
 use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
 use ruff_python_ast::helpers::is_compound_statement;
 use ruff_python_ast::{self as ast, Constant, Expr, Ranged, Stmt, Suite};
-use ruff_python_trivia::{lines_after, lines_before, skip_trailing_trivia};
+use ruff_python_trivia::{lines_after_ignoring_trivia, lines_before};
 
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::prelude::*;
@@ -180,8 +180,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                     // it then counts the lines between the statement and the trailing comment, which is
                     // always 0. This is why it skips any trailing trivia (trivia that's on the same line)
                     // and counts the lines after.
-                    let after_trailing_trivia = skip_trailing_trivia(offset, source);
-                    lines_after(after_trailing_trivia, source)
+                    lines_after_ignoring_trivia(offset, source)
                 };
 
                 match node_level {
