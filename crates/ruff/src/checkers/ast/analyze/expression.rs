@@ -78,6 +78,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 Rule::UnnecessaryLiteralUnion,
                 Rule::DuplicateUnionMember,
                 Rule::RedundantLiteralUnion,
+                Rule::UnnecessaryTypeUnion,
             ]) {
                 // Avoid duplicate checks if the parent is an `Union[...]` since these rules
                 // traverse nested unions.
@@ -96,8 +97,11 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     if checker.enabled(Rule::DuplicateUnionMember) {
                         flake8_pyi::rules::duplicate_union_member(checker, expr);
                     }
-                    if checker.is_stub && checker.enabled(Rule::RedundantLiteralUnion) {
+                    if checker.enabled(Rule::RedundantLiteralUnion) {
                         flake8_pyi::rules::redundant_literal_union(checker, expr);
+                    }
+                    if checker.enabled(Rule::UnnecessaryTypeUnion) {
+                        flake8_pyi::rules::unnecessary_type_union(checker, expr);
                     }
                 }
             }
@@ -179,9 +183,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                                     && checker.semantic.in_annotation()
                                     && !checker.settings.pyupgrade.keep_runtime_typing
                                 {
-                                    flake8_future_annotations::rules::future_rewritable_type_annotation(
-                                                checker, expr,
-                                            );
+                                    flake8_future_annotations::rules::future_rewritable_type_annotation(checker, expr);
                                 }
                             }
                             if checker.enabled(Rule::NonPEP585Annotation) {
@@ -387,9 +389,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                                         .enabled(Rule::StringDotFormatExtraPositionalArguments)
                                     {
                                         pyflakes::rules::string_dot_format_extra_positional_arguments(
-                                                checker,
-                                                &summary, args, location,
-                                            );
+                                            checker, &summary, args, location,
+                                        );
                                     }
                                     if checker.enabled(Rule::StringDotFormatMissingArguments) {
                                         pyflakes::rules::string_dot_format_missing_argument(
@@ -1075,33 +1076,30 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     );
                 }
             }
+
+            // Avoid duplicate checks if the parent is an `|` since these rules
+            // traverse nested unions.
+            let is_unchecked_union = !matches!(
+                checker.semantic.expr_parent(),
+                Some(Expr::BinOp(ast::ExprBinOp {
+                    op: Operator::BitOr,
+                    ..
+                }))
+            );
             if checker.enabled(Rule::DuplicateUnionMember)
                 && checker.semantic.in_type_definition()
-                // Avoid duplicate checks if the parent is an `|`
-                && !matches!(
-                    checker.semantic.expr_parent(),
-                    Some(Expr::BinOp(ast::ExprBinOp { op: Operator::BitOr, ..}))
-                )
+                && is_unchecked_union
             {
                 flake8_pyi::rules::duplicate_union_member(checker, expr);
             }
-            if checker.enabled(Rule::UnnecessaryLiteralUnion)
-                // Avoid duplicate checks if the parent is an `|`
-                && !matches!(
-                    checker.semantic.expr_parent(),
-                    Some(Expr::BinOp(ast::ExprBinOp { op: Operator::BitOr, ..}))
-                )
-            {
+            if checker.enabled(Rule::UnnecessaryLiteralUnion) && is_unchecked_union {
                 flake8_pyi::rules::unnecessary_literal_union(checker, expr);
             }
-            if checker.enabled(Rule::RedundantLiteralUnion)
-                // Avoid duplicate checks if the parent is an `|`
-                && !matches!(
-                    checker.semantic.expr_parent(),
-                    Some(Expr::BinOp(ast::ExprBinOp { op: Operator::BitOr, ..}))
-                )
-            {
+            if checker.enabled(Rule::RedundantLiteralUnion) && is_unchecked_union {
                 flake8_pyi::rules::redundant_literal_union(checker, expr);
+            }
+            if checker.enabled(Rule::UnnecessaryTypeUnion) && is_unchecked_union {
+                flake8_pyi::rules::unnecessary_type_union(checker, expr);
             }
         }
         Expr::UnaryOp(ast::ExprUnaryOp {
