@@ -46,6 +46,35 @@ from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, Con
 if True: from collections import (
     Mapping, Counter)
 
+# Bad imports from PYI027 that are now handled by PYI022 (UP035)
+from typing import ContextManager
+from typing import OrderedDict
+from typing_extensions import OrderedDict
+from typing import Callable
+from typing import ByteString
+from typing import Container
+from typing import Hashable
+from typing import ItemsView
+from typing import Iterable
+from typing import Iterator
+from typing import KeysView
+from typing import Mapping
+from typing import MappingView
+from typing import MutableMapping
+from typing import MutableSequence
+from typing import MutableSet
+from typing import Sequence
+from typing import Sized
+from typing import ValuesView
+from typing import Awaitable
+from typing import AsyncIterator
+from typing import AsyncIterable
+from typing import Coroutine
+from typing import Collection
+from typing import AsyncGenerator
+from typing import Reversible
+from typing import Generator
+
 # OK
 from a import b
 
