@@ -63,10 +63,19 @@ pub(super) fn is_empty_or_null_string(expr: &Expr) -> bool {
             ..
         }) => string.is_empty(),
         Expr::Constant(constant) if constant.value.is_none() => true,
-        Expr::FString(ast::ExprFString { values, .. }) => {
-            values.iter().all(is_empty_or_null_string)
+        Expr::FString(ast::ExprFString { parts, .. }) => {
+            parts.iter().all(is_empty_or_null_string_part)
         }
         _ => false,
+    }
+}
+
+fn is_empty_or_null_string_part(part: &ast::FStringPart) -> bool {
+    match part {
+        ast::FStringPart::String(ast::StringTodoName { value, .. }) => value.is_empty(),
+        ast::FStringPart::FormattedValue(ast::FormattedValue { expression, .. }) => {
+            is_empty_or_null_string(expression)
+        }
     }
 }
 

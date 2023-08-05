@@ -91,7 +91,7 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
         return Some(node.into());
     }
 
-    let mut fstring_elems = Vec::with_capacity(joinees.len() * 2);
+    let mut fstring_parts = Vec::with_capacity(joinees.len() * 2);
     let mut first = true;
 
     for expr in joinees {
@@ -101,13 +101,13 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
             return None;
         }
         if !std::mem::take(&mut first) {
-            fstring_elems.push(helpers::to_constant_string(joiner));
+            fstring_parts.push(helpers::to_constant_string(joiner));
         }
-        fstring_elems.push(helpers::to_f_string_element(expr)?);
+        fstring_parts.push(helpers::to_fstring_part(expr)?);
     }
 
     let node = ast::ExprFString {
-        values: fstring_elems,
+        parts: fstring_parts,
         implicit_concatenated: false,
         range: TextRange::default(),
     };

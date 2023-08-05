@@ -188,7 +188,6 @@ fn is_allowed_value(expr: &Expr) -> bool {
         | Expr::GeneratorExp(_)
         | Expr::Compare(_)
         | Expr::Call(_)
-        | Expr::FormattedValue(_)
         | Expr::FString(_)
         | Expr::Constant(_)
         | Expr::Attribute(_)
