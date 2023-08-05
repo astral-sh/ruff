@@ -893,5 +893,18 @@ UP031_0.py:104:5: UP031 [*] Use format specifiers instead of percent format
     105 |+    foo {}
     106 |+    """.format(x)
 108 107 | )
+109 108 | 
+110 109 | "%s" % (
+
+UP031_0.py:110:1: UP031 Use format specifiers instead of percent format
+    |
+108 |   )
+109 |   
+110 | / "%s" % (
+111 | |     x,  # comment
+112 | | )
+    | |_^ UP031
+    |
+    = help: Replace with format specifiers
 
 

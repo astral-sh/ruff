@@ -7,7 +7,7 @@ use ruff_python_literal::cformat::{
 use ruff_python_parser::{lexer, AsMode, Tok};
 use ruff_text_size::TextRange;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_ast::whitespace::indentation;
@@ -43,14 +43,16 @@ use crate::rules::pyupgrade::helpers::curly_escape;
 #[violation]
 pub struct PrintfStringFormatting;
 
-impl AlwaysAutofixableViolation for PrintfStringFormatting {
+impl Violation for PrintfStringFormatting {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use format specifiers instead of percent format")
     }
 
-    fn autofix_title(&self) -> String {
-        "Replace with format specifiers".to_string()
+    fn autofix_title(&self) -> Option<String> {
+        Some("Replace with format specifiers".to_string())
     }
 }
 
@@ -467,7 +469,15 @@ pub(crate) fn printf_string_formatting(
     contents.push_str(&format!(".format{params_string}"));
 
     let mut diagnostic = Diagnostic::new(PrintfStringFormatting, expr.range());
-    if checker.patch(diagnostic.kind.rule()) {
+    // Avoid autofix if there are comments within the right-hand side:
+    // ```
+    // "%s" % (
+    //     0,  # 0
+    // )
+    // ```
+    if checker.patch(diagnostic.kind.rule())
+        && !checker.indexer().comment_ranges().intersects(right.range())
+    {
         diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
             contents,
             expr.range(),
