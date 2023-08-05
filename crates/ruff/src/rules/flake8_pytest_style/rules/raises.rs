@@ -74,7 +74,7 @@ impl Violation for PytestRaisesWithMultipleStatements {
 /// Use instead:
 /// ```python
 /// def test_foo():
-///     with pytest.raises(ValueError, match='expected message'):
+///     with pytest.raises(ValueError, match="expected message"):
 ///         ...
 /// ```
 ///
