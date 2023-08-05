@@ -207,6 +207,7 @@ fn is_first_statement_in_body(statement: AnyNodeRef, has_body: AnyNodeRef) -> bo
         | AnyNodeRef::ExceptHandlerExceptHandler(ast::ExceptHandlerExceptHandler {
             body, ..
         })
+        | AnyNodeRef::MatchCase(ast::MatchCase { body, .. })
         | AnyNodeRef::StmtFunctionDef(ast::StmtFunctionDef { body, .. })
         | AnyNodeRef::StmtClassDef(ast::StmtClassDef { body, .. }) => {
             are_same_optional(statement, body.first())

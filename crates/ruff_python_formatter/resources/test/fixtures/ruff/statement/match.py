@@ -55,3 +55,36 @@ def foo():
     match inside_func:  # comment
         case "bar":
             pass
+
+
+match newlines:
+
+    # case 1 leading comment
+
+
+    case "top level case comment with newlines":  # case dangling comment
+        # pass leading comment
+        pass
+        # pass trailing comment
+
+
+    # case 2 leading comment
+
+
+
+    case "case comment with newlines" if foo == 2:  # second
+        pass
+
+    case "one", "newline" if (foo := 1):  # third
+        pass
+
+
+    case "two newlines":
+        pass
+
+
+
+    case "three newlines":
+        pass
+    case _:
+        pass

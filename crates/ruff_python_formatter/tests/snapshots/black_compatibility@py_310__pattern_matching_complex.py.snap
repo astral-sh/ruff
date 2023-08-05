@@ -265,7 +265,7 @@ match x:
 +    case NOT_YET_IMPLEMENTED_Pattern:
          y = 0
 -    case [1, 0] if (x := x[:0]):
-+    case NOT_YET_IMPLEMENTED_Pattern if x := x[:0]:
++    case NOT_YET_IMPLEMENTED_Pattern if (x := x[:0]):
          y = 1
 -    case [1, 0]:
 +    case NOT_YET_IMPLEMENTED_Pattern:
@@ -431,7 +431,7 @@ match (0, 1, 2):
 match x:
     case NOT_YET_IMPLEMENTED_Pattern:
         y = 0
-    case NOT_YET_IMPLEMENTED_Pattern if x := x[:0]:
+    case NOT_YET_IMPLEMENTED_Pattern if (x := x[:0]):
         y = 1
     case NOT_YET_IMPLEMENTED_Pattern:
         y = 2
