@@ -81,62 +81,43 @@ B006_B008.py:221:20: B006 Do not use mutable data structures for argument defaul
 222 |     pass
     |
 
-B006_B008.py:254:27: B006 Do not use mutable data structures for argument defaults
+B006_B008.py:258:27: B006 Do not use mutable data structures for argument defaults
     |
-253 | def mutable_annotations(
-254 |     a: list[int] | None = [],
+257 | def mutable_annotations(
+258 |     a: list[int] | None = [],
     |                           ^^ B006
-255 |     b: Optional[Dict[int, int]] = {},
-256 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+259 |     b: Optional[Dict[int, int]] = {},
+260 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
     |
 
-B006_B008.py:255:35: B006 Do not use mutable data structures for argument defaults
+B006_B008.py:259:35: B006 Do not use mutable data structures for argument defaults
     |
-253 | def mutable_annotations(
-254 |     a: list[int] | None = [],
-255 |     b: Optional[Dict[int, int]] = {},
+257 | def mutable_annotations(
+258 |     a: list[int] | None = [],
+259 |     b: Optional[Dict[int, int]] = {},
     |                                   ^^ B006
-256 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
-257 | ):
+260 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+261 |     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
     |
 
-B006_B008.py:256:62: B006 Do not use mutable data structures for argument defaults
+B006_B008.py:260:62: B006 Do not use mutable data structures for argument defaults
     |
-254 |     a: list[int] | None = [],
-255 |     b: Optional[Dict[int, int]] = {},
-256 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+258 |     a: list[int] | None = [],
+259 |     b: Optional[Dict[int, int]] = {},
+260 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
     |                                                              ^^^^^ B006
-257 | ):
-258 |     pass
+261 |     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+262 | ):
     |
 
-B006_B008.py:271:27: B006 Do not use mutable data structures for argument defaults
+B006_B008.py:261:80: B006 Do not use mutable data structures for argument defaults
     |
-270 | def mutable_annotations(
-271 |     a: list[int] | None = [],
-    |                           ^^ B006
-272 |     b: Optional[Dict[int, int]] = {},
-273 |     c: Annotated_te[Union[Set[str], abc.Sized], "annotation"] = set(),
-    |
-
-B006_B008.py:272:35: B006 Do not use mutable data structures for argument defaults
-    |
-270 | def mutable_annotations(
-271 |     a: list[int] | None = [],
-272 |     b: Optional[Dict[int, int]] = {},
-    |                                   ^^ B006
-273 |     c: Annotated_te[Union[Set[str], abc.Sized], "annotation"] = set(),
-274 | ):
-    |
-
-B006_B008.py:273:65: B006 Do not use mutable data structures for argument defaults
-    |
-271 |     a: list[int] | None = [],
-272 |     b: Optional[Dict[int, int]] = {},
-273 |     c: Annotated_te[Union[Set[str], abc.Sized], "annotation"] = set(),
-    |                                                                 ^^^^^ B006
-274 | ):
-275 |     pass
+259 |     b: Optional[Dict[int, int]] = {},
+260 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+261 |     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+    |                                                                                ^^^^^ B006
+262 | ):
+263 |     pass
     |
 
 
