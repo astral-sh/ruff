@@ -1,7 +1,7 @@
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_true;
-use ruff_python_ast::{self as ast, Keyword, Ranged};
+use ruff_python_ast::{self as ast, Keyword, PySourceType, Ranged};
 use ruff_python_semantic::{BindingKind, Import};
 use ruff_source_file::Locator;
 
@@ -93,9 +93,12 @@ pub(crate) fn inplace_argument(checker: &mut Checker, call: &ast::ExprCall) {
                         && checker.semantic().expr_parent().is_none()
                         && !checker.semantic().scope().kind.is_lambda()
                     {
-                        if let Some(fix) =
-                            convert_inplace_argument_to_assignment(checker.locator(), call, keyword)
-                        {
+                        if let Some(fix) = convert_inplace_argument_to_assignment(
+                            checker.locator(),
+                            call,
+                            keyword,
+                            checker.source_type,
+                        ) {
                             diagnostic.set_fix(fix);
                         }
                     }
@@ -116,6 +119,7 @@ fn convert_inplace_argument_to_assignment(
     locator: &Locator,
     call: &ast::ExprCall,
     keyword: &Keyword,
+    source_type: PySourceType,
 ) -> Option<Fix> {
     // Add the assignment.
     let attr = call.func.as_attribute_expr()?;
@@ -125,8 +129,14 @@ fn convert_inplace_argument_to_assignment(
     );
 
     // Remove the `inplace` argument.
-    let remove_argument =
-        remove_argument(keyword, &call.arguments, Parentheses::Preserve, locator).ok()?;
+    let remove_argument = remove_argument(
+        keyword,
+        &call.arguments,
+        Parentheses::Preserve,
+        locator,
+        source_type,
+    )
+    .ok()?;
 
     Some(Fix::suggested_edits(insert_assignment, [remove_argument]))
 }

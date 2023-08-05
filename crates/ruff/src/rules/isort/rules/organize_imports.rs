@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use itertools::{EitherOrBoth, Itertools};
-use ruff_python_ast::{Ranged, Stmt};
+use ruff_python_ast::{PySourceType, Ranged, Stmt};
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -87,6 +87,7 @@ pub(crate) fn organize_imports(
     indexer: &Indexer,
     settings: &Settings,
     package: Option<&Path>,
+    source_type: PySourceType,
 ) -> Option<Diagnostic> {
     let indentation = locator.slice(extract_indentation_range(&block.imports, locator));
     let indentation = leading_indentation(indentation);
@@ -105,6 +106,7 @@ pub(crate) fn organize_imports(
     let comments = comments::collect_comments(
         TextRange::new(range.start(), locator.full_line_end(range.end())),
         locator,
+        source_type,
     );
 
     let trailing_line_end = if block.trailer.is_none() {
@@ -123,6 +125,7 @@ pub(crate) fn organize_imports(
         stylist,
         &settings.src,
         package,
+        source_type,
         settings.isort.combine_as_imports,
         settings.isort.force_single_line,
         settings.isort.force_sort_within_sections,

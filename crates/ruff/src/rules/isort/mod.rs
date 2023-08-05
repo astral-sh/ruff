@@ -11,6 +11,7 @@ pub use categorize::{ImportSection, ImportType};
 use comments::Comment;
 use normalize::normalize_imports;
 use order::order_imports;
+use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
 use settings::RelativeImportsOrder;
@@ -72,6 +73,7 @@ pub(crate) fn format_imports(
     stylist: &Stylist,
     src: &[PathBuf],
     package: Option<&Path>,
+    source_type: PySourceType,
     combine_as_imports: bool,
     force_single_line: bool,
     force_sort_within_sections: bool,
@@ -94,7 +96,13 @@ pub(crate) fn format_imports(
     section_order: &[ImportSection],
 ) -> String {
     let trailer = &block.trailer;
-    let block = annotate_imports(&block.imports, comments, locator, split_on_trailing_comma);
+    let block = annotate_imports(
+        &block.imports,
+        comments,
+        locator,
+        split_on_trailing_comma,
+        source_type,
+    );
 
     // Normalize imports (i.e., deduplicate, aggregate `from` imports).
     let block = normalize_imports(

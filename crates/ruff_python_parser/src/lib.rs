@@ -114,7 +114,7 @@ pub use parser::{
     parse, parse_expression, parse_expression_starts_at, parse_program, parse_starts_at,
     parse_suite, parse_tokens, ParseError, ParseErrorType,
 };
-use ruff_python_ast::{CmpOp, Expr, Mod, Ranged, Suite};
+use ruff_python_ast::{CmpOp, Expr, Mod, PySourceType, Ranged, Suite};
 use ruff_text_size::{TextRange, TextSize};
 pub use string::FStringErrorType;
 pub use token::{StringKind, Tok, TokenKind};
@@ -130,9 +130,9 @@ mod token;
 pub mod typing;
 
 /// Collect tokens up to and including the first error.
-pub fn tokenize(contents: &str) -> Vec<LexResult> {
+pub fn tokenize(contents: &str, mode: Mode) -> Vec<LexResult> {
     let mut tokens: Vec<LexResult> = vec![];
-    for tok in lexer::lex(contents, Mode::Module) {
+    for tok in lexer::lex(contents, mode) {
         let is_err = tok.is_err();
         tokens.push(tok);
         if is_err {
@@ -146,17 +146,32 @@ pub fn tokenize(contents: &str) -> Vec<LexResult> {
 pub fn parse_program_tokens(
     lxr: Vec<LexResult>,
     source_path: &str,
+    is_jupyter_notebook: bool,
 ) -> anyhow::Result<Suite, ParseError> {
-    match parse_tokens(lxr, Mode::Module, source_path)? {
+    let mode = if is_jupyter_notebook {
+        Mode::Jupyter
+    } else {
+        Mode::Module
+    };
+    match parse_tokens(lxr, mode, source_path)? {
         Mod::Module(m) => Ok(m.body),
         Mod::Expression(_) => unreachable!("Mode::Module doesn't return other variant"),
     }
 }
 
 /// Return the `Range` of the first `Tok::Colon` token in a `Range`.
-pub fn first_colon_range(range: TextRange, source: &str) -> Option<TextRange> {
+pub fn first_colon_range(
+    range: TextRange,
+    source: &str,
+    is_jupyter_notebook: bool,
+) -> Option<TextRange> {
     let contents = &source[range];
-    let range = lexer::lex_starts_at(contents, Mode::Module, range.start())
+    let mode = if is_jupyter_notebook {
+        Mode::Jupyter
+    } else {
+        Mode::Module
+    };
+    let range = lexer::lex_starts_at(contents, mode, range.start())
         .flatten()
         .find(|(tok, _)| tok.is_colon())
         .map(|(_, range)| range);
@@ -308,6 +323,19 @@ impl std::str::FromStr for Mode {
     }
 }
 
+pub trait AsMode {
+    fn as_mode(&self) -> Mode;
+}
+
+impl AsMode for PySourceType {
+    fn as_mode(&self) -> Mode {
+        match self {
+            PySourceType::Python | PySourceType::Stub => Mode::Module,
+            PySourceType::Jupyter => Mode::Jupyter,
+        }
+    }
+}
+
 /// Returned when a given mode is not valid.
 #[derive(Debug)]
 pub struct ModeParseError;
@@ -357,6 +385,7 @@ mod tests {
         let range = first_colon_range(
             TextRange::new(TextSize::from(0), contents.text_len()),
             contents,
+            false,
         )
         .unwrap();
         assert_eq!(&contents[range], ":");

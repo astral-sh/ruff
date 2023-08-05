@@ -9,6 +9,7 @@ use ruff::linter::lint_only;
 use ruff::settings::{flags, Settings};
 use ruff::RuleSelector;
 use ruff_benchmark::{TestCase, TestCaseSpeed, TestFile, TestFileDownloadError};
+use ruff_python_ast::PySourceType;
 
 #[cfg(target_os = "windows")]
 #[global_allocator]
@@ -57,13 +58,15 @@ fn benchmark_linter(mut group: BenchmarkGroup<WallTime>, settings: &Settings) {
             &case,
             |b, case| {
                 b.iter(|| {
+                    let path = case.path();
                     let result = lint_only(
                         case.code(),
-                        &case.path(),
+                        &path,
                         None,
                         settings,
                         flags::Noqa::Enabled,
                         None,
+                        PySourceType::from(path.as_path()),
                     );
 
                     // Assert that file contains no parse errors

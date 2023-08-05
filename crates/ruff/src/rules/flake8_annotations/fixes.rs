@@ -1,6 +1,6 @@
 use anyhow::{bail, Result};
-use ruff_python_ast::{Ranged, Stmt};
-use ruff_python_parser::{lexer, Mode, Tok};
+use ruff_python_ast::{PySourceType, Ranged, Stmt};
+use ruff_python_parser::{lexer, AsMode, Tok};
 
 use ruff_diagnostics::Edit;
 use ruff_source_file::Locator;
@@ -10,6 +10,7 @@ pub(crate) fn add_return_annotation(
     locator: &Locator,
     stmt: &Stmt,
     annotation: &str,
+    source_type: PySourceType,
 ) -> Result<Edit> {
     let contents = &locator.contents()[stmt.range()];
 
@@ -17,7 +18,9 @@ pub(crate) fn add_return_annotation(
     let mut seen_lpar = false;
     let mut seen_rpar = false;
     let mut count = 0u32;
-    for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, stmt.start()).flatten() {
+    for (tok, range) in
+        lexer::lex_starts_at(contents, source_type.as_mode(), stmt.start()).flatten()
+    {
         if seen_lpar && seen_rpar {
             if matches!(tok, Tok::Colon) {
                 return Ok(Edit::insertion(format!(" -> {annotation}"), range.start()));

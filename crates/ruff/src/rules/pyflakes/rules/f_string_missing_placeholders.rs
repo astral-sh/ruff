@@ -1,5 +1,5 @@
-use ruff_python_ast::{Expr, Ranged};
-use ruff_python_parser::{lexer, Mode, StringKind, Tok};
+use ruff_python_ast::{Expr, PySourceType, Ranged};
+use ruff_python_parser::{lexer, AsMode, StringKind, Tok};
 use ruff_text_size::{TextRange, TextSize};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
@@ -52,9 +52,10 @@ impl AlwaysAutofixableViolation for FStringMissingPlaceholders {
 fn find_useless_f_strings<'a>(
     expr: &'a Expr,
     locator: &'a Locator,
+    source_type: PySourceType,
 ) -> impl Iterator<Item = (TextRange, TextRange)> + 'a {
     let contents = locator.slice(expr.range());
-    lexer::lex_starts_at(contents, Mode::Module, expr.start())
+    lexer::lex_starts_at(contents, source_type.as_mode(), expr.start())
         .flatten()
         .filter_map(|(tok, range)| match tok {
             Tok::String {
@@ -85,7 +86,9 @@ pub(crate) fn f_string_missing_placeholders(expr: &Expr, values: &[Expr], checke
         .iter()
         .any(|value| matches!(value, Expr::FormattedValue(_)))
     {
-        for (prefix_range, tok_range) in find_useless_f_strings(expr, checker.locator()) {
+        for (prefix_range, tok_range) in
+            find_useless_f_strings(expr, checker.locator(), checker.source_type)
+        {
             let mut diagnostic = Diagnostic::new(FStringMissingPlaceholders, tok_range);
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.set_fix(convert_f_string_to_regular_string(

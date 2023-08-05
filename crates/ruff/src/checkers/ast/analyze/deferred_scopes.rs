@@ -37,7 +37,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
     // Identify any valid runtime imports. If a module is imported at runtime, and
     // used at runtime, then by default, we avoid flagging any other
     // imports from that model as typing-only.
-    let enforce_typing_imports = !checker.is_stub
+    let enforce_typing_imports = !checker.source_type.is_stub()
         && checker.any_enabled(&[
             Rule::RuntimeImportInTypeCheckingBlock,
             Rule::TypingOnlyFirstPartyImport,
@@ -243,7 +243,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                 pyflakes::rules::unused_annotation(checker, scope, &mut diagnostics);
             }
 
-            if !checker.is_stub {
+            if !checker.source_type.is_stub() {
                 if checker.any_enabled(&[
                     Rule::UnusedClassMethodArgument,
                     Rule::UnusedFunctionArgument,

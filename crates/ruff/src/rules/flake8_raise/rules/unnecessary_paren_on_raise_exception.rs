@@ -1,5 +1,5 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, Ranged};
-use ruff_python_parser::{lexer, Mode, Tok};
+use ruff_python_ast::{self as ast, Arguments, Expr, PySourceType, Ranged};
+use ruff_python_parser::{lexer, AsMode, Tok};
 use ruff_text_size::{TextRange, TextSize};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
@@ -71,7 +71,7 @@ pub(crate) fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: 
             return;
         }
 
-        let range = match_parens(func.end(), checker.locator())
+        let range = match_parens(func.end(), checker.locator(), checker.source_type)
             .expect("Expected call to include parentheses");
         let mut diagnostic = Diagnostic::new(UnnecessaryParenOnRaiseException, range);
         if checker.patch(diagnostic.kind.rule()) {
@@ -82,14 +82,18 @@ pub(crate) fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: 
 }
 
 /// Return the range of the first parenthesis pair after a given [`TextSize`].
-fn match_parens(start: TextSize, locator: &Locator) -> Option<TextRange> {
+fn match_parens(
+    start: TextSize,
+    locator: &Locator,
+    source_type: PySourceType,
+) -> Option<TextRange> {
     let contents = &locator.contents()[usize::from(start)..];
 
     let mut fix_start = None;
     let mut fix_end = None;
     let mut count = 0u32;
 
-    for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, start).flatten() {
+    for (tok, range) in lexer::lex_starts_at(contents, source_type.as_mode(), start).flatten() {
         match tok {
             Tok::Lpar => {
                 if count == 0 {

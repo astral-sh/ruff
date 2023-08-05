@@ -3,10 +3,12 @@
 use anyhow::{bail, Result};
 
 use ruff_diagnostics::Edit;
-use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Expr, Keyword, Ranged, Stmt};
+use ruff_python_ast::{
+    self as ast, Arguments, ExceptHandler, Expr, Keyword, PySourceType, Ranged, Stmt,
+};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::{lexer, Mode};
+use ruff_python_parser::{lexer, AsMode};
 use ruff_python_trivia::{has_leading_content, is_python_whitespace, PythonWhitespace};
 use ruff_source_file::{Locator, NewlineWithTrailingNewline};
 use ruff_text_size::{TextLen, TextRange, TextSize};
@@ -88,6 +90,7 @@ pub(crate) fn remove_argument<T: Ranged>(
     arguments: &Arguments,
     parentheses: Parentheses,
     locator: &Locator,
+    source_type: PySourceType,
 ) -> Result<Edit> {
     // TODO(sbrugman): Preserve trailing comments.
     if arguments.keywords.len() + arguments.args.len() > 1 {
@@ -106,7 +109,7 @@ pub(crate) fn remove_argument<T: Ranged>(
             let mut seen_comma = false;
             for (tok, range) in lexer::lex_starts_at(
                 locator.slice(arguments.range()),
-                Mode::Module,
+                source_type.as_mode(),
                 arguments.start(),
             )
             .flatten()
@@ -135,7 +138,7 @@ pub(crate) fn remove_argument<T: Ranged>(
             // previous comma to the end of the argument.
             for (tok, range) in lexer::lex_starts_at(
                 locator.slice(arguments.range()),
-                Mode::Module,
+                source_type.as_mode(),
                 arguments.start(),
             )
             .flatten()

@@ -133,7 +133,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker.diagnostics.push(diagnostic);
                 }
             }
-            if checker.is_stub {
+            if checker.source_type.is_stub() {
                 if checker.enabled(Rule::PassStatementStubBody) {
                     flake8_pyi::rules::pass_statement_stub_body(checker, body);
                 }
@@ -168,12 +168,14 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     type_params.as_ref(),
                 );
             }
-            if checker.is_stub {
+            if checker.source_type.is_stub() {
                 if checker.enabled(Rule::StrOrReprDefinedInStub) {
                     flake8_pyi::rules::str_or_repr_defined_in_stub(checker, stmt);
                 }
             }
-            if checker.is_stub || checker.settings.target_version >= PythonVersion::Py311 {
+            if checker.source_type.is_stub()
+                || checker.settings.target_version >= PythonVersion::Py311
+            {
                 if checker.enabled(Rule::NoReturnArgumentAnnotationInStub) {
                     flake8_pyi::rules::no_return_argument_annotation(checker, parameters);
                 }
@@ -412,7 +414,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     body,
                 );
             }
-            if !checker.is_stub {
+            if !checker.source_type.is_stub() {
                 if checker.enabled(Rule::DjangoModelWithoutDunderStr) {
                     flake8_django::rules::model_without_dunder_str(checker, class_def);
                 }
@@ -453,7 +455,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker.diagnostics.push(diagnostic);
                 }
             }
-            if !checker.is_stub {
+            if !checker.source_type.is_stub() {
                 if checker.any_enabled(&[
                     Rule::AbstractBaseClassWithoutAbstractMethod,
                     Rule::EmptyMethodWithoutAbstractDecorator,
@@ -467,7 +469,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     );
                 }
             }
-            if checker.is_stub {
+            if checker.source_type.is_stub() {
                 if checker.enabled(Rule::PassStatementStubBody) {
                     flake8_pyi::rules::pass_statement_stub_body(checker, body);
                 }
@@ -569,7 +571,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         alias,
                     );
                 }
-                if !checker.is_stub {
+                if !checker.source_type.is_stub() {
                     if checker.enabled(Rule::UselessImportAlias) {
                         pylint::rules::useless_import_alias(checker, alias);
                     }
@@ -744,7 +746,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker.diagnostics.push(diagnostic);
                 }
             }
-            if checker.is_stub {
+            if checker.source_type.is_stub() {
                 if checker.enabled(Rule::FutureAnnotationsInStub) {
                     flake8_pyi::rules::from_future_import(checker, import_from);
                 }
@@ -889,7 +891,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                             checker.diagnostics.push(diagnostic);
                         }
                     }
-                    if !checker.is_stub {
+                    if !checker.source_type.is_stub() {
                         if checker.enabled(Rule::UselessImportAlias) {
                             pylint::rules::useless_import_alias(checker, alias);
                         }
@@ -1013,7 +1015,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker.diagnostics.push(diagnostic);
                 }
             }
-            if checker.is_stub {
+            if checker.source_type.is_stub() {
                 if checker.any_enabled(&[
                     Rule::UnrecognizedVersionInfoCheck,
                     Rule::PatchVersionComparison,
@@ -1325,7 +1327,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.settings.rules.enabled(Rule::TypeBivariance) {
                 pylint::rules::type_bivariance(checker, value);
             }
-            if checker.is_stub {
+            if checker.source_type.is_stub() {
                 if checker.any_enabled(&[
                     Rule::UnprefixedTypeParam,
                     Rule::AssignmentDefaultInStub,
@@ -1395,7 +1397,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::NonPEP695TypeAlias) {
                 pyupgrade::rules::non_pep695_type_alias(checker, assign_stmt);
             }
-            if checker.is_stub {
+            if checker.source_type.is_stub() {
                 if let Some(value) = value {
                     if checker.enabled(Rule::AssignmentDefaultInStub) {
                         // Ignore assignments in function bodies; those are covered by other rules.

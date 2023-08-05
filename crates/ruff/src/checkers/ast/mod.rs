@@ -43,7 +43,7 @@ use ruff_python_ast::helpers::{extract_handled_exceptions, to_module_path};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::str::trailing_quote;
 use ruff_python_ast::visitor::{walk_except_handler, walk_pattern, Visitor};
-use ruff_python_ast::{helpers, str, visitor};
+use ruff_python_ast::{helpers, str, visitor, PySourceType};
 use ruff_python_codegen::{Generator, Quote, Stylist};
 use ruff_python_index::Indexer;
 use ruff_python_parser::typing::{parse_type_annotation, AnnotationKind};
@@ -53,7 +53,6 @@ use ruff_python_semantic::{
     ModuleKind, ScopeId, ScopeKind, SemanticModel, SemanticModelFlags, StarImport, SubmoduleImport,
 };
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
-use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_source_file::Locator;
 
 use crate::checkers::ast::deferred::Deferred;
@@ -75,8 +74,8 @@ pub(crate) struct Checker<'a> {
     package: Option<&'a Path>,
     /// The module representation of the current file (e.g., `foo.bar`).
     module_path: Option<&'a [String]>,
-    /// Whether the current file is a stub (`.pyi`) file.
-    is_stub: bool,
+    /// The [`PySourceType`] of the current file.
+    pub(crate) source_type: PySourceType,
     /// The [`flags::Noqa`] for the current analysis (i.e., whether to respect suppression
     /// comments).
     noqa: flags::Noqa,
@@ -118,6 +117,7 @@ impl<'a> Checker<'a> {
         stylist: &'a Stylist,
         indexer: &'a Indexer,
         importer: Importer<'a>,
+        source_type: PySourceType,
     ) -> Checker<'a> {
         Checker {
             settings,
@@ -126,7 +126,7 @@ impl<'a> Checker<'a> {
             path,
             package,
             module_path: module.path(),
-            is_stub: is_python_stub_file(path),
+            source_type,
             locator,
             stylist,
             indexer,
@@ -231,11 +231,6 @@ impl<'a> Checker<'a> {
     /// The [`SemanticModel`], built up over the course of the AST traversal.
     pub(crate) const fn semantic(&self) -> &SemanticModel<'a> {
         &self.semantic
-    }
-
-    /// Return `true` if the current file is a stub file (`.pyi`).
-    pub(crate) const fn is_stub(&self) -> bool {
-        self.is_stub
     }
 
     /// The [`Path`] to the file under analysis.
@@ -1786,7 +1781,7 @@ impl<'a> Checker<'a> {
                             pyupgrade::rules::quoted_annotation(self, value, range);
                         }
                     }
-                    if self.is_stub {
+                    if self.source_type.is_stub() {
                         if self.enabled(Rule::QuotedAnnotationInStub) {
                             flake8_pyi::rules::quoted_annotation_in_stub(self, value, range);
                         }
@@ -1928,6 +1923,7 @@ pub(crate) fn check_ast(
     noqa: flags::Noqa,
     path: &Path,
     package: Option<&Path>,
+    source_type: PySourceType,
 ) -> Vec<Diagnostic> {
     let module_path = package.and_then(|package| to_module_path(package, path));
     let module = Module {
@@ -1955,6 +1951,7 @@ pub(crate) fn check_ast(
         stylist,
         indexer,
         Importer::new(python_ast, locator, stylist),
+        source_type,
     );
     checker.bind_builtins();
 

@@ -4,7 +4,7 @@ use ruff_python_ast::{self as ast, Constant, Expr, Ranged};
 use ruff_python_literal::cformat::{
     CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatString,
 };
-use ruff_python_parser::{lexer, Mode, Tok};
+use ruff_python_parser::{lexer, AsMode, Tok};
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
@@ -339,7 +339,7 @@ pub(crate) fn printf_string_formatting(
     let mut extension = None;
     for (tok, range) in lexer::lex_starts_at(
         checker.locator().slice(expr.range()),
-        Mode::Module,
+        checker.source_type.as_mode(),
         expr.start(),
     )
     .flatten()

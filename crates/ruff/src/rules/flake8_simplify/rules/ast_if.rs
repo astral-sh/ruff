@@ -378,6 +378,7 @@ pub(crate) fn nested_if_statements(
     let colon = first_colon_range(
         TextRange::new(test.end(), first_stmt.start()),
         checker.locator().contents(),
+        checker.source_type.is_jupyter(),
     );
 
     // Check if the parent is already emitting a larger diagnostic including this if statement

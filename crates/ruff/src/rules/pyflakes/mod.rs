@@ -12,11 +12,14 @@ mod tests {
     use anyhow::Result;
     use regex::Regex;
     use ruff_python_parser::lexer::LexResult;
+
     use test_case::test_case;
 
     use ruff_diagnostics::Diagnostic;
+    use ruff_python_ast::PySourceType;
     use ruff_python_codegen::Stylist;
     use ruff_python_index::Indexer;
+    use ruff_python_parser::AsMode;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::Locator;
 
@@ -504,8 +507,9 @@ mod tests {
     /// Note that all tests marked with `#[ignore]` should be considered TODOs.
     fn flakes(contents: &str, expected: &[Rule]) {
         let contents = dedent(contents);
+        let source_type = PySourceType::default();
         let settings = Settings::for_rules(Linter::Pyflakes.rules());
-        let tokens: Vec<LexResult> = ruff_python_parser::tokenize(&contents);
+        let tokens: Vec<LexResult> = ruff_python_parser::tokenize(&contents, source_type.as_mode());
         let locator = Locator::new(&contents);
         let stylist = Stylist::from_tokens(&tokens, &locator);
         let indexer = Indexer::from_tokens(&tokens, &locator);
@@ -529,6 +533,7 @@ mod tests {
             &settings,
             flags::Noqa::Enabled,
             None,
+            source_type,
         );
         diagnostics.sort_by_key(Diagnostic::start);
         let actual = diagnostics

@@ -7,7 +7,7 @@ use std::error::Error;
 
 use anyhow::Result;
 use libcst_native::{ImportAlias, Name, NameOrAttribute};
-use ruff_python_ast::{self as ast, Ranged, Stmt, Suite};
+use ruff_python_ast::{self as ast, PySourceType, Ranged, Stmt, Suite};
 use ruff_text_size::TextSize;
 
 use ruff_diagnostics::Edit;
@@ -121,6 +121,7 @@ impl<'a> Importer<'a> {
         import: &StmtImports,
         at: TextSize,
         semantic: &SemanticModel,
+        source_type: PySourceType,
     ) -> Result<TypingImportEdit> {
         // Generate the modified import statement.
         let content = autofix::codemods::retain_imports(
@@ -140,7 +141,7 @@ impl<'a> Importer<'a> {
         // Add the import to a `TYPE_CHECKING` block.
         let add_import_edit = if let Some(block) = self.preceding_type_checking_block(at) {
             // Add the import to the `TYPE_CHECKING` block.
-            self.add_to_type_checking_block(&content, block.start())
+            self.add_to_type_checking_block(&content, block.start(), source_type)
         } else {
             // Add the import to a new `TYPE_CHECKING` block.
             self.add_type_checking_block(
@@ -353,8 +354,13 @@ impl<'a> Importer<'a> {
     }
 
     /// Add an import statement to an existing `TYPE_CHECKING` block.
-    fn add_to_type_checking_block(&self, content: &str, at: TextSize) -> Edit {
-        Insertion::start_of_block(at, self.locator, self.stylist).into_edit(content)
+    fn add_to_type_checking_block(
+        &self,
+        content: &str,
+        at: TextSize,
+        source_type: PySourceType,
+    ) -> Edit {
+        Insertion::start_of_block(at, self.locator, self.stylist, source_type).into_edit(content)
     }
 
     /// Return the import statement that precedes the given position, if any.

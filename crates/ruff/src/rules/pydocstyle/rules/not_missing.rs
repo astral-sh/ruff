@@ -523,7 +523,7 @@ pub(crate) fn not_missing(
     definition: &Definition,
     visibility: Visibility,
 ) -> bool {
-    if checker.is_stub() {
+    if checker.source_type.is_stub() {
         return true;
     }
 

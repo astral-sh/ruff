@@ -7,11 +7,14 @@ use std::path::Path;
 use anyhow::Result;
 use itertools::Itertools;
 use ruff_python_parser::lexer::LexResult;
+
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic};
+use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
+use ruff_python_parser::AsMode;
 use ruff_python_trivia::textwrap::dedent;
 use ruff_source_file::{Locator, SourceFileBuilder};
 
@@ -61,8 +64,9 @@ pub(crate) fn test_notebook_path(
     path: impl AsRef<Path>,
     expected: impl AsRef<Path>,
     settings: &Settings,
-) -> Result<(Vec<Message>, SourceKind)> {
+) -> Result<(Vec<Message>, SourceKind, SourceKind)> {
     let mut source_kind = SourceKind::Jupyter(read_jupyter_notebook(path.as_ref())?);
+    let original_source_kind = source_kind.clone();
     let messages = test_contents(&mut source_kind, path.as_ref(), settings);
     let expected_notebook = read_jupyter_notebook(expected.as_ref())?;
     if let SourceKind::Jupyter(notebook) = &source_kind {
@@ -70,7 +74,7 @@ pub(crate) fn test_notebook_path(
         assert_eq!(notebook.index(), expected_notebook.index());
         assert_eq!(notebook.content(), expected_notebook.content());
     };
-    Ok((messages, source_kind))
+    Ok((messages, original_source_kind, source_kind))
 }
 
 /// Run [`check_path`] on a snippet of Python code.
@@ -100,7 +104,8 @@ pub(crate) fn max_iterations() -> usize {
 /// asserts that autofixes converge after a fixed number of iterations.
 fn test_contents(source_kind: &mut SourceKind, path: &Path, settings: &Settings) -> Vec<Message> {
     let contents = source_kind.content().to_string();
-    let tokens: Vec<LexResult> = ruff_python_parser::tokenize(&contents);
+    let source_type = PySourceType::from(path);
+    let tokens: Vec<LexResult> = ruff_python_parser::tokenize(&contents, source_type.as_mode());
     let locator = Locator::new(&contents);
     let stylist = Stylist::from_tokens(&tokens, &locator);
     let indexer = Indexer::from_tokens(&tokens, &locator);
@@ -125,6 +130,7 @@ fn test_contents(source_kind: &mut SourceKind, path: &Path, settings: &Settings)
         settings,
         flags::Noqa::Enabled,
         Some(source_kind),
+        source_type,
     );
 
     let source_has_errors = error.is_some();
@@ -162,7 +168,8 @@ fn test_contents(source_kind: &mut SourceKind, path: &Path, settings: &Settings)
                 notebook.update(&source_map, &fixed_contents);
             };
 
-            let tokens: Vec<LexResult> = ruff_python_parser::tokenize(&fixed_contents);
+            let tokens: Vec<LexResult> =
+                ruff_python_parser::tokenize(&fixed_contents, source_type.as_mode());
             let locator = Locator::new(&fixed_contents);
             let stylist = Stylist::from_tokens(&tokens, &locator);
             let indexer = Indexer::from_tokens(&tokens, &locator);
@@ -187,6 +194,7 @@ fn test_contents(source_kind: &mut SourceKind, path: &Path, settings: &Settings)
                 settings,
                 flags::Noqa::Enabled,
                 Some(source_kind),
+                source_type,
             );
 
             if let Some(fixed_error) = fixed_error {

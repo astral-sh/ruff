@@ -1,7 +1,7 @@
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Keyword, Ranged};
-use ruff_python_parser::{lexer, Mode, Tok};
+use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Keyword, PySourceType, Ranged};
+use ruff_python_parser::{lexer, AsMode, Tok};
 use ruff_source_file::Locator;
 use ruff_text_size::TextRange;
 
@@ -119,12 +119,18 @@ fn match_encoding_arg(arguments: &Arguments) -> Option<EncodingArg> {
 }
 
 /// Return a [`Fix`] replacing the call to encode with a byte string.
-fn replace_with_bytes_literal<T: Ranged>(locator: &Locator, expr: &T) -> Fix {
+fn replace_with_bytes_literal<T: Ranged>(
+    locator: &Locator,
+    expr: &T,
+    source_type: PySourceType,
+) -> Fix {
     // Build up a replacement string by prefixing all string tokens with `b`.
     let contents = locator.slice(expr.range());
     let mut replacement = String::with_capacity(contents.len() + 1);
     let mut prev = expr.start();
-    for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, expr.start()).flatten() {
+    for (tok, range) in
+        lexer::lex_starts_at(contents, source_type.as_mode(), expr.start()).flatten()
+    {
         match tok {
             Tok::Dot => break,
             Tok::String { .. } => {
@@ -166,7 +172,11 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                         call.range(),
                     );
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
-                        diagnostic.set_fix(replace_with_bytes_literal(checker.locator(), call));
+                        diagnostic.set_fix(replace_with_bytes_literal(
+                            checker.locator(),
+                            call,
+                            checker.source_type,
+                        ));
                     }
                     checker.diagnostics.push(diagnostic);
                 } else if let EncodingArg::Keyword(kwarg) = encoding_arg {
@@ -185,6 +195,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                                 &call.arguments,
                                 Parentheses::Preserve,
                                 checker.locator(),
+                                checker.source_type,
                             )
                             .map(Fix::automatic)
                         });
@@ -205,6 +216,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                                 &call.arguments,
                                 Parentheses::Preserve,
                                 checker.locator(),
+                                checker.source_type,
                             )
                             .map(Fix::automatic)
                         });
@@ -232,6 +244,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                                 &call.arguments,
                                 Parentheses::Preserve,
                                 checker.locator(),
+                                checker.source_type,
                             )
                             .map(Fix::automatic)
                         });
@@ -252,6 +265,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                                 &call.arguments,
                                 Parentheses::Preserve,
                                 checker.locator(),
+                                checker.source_type,
                             )
                             .map(Fix::automatic)
                         });

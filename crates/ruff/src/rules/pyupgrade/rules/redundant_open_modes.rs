@@ -4,8 +4,8 @@ use anyhow::{anyhow, Result};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Constant, Expr, Ranged};
-use ruff_python_parser::{lexer, Mode};
+use ruff_python_ast::{self as ast, Constant, Expr, PySourceType, Ranged};
+use ruff_python_parser::{lexer, AsMode};
 use ruff_python_semantic::SemanticModel;
 use ruff_source_file::Locator;
 use ruff_text_size::TextSize;
@@ -84,6 +84,7 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, call: &ast::ExprCall) 
                                 mode.replacement_value(),
                                 checker.locator(),
                                 checker.patch(Rule::RedundantOpenModes),
+                                checker.source_type,
                             ));
                         }
                     }
@@ -103,6 +104,7 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, call: &ast::ExprCall) 
                         mode.replacement_value(),
                         checker.locator(),
                         checker.patch(Rule::RedundantOpenModes),
+                        checker.source_type,
                     ));
                 }
             }
@@ -169,6 +171,7 @@ fn create_check<T: Ranged>(
     replacement_value: Option<&str>,
     locator: &Locator,
     patch: bool,
+    source_type: PySourceType,
 ) -> Diagnostic {
     let mut diagnostic = Diagnostic::new(
         RedundantOpenModes {
@@ -184,7 +187,7 @@ fn create_check<T: Ranged>(
             )));
         } else {
             diagnostic.try_set_fix(|| {
-                create_remove_param_fix(locator, expr, mode_param).map(Fix::automatic)
+                create_remove_param_fix(locator, expr, mode_param, source_type).map(Fix::automatic)
             });
         }
     }
@@ -195,6 +198,7 @@ fn create_remove_param_fix<T: Ranged>(
     locator: &Locator,
     expr: &T,
     mode_param: &Expr,
+    source_type: PySourceType,
 ) -> Result<Edit> {
     let content = locator.slice(expr.range());
     // Find the last comma before mode_param and create a deletion fix
@@ -203,7 +207,8 @@ fn create_remove_param_fix<T: Ranged>(
     let mut fix_end: Option<TextSize> = None;
     let mut is_first_arg: bool = false;
     let mut delete_first_arg: bool = false;
-    for (tok, range) in lexer::lex_starts_at(content, Mode::Module, expr.start()).flatten() {
+    for (tok, range) in lexer::lex_starts_at(content, source_type.as_mode(), expr.start()).flatten()
+    {
         if range.start() == mode_param.start() {
             if is_first_arg {
                 delete_first_arg = true;

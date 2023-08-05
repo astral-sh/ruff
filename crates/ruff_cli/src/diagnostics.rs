@@ -29,7 +29,8 @@ use ruff::{fs, IOError};
 use ruff_diagnostics::Diagnostic;
 use ruff_macros::CacheKey;
 use ruff_python_ast::imports::ImportMap;
-use ruff_python_stdlib::path::{is_jupyter_notebook, is_project_toml};
+use ruff_python_ast::PySourceType;
+use ruff_python_stdlib::path::is_project_toml;
 use ruff_source_file::{LineIndex, SourceCode, SourceFileBuilder};
 
 #[derive(CacheKey)]
@@ -211,8 +212,10 @@ pub(crate) fn lint_path(
         });
     }
 
+    let source_type = PySourceType::from(path);
+
     // Read the file from disk
-    let mut source_kind = if is_jupyter_notebook(path) {
+    let mut source_kind = if source_type.is_jupyter() {
         match load_jupyter_notebook(path) {
             Ok(notebook) => SourceKind::Jupyter(notebook),
             Err(diagnostic) => return Ok(*diagnostic),
@@ -249,6 +252,7 @@ pub(crate) fn lint_path(
             noqa,
             &settings.lib,
             &mut source_kind,
+            source_type,
         ) {
             if !fixed.is_empty() {
                 match autofix {
@@ -335,6 +339,7 @@ pub(crate) fn lint_path(
                 &settings.lib,
                 noqa,
                 Some(&source_kind),
+                source_type,
             );
             let fixed = FxHashMap::default();
             (result, fixed)
@@ -347,6 +352,7 @@ pub(crate) fn lint_path(
             &settings.lib,
             noqa,
             Some(&source_kind),
+            source_type,
         );
         let fixed = FxHashMap::default();
         (result, fixed)
@@ -396,6 +402,8 @@ pub(crate) fn lint_stdin(
     autofix: flags::FixMode,
 ) -> Result<Diagnostics> {
     let mut source_kind = SourceKind::Python(contents.to_string());
+    let source_type = PySourceType::default();
+
     // Lint the inputs.
     let (
         LinterResult {
@@ -415,6 +423,7 @@ pub(crate) fn lint_stdin(
             noqa,
             settings,
             &mut source_kind,
+            source_type,
         ) {
             match autofix {
                 flags::FixMode::Apply => {
@@ -450,6 +459,7 @@ pub(crate) fn lint_stdin(
                 settings,
                 noqa,
                 Some(&source_kind),
+                source_type,
             );
             let fixed = FxHashMap::default();
 
@@ -468,6 +478,7 @@ pub(crate) fn lint_stdin(
             settings,
             noqa,
             Some(&source_kind),
+            source_type,
         );
         let fixed = FxHashMap::default();
         (result, fixed)

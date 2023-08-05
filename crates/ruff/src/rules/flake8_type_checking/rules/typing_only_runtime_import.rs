@@ -447,6 +447,7 @@ fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[Import]) -> Result
         },
         at,
         checker.semantic(),
+        checker.source_type,
     )?;
 
     Ok(

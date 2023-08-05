@@ -25,6 +25,7 @@ use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_python_formatter::{format_module, format_node, PyFormatOptions};
 use ruff_python_index::{CommentRangesBuilder, Indexer};
+use ruff_python_parser::AsMode;
 use ruff_source_file::{Locator, SourceLocation};
 
 #[wasm_bindgen(typescript_custom_section)]
@@ -197,8 +198,10 @@ impl Workspace {
     }
 
     pub fn check(&self, contents: &str) -> Result<JsValue, Error> {
+        let source_type = PySourceType::default();
+
         // Tokenize once.
-        let tokens: Vec<LexResult> = ruff_python_parser::tokenize(contents);
+        let tokens: Vec<LexResult> = ruff_python_parser::tokenize(contents, source_type.as_mode());
 
         // Map row and column locations to byte slices (lazily).
         let locator = Locator::new(contents);
@@ -228,6 +231,7 @@ impl Workspace {
             &self.settings,
             flags::Noqa::Enabled,
             None,
+            source_type,
         );
 
         let source_code = locator.to_source_code();

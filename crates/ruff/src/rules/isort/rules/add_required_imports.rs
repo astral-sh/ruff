@@ -1,5 +1,5 @@
 use log::error;
-use ruff_python_ast::{self as ast, Stmt, Suite};
+use ruff_python_ast::{self as ast, PySourceType, Stmt, Suite};
 use ruff_text_size::{TextRange, TextSize};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
@@ -91,7 +91,7 @@ fn add_required_import(
     locator: &Locator,
     stylist: &Stylist,
     settings: &Settings,
-    is_stub: bool,
+    source_type: PySourceType,
 ) -> Option<Diagnostic> {
     // Don't add imports to semantically-empty files.
     if python_ast.iter().all(is_docstring_stmt) {
@@ -99,7 +99,7 @@ fn add_required_import(
     }
 
     // We don't need to add `__future__` imports to stubs.
-    if is_stub && required_import.is_future_import() {
+    if source_type.is_stub() && required_import.is_future_import() {
         return None;
     }
 
@@ -131,7 +131,7 @@ pub(crate) fn add_required_imports(
     locator: &Locator,
     stylist: &Stylist,
     settings: &Settings,
-    is_stub: bool,
+    source_type: PySourceType,
 ) -> Vec<Diagnostic> {
     settings
         .isort
@@ -172,7 +172,7 @@ pub(crate) fn add_required_imports(
                             locator,
                             stylist,
                             settings,
-                            is_stub,
+                            source_type,
                         )
                     })
                     .collect(),
@@ -190,7 +190,7 @@ pub(crate) fn add_required_imports(
                             locator,
                             stylist,
                             settings,
-                            is_stub,
+                            source_type,
                         )
                     })
                     .collect(),
