@@ -240,12 +240,16 @@ def foo(f=lambda x: print(x)):
 
 from collections import abc
 from typing import Annotated, Dict, Optional, Sequence, Union, Set
+import typing_extensions
 
 
 def immutable_annotations(
     a: Sequence[int] | None = [],
     b: Optional[abc.Mapping[int, int]] = {},
     c: Annotated[Union[abc.Set[str], abc.Sized], "annotation"] = set(),
+    d: typing_extensions.Annotated[
+        Union[abc.Set[str], abc.Sized], "annotation"
+    ] = set(),
 ):
     pass
 
@@ -254,5 +258,6 @@ def mutable_annotations(
     a: list[int] | None = [],
     b: Optional[Dict[int, int]] = {},
     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+    d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
 ):
     pass
