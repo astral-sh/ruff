@@ -453,7 +453,7 @@ impl<'source> Lexer<'source> {
 
                     if kind.is_help() {
                         value = value.trim_start_matches([' ', '?']).to_string();
-                    } else {
+                    } else if kind.is_magic() {
                         value.insert_str(0, &kind.to_string());
                     }
                     let kind = match question_count {
@@ -1410,7 +1410,8 @@ mod tests {
 ????
 %foo?
 %foo??
-%%foo???"
+%%foo???
+!pwd?"
             .trim();
         let tokens = lex_jupyter_source(source);
         assert_eq!(
@@ -1489,6 +1490,11 @@ mod tests {
                 Tok::MagicCommand {
                     value: "foo???".to_string(),
                     kind: MagicKind::Magic2,
+                },
+                Tok::Newline,
+                Tok::MagicCommand {
+                    value: "pwd".to_string(),
+                    kind: MagicKind::Help,
                 },
                 Tok::Newline,
             ]

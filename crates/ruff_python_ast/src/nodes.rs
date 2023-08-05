@@ -2377,8 +2377,14 @@ impl MagicKind {
         len.into()
     }
 
+    /// Returns `true` if the kind is a help command i.e., `?` or `??`.
     pub const fn is_help(self) -> bool {
         matches!(self, MagicKind::Help | MagicKind::Help2)
+    }
+
+    /// Returns `true` if the kind is a magic command i.e., `%` or `%%`.
+    pub const fn is_magic(self) -> bool {
+        matches!(self, MagicKind::Magic | MagicKind::Magic2)
     }
 }
 
