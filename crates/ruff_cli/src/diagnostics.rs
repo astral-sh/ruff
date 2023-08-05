@@ -24,11 +24,12 @@ use ruff::message::Message;
 use ruff::pyproject_toml::lint_pyproject_toml;
 use ruff::registry::Rule;
 use ruff::settings::{flags, AllSettings, Settings};
-use ruff::source_kind::{PySourceType, SourceKind};
+use ruff::source_kind::SourceKind;
 use ruff::{fs, IOError};
 use ruff_diagnostics::Diagnostic;
 use ruff_macros::CacheKey;
 use ruff_python_ast::imports::ImportMap;
+use ruff_python_ast::PySourceType;
 use ruff_python_stdlib::path::is_project_toml;
 use ruff_source_file::{LineIndex, SourceCode, SourceFileBuilder};
 

@@ -1,11 +1,9 @@
 use anyhow::{bail, Result};
-use ruff_python_ast::{Ranged, Stmt};
-use ruff_python_parser::{lexer, Tok};
+use ruff_python_ast::{PySourceType, Ranged, Stmt};
+use ruff_python_parser::{lexer, AsMode, Tok};
 
 use ruff_diagnostics::Edit;
 use ruff_source_file::Locator;
-
-use crate::source_kind::PySourceType;
 
 /// ANN204
 pub(crate) fn add_return_annotation(

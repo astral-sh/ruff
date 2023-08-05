@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use ruff_python_ast::{self as ast, Constant, Expr, Ranged};
 use ruff_python_literal::cformat::{CFormatPart, CFormatSpec, CFormatStrOrBytes, CFormatString};
-use ruff_python_parser::lexer;
+use ruff_python_parser::{lexer, AsMode};
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
 

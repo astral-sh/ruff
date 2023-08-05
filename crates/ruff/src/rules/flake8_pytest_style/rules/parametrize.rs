@@ -1,5 +1,7 @@
-use ruff_python_ast::{self as ast, Arguments, Constant, Decorator, Expr, ExprContext, Ranged};
-use ruff_python_parser::{lexer, Tok};
+use ruff_python_ast::{
+    self as ast, Arguments, Constant, Decorator, Expr, ExprContext, PySourceType, Ranged,
+};
+use ruff_python_parser::{lexer, AsMode, Tok};
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -9,7 +11,6 @@ use ruff_source_file::Locator;
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
-use crate::source_kind::PySourceType;
 
 use super::super::types;
 use super::helpers::{is_pytest_parametrize, split_names};

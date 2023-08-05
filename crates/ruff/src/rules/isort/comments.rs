@@ -1,11 +1,10 @@
 use std::borrow::Cow;
 
-use ruff_python_parser::{lexer, Tok};
+use ruff_python_ast::PySourceType;
+use ruff_python_parser::{lexer, AsMode, Tok};
 use ruff_text_size::{TextRange, TextSize};
 
 use ruff_source_file::Locator;
-
-use crate::source_kind::PySourceType;
 
 #[derive(Debug)]
 pub(crate) struct Comment<'a> {

@@ -1,11 +1,10 @@
-use ruff_python_ast::{Ranged, Stmt};
-use ruff_python_parser::{lexer, Tok};
+use ruff_python_ast::{PySourceType, Ranged, Stmt};
+use ruff_python_parser::{lexer, AsMode, Tok};
 
 use ruff_python_trivia::PythonWhitespace;
 use ruff_source_file::{Locator, UniversalNewlines};
 
 use crate::rules::isort::types::TrailingComma;
-use crate::source_kind::PySourceType;
 
 /// Return `true` if a `Stmt::ImportFrom` statement ends with a magic
 /// trailing comma.

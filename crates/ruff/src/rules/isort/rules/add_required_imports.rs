@@ -1,5 +1,5 @@
 use log::error;
-use ruff_python_ast::{self as ast, Stmt, Suite};
+use ruff_python_ast::{self as ast, PySourceType, Stmt, Suite};
 use ruff_text_size::{TextRange, TextSize};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
@@ -13,7 +13,6 @@ use ruff_source_file::Locator;
 use crate::importer::Importer;
 use crate::registry::Rule;
 use crate::settings::Settings;
-use crate::source_kind::PySourceType;
 
 /// ## What it does
 /// Adds any required imports, as specified by the user, to the top of the

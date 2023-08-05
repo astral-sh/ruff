@@ -114,7 +114,7 @@ pub use parser::{
     parse, parse_expression, parse_expression_starts_at, parse_program, parse_starts_at,
     parse_suite, parse_tokens, ParseError, ParseErrorType,
 };
-use ruff_python_ast::{CmpOp, Expr, Mod, Ranged, Suite};
+use ruff_python_ast::{CmpOp, Expr, Mod, PySourceType, Ranged, Suite};
 use ruff_text_size::{TextRange, TextSize};
 pub use string::FStringErrorType;
 pub use token::{StringKind, Tok, TokenKind};
@@ -319,6 +319,19 @@ impl std::str::FromStr for Mode {
             "eval" => Ok(Mode::Expression),
             "jupyter" => Ok(Mode::Jupyter),
             _ => Err(ModeParseError),
+        }
+    }
+}
+
+pub trait AsMode {
+    fn as_mode(&self) -> Mode;
+}
+
+impl AsMode for PySourceType {
+    fn as_mode(&self) -> Mode {
+        match self {
+            PySourceType::Python | PySourceType::Stub => Mode::Module,
+            PySourceType::Jupyter => Mode::Jupyter,
         }
     }
 }

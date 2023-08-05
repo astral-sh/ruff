@@ -1,5 +1,5 @@
-use ruff_python_ast::{Expr, Ranged};
-use ruff_python_parser::{lexer, StringKind, Tok};
+use ruff_python_ast::{Expr, PySourceType, Ranged};
+use ruff_python_parser::{lexer, AsMode, StringKind, Tok};
 use ruff_text_size::{TextRange, TextSize};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
@@ -8,7 +8,6 @@ use ruff_source_file::Locator;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
-use crate::source_kind::PySourceType;
 
 /// ## What it does
 /// Checks for f-strings that do not contain any placeholder expressions.

@@ -11,6 +11,7 @@ pub use categorize::{ImportSection, ImportType};
 use comments::Comment;
 use normalize::normalize_imports;
 use order::order_imports;
+use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
 use settings::RelativeImportsOrder;
@@ -22,7 +23,6 @@ use crate::line_width::{LineLength, LineWidth};
 use crate::rules::isort::categorize::KnownModules;
 use crate::rules::isort::types::ImportBlock;
 use crate::settings::types::PythonVersion;
-use crate::source_kind::PySourceType;
 
 mod annotate;
 pub(crate) mod block;

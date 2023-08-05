@@ -1,6 +1,6 @@
 use itertools::Itertools;
-use ruff_python_ast::{self as ast, Ranged, Stmt};
-use ruff_python_parser::{lexer, Tok};
+use ruff_python_ast::{self as ast, PySourceType, Ranged, Stmt};
+use ruff_python_parser::{lexer, AsMode, Tok};
 use ruff_text_size::{TextRange, TextSize};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -12,7 +12,6 @@ use ruff_source_file::Locator;
 use crate::autofix::edits::delete_stmt;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
-use crate::source_kind::PySourceType;
 
 /// ## What it does
 /// Checks for the presence of unused variables in function scopes.

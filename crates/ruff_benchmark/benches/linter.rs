@@ -7,8 +7,8 @@ use criterion::{
 
 use ruff::linter::lint_only;
 use ruff::settings::{flags, Settings};
-use ruff::source_kind::PySourceType;
 use ruff::RuleSelector;
+use ruff_python_ast::PySourceType;
 use ruff_benchmark::{TestCase, TestCaseSpeed, TestFile, TestFileDownloadError};
 
 #[cfg(target_os = "windows")]

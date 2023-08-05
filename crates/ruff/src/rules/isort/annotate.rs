@@ -1,9 +1,7 @@
-use ruff_python_ast::{self as ast, Ranged, Stmt};
+use ruff_python_ast::{self as ast, PySourceType, Ranged, Stmt};
 use ruff_text_size::TextRange;
 
 use ruff_source_file::Locator;
-
-use crate::source_kind::PySourceType;
 
 use super::comments::Comment;
 use super::helpers::trailing_comma;

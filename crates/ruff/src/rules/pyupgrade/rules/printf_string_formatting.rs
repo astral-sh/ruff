@@ -4,7 +4,7 @@ use ruff_python_ast::{self as ast, Constant, Expr, Ranged};
 use ruff_python_literal::cformat::{
     CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatString,
 };
-use ruff_python_parser::{lexer, Tok};
+use ruff_python_parser::{lexer, AsMode, Tok};
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};

@@ -7,11 +7,12 @@ use colored::Colorize;
 use itertools::Itertools;
 use log::error;
 use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::ParseError;
+use ruff_python_parser::{AsMode, ParseError};
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::imports::ImportMap;
+use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 
@@ -32,7 +33,7 @@ use crate::noqa::add_noqa;
 use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle;
 use crate::settings::{flags, Settings};
-use crate::source_kind::{PySourceType, SourceKind};
+use crate::source_kind::SourceKind;
 use crate::{directives, fs};
 
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");

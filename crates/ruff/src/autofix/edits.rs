@@ -3,16 +3,17 @@
 use anyhow::{bail, Result};
 
 use ruff_diagnostics::Edit;
-use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Expr, Keyword, Ranged, Stmt};
+use ruff_python_ast::{
+    self as ast, Arguments, ExceptHandler, Expr, Keyword, PySourceType, Ranged, Stmt,
+};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::lexer;
+use ruff_python_parser::{lexer, AsMode};
 use ruff_python_trivia::{has_leading_content, is_python_whitespace, PythonWhitespace};
 use ruff_source_file::{Locator, NewlineWithTrailingNewline};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::autofix::codemods;
-use crate::source_kind::PySourceType;
 
 /// Return the `Fix` to use when deleting a `Stmt`.
 ///

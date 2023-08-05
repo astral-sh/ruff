@@ -2,7 +2,7 @@
 use std::borrow::Cow;
 use std::path::Path;
 
-use ruff_python_ast::{self as ast, Ranged, Stmt, Suite};
+use ruff_python_ast::{self as ast, PySourceType, Ranged, Stmt, Suite};
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::helpers::to_module_path;
@@ -18,7 +18,7 @@ use crate::registry::Rule;
 use crate::rules::isort;
 use crate::rules::isort::block::{Block, BlockBuilder};
 use crate::settings::Settings;
-use crate::source_kind::{PySourceType, SourceKind};
+use crate::source_kind::SourceKind;
 
 fn extract_import_map(path: &Path, package: Option<&Path>, blocks: &[&Block]) -> Option<ImportMap> {
     let Some(package) = package else {

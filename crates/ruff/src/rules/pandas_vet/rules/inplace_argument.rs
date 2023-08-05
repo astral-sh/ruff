@@ -1,14 +1,13 @@
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_true;
-use ruff_python_ast::{self as ast, Keyword, Ranged};
+use ruff_python_ast::{self as ast, Keyword, PySourceType, Ranged};
 use ruff_python_semantic::{BindingKind, Import};
 use ruff_source_file::Locator;
 
 use crate::autofix::edits::{remove_argument, Parentheses};
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
-use crate::source_kind::PySourceType;
 
 /// ## What it does
 /// Checks for `inplace=True` usages in `pandas` function and method

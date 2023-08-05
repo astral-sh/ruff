@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use itertools::{EitherOrBoth, Itertools};
-use ruff_python_ast::{Ranged, Stmt};
+use ruff_python_ast::{PySourceType, Ranged, Stmt};
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -15,7 +15,6 @@ use ruff_source_file::{Locator, UniversalNewlines};
 use crate::line_width::LineWidth;
 use crate::registry::AsRule;
 use crate::settings::Settings;
-use crate::source_kind::PySourceType;
 
 use super::super::block::Block;
 use super::super::{comments, format_imports};

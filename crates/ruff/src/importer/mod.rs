@@ -7,7 +7,7 @@ use std::error::Error;
 
 use anyhow::Result;
 use libcst_native::{ImportAlias, Name, NameOrAttribute};
-use ruff_python_ast::{self as ast, Ranged, Stmt, Suite};
+use ruff_python_ast::{self as ast, PySourceType, Ranged, Stmt, Suite};
 use ruff_text_size::TextSize;
 
 use ruff_diagnostics::Edit;
@@ -21,7 +21,6 @@ use crate::autofix;
 use crate::autofix::codemods::CodegenStylist;
 use crate::cst::matchers::{match_aliases, match_import_from, match_statement};
 use crate::importer::insertion::Insertion;
-use crate::source_kind::PySourceType;
 
 mod insertion;
 

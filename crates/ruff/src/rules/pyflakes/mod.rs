@@ -16,8 +16,10 @@ mod tests {
     use test_case::test_case;
 
     use ruff_diagnostics::Diagnostic;
+    use ruff_python_ast::PySourceType;
     use ruff_python_codegen::Stylist;
     use ruff_python_index::Indexer;
+    use ruff_python_parser::AsMode;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::Locator;
 
@@ -25,7 +27,6 @@ mod tests {
     use crate::registry::{AsRule, Linter, Rule};
     use crate::rules::pyflakes;
     use crate::settings::{flags, Settings};
-    use crate::source_kind::PySourceType;
     use crate::test::{test_path, test_snippet};
     use crate::{assert_messages, directives};
 

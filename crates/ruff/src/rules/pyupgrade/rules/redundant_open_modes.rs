@@ -4,15 +4,14 @@ use anyhow::{anyhow, Result};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Constant, Expr, Ranged};
-use ruff_python_parser::lexer;
+use ruff_python_ast::{self as ast, Constant, Expr, PySourceType, Ranged};
+use ruff_python_parser::{lexer, AsMode};
 use ruff_python_semantic::SemanticModel;
 use ruff_source_file::Locator;
 use ruff_text_size::TextSize;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
-use crate::source_kind::PySourceType;
 
 /// ## What it does
 /// Checks for redundant `open` mode parameters.

@@ -11,8 +11,10 @@ use ruff_python_parser::lexer::LexResult;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic};
+use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
+use ruff_python_parser::AsMode;
 use ruff_python_trivia::textwrap::dedent;
 use ruff_source_file::{Locator, SourceFileBuilder};
 
@@ -26,7 +28,7 @@ use crate::packaging::detect_package_root;
 use crate::registry::AsRule;
 use crate::rules::pycodestyle::rules::syntax_error;
 use crate::settings::{flags, Settings};
-use crate::source_kind::{PySourceType, SourceKind};
+use crate::source_kind::SourceKind;
 
 #[cfg(not(fuzzing))]
 pub(crate) fn read_jupyter_notebook(path: &Path) -> Result<Notebook> {
