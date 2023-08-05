@@ -1278,17 +1278,6 @@ where
         self.semantic.flags = flags_snapshot;
     }
 
-    fn visit_format_spec(&mut self, format_spec: &'b Expr) {
-        match format_spec {
-            Expr::FString(ast::ExprFString { values, .. }) => {
-                for value in values {
-                    self.visit_expr(value);
-                }
-            }
-            _ => unreachable!("Unexpected expression for format_spec"),
-        }
-    }
-
     fn visit_parameters(&mut self, parameters: &'b Parameters) {
         // Step 1: Binding.
         // Bind, but intentionally avoid walking default expressions, as we handle them

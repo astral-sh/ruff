@@ -189,7 +189,7 @@ impl<'a> StringParser<'a> {
         // sign). the expression_length is the length of the actual expression part that we pass to
         // `parse_fstring_expr`
         let mut expression_length = 0;
-        let mut spec = None;
+        let mut spec = vec![];
         let mut delimiters = Vec::new();
         let mut conversion = ConversionFlag::None;
         let mut self_documenting = false;
@@ -242,14 +242,7 @@ impl<'a> StringParser<'a> {
                 }
 
                 ':' if delimiters.is_empty() => {
-                    let start_location = self.get_pos();
-                    let parsed_spec = self.parse_spec(nested)?;
-
-                    spec = Some(Box::new(Expr::from(ast::ExprFString {
-                        parts: parsed_spec,
-                        implicit_concatenated: false,
-                        range: self.range(start_location),
-                    })));
+                    spec = self.parse_spec(nested)?;
                 }
                 '(' | '{' | '[' => {
                     expression.push(ch);

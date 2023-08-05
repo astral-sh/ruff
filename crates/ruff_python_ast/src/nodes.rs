@@ -880,8 +880,7 @@ pub struct FormattedValue {
     pub expression: Box<Expr>,
     pub debug_text: Option<DebugText>,
     pub conversion: ConversionFlag,
-    // TODO: is this Option<Box<FStringPart>>?
-    pub format_spec: Option<Box<Expr>>,
+    pub format_spec: Vec<FStringPart>,
 }
 
 #[derive(Clone, Debug, PartialEq)]

@@ -19,31 +19,23 @@ FString(
                     ),
                     debug_text: None,
                     conversion: None,
-                    format_spec: Some(
-                        FString(
-                            ExprFString {
+                    format_spec: [
+                        FormattedValue(
+                            FormattedValue {
                                 range: 7..13,
-                                implicit_concatenated: false,
-                                parts: [
-                                    FormattedValue(
-                                        FormattedValue {
-                                            range: 7..13,
-                                            expression: Name(
-                                                ExprName {
-                                                    range: 8..12,
-                                                    id: "spec",
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                            debug_text: None,
-                                            conversion: None,
-                                            format_spec: None,
-                                        },
-                                    ),
-                                ],
+                                expression: Name(
+                                    ExprName {
+                                        range: 8..12,
+                                        id: "spec",
+                                        ctx: Load,
+                                    },
+                                ),
+                                debug_text: None,
+                                conversion: None,
+                                format_spec: [],
                             },
                         ),
-                    ),
+                    ],
                 },
             ),
         ],

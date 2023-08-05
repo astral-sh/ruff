@@ -29,7 +29,7 @@ expression: parse_ast
                                 ),
                                 debug_text: None,
                                 conversion: None,
-                                format_spec: None,
+                                format_spec: [],
                             },
                         ),
                         String(
@@ -50,7 +50,7 @@ expression: parse_ast
                                 ),
                                 debug_text: None,
                                 conversion: None,
-                                format_spec: None,
+                                format_spec: [],
                             },
                         ),
                         String(

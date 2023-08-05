@@ -75,11 +75,6 @@ pub trait PreorderVisitor<'a> {
     }
 
     #[inline]
-    fn visit_format_spec(&mut self, format_spec: &'a Expr) {
-        walk_format_spec(self, format_spec);
-    }
-
-    #[inline]
     fn visit_arguments(&mut self, arguments: &'a Arguments) {
         walk_arguments(self, arguments);
     }
@@ -514,9 +509,8 @@ pub fn walk_fstring_part<'a, V: PreorderVisitor<'a> + ?Sized>(
     }) = fstring_part
     {
         visitor.visit_expr(expression);
-        if let Some(expr) = format_spec {
-            // TODO: why go via `visit_format_spec` as opposed to just straight to `visit_expr`?
-            visitor.visit_format_spec(expr);
+        for spec_part in format_spec {
+            walk_fstring_part(visitor, spec_part);
         }
     }
 }

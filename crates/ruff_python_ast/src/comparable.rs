@@ -530,7 +530,7 @@ pub struct FormattedValue<'a> {
     expression: ComparableExpr<'a>,
     debug_text: Option<&'a ast::DebugText>,
     pub conversion: ast::ConversionFlag,
-    pub format_spec: Option<Box<ComparableExpr<'a>>>,
+    pub format_spec: Vec<ComparableFStringPart<'a>>,
 }
 
 impl<'a> From<&'a ast::FStringPart> for ComparableFStringPart<'a> {
@@ -542,7 +542,7 @@ impl<'a> From<&'a ast::FStringPart> for ComparableFStringPart<'a> {
                     expression: (&formatted_value.expression).into(),
                     debug_text: formatted_value.debug_text.as_ref(),
                     conversion: formatted_value.conversion,
-                    format_spec: formatted_value.format_spec.as_ref().map(Into::into),
+                    format_spec: formatted_value.format_spec.iter().map(Into::into).collect(),
                 })
             }
         }
@@ -676,7 +676,7 @@ pub struct ExprFormattedValue<'a> {
     value: Box<ComparableExpr<'a>>,
     debug_text: Option<&'a ast::DebugText>,
     conversion: ast::ConversionFlag,
-    format_spec: Option<Box<ComparableExpr<'a>>>,
+    format_spec: Vec<ComparableFStringPart<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]

@@ -30,7 +30,7 @@ FString(
                         },
                     ),
                     conversion: None,
-                    format_spec: None,
+                    format_spec: [],
                 },
             ),
             String(
@@ -56,7 +56,7 @@ FString(
                         },
                     ),
                     conversion: None,
-                    format_spec: None,
+                    format_spec: [],
                 },
             ),
         ],

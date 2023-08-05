@@ -24,22 +24,14 @@ FString(
                         },
                     ),
                     conversion: None,
-                    format_spec: Some(
-                        FString(
-                            ExprFString {
+                    format_spec: [
+                        String(
+                            StringTodoName {
                                 range: 9..12,
-                                implicit_concatenated: false,
-                                parts: [
-                                    String(
-                                        StringTodoName {
-                                            range: 9..12,
-                                            value: ">10",
-                                        },
-                                    ),
-                                ],
+                                value: ">10",
                             },
                         ),
-                    ),
+                    ],
                 },
             ),
         ],

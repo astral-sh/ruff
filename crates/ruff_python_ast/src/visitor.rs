@@ -50,9 +50,6 @@ pub trait Visitor<'a> {
     fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler) {
         walk_except_handler(self, except_handler);
     }
-    fn visit_format_spec(&mut self, format_spec: &'a Expr) {
-        walk_format_spec(self, format_spec);
-    }
     fn visit_arguments(&mut self, arguments: &'a Arguments) {
         walk_arguments(self, arguments);
     }
@@ -563,10 +560,6 @@ pub fn walk_except_handler<'a, V: Visitor<'a> + ?Sized>(
     }
 }
 
-pub fn walk_format_spec<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, format_spec: &'a Expr) {
-    visitor.visit_expr(format_spec);
-}
-
 pub fn walk_arguments<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, arguments: &'a Arguments) {
     // Note that the there might be keywords before the last arg, e.g. in
     // f(*args, a=2, *args2, **kwargs)`, but we follow Python in evaluating first `args` and then
@@ -727,9 +720,8 @@ pub fn walk_fstring_part<'a, V: Visitor<'a> + ?Sized>(
     }) = fstring_part
     {
         visitor.visit_expr(expression);
-        if let Some(expr) = format_spec {
-            // TODO: why go via `visit_format_spec` as opposed to just straight to `visit_expr`?
-            visitor.visit_format_spec(expr);
+        for spec_part in format_spec {
+            walk_fstring_part(visitor, spec_part);
         }
     }
 }

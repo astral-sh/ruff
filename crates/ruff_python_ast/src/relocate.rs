@@ -131,23 +131,7 @@ pub fn relocate_expr(expr: &mut Expr, location: TextRange) {
         Expr::FString(nodes::ExprFString { parts, range, .. }) => {
             *range = location;
             for part in parts {
-                match part {
-                    nodes::FStringPart::String(nodes::StringTodoName { range, .. }) => {
-                        *range = location;
-                    }
-                    nodes::FStringPart::FormattedValue(nodes::FormattedValue {
-                        range,
-                        expression,
-                        format_spec,
-                        ..
-                    }) => {
-                        *range = location;
-                        relocate_expr(expression, location);
-                        if let Some(format_spec) = format_spec {
-                            relocate_expr(format_spec, location);
-                        }
-                    }
-                }
+                relocate_fstring_part(part, location);
             }
         }
         Expr::Constant(nodes::ExprConstant { range, .. }) => {
@@ -205,6 +189,28 @@ pub fn relocate_expr(expr: &mut Expr, location: TextRange) {
         }
         Expr::IpyEscapeCommand(nodes::ExprIpyEscapeCommand { range, .. }) => {
             *range = location;
+        }
+    }
+}
+
+/// Change a f-string part's location (recursively) to match a desired, fixed
+/// location.
+fn relocate_fstring_part(part: &mut nodes::FStringPart, location: TextRange) {
+    match part {
+        nodes::FStringPart::String(nodes::StringTodoName { range, .. }) => {
+            *range = location;
+        }
+        nodes::FStringPart::FormattedValue(nodes::FormattedValue {
+            range,
+            expression,
+            format_spec,
+            ..
+        }) => {
+            *range = location;
+            relocate_expr(expression, location);
+            for spec_part in format_spec {
+                relocate_fstring_part(spec_part, location);
+            }
         }
     }
 }

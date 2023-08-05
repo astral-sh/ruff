@@ -297,8 +297,8 @@ pub fn any_over_fstring_part(part: &FStringPart, func: &dyn Fn(&Expr) -> bool) -
         }) => {
             any_over_expr(expression, func)
                 || format_spec
-                    .as_ref()
-                    .map_or(false, |format_spec| any_over_expr(format_spec, func))
+                    .iter()
+                    .any(|spec_part| any_over_fstring_part(spec_part, func))
         }
     }
 }
