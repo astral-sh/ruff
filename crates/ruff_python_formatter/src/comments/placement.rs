@@ -62,7 +62,9 @@ pub(super) fn place_comment<'a>(
                 CommentPlacement::Default(comment)
             }
         }
-        AnyNodeRef::MatchCase(match_case) => handle_match_comment(comment, match_case, locator),
+        AnyNodeRef::MatchCase(match_case) => {
+            handle_match_case_comment(comment, match_case, locator)
+        }
         AnyNodeRef::ModModule(_) => {
             handle_module_level_own_line_comment_before_class_or_function_comment(comment, locator)
         }
@@ -207,6 +209,10 @@ fn is_first_statement_in_body(statement: AnyNodeRef, has_body: AnyNodeRef) -> bo
         | AnyNodeRef::StmtFunctionDef(ast::StmtFunctionDef { body, .. })
         | AnyNodeRef::StmtClassDef(ast::StmtClassDef { body, .. }) => {
             are_same_optional(statement, body.first())
+        }
+
+        AnyNodeRef::StmtMatch(ast::StmtMatch { cases, .. }) => {
+            are_same_optional(statement, cases.first())
         }
 
         _ => false,
@@ -415,7 +421,7 @@ fn handle_own_line_comment_in_clause<'a>(
 ///     # Leading `case (x, y, z)` comment
 ///     case _:
 /// ```
-fn handle_match_comment<'a>(
+fn handle_match_case_comment<'a>(
     comment: DecoratedComment<'a>,
     match_case: &'a MatchCase,
     locator: &Locator,
