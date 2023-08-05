@@ -1,0 +1,126 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/match.py
+---
+## Input
+```py
+# leading match comment
+match foo:  # dangling match comment
+    case "bar":
+        pass
+
+
+# leading match comment
+match (  # leading expr comment
+    # another leading expr comment
+    foo  # trailing expr comment
+    # another trailing expr comment
+):  # dangling match comment
+    case "bar":
+        pass
+
+
+# leading match comment
+match (  # hello
+    foo  # trailing expr comment
+    ,  # another
+):  # dangling match comment
+    case "bar":
+        pass
+
+
+match [  # comment
+    first,
+    second,
+    third
+]:  # another comment
+    case ["a", "b", "c"]:
+        pass
+
+match (  # comment
+    "a b c"
+).split():  # another comment
+    case ["a", "b", "c"]:
+        pass
+
+
+match (  # comment
+    # let's go
+    yield foo
+):  # another comment
+    case ["a", "b", "c"]:
+        pass
+
+
+match aaaaaaaaahhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh:  # comment
+    case "sshhhhhhhh":
+        pass
+
+
+def foo():
+    match inside_func:  # comment
+        case "bar":
+            pass
+```
+
+## Output
+```py
+# leading match comment
+match foo:  # dangling match comment
+    case NOT_YET_IMPLEMENTED_MatchCase:
+        pass
+
+
+# leading match comment
+match (
+    # leading expr comment
+    # another leading expr comment
+    foo  # trailing expr comment
+    # another trailing expr comment
+):  # dangling match comment
+    case NOT_YET_IMPLEMENTED_MatchCase:
+        pass
+
+
+# leading match comment
+match (  # hello
+    foo,  # trailing expr comment  # another
+):  # dangling match comment
+    case NOT_YET_IMPLEMENTED_MatchCase:
+        pass
+
+
+match [first, second, third]:  # another comment  # comment
+    case NOT_YET_IMPLEMENTED_MatchCase:
+        pass
+
+match (
+    # comment
+    "a b c"
+).split():  # another comment
+    case NOT_YET_IMPLEMENTED_MatchCase:
+        pass
+
+
+match (
+    # comment
+    # let's go
+    yield foo
+):  # another comment
+    case NOT_YET_IMPLEMENTED_MatchCase:
+        pass
+
+
+match aaaaaaaaahhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh:  # comment
+    case NOT_YET_IMPLEMENTED_MatchCase:
+        pass
+
+
+def foo():
+    match inside_func:  # comment
+        case NOT_YET_IMPLEMENTED_MatchCase:
+            pass
+```
+
+
+
