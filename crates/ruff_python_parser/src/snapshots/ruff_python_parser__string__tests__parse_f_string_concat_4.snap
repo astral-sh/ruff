@@ -9,23 +9,18 @@ expression: parse_ast
             value: FString(
                 ExprFString {
                     range: 0..31,
-                    values: [
-                        Constant(
-                            ExprConstant {
+                    implicit_concatenated: true,
+                    parts: [
+                        String(
+                            StringTodoName {
                                 range: 1..16,
-                                value: Str(
-                                    StringConstant {
-                                        value: "Hello world",
-                                        unicode: false,
-                                        implicit_concatenated: true,
-                                    },
-                                ),
+                                value: "Hello world",
                             },
                         ),
                         FormattedValue(
-                            ExprFormattedValue {
+                            FormattedValue {
                                 range: 16..21,
-                                value: Constant(
+                                expression: Constant(
                                     ExprConstant {
                                         range: 17..20,
                                         value: Str(
@@ -42,20 +37,13 @@ expression: parse_ast
                                 format_spec: None,
                             },
                         ),
-                        Constant(
-                            ExprConstant {
+                        String(
+                            StringTodoName {
                                 range: 24..30,
-                                value: Str(
-                                    StringConstant {
-                                        value: "again!",
-                                        unicode: false,
-                                        implicit_concatenated: true,
-                                    },
-                                ),
+                                value: "again!",
                             },
                         ),
                     ],
-                    implicit_concatenated: true,
                 },
             ),
         },

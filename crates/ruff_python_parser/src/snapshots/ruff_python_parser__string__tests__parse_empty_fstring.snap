@@ -2,4 +2,10 @@
 source: crates/ruff_python_parser/src/string.rs
 expression: "parse_fstring(\"\").unwrap()"
 ---
-[]
+FString(
+    ExprFString {
+        range: 2..2,
+        implicit_concatenated: false,
+        parts: [],
+    },
+)

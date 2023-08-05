@@ -302,7 +302,6 @@ impl NeedsParentheses for Expr {
             Expr::YieldFrom(expr) => expr.needs_parentheses(parent, context),
             Expr::Compare(expr) => expr.needs_parentheses(parent, context),
             Expr::Call(expr) => expr.needs_parentheses(parent, context),
-            Expr::FormattedValue(expr) => expr.needs_parentheses(parent, context),
             Expr::FString(expr) => expr.needs_parentheses(parent, context),
             Expr::Constant(expr) => expr.needs_parentheses(parent, context),
             Expr::Attribute(expr) => expr.needs_parentheses(parent, context),
@@ -534,7 +533,6 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             | Expr::Await(_)
             | Expr::Yield(_)
             | Expr::YieldFrom(_)
-            | Expr::FormattedValue(_)
             | Expr::FString(_)
             | Expr::Constant(_)
             | Expr::Starred(_)

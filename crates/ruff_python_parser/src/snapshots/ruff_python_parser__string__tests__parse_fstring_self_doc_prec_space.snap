@@ -2,25 +2,31 @@
 source: crates/ruff_python_parser/src/string.rs
 expression: parse_ast
 ---
-[
-    FormattedValue(
-        ExprFormattedValue {
-            range: 2..9,
-            value: Name(
-                ExprName {
-                    range: 3..4,
-                    id: "x",
-                    ctx: Load,
+FString(
+    ExprFString {
+        range: 2..9,
+        implicit_concatenated: false,
+        parts: [
+            FormattedValue(
+                FormattedValue {
+                    range: 2..9,
+                    expression: Name(
+                        ExprName {
+                            range: 3..4,
+                            id: "x",
+                            ctx: Load,
+                        },
+                    ),
+                    debug_text: Some(
+                        DebugText {
+                            leading: "",
+                            trailing: "   =",
+                        },
+                    ),
+                    conversion: None,
+                    format_spec: None,
                 },
             ),
-            debug_text: Some(
-                DebugText {
-                    leading: "",
-                    trailing: "   =",
-                },
-            ),
-            conversion: None,
-            format_spec: None,
-        },
-    ),
-]
+        ],
+    },
+)

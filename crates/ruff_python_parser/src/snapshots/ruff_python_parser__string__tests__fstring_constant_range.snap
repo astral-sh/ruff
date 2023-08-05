@@ -9,23 +9,18 @@ expression: parse_ast
             value: FString(
                 ExprFString {
                     range: 0..22,
-                    values: [
-                        Constant(
-                            ExprConstant {
+                    implicit_concatenated: false,
+                    parts: [
+                        String(
+                            StringTodoName {
                                 range: 2..5,
-                                value: Str(
-                                    StringConstant {
-                                        value: "aaa",
-                                        unicode: false,
-                                        implicit_concatenated: false,
-                                    },
-                                ),
+                                value: "aaa",
                             },
                         ),
                         FormattedValue(
-                            ExprFormattedValue {
+                            FormattedValue {
                                 range: 5..10,
-                                value: Name(
+                                expression: Name(
                                     ExprName {
                                         range: 6..9,
                                         id: "bbb",
@@ -37,22 +32,16 @@ expression: parse_ast
                                 format_spec: None,
                             },
                         ),
-                        Constant(
-                            ExprConstant {
+                        String(
+                            StringTodoName {
                                 range: 10..13,
-                                value: Str(
-                                    StringConstant {
-                                        value: "ccc",
-                                        unicode: false,
-                                        implicit_concatenated: false,
-                                    },
-                                ),
+                                value: "ccc",
                             },
                         ),
                         FormattedValue(
-                            ExprFormattedValue {
+                            FormattedValue {
                                 range: 13..18,
-                                value: Name(
+                                expression: Name(
                                     ExprName {
                                         range: 14..17,
                                         id: "ddd",
@@ -64,20 +53,13 @@ expression: parse_ast
                                 format_spec: None,
                             },
                         ),
-                        Constant(
-                            ExprConstant {
+                        String(
+                            StringTodoName {
                                 range: 18..21,
-                                value: Str(
-                                    StringConstant {
-                                        value: "eee",
-                                        unicode: false,
-                                        implicit_concatenated: false,
-                                    },
-                                ),
+                                value: "eee",
                             },
                         ),
                     ],
-                    implicit_concatenated: false,
                 },
             ),
         },

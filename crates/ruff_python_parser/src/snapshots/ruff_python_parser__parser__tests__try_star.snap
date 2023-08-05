@@ -197,23 +197,18 @@ expression: parse_ast
                                                     FString(
                                                         ExprFString {
                                                             range: 133..179,
-                                                            values: [
-                                                                Constant(
-                                                                    ExprConstant {
+                                                            implicit_concatenated: false,
+                                                            parts: [
+                                                                String(
+                                                                    StringTodoName {
                                                                         range: 135..142,
-                                                                        value: Str(
-                                                                            StringConstant {
-                                                                                value: "caught ",
-                                                                                unicode: false,
-                                                                                implicit_concatenated: false,
-                                                                            },
-                                                                        ),
+                                                                        value: "caught ",
                                                                     },
                                                                 ),
                                                                 FormattedValue(
-                                                                    ExprFormattedValue {
+                                                                    FormattedValue {
                                                                         range: 142..151,
-                                                                        value: Call(
+                                                                        expression: Call(
                                                                             ExprCall {
                                                                                 range: 143..150,
                                                                                 func: Name(
@@ -243,22 +238,16 @@ expression: parse_ast
                                                                         format_spec: None,
                                                                     },
                                                                 ),
-                                                                Constant(
-                                                                    ExprConstant {
+                                                                String(
+                                                                    StringTodoName {
                                                                         range: 151..164,
-                                                                        value: Str(
-                                                                            StringConstant {
-                                                                                value: " with nested ",
-                                                                                unicode: false,
-                                                                                implicit_concatenated: false,
-                                                                            },
-                                                                        ),
+                                                                        value: " with nested ",
                                                                     },
                                                                 ),
                                                                 FormattedValue(
-                                                                    ExprFormattedValue {
+                                                                    FormattedValue {
                                                                         range: 164..178,
-                                                                        value: Attribute(
+                                                                        expression: Attribute(
                                                                             ExprAttribute {
                                                                                 range: 165..177,
                                                                                 value: Name(
@@ -281,7 +270,6 @@ expression: parse_ast
                                                                     },
                                                                 ),
                                                             ],
-                                                            implicit_concatenated: false,
                                                         },
                                                     ),
                                                 ],
@@ -332,23 +320,18 @@ expression: parse_ast
                                                     FString(
                                                         ExprFString {
                                                             range: 213..259,
-                                                            values: [
-                                                                Constant(
-                                                                    ExprConstant {
+                                                            implicit_concatenated: false,
+                                                            parts: [
+                                                                String(
+                                                                    StringTodoName {
                                                                         range: 215..222,
-                                                                        value: Str(
-                                                                            StringConstant {
-                                                                                value: "caught ",
-                                                                                unicode: false,
-                                                                                implicit_concatenated: false,
-                                                                            },
-                                                                        ),
+                                                                        value: "caught ",
                                                                     },
                                                                 ),
                                                                 FormattedValue(
-                                                                    ExprFormattedValue {
+                                                                    FormattedValue {
                                                                         range: 222..231,
-                                                                        value: Call(
+                                                                        expression: Call(
                                                                             ExprCall {
                                                                                 range: 223..230,
                                                                                 func: Name(
@@ -378,22 +361,16 @@ expression: parse_ast
                                                                         format_spec: None,
                                                                     },
                                                                 ),
-                                                                Constant(
-                                                                    ExprConstant {
+                                                                String(
+                                                                    StringTodoName {
                                                                         range: 231..244,
-                                                                        value: Str(
-                                                                            StringConstant {
-                                                                                value: " with nested ",
-                                                                                unicode: false,
-                                                                                implicit_concatenated: false,
-                                                                            },
-                                                                        ),
+                                                                        value: " with nested ",
                                                                     },
                                                                 ),
                                                                 FormattedValue(
-                                                                    ExprFormattedValue {
+                                                                    FormattedValue {
                                                                         range: 244..258,
-                                                                        value: Attribute(
+                                                                        expression: Attribute(
                                                                             ExprAttribute {
                                                                                 range: 245..257,
                                                                                 value: Name(
@@ -416,7 +393,6 @@ expression: parse_ast
                                                                     },
                                                                 ),
                                                             ],
-                                                            implicit_concatenated: false,
                                                         },
                                                     ),
                                                 ],

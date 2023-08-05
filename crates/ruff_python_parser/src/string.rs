@@ -173,11 +173,15 @@ impl<'a> StringParser<'a> {
         }
     }
 
-    fn parse_formatted_value(&mut self, nested: u8) -> Result<Vec<Expr>, LexicalError> {
+    fn parse_formatted_value(&mut self, nested: u8) -> Result<Vec<ast::FStringPart>, LexicalError> {
         use FStringErrorType::{
-            EmptyExpression, InvalidConversionFlag, InvalidExpression, MismatchedDelimiter,
-            UnclosedLbrace, Unmatched, UnterminatedString,
+            EmptyExpression, ExpressionNestedTooDeeply, InvalidConversionFlag, InvalidExpression,
+            MismatchedDelimiter, UnclosedLbrace, Unmatched, UnterminatedString,
         };
+
+        if nested >= 2 {
+            return Err(FStringError::new(ExpressionNestedTooDeeply, self.get_pos()).into());
+        }
 
         let mut expression = String::new();
         // for self-documenting strings we also store the `=` and any trailing space inside
@@ -242,7 +246,7 @@ impl<'a> StringParser<'a> {
                     let parsed_spec = self.parse_spec(nested)?;
 
                     spec = Some(Box::new(Expr::from(ast::ExprFString {
-                        values: parsed_spec,
+                        parts: parsed_spec,
                         implicit_concatenated: false,
                         range: self.range(start_location),
                     })));
@@ -320,8 +324,8 @@ impl<'a> StringParser<'a> {
                         let leading =
                             &expression[..usize::from(value.start() - start_location) - 1];
                         let trailing = &expression[usize::from(value.end() - start_location) - 1..];
-                        vec![Expr::from(ast::ExprFormattedValue {
-                            value: Box::new(value),
+                        vec![ast::FStringPart::FormattedValue(ast::FormattedValue {
+                            expression: Box::new(value),
                             debug_text: Some(ast::DebugText {
                                 leading: leading.to_string(),
                                 trailing: trailing.to_string(),
@@ -331,8 +335,8 @@ impl<'a> StringParser<'a> {
                             range: self.range(start_location),
                         })]
                     } else {
-                        vec![Expr::from(ast::ExprFormattedValue {
-                            value: Box::new(
+                        vec![ast::FStringPart::FormattedValue(ast::FormattedValue {
+                            expression: Box::new(
                                 parse_fstring_expr(&expression, start_location).map_err(|e| {
                                     FStringError::new(
                                         InvalidExpression(Box::new(e.error)),
@@ -376,7 +380,7 @@ impl<'a> StringParser<'a> {
         Err(FStringError::new(UnclosedLbrace, self.get_pos()).into())
     }
 
-    fn parse_spec(&mut self, nested: u8) -> Result<Vec<Expr>, LexicalError> {
+    fn parse_spec(&mut self, nested: u8) -> Result<Vec<ast::FStringPart>, LexicalError> {
         let mut spec_constructor = Vec::new();
         let mut constant_piece = String::new();
         let mut start_location = self.get_pos();
@@ -384,12 +388,12 @@ impl<'a> StringParser<'a> {
             match next {
                 '{' => {
                     if !constant_piece.is_empty() {
-                        spec_constructor.push(Expr::from(ast::ExprConstant {
-                            value: std::mem::take(&mut constant_piece).into(),
+                        spec_constructor.push(ast::FStringPart::String(ast::StringTodoName {
+                            value: std::mem::take(&mut constant_piece),
                             range: self.range(start_location),
                         }));
                     }
-                    let parsed_expr = self.parse_fstring(nested + 1)?;
+                    let parsed_expr = self.parse_formatted_value(nested + 1)?;
                     spec_constructor.extend(parsed_expr);
                     start_location = self.get_pos();
                     continue;
@@ -404,24 +408,21 @@ impl<'a> StringParser<'a> {
             self.next_char();
         }
         if !constant_piece.is_empty() {
-            spec_constructor.push(Expr::from(ast::ExprConstant {
-                value: std::mem::take(&mut constant_piece).into(),
+            spec_constructor.push(ast::FStringPart::String(ast::StringTodoName {
+                value: std::mem::take(&mut constant_piece),
                 range: self.range(start_location),
             }));
         }
         Ok(spec_constructor)
     }
 
-    fn parse_fstring(&mut self, nested: u8) -> Result<Vec<Expr>, LexicalError> {
-        use FStringErrorType::{ExpressionNestedTooDeeply, SingleRbrace, UnclosedLbrace};
-
-        if nested >= 2 {
-            return Err(FStringError::new(ExpressionNestedTooDeeply, self.get_pos()).into());
-        }
+    fn parse_fstring(&mut self, nested: u8) -> Result<Expr, LexicalError> {
+        use FStringErrorType::{SingleRbrace, UnclosedLbrace};
 
         let mut content = String::new();
-        let mut start_location = self.get_pos();
-        let mut values = vec![];
+        let start_location = self.get_pos();
+        let mut part_start_location = self.get_pos();
+        let mut parts = vec![];
 
         while let Some(ch) = self.peek() {
             match ch {
@@ -441,15 +442,15 @@ impl<'a> StringParser<'a> {
                         }
                     }
                     if !content.is_empty() {
-                        values.push(Expr::from(ast::ExprConstant {
-                            value: std::mem::take(&mut content).into(),
-                            range: self.range(start_location),
+                        parts.push(ast::FStringPart::String(ast::StringTodoName {
+                            value: std::mem::take(&mut content),
+                            range: self.range(part_start_location),
                         }));
                     }
 
-                    let parsed_values = self.parse_formatted_value(nested)?;
-                    values.extend(parsed_values);
-                    start_location = self.get_pos();
+                    let parsed_parts = self.parse_formatted_value(nested)?;
+                    parts.extend(parsed_parts);
+                    part_start_location = self.get_pos();
                 }
                 '}' => {
                     if nested > 0 {
@@ -475,13 +476,17 @@ impl<'a> StringParser<'a> {
         }
 
         if !content.is_empty() {
-            values.push(Expr::from(ast::ExprConstant {
-                value: content.into(),
-                range: self.range(start_location),
+            parts.push(ast::FStringPart::String(ast::StringTodoName {
+                value: content,
+                range: self.range(part_start_location),
             }));
         }
 
-        Ok(values)
+        Ok(Expr::from(ast::ExprFString {
+            parts,
+            implicit_concatenated: false,
+            range: self.range(start_location),
+        }))
     }
 
     fn parse_bytes(&mut self) -> Result<Expr, LexicalError> {
@@ -533,13 +538,13 @@ impl<'a> StringParser<'a> {
         }))
     }
 
-    fn parse(&mut self) -> Result<Vec<Expr>, LexicalError> {
+    fn parse(&mut self) -> Result<Expr, LexicalError> {
         if self.kind.is_any_fstring() {
             self.parse_fstring(0)
         } else if self.kind.is_any_bytes() {
-            self.parse_bytes().map(|expr| vec![expr])
+            self.parse_bytes()
         } else {
-            self.parse_string().map(|expr| vec![expr])
+            self.parse_string()
         }
     }
 }
@@ -554,7 +559,7 @@ fn parse_string(
     kind: StringKind,
     triple_quoted: bool,
     start: TextSize,
-) -> Result<Vec<Expr>, LexicalError> {
+) -> Result<Expr, LexicalError> {
     StringParser::new(source, kind, triple_quoted, start).parse()
 }
 
@@ -587,14 +592,13 @@ pub(crate) fn parse_strings(
     if has_bytes {
         let mut content: Vec<u8> = vec![];
         for (start, (source, kind, triple_quoted), _) in values {
-            for value in parse_string(&source, kind, triple_quoted, start)? {
-                match value {
-                    Expr::Constant(ast::ExprConstant {
-                        value: Constant::Bytes(BytesConstant { value, .. }),
-                        ..
-                    }) => content.extend(value),
-                    _ => unreachable!("Unexpected non-bytes expression."),
-                }
+            let value = parse_string(&source, kind, triple_quoted, start)?;
+            match value {
+                Expr::Constant(ast::ExprConstant {
+                    value: Constant::Bytes(BytesConstant { value, .. }),
+                    ..
+                }) => content.extend(value),
+                _ => unreachable!("Unexpected non-bytes expression."),
             }
         }
         return Ok(ast::ExprConstant {
@@ -610,14 +614,13 @@ pub(crate) fn parse_strings(
     if !has_fstring {
         let mut content: Vec<String> = vec![];
         for (start, (source, kind, triple_quoted), _) in values {
-            for value in parse_string(&source, kind, triple_quoted, start)? {
-                match value {
-                    Expr::Constant(ast::ExprConstant {
-                        value: Constant::Str(StringConstant { value, .. }),
-                        ..
-                    }) => content.push(value),
-                    _ => unreachable!("Unexpected non-string expression."),
-                }
+            let value = parse_string(&source, kind, triple_quoted, start)?;
+            match value {
+                Expr::Constant(ast::ExprConstant {
+                    value: Constant::Str(StringConstant { value, .. }),
+                    ..
+                }) => content.push(value),
+                _ => unreachable!("Unexpected non-string expression."),
             }
         }
         return Ok(ast::ExprConstant {
@@ -632,44 +635,58 @@ pub(crate) fn parse_strings(
     }
 
     // De-duplicate adjacent constants.
-    let mut deduped: Vec<Expr> = vec![];
+    let mut deduped: Vec<ast::FStringPart> = vec![];
     let mut current: Vec<String> = vec![];
     let mut current_start = initial_start;
     let mut current_end = last_end;
 
-    let take_current = |current: &mut Vec<String>, start, end| -> Expr {
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(StringConstant {
-                value: current.drain(..).collect::<String>(),
-                unicode: is_initial_kind_unicode,
-                implicit_concatenated,
-            }),
+    let take_current = |current: &mut Vec<String>, start, end| -> ast::FStringPart {
+        ast::FStringPart::String(ast::StringTodoName {
+            value: current.drain(..).collect::<String>(),
             range: TextRange::new(start, end),
         })
     };
 
     for (start, (source, kind, triple_quoted), _) in values {
-        for value in parse_string(&source, kind, triple_quoted, start)? {
-            let value_range = value.range();
-            match value {
-                Expr::FormattedValue { .. } => {
-                    if !current.is_empty() {
-                        deduped.push(take_current(&mut current, current_start, current_end));
+        let value = parse_string(&source, kind, triple_quoted, start)?;
+        match value {
+            Expr::FString(ast::ExprFString { parts, .. }) => {
+                for part in parts {
+                    match part {
+                        ast::FStringPart::String(ast::StringTodoName {
+                            value: inner,
+                            range,
+                        }) => {
+                            if current.is_empty() {
+                                current_start = range.start();
+                            }
+                            current_end = range.end();
+                            current.push(inner);
+                        }
+                        ast::FStringPart::FormattedValue(ast::FormattedValue { .. }) => {
+                            if !current.is_empty() {
+                                deduped.push(take_current(
+                                    &mut current,
+                                    current_start,
+                                    current_end,
+                                ));
+                            }
+                            deduped.push(part);
+                        }
                     }
-                    deduped.push(value);
                 }
-                Expr::Constant(ast::ExprConstant {
-                    value: Constant::Str(StringConstant { value, .. }),
-                    ..
-                }) => {
-                    if current.is_empty() {
-                        current_start = value_range.start();
-                    }
-                    current_end = value_range.end();
-                    current.push(value);
-                }
-                _ => unreachable!("Unexpected non-string expression."),
             }
+            Expr::Constant(ast::ExprConstant {
+                value: Constant::Str(StringConstant { value, .. }),
+                range,
+            }) => {
+                if current.is_empty() {
+                    current_start = range.start();
+                }
+                current_end = range.end();
+                current.push(value);
+            }
+            expr => unreachable!("Unexpected non-string expression: `{expr:?}`."),
         }
     }
     if !current.is_empty() {
@@ -677,7 +694,7 @@ pub(crate) fn parse_strings(
     }
 
     Ok(Expr::FString(ast::ExprFString {
-        values: deduped,
+        parts: deduped,
         implicit_concatenated,
         range: TextRange::new(initial_start, last_end),
     }))
@@ -788,7 +805,7 @@ mod tests {
     use super::*;
     use crate::parser::parse_suite;
 
-    fn parse_fstring(source: &str) -> Result<Vec<Expr>, LexicalError> {
+    fn parse_fstring(source: &str) -> Result<Expr, LexicalError> {
         StringParser::new(source, StringKind::FString, false, TextSize::default()).parse()
     }
 

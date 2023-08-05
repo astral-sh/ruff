@@ -3314,11 +3314,6 @@ impl From<ExprCall> for ParenthesizedExpr {
         Expr::Call(payload).into()
     }
 }
-impl From<ExprFormattedValue> for ParenthesizedExpr {
-    fn from(payload: ExprFormattedValue) -> Self {
-        Expr::FormattedValue(payload).into()
-    }
-}
 impl From<ExprFString> for ParenthesizedExpr {
     fn from(payload: ExprFString) -> Self {
         Expr::FString(payload).into()

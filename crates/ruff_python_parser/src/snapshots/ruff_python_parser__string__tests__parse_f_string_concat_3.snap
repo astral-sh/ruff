@@ -9,23 +9,18 @@ expression: parse_ast
             value: FString(
                 ExprFString {
                     range: 0..22,
-                    values: [
-                        Constant(
-                            ExprConstant {
+                    implicit_concatenated: true,
+                    parts: [
+                        String(
+                            StringTodoName {
                                 range: 1..16,
-                                value: Str(
-                                    StringConstant {
-                                        value: "Hello world",
-                                        unicode: false,
-                                        implicit_concatenated: true,
-                                    },
-                                ),
+                                value: "Hello world",
                             },
                         ),
                         FormattedValue(
-                            ExprFormattedValue {
+                            FormattedValue {
                                 range: 16..21,
-                                value: Constant(
+                                expression: Constant(
                                     ExprConstant {
                                         range: 17..20,
                                         value: Str(
@@ -43,7 +38,6 @@ expression: parse_ast
                             },
                         ),
                     ],
-                    implicit_concatenated: true,
                 },
             ),
         },

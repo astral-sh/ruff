@@ -2,47 +2,47 @@
 source: crates/ruff_python_parser/src/string.rs
 expression: parse_ast
 ---
-[
-    FormattedValue(
-        ExprFormattedValue {
-            range: 2..5,
-            value: Name(
-                ExprName {
-                    range: 3..4,
-                    id: "a",
-                    ctx: Load,
+FString(
+    ExprFString {
+        range: 2..17,
+        implicit_concatenated: false,
+        parts: [
+            FormattedValue(
+                FormattedValue {
+                    range: 2..5,
+                    expression: Name(
+                        ExprName {
+                            range: 3..4,
+                            id: "a",
+                            ctx: Load,
+                        },
+                    ),
+                    debug_text: None,
+                    conversion: None,
+                    format_spec: None,
                 },
             ),
-            debug_text: None,
-            conversion: None,
-            format_spec: None,
-        },
-    ),
-    FormattedValue(
-        ExprFormattedValue {
-            range: 5..10,
-            value: Name(
-                ExprName {
-                    range: 7..8,
-                    id: "b",
-                    ctx: Load,
+            FormattedValue(
+                FormattedValue {
+                    range: 5..10,
+                    expression: Name(
+                        ExprName {
+                            range: 7..8,
+                            id: "b",
+                            ctx: Load,
+                        },
+                    ),
+                    debug_text: None,
+                    conversion: None,
+                    format_spec: None,
                 },
             ),
-            debug_text: None,
-            conversion: None,
-            format_spec: None,
-        },
-    ),
-    Constant(
-        ExprConstant {
-            range: 10..17,
-            value: Str(
-                StringConstant {
+            String(
+                StringTodoName {
+                    range: 10..17,
                     value: "{foo}",
-                    unicode: false,
-                    implicit_concatenated: false,
                 },
             ),
-        },
-    ),
-]
+        ],
+    },
+)

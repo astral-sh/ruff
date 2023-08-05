@@ -2,49 +2,55 @@
 source: crates/ruff_python_parser/src/string.rs
 expression: parse_ast
 ---
-[
-    FormattedValue(
-        ExprFormattedValue {
-            range: 2..15,
-            value: Name(
-                ExprName {
-                    range: 3..6,
-                    id: "foo",
-                    ctx: Load,
-                },
-            ),
-            debug_text: None,
-            conversion: None,
-            format_spec: Some(
-                FString(
-                    ExprFString {
-                        range: 7..14,
-                        values: [
-                            FormattedValue(
-                                ExprFormattedValue {
-                                    range: 7..14,
-                                    value: Constant(
-                                        ExprConstant {
-                                            range: 8..13,
-                                            value: Str(
-                                                StringConstant {
-                                                    value: "",
-                                                    unicode: false,
-                                                    implicit_concatenated: true,
+FString(
+    ExprFString {
+        range: 2..15,
+        implicit_concatenated: false,
+        parts: [
+            FormattedValue(
+                FormattedValue {
+                    range: 2..15,
+                    expression: Name(
+                        ExprName {
+                            range: 3..6,
+                            id: "foo",
+                            ctx: Load,
+                        },
+                    ),
+                    debug_text: None,
+                    conversion: None,
+                    format_spec: Some(
+                        FString(
+                            ExprFString {
+                                range: 7..14,
+                                implicit_concatenated: false,
+                                parts: [
+                                    FormattedValue(
+                                        FormattedValue {
+                                            range: 7..14,
+                                            expression: Constant(
+                                                ExprConstant {
+                                                    range: 8..13,
+                                                    value: Str(
+                                                        StringConstant {
+                                                            value: "",
+                                                            unicode: false,
+                                                            implicit_concatenated: true,
+                                                        },
+                                                    ),
                                                 },
                                             ),
+                                            debug_text: None,
+                                            conversion: None,
+                                            format_spec: None,
                                         },
                                     ),
-                                    debug_text: None,
-                                    conversion: None,
-                                    format_spec: None,
-                                },
-                            ),
-                        ],
-                        implicit_concatenated: false,
-                    },
-                ),
+                                ],
+                            },
+                        ),
+                    ),
+                },
             ),
-        },
-    ),
-]
+        ],
+    },
+)

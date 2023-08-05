@@ -2,19 +2,25 @@
 source: crates/ruff_python_parser/src/string.rs
 expression: parse_ast
 ---
-[
-    FormattedValue(
-        ExprFormattedValue {
-            range: 2..9,
-            value: Yield(
-                ExprYield {
-                    range: 3..8,
-                    value: None,
+FString(
+    ExprFString {
+        range: 2..9,
+        implicit_concatenated: false,
+        parts: [
+            FormattedValue(
+                FormattedValue {
+                    range: 2..9,
+                    expression: Yield(
+                        ExprYield {
+                            range: 3..8,
+                            value: None,
+                        },
+                    ),
+                    debug_text: None,
+                    conversion: None,
+                    format_spec: None,
                 },
             ),
-            debug_text: None,
-            conversion: None,
-            format_spec: None,
-        },
-    ),
-]
+        ],
+    },
+)
