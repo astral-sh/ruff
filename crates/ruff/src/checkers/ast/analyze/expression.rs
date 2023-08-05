@@ -206,7 +206,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 }
                 ExprContext::Store => {
                     if checker.enabled(Rule::NonLowercaseVariableInFunction) {
-                        if checker.semantic.current_scope().kind.is_any_function() {
+                        if checker.semantic.current_scope().kind.is_function() {
                             // Ignore globals.
                             if !checker
                                 .semantic

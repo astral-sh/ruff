@@ -70,22 +70,14 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         Stmt::FunctionDef(ast::StmtFunctionDef {
+            is_async,
             name,
             decorator_list,
             returns,
             parameters,
             body,
             type_params,
-            ..
-        })
-        | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-            name,
-            decorator_list,
-            returns,
-            parameters,
-            body,
-            type_params,
-            ..
+            range: _,
         }) => {
             if checker.enabled(Rule::DjangoNonLeadingReceiverDecorator) {
                 flake8_django::rules::non_leading_receiver_decorator(checker, decorator_list);
@@ -151,11 +143,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_pyi::rules::non_self_return_type(
                     checker,
                     stmt,
+                    *is_async,
                     name,
                     decorator_list,
                     returns.as_ref().map(AsRef::as_ref),
                     parameters,
-                    stmt.is_async_function_def_stmt(),
                 );
             }
             if checker.enabled(Rule::CustomTypeVarReturnType) {
@@ -181,12 +173,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             if checker.enabled(Rule::BadExitAnnotation) {
-                flake8_pyi::rules::bad_exit_annotation(
-                    checker,
-                    stmt.is_async_function_def_stmt(),
-                    name,
-                    parameters,
-                );
+                flake8_pyi::rules::bad_exit_annotation(checker, *is_async, name, parameters);
             }
             if checker.enabled(Rule::RedundantNumericUnion) {
                 flake8_pyi::rules::redundant_numeric_union(checker, parameters);
@@ -1097,8 +1084,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pygrep_hooks::rules::non_existent_mock_method(checker, test);
             }
         }
-        Stmt::With(ast::StmtWith { items, body, .. })
-        | Stmt::AsyncWith(ast::StmtAsyncWith { items, body, .. }) => {
+        Stmt::With(with_ @ ast::StmtWith { items, body, .. }) => {
             if checker.enabled(Rule::AssertRaisesException) {
                 flake8_bugbear::rules::assert_raises_exception(checker, items);
             }
@@ -1108,8 +1094,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::MultipleWithStatements) {
                 flake8_simplify::rules::multiple_with_statements(
                     checker,
-                    stmt,
-                    body,
+                    with_,
                     checker.semantic.current_statement_parent(),
                 );
             }
@@ -1129,13 +1114,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         Stmt::For(ast::StmtFor {
-            target,
-            body,
-            iter,
-            orelse,
-            ..
-        })
-        | Stmt::AsyncFor(ast::StmtAsyncFor {
             target,
             body,
             iter,
@@ -1339,7 +1317,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     if !checker
                         .semantic
                         .current_scopes()
-                        .any(|scope| scope.kind.is_any_function())
+                        .any(|scope| scope.kind.is_function())
                     {
                         if checker.enabled(Rule::UnprefixedTypeParam) {
                             flake8_pyi::rules::prefix_type_params(checker, value, targets);
@@ -1404,7 +1382,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         if !checker
                             .semantic
                             .current_scopes()
-                            .any(|scope| scope.kind.is_any_function())
+                            .any(|scope| scope.kind.is_function())
                         {
                             flake8_pyi::rules::annotated_assignment_default_in_stub(
                                 checker, target, value, annotation,

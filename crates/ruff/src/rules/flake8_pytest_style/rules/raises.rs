@@ -195,12 +195,9 @@ pub(crate) fn complex_raises(
     if raises_called {
         let is_too_complex = if let [stmt] = body {
             match stmt {
-                Stmt::With(ast::StmtWith { body, .. })
-                | Stmt::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
-                    is_non_trivial_with_body(body)
-                }
+                Stmt::With(ast::StmtWith { body, .. }) => is_non_trivial_with_body(body),
                 // Allow function and class definitions to test decorators
-                Stmt::ClassDef(_) | Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) => false,
+                Stmt::ClassDef(_) | Stmt::FunctionDef(_) => false,
                 stmt => is_compound_statement(stmt),
             }
         } else {

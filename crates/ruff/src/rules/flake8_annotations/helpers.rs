@@ -15,14 +15,6 @@ pub(super) fn match_function_def(
             body,
             decorator_list,
             ..
-        })
-        | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-            name,
-            parameters,
-            returns,
-            body,
-            decorator_list,
-            ..
         }) => (
             name,
             parameters,

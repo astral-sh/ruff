@@ -128,26 +128,6 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             }
             visitor.visit_body(body);
         }
-        Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-            parameters,
-            body,
-            decorator_list,
-            returns,
-            type_params,
-            ..
-        }) => {
-            for decorator in decorator_list {
-                visitor.visit_decorator(decorator);
-            }
-            if let Some(type_params) = type_params {
-                visitor.visit_type_params(type_params);
-            }
-            visitor.visit_parameters(parameters);
-            for expr in returns {
-                visitor.visit_annotation(expr);
-            }
-            visitor.visit_body(body);
-        }
         Stmt::ClassDef(ast::StmtClassDef {
             arguments,
             body,
@@ -228,18 +208,6 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             visitor.visit_body(body);
             visitor.visit_body(orelse);
         }
-        Stmt::AsyncFor(ast::StmtAsyncFor {
-            target,
-            iter,
-            body,
-            orelse,
-            ..
-        }) => {
-            visitor.visit_expr(iter);
-            visitor.visit_expr(target);
-            visitor.visit_body(body);
-            visitor.visit_body(orelse);
-        }
         Stmt::While(ast::StmtWhile {
             test,
             body,
@@ -266,12 +234,6 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             }
         }
         Stmt::With(ast::StmtWith { items, body, .. }) => {
-            for with_item in items {
-                visitor.visit_with_item(with_item);
-            }
-            visitor.visit_body(body);
-        }
-        Stmt::AsyncWith(ast::StmtAsyncWith { items, body, .. }) => {
             for with_item in items {
                 visitor.visit_with_item(with_item);
             }

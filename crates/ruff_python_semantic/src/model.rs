@@ -478,7 +478,7 @@ impl<'a> SemanticModel<'a> {
                 }
             }
 
-            seen_function |= scope.kind.is_any_function();
+            seen_function |= scope.kind.is_function();
             import_starred = import_starred || scope.uses_star_imports();
         }
 
@@ -540,7 +540,7 @@ impl<'a> SemanticModel<'a> {
                 }
             }
 
-            seen_function |= scope.kind.is_any_function();
+            seen_function |= scope.kind.is_function();
         }
 
         None
@@ -1015,11 +1015,8 @@ impl<'a> SemanticModel<'a> {
     /// Return `true` if the model is in an async context.
     pub fn in_async_context(&self) -> bool {
         for scope in self.current_scopes() {
-            if scope.kind.is_async_function() {
-                return true;
-            }
-            if scope.kind.is_function() {
-                return false;
+            if let ScopeKind::Function(ast::StmtFunctionDef { is_async, .. }) = scope.kind {
+                return *is_async;
             }
         }
         false

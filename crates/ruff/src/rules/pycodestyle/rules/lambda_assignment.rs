@@ -220,6 +220,7 @@ fn function(
                 })
                 .collect::<Vec<_>>();
             let func = Stmt::FunctionDef(ast::StmtFunctionDef {
+                is_async: false,
                 name: Identifier::new(name.to_string(), TextRange::default()),
                 parameters: Box::new(Parameters {
                     posonlyargs: new_posonlyargs,
@@ -236,6 +237,7 @@ fn function(
         }
     }
     let func = Stmt::FunctionDef(ast::StmtFunctionDef {
+        is_async: false,
         name: Identifier::new(name.to_string(), TextRange::default()),
         parameters: Box::new(parameters.clone()),
         body: vec![body],

@@ -67,9 +67,7 @@ pub(super) fn place_comment<'a>(
             handle_module_level_own_line_comment_before_class_or_function_comment(comment, locator)
         }
         AnyNodeRef::WithItem(_) => handle_with_item_comment(comment, locator),
-        AnyNodeRef::StmtFunctionDef(_) | AnyNodeRef::StmtAsyncFunctionDef(_) => {
-            handle_leading_function_with_decorators_comment(comment)
-        }
+        AnyNodeRef::StmtFunctionDef(_) => handle_leading_function_with_decorators_comment(comment),
         AnyNodeRef::StmtClassDef(class_def) => {
             handle_leading_class_with_decorators_comment(comment, class_def)
         }
@@ -178,7 +176,6 @@ fn handle_end_of_line_comment_around_body<'a>(
 fn is_first_statement_in_body(statement: AnyNodeRef, has_body: AnyNodeRef) -> bool {
     match has_body {
         AnyNodeRef::StmtFor(ast::StmtFor { body, orelse, .. })
-        | AnyNodeRef::StmtAsyncFor(ast::StmtAsyncFor { body, orelse, .. })
         | AnyNodeRef::StmtWhile(ast::StmtWhile { body, orelse, .. }) => {
             are_same_optional(statement, body.first())
                 || are_same_optional(statement, orelse.first())
@@ -208,7 +205,6 @@ fn is_first_statement_in_body(statement: AnyNodeRef, has_body: AnyNodeRef) -> bo
             body, ..
         })
         | AnyNodeRef::StmtFunctionDef(ast::StmtFunctionDef { body, .. })
-        | AnyNodeRef::StmtAsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. })
         | AnyNodeRef::StmtClassDef(ast::StmtClassDef { body, .. }) => {
             are_same_optional(statement, body.first())
         }
@@ -773,9 +769,7 @@ fn handle_module_level_own_line_comment_before_class_or_function_comment<'a>(
     // ... where the following is a function or class statement.
     if !matches!(
         following,
-        AnyNodeRef::StmtAsyncFunctionDef(_)
-            | AnyNodeRef::StmtFunctionDef(_)
-            | AnyNodeRef::StmtClassDef(_)
+        AnyNodeRef::StmtFunctionDef(_) | AnyNodeRef::StmtClassDef(_)
     ) {
         return CommentPlacement::Default(comment);
     }
@@ -1408,10 +1402,8 @@ where
 fn last_child_in_body(node: AnyNodeRef) -> Option<AnyNodeRef> {
     let body = match node {
         AnyNodeRef::StmtFunctionDef(ast::StmtFunctionDef { body, .. })
-        | AnyNodeRef::StmtAsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. })
         | AnyNodeRef::StmtClassDef(ast::StmtClassDef { body, .. })
         | AnyNodeRef::StmtWith(ast::StmtWith { body, .. })
-        | AnyNodeRef::StmtAsyncWith(ast::StmtAsyncWith { body, .. })
         | AnyNodeRef::MatchCase(MatchCase { body, .. })
         | AnyNodeRef::ExceptHandlerExceptHandler(ast::ExceptHandlerExceptHandler {
             body, ..
@@ -1424,7 +1416,6 @@ fn last_child_in_body(node: AnyNodeRef) -> Option<AnyNodeRef> {
         }) => elif_else_clauses.last().map_or(body, |clause| &clause.body),
 
         AnyNodeRef::StmtFor(ast::StmtFor { body, orelse, .. })
-        | AnyNodeRef::StmtAsyncFor(ast::StmtAsyncFor { body, orelse, .. })
         | AnyNodeRef::StmtWhile(ast::StmtWhile { body, orelse, .. }) => {
             if orelse.is_empty() {
                 body
@@ -1477,7 +1468,6 @@ fn last_child_in_body(node: AnyNodeRef) -> Option<AnyNodeRef> {
 fn is_first_statement_in_alternate_body(statement: AnyNodeRef, has_body: AnyNodeRef) -> bool {
     match has_body {
         AnyNodeRef::StmtFor(ast::StmtFor { orelse, .. })
-        | AnyNodeRef::StmtAsyncFor(ast::StmtAsyncFor { orelse, .. })
         | AnyNodeRef::StmtWhile(ast::StmtWhile { orelse, .. }) => {
             are_same_optional(statement, orelse.first())
         }

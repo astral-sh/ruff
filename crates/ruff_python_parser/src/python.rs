@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: f99d8cb29227bfbe1fa07719f655304a9a93fd4715726687ef40c091adbdbad5
+// sha3: d713a7771107f8c20353ce5e890fba004b3c5491f513d28e9348a49cd510c59b
 use num_bigint::BigInt;
 use ruff_text_size::TextSize;
 use ruff_python_ast::{self as ast, Ranged, MagicKind};
@@ -33081,11 +33081,7 @@ fn __action147<
             .end();
         let target = Box::new(set_context(target, ast::ExprContext::Store));
         let iter = Box::new(iter);
-        if is_async.is_some() {
-            ast::Stmt::AsyncFor(ast::StmtAsyncFor { target, iter, body, orelse, range: (location..end_location).into() })
-        } else {
-            ast::Stmt::For(ast::StmtFor { target, iter, body, orelse, range: (location..end_location).into() })
-        }
+        ast::Stmt::For(ast::StmtFor { target, iter, body, orelse, is_async: is_async.is_some(), range: (location..end_location).into() })
     }
 }
 
@@ -33306,11 +33302,7 @@ fn __action155<
 {
     {
         let end_location = body.last().unwrap().end();
-        if is_async.is_some() {
-            ast::StmtAsyncWith { items, body, range: (location..end_location).into() }.into()
-        } else {
-            ast::StmtWith { items, body, range: (location..end_location).into() }.into()
-        }
+        ast::StmtWith { items, body, is_async: is_async.is_some(), range: (location..end_location).into() }.into()
     }
 }
 
@@ -33407,11 +33399,7 @@ fn __action161<
         let args = Box::new(args);
         let returns = r.map(Box::new);
         let end_location = body.last().unwrap().end();
-        if is_async.is_some() {
-            ast::StmtAsyncFunctionDef { name, parameters:args, body, decorator_list, returns, type_params, range: (location..end_location).into() }.into()
-        } else {
-            ast::StmtFunctionDef { name, parameters:args, body, decorator_list, returns, type_params, range: (location..end_location).into() }.into()
-        }
+        ast::StmtFunctionDef { name, parameters:args, body, decorator_list, returns, type_params, is_async: is_async.is_some(), range: (location..end_location).into() }.into()
     }
 }
 

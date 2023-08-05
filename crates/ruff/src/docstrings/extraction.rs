@@ -30,8 +30,7 @@ pub(crate) fn extract_docstring<'a>(definition: &'a Definition<'a>) -> Option<&'
         Definition::Module(module) => docstring_from(module.python_ast),
         Definition::Member(member) => {
             if let Stmt::ClassDef(ast::StmtClassDef { body, .. })
-            | Stmt::FunctionDef(ast::StmtFunctionDef { body, .. })
-            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. }) = &member.stmt
+            | Stmt::FunctionDef(ast::StmtFunctionDef { body, .. }) = &member.stmt
             {
                 docstring_from(body)
             } else {

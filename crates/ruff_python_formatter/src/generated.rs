@@ -108,42 +108,6 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtFunctionDef {
     }
 }
 
-impl FormatRule<ast::StmtAsyncFunctionDef, PyFormatContext<'_>>
-    for crate::statement::stmt_async_function_def::FormatStmtAsyncFunctionDef
-{
-    #[inline]
-    fn fmt(&self, node: &ast::StmtAsyncFunctionDef, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::StmtAsyncFunctionDef>::fmt(self, node, f)
-    }
-}
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StmtAsyncFunctionDef {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::StmtAsyncFunctionDef,
-        crate::statement::stmt_async_function_def::FormatStmtAsyncFunctionDef,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::statement::stmt_async_function_def::FormatStmtAsyncFunctionDef::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtAsyncFunctionDef {
-    type Format = FormatOwnedWithRule<
-        ast::StmtAsyncFunctionDef,
-        crate::statement::stmt_async_function_def::FormatStmtAsyncFunctionDef,
-        PyFormatContext<'ast>,
-    >;
-    fn into_format(self) -> Self::Format {
-        FormatOwnedWithRule::new(
-            self,
-            crate::statement::stmt_async_function_def::FormatStmtAsyncFunctionDef::default(),
-        )
-    }
-}
-
 impl FormatRule<ast::StmtClassDef, PyFormatContext<'_>>
     for crate::statement::stmt_class_def::FormatStmtClassDef
 {
@@ -424,42 +388,6 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtFor {
     }
 }
 
-impl FormatRule<ast::StmtAsyncFor, PyFormatContext<'_>>
-    for crate::statement::stmt_async_for::FormatStmtAsyncFor
-{
-    #[inline]
-    fn fmt(&self, node: &ast::StmtAsyncFor, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::StmtAsyncFor>::fmt(self, node, f)
-    }
-}
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StmtAsyncFor {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::StmtAsyncFor,
-        crate::statement::stmt_async_for::FormatStmtAsyncFor,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::statement::stmt_async_for::FormatStmtAsyncFor::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtAsyncFor {
-    type Format = FormatOwnedWithRule<
-        ast::StmtAsyncFor,
-        crate::statement::stmt_async_for::FormatStmtAsyncFor,
-        PyFormatContext<'ast>,
-    >;
-    fn into_format(self) -> Self::Format {
-        FormatOwnedWithRule::new(
-            self,
-            crate::statement::stmt_async_for::FormatStmtAsyncFor::default(),
-        )
-    }
-}
-
 impl FormatRule<ast::StmtWhile, PyFormatContext<'_>>
     for crate::statement::stmt_while::FormatStmtWhile
 {
@@ -551,42 +479,6 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtWith {
     >;
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, crate::statement::stmt_with::FormatStmtWith::default())
-    }
-}
-
-impl FormatRule<ast::StmtAsyncWith, PyFormatContext<'_>>
-    for crate::statement::stmt_async_with::FormatStmtAsyncWith
-{
-    #[inline]
-    fn fmt(&self, node: &ast::StmtAsyncWith, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::StmtAsyncWith>::fmt(self, node, f)
-    }
-}
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StmtAsyncWith {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::StmtAsyncWith,
-        crate::statement::stmt_async_with::FormatStmtAsyncWith,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::statement::stmt_async_with::FormatStmtAsyncWith::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtAsyncWith {
-    type Format = FormatOwnedWithRule<
-        ast::StmtAsyncWith,
-        crate::statement::stmt_async_with::FormatStmtAsyncWith,
-        PyFormatContext<'ast>,
-    >;
-    fn into_format(self) -> Self::Format {
-        FormatOwnedWithRule::new(
-            self,
-            crate::statement::stmt_async_with::FormatStmtAsyncWith::default(),
-        )
     }
 }
 

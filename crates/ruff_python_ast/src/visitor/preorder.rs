@@ -145,14 +145,6 @@ where
             returns,
             type_params,
             ..
-        })
-        | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-            parameters,
-            body,
-            decorator_list,
-            returns,
-            type_params,
-            ..
         }) => {
             for decorator in decorator_list {
                 visitor.visit_decorator(decorator);
@@ -261,13 +253,6 @@ where
             body,
             orelse,
             ..
-        })
-        | Stmt::AsyncFor(ast::StmtAsyncFor {
-            target,
-            iter,
-            body,
-            orelse,
-            ..
         }) => {
             visitor.visit_expr(target);
             visitor.visit_expr(iter);
@@ -302,11 +287,7 @@ where
         Stmt::With(ast::StmtWith {
             items,
             body,
-            range: _,
-        })
-        | Stmt::AsyncWith(ast::StmtAsyncWith {
-            items,
-            body,
+            is_async: _,
             range: _,
         }) => {
             for with_item in items {

@@ -113,11 +113,11 @@ impl Violation for NonSelfReturnType {
 pub(crate) fn non_self_return_type(
     checker: &mut Checker,
     stmt: &Stmt,
+    is_async: bool,
     name: &str,
     decorator_list: &[Decorator],
     returns: Option<&Expr>,
     parameters: &Parameters,
-    async_: bool,
 ) {
     let ScopeKind::Class(class_def) = checker.semantic().current_scope().kind else {
         return;
@@ -138,7 +138,7 @@ pub(crate) fn non_self_return_type(
         return;
     }
 
-    if async_ {
+    if is_async {
         if name == "__aenter__"
             && is_name(returns, &class_def.name)
             && !is_final(&class_def.decorator_list, checker.semantic())

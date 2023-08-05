@@ -89,7 +89,7 @@ impl<'a> BlockBuilder<'a> {
             // sibling (i.e., as if the comment is the next statement, as
             // opposed to the class or function).
             match stmt {
-                Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) => {
+                Stmt::FunctionDef(_) => {
                     if helpers::has_comment_break(stmt, self.locator) {
                         Trailer::Sibling
                     } else {
@@ -196,12 +196,6 @@ where
                 }
                 self.finalize(None);
             }
-            Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. }) => {
-                for stmt in body {
-                    self.visit_stmt(stmt);
-                }
-                self.finalize(None);
-            }
             Stmt::ClassDef(ast::StmtClassDef { body, .. }) => {
                 for stmt in body {
                     self.visit_stmt(stmt);
@@ -209,17 +203,6 @@ where
                 self.finalize(None);
             }
             Stmt::For(ast::StmtFor { body, orelse, .. }) => {
-                for stmt in body {
-                    self.visit_stmt(stmt);
-                }
-                self.finalize(None);
-
-                for stmt in orelse {
-                    self.visit_stmt(stmt);
-                }
-                self.finalize(None);
-            }
-            Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. }) => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
@@ -256,12 +239,6 @@ where
                 }
             }
             Stmt::With(ast::StmtWith { body, .. }) => {
-                for stmt in body {
-                    self.visit_stmt(stmt);
-                }
-                self.finalize(None);
-            }
-            Stmt::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }

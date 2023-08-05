@@ -178,17 +178,10 @@ bitflags! {
 pub enum ScopeKind<'a> {
     Class(&'a ast::StmtClassDef),
     Function(&'a ast::StmtFunctionDef),
-    AsyncFunction(&'a ast::StmtAsyncFunctionDef),
     Generator,
     Module,
     Type,
     Lambda(&'a ast::ExprLambda),
-}
-
-impl ScopeKind<'_> {
-    pub const fn is_any_function(&self) -> bool {
-        matches!(self, ScopeKind::Function(_) | ScopeKind::AsyncFunction(_))
-    }
 }
 
 /// Id uniquely identifying a scope in a program.

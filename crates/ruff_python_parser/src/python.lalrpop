@@ -858,11 +858,7 @@ ForStatement: ast::Stmt = {
             .end();
         let target = Box::new(set_context(target, ast::ExprContext::Store));
         let iter = Box::new(iter);
-        if is_async.is_some() {
-            ast::Stmt::AsyncFor(ast::StmtAsyncFor { target, iter, body, orelse, range: (location..end_location).into() })
-        } else {
-            ast::Stmt::For(ast::StmtFor { target, iter, body, orelse, range: (location..end_location).into() })
-        }
+        ast::Stmt::For(ast::StmtFor { target, iter, body, orelse, is_async: is_async.is_some(), range: (location..end_location).into() })
     },
 };
 
@@ -975,11 +971,7 @@ ExceptClause: ast::ExceptHandler = {
 WithStatement: ast::Stmt = {
     <location:@L> <is_async:"async"?> "with" <items:WithItems> ":" <body:Suite> => {
         let end_location = body.last().unwrap().end();
-        if is_async.is_some() {
-            ast::StmtAsyncWith { items, body, range: (location..end_location).into() }.into()
-        } else {
-            ast::StmtWith { items, body, range: (location..end_location).into() }.into()
-        }
+        ast::StmtWith { items, body, is_async: is_async.is_some(), range: (location..end_location).into() }.into()
     },
 };
 
@@ -1014,11 +1006,7 @@ FuncDef: ast::Stmt = {
         let args = Box::new(args);
         let returns = r.map(Box::new);
         let end_location = body.last().unwrap().end();
-        if is_async.is_some() {
-            ast::StmtAsyncFunctionDef { name, parameters:args, body, decorator_list, returns, type_params, range: (location..end_location).into() }.into()
-        } else {
-            ast::StmtFunctionDef { name, parameters:args, body, decorator_list, returns, type_params, range: (location..end_location).into() }.into()
-        }
+        ast::StmtFunctionDef { name, parameters:args, body, decorator_list, returns, type_params, is_async: is_async.is_some(), range: (location..end_location).into() }.into()
     },
 };
 

@@ -78,8 +78,7 @@ fn num_statements(stmts: &[Stmt]) -> usize {
                     count += num_statements(&clause.body);
                 }
             }
-            Stmt::For(ast::StmtFor { body, orelse, .. })
-            | Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. }) => {
+            Stmt::For(ast::StmtFor { body, orelse, .. }) => {
                 count += num_statements(body);
                 count += num_statements(orelse);
             }
@@ -129,7 +128,6 @@ fn num_statements(stmts: &[Stmt]) -> usize {
                 }
             }
             Stmt::FunctionDef(ast::StmtFunctionDef { body, .. })
-            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. })
             | Stmt::With(ast::StmtWith { body, .. }) => {
                 count += 1;
                 count += num_statements(body);

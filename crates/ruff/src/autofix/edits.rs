@@ -179,16 +179,13 @@ fn is_only<T: PartialEq>(vec: &[T], value: &T) -> bool {
 fn is_lone_child(child: &Stmt, parent: &Stmt) -> bool {
     match parent {
         Stmt::FunctionDef(ast::StmtFunctionDef { body, .. })
-        | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. })
         | Stmt::ClassDef(ast::StmtClassDef { body, .. })
-        | Stmt::With(ast::StmtWith { body, .. })
-        | Stmt::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
+        | Stmt::With(ast::StmtWith { body, .. }) => {
             if is_only(body, child) {
                 return true;
             }
         }
         Stmt::For(ast::StmtFor { body, orelse, .. })
-        | Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. })
         | Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
             if is_only(body, child) || is_only(orelse, child) {
                 return true;

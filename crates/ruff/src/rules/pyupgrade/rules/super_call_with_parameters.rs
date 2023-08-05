@@ -83,7 +83,7 @@ pub(crate) fn super_call_with_parameters(
     let scope = checker.semantic().current_scope();
 
     // Check: are we in a Function scope?
-    if !scope.kind.is_any_function() {
+    if !scope.kind.is_function() {
         return;
     }
 

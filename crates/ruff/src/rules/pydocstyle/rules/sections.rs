@@ -1726,9 +1726,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
         return;
     };
 
-    let (Stmt::FunctionDef(ast::StmtFunctionDef { parameters, .. })
-    | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { parameters, .. })) = stmt
-    else {
+    let Stmt::FunctionDef(ast::StmtFunctionDef { parameters, .. }) = stmt else {
         return;
     };
 

@@ -49,14 +49,14 @@ use crate::checkers::ast::Checker;
 /// ```
 #[violation]
 pub struct IterMethodReturnIterable {
-    async_: bool,
+    is_async: bool,
 }
 
 impl Violation for IterMethodReturnIterable {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let IterMethodReturnIterable { async_ } = self;
-        if *async_ {
+        let IterMethodReturnIterable { is_async } = self;
+        if *is_async {
             format!("`__aiter__` methods should return an `AsyncIterator`, not an `AsyncIterable`")
         } else {
             format!("`__iter__` methods should return an `Iterator`, not an `Iterable`")
@@ -91,7 +91,7 @@ pub(crate) fn iter_method_return_iterable(checker: &mut Checker, definition: &De
         returns
     };
 
-    let async_ = match name.as_str() {
+    let is_async = match name.as_str() {
         "__iter__" => false,
         "__aiter__" => true,
         _ => return,
@@ -101,7 +101,7 @@ pub(crate) fn iter_method_return_iterable(checker: &mut Checker, definition: &De
         .semantic()
         .resolve_call_path(annotation)
         .is_some_and(|call_path| {
-            if async_ {
+            if is_async {
                 matches!(
                     call_path.as_slice(),
                     ["typing", "AsyncIterable"] | ["collections", "abc", "AsyncIterable"]
@@ -115,7 +115,7 @@ pub(crate) fn iter_method_return_iterable(checker: &mut Checker, definition: &De
         })
     {
         checker.diagnostics.push(Diagnostic::new(
-            IterMethodReturnIterable { async_ },
+            IterMethodReturnIterable { is_async },
             returns.range(),
         ));
     }

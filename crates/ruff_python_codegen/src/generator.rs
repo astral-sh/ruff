@@ -23,7 +23,6 @@ mod precedence {
     pub(crate) const YIELD_FROM: u8 = 7;
     pub(crate) const IF: u8 = 9;
     pub(crate) const FOR: u8 = 9;
-    pub(crate) const ASYNC_FOR: u8 = 9;
     pub(crate) const WHILE: u8 = 9;
     pub(crate) const RETURN: u8 = 11;
     pub(crate) const SLICE: u8 = 13;
@@ -204,6 +203,7 @@ impl<'a> Generator<'a> {
 
         match ast {
             Stmt::FunctionDef(ast::StmtFunctionDef {
+                is_async,
                 name,
                 parameters,
                 body,
@@ -220,43 +220,10 @@ impl<'a> Generator<'a> {
                     });
                 }
                 statement!({
+                    if *is_async {
+                        self.p("async ");
+                    }
                     self.p("def ");
-                    self.p_id(name);
-                    if let Some(type_params) = type_params {
-                        self.unparse_type_params(type_params);
-                    }
-                    self.p("(");
-                    self.unparse_parameters(parameters);
-                    self.p(")");
-                    if let Some(returns) = returns {
-                        self.p(" -> ");
-                        self.unparse_expr(returns, precedence::MAX);
-                    }
-                    self.p(":");
-                });
-                self.body(body);
-                if self.indent_depth == 0 {
-                    self.newlines(2);
-                }
-            }
-            Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-                name,
-                parameters,
-                body,
-                returns,
-                decorator_list,
-                type_params,
-                ..
-            }) => {
-                self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
-                for decorator in decorator_list {
-                    statement!({
-                        self.p("@");
-                        self.unparse_expr(&decorator.expression, precedence::MAX);
-                    });
-                }
-                statement!({
-                    self.p("async def ");
                     self.p_id(name);
                     if let Some(type_params) = type_params {
                         self.unparse_type_params(type_params);
@@ -400,6 +367,7 @@ impl<'a> Generator<'a> {
                 });
             }
             Stmt::For(ast::StmtFor {
+                is_async,
                 target,
                 iter,
                 body,
@@ -407,30 +375,11 @@ impl<'a> Generator<'a> {
                 ..
             }) => {
                 statement!({
+                    if *is_async {
+                        self.p("async ");
+                    }
                     self.p("for ");
                     self.unparse_expr(target, precedence::FOR);
-                    self.p(" in ");
-                    self.unparse_expr(iter, precedence::MAX);
-                    self.p(":");
-                });
-                self.body(body);
-                if !orelse.is_empty() {
-                    statement!({
-                        self.p("else:");
-                    });
-                    self.body(orelse);
-                }
-            }
-            Stmt::AsyncFor(ast::StmtAsyncFor {
-                target,
-                iter,
-                body,
-                orelse,
-                ..
-            }) => {
-                statement!({
-                    self.p("async for ");
-                    self.unparse_expr(target, precedence::ASYNC_FOR);
                     self.p(" in ");
                     self.unparse_expr(iter, precedence::MAX);
                     self.p(":");
@@ -490,21 +439,17 @@ impl<'a> Generator<'a> {
                     self.body(&clause.body);
                 }
             }
-            Stmt::With(ast::StmtWith { items, body, .. }) => {
+            Stmt::With(ast::StmtWith {
+                is_async,
+                items,
+                body,
+                ..
+            }) => {
                 statement!({
-                    self.p("with ");
-                    let mut first = true;
-                    for item in items {
-                        self.p_delim(&mut first, ", ");
-                        self.unparse_with_item(item);
+                    if *is_async {
+                        self.p("async ");
                     }
-                    self.p(":");
-                });
-                self.body(body);
-            }
-            Stmt::AsyncWith(ast::StmtAsyncWith { items, body, .. }) => {
-                statement!({
-                    self.p("async with ");
+                    self.p("with ");
                     let mut first = true;
                     for item in items {
                         self.p_delim(&mut first, ", ");
