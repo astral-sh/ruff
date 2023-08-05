@@ -31,7 +31,6 @@ pub(crate) mod expr_constant;
 pub(crate) mod expr_dict;
 pub(crate) mod expr_dict_comp;
 pub(crate) mod expr_f_string;
-pub(crate) mod expr_formatted_value;
 pub(crate) mod expr_generator_exp;
 pub(crate) mod expr_if_exp;
 pub(crate) mod expr_ipy_escape_command;
@@ -90,7 +89,6 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             Expr::YieldFrom(expr) => expr.format().fmt(f),
             Expr::Compare(expr) => expr.format().fmt(f),
             Expr::Call(expr) => expr.format().fmt(f),
-            Expr::FormattedValue(expr) => expr.format().fmt(f),
             Expr::FString(expr) => expr.format().fmt(f),
             Expr::Constant(expr) => expr.format().fmt(f),
             Expr::Attribute(expr) => expr.format().fmt(f),
