@@ -36,7 +36,7 @@ use crate::registry::AsRule;
 /// - [Python documentation: `OSError`](https://docs.python.org/3/library/exceptions.html#OSError)
 #[violation]
 pub struct OSErrorAlias {
-    pub name: Option<String>,
+    name: Option<String>,
 }
 
 impl AlwaysAutofixableViolation for OSErrorAlias {

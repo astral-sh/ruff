@@ -39,7 +39,9 @@ use ruff_text_size::{TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, IsolationLevel};
 use ruff_python_ast::all::{extract_all_names, DunderAllFlags};
-use ruff_python_ast::helpers::{extract_handled_exceptions, to_module_path};
+use ruff_python_ast::helpers::{
+    collect_import_from_member, extract_handled_exceptions, to_module_path,
+};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::str::trailing_quote;
 use ruff_python_ast::visitor::{walk_except_handler, walk_pattern, Visitor};
@@ -320,11 +322,11 @@ where
                         // Given `import foo.bar`, `name` would be "foo", and `qualified_name` would be
                         // "foo.bar".
                         let name = alias.name.split('.').next().unwrap();
-                        let qualified_name = &alias.name;
+                        let call_path: Box<[&str]> = alias.name.split('.').collect();
                         self.add_binding(
                             name,
                             alias.identifier(),
-                            BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }),
+                            BindingKind::SubmoduleImport(SubmoduleImport { call_path }),
                             BindingFlags::EXTERNAL,
                         );
                     } else {
@@ -341,11 +343,11 @@ where
                         }
 
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
-                        let qualified_name = &alias.name;
+                        let call_path: Box<[&str]> = alias.name.split('.').collect();
                         self.add_binding(
                             name,
                             alias.identifier(),
-                            BindingKind::Import(Import { qualified_name }),
+                            BindingKind::Import(Import { call_path }),
                             flags,
                         );
                     }
@@ -389,12 +391,16 @@ where
                         // be "foo.bar". Given `from foo import bar as baz`, `name` would be "baz"
                         // and `qualified_name` would be "foo.bar".
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
-                        let qualified_name =
-                            helpers::format_import_from_member(level, module, &alias.name);
+
+                        // Attempt to resolve any relative imports; but if we don't know the current
+                        // module path, or the relative import extends beyond the package root,
+                        // fallback to a literal representation (e.g., `[".", "foo"]`).
+                        let call_path = collect_import_from_member(level, module, &alias.name)
+                            .into_boxed_slice();
                         self.add_binding(
                             name,
                             alias.identifier(),
-                            BindingKind::FromImport(FromImport { qualified_name }),
+                            BindingKind::FromImport(FromImport { call_path }),
                             flags,
                         );
                     }

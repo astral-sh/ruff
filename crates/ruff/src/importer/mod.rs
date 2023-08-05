@@ -87,13 +87,13 @@ impl<'a> Importer<'a> {
     /// import statement.
     pub(crate) fn runtime_import_edit(
         &self,
-        import: &StmtImports,
+        import: &ImportedMembers,
         at: TextSize,
     ) -> Result<RuntimeImportEdit> {
         // Generate the modified import statement.
         let content = autofix::codemods::retain_imports(
-            &import.qualified_names,
-            import.stmt,
+            &import.names,
+            import.statement,
             self.locator,
             self.stylist,
         )?;
@@ -118,15 +118,15 @@ impl<'a> Importer<'a> {
     /// `TYPE_CHECKING` block.
     pub(crate) fn typing_import_edit(
         &self,
-        import: &StmtImports,
+        import: &ImportedMembers,
         at: TextSize,
         semantic: &SemanticModel,
         source_type: PySourceType,
     ) -> Result<TypingImportEdit> {
         // Generate the modified import statement.
         let content = autofix::codemods::retain_imports(
-            &import.qualified_names,
-            import.stmt,
+            &import.names,
+            import.statement,
             self.locator,
             self.stylist,
         )?;
@@ -452,11 +452,11 @@ impl<'a> ImportRequest<'a> {
 }
 
 /// An existing list of module or member imports, located within an import statement.
-pub(crate) struct StmtImports<'a> {
+pub(crate) struct ImportedMembers<'a> {
     /// The import statement.
-    pub(crate) stmt: &'a Stmt,
-    /// The "qualified names" of the imported modules or members.
-    pub(crate) qualified_names: Vec<&'a str>,
+    pub(crate) statement: &'a Stmt,
+    /// The "names" of the imported members.
+    pub(crate) names: Vec<&'a str>,
 }
 
 /// The result of an [`Importer::get_or_import_symbol`] call.
