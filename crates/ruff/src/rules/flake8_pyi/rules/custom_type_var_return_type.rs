@@ -2,9 +2,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::map_subscript;
-use ruff_python_ast::{
-    Decorator, Expr, ParameterWithDefault, Parameters, Ranged, TypeParam, TypeParams,
-};
+use ruff_python_ast::{Decorator, Expr, Parameters, Ranged, TypeParam, TypeParams};
 use ruff_python_semantic::analyze::visibility::{
     is_abstract, is_classmethod, is_new, is_overload, is_staticmethod,
 };
@@ -77,11 +75,19 @@ pub(crate) fn custom_type_var_return_type(
     args: &Parameters,
     type_params: Option<&TypeParams>,
 ) {
-    if args.args.is_empty() && args.posonlyargs.is_empty() {
+    // Given, e.g., `def foo(self: _S, arg: bytes) -> _T`, extract `_T`.
+    let Some(return_annotation) = returns else {
         return;
-    }
+    };
 
-    let Some(returns) = returns else {
+    // Given, e.g., `def foo(self: _S, arg: bytes)`, extract `_S`.
+    let Some(self_or_cls_annotation) = args
+        .posonlyargs
+        .iter()
+        .chain(args.args.iter())
+        .next()
+        .and_then(|parameter_with_default| parameter_with_default.parameter.annotation.as_ref())
+    else {
         return;
     };
 
@@ -97,14 +103,12 @@ pub(crate) fn custom_type_var_return_type(
         return;
     }
 
-    let returns = map_subscript(returns);
-
     let uses_custom_var: bool =
         if is_classmethod(decorator_list, checker.semantic()) || is_new(name) {
-            class_method(args, returns, type_params)
+            class_method(self_or_cls_annotation, return_annotation, type_params)
         } else {
             // If not static, or a class method or __new__ we know it is an instance method
-            instance_method(args, returns, type_params)
+            instance_method(self_or_cls_annotation, return_annotation, type_params)
         };
 
     if uses_custom_var {
@@ -112,7 +116,7 @@ pub(crate) fn custom_type_var_return_type(
             CustomTypeVarReturnType {
                 method_name: name.to_string(),
             },
-            returns.range(),
+            return_annotation.range(),
         ));
     }
 }
@@ -120,17 +124,11 @@ pub(crate) fn custom_type_var_return_type(
 /// Returns `true` if the class method is annotated with a custom `TypeVar` that is likely
 /// private.
 fn class_method(
-    args: &Parameters,
+    cls_annotation: &Expr,
     return_annotation: &Expr,
     type_params: Option<&TypeParams>,
 ) -> bool {
-    let ParameterWithDefault { parameter, .. } = &args.args[0];
-
-    let Some(annotation) = &parameter.annotation else {
-        return false;
-    };
-
-    let Expr::Subscript(ast::ExprSubscript { slice, value, .. }) = annotation.as_ref() else {
+    let Expr::Subscript(ast::ExprSubscript { slice, value, .. }) = cls_annotation else {
         return false;
     };
 
@@ -148,7 +146,7 @@ fn class_method(
         return false;
     };
 
-    let Expr::Name(return_annotation) = return_annotation else {
+    let Expr::Name(return_annotation) = map_subscript(return_annotation) else {
         return false;
     };
 
@@ -162,26 +160,20 @@ fn class_method(
 /// Returns `true` if the instance method is annotated with a custom `TypeVar` that is likely
 /// private.
 fn instance_method(
-    args: &Parameters,
+    self_annotation: &Expr,
     return_annotation: &Expr,
     type_params: Option<&TypeParams>,
 ) -> bool {
-    let ParameterWithDefault { parameter, .. } = &args.args[0];
-
-    let Some(annotation) = &parameter.annotation else {
-        return false;
-    };
-
     let Expr::Name(ast::ExprName {
         id: first_arg_type, ..
-    }) = annotation.as_ref()
+    }) = self_annotation
     else {
         return false;
     };
 
     let Expr::Name(ast::ExprName {
         id: return_type, ..
-    }) = return_annotation
+    }) = map_subscript(return_annotation)
     else {
         return false;
     };

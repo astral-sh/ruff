@@ -21,17 +21,24 @@ PYI019.pyi:14:54: PYI019 Methods like `bad_class_method` should return `typing.S
    |                                                      ^^ PYI019
    |
 
-PYI019.pyi:35:63: PYI019 Methods like `__new__` should return `typing.Self` instead of a custom `TypeVar`
+PYI019.pyi:18:55: PYI019 Methods like `bad_posonly_class_method` should return `typing.Self` instead of a custom `TypeVar`
    |
-33 | # Python > 3.12
-34 | class PEP695BadDunderNew[T]:
-35 |   def __new__[S](cls: type[S], *args: Any, ** kwargs: Any) -> S: ...  # PYI019
+17 |     @classmethod
+18 |     def bad_posonly_class_method(cls: type[_S], /) -> _S: ...  # PYI019
+   |                                                       ^^ PYI019
+   |
+
+PYI019.pyi:39:63: PYI019 Methods like `__new__` should return `typing.Self` instead of a custom `TypeVar`
+   |
+37 | # Python > 3.12
+38 | class PEP695BadDunderNew[T]:
+39 |   def __new__[S](cls: type[S], *args: Any, ** kwargs: Any) -> S: ...  # PYI019
    |                                                               ^ PYI019
    |
 
-PYI019.pyi:38:46: PYI019 Methods like `generic_instance_method` should return `typing.Self` instead of a custom `TypeVar`
+PYI019.pyi:42:46: PYI019 Methods like `generic_instance_method` should return `typing.Self` instead of a custom `TypeVar`
    |
-38 |   def generic_instance_method[S](self: S) -> S: ...  # PYI019
+42 |   def generic_instance_method[S](self: S) -> S: ...  # PYI019
    |                                              ^ PYI019
    |
 
