@@ -256,3 +256,20 @@ def mutable_annotations(
     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
 ):
     pass
+
+from typing_extensions import Annotated as Annotated_te
+
+def immutable_annotations(
+    a: Sequence[int] | None = [],
+    b: Optional[abc.Mapping[int, int]] = {},
+    c: Annotated_te[Union[abc.Set[str], abc.Sized], "annotation"] = set(),
+):
+    pass
+
+
+def mutable_annotations(
+    a: list[int] | None = [],
+    b: Optional[Dict[int, int]] = {},
+    c: Annotated_te[Union[Set[str], abc.Sized], "annotation"] = set(),
+):
+    pass
