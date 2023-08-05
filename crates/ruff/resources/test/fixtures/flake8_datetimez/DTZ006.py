@@ -16,3 +16,6 @@ from datetime import datetime
 
 # no args unqualified
 datetime.fromtimestamp(1234)
+
+# uses `astimezone` method
+datetime.fromtimestamp(1234).astimezone()

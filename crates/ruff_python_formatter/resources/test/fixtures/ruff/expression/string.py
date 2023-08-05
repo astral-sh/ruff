@@ -24,6 +24,12 @@ U"Test"
 r"Test"
 R"Test"
 
+# Block conversion if there is an unescaped quote just before the end of the triple
+# quoted string
+r'''\""'''
+r'''""'''
+r'\""'
+
 'This string will not include \
 backslashes or newline characters.'
 
@@ -92,7 +98,7 @@ if "Let's" "start" "with" "a" "simple" "example" "now repeat after me:" "I am co
 
 (
     # leading
-    "a" # trailing part commen
+    "a" # trailing part comment
 
     # leading part comment
 

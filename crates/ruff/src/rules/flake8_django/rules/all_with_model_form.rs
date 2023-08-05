@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Constant, Expr, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -49,27 +49,30 @@ impl Violation for DjangoAllWithModelForm {
 /// DJ007
 pub(crate) fn all_with_model_form(
     checker: &Checker,
-    bases: &[Expr],
+    arguments: Option<&Arguments>,
     body: &[Stmt],
 ) -> Option<Diagnostic> {
-    if !bases
-        .iter()
-        .any(|base| is_model_form(base, checker.semantic()))
-    {
+    if !arguments.is_some_and(|arguments| {
+        arguments
+            .args
+            .iter()
+            .any(|base| is_model_form(base, checker.semantic()))
+    }) {
         return None;
     }
-    for element in body.iter() {
+
+    for element in body {
         let Stmt::ClassDef(ast::StmtClassDef { name, body, .. }) = element else {
             continue;
         };
         if name != "Meta" {
             continue;
         }
-        for element in body.iter() {
+        for element in body {
             let Stmt::Assign(ast::StmtAssign { targets, value, .. }) = element else {
                 continue;
             };
-            for target in targets.iter() {
+            for target in targets {
                 let Expr::Name(ast::ExprName { id, .. }) = target else {
                     continue;
                 };

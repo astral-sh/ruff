@@ -41,6 +41,11 @@ impl<I: Idx, T> IndexSlice<I, T> {
     }
 
     #[inline]
+    pub const fn first(&self) -> Option<&T> {
+        self.raw.first()
+    }
+
+    #[inline]
     pub const fn len(&self) -> usize {
         self.raw.len()
     }
@@ -61,6 +66,13 @@ impl<I: Idx, T> IndexSlice<I, T> {
         &self,
     ) -> impl DoubleEndedIterator<Item = I> + ExactSizeIterator + Clone + 'static {
         (0..self.len()).map(|n| I::new(n))
+    }
+
+    #[inline]
+    pub fn iter_enumerated(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = (I, &T)> + ExactSizeIterator + '_ {
+        self.raw.iter().enumerate().map(|(n, t)| (I::new(n), t))
     }
 
     #[inline]

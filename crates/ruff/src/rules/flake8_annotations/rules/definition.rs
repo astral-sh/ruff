@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{ArgWithDefault, Expr, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Constant, Expr, ParameterWithDefault, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -6,12 +6,14 @@ use ruff_python_ast::cast;
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::statement_visitor::StatementVisitor;
+use ruff_python_parser::typing::parse_type_annotation;
 use ruff_python_semantic::analyze::visibility;
-use ruff_python_semantic::{Definition, Member, MemberKind, SemanticModel};
+use ruff_python_semantic::{Definition, Member, MemberKind};
 use ruff_python_stdlib::typing::simple_magic_return_type;
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
+use crate::rules::ruff::typing::type_hint_resolves_to_any;
 
 use super::super::fixes;
 use super::super::helpers::match_function_def;
@@ -374,7 +376,7 @@ impl Violation for MissingReturnTypeClassMethod {
 }
 
 /// ## What it does
-/// Checks that an expression is annotated with a more specific type than
+/// Checks that function arguments are annotated with a more specific type than
 /// `Any`.
 ///
 /// ## Why is this bad?
@@ -397,9 +399,23 @@ impl Violation for MissingReturnTypeClassMethod {
 ///     ...
 /// ```
 ///
+/// ## Known problems
+///
+/// Type aliases are unsupported and can lead to false positives.
+/// For example, the following will trigger this rule inadvertently:
+/// ```python
+/// from typing import Any
+///
+/// MyAny = Any
+///
+///
+/// def foo(x: MyAny):
+///     ...
+/// ```
+///
 /// ## References
 /// - [PEP 484](https://www.python.org/dev/peps/pep-0484/#the-any-type)
-/// - [`typing.Any`](https://docs.python.org/3/library/typing.html#typing.Any)
+/// - [Python documentation: `typing.Any`](https://docs.python.org/3/library/typing.html#typing.Any)
 /// - [Mypy: The Any type](https://mypy.readthedocs.io/en/stable/kinds_of_types.html#the-any-type)
 #[violation]
 pub struct AnyType {
@@ -432,20 +448,48 @@ fn is_none_returning(body: &[Stmt]) -> bool {
 
 /// ANN401
 fn check_dynamically_typed<F>(
+    checker: &Checker,
     annotation: &Expr,
     func: F,
     diagnostics: &mut Vec<Diagnostic>,
-    is_overridden: bool,
-    semantic: &SemanticModel,
 ) where
     F: FnOnce() -> String,
 {
-    if !is_overridden && semantic.match_typing_expr(annotation, "Any") {
-        diagnostics.push(Diagnostic::new(
-            AnyType { name: func() },
-            annotation.range(),
-        ));
-    };
+    if let Expr::Constant(ast::ExprConstant {
+        range,
+        value: Constant::Str(string),
+        ..
+    }) = annotation
+    {
+        // Quoted annotations
+        if let Ok((parsed_annotation, _)) =
+            parse_type_annotation(string, *range, checker.locator().contents())
+        {
+            if type_hint_resolves_to_any(
+                &parsed_annotation,
+                checker.semantic(),
+                checker.locator(),
+                checker.settings.target_version.minor(),
+            ) {
+                diagnostics.push(Diagnostic::new(
+                    AnyType { name: func() },
+                    annotation.range(),
+                ));
+            }
+        }
+    } else {
+        if type_hint_resolves_to_any(
+            annotation,
+            checker.semantic(),
+            checker.locator(),
+            checker.settings.target_version.minor(),
+        ) {
+            diagnostics.push(Diagnostic::new(
+                AnyType { name: func() },
+                annotation.range(),
+            ));
+        }
+    }
 }
 
 /// Generate flake8-annotation checks for a given `Definition`.
@@ -457,11 +501,7 @@ pub(crate) fn definition(
     // TODO(charlie): Consider using the AST directly here rather than `Definition`.
     // We could adhere more closely to `flake8-annotations` by defining public
     // vs. secret vs. protected.
-    let Definition::Member(Member {
-        kind,
-        stmt,
-        ..
-    }) = definition else {
+    let Definition::Member(Member { kind, stmt, .. }) = definition else {
         return vec![];
     };
 
@@ -484,8 +524,8 @@ pub(crate) fn definition(
     let is_overridden = visibility::is_override(decorator_list, checker.semantic());
 
     // ANN001, ANN401
-    for ArgWithDefault {
-        def,
+    for ParameterWithDefault {
+        parameter,
         default: _,
         range: _,
     } in arguments
@@ -502,27 +542,29 @@ pub(crate) fn definition(
         )
     {
         // ANN401 for dynamically typed arguments
-        if let Some(annotation) = &def.annotation {
+        if let Some(annotation) = &parameter.annotation {
             has_any_typed_arg = true;
-            if checker.enabled(Rule::AnyType) {
+            if checker.enabled(Rule::AnyType) && !is_overridden {
                 check_dynamically_typed(
+                    checker,
                     annotation,
-                    || def.arg.to_string(),
+                    || parameter.name.to_string(),
                     &mut diagnostics,
-                    is_overridden,
-                    checker.semantic(),
                 );
             }
         } else {
             if !(checker.settings.flake8_annotations.suppress_dummy_args
-                && checker.settings.dummy_variable_rgx.is_match(&def.arg))
+                && checker
+                    .settings
+                    .dummy_variable_rgx
+                    .is_match(&parameter.name))
             {
                 if checker.enabled(Rule::MissingTypeFunctionArgument) {
                     diagnostics.push(Diagnostic::new(
                         MissingTypeFunctionArgument {
-                            name: def.arg.to_string(),
+                            name: parameter.name.to_string(),
                         },
-                        def.range(),
+                        parameter.range(),
                     ));
                 }
             }
@@ -534,25 +576,19 @@ pub(crate) fn definition(
         if let Some(expr) = &arg.annotation {
             has_any_typed_arg = true;
             if !checker.settings.flake8_annotations.allow_star_arg_any {
-                if checker.enabled(Rule::AnyType) {
-                    let name = &arg.arg;
-                    check_dynamically_typed(
-                        expr,
-                        || format!("*{name}"),
-                        &mut diagnostics,
-                        is_overridden,
-                        checker.semantic(),
-                    );
+                if checker.enabled(Rule::AnyType) && !is_overridden {
+                    let name = &arg.name;
+                    check_dynamically_typed(checker, expr, || format!("*{name}"), &mut diagnostics);
                 }
             }
         } else {
             if !(checker.settings.flake8_annotations.suppress_dummy_args
-                && checker.settings.dummy_variable_rgx.is_match(&arg.arg))
+                && checker.settings.dummy_variable_rgx.is_match(&arg.name))
             {
                 if checker.enabled(Rule::MissingTypeArgs) {
                     diagnostics.push(Diagnostic::new(
                         MissingTypeArgs {
-                            name: arg.arg.to_string(),
+                            name: arg.name.to_string(),
                         },
                         arg.range(),
                     ));
@@ -566,25 +602,24 @@ pub(crate) fn definition(
         if let Some(expr) = &arg.annotation {
             has_any_typed_arg = true;
             if !checker.settings.flake8_annotations.allow_star_arg_any {
-                if checker.enabled(Rule::AnyType) {
-                    let name = &arg.arg;
+                if checker.enabled(Rule::AnyType) && !is_overridden {
+                    let name = &arg.name;
                     check_dynamically_typed(
+                        checker,
                         expr,
                         || format!("**{name}"),
                         &mut diagnostics,
-                        is_overridden,
-                        checker.semantic(),
                     );
                 }
             }
         } else {
             if !(checker.settings.flake8_annotations.suppress_dummy_args
-                && checker.settings.dummy_variable_rgx.is_match(&arg.arg))
+                && checker.settings.dummy_variable_rgx.is_match(&arg.name))
             {
                 if checker.enabled(Rule::MissingTypeKwargs) {
                     diagnostics.push(Diagnostic::new(
                         MissingTypeKwargs {
-                            name: arg.arg.to_string(),
+                            name: arg.name.to_string(),
                         },
                         arg.range(),
                     ));
@@ -595,8 +630,8 @@ pub(crate) fn definition(
 
     // ANN101, ANN102
     if is_method && !visibility::is_staticmethod(cast::decorator_list(stmt), checker.semantic()) {
-        if let Some(ArgWithDefault {
-            def,
+        if let Some(ParameterWithDefault {
+            parameter,
             default: _,
             range: _,
         }) = arguments
@@ -604,23 +639,23 @@ pub(crate) fn definition(
             .first()
             .or_else(|| arguments.args.first())
         {
-            if def.annotation.is_none() {
+            if parameter.annotation.is_none() {
                 if visibility::is_classmethod(cast::decorator_list(stmt), checker.semantic()) {
                     if checker.enabled(Rule::MissingTypeCls) {
                         diagnostics.push(Diagnostic::new(
                             MissingTypeCls {
-                                name: def.arg.to_string(),
+                                name: parameter.name.to_string(),
                             },
-                            def.range(),
+                            parameter.range(),
                         ));
                     }
                 } else {
                     if checker.enabled(Rule::MissingTypeSelf) {
                         diagnostics.push(Diagnostic::new(
                             MissingTypeSelf {
-                                name: def.arg.to_string(),
+                                name: parameter.name.to_string(),
                             },
-                            def.range(),
+                            parameter.range(),
                         ));
                     }
                 }
@@ -633,14 +668,8 @@ pub(crate) fn definition(
     // ANN201, ANN202, ANN401
     if let Some(expr) = &returns {
         has_typed_return = true;
-        if checker.enabled(Rule::AnyType) {
-            check_dynamically_typed(
-                expr,
-                || name.to_string(),
-                &mut diagnostics,
-                is_overridden,
-                checker.semantic(),
-            );
+        if checker.enabled(Rule::AnyType) && !is_overridden {
+            check_dynamically_typed(checker, expr, || name.to_string(), &mut diagnostics);
         }
     } else if !(
         // Allow omission of return annotation if the function only returns `None`
@@ -680,8 +709,13 @@ pub(crate) fn definition(
                     );
                     if checker.patch(diagnostic.kind.rule()) {
                         diagnostic.try_set_fix(|| {
-                            fixes::add_return_annotation(checker.locator, stmt, "None")
-                                .map(Fix::suggested)
+                            fixes::add_return_annotation(
+                                checker.locator(),
+                                stmt,
+                                "None",
+                                checker.source_type,
+                            )
+                            .map(Fix::suggested)
                         });
                     }
                     diagnostics.push(diagnostic);
@@ -698,8 +732,13 @@ pub(crate) fn definition(
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(return_type) = simple_magic_return_type(name) {
                         diagnostic.try_set_fix(|| {
-                            fixes::add_return_annotation(checker.locator, stmt, return_type)
-                                .map(Fix::suggested)
+                            fixes::add_return_annotation(
+                                checker.locator(),
+                                stmt,
+                                return_type,
+                                checker.source_type,
+                            )
+                            .map(Fix::suggested)
                         });
                     }
                 }

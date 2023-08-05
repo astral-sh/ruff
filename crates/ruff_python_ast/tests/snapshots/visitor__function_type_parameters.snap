@@ -1,0 +1,14 @@
+---
+source: crates/ruff_python_ast/tests/visitor.rs
+expression: trace
+---
+- StmtFunctionDef
+  - TypeParamTypeVar
+    - ExprName
+  - TypeParamTypeVar
+  - TypeParamTypeVarTuple
+  - TypeParamParamSpec
+  - Parameters
+  - StmtExpr
+    - ExprConstant
+

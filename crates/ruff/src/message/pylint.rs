@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use ruff_python_ast::source_code::OneIndexed;
+use ruff_source_file::OneIndexed;
 
 use crate::fs::relativize_path;
 use crate::message::{Emitter, EmitterContext, Message};
@@ -49,7 +49,7 @@ mod tests {
 
     #[test]
     fn output() {
-        let mut emitter = PylintEmitter::default();
+        let mut emitter = PylintEmitter;
         let content = capture_emitter_output(&mut emitter, &create_messages());
 
         assert_snapshot!(content);

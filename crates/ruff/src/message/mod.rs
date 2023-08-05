@@ -16,7 +16,7 @@ pub use json_lines::JsonLinesEmitter;
 pub use junit::JunitEmitter;
 pub use pylint::PylintEmitter;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
-use ruff_python_ast::source_code::{SourceFile, SourceLocation};
+use ruff_source_file::{SourceFile, SourceLocation};
 pub use text::TextEmitter;
 
 mod azure;
@@ -141,7 +141,7 @@ impl<'a> EmitterContext<'a> {
     pub fn is_jupyter_notebook(&self, name: &str) -> bool {
         self.source_kind
             .get(name)
-            .map_or(false, SourceKind::is_jupyter)
+            .is_some_and(SourceKind::is_jupyter)
     }
 
     pub fn source_kind(&self, name: &str) -> Option<&SourceKind> {
@@ -155,7 +155,7 @@ mod tests {
     use rustc_hash::FxHashMap;
 
     use ruff_diagnostics::{Diagnostic, DiagnosticKind, Edit, Fix};
-    use ruff_python_ast::source_code::SourceFileBuilder;
+    use ruff_source_file::SourceFileBuilder;
 
     use crate::message::{Emitter, EmitterContext, Message};
 

@@ -3,14 +3,14 @@ use std::iter;
 
 use itertools::Either::{Left, Right};
 use itertools::Itertools;
+use ruff_python_ast::{self as ast, Arguments, BoolOp, CmpOp, Expr, ExprContext, Ranged, UnaryOp};
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{self, BoolOp, CmpOp, Expr, ExprContext, Ranged, UnaryOp};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::helpers::{contains_effect, has_comments, Truthiness};
+use ruff_python_ast::helpers::{contains_effect, Truthiness};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -299,7 +299,12 @@ fn is_same_expr<'a>(a: &'a Expr, b: &'a Expr) -> Option<&'a str> {
 
 /// SIM101
 pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
-    let Expr::BoolOp(ast::ExprBoolOp { op: BoolOp::Or, values, range: _ } )= expr else {
+    let Expr::BoolOp(ast::ExprBoolOp {
+        op: BoolOp::Or,
+        values,
+        range: _,
+    }) = expr
+    else {
         return;
     };
 
@@ -308,7 +313,17 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
     let mut duplicates: FxHashMap<ComparableExpr, Vec<usize>> = FxHashMap::default();
     for (index, call) in values.iter().enumerate() {
         // Verify that this is an `isinstance` call.
-        let Expr::Call(ast::ExprCall { func, args, keywords, range: _ }) = &call else {
+        let Expr::Call(ast::ExprCall {
+            func,
+            arguments:
+                Arguments {
+                    args,
+                    keywords,
+                    range: _,
+                },
+            range: _,
+        }) = &call
+        else {
             continue;
         };
         if args.len() != 2 {
@@ -340,7 +355,11 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
         if indices.len() > 1 {
             // Grab the target used in each duplicate `isinstance` call (e.g., `obj` in
             // `isinstance(obj, int)`).
-            let target = if let Expr::Call(ast::ExprCall { args, .. }) = &values[indices[0]] {
+            let target = if let Expr::Call(ast::ExprCall {
+                arguments: Arguments { args, .. },
+                ..
+            }) = &values[indices[0]]
+            {
                 args.get(0).expect("`isinstance` should have two arguments")
             } else {
                 unreachable!("Indices should only contain `isinstance` calls")
@@ -363,7 +382,11 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                         .iter()
                         .map(|index| &values[*index])
                         .map(|expr| {
-                            let Expr::Call(ast::ExprCall { args, .. }) = expr else {
+                            let Expr::Call(ast::ExprCall {
+                                arguments: Arguments { args, .. },
+                                ..
+                            }) = expr
+                            else {
                                 unreachable!("Indices should only contain `isinstance` calls")
                             };
                             args.get(1).expect("`isinstance` should have two arguments")
@@ -394,8 +417,11 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                     };
                     let node2 = ast::ExprCall {
                         func: Box::new(node1.into()),
-                        args: vec![target.clone(), node.into()],
-                        keywords: vec![],
+                        arguments: Arguments {
+                            args: vec![target.clone(), node.into()],
+                            keywords: vec![],
+                            range: TextRange::default(),
+                        },
                         range: TextRange::default(),
                     };
                     let call = node2.into();
@@ -430,7 +456,13 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
 }
 
 fn match_eq_target(expr: &Expr) -> Option<(&str, &Expr)> {
-    let Expr::Compare(ast::ExprCompare { left, ops, comparators, range: _ } )= expr else {
+    let Expr::Compare(ast::ExprCompare {
+        left,
+        ops,
+        comparators,
+        range: _,
+    }) = expr
+    else {
         return None;
     };
     if ops.len() != 1 || comparators.len() != 1 {
@@ -451,7 +483,12 @@ fn match_eq_target(expr: &Expr) -> Option<(&str, &Expr)> {
 
 /// SIM109
 pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
-    let Expr::BoolOp(ast::ExprBoolOp { op: BoolOp::Or, values, range: _ }) = expr else {
+    let Expr::BoolOp(ast::ExprBoolOp {
+        op: BoolOp::Or,
+        values,
+        range: _,
+    }) = expr
+    else {
         return;
     };
 
@@ -483,7 +520,7 @@ pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
         }
 
         // Avoid removing comments.
-        if has_comments(expr, checker.locator) {
+        if checker.indexer().has_comments(expr, checker.locator()) {
             continue;
         }
 
@@ -540,7 +577,12 @@ pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
 
 /// SIM220
 pub(crate) fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
-    let Expr::BoolOp(ast::ExprBoolOp { op: BoolOp::And, values, range: _, }) = expr else {
+    let Expr::BoolOp(ast::ExprBoolOp {
+        op: BoolOp::And,
+        values,
+        range: _,
+    }) = expr
+    else {
         return;
     };
     if values.len() < 2 {
@@ -594,7 +636,12 @@ pub(crate) fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
 
 /// SIM221
 pub(crate) fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
-    let Expr::BoolOp(ast::ExprBoolOp { op: BoolOp::Or, values, range: _, }) = expr else {
+    let Expr::BoolOp(ast::ExprBoolOp {
+        op: BoolOp::Or,
+        values,
+        range: _,
+    }) = expr
+    else {
         return;
     };
     if values.len() < 2 {
@@ -672,7 +719,12 @@ fn is_short_circuit(
     expected_op: BoolOp,
     checker: &Checker,
 ) -> Option<(Edit, ContentAround)> {
-    let Expr::BoolOp(ast::ExprBoolOp { op, values, range: _, }) = expr else {
+    let Expr::BoolOp(ast::ExprBoolOp {
+        op,
+        values,
+        range: _,
+    }) = expr
+    else {
         return None;
     };
     if *op != expected_op {

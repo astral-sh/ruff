@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use rustpython_parser::ast::{self, Constant, Expr, Ranged};
+use ruff_python_ast::{self as ast, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -55,14 +55,12 @@ pub(crate) fn strip_with_multi_characters(
     if !matches!(attr.as_str(), "strip" | "lstrip" | "rstrip") {
         return;
     }
-    if args.len() != 1 {
-        return;
-    }
 
-    let Expr::Constant(ast::ExprConstant {
+    let [Expr::Constant(ast::ExprConstant {
         value: Constant::Str(value),
         ..
-    } )= &args[0] else {
+    })] = args
+    else {
         return;
     };
 

@@ -57,12 +57,7 @@ impl From<Options> for Settings {
                 .function_names
                 .unwrap_or_else(default_func_names)
                 .into_iter()
-                .chain(
-                    options
-                        .extend_function_names
-                        .unwrap_or_default()
-                        .into_iter(),
-                )
+                .chain(options.extend_function_names.unwrap_or_default())
                 .collect(),
         }
     }

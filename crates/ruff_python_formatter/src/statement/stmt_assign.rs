@@ -1,15 +1,12 @@
-use crate::context::PyFormatContext;
-use crate::expression::parentheses::Parenthesize;
-use crate::{AsFormat, FormatNodeRule, PyFormatter};
-use ruff_formatter::formatter::Formatter;
-use ruff_formatter::prelude::{space, text};
-use ruff_formatter::{write, Buffer, Format, FormatResult};
-use rustpython_parser::ast::Expr;
-use rustpython_parser::ast::StmtAssign;
+use ruff_python_ast::{Expr, StmtAssign};
 
-// Note: This currently does wrap but not the black way so the types below likely need to be
-// replaced entirely
-//
+use ruff_formatter::{format_args, write, FormatError};
+
+use crate::context::{NodeLevel, WithNodeLevel};
+use crate::expression::parentheses::{Parentheses, Parenthesize};
+use crate::expression::{has_own_parentheses, maybe_parenthesize_expression};
+use crate::prelude::*;
+use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatStmtAssign;
@@ -20,34 +17,78 @@ impl FormatNodeRule<StmtAssign> for FormatStmtAssign {
             range: _,
             targets,
             value,
-            type_comment: _,
         } = item;
+
+        let (first, rest) = targets.split_first().ok_or(FormatError::syntax_error(
+            "Expected at least on assignment target",
+        ))?;
+
         write!(
             f,
             [
-                LhsAssignList::new(targets),
-                value.format().with_options(Parenthesize::IfBreaks)
+                first.format(),
+                space(),
+                text("="),
+                space(),
+                FormatTargets { targets: rest }
             ]
+        )?;
+
+        write!(
+            f,
+            [maybe_parenthesize_expression(
+                value,
+                item,
+                Parenthesize::IfBreaks
+            )]
         )
     }
 }
 
-#[derive(Debug)]
-struct LhsAssignList<'a> {
-    lhs_assign_list: &'a [Expr],
+struct FormatTargets<'a> {
+    targets: &'a [Expr],
 }
 
-impl<'a> LhsAssignList<'a> {
-    const fn new(lhs_assign_list: &'a [Expr]) -> Self {
-        Self { lhs_assign_list }
-    }
-}
+impl Format<PyFormatContext<'_>> for FormatTargets<'_> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
+        if let Some((first, rest)) = self.targets.split_first() {
+            let can_omit_parentheses = has_own_parentheses(first);
 
-impl Format<PyFormatContext<'_>> for LhsAssignList<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
-        for element in self.lhs_assign_list {
-            write!(f, [&element.format(), space(), text("="), space(),])?;
+            let group_id = if can_omit_parentheses {
+                Some(f.group_id("assignment_parentheses"))
+            } else {
+                None
+            };
+
+            let format_first = format_with(|f: &mut PyFormatter| {
+                let mut f = WithNodeLevel::new(NodeLevel::Expression(group_id), f);
+                if can_omit_parentheses {
+                    write!(f, [first.format().with_options(Parentheses::Never)])
+                } else {
+                    write!(
+                        f,
+                        [
+                            if_group_breaks(&text("(")),
+                            soft_block_indent(&first.format().with_options(Parentheses::Never)),
+                            if_group_breaks(&text(")"))
+                        ]
+                    )
+                }
+            });
+
+            write!(
+                f,
+                [group(&format_args![
+                    format_first,
+                    space(),
+                    text("="),
+                    space(),
+                    FormatTargets { targets: rest }
+                ])
+                .with_group_id(group_id)]
+            )
+        } else {
+            Ok(())
         }
-        Ok(())
     }
 }

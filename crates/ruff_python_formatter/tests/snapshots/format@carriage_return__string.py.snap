@@ -1,0 +1,26 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/carriage_return/string.py
+---
+## Input
+```py
+'This string will not include \
+backslashes or newline characters.'
+
+"""Multiline
+String \"
+"""
+```
+
+## Output
+```py
+"This string will not include \
+backslashes or newline characters."
+
+"""Multiline
+String \"
+"""
+```
+
+
+

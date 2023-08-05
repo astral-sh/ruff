@@ -1,10 +1,12 @@
+use ruff_python_ast::Expr;
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
+
+use super::helpers;
 
 #[violation]
 pub struct CallDatetimeUtcnow;
@@ -28,15 +30,19 @@ impl Violation for CallDatetimeUtcnow {
 /// UTC. As such, the recommended way to create an object representing the
 /// current time in UTC is by calling `datetime.now(timezone.utc)`.
 pub(crate) fn call_datetime_utcnow(checker: &mut Checker, func: &Expr, location: TextRange) {
-    if checker
+    if !checker
         .semantic()
         .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["datetime", "datetime", "utcnow"])
-        })
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["datetime", "datetime", "utcnow"]))
     {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(CallDatetimeUtcnow, location));
+        return;
     }
+
+    if helpers::parent_expr_is_astimezone(checker) {
+        return;
+    }
+
+    checker
+        .diagnostics
+        .push(Diagnostic::new(CallDatetimeUtcnow, location));
 }

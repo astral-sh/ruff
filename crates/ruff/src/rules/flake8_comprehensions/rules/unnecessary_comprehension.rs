@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Comprehension, Expr, Ranged};
+use ruff_python_ast::{self as ast, Comprehension, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
@@ -68,7 +68,7 @@ fn add_diagnostic(checker: &mut Checker, expr: &Expr) {
     if checker.patch(diagnostic.kind.rule()) {
         #[allow(deprecated)]
         diagnostic.try_set_fix_from_edit(|| {
-            fixes::fix_unnecessary_comprehension(checker.locator, checker.stylist, expr)
+            fixes::fix_unnecessary_comprehension(checker.locator(), checker.stylist(), expr)
         });
     }
     checker.diagnostics.push(diagnostic);
@@ -82,10 +82,9 @@ pub(crate) fn unnecessary_dict_comprehension(
     value: &Expr,
     generators: &[Comprehension],
 ) {
-    if generators.len() != 1 {
+    let [generator] = generators else {
         return;
-    }
-    let generator = &generators[0];
+    };
     if !generator.ifs.is_empty() || generator.is_async {
         return;
     }
@@ -123,10 +122,9 @@ pub(crate) fn unnecessary_list_set_comprehension(
     elt: &Expr,
     generators: &[Comprehension],
 ) {
-    if generators.len() != 1 {
+    let [generator] = generators else {
         return;
-    }
-    let generator = &generators[0];
+    };
     if !generator.ifs.is_empty() || generator.is_async {
         return;
     }

@@ -1,14 +1,14 @@
 #![allow(clippy::print_stdout)]
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
 use clap::{command, Parser, ValueEnum};
-use rustpython_parser::lexer::lex;
-use rustpython_parser::{parse_tokens, Mode};
 
 use ruff_formatter::SourceCode;
-use ruff_python_ast::source_code::CommentRangesBuilder;
+use ruff_python_index::CommentRangesBuilder;
+use ruff_python_parser::lexer::lex;
+use ruff_python_parser::{parse_tokens, Mode};
 
 use crate::{format_node, PyFormatOptions};
 
@@ -37,7 +37,7 @@ pub struct Cli {
     pub print_comments: bool,
 }
 
-pub fn format_and_debug_print(input: &str, cli: &Cli) -> Result<String> {
+pub fn format_and_debug_print(input: &str, cli: &Cli, source_type: &Path) -> Result<String> {
     let mut tokens = Vec::new();
     let mut comment_ranges = CommentRangesBuilder::default();
 
@@ -54,15 +54,12 @@ pub fn format_and_debug_print(input: &str, cli: &Cli) -> Result<String> {
     let comment_ranges = comment_ranges.finish();
 
     // Parse the AST.
-    let python_ast = parse_tokens(tokens, Mode::Module, "<filename>")
-        .with_context(|| "Syntax error in input")?;
+    let python_ast =
+        parse_tokens(tokens, Mode::Module, "<filename>").context("Syntax error in input")?;
 
-    let formatted = format_node(
-        &python_ast,
-        &comment_ranges,
-        input,
-        PyFormatOptions::default(),
-    )?;
+    let options = PyFormatOptions::from_extension(source_type);
+    let formatted = format_node(&python_ast, &comment_ranges, input, options)
+        .context("Failed to format node")?;
     if cli.print_ir {
         println!("{}", formatted.document().display(SourceCode::new(input)));
     }
@@ -74,7 +71,7 @@ pub fn format_and_debug_print(input: &str, cli: &Cli) -> Result<String> {
     }
     Ok(formatted
         .print()
-        .with_context(|| "Failed to print the formatter IR")?
+        .context("Failed to print the formatter IR")?
         .as_code()
         .to_string())
 }

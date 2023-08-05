@@ -1,0 +1,11 @@
+---
+source: crates/ruff_python_ast/tests/visitor.rs
+expression: trace
+---
+- StmtExpr
+  - ExprSetComp
+    - Comprehension
+      - ExprName
+      - ExprName
+    - ExprName
+

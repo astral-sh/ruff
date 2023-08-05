@@ -8,3 +8,11 @@ a2 = (
 
 # Break the last element
 a = asdf = fjhalsdljfalflaflapamsakjsdhflakjdslfjhalsdljfalflaflapamsakjsdhflakjdslfjhalsdljfal = 1
+
+aa = [
+    bakjdshflkjahdslkfjlasfdahjlfds
+] = dddd = ddd = fkjaödkjaföjfahlfdalfhaöfaöfhaöfha = g = [3]
+
+aaaa = ( # trailing
+    # comment
+    bbbbb) = cccccccccccccccc = 3

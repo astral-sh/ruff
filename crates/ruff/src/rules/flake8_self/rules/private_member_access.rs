@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, Ranged};
+use ruff_python_ast::{self as ast, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -156,12 +156,12 @@ pub(crate) fn private_member_access(checker: &mut Checker, expr: &Expr) {
                         ScopeKind::Class(ast::StmtClassDef { name, .. }) => Some(name),
                         _ => None,
                     })
-                    .map_or(false, |name| {
+                    .is_some_and(|name| {
                         if call_path.as_slice() == [name.as_str()] {
                             checker
                                 .semantic()
                                 .find_binding(name)
-                                .map_or(false, |binding| {
+                                .is_some_and(|binding| {
                                     // TODO(charlie): Could the name ever be bound to a
                                     // _different_ class here?
                                     binding.kind.is_class_definition()

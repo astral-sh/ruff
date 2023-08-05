@@ -5,7 +5,6 @@
 //!
 //! [Ruff]: https://github.com/astral-sh/ruff
 
-pub use ruff_python_ast::source_code::round_trip;
 pub use rule_selector::RuleSelector;
 pub use rules::pycodestyle::rules::IOError;
 
@@ -14,6 +13,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 mod autofix;
 mod checkers;
 mod codes;
+mod comments;
 mod cst;
 pub mod directives;
 mod doc_lines;
@@ -38,6 +38,7 @@ mod rule_selector;
 pub mod rules;
 pub mod settings;
 pub mod source_kind;
+pub mod upstream_categories;
 
 #[cfg(any(test, fuzzing))]
 pub mod test;

@@ -23,7 +23,7 @@ elif a:
 else:
     b = 2
 
-# OK (false negative)
+# SIM108
 if True:
     pass
 else:

@@ -1,12 +1,12 @@
 use itertools::Itertools;
+use ruff_python_parser::lexer::{LexResult, Spanned};
+use ruff_python_parser::Tok;
 use ruff_text_size::TextRange;
-use rustpython_parser::lexer::{LexResult, Spanned};
-use rustpython_parser::Tok;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::Locator;
+use ruff_source_file::Locator;
 
 use crate::registry::Rule;
 use crate::settings::Settings;
@@ -222,12 +222,11 @@ impl AlwaysAutofixableViolation for ProhibitedTrailingComma {
 
 /// COM812, COM818, COM819
 pub(crate) fn trailing_commas(
+    diagnostics: &mut Vec<Diagnostic>,
     tokens: &[LexResult],
     locator: &Locator,
     settings: &Settings,
-) -> Vec<Diagnostic> {
-    let mut diagnostics = vec![];
-
+) {
     let tokens = tokens
         .iter()
         .flatten()
@@ -387,6 +386,4 @@ pub(crate) fn trailing_commas(
             stack.pop();
         }
     }
-
-    diagnostics
 }

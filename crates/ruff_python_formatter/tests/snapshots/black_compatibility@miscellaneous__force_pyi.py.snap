@@ -1,0 +1,218 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/miscellaneous/force_pyi.py
+---
+## Input
+
+```py
+from typing import Union
+
+@bird
+def zoo(): ...
+
+class A: ...
+@bar
+class B:
+    def BMethod(self) -> None: ...
+    @overload
+    def BMethod(self, arg : List[str]) -> None: ...
+
+class C: ...
+@hmm
+class D: ...
+class E: ...
+
+@baz
+def foo() -> None:
+    ...
+
+class F (A , C): ...
+def spam() -> None: ...
+
+@overload
+def spam(arg: str) -> str: ...
+
+var  : int = 1
+
+def eggs() -> Union[str, int]: ...
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -1,32 +1,58 @@
+ from typing import Union
+ 
++
+ @bird
+-def zoo(): ...
++def zoo():
++    ...
+ 
+-class A: ...
+ 
++class A:
++    ...
++
++
+ @bar
+ class B:
+-    def BMethod(self) -> None: ...
++    def BMethod(self) -> None:
++        ...
++
+     @overload
+-    def BMethod(self, arg: List[str]) -> None: ...
++    def BMethod(self, arg: List[str]) -> None:
++        ...
++
++
++class C:
++    ...
+ 
+-class C: ...
+ 
+ @hmm
+-class D: ...
++class D:
++    ...
++
++
++class E:
++    ...
+ 
+-class E: ...
+ 
+ @baz
+-def foo() -> None: ...
++def foo() -> None:
++    ...
+ 
+-class F(A, C): ...
+ 
+-def spam() -> None: ...
++class F(A, C):
++    ...
++
++
++def spam() -> None:
++    ...
++
++
+ @overload
+-def spam(arg: str) -> str: ...
++def spam(arg: str) -> str:
++    ...
++
+ 
+ var: int = 1
+ 
+-def eggs() -> Union[str, int]: ...
++
++def eggs() -> Union[str, int]:
++    ...
+```
+
+## Ruff Output
+
+```py
+from typing import Union
+
+
+@bird
+def zoo():
+    ...
+
+
+class A:
+    ...
+
+
+@bar
+class B:
+    def BMethod(self) -> None:
+        ...
+
+    @overload
+    def BMethod(self, arg: List[str]) -> None:
+        ...
+
+
+class C:
+    ...
+
+
+@hmm
+class D:
+    ...
+
+
+class E:
+    ...
+
+
+@baz
+def foo() -> None:
+    ...
+
+
+class F(A, C):
+    ...
+
+
+def spam() -> None:
+    ...
+
+
+@overload
+def spam(arg: str) -> str:
+    ...
+
+
+var: int = 1
+
+
+def eggs() -> Union[str, int]:
+    ...
+```
+
+## Black Output
+
+```py
+from typing import Union
+
+@bird
+def zoo(): ...
+
+class A: ...
+
+@bar
+class B:
+    def BMethod(self) -> None: ...
+    @overload
+    def BMethod(self, arg: List[str]) -> None: ...
+
+class C: ...
+
+@hmm
+class D: ...
+
+class E: ...
+
+@baz
+def foo() -> None: ...
+
+class F(A, C): ...
+
+def spam() -> None: ...
+@overload
+def spam(arg: str) -> str: ...
+
+var: int = 1
+
+def eggs() -> Union[str, int]: ...
+```
+
+

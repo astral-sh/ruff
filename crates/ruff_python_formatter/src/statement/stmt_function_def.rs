@@ -1,12 +1,15 @@
-use crate::comments::{leading_comments, trailing_comments};
-use crate::context::NodeLevel;
-use crate::expression::parentheses::Parenthesize;
-use crate::prelude::*;
-use crate::trivia::{lines_after, skip_trailing_trivia};
-use crate::FormatNodeRule;
+use ruff_python_ast::{Ranged, StmtFunctionDef};
+
 use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule};
 use ruff_python_ast::function::AnyFunctionDefinition;
-use rustpython_parser::ast::{Ranged, StmtFunctionDef};
+use ruff_python_trivia::lines_after_ignoring_trivia;
+
+use crate::comments::{leading_comments, trailing_comments};
+
+use crate::expression::parentheses::{optional_parentheses, Parentheses};
+use crate::prelude::*;
+use crate::statement::suite::SuiteKind;
+use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatStmtFunctionDef;
@@ -30,46 +33,38 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
 pub struct FormatAnyFunctionDef;
 
 impl FormatRule<AnyFunctionDefinition<'_>, PyFormatContext<'_>> for FormatAnyFunctionDef {
-    fn fmt(
-        &self,
-        item: &AnyFunctionDefinition<'_>,
-        f: &mut Formatter<PyFormatContext<'_>>,
-    ) -> FormatResult<()> {
+    fn fmt(&self, item: &AnyFunctionDefinition<'_>, f: &mut PyFormatter) -> FormatResult<()> {
         let comments = f.context().comments().clone();
 
         let dangling_comments = comments.dangling_comments(item);
         let trailing_definition_comments_start =
             dangling_comments.partition_point(|comment| comment.line_position().is_own_line());
 
-        let (leading_function_definition_comments, trailing_definition_comments) =
+        let (leading_definition_comments, trailing_definition_comments) =
             dangling_comments.split_at(trailing_definition_comments_start);
 
         if let Some(last_decorator) = item.decorators().last() {
-            f.join_nodes(NodeLevel::CompoundStatement)
-                .nodes(item.decorators())
+            f.join_with(hard_line_break())
+                .entries(item.decorators().iter().formatted())
                 .finish()?;
 
-            if leading_function_definition_comments.is_empty() {
+            if leading_definition_comments.is_empty() {
                 write!(f, [hard_line_break()])?;
             } else {
-                // Write any leading function comments (between last decorator and function header)
+                // Write any leading definition comments (between last decorator and the header)
                 // while maintaining the right amount of empty lines between the comment
                 // and the last decorator.
-                let decorator_end =
-                    skip_trailing_trivia(last_decorator.end(), f.context().contents());
-
-                let leading_line = if lines_after(decorator_end, f.context().contents()) <= 1 {
-                    hard_line_break()
-                } else {
-                    empty_line()
-                };
+                let leading_line =
+                    if lines_after_ignoring_trivia(last_decorator.end(), f.context().source()) <= 1
+                    {
+                        hard_line_break()
+                    } else {
+                        empty_line()
+                    };
 
                 write!(
                     f,
-                    [
-                        leading_line,
-                        leading_comments(leading_function_definition_comments)
-                    ]
+                    [leading_line, leading_comments(leading_definition_comments)]
                 )?;
             }
         }
@@ -80,15 +75,13 @@ impl FormatRule<AnyFunctionDefinition<'_>, PyFormatContext<'_>> for FormatAnyFun
 
         let name = item.name();
 
-        write!(
-            f,
-            [
-                text("def"),
-                space(),
-                name.format(),
-                item.arguments().format(),
-            ]
-        )?;
+        write!(f, [text("def"), space(), name.format()])?;
+
+        if let Some(type_params) = item.type_params() {
+            write!(f, [type_params.format()])?;
+        }
+
+        write!(f, [item.arguments().format()])?;
 
         if let Some(return_annotation) = item.returns() {
             write!(
@@ -97,9 +90,9 @@ impl FormatRule<AnyFunctionDefinition<'_>, PyFormatContext<'_>> for FormatAnyFun
                     space(),
                     text("->"),
                     space(),
-                    return_annotation
-                        .format()
-                        .with_options(Parenthesize::IfBreaks)
+                    optional_parentheses(
+                        &return_annotation.format().with_options(Parentheses::Never)
+                    )
                 ]
             )?;
         }
@@ -109,7 +102,7 @@ impl FormatRule<AnyFunctionDefinition<'_>, PyFormatContext<'_>> for FormatAnyFun
             [
                 text(":"),
                 trailing_comments(trailing_definition_comments),
-                block_indent(&item.body().format())
+                block_indent(&item.body().format().with_options(SuiteKind::Function))
             ]
         )
     }
@@ -124,7 +117,7 @@ impl<'def, 'ast> AsFormat<PyFormatContext<'ast>> for AnyFunctionDefinition<'def>
     > where Self: 'a;
 
     fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, FormatAnyFunctionDef::default())
+        FormatRefWithRule::new(self, FormatAnyFunctionDef)
     }
 }
 

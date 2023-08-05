@@ -57,10 +57,7 @@ pub enum FormatElement {
 
     /// A list of different variants representing the same content. The printer picks the best fitting content.
     /// Line breaks inside of a best fitting don't propagate to parent groups.
-    BestFitting {
-        variants: BestFittingVariants,
-        mode: BestFittingMode,
-    },
+    BestFitting { variants: BestFittingVariants },
 
     /// A [Tag] that marks the start/end of some content to which some special formatting is applied.
     Tag(Tag),
@@ -87,10 +84,9 @@ impl std::fmt::Debug for FormatElement {
                 .field(contains_newlines)
                 .finish(),
             FormatElement::LineSuffixBoundary => write!(fmt, "LineSuffixBoundary"),
-            FormatElement::BestFitting { variants, mode } => fmt
+            FormatElement::BestFitting { variants } => fmt
                 .debug_struct("BestFitting")
                 .field("variants", variants)
-                .field("mode", &mode)
                 .finish(),
             FormatElement::Interned(interned) => {
                 fmt.debug_list().entries(interned.deref()).finish()
@@ -299,29 +295,6 @@ impl FormatElements for FormatElement {
             _ => None,
         }
     }
-}
-
-/// Mode used to determine if any variant (except the most expanded) fits for [`BestFittingVariants`].
-#[repr(u8)]
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
-pub enum BestFittingMode {
-    /// The variant fits if the content up to the first hard or a soft line break inside a [`Group`] with
-    /// [`PrintMode::Expanded`] fits on the line. The default mode.
-    ///
-    /// [`Group`]: tag::Group
-    #[default]
-    FirstLine,
-
-    /// A variant fits if all lines fit into the configured print width. A line ends if by any
-    /// hard or a soft line break inside a [`Group`] with [`PrintMode::Expanded`].
-    /// The content doesn't fit if there's any hard line break  outside a [`Group`] with [`PrintMode::Expanded`]
-    /// (a hard line break in content that should be considered in [`PrintMode::Flat`].
-    ///
-    /// Use this mode with caution as it requires measuring all content of the variant which is more
-    /// expensive than using [`BestFittingMode::FirstLine`].
-    ///
-    /// [`Group`]: tag::Group
-    AllLines,
 }
 
 /// The different variants for this element.

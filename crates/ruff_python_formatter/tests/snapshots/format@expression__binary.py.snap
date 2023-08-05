@@ -211,6 +211,12 @@ if (
 # Unstable formatting in https://github.com/realtyem/synapse-unraid/blob/unraid_develop/synapse/handlers/presence.py
 for user_id in set(target_user_ids) - {u.user_id for u in updates}:
     updates.append(UserPresenceState.default(user_id))
+
+# Keeps parenthesized left hand sides
+(
+    log(self.price / self.strike)
+    + (self.risk_free - self.div_cont + 0.5 * (self.sigma**2)) * self.exp_time
+) / self.sigmaT
 ```
 
 ## Output
@@ -271,9 +277,16 @@ aaaaaaaaaaaaaa + {
     dddddddddddddddd,
     eeeeeee,
 }
-aaaaaaaaaaaaaa + [i for i in []]
-aaaaaaaaaaaaaa + (i for i in [])
-aaaaaaaaaaaaaa + {NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
+aaaaaaaaaaaaaa + [
+    a for x in bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+]
+(
+    aaaaaaaaaaaaaa
+    + (a for x in bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)
+)
+aaaaaaaaaaaaaa + {
+    a for x in bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+}
 
 # Wraps it in parentheses if it needs to break both left and right
 (
@@ -283,13 +296,16 @@ aaaaaaaaaaaaaa + {NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}
 
 
 # But only for expressions that have a statement parent.
-not (aaaaaaaaaaaaaa + {NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set})
+not (
+    aaaaaaaaaaaaaa
+    + {a for x in bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb}
+)
 [
     a
     + [
-        bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+        bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
     ]
-    in c,
+    in c
 ]
 
 
@@ -464,10 +480,14 @@ if (
 
 
 # Unstable formatting in https://github.com/realtyem/synapse-unraid/blob/unraid_develop/synapse/handlers/presence.py
-for user_id in set(
-    target_user_ids
-) - {NOT_IMPLEMENTED_set_value for value in NOT_IMPLEMENTED_set}:
+for user_id in set(target_user_ids) - {u.user_id for u in updates}:
     updates.append(UserPresenceState.default(user_id))
+
+# Keeps parenthesized left hand sides
+(
+    log(self.price / self.strike)
+    + (self.risk_free - self.div_cont + 0.5 * (self.sigma**2)) * self.exp_time
+) / self.sigmaT
 ```
 
 

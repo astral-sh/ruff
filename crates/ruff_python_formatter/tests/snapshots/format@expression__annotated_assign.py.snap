@@ -1,0 +1,37 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/annotated_assign.py
+---
+## Input
+```py
+a: string
+
+b: string = "test"
+
+b: list[
+    string,
+    int
+] = [1, 2]
+
+b: list[
+    string,
+    int,
+] = [1, 2]
+```
+
+## Output
+```py
+a: string
+
+b: string = "test"
+
+b: list[string, int] = [1, 2]
+
+b: list[
+    string,
+    int,
+] = [1, 2]
+```
+
+
+

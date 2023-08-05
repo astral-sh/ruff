@@ -1,0 +1,25 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/aug_assign.py
+---
+## Input
+```py
+tree_depth += 1
+
+greeting += "This is very long, formal greeting for whomever is name here. Dear %s, it will break the line" % len(
+    name
+)
+```
+
+## Output
+```py
+tree_depth += 1
+
+greeting += (
+    "This is very long, formal greeting for whomever is name here. Dear %s, it will break the line"
+    % len(name)
+)
+```
+
+
+

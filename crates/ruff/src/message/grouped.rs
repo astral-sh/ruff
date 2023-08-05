@@ -4,7 +4,7 @@ use std::num::NonZeroUsize;
 
 use colored::Colorize;
 
-use ruff_python_ast::source_code::OneIndexed;
+use ruff_source_file::OneIndexed;
 
 use crate::fs::relativize_path;
 use crate::jupyter::{JupyterIndex, Notebook};

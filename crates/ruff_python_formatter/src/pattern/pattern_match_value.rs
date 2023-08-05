@@ -1,4 +1,4 @@
-use rustpython_parser::ast::PatternMatchValue;
+use ruff_python_ast::PatternMatchValue;
 
 use ruff_formatter::{write, Buffer, FormatResult};
 

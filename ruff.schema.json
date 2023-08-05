@@ -199,7 +199,7 @@
       ]
     },
     "flake8-copyright": {
-      "description": "Options for the `copyright` plugin.",
+      "description": "Options for the `flake8-copyright` plugin.",
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8CopyrightOptions"
@@ -386,6 +386,16 @@
         }
       ]
     },
+    "logger-objects": {
+      "description": "A list of objects that should be treated equivalently to a `logging.Logger` object.\n\nThis is useful for ensuring proper diagnostics (e.g., to identify `logging` deprecations and other best-practices) for projects that re-export a `logging.Logger` object from a common module.\n\nFor example, if you have a module `logging_setup.py` with the following contents: ```python import logging\n\nlogger = logging.getLogger(__name__) ```\n\nAdding `\"logging_setup.logger\"` to `logger-objects` will ensure that `logging_setup.logger` is treated as a `logging.Logger` object when imported from other modules (e.g., `from logging_setup import logger`).",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
     "mccabe": {
       "description": "Options for the `mccabe` plugin.",
       "anyOf": [
@@ -475,6 +485,17 @@
         }
       ]
     },
+    "pyupgrade": {
+      "description": "Options for the `pyupgrade` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/PyUpgradeOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "required-version": {
       "description": "Require a specific version of Ruff to be running (useful for unifying results across many environments, e.g., with a `pyproject.toml` file).",
       "anyOf": [
@@ -518,7 +539,7 @@
       ]
     },
     "src": {
-      "description": "The source code paths to consider, e.g., when resolving first- vs. third-party imports.\n\nAs an example: given a Python package structure like:\n\n```text my_package/ pyproject.toml src/ my_package/ __init__.py foo.py bar.py ```\n\nThe `src` directory should be included in the `src` option (e.g., `src = [\"src\"]`), such that when resolving imports, `my_package.foo` is considered a first-party import.\n\nWhen omitted, the `src` directory will typically default to the directory containing the nearest `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file (the \"project root\"), unless a configuration file is explicitly provided (e.g., via the `--config` command-line flag).\n\nThis field supports globs. For example, if you have a series of Python packages in a `python_modules` directory, `src = [\"python_modules/*\"]` would expand to incorporate all of the packages in that directory. User home directory and environment variables will also be expanded.",
+      "description": "The directories to consider when resolving first- vs. third-party imports.\n\nAs an example: given a Python package structure like:\n\n```text my_project ├── pyproject.toml └── src └── my_package ├── __init__.py ├── foo.py └── bar.py ```\n\nThe `./src` directory should be included in the `src` option (e.g., `src = [\"src\"]`), such that when resolving imports, `my_package.foo` is considered a first-party import.\n\nWhen omitted, the `src` directory will typically default to the directory containing the nearest `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file (the \"project root\"), unless a configuration file is explicitly provided (e.g., via the `--config` command-line flag).\n\nThis field supports globs. For example, if you have a series of Python packages in a `python_modules` directory, `src = [\"python_modules/*\"]` would expand to incorporate all of the packages in that directory. User home directory and environment variables will also be expanded.",
       "type": [
         "array",
         "null"
@@ -560,7 +581,7 @@
       }
     },
     "typing-modules": {
-      "description": "A list of modules whose imports should be treated equivalently to members of the `typing` module.\n\nThis is useful for ensuring proper type annotation inference for projects that re-export `typing` and `typing_extensions` members from a compatibility module. If omitted, any members imported from modules apart from `typing` and `typing_extensions` will be treated as ordinary Python objects.",
+      "description": "A list of modules whose exports should be treated equivalently to members of the `typing` module.\n\nThis is useful for ensuring proper type annotation inference for projects that re-export `typing` and `typing_extensions` members from a compatibility module. If omitted, any members imported from modules apart from `typing` and `typing_extensions` will be treated as ordinary Python objects.",
       "type": [
         "array",
         "null"
@@ -709,7 +730,7 @@
       "type": "object",
       "properties": {
         "extend-immutable-calls": {
-          "description": "Additional callable functions to consider \"immutable\" when evaluating, e.g., the `no-mutable-default-argument` rule (`B006`) or `no-function-call-in-dataclass-defaults` rule (`RUF009`).",
+          "description": "Additional callable functions to consider \"immutable\" when evaluating, e.g., the `function-call-in-default-argument` rule (`B008`) or `function-call-in-dataclass-defaults` rule (`RUF009`).\n\nExpects to receive a list of fully-qualified names (e.g., `fastapi.Query`, rather than `Query`).",
           "type": [
             "array",
             "null"
@@ -1124,6 +1145,13 @@
     "IsortOptions": {
       "type": "object",
       "properties": {
+        "case-sensitive": {
+          "description": "Sort imports taking into account case sensitivity.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "classes": {
           "description": "An override list of tokens to always recognize as a Class for `order-by-type` regardless of casing.",
           "type": [
@@ -1152,7 +1180,7 @@
           }
         },
         "extra-standard-library": {
-          "description": "A list of modules to consider standard-library, in addition to those known to Ruff in advance.",
+          "description": "A list of modules to consider standard-library, in addition to those known to Ruff in advance.\n\nSupports glob patterns. For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
           "type": [
             "array",
             "null"
@@ -1203,7 +1231,7 @@
           }
         },
         "known-first-party": {
-          "description": "A list of modules to consider first-party, regardless of whether they can be identified as such via introspection of the local filesystem.",
+          "description": "A list of modules to consider first-party, regardless of whether they can be identified as such via introspection of the local filesystem.\n\nSupports glob patterns. For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
           "type": [
             "array",
             "null"
@@ -1213,7 +1241,7 @@
           }
         },
         "known-local-folder": {
-          "description": "A list of modules to consider being a local folder. Generally, this is reserved for relative imports (`from . import module`).",
+          "description": "A list of modules to consider being a local folder. Generally, this is reserved for relative imports (`from . import module`).\n\nSupports glob patterns. For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
           "type": [
             "array",
             "null"
@@ -1223,7 +1251,7 @@
           }
         },
         "known-third-party": {
-          "description": "A list of modules to consider third-party, regardless of whether they can be identified as such via introspection of the local filesystem.",
+          "description": "A list of modules to consider third-party, regardless of whether they can be identified as such via introspection of the local filesystem.\n\nSupports glob patterns. For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
           "type": [
             "array",
             "null"
@@ -1396,6 +1424,16 @@
             "type": "string"
           }
         },
+        "extend-ignore-names": {
+          "description": "Additional names (or patterns) to ignore when considering `pep8-naming` violations, in addition to those included in `ignore-names`.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "ignore-names": {
           "description": "A list of names (or patterns) to ignore when considering `pep8-naming` violations.",
           "type": [
@@ -1415,6 +1453,19 @@
           "items": {
             "type": "string"
           }
+        }
+      },
+      "additionalProperties": false
+    },
+    "PyUpgradeOptions": {
+      "type": "object",
+      "properties": {
+        "keep-runtime-typing": {
+          "description": "Whether to avoid PEP 585 (`List[int]` -> `list[int]`) and PEP 604 (`Union[str, int]` -> `str | int`) rewrites even if a file imports `from __future__ import annotations`.\n\nThis setting is only applicable when the target Python version is below 3.9 and 3.10 respectively, and is most commonly used when working with libraries like Pydantic and FastAPI, which rely on the ability to parse type annotations at runtime. The use of `from __future__ import annotations` causes Python to treat the type annotations as strings, which typically allows for the use of language features that appear in later Python versions but are not yet supported by the current version (e.g., `str | int`). However, libraries that rely on runtime type annotations will break if the annotations are incompatible with the current Python version.\n\nFor example, while the following is valid Python 3.8 code due to the presence of `from __future__ import annotations`, the use of `str| int` prior to Python 3.10 will cause Pydantic to raise a `TypeError` at runtime:\n\n```python from __future__ import annotations\n\nimport pydantic\n\nclass Foo(pydantic.BaseModel): bar: str | int ```",
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       },
       "additionalProperties": false
@@ -1447,7 +1498,7 @@
       "type": "object",
       "properties": {
         "convention": {
-          "description": "Whether to use Google-style or NumPy-style conventions or the PEP257 defaults when analyzing docstring sections.",
+          "description": "Whether to use Google-style or NumPy-style conventions or the PEP257 defaults when analyzing docstring sections.\n\nEnabling a convention will force-disable any rules that are not included in the specified convention. As such, the intended use is to enable a convention and then selectively disable any additional rules on top of it.\n\nFor example, to use Google-style conventions but avoid requiring documentation for every function parameter:\n\n```toml [tool.ruff] # Enable all `pydocstyle` rules, limiting to those that adhere to the # Google convention via `convention = \"google\"`, below. select = [\"D\"]\n\n# On top of the Google convention, disable `D417`, which requires # documentation for every function parameter. ignore = [\"D417\"]\n\n[tool.ruff.pydocstyle] convention = \"google\" ```\n\nAs conventions force-disable all rules not included in the convention, enabling _additional_ rules on top of a convention is currently unsupported.",
           "anyOf": [
             {
               "$ref": "#/definitions/Convention"
@@ -1484,7 +1535,7 @@
       "type": "object",
       "properties": {
         "extend-generics": {
-          "description": "Additional functions or classes to consider generic, such that any subscripts should be treated as type annotation (e.g., `ForeignKey` in `django.db.models.ForeignKey[\"User\"]`.",
+          "description": "Additional functions or classes to consider generic, such that any subscripts should be treated as type annotation (e.g., `ForeignKey` in `django.db.models.ForeignKey[\"User\"]`.\n\nExpects to receive a list of fully-qualified names (e.g., `django.db.models.ForeignKey`, rather than `ForeignKey`).",
           "type": [
             "array",
             "null"
@@ -1562,17 +1613,17 @@
     "Quote": {
       "oneOf": [
         {
-          "description": "Use single quotes.",
-          "type": "string",
-          "enum": [
-            "single"
-          ]
-        },
-        {
           "description": "Use double quotes.",
           "type": "string",
           "enum": [
             "double"
+          ]
+        },
+        {
+          "description": "Use single quotes.",
+          "type": "string",
+          "enum": [
+            "single"
           ]
         }
       ]
@@ -1681,6 +1732,7 @@
         "B031",
         "B032",
         "B033",
+        "B034",
         "B9",
         "B90",
         "B904",
@@ -1827,6 +1879,8 @@
         "E227",
         "E228",
         "E231",
+        "E241",
+        "E242",
         "E251",
         "E252",
         "E261",
@@ -2042,6 +2096,7 @@
         "NPY00",
         "NPY001",
         "NPY002",
+        "NPY003",
         "PD",
         "PD0",
         "PD00",
@@ -2057,6 +2112,9 @@
         "PD012",
         "PD013",
         "PD015",
+        "PD1",
+        "PD10",
+        "PD101",
         "PD9",
         "PD90",
         "PD901",
@@ -2068,6 +2126,10 @@
         "PERF2",
         "PERF20",
         "PERF203",
+        "PERF4",
+        "PERF40",
+        "PERF401",
+        "PERF402",
         "PGH",
         "PGH0",
         "PGH00",
@@ -2092,6 +2154,12 @@
         "PL",
         "PLC",
         "PLC0",
+        "PLC01",
+        "PLC010",
+        "PLC0105",
+        "PLC013",
+        "PLC0131",
+        "PLC0132",
         "PLC02",
         "PLC020",
         "PLC0205",
@@ -2135,6 +2203,7 @@
         "PLE1206",
         "PLE13",
         "PLE130",
+        "PLE1300",
         "PLE1307",
         "PLE131",
         "PLE1310",
@@ -2179,6 +2248,7 @@
         "PLR1701",
         "PLR171",
         "PLR1711",
+        "PLR1714",
         "PLR172",
         "PLR1722",
         "PLR2",
@@ -2194,6 +2264,7 @@
         "PLW01",
         "PLW012",
         "PLW0120",
+        "PLW0127",
         "PLW0129",
         "PLW013",
         "PLW0131",
@@ -2211,6 +2282,8 @@
         "PLW15",
         "PLW150",
         "PLW1508",
+        "PLW1509",
+        "PLW1641",
         "PLW2",
         "PLW29",
         "PLW290",
@@ -2279,10 +2352,23 @@
         "PTH122",
         "PTH123",
         "PTH124",
+        "PTH2",
+        "PTH20",
+        "PTH201",
+        "PTH202",
+        "PTH203",
+        "PTH204",
+        "PTH205",
+        "PTH206",
+        "PTH207",
         "PYI",
         "PYI0",
         "PYI00",
         "PYI001",
+        "PYI002",
+        "PYI003",
+        "PYI004",
+        "PYI005",
         "PYI006",
         "PYI007",
         "PYI008",
@@ -2295,28 +2381,41 @@
         "PYI014",
         "PYI015",
         "PYI016",
+        "PYI017",
+        "PYI018",
+        "PYI019",
         "PYI02",
         "PYI020",
         "PYI021",
         "PYI024",
         "PYI025",
+        "PYI026",
         "PYI029",
         "PYI03",
+        "PYI030",
         "PYI032",
         "PYI033",
         "PYI034",
         "PYI035",
+        "PYI036",
         "PYI04",
+        "PYI041",
         "PYI042",
         "PYI043",
         "PYI044",
         "PYI045",
+        "PYI046",
+        "PYI047",
         "PYI048",
+        "PYI049",
         "PYI05",
         "PYI050",
+        "PYI051",
         "PYI052",
         "PYI053",
         "PYI054",
+        "PYI055",
+        "PYI056",
         "Q",
         "Q0",
         "Q00",
@@ -2355,6 +2454,8 @@
         "RUF011",
         "RUF012",
         "RUF013",
+        "RUF015",
+        "RUF016",
         "RUF1",
         "RUF10",
         "RUF100",
@@ -2568,6 +2669,8 @@
         "UP037",
         "UP038",
         "UP039",
+        "UP04",
+        "UP040",
         "W",
         "W1",
         "W19",

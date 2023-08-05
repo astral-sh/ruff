@@ -96,7 +96,7 @@ impl<Context> Copy for Arguments<'_, Context> {}
 
 impl<Context> Clone for Arguments<'_, Context> {
     fn clone(&self) -> Self {
-        Self(self.0)
+        *self
     }
 }
 

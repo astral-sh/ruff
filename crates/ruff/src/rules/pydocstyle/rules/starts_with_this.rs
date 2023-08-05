@@ -58,7 +58,7 @@ pub(crate) fn starts_with_this(checker: &mut Checker, docstring: &Docstring) {
     }
 
     let Some(first_word) = trimmed.split(' ').next() else {
-        return
+        return;
     };
     if normalize_word(first_word) != "this" {
         return;

@@ -1,4 +1,4 @@
-//! Rules related to copyright notices.
+//! Rules from [flake8-copyright](https://pypi.org/project/flake8-copyright/).
 pub(crate) mod rules;
 
 pub mod settings;

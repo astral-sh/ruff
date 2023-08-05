@@ -38,6 +38,15 @@ if key in a_dict:
 else:
     vars[idx] = "defaultß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789"
 
+# SIM401
+if foo():
+    pass
+else:
+    if key in a_dict:
+        vars[idx] = a_dict[key]
+    else:
+        vars[idx] = "default"
+
 ###
 # Negative cases
 ###
@@ -105,12 +114,3 @@ elif key in a_dict:
     vars[idx] = a_dict[key]
 else:
     vars[idx] = "default"
-
-# OK (false negative for nested else)
-if foo():
-    pass
-else:
-    if key in a_dict:
-        vars[idx] = a_dict[key]
-    else:
-        vars[idx] = "default"

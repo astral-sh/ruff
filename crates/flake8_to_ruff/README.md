@@ -82,12 +82,12 @@ flake8-to-ruff path/to/.flake8 --plugin flake8-builtins --plugin flake8-quotes
 ## Limitations
 
 1. Ruff only supports a subset of the Flake configuration options. `flake8-to-ruff` will warn on and
-   ignore unsupported options in the `.flake8` file (or equivalent). (Similarly, Ruff has a few
-   configuration options that don't exist in Flake8.)
+    ignore unsupported options in the `.flake8` file (or equivalent). (Similarly, Ruff has a few
+    configuration options that don't exist in Flake8.)
 1. Ruff will omit any rule codes that are unimplemented or unsupported by Ruff, including rule
-   codes from unsupported plugins. (See the
-   [documentation](https://beta.ruff.rs/docs/faq/#how-does-ruff-compare-to-flake8) for the complete
-   list of supported plugins.)
+    codes from unsupported plugins. (See the
+    [documentation](https://beta.ruff.rs/docs/faq/#how-does-ruff-compare-to-flake8) for the complete
+    list of supported plugins.)
 
 ## License
 

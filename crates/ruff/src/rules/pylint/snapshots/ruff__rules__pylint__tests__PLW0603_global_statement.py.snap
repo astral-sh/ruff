@@ -89,12 +89,13 @@ global_statement.py:80:5: PLW0603 Using the global statement to update `CONSTANT
 82 |     CONSTANT = 2
    |
 
-global_statement.py:81:5: PLW0603 Using the global statement to update `CONSTANT` is discouraged
+global_statement.py:80:5: PLW0603 Using the global statement to update `CONSTANT` is discouraged
    |
+78 | def multiple_assignment():
 79 |     """Should warn on every assignment."""
 80 |     global CONSTANT  # [global-statement]
+   |     ^^^^^^^^^^^^^^^ PLW0603
 81 |     CONSTANT = 1
-   |     ^^^^^^^^^^^^ PLW0603
 82 |     CONSTANT = 2
    |
 

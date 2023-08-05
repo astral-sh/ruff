@@ -38,7 +38,7 @@ mod source_code;
 use crate::formatter::Formatter;
 use crate::group_id::UniqueGroupIdBuilder;
 use crate::prelude::TagKind;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
 
 use crate::format_element::document::Document;
@@ -331,6 +331,16 @@ where
         Ok(printed)
     }
 }
+
+impl<Context> Display for Formatted<Context>
+where
+    Context: FormatContext,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(&self.document.display(self.context.source_code()), f)
+    }
+}
+
 pub type PrintResult<T> = Result<T, PrintError>;
 
 #[derive(Debug, Clone, Eq, PartialEq)]

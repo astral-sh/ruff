@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -52,21 +52,23 @@ impl Violation for DjangoModelWithoutDunderStr {
 
 /// DJ008
 pub(crate) fn model_without_dunder_str(
-    checker: &Checker,
-    bases: &[Expr],
-    body: &[Stmt],
-    class_location: &Stmt,
-) -> Option<Diagnostic> {
-    if !is_non_abstract_model(bases, body, checker.semantic()) {
-        return None;
+    checker: &mut Checker,
+    ast::StmtClassDef {
+        name,
+        arguments,
+        body,
+        ..
+    }: &ast::StmtClassDef,
+) {
+    if !is_non_abstract_model(arguments.as_deref(), body, checker.semantic()) {
+        return;
     }
-    if !has_dunder_method(body) {
-        return Some(Diagnostic::new(
-            DjangoModelWithoutDunderStr,
-            class_location.range(),
-        ));
+    if has_dunder_method(body) {
+        return;
     }
-    None
+    checker
+        .diagnostics
+        .push(Diagnostic::new(DjangoModelWithoutDunderStr, name.range()));
 }
 
 fn has_dunder_method(body: &[Stmt]) -> bool {
@@ -81,33 +83,37 @@ fn has_dunder_method(body: &[Stmt]) -> bool {
     })
 }
 
-fn is_non_abstract_model(bases: &[Expr], body: &[Stmt], semantic: &SemanticModel) -> bool {
-    for base in bases.iter() {
-        if is_model_abstract(body) {
-            continue;
-        }
-        if helpers::is_model(base, semantic) {
-            return true;
-        }
+fn is_non_abstract_model(
+    arguments: Option<&Arguments>,
+    body: &[Stmt],
+    semantic: &SemanticModel,
+) -> bool {
+    let Some(Arguments { args: bases, .. }) = arguments else {
+        return false;
+    };
+
+    if is_model_abstract(body) {
+        return false;
     }
-    false
+
+    bases.iter().any(|base| helpers::is_model(base, semantic))
 }
 
 /// Check if class is abstract, in terms of Django model inheritance.
 fn is_model_abstract(body: &[Stmt]) -> bool {
-    for element in body.iter() {
-        let Stmt::ClassDef(ast::StmtClassDef {name, body, ..}) = element else {
-            continue
+    for element in body {
+        let Stmt::ClassDef(ast::StmtClassDef { name, body, .. }) = element else {
+            continue;
         };
         if name != "Meta" {
             continue;
         }
-        for element in body.iter() {
-            let Stmt::Assign(ast::StmtAssign {targets, value, ..}) = element else {
+        for element in body {
+            let Stmt::Assign(ast::StmtAssign { targets, value, .. }) = element else {
                 continue;
             };
-            for target in targets.iter() {
-                let Expr::Name(ast::ExprName {id , ..}) = target else {
+            for target in targets {
+                let Expr::Name(ast::ExprName { id, .. }) = target else {
                     continue;
                 };
                 if id != "abstract" {

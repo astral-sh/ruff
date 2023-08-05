@@ -138,6 +138,8 @@ ISC.py:52:5: ISC001 [*] Implicitly concatenated string literals on one line
 51 | 
 52 | _ = rf"a" rf"b"
    |     ^^^^^^^^^^^ ISC001
+53 | 
+54 | # Single-line explicit concatenation should be ignored.
    |
    = help: Combine string literals
 
@@ -147,5 +149,8 @@ ISC.py:52:5: ISC001 [*] Implicitly concatenated string literals on one line
 51 51 | 
 52    |-_ = rf"a" rf"b"
    52 |+_ = rf"ab"
+53 53 | 
+54 54 | # Single-line explicit concatenation should be ignored.
+55 55 | _ = "abc" + "def" + "ghi"
 
 

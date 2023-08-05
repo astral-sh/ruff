@@ -333,7 +333,7 @@ pub(crate) fn infer_plugins_from_codes(selectors: &HashSet<RuleSelector>) -> Vec
         for selector in selectors {
             if selector
                 .into_iter()
-                .any(|rule| Linter::from(plugin).into_iter().any(|r| r == rule))
+                .any(|rule| Linter::from(plugin).rules().any(|r| r == rule))
             {
                 return true;
             }

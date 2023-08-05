@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule};
-use rustpython_parser::ast::Stmt;
+use ruff_python_ast::Stmt;
 
 pub(crate) mod stmt_ann_assign;
 pub(crate) mod stmt_assert;
@@ -20,6 +20,7 @@ pub(crate) mod stmt_global;
 pub(crate) mod stmt_if;
 pub(crate) mod stmt_import;
 pub(crate) mod stmt_import_from;
+pub(crate) mod stmt_line_magic;
 pub(crate) mod stmt_match;
 pub(crate) mod stmt_nonlocal;
 pub(crate) mod stmt_pass;
@@ -27,6 +28,7 @@ pub(crate) mod stmt_raise;
 pub(crate) mod stmt_return;
 pub(crate) mod stmt_try;
 pub(crate) mod stmt_try_star;
+pub(crate) mod stmt_type_alias;
 pub(crate) mod stmt_while;
 pub(crate) mod stmt_with;
 pub(crate) mod suite;
@@ -64,6 +66,8 @@ impl FormatRule<Stmt, PyFormatContext<'_>> for FormatStmt {
             Stmt::Pass(x) => x.format().fmt(f),
             Stmt::Break(x) => x.format().fmt(f),
             Stmt::Continue(x) => x.format().fmt(f),
+            Stmt::TypeAlias(x) => x.format().fmt(f),
+            Stmt::LineMagic(_) => todo!(),
         }
     }
 }
@@ -72,7 +76,7 @@ impl<'ast> AsFormat<PyFormatContext<'ast>> for Stmt {
     type Format<'a> = FormatRefWithRule<'a, Stmt, FormatStmt, PyFormatContext<'ast>>;
 
     fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, FormatStmt::default())
+        FormatRefWithRule::new(self, FormatStmt)
     }
 }
 
@@ -80,6 +84,6 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Stmt {
     type Format = FormatOwnedWithRule<Stmt, FormatStmt, PyFormatContext<'ast>>;
 
     fn into_format(self) -> Self::Format {
-        FormatOwnedWithRule::new(self, FormatStmt::default())
+        FormatOwnedWithRule::new(self, FormatStmt)
     }
 }

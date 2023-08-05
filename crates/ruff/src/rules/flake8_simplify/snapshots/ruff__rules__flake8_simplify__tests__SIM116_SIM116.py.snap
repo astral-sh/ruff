@@ -105,6 +105,8 @@ SIM116.py:79:1: SIM116 Use a dictionary instead of consecutive `if` statements
 85 | | elif func_name == "move":
 86 | |     return "MV"
    | |_______________^ SIM116
+87 |   
+88 |   # OK
    |
 
 

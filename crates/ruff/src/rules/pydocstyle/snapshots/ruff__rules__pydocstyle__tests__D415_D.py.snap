@@ -254,4 +254,38 @@ D.py:615:5: D415 [*] First line should end with a period, question mark, or excl
 617 617 |     """
 618 618 | 
 
+D.py:639:17: D415 [*] First line should end with a period, question mark, or exclamation point
+    |
+639 | class SameLine: """This is a docstring on the same line"""
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D415
+640 | 
+641 | def same_line(): """This is a docstring on the same line"""
+    |
+    = help: Add closing punctuation
+
+ℹ Suggested fix
+636 636 |     """ This is a docstring that starts with a space."""  # noqa: D210
+637 637 | 
+638 638 | 
+639     |-class SameLine: """This is a docstring on the same line"""
+    639 |+class SameLine: """This is a docstring on the same line."""
+640 640 | 
+641 641 | def same_line(): """This is a docstring on the same line"""
+
+D.py:641:18: D415 [*] First line should end with a period, question mark, or exclamation point
+    |
+639 | class SameLine: """This is a docstring on the same line"""
+640 | 
+641 | def same_line(): """This is a docstring on the same line"""
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D415
+    |
+    = help: Add closing punctuation
+
+ℹ Suggested fix
+638 638 | 
+639 639 | class SameLine: """This is a docstring on the same line"""
+640 640 | 
+641     |-def same_line(): """This is a docstring on the same line"""
+    641 |+def same_line(): """This is a docstring on the same line."""
+
 

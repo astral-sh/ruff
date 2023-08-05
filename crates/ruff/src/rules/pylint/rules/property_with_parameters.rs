@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Arguments, Decorator, Expr, Stmt};
+use ruff_python_ast::{self as ast, Decorator, Expr, Parameters, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -51,19 +51,19 @@ pub(crate) fn property_with_parameters(
     checker: &mut Checker,
     stmt: &Stmt,
     decorator_list: &[Decorator],
-    args: &Arguments,
+    parameters: &Parameters,
 ) {
     if !decorator_list
         .iter()
-        .any(|d| matches!(&d.expression, Expr::Name(ast::ExprName { id, .. }) if id == "property"))
+        .any(|decorator| matches!(&decorator.expression, Expr::Name(ast::ExprName { id, .. }) if id == "property"))
     {
         return;
     }
-    if args
+    if parameters
         .posonlyargs
         .iter()
-        .chain(&args.args)
-        .chain(&args.kwonlyargs)
+        .chain(&parameters.args)
+        .chain(&parameters.kwonlyargs)
         .count()
         > 1
         && checker.semantic().is_builtin("property")

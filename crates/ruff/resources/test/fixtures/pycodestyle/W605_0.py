@@ -41,3 +41,5 @@ regex = '\w'  # noqa
 regex = '''
 \w
 '''  # noqa
+
+regex = '\\\_'

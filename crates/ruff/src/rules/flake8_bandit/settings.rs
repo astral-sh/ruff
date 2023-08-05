@@ -59,12 +59,7 @@ impl From<Options> for Settings {
                 .hardcoded_tmp_directory
                 .unwrap_or_else(default_tmp_dirs)
                 .into_iter()
-                .chain(
-                    options
-                        .hardcoded_tmp_directory_extend
-                        .unwrap_or_default()
-                        .into_iter(),
-                )
+                .chain(options.hardcoded_tmp_directory_extend.unwrap_or_default())
                 .collect(),
             check_typed_exception: options.check_typed_exception.unwrap_or(false),
         }

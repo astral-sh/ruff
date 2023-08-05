@@ -1,0 +1,61 @@
+---
+source: crates/ruff_python_parser/src/parser.rs
+expression: parse_ast
+---
+Dict(
+    ExprDict {
+        range: 0..25,
+        keys: [
+            Some(
+                Constant(
+                    ExprConstant {
+                        range: 1..4,
+                        value: Str(
+                            "a",
+                        ),
+                        kind: None,
+                    },
+                ),
+            ),
+            None,
+            Some(
+                Constant(
+                    ExprConstant {
+                        range: 16..19,
+                        value: Str(
+                            "d",
+                        ),
+                        kind: None,
+                    },
+                ),
+            ),
+        ],
+        values: [
+            Constant(
+                ExprConstant {
+                    range: 6..9,
+                    value: Str(
+                        "b",
+                    ),
+                    kind: None,
+                },
+            ),
+            Name(
+                ExprName {
+                    range: 13..14,
+                    id: "c",
+                    ctx: Load,
+                },
+            ),
+            Constant(
+                ExprConstant {
+                    range: 21..24,
+                    value: Str(
+                        "e",
+                    ),
+                    kind: None,
+                },
+            ),
+        ],
+    },
+)

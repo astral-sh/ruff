@@ -634,3 +634,8 @@ def starts_with_this():
 @expect('D404: First word of the docstring should not be "This"')
 def starts_with_space_then_this():
     """ This is a docstring that starts with a space."""  # noqa: D210
+
+
+class SameLine: """This is a docstring on the same line"""
+
+def same_line(): """This is a docstring on the same line"""

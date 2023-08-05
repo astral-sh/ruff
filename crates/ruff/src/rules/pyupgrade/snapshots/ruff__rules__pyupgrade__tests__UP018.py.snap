@@ -1,148 +1,294 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-UP018.py:21:1: UP018 [*] Unnecessary call to `str`
+UP018.py:36:1: UP018 [*] Unnecessary `str` call (rewrite as a literal)
    |
-20 | # These become string or byte literals
-21 | str()
+35 | # These become string or byte literals
+36 | str()
    | ^^^^^ UP018
-22 | str("foo")
-23 | str("""
+37 | str("foo")
+38 | str("""
    |
    = help: Replace with empty string
 
 ℹ Fix
-18 18 | f"{f'{str()}'}"
-19 19 | 
-20 20 | # These become string or byte literals
-21    |-str()
-   21 |+""
-22 22 | str("foo")
-23 23 | str("""
-24 24 | foo""")
+33 33 | bool(1.0)
+34 34 | 
+35 35 | # These become string or byte literals
+36    |-str()
+   36 |+""
+37 37 | str("foo")
+38 38 | str("""
+39 39 | foo""")
 
-UP018.py:22:1: UP018 [*] Unnecessary call to `str`
+UP018.py:37:1: UP018 [*] Unnecessary `str` call (rewrite as a literal)
    |
-20 | # These become string or byte literals
-21 | str()
-22 | str("foo")
+35 | # These become string or byte literals
+36 | str()
+37 | str("foo")
    | ^^^^^^^^^^ UP018
-23 | str("""
-24 | foo""")
+38 | str("""
+39 | foo""")
    |
    = help: Replace with empty string
 
 ℹ Fix
-19 19 | 
-20 20 | # These become string or byte literals
-21 21 | str()
-22    |-str("foo")
-   22 |+"foo"
-23 23 | str("""
-24 24 | foo""")
-25 25 | bytes()
+34 34 | 
+35 35 | # These become string or byte literals
+36 36 | str()
+37    |-str("foo")
+   37 |+"foo"
+38 38 | str("""
+39 39 | foo""")
+40 40 | bytes()
 
-UP018.py:23:1: UP018 [*] Unnecessary call to `str`
+UP018.py:38:1: UP018 [*] Unnecessary `str` call (rewrite as a literal)
    |
-21 |   str()
-22 |   str("foo")
-23 | / str("""
-24 | | foo""")
+36 |   str()
+37 |   str("foo")
+38 | / str("""
+39 | | foo""")
    | |_______^ UP018
-25 |   bytes()
-26 |   bytes(b"foo")
+40 |   bytes()
+41 |   bytes(b"foo")
    |
    = help: Replace with empty string
 
 ℹ Fix
-20 20 | # These become string or byte literals
-21 21 | str()
-22 22 | str("foo")
-23    |-str("""
-24    |-foo""")
-   23 |+"""
-   24 |+foo"""
-25 25 | bytes()
-26 26 | bytes(b"foo")
-27 27 | bytes(b"""
+35 35 | # These become string or byte literals
+36 36 | str()
+37 37 | str("foo")
+38    |-str("""
+39    |-foo""")
+   38 |+"""
+   39 |+foo"""
+40 40 | bytes()
+41 41 | bytes(b"foo")
+42 42 | bytes(b"""
 
-UP018.py:25:1: UP018 [*] Unnecessary call to `bytes`
+UP018.py:40:1: UP018 [*] Unnecessary `bytes` call (rewrite as a literal)
    |
-23 | str("""
-24 | foo""")
-25 | bytes()
+38 | str("""
+39 | foo""")
+40 | bytes()
    | ^^^^^^^ UP018
-26 | bytes(b"foo")
-27 | bytes(b"""
+41 | bytes(b"foo")
+42 | bytes(b"""
    |
    = help: Replace with empty bytes
 
 ℹ Fix
-22 22 | str("foo")
-23 23 | str("""
-24 24 | foo""")
-25    |-bytes()
-   25 |+b""
-26 26 | bytes(b"foo")
-27 27 | bytes(b"""
-28 28 | foo""")
+37 37 | str("foo")
+38 38 | str("""
+39 39 | foo""")
+40    |-bytes()
+   40 |+b""
+41 41 | bytes(b"foo")
+42 42 | bytes(b"""
+43 43 | foo""")
 
-UP018.py:26:1: UP018 [*] Unnecessary call to `bytes`
+UP018.py:41:1: UP018 [*] Unnecessary `bytes` call (rewrite as a literal)
    |
-24 | foo""")
-25 | bytes()
-26 | bytes(b"foo")
+39 | foo""")
+40 | bytes()
+41 | bytes(b"foo")
    | ^^^^^^^^^^^^^ UP018
-27 | bytes(b"""
-28 | foo""")
+42 | bytes(b"""
+43 | foo""")
    |
    = help: Replace with empty bytes
 
 ℹ Fix
-23 23 | str("""
-24 24 | foo""")
-25 25 | bytes()
-26    |-bytes(b"foo")
-   26 |+b"foo"
-27 27 | bytes(b"""
-28 28 | foo""")
-29 29 | f"{str()}"
+38 38 | str("""
+39 39 | foo""")
+40 40 | bytes()
+41    |-bytes(b"foo")
+   41 |+b"foo"
+42 42 | bytes(b"""
+43 43 | foo""")
+44 44 | f"{str()}"
 
-UP018.py:27:1: UP018 [*] Unnecessary call to `bytes`
+UP018.py:42:1: UP018 [*] Unnecessary `bytes` call (rewrite as a literal)
    |
-25 |   bytes()
-26 |   bytes(b"foo")
-27 | / bytes(b"""
-28 | | foo""")
+40 |   bytes()
+41 |   bytes(b"foo")
+42 | / bytes(b"""
+43 | | foo""")
    | |_______^ UP018
-29 |   f"{str()}"
+44 |   f"{str()}"
+45 |   int()
    |
    = help: Replace with empty bytes
 
 ℹ Fix
-24 24 | foo""")
-25 25 | bytes()
-26 26 | bytes(b"foo")
-27    |-bytes(b"""
-28    |-foo""")
-   27 |+b"""
-   28 |+foo"""
-29 29 | f"{str()}"
+39 39 | foo""")
+40 40 | bytes()
+41 41 | bytes(b"foo")
+42    |-bytes(b"""
+43    |-foo""")
+   42 |+b"""
+   43 |+foo"""
+44 44 | f"{str()}"
+45 45 | int()
+46 46 | int(1)
 
-UP018.py:29:4: UP018 [*] Unnecessary call to `str`
+UP018.py:44:4: UP018 [*] Unnecessary `str` call (rewrite as a literal)
    |
-27 | bytes(b"""
-28 | foo""")
-29 | f"{str()}"
+42 | bytes(b"""
+43 | foo""")
+44 | f"{str()}"
    |    ^^^^^ UP018
+45 | int()
+46 | int(1)
    |
    = help: Replace with empty string
 
 ℹ Fix
-26 26 | bytes(b"foo")
-27 27 | bytes(b"""
-28 28 | foo""")
-29    |-f"{str()}"
-   29 |+f"{''}"
+41 41 | bytes(b"foo")
+42 42 | bytes(b"""
+43 43 | foo""")
+44    |-f"{str()}"
+   44 |+f"{''}"
+45 45 | int()
+46 46 | int(1)
+47 47 | float()
+
+UP018.py:45:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
+   |
+43 | foo""")
+44 | f"{str()}"
+45 | int()
+   | ^^^^^ UP018
+46 | int(1)
+47 | float()
+   |
+   = help: Replace with 0
+
+ℹ Fix
+42 42 | bytes(b"""
+43 43 | foo""")
+44 44 | f"{str()}"
+45    |-int()
+   45 |+0
+46 46 | int(1)
+47 47 | float()
+48 48 | float(1.0)
+
+UP018.py:46:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
+   |
+44 | f"{str()}"
+45 | int()
+46 | int(1)
+   | ^^^^^^ UP018
+47 | float()
+48 | float(1.0)
+   |
+   = help: Replace with 0
+
+ℹ Fix
+43 43 | foo""")
+44 44 | f"{str()}"
+45 45 | int()
+46    |-int(1)
+   46 |+1
+47 47 | float()
+48 48 | float(1.0)
+49 49 | bool()
+
+UP018.py:47:1: UP018 [*] Unnecessary `float` call (rewrite as a literal)
+   |
+45 | int()
+46 | int(1)
+47 | float()
+   | ^^^^^^^ UP018
+48 | float(1.0)
+49 | bool()
+   |
+   = help: Replace with 0.0
+
+ℹ Fix
+44 44 | f"{str()}"
+45 45 | int()
+46 46 | int(1)
+47    |-float()
+   47 |+0.0
+48 48 | float(1.0)
+49 49 | bool()
+50 50 | bool(True)
+
+UP018.py:48:1: UP018 [*] Unnecessary `float` call (rewrite as a literal)
+   |
+46 | int(1)
+47 | float()
+48 | float(1.0)
+   | ^^^^^^^^^^ UP018
+49 | bool()
+50 | bool(True)
+   |
+   = help: Replace with 0.0
+
+ℹ Fix
+45 45 | int()
+46 46 | int(1)
+47 47 | float()
+48    |-float(1.0)
+   48 |+1.0
+49 49 | bool()
+50 50 | bool(True)
+51 51 | bool(False)
+
+UP018.py:49:1: UP018 [*] Unnecessary `bool` call (rewrite as a literal)
+   |
+47 | float()
+48 | float(1.0)
+49 | bool()
+   | ^^^^^^ UP018
+50 | bool(True)
+51 | bool(False)
+   |
+   = help: Replace with `False`
+
+ℹ Fix
+46 46 | int(1)
+47 47 | float()
+48 48 | float(1.0)
+49    |-bool()
+   49 |+False
+50 50 | bool(True)
+51 51 | bool(False)
+
+UP018.py:50:1: UP018 [*] Unnecessary `bool` call (rewrite as a literal)
+   |
+48 | float(1.0)
+49 | bool()
+50 | bool(True)
+   | ^^^^^^^^^^ UP018
+51 | bool(False)
+   |
+   = help: Replace with `False`
+
+ℹ Fix
+47 47 | float()
+48 48 | float(1.0)
+49 49 | bool()
+50    |-bool(True)
+   50 |+True
+51 51 | bool(False)
+
+UP018.py:51:1: UP018 [*] Unnecessary `bool` call (rewrite as a literal)
+   |
+49 | bool()
+50 | bool(True)
+51 | bool(False)
+   | ^^^^^^^^^^^ UP018
+   |
+   = help: Replace with `False`
+
+ℹ Fix
+48 48 | float(1.0)
+49 49 | bool()
+50 50 | bool(True)
+51    |-bool(False)
+   51 |+False
 
 

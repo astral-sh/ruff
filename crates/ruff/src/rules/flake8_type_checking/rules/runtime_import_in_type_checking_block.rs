@@ -4,7 +4,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::{NodeId, ReferenceId, Scope};
+use ruff_python_semantic::{NodeId, ResolvedReferenceId, Scope};
 
 use crate::autofix;
 use crate::checkers::ast::Checker;
@@ -104,7 +104,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
             };
 
             if checker.rule_is_ignored(Rule::RuntimeImportInTypeCheckingBlock, import.range.start())
-                || import.parent_range.map_or(false, |parent_range| {
+                || import.parent_range.is_some_and(|parent_range| {
                     checker.rule_is_ignored(
                         Rule::RuntimeImportInTypeCheckingBlock,
                         parent_range.start(),
@@ -180,7 +180,7 @@ struct Import<'a> {
     /// The qualified name of the import (e.g., `typing.List` for `from typing import List`).
     qualified_name: &'a str,
     /// The first reference to the imported symbol.
-    reference_id: ReferenceId,
+    reference_id: ResolvedReferenceId,
     /// The trimmed range of the import (e.g., `List` in `from typing import List`).
     range: TextRange,
     /// The range of the import's parent statement.
@@ -210,13 +210,13 @@ fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[Import]) -> Result
         qualified_names.iter().copied(),
         stmt,
         parent,
-        checker.locator,
-        checker.stylist,
-        checker.indexer,
+        checker.locator(),
+        checker.stylist(),
+        checker.indexer(),
     )?;
 
     // Step 2) Add the import to the top-level.
-    let add_import_edit = checker.importer.runtime_import_edit(
+    let add_import_edit = checker.importer().runtime_import_edit(
         &StmtImports {
             stmt,
             qualified_names,

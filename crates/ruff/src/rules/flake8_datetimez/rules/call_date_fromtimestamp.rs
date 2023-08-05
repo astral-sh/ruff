@@ -1,5 +1,5 @@
+use ruff_python_ast::Expr;
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -29,7 +29,7 @@ pub(crate) fn call_date_fromtimestamp(checker: &mut Checker, func: &Expr, locati
     if checker
         .semantic()
         .resolve_call_path(func)
-        .map_or(false, |call_path| {
+        .is_some_and(|call_path| {
             matches!(call_path.as_slice(), ["datetime", "date", "fromtimestamp"])
         })
     {

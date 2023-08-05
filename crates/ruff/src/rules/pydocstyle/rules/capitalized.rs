@@ -1,5 +1,5 @@
+use ruff_python_ast::Ranged;
 use ruff_text_size::{TextLen, TextRange};
-use rustpython_parser::ast::Ranged;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -69,7 +69,7 @@ pub(crate) fn capitalized(checker: &mut Checker, docstring: &Docstring) {
 
     let body = docstring.body();
     let Some(first_word) = body.split(' ').next() else {
-        return
+        return;
     };
 
     // Like pydocstyle, we only support ASCII for now.

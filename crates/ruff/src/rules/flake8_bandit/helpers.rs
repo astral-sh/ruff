@@ -1,6 +1,6 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustpython_parser::ast::{self, Constant, Expr};
+use ruff_python_ast::{self as ast, Constant, Expr};
 
 use ruff_python_semantic::SemanticModel;
 
@@ -26,18 +26,14 @@ pub(super) fn is_untyped_exception(type_: Option<&Expr>, semantic: &SemanticMode
     type_.map_or(true, |type_| {
         if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &type_ {
             elts.iter().any(|type_| {
-                semantic
-                    .resolve_call_path(type_)
-                    .map_or(false, |call_path| {
-                        matches!(call_path.as_slice(), ["", "Exception" | "BaseException"])
-                    })
-            })
-        } else {
-            semantic
-                .resolve_call_path(type_)
-                .map_or(false, |call_path| {
+                semantic.resolve_call_path(type_).is_some_and(|call_path| {
                     matches!(call_path.as_slice(), ["", "Exception" | "BaseException"])
                 })
+            })
+        } else {
+            semantic.resolve_call_path(type_).is_some_and(|call_path| {
+                matches!(call_path.as_slice(), ["", "Exception" | "BaseException"])
+            })
         }
     })
 }

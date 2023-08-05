@@ -1,30 +1,66 @@
-use crate::comments::Comments;
+use ruff_formatter::{format_args, write, FormatResult};
+use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::ExprListComp;
+
+use crate::context::PyFormatContext;
 use crate::expression::parentheses::{
-    default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
+    parenthesized_with_dangling_comments, NeedsParentheses, OptionalParentheses,
 };
-use crate::{not_yet_implemented_custom_text, FormatNodeRule, PyFormatter};
-use ruff_formatter::{write, Buffer, FormatResult};
-use rustpython_parser::ast::ExprListComp;
+use crate::prelude::*;
+use crate::AsFormat;
+use crate::{FormatNodeRule, PyFormatter};
 
 #[derive(Default)]
 pub struct FormatExprListComp;
 
 impl FormatNodeRule<ExprListComp> for FormatExprListComp {
-    fn fmt_fields(&self, _item: &ExprListComp, f: &mut PyFormatter) -> FormatResult<()> {
-        write!(f, [not_yet_implemented_custom_text("[i for i in []]")])
+    fn fmt_fields(&self, item: &ExprListComp, f: &mut PyFormatter) -> FormatResult<()> {
+        let ExprListComp {
+            range: _,
+            elt,
+            generators,
+        } = item;
+
+        let joined = format_with(|f| {
+            f.join_with(soft_line_break_or_space())
+                .entries(generators.iter().formatted())
+                .finish()
+        });
+
+        let comments = f.context().comments().clone();
+        let dangling = comments.dangling_comments(item);
+
+        write!(
+            f,
+            [parenthesized_with_dangling_comments(
+                "[",
+                dangling,
+                &group(&format_args![
+                    group(&elt.format()),
+                    soft_line_break_or_space(),
+                    &joined
+                ]),
+                "]"
+            )]
+        )
+    }
+
+    fn fmt_dangling_comments(
+        &self,
+        _node: &ExprListComp,
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        // Handled as part of `fmt_fields`
+        Ok(())
     }
 }
 
 impl NeedsParentheses for ExprListComp {
     fn needs_parentheses(
         &self,
-        parenthesize: Parenthesize,
-        source: &str,
-        comments: &Comments,
-    ) -> Parentheses {
-        match default_expression_needs_parentheses(self.into(), parenthesize, source, comments) {
-            Parentheses::Optional => Parentheses::Never,
-            parentheses => parentheses,
-        }
+        _parent: AnyNodeRef,
+        _context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        OptionalParentheses::Never
     }
 }

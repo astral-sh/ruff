@@ -15,7 +15,6 @@ mod search;
 
 #[cfg(test)]
 mod tests {
-    use insta::assert_debug_snapshot;
     use std::fs::{create_dir_all, File};
     use std::io::{self, Write};
     use std::path::{Path, PathBuf};
@@ -127,6 +126,16 @@ mod tests {
 
     fn setup() {
         env_logger::builder().is_test(true).try_init().ok();
+    }
+
+    macro_rules! assert_debug_snapshot_normalize_paths {
+        ($value: ident) => {{
+            // The debug representation for the backslash are two backslashes (escaping)
+            let $value = std::format!("{:#?}", $value).replace("\\\\", "/");
+            // `insta::assert_snapshot` uses the debug representation of the string, which would
+            // be a single line containing `\n`
+            insta::assert_display_snapshot!($value);
+        }};
     }
 
     #[test]
@@ -810,7 +819,7 @@ mod tests {
             },
         );
 
-        assert_debug_snapshot!(result);
+        assert_debug_snapshot_normalize_paths!(result);
     }
 
     #[test]
@@ -831,7 +840,7 @@ mod tests {
             },
         );
 
-        assert_debug_snapshot!(result);
+        assert_debug_snapshot_normalize_paths!(result);
     }
 
     #[test]
@@ -852,7 +861,7 @@ mod tests {
             },
         );
 
-        assert_debug_snapshot!(result);
+        assert_debug_snapshot_normalize_paths!(result);
     }
 
     #[test]
@@ -873,7 +882,7 @@ mod tests {
             },
         );
 
-        assert_debug_snapshot!(result);
+        assert_debug_snapshot_normalize_paths!(result);
     }
 
     #[test]
@@ -894,7 +903,7 @@ mod tests {
             },
         );
 
-        assert_debug_snapshot!(result);
+        assert_debug_snapshot_normalize_paths!(result);
     }
 
     #[test]
@@ -915,7 +924,7 @@ mod tests {
             },
         );
 
-        assert_debug_snapshot!(result);
+        assert_debug_snapshot_normalize_paths!(result);
     }
 
     #[test]
@@ -936,6 +945,6 @@ mod tests {
             },
         );
 
-        assert_debug_snapshot!(result);
+        assert_debug_snapshot_normalize_paths!(result);
     }
 }

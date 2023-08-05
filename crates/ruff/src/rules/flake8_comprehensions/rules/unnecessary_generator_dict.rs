@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, Keyword, Ranged};
+use ruff_python_ast::{self as ast, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
@@ -49,7 +49,9 @@ pub(crate) fn unnecessary_generator_dict(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    let Some(argument) = helpers::exactly_one_argument_with_matching_function("dict", func, args, keywords) else {
+    let Some(argument) =
+        helpers::exactly_one_argument_with_matching_function("dict", func, args, keywords)
+    else {
         return;
     };
     if let Expr::GeneratorExp(ast::ExprGeneratorExp { elt, .. }) = argument {

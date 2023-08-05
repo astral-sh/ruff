@@ -7,14 +7,15 @@ use libcst_native::{
     ParenthesizedNode, SimpleStatementLine, SimpleWhitespace, SmallStatement, Statement,
     TrailingWhitespace, UnaryOperation,
 };
-use rustpython_parser::ast::{self, BoolOp, ExceptHandler, Expr, Keyword, Ranged, Stmt, UnaryOp};
+use ruff_python_ast::{self as ast, BoolOp, ExceptHandler, Expr, Keyword, Ranged, Stmt, UnaryOp};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{has_comments_in, Truthiness};
-use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{visitor, whitespace};
+use ruff_python_codegen::Stylist;
+use ruff_source_file::Locator;
 
 use crate::autofix::codemods::CodegenStylist;
 use crate::checkers::ast::Checker;
@@ -68,6 +69,34 @@ impl Violation for PytestCompositeAssertion {
     }
 }
 
+/// ## What it does
+/// Checks for `assert` statements in `except` clauses.
+///
+/// ## Why is this bad?
+/// When testing for exceptions, `pytest.raises()` should be used instead of
+/// `assert` statements in `except` clauses, as it's more explicit and
+/// idiomatic. Further, `pytest.raises()` will fail if the exception is _not_
+/// raised, unlike the `assert` statement.
+///
+/// ## Example
+/// ```python
+/// def test_foo():
+///     try:
+///         1 / 0
+///     except ZeroDivisionError as e:
+///         assert e.args
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def test_foo():
+///     with pytest.raises(ZeroDivisionError) as exc_info:
+///         1 / 0
+///     assert exc_info.value.args
+/// ```
+///
+/// ## References
+/// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
 #[violation]
 pub struct PytestAssertInExcept {
     name: String,
@@ -83,6 +112,29 @@ impl Violation for PytestAssertInExcept {
     }
 }
 
+/// ## What it does
+/// Checks for `assert` statements whose test expression is a falsy value.
+///
+/// ## Why is this bad?
+/// `pytest.fail` conveys the intent more clearly than `assert falsy_value`.
+///
+/// ## Example
+/// ```python
+/// def test_foo():
+///     if some_condition:
+///         assert False, "some_condition was True"
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def test_foo():
+///     if some_condition:
+///         pytest.fail("some_condition was True")
+///     ...
+/// ```
+///
+/// References
+/// - [`pytest` documentation: `pytest.fail`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fail)
 #[violation]
 pub struct PytestAssertAlwaysFalse;
 
@@ -197,7 +249,7 @@ pub(crate) fn unittest_assertion(
                     if checker.semantic().stmt().is_expr_stmt()
                         && checker.semantic().expr_parent().is_none()
                         && !checker.semantic().scope().kind.is_lambda()
-                        && !has_comments_in(expr.range(), checker.locator)
+                        && !checker.indexer().comment_ranges().intersects(expr.range())
                     {
                         if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
                             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
@@ -226,10 +278,10 @@ pub(crate) fn assert_falsy(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
 }
 
 /// PT017
-pub(crate) fn assert_in_exception_handler(handlers: &[ExceptHandler]) -> Vec<Diagnostic> {
-    handlers
-        .iter()
-        .flat_map(|handler| match handler {
+pub(crate) fn assert_in_exception_handler(checker: &mut Checker, handlers: &[ExceptHandler]) {
+    checker
+        .diagnostics
+        .extend(handlers.iter().flat_map(|handler| match handler {
             ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                 name, body, ..
             }) => {
@@ -239,8 +291,7 @@ pub(crate) fn assert_in_exception_handler(handlers: &[ExceptHandler]) -> Vec<Dia
                     Vec::new()
                 }
             }
-        })
-        .collect()
+        }));
 }
 
 #[derive(Copy, Clone)]
@@ -392,7 +443,8 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
     let statements = if outer_indent.is_empty() {
         &mut tree.body
     } else {
-        let [Statement::Compound(CompoundStatement::FunctionDef(embedding))] = &mut *tree.body else {
+        let [Statement::Compound(CompoundStatement::FunctionDef(embedding))] = &mut *tree.body
+        else {
             bail!("Expected statement to be embedded in a function definition")
         };
 
@@ -483,11 +535,11 @@ pub(crate) fn composite_condition(
         if checker.patch(diagnostic.kind.rule()) {
             if matches!(composite, CompositionKind::Simple)
                 && msg.is_none()
-                && !has_comments_in(stmt.range(), checker.locator)
+                && !checker.indexer().comment_ranges().intersects(stmt.range())
             {
                 #[allow(deprecated)]
                 diagnostic.try_set_fix_from_edit(|| {
-                    fix_composite_condition(stmt, checker.locator, checker.stylist)
+                    fix_composite_condition(stmt, checker.locator(), checker.stylist())
                 });
             }
         }

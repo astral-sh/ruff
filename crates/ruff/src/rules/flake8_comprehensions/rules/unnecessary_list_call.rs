@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, Ranged};
+use ruff_python_ast::{Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
@@ -58,7 +58,7 @@ pub(crate) fn unnecessary_list_call(
     if checker.patch(diagnostic.kind.rule()) {
         #[allow(deprecated)]
         diagnostic.try_set_fix_from_edit(|| {
-            fixes::fix_unnecessary_list_call(checker.locator, checker.stylist, expr)
+            fixes::fix_unnecessary_list_call(checker.locator(), checker.stylist(), expr)
         });
     }
     checker.diagnostics.push(diagnostic);

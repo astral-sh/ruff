@@ -1,10 +1,11 @@
 use itertools::Itertools;
-use rustpython_parser::ast::{Alias, Ranged, Stmt};
+use ruff_python_ast::{Alias, Ranged, Stmt};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::whitespace::indentation;
+use ruff_python_codegen::Stylist;
+use ruff_source_file::Locator;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -471,7 +472,7 @@ impl<'a> ImportReplacer<'a> {
             // line, we can't add a statement after it. For example, if we have
             // `if True: import foo`, we can't add a statement to the next line.
             let Some(indentation) = indentation else {
-                 let operation = WithoutRename {
+                let operation = WithoutRename {
                     target: target.to_string(),
                     members: matched_names
                         .iter()
@@ -548,10 +549,10 @@ pub(crate) fn deprecated_import(
     level: Option<u32>,
 ) {
     // Avoid relative and star imports.
-    if level.map_or(false, |level| level > 0) {
+    if level.is_some_and(|level| level > 0) {
         return;
     }
-    if names.first().map_or(false, |name| &name.name == "*") {
+    if names.first().is_some_and(|name| &name.name == "*") {
         return;
     }
     let Some(module) = module else {
@@ -567,8 +568,8 @@ pub(crate) fn deprecated_import(
         stmt,
         module,
         &members,
-        checker.locator,
-        checker.stylist,
+        checker.locator(),
+        checker.stylist(),
         checker.settings.target_version,
     );
 

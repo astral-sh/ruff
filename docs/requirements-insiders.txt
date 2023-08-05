@@ -1,0 +1,4 @@
+PyYAML==6.0
+black==23.3.0
+mkdocs==1.4.3
+git+ssh://git@github.com/astral-sh/mkdocs-material-insiders.git

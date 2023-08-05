@@ -12,7 +12,7 @@ use crate::rules::{
     flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
     flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
-    pycodestyle, pydocstyle, pyflakes, pylint,
+    pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
 };
 use crate::settings::types::{PythonVersion, SerializationFormat, Version};
 
@@ -324,6 +324,30 @@ pub struct Options {
     /// The tabulation size to calculate line length.
     pub tab_size: Option<TabSize>,
     #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"logger-objects = ["logging_setup.logger"]"#
+    )]
+    /// A list of objects that should be treated equivalently to a
+    /// `logging.Logger` object.
+    ///
+    /// This is useful for ensuring proper diagnostics (e.g., to identify
+    /// `logging` deprecations and other best-practices) for projects that
+    /// re-export a `logging.Logger` object from a common module.
+    ///
+    /// For example, if you have a module `logging_setup.py` with the following
+    /// contents:
+    /// ```python
+    /// import logging
+    ///
+    /// logger = logging.getLogger(__name__)
+    /// ```
+    ///
+    /// Adding `"logging_setup.logger"` to `logger-objects` will ensure that
+    /// `logging_setup.logger` is treated as a `logging.Logger` object when
+    /// imported from other modules (e.g., `from logging_setup import logger`).
+    pub logger_objects: Option<Vec<String>>,
+    #[option(
         default = "None",
         value_type = "str",
         example = r#"
@@ -391,22 +415,22 @@ pub struct Options {
             src = ["src", "test"]
         "#
     )]
-    /// The source code paths to consider, e.g., when resolving first- vs.
-    /// third-party imports.
+    /// The directories to consider when resolving first- vs. third-party
+    /// imports.
     ///
     /// As an example: given a Python package structure like:
     ///
     /// ```text
-    /// my_package/
-    ///   pyproject.toml
-    ///   src/
-    ///     my_package/
-    ///       __init__.py
-    ///       foo.py
-    ///       bar.py
+    /// my_project
+    /// ├── pyproject.toml
+    /// └── src
+    ///     └── my_package
+    ///         ├── __init__.py
+    ///         ├── foo.py
+    ///         └── bar.py
     /// ```
     ///
-    /// The `src` directory should be included in the `src` option
+    /// The `./src` directory should be included in the `src` option
     /// (e.g., `src = ["src"]`), such that when resolving imports,
     /// `my_package.foo` is considered a first-party import.
     ///
@@ -463,7 +487,7 @@ pub struct Options {
         value_type = "list[str]",
         example = r#"typing-modules = ["airflow.typing_compat"]"#
     )]
-    /// A list of modules whose imports should be treated equivalently to
+    /// A list of modules whose exports should be treated equivalently to
     /// members of the `typing` module.
     ///
     /// This is useful for ensuring proper type annotation inference for
@@ -498,7 +522,7 @@ pub struct Options {
     /// Options for the `flake8-comprehensions` plugin.
     pub flake8_comprehensions: Option<flake8_comprehensions::settings::Options>,
     #[option_group]
-    /// Options for the `copyright` plugin.
+    /// Options for the `flake8-copyright` plugin.
     pub flake8_copyright: Option<flake8_copyright::settings::Options>,
     #[option_group]
     /// Options for the `flake8-errmsg` plugin.
@@ -551,6 +575,9 @@ pub struct Options {
     #[option_group]
     /// Options for the `pylint` plugin.
     pub pylint: Option<pylint::settings::Options>,
+    #[option_group]
+    /// Options for the `pyupgrade` plugin.
+    pub pyupgrade: Option<pyupgrade::settings::Options>,
     // Tables are required to go last.
     #[option(
         default = "{}",

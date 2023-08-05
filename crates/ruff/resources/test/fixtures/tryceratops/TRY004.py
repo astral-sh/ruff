@@ -230,6 +230,15 @@ def incorrect_multi_conditional(arg1, arg2):
         raise Exception("...")  # should be typeerror
 
 
+def multiple_is_instance_checks(some_arg):
+    if isinstance(some_arg, str):
+        pass
+    elif isinstance(some_arg, int):
+        pass
+    else:
+        raise Exception("...")   # should be typeerror
+
+
 class MyCustomTypeValidation(Exception):
     pass
 
@@ -294,6 +303,17 @@ def multiple_ifs(some_args):
                 raise ValueError("...")  # this is ok if we don't simplify
             else:
                 pass
+
+
+def else_body(obj):
+    if isinstance(obj, datetime.timedelta):
+        return "TimeDelta"
+    elif isinstance(obj, relativedelta.relativedelta):
+        return "RelativeDelta"
+    elif isinstance(obj, CronExpression):
+        return "CronExpression"
+    else:
+        raise Exception(f"Unknown object type: {obj.__class__.__name__}")
 
 
 def early_return():

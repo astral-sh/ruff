@@ -1,5 +1,5 @@
-use rustpython_parser::ast;
-use rustpython_parser::ast::Stmt;
+use ruff_python_ast as ast;
+use ruff_python_ast::Stmt;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -48,10 +48,11 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
         name,
         decorator_list,
         returns,
-        args,
+        parameters,
         ..
-    }) = stmt else {
-        return
+    }) = stmt
+    else {
+        return;
     };
 
     let Some(returns) = returns else {
@@ -68,7 +69,9 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
 
     // It is a violation only if the method signature matches that of `object.__str__`
     // or `object.__repr__` exactly and the method is not decorated as abstract.
-    if !args.kwonlyargs.is_empty() || (args.args.len() + args.posonlyargs.len()) > 1 {
+    if !parameters.kwonlyargs.is_empty()
+        || (parameters.args.len() + parameters.posonlyargs.len()) > 1
+    {
         return;
     }
 
@@ -95,7 +98,7 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
     if checker.patch(diagnostic.kind.rule()) {
         let stmt = checker.semantic().stmt();
         let parent = checker.semantic().stmt_parent();
-        let edit = delete_stmt(stmt, parent, checker.locator, checker.indexer);
+        let edit = delete_stmt(stmt, parent, checker.locator(), checker.indexer());
         diagnostic.set_fix(
             Fix::automatic(edit).isolate(checker.isolation(checker.semantic().stmt_parent())),
         );

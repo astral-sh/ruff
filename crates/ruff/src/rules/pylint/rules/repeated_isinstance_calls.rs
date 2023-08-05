@@ -1,6 +1,6 @@
 use itertools::Itertools;
+use ruff_python_ast::{self as ast, Arguments, BoolOp, Expr, Ranged};
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_parser::ast::{self, BoolOp, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -73,7 +73,12 @@ pub(crate) fn repeated_isinstance_calls(
     let mut obj_to_types: FxHashMap<HashableExpr, (usize, FxHashSet<HashableExpr>)> =
         FxHashMap::default();
     for value in values {
-        let Expr::Call(ast::ExprCall { func, args, .. }) = value else {
+        let Expr::Call(ast::ExprCall {
+            func,
+            arguments: Arguments { args, .. },
+            ..
+        }) = value
+        else {
             continue;
         };
         if !matches!(func.as_ref(), Expr::Name(ast::ExprName { id, .. }) if id == "isinstance") {

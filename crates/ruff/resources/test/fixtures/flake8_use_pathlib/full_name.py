@@ -2,6 +2,7 @@ import os
 import os.path
 
 p = "/foo"
+q = "bar"
 
 a = os.path.abspath(p)
 aa = os.chmod(p)
@@ -21,7 +22,9 @@ bbbbb = os.path.islink(p)
 os.readlink(p)
 os.stat(p)
 os.path.isabs(p)
-os.path.join(p)
+os.path.join(p, q)
+os.sep.join([p, q])
+os.sep.join((p, q))
 os.path.basename(p)
 os.path.dirname(p)
 os.path.samefile(p)

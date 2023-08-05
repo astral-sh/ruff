@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Decorator, Expr, Ranged};
+use ruff_python_ast::{self as ast, Decorator, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -70,7 +70,7 @@ impl Violation for CachedInstanceMethod {
 }
 
 fn is_cache_func(expr: &Expr, semantic: &SemanticModel) -> bool {
-    semantic.resolve_call_path(expr).map_or(false, |call_path| {
+    semantic.resolve_call_path(expr).is_some_and(|call_path| {
         matches!(call_path.as_slice(), ["functools", "lru_cache" | "cache"])
     })
 }

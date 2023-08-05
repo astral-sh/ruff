@@ -10,6 +10,7 @@ F602.py:5:5: F602 Dictionary key `a` repeated
 6 |     b: 3,
 7 | }
   |
+  = help: Remove repeated key `a`
 
 F602.py:11:5: F602 Dictionary key `a` repeated
    |
@@ -20,6 +21,7 @@ F602.py:11:5: F602 Dictionary key `a` repeated
 12 |     a: 3,
 13 |     a: 3,
    |
+   = help: Remove repeated key `a`
 
 F602.py:12:5: F602 Dictionary key `a` repeated
    |
@@ -30,6 +32,7 @@ F602.py:12:5: F602 Dictionary key `a` repeated
 13 |     a: 3,
 14 | }
    |
+   = help: Remove repeated key `a`
 
 F602.py:13:5: F602 [*] Dictionary key `a` repeated
    |
@@ -59,6 +62,7 @@ F602.py:18:5: F602 Dictionary key `a` repeated
 19 |     a: 3,
 20 |     a: 3,
    |
+   = help: Remove repeated key `a`
 
 F602.py:19:5: F602 Dictionary key `a` repeated
    |
@@ -69,6 +73,7 @@ F602.py:19:5: F602 Dictionary key `a` repeated
 20 |     a: 3,
 21 |     a: 4,
    |
+   = help: Remove repeated key `a`
 
 F602.py:20:5: F602 [*] Dictionary key `a` repeated
    |
@@ -98,6 +103,7 @@ F602.py:21:5: F602 Dictionary key `a` repeated
    |     ^ F602
 22 | }
    |
+   = help: Remove repeated key `a`
 
 F602.py:26:5: F602 [*] Dictionary key `a` repeated
    |
@@ -128,6 +134,7 @@ F602.py:27:5: F602 Dictionary key `a` repeated
 28 |     a: 3,
 29 |     a: 4,
    |
+   = help: Remove repeated key `a`
 
 F602.py:28:5: F602 Dictionary key `a` repeated
    |
@@ -138,6 +145,7 @@ F602.py:28:5: F602 Dictionary key `a` repeated
 29 |     a: 4,
 30 | }
    |
+   = help: Remove repeated key `a`
 
 F602.py:29:5: F602 Dictionary key `a` repeated
    |
@@ -147,6 +155,7 @@ F602.py:29:5: F602 Dictionary key `a` repeated
    |     ^ F602
 30 | }
    |
+   = help: Remove repeated key `a`
 
 F602.py:35:5: F602 [*] Dictionary key `a` repeated
    |
@@ -177,6 +186,7 @@ F602.py:37:5: F602 Dictionary key `a` repeated
 38 |     "a": 3,
 39 |     a: 3,
    |
+   = help: Remove repeated key `a`
 
 F602.py:39:5: F602 Dictionary key `a` repeated
    |
@@ -187,6 +197,7 @@ F602.py:39:5: F602 Dictionary key `a` repeated
 40 |     "a": 3,
 41 |     a: 4,
    |
+   = help: Remove repeated key `a`
 
 F602.py:41:5: F602 Dictionary key `a` repeated
    |
@@ -196,6 +207,7 @@ F602.py:41:5: F602 Dictionary key `a` repeated
    |     ^ F602
 42 | }
    |
+   = help: Remove repeated key `a`
 
 F602.py:44:12: F602 [*] Dictionary key `a` repeated
    |

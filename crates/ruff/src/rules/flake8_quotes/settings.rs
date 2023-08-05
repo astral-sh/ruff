@@ -8,10 +8,10 @@ use ruff_macros::{CacheKey, CombineOptions, ConfigurationOptions};
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum Quote {
-    /// Use single quotes.
-    Single,
     /// Use double quotes.
     Double,
+    /// Use single quotes.
+    Single,
 }
 
 impl Default for Quote {

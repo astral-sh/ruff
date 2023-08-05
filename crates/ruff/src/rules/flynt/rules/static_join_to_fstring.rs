@@ -1,6 +1,6 @@
 use itertools::Itertools;
+use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Ranged};
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -9,6 +9,24 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 use crate::rules::flynt::helpers;
 
+/// ## What it does
+/// Checks for `str#join` calls that can be replaced with f-strings.
+///
+/// ## Why is this bad?
+/// f-strings are more readable and generally preferred over `str#join` calls.
+///
+/// ## Example
+/// ```python
+/// " ".join((foo, bar))
+/// ```
+///
+/// Use instead:
+/// ```python
+/// f"{foo} {bar}"
+/// ```
+///
+/// ## References
+/// - [Python documentation: f-strings](https://docs.python.org/3/reference/lexical_analysis.html#f-strings)
 #[violation]
 pub struct StaticJoinToFString {
     expr: String,
@@ -89,10 +107,10 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
 
 pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner: &str) {
     let Expr::Call(ast::ExprCall {
-        args,
-        keywords,
+        arguments: Arguments { args, keywords, .. },
         ..
-    }) = expr else {
+    }) = expr
+    else {
         return;
     };
 
@@ -111,7 +129,9 @@ pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner:
 
     // Try to build the fstring (internally checks whether e.g. the elements are
     // convertible to f-string parts).
-    let Some(new_expr) = build_fstring(joiner, joinees) else { return };
+    let Some(new_expr) = build_fstring(joiner, joinees) else {
+        return;
+    };
 
     let contents = checker.generator().expr(&new_expr);
 

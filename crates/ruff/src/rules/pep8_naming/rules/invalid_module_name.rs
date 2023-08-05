@@ -55,7 +55,7 @@ pub(crate) fn invalid_module_name(
 ) -> Option<Diagnostic> {
     if !path
         .extension()
-        .map_or(false, |ext| ext == "py" || ext == "pyi")
+        .is_some_and(|ext| ext == "py" || ext == "pyi")
     {
         return None;
     }
@@ -97,7 +97,7 @@ pub(crate) fn invalid_module_name(
 
 /// Return `true` if a [`Path`] should use the name of its parent directory as its module name.
 fn is_module_file(path: &Path) -> bool {
-    path.file_name().map_or(false, |file_name| {
+    path.file_name().is_some_and(|file_name| {
         file_name == "__init__.py"
             || file_name == "__init__.pyi"
             || file_name == "__main__.py"
@@ -110,5 +110,5 @@ fn is_migration_file(path: &Path) -> bool {
     path.parent()
         .and_then(Path::file_name)
         .and_then(OsStr::to_str)
-        .map_or(false, |parent| matches!(parent, "versions" | "migrations"))
+        .is_some_and(|parent| matches!(parent, "versions" | "migrations"))
 }

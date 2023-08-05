@@ -2,7 +2,7 @@
 
 # Ruff
 
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![image](https://img.shields.io/pypi/v/ruff.svg)](https://pypi.python.org/pypi/ruff)
 [![image](https://img.shields.io/pypi/l/ruff.svg)](https://pypi.python.org/pypi/ruff)
 [![image](https://img.shields.io/pypi/pyversions/ruff.svg)](https://pypi.python.org/pypi/ruff)
@@ -32,9 +32,10 @@ An extremely fast Python linter, written in Rust.
 - 🔧 Autofix support, for automatic error correction (e.g., automatically remove unused imports)
 - 📏 Over [500 built-in rules](https://beta.ruff.rs/docs/rules/)
 - ⚖️ [Near-parity](https://beta.ruff.rs/docs/faq/#how-does-ruff-compare-to-flake8) with the
-  built-in Flake8 rule set
+    built-in Flake8 rule set
 - 🔌 Native re-implementations of dozens of Flake8 plugins, like flake8-bugbear
-- ⌨️ First-party editor integrations for [VS Code](https://github.com/astral-sh/ruff-vscode) and [more](https://github.com/astral-sh/ruff-lsp)
+- ⌨️ First-party [editor integrations](https://beta.ruff.rs/docs/editor-integrations/) for
+    [VS Code](https://github.com/astral-sh/ruff-vscode) and [more](https://github.com/astral-sh/ruff-lsp)
 - 🌎 Monorepo-friendly, with [hierarchical and cascading configuration](https://beta.ruff.rs/docs/configuration/#pyprojecttoml-discovery)
 
 Ruff aims to be orders of magnitude faster than alternative tools while integrating more
@@ -139,7 +140,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com) hook:
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.0.275
+  rev: v0.0.282
   hooks:
     - id: ruff
 ```
@@ -347,6 +348,7 @@ Ruff is released under the MIT license.
 Ruff is used by a number of major open-source projects and companies, including:
 
 - Amazon ([AWS SAM](https://github.com/aws/serverless-application-model))
+- Anthropic ([Python SDK](https://github.com/anthropics/anthropic-sdk-python))
 - [Apache Airflow](https://github.com/apache/airflow)
 - AstraZeneca ([Magnus](https://github.com/AstraZeneca/magnus-core))
 - Benchling ([Refac](https://github.com/benchling/refac))
@@ -356,26 +358,30 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [DVC](https://github.com/iterative/dvc)
 - [Dagger](https://github.com/dagger/dagger)
 - [Dagster](https://github.com/dagster-io/dagster)
+- Databricks ([MLflow](https://github.com/mlflow/mlflow))
 - [FastAPI](https://github.com/tiangolo/fastapi)
 - [Gradio](https://github.com/gradio-app/gradio)
 - [Great Expectations](https://github.com/great-expectations/great_expectations)
+- [HTTPX](https://github.com/encode/httpx)
 - Hugging Face ([Transformers](https://github.com/huggingface/transformers),
-  [Datasets](https://github.com/huggingface/datasets),
-  [Diffusers](https://github.com/huggingface/diffusers))
+    [Datasets](https://github.com/huggingface/datasets),
+    [Diffusers](https://github.com/huggingface/diffusers))
 - [Hatch](https://github.com/pypa/hatch)
 - [Home Assistant](https://github.com/home-assistant/core)
+- ING Bank ([popmon](https://github.com/ing-bank/popmon), [probatus](https://github.com/ing-bank/probatus))
 - [Ibis](https://github.com/ibis-project/ibis)
 - [Jupyter](https://github.com/jupyter-server/jupyter_server)
 - [LangChain](https://github.com/hwchase17/langchain)
 - [LlamaIndex](https://github.com/jerryjliu/llama_index)
 - Matrix ([Synapse](https://github.com/matrix-org/synapse))
+- [MegaLinter](https://github.com/oxsecurity/megalinter)
 - Meltano ([Meltano CLI](https://github.com/meltano/meltano), [Singer SDK](https://github.com/meltano/sdk))
+- Microsoft ([Semantic Kernel](https://github.com/microsoft/semantic-kernel),
+    [ONNX Runtime](https://github.com/microsoft/onnxruntime),
+    [LightGBM](https://github.com/microsoft/LightGBM))
 - Modern Treasury ([Python SDK](https://github.com/Modern-Treasury/modern-treasury-python-sdk))
 - Mozilla ([Firefox](https://github.com/mozilla/gecko-dev))
-- [MegaLinter](https://github.com/oxsecurity/megalinter)
-- Microsoft ([Semantic Kernel](https://github.com/microsoft/semantic-kernel),
-  [ONNX Runtime](https://github.com/microsoft/onnxruntime),
-  [LightGBM](https://github.com/microsoft/LightGBM))
+- [Mypy](https://github.com/python/mypy)
 - Netflix ([Dispatch](https://github.com/Netflix/dispatch))
 - [Neon](https://github.com/neondatabase/neon)
 - [ONNX](https://github.com/onnx/onnx)
@@ -391,7 +397,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [PyTorch](https://github.com/pytorch/pytorch)
 - [Pydantic](https://github.com/pydantic/pydantic)
 - [Pylint](https://github.com/PyCQA/pylint)
-- [Pynecone](https://github.com/pynecone-io/pynecone)
+- [Reflex](https://github.com/reflex-dev/reflex)
 - [Robyn](https://github.com/sansyrox/robyn)
 - Scale AI ([Launch SDK](https://github.com/scaleapi/launch-python-client))
 - Snowflake ([SnowCLI](https://github.com/Snowflake-Labs/snowcli))
@@ -411,19 +417,20 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [featuretools](https://github.com/alteryx/featuretools)
 - [meson-python](https://github.com/mesonbuild/meson-python)
 - [nox](https://github.com/wntrblm/nox)
+- [pip](https://github.com/pypa/pip)
 
 ### Show Your Support
 
 If you're using Ruff, consider adding the Ruff badge to project's `README.md`:
 
 ```md
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 ```
 
 ...or `README.rst`:
 
 ```rst
-.. image:: https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json
+.. image:: https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json
     :target: https://github.com/astral-sh/ruff
     :alt: Ruff
 ```
@@ -431,7 +438,7 @@ If you're using Ruff, consider adding the Ruff badge to project's `README.md`:
 ...or, as HTML:
 
 ```html
-<a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json" alt="Ruff" style="max-width:100%;"></a>
+<a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff" style="max-width:100%;"></a>
 ```
 
 ## License
@@ -440,6 +447,6 @@ MIT
 
 <div align="center">
   <a target="_blank" href="https://astral.sh" style="background:none">
-    <img src="https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/svg/Astral.svg">
+    <img src="https://raw.githubusercontent.com/astral-sh/ruff/main/assets/svg/Astral.svg">
   </a>
 </div>

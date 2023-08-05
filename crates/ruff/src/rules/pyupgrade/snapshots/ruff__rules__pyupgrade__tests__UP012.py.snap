@@ -452,6 +452,8 @@ UP012.py:69:1: UP012 [*] Unnecessary call to `encode` as UTF-8
 71 | |     "def"
 72 | | )).encode()
    | |___________^ UP012
+73 |   
+74 |   (f"foo{bar}").encode("utf-8")
    |
    = help: Rewrite as bytes literal
 
@@ -465,5 +467,82 @@ UP012.py:69:1: UP012 [*] Unnecessary call to `encode` as UTF-8
    70 |+    b"abc"
    71 |+    b"def"
    72 |+))
+73 73 | 
+74 74 | (f"foo{bar}").encode("utf-8")
+75 75 | (f"foo{bar}").encode(encoding="utf-8")
+
+UP012.py:74:1: UP012 [*] Unnecessary call to `encode` as UTF-8
+   |
+72 | )).encode()
+73 | 
+74 | (f"foo{bar}").encode("utf-8")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP012
+75 | (f"foo{bar}").encode(encoding="utf-8")
+76 | ("unicode text©").encode("utf-8")
+   |
+   = help: Remove unnecessary encoding argument
+
+ℹ Fix
+71 71 |     "def"
+72 72 | )).encode()
+73 73 | 
+74    |-(f"foo{bar}").encode("utf-8")
+   74 |+(f"foo{bar}").encode()
+75 75 | (f"foo{bar}").encode(encoding="utf-8")
+76 76 | ("unicode text©").encode("utf-8")
+77 77 | ("unicode text©").encode(encoding="utf-8")
+
+UP012.py:75:1: UP012 [*] Unnecessary call to `encode` as UTF-8
+   |
+74 | (f"foo{bar}").encode("utf-8")
+75 | (f"foo{bar}").encode(encoding="utf-8")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP012
+76 | ("unicode text©").encode("utf-8")
+77 | ("unicode text©").encode(encoding="utf-8")
+   |
+   = help: Remove unnecessary encoding argument
+
+ℹ Fix
+72 72 | )).encode()
+73 73 | 
+74 74 | (f"foo{bar}").encode("utf-8")
+75    |-(f"foo{bar}").encode(encoding="utf-8")
+   75 |+(f"foo{bar}").encode()
+76 76 | ("unicode text©").encode("utf-8")
+77 77 | ("unicode text©").encode(encoding="utf-8")
+
+UP012.py:76:1: UP012 [*] Unnecessary call to `encode` as UTF-8
+   |
+74 | (f"foo{bar}").encode("utf-8")
+75 | (f"foo{bar}").encode(encoding="utf-8")
+76 | ("unicode text©").encode("utf-8")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP012
+77 | ("unicode text©").encode(encoding="utf-8")
+   |
+   = help: Remove unnecessary encoding argument
+
+ℹ Fix
+73 73 | 
+74 74 | (f"foo{bar}").encode("utf-8")
+75 75 | (f"foo{bar}").encode(encoding="utf-8")
+76    |-("unicode text©").encode("utf-8")
+   76 |+("unicode text©").encode()
+77 77 | ("unicode text©").encode(encoding="utf-8")
+
+UP012.py:77:1: UP012 [*] Unnecessary call to `encode` as UTF-8
+   |
+75 | (f"foo{bar}").encode(encoding="utf-8")
+76 | ("unicode text©").encode("utf-8")
+77 | ("unicode text©").encode(encoding="utf-8")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP012
+   |
+   = help: Remove unnecessary encoding argument
+
+ℹ Fix
+74 74 | (f"foo{bar}").encode("utf-8")
+75 75 | (f"foo{bar}").encode(encoding="utf-8")
+76 76 | ("unicode text©").encode("utf-8")
+77    |-("unicode text©").encode(encoding="utf-8")
+   77 |+("unicode text©").encode()
 
 

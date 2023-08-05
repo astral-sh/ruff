@@ -3,17 +3,24 @@ use crate::comments::{
 };
 use crate::context::PyFormatContext;
 pub use crate::options::{MagicTrailingComma, PyFormatOptions, QuoteStyle};
-use anyhow::{anyhow, Context, Result};
-use ruff_formatter::prelude::*;
-use ruff_formatter::{format, write};
+use ruff_formatter::format_element::tag;
+use ruff_formatter::prelude::{
+    dynamic_text, source_position, source_text_slice, text, ContainsNewlines, Formatter, Tag,
+};
+use ruff_formatter::{
+    format, normalize_newlines, write, Buffer, Format, FormatElement, FormatError, FormatResult,
+    PrintError,
+};
 use ruff_formatter::{Formatted, Printed, SourceCode};
 use ruff_python_ast::node::{AnyNodeRef, AstNode, NodeKind};
-use ruff_python_ast::source_code::{CommentRanges, CommentRangesBuilder, Locator};
+use ruff_python_ast::{Mod, Ranged};
+use ruff_python_index::{CommentRanges, CommentRangesBuilder};
+use ruff_python_parser::lexer::{lex, LexicalError};
+use ruff_python_parser::{parse_tokens, Mode, ParseError};
+use ruff_source_file::Locator;
 use ruff_text_size::{TextLen, TextRange};
-use rustpython_parser::ast::{Mod, Ranged};
-use rustpython_parser::lexer::lex;
-use rustpython_parser::{parse_tokens, Mode};
 use std::borrow::Cow;
+use thiserror::Error;
 
 pub(crate) mod builders;
 pub mod cli;
@@ -27,7 +34,7 @@ pub(crate) mod other;
 pub(crate) mod pattern;
 mod prelude;
 pub(crate) mod statement;
-mod trivia;
+pub(crate) mod type_param;
 
 include!("../../ruff_formatter/shared_traits.rs");
 
@@ -70,7 +77,7 @@ where
     /// default implementation formats the dangling comments at the end of the node, which isn't ideal but ensures that
     /// no comments are dropped.
     ///
-    /// A node can have dangling comments if all its children are tokens or if all node childrens are optional.
+    /// A node can have dangling comments if all its children are tokens or if all node children are optional.
     fn fmt_dangling_comments(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
         dangling_node_comments(node).fmt(f)
     }
@@ -84,16 +91,40 @@ where
     }
 }
 
-pub fn format_module(contents: &str, options: PyFormatOptions) -> Result<Printed> {
+#[derive(Error, Debug)]
+pub enum FormatModuleError {
+    #[error("source contains syntax errors (lexer error): {0:?}")]
+    LexError(LexicalError),
+    #[error("source contains syntax errors (parser error): {0:?}")]
+    ParseError(ParseError),
+    #[error(transparent)]
+    FormatError(#[from] FormatError),
+    #[error(transparent)]
+    PrintError(#[from] PrintError),
+}
+
+impl From<LexicalError> for FormatModuleError {
+    fn from(value: LexicalError) -> Self {
+        Self::LexError(value)
+    }
+}
+
+impl From<ParseError> for FormatModuleError {
+    fn from(value: ParseError) -> Self {
+        Self::ParseError(value)
+    }
+}
+
+pub fn format_module(
+    contents: &str,
+    options: PyFormatOptions,
+) -> Result<Printed, FormatModuleError> {
     // Tokenize once
     let mut tokens = Vec::new();
     let mut comment_ranges = CommentRangesBuilder::default();
 
     for result in lex(contents, Mode::Module) {
-        let (token, range) = match result {
-            Ok((token, range)) => (token, range),
-            Err(err) => return Err(anyhow!("Source contains syntax errors {err:?}")),
-        };
+        let (token, range) = result?;
 
         comment_ranges.visit_token(&token, range);
         tokens.push(Ok((token, range)));
@@ -102,14 +133,11 @@ pub fn format_module(contents: &str, options: PyFormatOptions) -> Result<Printed
     let comment_ranges = comment_ranges.finish();
 
     // Parse the AST.
-    let python_ast = parse_tokens(tokens, Mode::Module, "<filename>")
-        .with_context(|| "Syntax error in input")?;
+    let python_ast = parse_tokens(tokens, Mode::Module, "<filename>")?;
 
     let formatted = format_node(&python_ast, &comment_ranges, contents, options)?;
 
-    formatted
-        .print()
-        .with_context(|| "Failed to print the formatter IR")
+    Ok(formatted.print()?)
 }
 
 pub fn format_node<'a>(
@@ -160,6 +188,7 @@ impl Format<PyFormatContext<'_>> for NotYetImplemented {
 pub(crate) struct NotYetImplementedCustomText(&'static str);
 
 /// Formats a placeholder for nodes that have not yet been implemented
+#[allow(dead_code)]
 pub(crate) const fn not_yet_implemented_custom_text(
     text: &'static str,
 ) -> NotYetImplementedCustomText {
@@ -223,9 +252,10 @@ mod tests {
     use crate::{format_module, format_node, PyFormatOptions};
     use anyhow::Result;
     use insta::assert_snapshot;
-    use ruff_python_ast::source_code::CommentRangesBuilder;
-    use rustpython_parser::lexer::lex;
-    use rustpython_parser::{parse_tokens, Mode};
+    use ruff_python_index::CommentRangesBuilder;
+    use ruff_python_parser::lexer::lex;
+    use ruff_python_parser::{parse_tokens, Mode};
+    use std::path::Path;
 
     /// Very basic test intentionally kept very similar to the CLI
     #[test]
@@ -253,11 +283,31 @@ if True:
     #[test]
     fn quick_test() {
         let src = r#"
-if [
-    aaaaaa,
-    BBBB,ccccccccc,ddddddd,eeeeeeeeee,ffffff
-] & bbbbbbbbbbbbbbbbbbddddddddddddddddddddddddddddbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:
+with (
+    [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "bbbbbbbbbb",
+        "cccccccccccccccccccccccccccccccccccccccccc",
+        dddddddddddddddddddddddddddddddd,
+    ] as example1,
+    aaaaaaaaaaaaaaaaaaaaaaaaaa
+    + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    + cccccccccccccccccccccccccccc
+    + ddddddddddddddddd as example2,
+    CtxManager2() as example2,
+    CtxManager2() as example2,
+    CtxManager2() as example2,
+):
     ...
+
+with [
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "bbbbbbbbbb",
+    "cccccccccccccccccccccccccccccccccccccccccc",
+    dddddddddddddddddddddddddddddddd,
+] as example1, aaaaaaaaaaaaaaaaaaaaaaaaaa * bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb * cccccccccccccccccccccccccccc + ddddddddddddddddd as example2, CtxManager222222222222222() as example2:
+    ...
+
 "#;
         // Tokenize once
         let mut tokens = Vec::new();
@@ -272,15 +322,10 @@ if [
         let comment_ranges = comment_ranges.finish();
 
         // Parse the AST.
-        let python_ast = parse_tokens(tokens, Mode::Module, "<filename>").unwrap();
-
-        let formatted = format_node(
-            &python_ast,
-            &comment_ranges,
-            src,
-            PyFormatOptions::default(),
-        )
-        .unwrap();
+        let source_path = "code_inline.py";
+        let python_ast = parse_tokens(tokens, Mode::Module, source_path).unwrap();
+        let options = PyFormatOptions::from_extension(Path::new(source_path));
+        let formatted = format_node(&python_ast, &comment_ranges, src, options).unwrap();
 
         // Uncomment the `dbg` to print the IR.
         // Use `dbg_write!(f, []) instead of `write!(f, [])` in your formatting code to print some IR

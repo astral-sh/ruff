@@ -1,7 +1,8 @@
-use rustpython_ast::{ArgWithDefault, Mod, TypeIgnore};
-use rustpython_parser::ast::{
-    self, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Constant, Decorator, ExceptHandler,
-    Expr, Keyword, MatchCase, Operator, Pattern, Stmt, UnaryOp, WithItem,
+use crate::{
+    self as ast, Alias, Arguments, BoolOp, CmpOp, Comprehension, Constant, Decorator,
+    ElifElseClause, ExceptHandler, Expr, Keyword, MatchCase, Mod, Operator, Parameter,
+    ParameterWithDefault, Parameters, Pattern, Stmt, TypeParam, TypeParamTypeVar, TypeParams,
+    UnaryOp, WithItem,
 };
 
 /// Visitor that traverses all nodes recursively in pre-order.
@@ -26,9 +27,7 @@ pub trait PreorderVisitor<'a> {
         walk_decorator(self, decorator);
     }
 
-    fn visit_constant(&mut self, constant: &'a Constant) {
-        walk_constant(self, constant);
-    }
+    fn visit_constant(&mut self, _constant: &'a Constant) {}
 
     fn visit_bool_op(&mut self, bool_op: &'a BoolOp) {
         walk_bool_op(self, bool_op);
@@ -62,12 +61,16 @@ pub trait PreorderVisitor<'a> {
         walk_arguments(self, arguments);
     }
 
-    fn visit_arg(&mut self, arg: &'a Arg) {
-        walk_arg(self, arg);
+    fn visit_parameters(&mut self, parameters: &'a Parameters) {
+        walk_parameters(self, parameters);
     }
 
-    fn visit_arg_with_default(&mut self, arg_with_default: &'a ArgWithDefault) {
-        walk_arg_with_default(self, arg_with_default);
+    fn visit_parameter(&mut self, arg: &'a Parameter) {
+        walk_parameter(self, arg);
+    }
+
+    fn visit_parameter_with_default(&mut self, parameter_with_default: &'a ParameterWithDefault) {
+        walk_parameter_with_default(self, parameter_with_default);
     }
 
     fn visit_keyword(&mut self, keyword: &'a Keyword) {
@@ -82,6 +85,14 @@ pub trait PreorderVisitor<'a> {
         walk_with_item(self, with_item);
     }
 
+    fn visit_type_params(&mut self, type_params: &'a TypeParams) {
+        walk_type_params(self, type_params);
+    }
+
+    fn visit_type_param(&mut self, type_param: &'a TypeParam) {
+        walk_type_param(self, type_param);
+    }
+
     fn visit_match_case(&mut self, match_case: &'a MatchCase) {
         walk_match_case(self, match_case);
     }
@@ -94,8 +105,8 @@ pub trait PreorderVisitor<'a> {
         walk_body(self, body);
     }
 
-    fn visit_type_ignore(&mut self, type_ignore: &'a TypeIgnore) {
-        walk_type_ignore(self, type_ignore);
+    fn visit_elif_else_clause(&mut self, elif_else_clause: &'a ElifElseClause) {
+        walk_elif_else_clause(self, elif_else_clause);
     }
 }
 
@@ -104,29 +115,10 @@ where
     V: PreorderVisitor<'a> + ?Sized,
 {
     match module {
-        Mod::Module(ast::ModModule {
-            body,
-            range: _,
-            type_ignores,
-        }) => {
+        Mod::Module(ast::ModModule { body, range: _ }) => {
             visitor.visit_body(body);
-            for ignore in type_ignores {
-                visitor.visit_type_ignore(ignore);
-            }
         }
-        Mod::Interactive(ast::ModInteractive { body, range: _ }) => visitor.visit_body(body),
         Mod::Expression(ast::ModExpression { body, range: _ }) => visitor.visit_expr(body),
-        Mod::FunctionType(ast::ModFunctionType {
-            range: _,
-            argtypes,
-            returns,
-        }) => {
-            for arg_type in argtypes {
-                visitor.visit_expr(arg_type);
-            }
-
-            visitor.visit_expr(returns);
-        }
     }
 }
 
@@ -144,30 +136,33 @@ where
     V: PreorderVisitor<'a> + ?Sized,
 {
     match stmt {
-        Stmt::Expr(ast::StmtExpr {
-            value,
-            range: _range,
-        }) => visitor.visit_expr(value),
+        Stmt::Expr(ast::StmtExpr { value, range: _ }) => visitor.visit_expr(value),
 
         Stmt::FunctionDef(ast::StmtFunctionDef {
-            args,
+            parameters,
             body,
             decorator_list,
             returns,
+            type_params,
             ..
         })
         | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-            args,
+            parameters,
             body,
             decorator_list,
             returns,
+            type_params,
             ..
         }) => {
             for decorator in decorator_list {
                 visitor.visit_decorator(decorator);
             }
 
-            visitor.visit_arguments(args);
+            if let Some(type_params) = type_params {
+                visitor.visit_type_params(type_params);
+            }
+
+            visitor.visit_parameters(parameters);
 
             for expr in returns {
                 visitor.visit_annotation(expr);
@@ -177,50 +172,56 @@ where
         }
 
         Stmt::ClassDef(ast::StmtClassDef {
-            bases,
-            keywords,
+            arguments,
             body,
             decorator_list,
+            type_params,
             ..
         }) => {
             for decorator in decorator_list {
                 visitor.visit_decorator(decorator);
             }
 
-            for expr in bases {
-                visitor.visit_expr(expr);
+            if let Some(type_params) = type_params {
+                visitor.visit_type_params(type_params);
             }
 
-            for keyword in keywords {
-                visitor.visit_keyword(keyword);
+            if let Some(arguments) = arguments {
+                visitor.visit_arguments(arguments);
             }
 
             visitor.visit_body(body);
         }
 
-        Stmt::Return(ast::StmtReturn {
-            value,
-            range: _range,
-        }) => {
+        Stmt::Return(ast::StmtReturn { value, range: _ }) => {
             if let Some(expr) = value {
                 visitor.visit_expr(expr);
             }
         }
 
-        Stmt::Delete(ast::StmtDelete {
-            targets,
-            range: _range,
-        }) => {
+        Stmt::Delete(ast::StmtDelete { targets, range: _ }) => {
             for expr in targets {
                 visitor.visit_expr(expr);
             }
+        }
+
+        Stmt::TypeAlias(ast::StmtTypeAlias {
+            range: _,
+            name,
+            type_params,
+            value,
+        }) => {
+            visitor.visit_expr(name);
+            if let Some(type_params) = type_params {
+                visitor.visit_type_params(type_params);
+            }
+            visitor.visit_expr(value);
         }
 
         Stmt::Assign(ast::StmtAssign {
             targets,
             value,
             range: _,
-            type_comment: _,
         }) => {
             for expr in targets {
                 visitor.visit_expr(expr);
@@ -233,7 +234,7 @@ where
             target,
             op,
             value,
-            range: _range,
+            range: _,
         }) => {
             visitor.visit_expr(target);
             visitor.visit_operator(op);
@@ -278,7 +279,7 @@ where
             test,
             body,
             orelse,
-            range: _range,
+            range: _,
         }) => {
             visitor.visit_expr(test);
             visitor.visit_body(body);
@@ -288,24 +289,24 @@ where
         Stmt::If(ast::StmtIf {
             test,
             body,
-            orelse,
-            range: _range,
+            elif_else_clauses,
+            range: _,
         }) => {
             visitor.visit_expr(test);
             visitor.visit_body(body);
-            visitor.visit_body(orelse);
+            for clause in elif_else_clauses {
+                visitor.visit_elif_else_clause(clause);
+            }
         }
 
         Stmt::With(ast::StmtWith {
             items,
             body,
-            type_comment: _,
             range: _,
         })
         | Stmt::AsyncWith(ast::StmtAsyncWith {
             items,
             body,
-            type_comment: _,
             range: _,
         }) => {
             for with_item in items {
@@ -317,7 +318,7 @@ where
         Stmt::Match(ast::StmtMatch {
             subject,
             cases,
-            range: _range,
+            range: _,
         }) => {
             visitor.visit_expr(subject);
             for match_case in cases {
@@ -328,7 +329,7 @@ where
         Stmt::Raise(ast::StmtRaise {
             exc,
             cause,
-            range: _range,
+            range: _,
         }) => {
             if let Some(expr) = exc {
                 visitor.visit_expr(expr);
@@ -343,14 +344,14 @@ where
             handlers,
             orelse,
             finalbody,
-            range: _range,
+            range: _,
         })
         | Stmt::TryStar(ast::StmtTryStar {
             body,
             handlers,
             orelse,
             finalbody,
-            range: _range,
+            range: _,
         }) => {
             visitor.visit_body(body);
             for except_handler in handlers {
@@ -363,7 +364,7 @@ where
         Stmt::Assert(ast::StmtAssert {
             test,
             msg,
-            range: _range,
+            range: _,
         }) => {
             visitor.visit_expr(test);
             if let Some(expr) = msg {
@@ -371,10 +372,7 @@ where
             }
         }
 
-        Stmt::Import(ast::StmtImport {
-            names,
-            range: _range,
-        }) => {
+        Stmt::Import(ast::StmtImport { names, range: _ }) => {
             for alias in names {
                 visitor.visit_alias(alias);
             }
@@ -395,7 +393,8 @@ where
         | Stmt::Break(_)
         | Stmt::Continue(_)
         | Stmt::Global(_)
-        | Stmt::Nonlocal(_) => {}
+        | Stmt::Nonlocal(_)
+        | Stmt::LineMagic(_) => {}
     }
 }
 
@@ -418,7 +417,7 @@ where
         Expr::BoolOp(ast::ExprBoolOp {
             op,
             values,
-            range: _range,
+            range: _,
         }) => match values.as_slice() {
             [left, rest @ ..] => {
                 visitor.visit_expr(left);
@@ -435,7 +434,7 @@ where
         Expr::NamedExpr(ast::ExprNamedExpr {
             target,
             value,
-            range: _range,
+            range: _,
         }) => {
             visitor.visit_expr(target);
             visitor.visit_expr(value);
@@ -445,7 +444,7 @@ where
             left,
             op,
             right,
-            range: _range,
+            range: _,
         }) => {
             visitor.visit_expr(left);
             visitor.visit_operator(op);
@@ -455,18 +454,18 @@ where
         Expr::UnaryOp(ast::ExprUnaryOp {
             op,
             operand,
-            range: _range,
+            range: _,
         }) => {
             visitor.visit_unary_op(op);
             visitor.visit_expr(operand);
         }
 
         Expr::Lambda(ast::ExprLambda {
-            args,
+            parameters,
             body,
-            range: _range,
+            range: _,
         }) => {
-            visitor.visit_arguments(args);
+            visitor.visit_parameters(parameters);
             visitor.visit_expr(body);
         }
 
@@ -474,17 +473,18 @@ where
             test,
             body,
             orelse,
-            range: _range,
+            range: _,
         }) => {
-            visitor.visit_expr(test);
+            // `body if test else orelse`
             visitor.visit_expr(body);
+            visitor.visit_expr(test);
             visitor.visit_expr(orelse);
         }
 
         Expr::Dict(ast::ExprDict {
             keys,
             values,
-            range: _range,
+            range: _,
         }) => {
             for (key, value) in keys.iter().zip(values) {
                 if let Some(key) = key {
@@ -494,10 +494,7 @@ where
             }
         }
 
-        Expr::Set(ast::ExprSet {
-            elts,
-            range: _range,
-        }) => {
+        Expr::Set(ast::ExprSet { elts, range: _ }) => {
             for expr in elts {
                 visitor.visit_expr(expr);
             }
@@ -506,7 +503,7 @@ where
         Expr::ListComp(ast::ExprListComp {
             elt,
             generators,
-            range: _range,
+            range: _,
         }) => {
             visitor.visit_expr(elt);
             for comprehension in generators {
@@ -517,7 +514,7 @@ where
         Expr::SetComp(ast::ExprSetComp {
             elt,
             generators,
-            range: _range,
+            range: _,
         }) => {
             visitor.visit_expr(elt);
             for comprehension in generators {
@@ -529,7 +526,7 @@ where
             key,
             value,
             generators,
-            range: _range,
+            range: _,
         }) => {
             visitor.visit_expr(key);
             visitor.visit_expr(value);
@@ -542,7 +539,7 @@ where
         Expr::GeneratorExp(ast::ExprGeneratorExp {
             elt,
             generators,
-            range: _range,
+            range: _,
         }) => {
             visitor.visit_expr(elt);
             for comprehension in generators {
@@ -550,19 +547,10 @@ where
             }
         }
 
-        Expr::Await(ast::ExprAwait {
-            value,
-            range: _range,
-        })
-        | Expr::YieldFrom(ast::ExprYieldFrom {
-            value,
-            range: _range,
-        }) => visitor.visit_expr(value),
+        Expr::Await(ast::ExprAwait { value, range: _ })
+        | Expr::YieldFrom(ast::ExprYieldFrom { value, range: _ }) => visitor.visit_expr(value),
 
-        Expr::Yield(ast::ExprYield {
-            value,
-            range: _range,
-        }) => {
+        Expr::Yield(ast::ExprYield { value, range: _ }) => {
             if let Some(expr) = value {
                 visitor.visit_expr(expr);
             }
@@ -572,7 +560,7 @@ where
             left,
             ops,
             comparators,
-            range: _range,
+            range: _,
         }) => {
             visitor.visit_expr(left);
 
@@ -584,17 +572,11 @@ where
 
         Expr::Call(ast::ExprCall {
             func,
-            args,
-            keywords,
-            range: _range,
+            arguments,
+            range: _,
         }) => {
             visitor.visit_expr(func);
-            for expr in args {
-                visitor.visit_expr(expr);
-            }
-            for keyword in keywords {
-                visitor.visit_keyword(keyword);
-            }
+            visitor.visit_arguments(arguments);
         }
 
         Expr::FormattedValue(ast::ExprFormattedValue {
@@ -607,10 +589,7 @@ where
             }
         }
 
-        Expr::JoinedStr(ast::ExprJoinedStr {
-            values,
-            range: _range,
-        }) => {
+        Expr::JoinedStr(ast::ExprJoinedStr { values, range: _ }) => {
             for expr in values {
                 visitor.visit_expr(expr);
             }
@@ -635,7 +614,7 @@ where
             value,
             slice,
             ctx: _,
-            range: _range,
+            range: _,
         }) => {
             visitor.visit_expr(value);
             visitor.visit_expr(slice);
@@ -643,7 +622,7 @@ where
         Expr::Starred(ast::ExprStarred {
             value,
             ctx: _,
-            range: _range,
+            range: _,
         }) => {
             visitor.visit_expr(value);
         }
@@ -657,7 +636,7 @@ where
         Expr::List(ast::ExprList {
             elts,
             ctx: _,
-            range: _range,
+            range: _,
         }) => {
             for expr in elts {
                 visitor.visit_expr(expr);
@@ -666,7 +645,7 @@ where
         Expr::Tuple(ast::ExprTuple {
             elts,
             ctx: _,
-            range: _range,
+            range: _,
         }) => {
             for expr in elts {
                 visitor.visit_expr(expr);
@@ -677,7 +656,7 @@ where
             lower,
             upper,
             step,
-            range: _range,
+            range: _,
         }) => {
             if let Some(expr) = lower {
                 visitor.visit_expr(expr);
@@ -689,17 +668,7 @@ where
                 visitor.visit_expr(expr);
             }
         }
-    }
-}
-
-pub fn walk_constant<'a, V>(visitor: &mut V, constant: &'a Constant)
-where
-    V: PreorderVisitor<'a> + ?Sized,
-{
-    if let Constant::Tuple(constants) = constant {
-        for constant in constants {
-            visitor.visit_constant(constant);
-        }
+        Expr::LineMagic(_) => (),
     }
 }
 
@@ -713,6 +682,16 @@ where
     for expr in &comprehension.ifs {
         visitor.visit_expr(expr);
     }
+}
+
+pub fn walk_elif_else_clause<'a, V>(visitor: &mut V, elif_else_clause: &'a ElifElseClause)
+where
+    V: PreorderVisitor<'a> + ?Sized,
+{
+    if let Some(test) = &elif_else_clause.test {
+        visitor.visit_expr(test);
+    }
+    visitor.visit_body(&elif_else_clause.body);
 }
 
 pub fn walk_except_handler<'a, V>(visitor: &mut V, except_handler: &'a ExceptHandler)
@@ -745,38 +724,53 @@ pub fn walk_arguments<'a, V>(visitor: &mut V, arguments: &'a Arguments)
 where
     V: PreorderVisitor<'a> + ?Sized,
 {
-    for arg in arguments.posonlyargs.iter().chain(&arguments.args) {
-        visitor.visit_arg_with_default(arg);
+    for arg in &arguments.args {
+        visitor.visit_expr(arg);
     }
 
-    if let Some(arg) = &arguments.vararg {
-        visitor.visit_arg(arg);
-    }
-
-    for arg in &arguments.kwonlyargs {
-        visitor.visit_arg_with_default(arg);
-    }
-
-    if let Some(arg) = &arguments.kwarg {
-        visitor.visit_arg(arg);
+    for keyword in &arguments.keywords {
+        visitor.visit_keyword(keyword);
     }
 }
 
-pub fn walk_arg<'a, V>(visitor: &mut V, arg: &'a Arg)
+pub fn walk_parameters<'a, V>(visitor: &mut V, parameters: &'a Parameters)
 where
     V: PreorderVisitor<'a> + ?Sized,
 {
-    if let Some(expr) = &arg.annotation {
+    for arg in parameters.posonlyargs.iter().chain(&parameters.args) {
+        visitor.visit_parameter_with_default(arg);
+    }
+
+    if let Some(arg) = &parameters.vararg {
+        visitor.visit_parameter(arg);
+    }
+
+    for arg in &parameters.kwonlyargs {
+        visitor.visit_parameter_with_default(arg);
+    }
+
+    if let Some(arg) = &parameters.kwarg {
+        visitor.visit_parameter(arg);
+    }
+}
+
+pub fn walk_parameter<'a, V>(visitor: &mut V, parameter: &'a Parameter)
+where
+    V: PreorderVisitor<'a> + ?Sized,
+{
+    if let Some(expr) = &parameter.annotation {
         visitor.visit_annotation(expr);
     }
 }
 
-pub fn walk_arg_with_default<'a, V>(visitor: &mut V, arg_with_default: &'a ArgWithDefault)
-where
+pub fn walk_parameter_with_default<'a, V>(
+    visitor: &mut V,
+    parameter_with_default: &'a ParameterWithDefault,
+) where
     V: PreorderVisitor<'a> + ?Sized,
 {
-    visitor.visit_arg(&arg_with_default.def);
-    if let Some(expr) = &arg_with_default.default {
+    visitor.visit_parameter(&parameter_with_default.parameter);
+    if let Some(expr) = &parameter_with_default.default {
         visitor.visit_expr(expr);
     }
 }
@@ -800,6 +794,33 @@ where
     }
 }
 
+pub fn walk_type_params<'a, V>(visitor: &mut V, type_params: &'a TypeParams)
+where
+    V: PreorderVisitor<'a> + ?Sized,
+{
+    for type_param in &type_params.type_params {
+        visitor.visit_type_param(type_param);
+    }
+}
+
+pub fn walk_type_param<'a, V>(visitor: &mut V, type_param: &'a TypeParam)
+where
+    V: PreorderVisitor<'a> + ?Sized,
+{
+    match type_param {
+        TypeParam::TypeVar(TypeParamTypeVar {
+            bound,
+            name: _,
+            range: _,
+        }) => {
+            if let Some(expr) = bound {
+                visitor.visit_expr(expr);
+            }
+        }
+        TypeParam::TypeVarTuple(_) | TypeParam::ParamSpec(_) => {}
+    }
+}
+
 pub fn walk_match_case<'a, V>(visitor: &mut V, match_case: &'a MatchCase)
 where
     V: PreorderVisitor<'a> + ?Sized,
@@ -816,22 +837,15 @@ where
     V: PreorderVisitor<'a> + ?Sized,
 {
     match pattern {
-        Pattern::MatchValue(ast::PatternMatchValue {
-            value,
-            range: _range,
-        }) => visitor.visit_expr(value),
+        Pattern::MatchValue(ast::PatternMatchValue { value, range: _ }) => {
+            visitor.visit_expr(value);
+        }
 
-        Pattern::MatchSingleton(ast::PatternMatchSingleton {
-            value,
-            range: _range,
-        }) => {
+        Pattern::MatchSingleton(ast::PatternMatchSingleton { value, range: _ }) => {
             visitor.visit_constant(value);
         }
 
-        Pattern::MatchSequence(ast::PatternMatchSequence {
-            patterns,
-            range: _range,
-        }) => {
+        Pattern::MatchSequence(ast::PatternMatchSequence { patterns, range: _ }) => {
             for pattern in patterns {
                 visitor.visit_pattern(pattern);
             }
@@ -878,22 +892,12 @@ where
             }
         }
 
-        Pattern::MatchOr(ast::PatternMatchOr {
-            patterns,
-            range: _range,
-        }) => {
+        Pattern::MatchOr(ast::PatternMatchOr { patterns, range: _ }) => {
             for pattern in patterns {
                 visitor.visit_pattern(pattern);
             }
         }
     }
-}
-
-#[inline]
-pub fn walk_type_ignore<'a, V>(_visitor: &mut V, _type_ignore: &'a TypeIgnore)
-where
-    V: PreorderVisitor<'a> + ?Sized,
-{
 }
 
 pub fn walk_bool_op<'a, V>(_visitor: &mut V, _bool_op: &'a BoolOp)
@@ -928,260 +932,4 @@ pub fn walk_alias<'a, V>(_visitor: &mut V, _alias: &'a Alias)
 where
     V: PreorderVisitor<'a> + ?Sized,
 {
-}
-
-#[cfg(test)]
-mod tests {
-    use std::fmt::{Debug, Write};
-
-    use insta::assert_snapshot;
-    use rustpython_parser::lexer::lex;
-    use rustpython_parser::{parse_tokens, Mode};
-
-    use crate::node::AnyNodeRef;
-    use crate::visitor::preorder::{
-        walk_alias, walk_arg, walk_arguments, walk_comprehension, walk_except_handler, walk_expr,
-        walk_keyword, walk_match_case, walk_module, walk_pattern, walk_stmt, walk_type_ignore,
-        walk_with_item, Alias, Arg, Arguments, BoolOp, CmpOp, Comprehension, Constant,
-        ExceptHandler, Expr, Keyword, MatchCase, Mod, Operator, Pattern, PreorderVisitor, Stmt,
-        TypeIgnore, UnaryOp, WithItem,
-    };
-
-    #[test]
-    fn function_arguments() {
-        let source = r#"def a(b, c,/, d, e = 20, *args, named=5, other=20, **kwargs): pass"#;
-
-        let trace = trace_preorder_visitation(source);
-
-        assert_snapshot!(trace);
-    }
-
-    #[test]
-    fn function_positional_only_with_default() {
-        let source = r#"def a(b, c = 34,/, e = 20, *args): pass"#;
-
-        let trace = trace_preorder_visitation(source);
-
-        assert_snapshot!(trace);
-    }
-
-    #[test]
-    fn compare() {
-        let source = r#"4 < x < 5"#;
-
-        let trace = trace_preorder_visitation(source);
-
-        assert_snapshot!(trace);
-    }
-
-    #[test]
-    fn list_comprehension() {
-        let source = "[x for x in numbers]";
-
-        let trace = trace_preorder_visitation(source);
-
-        assert_snapshot!(trace);
-    }
-
-    #[test]
-    fn dict_comprehension() {
-        let source = "{x: x**2 for x in numbers}";
-
-        let trace = trace_preorder_visitation(source);
-
-        assert_snapshot!(trace);
-    }
-
-    #[test]
-    fn set_comprehension() {
-        let source = "{x for x in numbers}";
-
-        let trace = trace_preorder_visitation(source);
-
-        assert_snapshot!(trace);
-    }
-
-    #[test]
-    fn match_class_pattern() {
-        let source = r#"
-match x:
-    case Point2D(0, 0):
-        ...
-    case Point3D(x=0, y=0, z=0):
-        ...
-"#;
-
-        let trace = trace_preorder_visitation(source);
-
-        assert_snapshot!(trace);
-    }
-
-    #[test]
-    fn decorators() {
-        let source = r#"
-@decorator
-def a():
-    pass
-
-@test
-class A:
-    pass
-"#;
-
-        let trace = trace_preorder_visitation(source);
-
-        assert_snapshot!(trace);
-    }
-
-    fn trace_preorder_visitation(source: &str) -> String {
-        let tokens = lex(source, Mode::Module);
-        let parsed = parse_tokens(tokens, Mode::Module, "test.py").unwrap();
-
-        let mut visitor = RecordVisitor::default();
-        visitor.visit_mod(&parsed);
-
-        visitor.output
-    }
-
-    /// Emits a `tree` with a node for every visited AST node (labelled by the AST node's kind)
-    /// and leafs for attributes.
-    #[derive(Default)]
-    struct RecordVisitor {
-        depth: usize,
-        output: String,
-    }
-
-    impl RecordVisitor {
-        fn enter_node<'a, T>(&mut self, node: T)
-        where
-            T: Into<AnyNodeRef<'a>>,
-        {
-            self.emit(&node.into().kind());
-            self.depth += 1;
-        }
-
-        fn exit_node(&mut self) {
-            self.depth -= 1;
-        }
-
-        fn emit(&mut self, text: &dyn Debug) {
-            for _ in 0..self.depth {
-                self.output.push_str("  ");
-            }
-
-            writeln!(self.output, "- {text:?}").unwrap();
-        }
-    }
-
-    impl PreorderVisitor<'_> for RecordVisitor {
-        fn visit_mod(&mut self, module: &Mod) {
-            self.enter_node(module);
-            walk_module(self, module);
-            self.exit_node();
-        }
-
-        fn visit_stmt(&mut self, stmt: &Stmt) {
-            self.enter_node(stmt);
-            walk_stmt(self, stmt);
-            self.exit_node();
-        }
-
-        fn visit_annotation(&mut self, expr: &Expr) {
-            self.enter_node(expr);
-            walk_expr(self, expr);
-            self.exit_node();
-        }
-
-        fn visit_expr(&mut self, expr: &Expr) {
-            self.enter_node(expr);
-            walk_expr(self, expr);
-            self.exit_node();
-        }
-
-        fn visit_constant(&mut self, constant: &Constant) {
-            self.emit(&constant);
-        }
-
-        fn visit_bool_op(&mut self, bool_op: &BoolOp) {
-            self.emit(&bool_op);
-        }
-
-        fn visit_operator(&mut self, operator: &Operator) {
-            self.emit(&operator);
-        }
-
-        fn visit_unary_op(&mut self, unary_op: &UnaryOp) {
-            self.emit(&unary_op);
-        }
-
-        fn visit_cmp_op(&mut self, cmp_op: &CmpOp) {
-            self.emit(&cmp_op);
-        }
-
-        fn visit_comprehension(&mut self, comprehension: &Comprehension) {
-            self.enter_node(comprehension);
-            walk_comprehension(self, comprehension);
-            self.exit_node();
-        }
-
-        fn visit_except_handler(&mut self, except_handler: &ExceptHandler) {
-            self.enter_node(except_handler);
-            walk_except_handler(self, except_handler);
-            self.exit_node();
-        }
-
-        fn visit_format_spec(&mut self, format_spec: &Expr) {
-            self.enter_node(format_spec);
-            walk_expr(self, format_spec);
-            self.exit_node();
-        }
-
-        fn visit_arguments(&mut self, arguments: &Arguments) {
-            self.enter_node(arguments);
-            walk_arguments(self, arguments);
-            self.exit_node();
-        }
-
-        fn visit_arg(&mut self, arg: &Arg) {
-            self.enter_node(arg);
-            walk_arg(self, arg);
-            self.exit_node();
-        }
-
-        fn visit_keyword(&mut self, keyword: &Keyword) {
-            self.enter_node(keyword);
-            walk_keyword(self, keyword);
-            self.exit_node();
-        }
-
-        fn visit_alias(&mut self, alias: &Alias) {
-            self.enter_node(alias);
-            walk_alias(self, alias);
-            self.exit_node();
-        }
-
-        fn visit_with_item(&mut self, with_item: &WithItem) {
-            self.enter_node(with_item);
-            walk_with_item(self, with_item);
-            self.exit_node();
-        }
-
-        fn visit_match_case(&mut self, match_case: &MatchCase) {
-            self.enter_node(match_case);
-            walk_match_case(self, match_case);
-            self.exit_node();
-        }
-
-        fn visit_pattern(&mut self, pattern: &Pattern) {
-            self.enter_node(pattern);
-            walk_pattern(self, pattern);
-            self.exit_node();
-        }
-
-        fn visit_type_ignore(&mut self, type_ignore: &TypeIgnore) {
-            self.enter_node(type_ignore);
-            walk_type_ignore(self, type_ignore);
-            self.exit_node();
-        }
-    }
 }

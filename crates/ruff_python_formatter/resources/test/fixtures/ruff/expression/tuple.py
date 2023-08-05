@@ -35,9 +35,16 @@ e4 = (
 
 # Empty tuples and comments
 f1 = (
-	# empty
+    # empty
 )
 f2 = ()
+f3 = ( # end-of-line
+    # own-line
+) # trailing
+f4 = ( # end-of-line
+    # own-line
+    # own-line 2
+) # trailing
 
 # Comments in other tuples
 g1 = ( # a

@@ -1,5 +1,5 @@
+use ruff_python_ast::{self as ast, Expr, ParameterWithDefault, Ranged};
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{self, ArgWithDefault, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -71,22 +71,22 @@ where
                 }
             }
             Expr::Lambda(ast::ExprLambda {
-                args,
+                parameters,
                 body,
                 range: _,
             }) => {
                 visitor::walk_expr(self, body);
-                for ArgWithDefault {
-                    def,
+                for ParameterWithDefault {
+                    parameter,
                     default: _,
                     range: _,
-                } in args
+                } in parameters
                     .posonlyargs
                     .iter()
-                    .chain(&args.args)
-                    .chain(&args.kwonlyargs)
+                    .chain(&parameters.args)
+                    .chain(&parameters.kwonlyargs)
                 {
-                    self.names.remove(def.arg.as_str());
+                    self.names.remove(parameter.name.as_str());
                 }
             }
             _ => visitor::walk_expr(self, expr),

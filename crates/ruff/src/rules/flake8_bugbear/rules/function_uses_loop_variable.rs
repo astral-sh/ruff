@@ -1,12 +1,9 @@
-use rustc_hash::FxHashSet;
-use rustpython_parser::ast::{self, Comprehension, Expr, ExprContext, Ranged, Stmt};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::collect_arg_names;
 use ruff_python_ast::types::Node;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{self as ast, Arguments, Comprehension, Expr, ExprContext, Ranged, Stmt};
 
 use crate::checkers::ast::Checker;
 
@@ -58,19 +55,17 @@ impl Violation for FunctionUsesLoopVariable {
 
 #[derive(Default)]
 struct LoadedNamesVisitor<'a> {
-    // Tuple of: name, defining expression, and defining range.
-    loaded: Vec<(&'a str, &'a Expr)>,
-    // Tuple of: name, defining expression, and defining range.
-    stored: Vec<(&'a str, &'a Expr)>,
+    loaded: Vec<&'a ast::ExprName>,
+    stored: Vec<&'a ast::ExprName>,
 }
 
 /// `Visitor` to collect all used identifiers in a statement.
 impl<'a> Visitor<'a> for LoadedNamesVisitor<'a> {
     fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
-            Expr::Name(ast::ExprName { id, ctx, range: _ }) => match ctx {
-                ExprContext::Load => self.loaded.push((id, expr)),
-                ExprContext::Store => self.stored.push((id, expr)),
+            Expr::Name(name) => match &name.ctx {
+                ExprContext::Load => self.loaded.push(name),
+                ExprContext::Store => self.stored.push(name),
                 ExprContext::Del => {}
             },
             _ => visitor::walk_expr(self, expr),
@@ -80,7 +75,7 @@ impl<'a> Visitor<'a> for LoadedNamesVisitor<'a> {
 
 #[derive(Default)]
 struct SuspiciousVariablesVisitor<'a> {
-    names: Vec<(&'a str, &'a Expr)>,
+    names: Vec<&'a ast::ExprName>,
     safe_functions: Vec<&'a Expr>,
 }
 
@@ -89,23 +84,30 @@ struct SuspiciousVariablesVisitor<'a> {
 impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
-            Stmt::FunctionDef(ast::StmtFunctionDef { args, body, .. })
-            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { args, body, .. }) => {
+            Stmt::FunctionDef(ast::StmtFunctionDef {
+                parameters, body, ..
+            })
+            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
+                parameters, body, ..
+            }) => {
                 // Collect all loaded variable names.
                 let mut visitor = LoadedNamesVisitor::default();
                 visitor.visit_body(body);
 
-                // Collect all argument names.
-                let mut arg_names = collect_arg_names(args);
-                arg_names.extend(visitor.stored.iter().map(|(id, ..)| id));
-
                 // Treat any non-arguments as "suspicious".
-                self.names.extend(
-                    visitor
-                        .loaded
-                        .into_iter()
-                        .filter(|(id, ..)| !arg_names.contains(id)),
-                );
+                self.names
+                    .extend(visitor.loaded.into_iter().filter(|loaded| {
+                        if visitor.stored.iter().any(|stored| stored.id == loaded.id) {
+                            return false;
+                        }
+
+                        if parameters.includes(&loaded.id) {
+                            return false;
+                        }
+
+                        true
+                    }));
+
                 return;
             }
             Stmt::Return(ast::StmtReturn {
@@ -126,16 +128,19 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
         match expr {
             Expr::Call(ast::ExprCall {
                 func,
-                args,
-                keywords,
+                arguments:
+                    Arguments {
+                        args,
+                        keywords,
+                        range: _,
+                    },
                 range: _,
             }) => {
                 match func.as_ref() {
                     Expr::Name(ast::ExprName { id, .. }) => {
-                        let id = id.as_str();
-                        if id == "filter" || id == "reduce" || id == "map" {
+                        if matches!(id.as_str(), "filter" | "reduce" | "map") {
                             for arg in args {
-                                if matches!(arg, Expr::Lambda(_)) {
+                                if arg.is_lambda_expr() {
                                     self.safe_functions.push(arg);
                                 }
                             }
@@ -158,15 +163,15 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                 }
 
                 for keyword in keywords {
-                    if keyword.arg.as_ref().map_or(false, |arg| arg == "key")
-                        && matches!(keyword.value, Expr::Lambda(_))
+                    if keyword.arg.as_ref().is_some_and(|arg| arg == "key")
+                        && keyword.value.is_lambda_expr()
                     {
                         self.safe_functions.push(&keyword.value);
                     }
                 }
             }
             Expr::Lambda(ast::ExprLambda {
-                args,
+                parameters,
                 body,
                 range: _,
             }) => {
@@ -175,17 +180,19 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                     let mut visitor = LoadedNamesVisitor::default();
                     visitor.visit_expr(body);
 
-                    // Collect all argument names.
-                    let mut arg_names = collect_arg_names(args);
-                    arg_names.extend(visitor.stored.iter().map(|(id, ..)| id));
-
                     // Treat any non-arguments as "suspicious".
-                    self.names.extend(
-                        visitor
-                            .loaded
-                            .iter()
-                            .filter(|(id, ..)| !arg_names.contains(id)),
-                    );
+                    self.names
+                        .extend(visitor.loaded.into_iter().filter(|loaded| {
+                            if visitor.stored.iter().any(|stored| stored.id == loaded.id) {
+                                return false;
+                            }
+
+                            if parameters.includes(&loaded.id) {
+                                return false;
+                            }
+
+                            true
+                        }));
 
                     return;
                 }
@@ -198,7 +205,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
 
 #[derive(Default)]
 struct NamesFromAssignmentsVisitor<'a> {
-    names: FxHashSet<&'a str>,
+    names: Vec<&'a str>,
 }
 
 /// `Visitor` to collect all names used in an assignment expression.
@@ -206,7 +213,7 @@ impl<'a> Visitor<'a> for NamesFromAssignmentsVisitor<'a> {
     fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
             Expr::Name(ast::ExprName { id, .. }) => {
-                self.names.insert(id.as_str());
+                self.names.push(id.as_str());
             }
             Expr::Starred(ast::ExprStarred { value, .. }) => {
                 self.visit_expr(value);
@@ -223,7 +230,7 @@ impl<'a> Visitor<'a> for NamesFromAssignmentsVisitor<'a> {
 
 #[derive(Default)]
 struct AssignedNamesVisitor<'a> {
-    names: FxHashSet<&'a str>,
+    names: Vec<&'a str>,
 }
 
 /// `Visitor` to collect all used identifiers in a statement.
@@ -257,7 +264,7 @@ impl<'a> Visitor<'a> for AssignedNamesVisitor<'a> {
     }
 
     fn visit_expr(&mut self, expr: &'a Expr) {
-        if matches!(expr, Expr::Lambda(_)) {
+        if expr.is_lambda_expr() {
             // Don't recurse.
             return;
         }
@@ -275,7 +282,7 @@ impl<'a> Visitor<'a> for AssignedNamesVisitor<'a> {
 }
 
 /// B023
-pub(crate) fn function_uses_loop_variable<'a>(checker: &mut Checker<'a>, node: &Node<'a>) {
+pub(crate) fn function_uses_loop_variable(checker: &mut Checker, node: &Node) {
     // Identify any "suspicious" variables. These are defined as variables that are
     // referenced in a function or lambda body, but aren't bound as arguments.
     let suspicious_variables = {
@@ -300,15 +307,15 @@ pub(crate) fn function_uses_loop_variable<'a>(checker: &mut Checker<'a>, node: &
 
         // If a variable was used in a function or lambda body, and assigned in the
         // loop, flag it.
-        for (name, expr) in suspicious_variables {
-            if reassigned_in_loop.contains(name) {
-                if !checker.flake8_bugbear_seen.contains(&expr) {
-                    checker.flake8_bugbear_seen.push(expr);
+        for name in suspicious_variables {
+            if reassigned_in_loop.contains(&name.id.as_str()) {
+                if !checker.flake8_bugbear_seen.contains(&name.range()) {
+                    checker.flake8_bugbear_seen.push(name.range());
                     checker.diagnostics.push(Diagnostic::new(
                         FunctionUsesLoopVariable {
-                            name: name.to_string(),
+                            name: name.id.to_string(),
                         },
-                        expr.range(),
+                        name.range(),
                     ));
                 }
             }

@@ -107,11 +107,19 @@ x53 = (
     a.askjdfahdlskjflsajfadhsaf.akjdsf.aksjdlfadhaljsashdfljaf.askjdflhasfdlashdlfaskjfd.asdkjfksahdfkjafs
 )
 
+x6 = (
+    # Check assumption with enclosing nodes
+    a.b
+)
+
+# regression: https://github.com/astral-sh/ruff/issues/6181
+(#
+()).a
 ```
 
 ## Output
 ```py
-NOT_YET_IMPLEMENTED_StmtImportFrom
+from argparse import Namespace
 
 a = Namespace()
 
@@ -135,10 +143,10 @@ a = Namespace()
 
 
 (
-    a.
+    a.  # trailing dot comment
     # comment
     # in between
-    b  # trailing dot comment  # trailing identifier comment
+    b  # trailing identifier comment
 )
 
 
@@ -149,10 +157,10 @@ a.aaaaaaaaaaaaaaaaaaaaa.lllllllllllllllllllllllllllloooooooooong.chaaaaaaaaaaaaa
 # chain if and only if we need them, that is if there are own line comments inside
 # the chain.
 x1 = (
-    a.b.
+    a.b.  # comment 2
     # comment 1
     # comment 3
-    c.d  # comment 2
+    c.d
 )
 
 x20 = a.b
@@ -189,6 +197,17 @@ x8 = (a + a).b
 x51 = a.b.c
 x52 = a.askjdfahdlskjflsajfadhsaf.akjdsf.aksjdlfadhaljsashdfljaf.askjdflhasfdlashdlfaskjfd.asdkjfksahdfkjafs
 x53 = a.askjdfahdlskjflsajfadhsaf.akjdsf.aksjdlfadhaljsashdfljaf.askjdflhasfdlashdlfaskjfd.asdkjfksahdfkjafs
+
+x6 = (
+    # Check assumption with enclosing nodes
+    a.b
+)
+
+# regression: https://github.com/astral-sh/ruff/issues/6181
+(
+    #
+    ()
+).a
 ```
 
 

@@ -1,14 +1,15 @@
-use ruff_text_size::TextRange;
-use rustpython_parser::ast::{
-    self, Arg, ArgWithDefault, Arguments, Constant, Expr, Identifier, Ranged, Stmt,
+use ruff_python_ast::{
+    self as ast, Constant, Expr, Identifier, Parameter, ParameterWithDefault, Parameters, Ranged,
+    Stmt,
 };
+use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{has_leading_content, has_trailing_content};
-use ruff_python_ast::source_code::Generator;
+use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
-use ruff_python_whitespace::{leading_indentation, UniversalNewlines};
+use ruff_python_trivia::{has_leading_content, has_trailing_content, leading_indentation};
+use ruff_source_file::UniversalNewlines;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -67,7 +68,10 @@ pub(crate) fn lambda_assignment(
         return;
     };
 
-    let Expr::Lambda(ast::ExprLambda { args, body, .. }) = value else {
+    let Expr::Lambda(ast::ExprLambda {
+        parameters, body, ..
+    }) = value
+    else {
         return;
     };
 
@@ -79,15 +83,15 @@ pub(crate) fn lambda_assignment(
     );
 
     if checker.patch(diagnostic.kind.rule()) {
-        if !has_leading_content(stmt.start(), checker.locator)
-            && !has_trailing_content(stmt.end(), checker.locator)
+        if !has_leading_content(stmt.start(), checker.locator())
+            && !has_trailing_content(stmt.end(), checker.locator())
         {
-            let first_line = checker.locator.line(stmt.start());
+            let first_line = checker.locator().line(stmt.start());
             let indentation = leading_indentation(first_line);
             let mut indented = String::new();
             for (idx, line) in function(
                 id,
-                args,
+                parameters,
                 body,
                 annotation,
                 checker.semantic(),
@@ -99,7 +103,7 @@ pub(crate) fn lambda_assignment(
                 if idx == 0 {
                     indented.push_str(&line);
                 } else {
-                    indented.push_str(checker.stylist.line_ending().as_str());
+                    indented.push_str(checker.stylist().line_ending().as_str());
                     indented.push_str(indentation);
                     indented.push_str(&line);
                 }
@@ -113,7 +117,11 @@ pub(crate) fn lambda_assignment(
             // See: https://github.com/astral-sh/ruff/issues/3046
             // See: https://github.com/astral-sh/ruff/issues/5421
             if (annotation.is_some() && checker.semantic().scope().kind.is_class())
-                || checker.semantic().scope().has(id)
+                || checker
+                    .semantic()
+                    .scope()
+                    .get_all(id)
+                    .any(|binding_id| checker.semantic().binding(binding_id).kind.is_annotation())
             {
                 diagnostic.set_fix(Fix::manual(Edit::range_replacement(indented, stmt.range())));
             } else {
@@ -139,23 +147,20 @@ fn extract_types(annotation: &Expr, semantic: &SemanticModel) -> Option<(Vec<Exp
     let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() else {
         return None;
     };
-    if elts.len() != 2 {
+    let [param_types, return_type] = elts.as_slice() else {
         return None;
-    }
+    };
 
-    if !semantic
-        .resolve_call_path(value)
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["collections", "abc", "Callable"])
-                || semantic.match_typing_call_path(&call_path, "Callable")
-        })
-    {
+    if !semantic.resolve_call_path(value).is_some_and(|call_path| {
+        matches!(call_path.as_slice(), ["collections", "abc", "Callable"])
+            || semantic.match_typing_call_path(&call_path, "Callable")
+    }) {
         return None;
     }
 
     // The first argument to `Callable` must be a list of types, parameter
     // specification, or ellipsis.
-    let args = match &elts[0] {
+    let params = match param_types {
         Expr::List(ast::ExprList { elts, .. }) => elts.clone(),
         Expr::Constant(ast::ExprConstant {
             value: Constant::Ellipsis,
@@ -165,14 +170,14 @@ fn extract_types(annotation: &Expr, semantic: &SemanticModel) -> Option<(Vec<Exp
     };
 
     // The second argument to `Callable` must be a type.
-    let return_type = elts[1].clone();
+    let return_type = return_type.clone();
 
-    Some((args, return_type))
+    Some((params, return_type))
 }
 
 fn function(
     name: &str,
-    args: &Arguments,
+    parameters: &Parameters,
     body: &Expr,
     annotation: Option<&Expr>,
     semantic: &SemanticModel,
@@ -186,45 +191,45 @@ fn function(
         if let Some((arg_types, return_type)) = extract_types(annotation, semantic) {
             // A `lambda` expression can only have positional and positional-only
             // arguments. The order is always positional-only first, then positional.
-            let new_posonlyargs = args
+            let new_posonlyargs = parameters
                 .posonlyargs
                 .iter()
                 .enumerate()
-                .map(|(idx, arg_with_default)| ArgWithDefault {
-                    def: Arg {
+                .map(|(idx, parameter)| ParameterWithDefault {
+                    parameter: Parameter {
                         annotation: arg_types
                             .get(idx)
                             .map(|arg_type| Box::new(arg_type.clone())),
-                        ..arg_with_default.def.clone()
+                        ..parameter.parameter.clone()
                     },
-                    ..arg_with_default.clone()
+                    ..parameter.clone()
                 })
                 .collect::<Vec<_>>();
-            let new_args = args
+            let new_args = parameters
                 .args
                 .iter()
                 .enumerate()
-                .map(|(idx, arg_with_default)| ArgWithDefault {
-                    def: Arg {
+                .map(|(idx, parameter)| ParameterWithDefault {
+                    parameter: Parameter {
                         annotation: arg_types
                             .get(idx + new_posonlyargs.len())
                             .map(|arg_type| Box::new(arg_type.clone())),
-                        ..arg_with_default.def.clone()
+                        ..parameter.parameter.clone()
                     },
-                    ..arg_with_default.clone()
+                    ..parameter.clone()
                 })
                 .collect::<Vec<_>>();
             let func = Stmt::FunctionDef(ast::StmtFunctionDef {
                 name: Identifier::new(name.to_string(), TextRange::default()),
-                args: Box::new(Arguments {
+                parameters: Box::new(Parameters {
                     posonlyargs: new_posonlyargs,
                     args: new_args,
-                    ..args.clone()
+                    ..parameters.clone()
                 }),
                 body: vec![body],
                 decorator_list: vec![],
                 returns: Some(Box::new(return_type)),
-                type_comment: None,
+                type_params: None,
                 range: TextRange::default(),
             });
             return generator.stmt(&func);
@@ -232,11 +237,11 @@ fn function(
     }
     let func = Stmt::FunctionDef(ast::StmtFunctionDef {
         name: Identifier::new(name.to_string(), TextRange::default()),
-        args: Box::new(args.clone()),
+        parameters: Box::new(parameters.clone()),
         body: vec![body],
         decorator_list: vec![],
         returns: None,
-        type_comment: None,
+        type_params: None,
         range: TextRange::default(),
     });
     generator.stmt(&func)

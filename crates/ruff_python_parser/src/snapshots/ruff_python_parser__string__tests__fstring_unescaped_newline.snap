@@ -1,0 +1,42 @@
+---
+source: crates/ruff_python_parser/src/string.rs
+expression: parse_ast
+---
+[
+    Expr(
+        StmtExpr {
+            range: 0..11,
+            value: JoinedStr(
+                ExprJoinedStr {
+                    range: 0..11,
+                    values: [
+                        Constant(
+                            ExprConstant {
+                                range: 4..5,
+                                value: Str(
+                                    "\n",
+                                ),
+                                kind: None,
+                            },
+                        ),
+                        FormattedValue(
+                            ExprFormattedValue {
+                                range: 5..8,
+                                value: Name(
+                                    ExprName {
+                                        range: 6..7,
+                                        id: "x",
+                                        ctx: Load,
+                                    },
+                                ),
+                                debug_text: None,
+                                conversion: None,
+                                format_spec: None,
+                            },
+                        ),
+                    ],
+                },
+            ),
+        },
+    ),
+]

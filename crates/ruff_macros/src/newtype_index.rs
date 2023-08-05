@@ -36,10 +36,11 @@ pub(super) fn generate_newtype_index(item: ItemStruct) -> syn::Result<proc_macro
         #vis #struct_token #ident(std::num::NonZeroU32)#semi_token
 
         impl #ident {
-            const MAX: u32 = u32::MAX - 1;
+            const MAX_VALUE: u32 = u32::MAX - 1;
+            const MAX: Self = Self::from_u32(Self::MAX_VALUE);
 
             #vis const fn from_usize(value: usize) -> Self {
-                assert!(value <= Self::MAX as usize);
+                assert!(value <= Self::MAX_VALUE as usize);
 
                 // SAFETY:
                 // * The `value < u32::MAX` guarantees that the add doesn't overflow.
@@ -49,7 +50,7 @@ pub(super) fn generate_newtype_index(item: ItemStruct) -> syn::Result<proc_macro
             }
 
             #vis const fn from_u32(value: u32) -> Self {
-                assert!(value <= Self::MAX);
+                assert!(value <= Self::MAX_VALUE);
 
                 // SAFETY:
                 // * The `value < u32::MAX` guarantees that the add doesn't overflow.

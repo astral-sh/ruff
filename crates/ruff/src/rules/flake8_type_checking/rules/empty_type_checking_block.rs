@@ -1,5 +1,5 @@
-use rustpython_parser::ast;
-use rustpython_parser::ast::Ranged;
+use ruff_python_ast as ast;
+use ruff_python_ast::Ranged;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -48,11 +48,9 @@ impl AlwaysAutofixableViolation for EmptyTypeCheckingBlock {
 
 /// TCH005
 pub(crate) fn empty_type_checking_block(checker: &mut Checker, stmt: &ast::StmtIf) {
-    if stmt.body.len() != 1 {
+    let [stmt] = stmt.body.as_slice() else {
         return;
-    }
-
-    let stmt = &stmt.body[0];
+    };
     if !stmt.is_pass_stmt() {
         return;
     }
@@ -62,7 +60,7 @@ pub(crate) fn empty_type_checking_block(checker: &mut Checker, stmt: &ast::StmtI
         // Delete the entire type-checking block.
         let stmt = checker.semantic().stmt();
         let parent = checker.semantic().stmt_parent();
-        let edit = autofix::edits::delete_stmt(stmt, parent, checker.locator, checker.indexer);
+        let edit = autofix::edits::delete_stmt(stmt, parent, checker.locator(), checker.indexer());
         diagnostic.set_fix(Fix::automatic(edit).isolate(checker.isolation(parent)));
     }
     checker.diagnostics.push(diagnostic);

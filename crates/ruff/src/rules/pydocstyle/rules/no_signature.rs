@@ -1,9 +1,9 @@
-use rustpython_parser::ast::{self, Stmt};
+use ruff_python_ast::{self as ast, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::{Definition, Member, MemberKind};
-use ruff_python_whitespace::UniversalNewlines;
+use ruff_source_file::UniversalNewlines;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
@@ -58,7 +58,8 @@ pub(crate) fn no_signature(checker: &mut Checker, docstring: &Docstring) {
         kind: MemberKind::Function | MemberKind::NestedFunction | MemberKind::Method,
         stmt,
         ..
-    }) = docstring.definition else {
+    }) = docstring.definition
+    else {
         return;
     };
     let Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) = stmt else {

@@ -1,0 +1,5 @@
+---
+source: crates/ruff_python_parser/src/string.rs
+expression: "parse_fstring(\"\").unwrap()"
+---
+[]

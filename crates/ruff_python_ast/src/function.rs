@@ -1,8 +1,9 @@
 use crate::node::AnyNodeRef;
-use ruff_text_size::TextRange;
-use rustpython_ast::{
-    Arguments, Decorator, Expr, Identifier, Ranged, StmtAsyncFunctionDef, StmtFunctionDef, Suite,
+use crate::{
+    Decorator, Expr, Identifier, Parameters, Ranged, StmtAsyncFunctionDef, StmtFunctionDef, Suite,
+    TypeParams,
 };
+use ruff_text_size::TextRange;
 
 /// Enum that represents any python function definition.
 #[derive(Copy, Clone, PartialEq, Debug)]
@@ -49,10 +50,10 @@ impl<'a> AnyFunctionDefinition<'a> {
     }
 
     /// Returns the function arguments (parameters).
-    pub fn arguments(self) -> &'a Arguments {
+    pub fn arguments(self) -> &'a Parameters {
         match self {
-            Self::FunctionDefinition(definition) => definition.args.as_ref(),
-            Self::AsyncFunctionDefinition(definition) => definition.args.as_ref(),
+            Self::FunctionDefinition(definition) => definition.parameters.as_ref(),
+            Self::AsyncFunctionDefinition(definition) => definition.parameters.as_ref(),
         }
     }
 
@@ -79,10 +80,10 @@ impl<'a> AnyFunctionDefinition<'a> {
         }
     }
 
-    pub fn type_comments(self) -> Option<&'a str> {
+    pub fn type_params(self) -> Option<&'a TypeParams> {
         match self {
-            Self::FunctionDefinition(definition) => definition.type_comment.as_deref(),
-            Self::AsyncFunctionDefinition(definition) => definition.type_comment.as_deref(),
+            Self::FunctionDefinition(definition) => definition.type_params.as_ref(),
+            Self::AsyncFunctionDefinition(definition) => definition.type_params.as_ref(),
         }
     }
 

@@ -1,9 +1,10 @@
 use std::borrow::Cow;
 
+use ruff_python_ast::PySourceType;
+use ruff_python_parser::{lexer, AsMode, Tok};
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::{lexer, Mode, Tok};
 
-use ruff_python_ast::source_code::Locator;
+use ruff_source_file::Locator;
 
 #[derive(Debug)]
 pub(crate) struct Comment<'a> {
@@ -22,9 +23,13 @@ impl Comment<'_> {
 }
 
 /// Collect all comments in an import block.
-pub(crate) fn collect_comments<'a>(range: TextRange, locator: &'a Locator) -> Vec<Comment<'a>> {
+pub(crate) fn collect_comments<'a>(
+    range: TextRange,
+    locator: &'a Locator,
+    source_type: PySourceType,
+) -> Vec<Comment<'a>> {
     let contents = locator.slice(range);
-    lexer::lex_starts_at(contents, Mode::Module, range.start())
+    lexer::lex_starts_at(contents, source_type.as_mode(), range.start())
         .flatten()
         .filter_map(|(tok, range)| {
             if let Tok::Comment(value) = tok {

@@ -154,6 +154,9 @@ class Test:
                 not parsed.hostname.strip()):
             pass
 
+
+a = "type comment with trailing space"  # type: str   
+
 #######################
 ### SECTION COMMENT ###
 #######################

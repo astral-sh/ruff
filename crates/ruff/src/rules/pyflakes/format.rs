@@ -1,7 +1,7 @@
 //! Implements helper functions for using vendored/format.rs
 use std::convert::TryFrom;
 
-use rustpython_format::{
+use ruff_python_literal::format::{
     FieldName, FieldType, FormatParseError, FormatPart, FormatString, FromTemplate,
 };
 
@@ -44,7 +44,8 @@ impl TryFrom<&str> for FormatSummary {
                 field_name,
                 format_spec,
                 ..
-            } = format_part else {
+            } = format_part
+            else {
                 continue;
             };
             let parsed = FieldName::parse(field_name)?;

@@ -182,6 +182,11 @@ pub fn is_pep_593_generic_type(call_path: &[&str]) -> bool {
     matches!(call_path, ["typing" | "typing_extensions", "Annotated"])
 }
 
+/// Returns `true` if a call path is `Literal`.
+pub fn is_standard_library_literal(call_path: &[&str]) -> bool {
+    matches!(call_path, ["typing" | "typing_extensions", "Literal"])
+}
+
 /// Returns `true` if a name matches that of a generic from the Python standard library (e.g.
 /// `list` or `Set`).
 ///
@@ -265,6 +270,11 @@ pub fn is_pep_593_generic_member(member: &str) -> bool {
     // Constructed by taking every pattern from `is_pep_593_generic`, removing all but
     // the last element in each pattern, and de-duplicating the values.
     matches!(member, "Annotated")
+}
+
+/// Returns `true` if a name matches that of the `Literal` generic.
+pub fn is_literal_member(member: &str) -> bool {
+    matches!(member, "Literal")
 }
 
 /// Returns `true` if a call path represents that of an immutable, non-generic type from the Python
@@ -354,7 +364,7 @@ pub fn is_immutable_return_type(call_path: &[&str]) -> bool {
             | ["re", "compile"]
             | [
                 "",
-                "bool" | "complex" | "float" | "frozenset" | "int" | "str" | "tuple"
+                "bool" | "bytes" | "complex" | "float" | "frozenset" | "int" | "str" | "tuple"
             ]
     )
 }

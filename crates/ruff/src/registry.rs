@@ -7,7 +7,7 @@ pub use codes::Rule;
 use ruff_macros::RuleNamespace;
 pub use rule_set::{RuleSet, RuleSetIterator};
 
-use crate::codes::{self, RuleCodePrefix};
+use crate::codes::{self};
 
 mod rule_set;
 
@@ -18,8 +18,10 @@ pub trait AsRule {
 impl Rule {
     pub fn from_code(code: &str) -> Result<Self, FromCodeError> {
         let (linter, code) = Linter::parse_code(code).ok_or(FromCodeError::Unknown)?;
-        let prefix: RuleCodePrefix = RuleCodePrefix::parse(&linter, code)?;
-        Ok(prefix.into_iter().next().unwrap())
+        linter
+            .all_rules()
+            .find(|rule| rule.noqa_code().suffix() == code)
+            .ok_or(FromCodeError::Unknown)
     }
 }
 
@@ -80,9 +82,9 @@ pub enum Linter {
     /// [flake8-commas](https://pypi.org/project/flake8-commas/)
     #[prefix = "COM"]
     Flake8Commas,
-    /// Copyright-related rules
+    /// [flake8-copyright](https://pypi.org/project/flake8-copyright/)
     #[prefix = "CPY"]
-    Copyright,
+    Flake8Copyright,
     /// [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/)
     #[prefix = "C4"]
     Flake8Comprehensions,
@@ -110,7 +112,7 @@ pub enum Linter {
     /// [flake8-import-conventions](https://github.com/joaopalmeiro/flake8-import-conventions)
     #[prefix = "ICN"]
     Flake8ImportConventions,
-    /// [flake8-logging-format](https://pypi.org/project/flake8-logging-format/0.9.0/)
+    /// [flake8-logging-format](https://pypi.org/project/flake8-logging-format/)
     #[prefix = "G"]
     Flake8LoggingFormat,
     /// [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420/)
@@ -179,7 +181,7 @@ pub enum Linter {
     /// [Pylint](https://pypi.org/project/pylint/)
     #[prefix = "PL"]
     Pylint,
-    /// [tryceratops](https://pypi.org/project/tryceratops/1.1.0/)
+    /// [tryceratops](https://pypi.org/project/tryceratops/)
     #[prefix = "TRY"]
     Tryceratops,
     /// [flynt](https://pypi.org/project/flynt/)
@@ -216,30 +218,6 @@ pub trait RuleNamespace: Sized {
     fn url(&self) -> Option<&'static str>;
 }
 
-/// The prefix and name for an upstream linter category.
-pub struct UpstreamCategory(pub RuleCodePrefix, pub &'static str);
-
-impl Linter {
-    pub const fn upstream_categories(&self) -> Option<&'static [UpstreamCategory]> {
-        match self {
-            Linter::Pycodestyle => Some(&[
-                UpstreamCategory(RuleCodePrefix::Pycodestyle(codes::Pycodestyle::E), "Error"),
-                UpstreamCategory(
-                    RuleCodePrefix::Pycodestyle(codes::Pycodestyle::W),
-                    "Warning",
-                ),
-            ]),
-            Linter::Pylint => Some(&[
-                UpstreamCategory(RuleCodePrefix::Pylint(codes::Pylint::C), "Convention"),
-                UpstreamCategory(RuleCodePrefix::Pylint(codes::Pylint::E), "Error"),
-                UpstreamCategory(RuleCodePrefix::Pylint(codes::Pylint::R), "Refactor"),
-                UpstreamCategory(RuleCodePrefix::Pylint(codes::Pylint::W), "Warning"),
-            ]),
-            _ => None,
-        }
-    }
-}
-
 #[derive(is_macro::Is, Copy, Clone)]
 pub enum LintSource {
     Ast,
@@ -250,6 +228,7 @@ pub enum LintSource {
     Imports,
     Noqa,
     Filesystem,
+    PyprojectToml,
 }
 
 impl Rule {
@@ -257,24 +236,17 @@ impl Rule {
     /// physical lines).
     pub const fn lint_source(&self) -> LintSource {
         match self {
+            Rule::InvalidPyprojectToml => LintSource::PyprojectToml,
             Rule::UnusedNOQA => LintSource::Noqa,
-            Rule::BlanketNOQA
-            | Rule::BlanketTypeIgnore
+            Rule::BidirectionalUnicode
+            | Rule::BlankLineWithWhitespace
             | Rule::DocLineTooLong
             | Rule::LineTooLong
-            | Rule::MixedSpacesAndTabs
-            | Rule::MissingNewlineAtEndOfFile
-            | Rule::UTF8EncodingDeclaration
-            | Rule::ShebangMissingExecutableFile
-            | Rule::ShebangNotExecutable
-            | Rule::ShebangNotFirstLine
-            | Rule::BidirectionalUnicode
-            | Rule::ShebangMissingPython
-            | Rule::ShebangLeadingWhitespace
-            | Rule::TrailingWhitespace
-            | Rule::TabIndentation
             | Rule::MissingCopyrightNotice
-            | Rule::BlankLineWithWhitespace => LintSource::PhysicalLines,
+            | Rule::MissingNewlineAtEndOfFile
+            | Rule::MixedSpacesAndTabs
+            | Rule::TabIndentation
+            | Rule::TrailingWhitespace => LintSource::PhysicalLines,
             Rule::AmbiguousUnicodeCharacterComment
             | Rule::AmbiguousUnicodeCharacterDocstring
             | Rule::AmbiguousUnicodeCharacterString
@@ -282,34 +254,42 @@ impl Rule {
             | Rule::BadQuotesDocstring
             | Rule::BadQuotesInlineString
             | Rule::BadQuotesMultilineString
+            | Rule::BlanketNOQA
+            | Rule::BlanketTypeIgnore
             | Rule::CommentedOutCode
-            | Rule::MultiLineImplicitStringConcatenation
+            | Rule::ExtraneousParentheses
             | Rule::InvalidCharacterBackspace
-            | Rule::InvalidCharacterSub
             | Rule::InvalidCharacterEsc
             | Rule::InvalidCharacterNul
+            | Rule::InvalidCharacterSub
             | Rule::InvalidCharacterZeroWidthSpace
-            | Rule::ExtraneousParentheses
             | Rule::InvalidEscapeSequence
-            | Rule::SingleLineImplicitStringConcatenation
-            | Rule::MissingTrailingComma
-            | Rule::TrailingCommaOnBareTuple
-            | Rule::MultipleStatementsOnOneLineColon
-            | Rule::UselessSemicolon
-            | Rule::MultipleStatementsOnOneLineSemicolon
-            | Rule::ProhibitedTrailingComma
-            | Rule::TypeCommentInStub
-            | Rule::InvalidTodoTag
-            | Rule::MissingTodoAuthor
-            | Rule::MissingTodoLink
-            | Rule::MissingTodoColon
-            | Rule::MissingTodoDescription
             | Rule::InvalidTodoCapitalization
-            | Rule::MissingSpaceAfterTodoColon
+            | Rule::InvalidTodoTag
             | Rule::LineContainsFixme
             | Rule::LineContainsHack
             | Rule::LineContainsTodo
-            | Rule::LineContainsXxx => LintSource::Tokens,
+            | Rule::LineContainsXxx
+            | Rule::MissingSpaceAfterTodoColon
+            | Rule::MissingTodoAuthor
+            | Rule::MissingTodoColon
+            | Rule::MissingTodoDescription
+            | Rule::MissingTodoLink
+            | Rule::MissingTrailingComma
+            | Rule::MultiLineImplicitStringConcatenation
+            | Rule::MultipleStatementsOnOneLineColon
+            | Rule::MultipleStatementsOnOneLineSemicolon
+            | Rule::ProhibitedTrailingComma
+            | Rule::ShebangLeadingWhitespace
+            | Rule::ShebangMissingExecutableFile
+            | Rule::ShebangMissingPython
+            | Rule::ShebangNotExecutable
+            | Rule::ShebangNotFirstLine
+            | Rule::SingleLineImplicitStringConcatenation
+            | Rule::TrailingCommaOnBareTuple
+            | Rule::TypeCommentInStub
+            | Rule::UselessSemicolon
+            | Rule::UTF8EncodingDeclaration => LintSource::Tokens,
             Rule::IOError => LintSource::Io,
             Rule::UnsortedImports | Rule::MissingRequiredImport => LintSource::Imports,
             Rule::ImplicitNamespacePackage | Rule::InvalidModuleName => LintSource::Filesystem,
@@ -323,6 +303,7 @@ impl Rule {
             | Rule::MissingWhitespaceAroundOperator
             | Rule::MissingWhitespaceAroundParameterEquals
             | Rule::MultipleLeadingHashesForBlockComment
+            | Rule::MultipleSpacesAfterComma
             | Rule::MultipleSpacesAfterKeyword
             | Rule::MultipleSpacesAfterOperator
             | Rule::MultipleSpacesBeforeKeyword
@@ -332,6 +313,7 @@ impl Rule {
             | Rule::NoSpaceAfterBlockComment
             | Rule::NoSpaceAfterInlineComment
             | Rule::OverIndented
+            | Rule::TabAfterComma
             | Rule::TabAfterKeyword
             | Rule::TabAfterOperator
             | Rule::TabBeforeKeyword

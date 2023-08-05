@@ -87,6 +87,32 @@ pub struct Options {
     )]
     /// Whether to use Google-style or NumPy-style conventions or the PEP257
     /// defaults when analyzing docstring sections.
+    ///
+    /// Enabling a convention will force-disable any rules that are not
+    /// included in the specified convention. As such, the intended use is
+    /// to enable a convention and then selectively disable any additional
+    /// rules on top of it.
+    ///
+    /// For example, to use Google-style conventions but avoid requiring
+    /// documentation for every function parameter:
+    ///
+    /// ```toml
+    /// [tool.ruff]
+    /// # Enable all `pydocstyle` rules, limiting to those that adhere to the
+    /// # Google convention via `convention = "google"`, below.
+    /// select = ["D"]
+    ///
+    /// # On top of the Google convention, disable `D417`, which requires
+    /// # documentation for every function parameter.
+    /// ignore = ["D417"]
+    ///
+    /// [tool.ruff.pydocstyle]
+    /// convention = "google"
+    /// ```
+    ///
+    /// As conventions force-disable all rules not included in the convention,
+    /// enabling _additional_ rules on top of a convention is currently
+    /// unsupported.
     pub convention: Option<Convention>,
     #[option(
         default = r#"[]"#,

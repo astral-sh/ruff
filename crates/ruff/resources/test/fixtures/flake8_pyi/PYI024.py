@@ -1,9 +1,11 @@
 import collections
 
-person: collections.namedtuple  # OK
+person: collections.namedtuple  # Y024 Use "typing.NamedTuple" instead of "collections.namedtuple"
 
 from collections import namedtuple
 
-person: namedtuple  # OK
+person: namedtuple  # Y024 Use "typing.NamedTuple" instead of "collections.namedtuple"
 
-person = namedtuple("Person", ["name", "age"])  # OK
+person = namedtuple(
+    "Person", ["name", "age"]
+)  # Y024 Use "typing.NamedTuple" instead of "collections.namedtuple"

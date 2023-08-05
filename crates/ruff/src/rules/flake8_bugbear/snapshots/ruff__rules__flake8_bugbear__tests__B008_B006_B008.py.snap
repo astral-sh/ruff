@@ -46,38 +46,38 @@ B006_B008.py:120:30: B008 Do not perform function call in argument defaults
 121 |     ...
     |
 
-B006_B008.py:218:31: B008 Do not perform function call `dt.datetime.now` in argument defaults
+B006_B008.py:221:31: B008 Do not perform function call `dt.datetime.now` in argument defaults
     |
-216 | # B006 and B008
-217 | # We should handle arbitrary nesting of these B008.
-218 | def nested_combo(a=[float(3), dt.datetime.now()]):
+219 | # B006 and B008
+220 | # We should handle arbitrary nesting of these B008.
+221 | def nested_combo(a=[float(3), dt.datetime.now()]):
     |                               ^^^^^^^^^^^^^^^^^ B008
-219 |     pass
+222 |     pass
     |
 
-B006_B008.py:224:22: B008 Do not perform function call `map` in argument defaults
+B006_B008.py:227:22: B008 Do not perform function call `map` in argument defaults
     |
-222 | # Don't flag nested B006 since we can't guarantee that
-223 | # it isn't made mutable by the outer operation.
-224 | def no_nested_b006(a=map(lambda s: s.upper(), ["a", "b", "c"])):
+225 | # Don't flag nested B006 since we can't guarantee that
+226 | # it isn't made mutable by the outer operation.
+227 | def no_nested_b006(a=map(lambda s: s.upper(), ["a", "b", "c"])):
     |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B008
-225 |     pass
+228 |     pass
     |
 
-B006_B008.py:229:19: B008 Do not perform function call `random.randint` in argument defaults
+B006_B008.py:232:19: B008 Do not perform function call `random.randint` in argument defaults
     |
-228 | # B008-ception.
-229 | def nested_b008(a=random.randint(0, dt.datetime.now().year)):
+231 | # B008-ception.
+232 | def nested_b008(a=random.randint(0, dt.datetime.now().year)):
     |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B008
-230 |     pass
+233 |     pass
     |
 
-B006_B008.py:229:37: B008 Do not perform function call `dt.datetime.now` in argument defaults
+B006_B008.py:232:37: B008 Do not perform function call `dt.datetime.now` in argument defaults
     |
-228 | # B008-ception.
-229 | def nested_b008(a=random.randint(0, dt.datetime.now().year)):
+231 | # B008-ception.
+232 | def nested_b008(a=random.randint(0, dt.datetime.now().year)):
     |                                     ^^^^^^^^^^^^^^^^^ B008
-230 |     pass
+233 |     pass
     |
 
 

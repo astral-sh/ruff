@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, Keyword, Ranged};
+use ruff_python_ast::{self as ast, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{AutofixKind, Diagnostic};
@@ -66,11 +66,13 @@ pub(crate) fn unnecessary_comprehension_any_all(
     if !keywords.is_empty() {
         return;
     }
-    let Expr::Name(ast::ExprName { id, .. } )= func  else {
+    let Expr::Name(ast::ExprName { id, .. }) = func else {
         return;
     };
     if (matches!(id.as_str(), "all" | "any")) && args.len() == 1 {
-        let (Expr::ListComp(ast::ExprListComp { elt, .. } )| Expr::SetComp(ast::ExprSetComp { elt, .. })) = &args[0] else {
+        let (Expr::ListComp(ast::ExprListComp { elt, .. })
+        | Expr::SetComp(ast::ExprSetComp { elt, .. })) = &args[0]
+        else {
             return;
         };
         if contains_await(elt) {
@@ -82,7 +84,11 @@ pub(crate) fn unnecessary_comprehension_any_all(
         let mut diagnostic = Diagnostic::new(UnnecessaryComprehensionAnyAll, args[0].range());
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.try_set_fix(|| {
-                fixes::fix_unnecessary_comprehension_any_all(checker.locator, checker.stylist, expr)
+                fixes::fix_unnecessary_comprehension_any_all(
+                    checker.locator(),
+                    checker.stylist(),
+                    expr,
+                )
             });
         }
         checker.diagnostics.push(diagnostic);

@@ -85,6 +85,9 @@ impl std::fmt::Display for ImportFrom<'_> {
             write!(f, "{module}")?;
         }
         write!(f, " import {}", self.name.name)?;
+        if let Some(as_name) = self.name.as_name {
+            write!(f, " as {as_name}")?;
+        }
         Ok(())
     }
 }

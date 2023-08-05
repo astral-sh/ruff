@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
+use std::iter;
 
-use rustpython_parser::ast::{self, ExceptHandler, Stmt};
+use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
 
 use crate::node::{NodeId, Nodes};
 
@@ -9,9 +10,9 @@ fn common_ancestor(
     left: NodeId,
     right: NodeId,
     stop: Option<NodeId>,
-    node_tree: &Nodes,
+    node_tree: &Nodes<Stmt>,
 ) -> Option<NodeId> {
-    if stop.map_or(false, |stop| left == stop || right == stop) {
+    if stop.is_some_and(|stop| left == stop || right == stop) {
         return None;
     }
 
@@ -42,7 +43,17 @@ fn common_ancestor(
 /// Return the alternative branches for a given node.
 fn alternatives(stmt: &Stmt) -> Vec<Vec<&Stmt>> {
     match stmt {
-        Stmt::If(ast::StmtIf { body, .. }) => vec![body.iter().collect()],
+        Stmt::If(ast::StmtIf {
+            body,
+            elif_else_clauses,
+            ..
+        }) => iter::once(body.iter().collect())
+            .chain(
+                elif_else_clauses
+                    .iter()
+                    .map(|clause| clause.body.iter().collect()),
+            )
+            .collect(),
         Stmt::Try(ast::StmtTry {
             body,
             handlers,
@@ -75,10 +86,10 @@ fn descendant_of<'a>(
     stmt: NodeId,
     ancestors: &[&'a Stmt],
     stop: NodeId,
-    node_tree: &Nodes<'a>,
+    node_tree: &Nodes<'a, Stmt>,
 ) -> bool {
     ancestors.iter().any(|ancestor| {
-        node_tree.node_id(ancestor).map_or(false, |ancestor| {
+        node_tree.node_id(ancestor).is_some_and(|ancestor| {
             common_ancestor(stmt, ancestor, Some(stop), node_tree).is_some()
         })
     })
@@ -86,7 +97,7 @@ fn descendant_of<'a>(
 
 /// Return `true` if `left` and `right` are on different branches of an `if` or
 /// `try` statement.
-pub fn different_forks(left: NodeId, right: NodeId, node_tree: &Nodes) -> bool {
+pub fn different_forks(left: NodeId, right: NodeId, node_tree: &Nodes<Stmt>) -> bool {
     if let Some(ancestor) = common_ancestor(left, right, None, node_tree) {
         for items in alternatives(node_tree[ancestor]) {
             let l = descendant_of(left, &items, ancestor, node_tree);

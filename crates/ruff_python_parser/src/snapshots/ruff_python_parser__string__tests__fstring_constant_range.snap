@@ -1,0 +1,75 @@
+---
+source: crates/ruff_python_parser/src/string.rs
+expression: parse_ast
+---
+[
+    Expr(
+        StmtExpr {
+            range: 0..22,
+            value: JoinedStr(
+                ExprJoinedStr {
+                    range: 0..22,
+                    values: [
+                        Constant(
+                            ExprConstant {
+                                range: 2..5,
+                                value: Str(
+                                    "aaa",
+                                ),
+                                kind: None,
+                            },
+                        ),
+                        FormattedValue(
+                            ExprFormattedValue {
+                                range: 5..10,
+                                value: Name(
+                                    ExprName {
+                                        range: 6..9,
+                                        id: "bbb",
+                                        ctx: Load,
+                                    },
+                                ),
+                                debug_text: None,
+                                conversion: None,
+                                format_spec: None,
+                            },
+                        ),
+                        Constant(
+                            ExprConstant {
+                                range: 10..13,
+                                value: Str(
+                                    "ccc",
+                                ),
+                                kind: None,
+                            },
+                        ),
+                        FormattedValue(
+                            ExprFormattedValue {
+                                range: 13..18,
+                                value: Name(
+                                    ExprName {
+                                        range: 14..17,
+                                        id: "ddd",
+                                        ctx: Load,
+                                    },
+                                ),
+                                debug_text: None,
+                                conversion: None,
+                                format_spec: None,
+                            },
+                        ),
+                        Constant(
+                            ExprConstant {
+                                range: 18..21,
+                                value: Str(
+                                    "eee",
+                                ),
+                                kind: None,
+                            },
+                        ),
+                    ],
+                },
+            ),
+        },
+    ),
+]

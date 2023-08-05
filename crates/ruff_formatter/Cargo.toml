@@ -11,7 +11,7 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-ruff_text_size = { workspace = true }
+ruff_text_size = { path = "../ruff_text_size" }
 
 drop_bomb = { version = "0.1.5" }
 rustc-hash = { workspace = true }

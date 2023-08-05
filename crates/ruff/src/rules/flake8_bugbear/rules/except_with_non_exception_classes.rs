@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use rustpython_parser::ast::{self, ExceptHandler, Expr, Ranged};
+use ruff_python_ast::{self as ast, ExceptHandler, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -47,7 +47,7 @@ impl Violation for ExceptWithNonExceptionClasses {
 /// This should leave any unstarred iterables alone (subsequently raising a
 /// warning for B029).
 fn flatten_starred_iterables(expr: &Expr) -> Vec<&Expr> {
-    let Expr::Tuple(ast::ExprTuple { elts, .. } )= expr else {
+    let Expr::Tuple(ast::ExprTuple { elts, .. }) = expr else {
         return vec![expr];
     };
     let mut flattened_exprs: Vec<&Expr> = Vec::with_capacity(elts.len());

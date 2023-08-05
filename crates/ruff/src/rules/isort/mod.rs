@@ -11,7 +11,9 @@ pub use categorize::{ImportSection, ImportType};
 use comments::Comment;
 use normalize::normalize_imports;
 use order::order_imports;
-use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python_ast::PySourceType;
+use ruff_python_codegen::Stylist;
+use ruff_source_file::Locator;
 use settings::RelativeImportsOrder;
 use sorting::cmp_either_import;
 use types::EitherImport::{Import, ImportFrom};
@@ -71,9 +73,11 @@ pub(crate) fn format_imports(
     stylist: &Stylist,
     src: &[PathBuf],
     package: Option<&Path>,
+    source_type: PySourceType,
     combine_as_imports: bool,
     force_single_line: bool,
     force_sort_within_sections: bool,
+    case_sensitive: bool,
     force_wrap_aliases: bool,
     force_to_top: &BTreeSet<String>,
     known_modules: &KnownModules,
@@ -92,7 +96,13 @@ pub(crate) fn format_imports(
     section_order: &[ImportSection],
 ) -> String {
     let trailer = &block.trailer;
-    let block = annotate_imports(&block.imports, comments, locator, split_on_trailing_comma);
+    let block = annotate_imports(
+        &block.imports,
+        comments,
+        locator,
+        split_on_trailing_comma,
+        source_type,
+    );
 
     // Normalize imports (i.e., deduplicate, aggregate `from` imports).
     let block = normalize_imports(
@@ -114,6 +124,7 @@ pub(crate) fn format_imports(
             src,
             package,
             force_sort_within_sections,
+            case_sensitive,
             force_wrap_aliases,
             force_to_top,
             known_modules,
@@ -171,6 +182,7 @@ fn format_import_block(
     src: &[PathBuf],
     package: Option<&Path>,
     force_sort_within_sections: bool,
+    case_sensitive: bool,
     force_wrap_aliases: bool,
     force_to_top: &BTreeSet<String>,
     known_modules: &KnownModules,
@@ -206,6 +218,7 @@ fn format_import_block(
         let imports = order_imports(
             import_block,
             order_by_type,
+            case_sensitive,
             relative_imports_order,
             classes,
             constants,
@@ -222,7 +235,13 @@ fn format_import_block(
                 .collect::<Vec<EitherImport>>();
             if force_sort_within_sections {
                 imports.sort_by(|import1, import2| {
-                    cmp_either_import(import1, import2, relative_imports_order, force_to_top)
+                    cmp_either_import(
+                        import1,
+                        import2,
+                        relative_imports_order,
+                        force_to_top,
+                        case_sensitive,
+                    )
                 });
             };
             imports
@@ -303,6 +322,8 @@ mod tests {
 
     #[test_case(Path::new("add_newline_before_comments.py"))]
     #[test_case(Path::new("as_imports_comments.py"))]
+    #[test_case(Path::new("bom_sorted.py"))]
+    #[test_case(Path::new("bom_unsorted.py"))]
     #[test_case(Path::new("combine_as_imports.py"))]
     #[test_case(Path::new("combine_import_from.py"))]
     #[test_case(Path::new("comments.py"))]
@@ -312,6 +333,7 @@ mod tests {
     #[test_case(Path::new("force_sort_within_sections.py"))]
     #[test_case(Path::new("force_to_top.py"))]
     #[test_case(Path::new("force_wrap_aliases.py"))]
+    #[test_case(Path::new("if_elif_else.py"))]
     #[test_case(Path::new("import_from_after_import.py"))]
     #[test_case(Path::new("inline_comments.py"))]
     #[test_case(Path::new("insert_empty_lines.py"))]
@@ -319,6 +341,7 @@ mod tests {
     #[test_case(Path::new("isort_skip_file.py"))]
     #[test_case(Path::new("leading_prefix.py"))]
     #[test_case(Path::new("magic_trailing_comma.py"))]
+    #[test_case(Path::new("match_case.py"))]
     #[test_case(Path::new("natural_order.py"))]
     #[test_case(Path::new("no_lines_before.py"))]
     #[test_case(Path::new("no_reorder_within_section.py"))]
@@ -359,6 +382,10 @@ mod tests {
         Ok(())
     }
 
+    fn pattern(pattern: &str) -> glob::Pattern {
+        glob::Pattern::new(pattern).unwrap()
+    }
+
     #[test_case(Path::new("separate_subpackage_first_and_third_party_imports.py"))]
     fn separate_modules(path: &Path) -> Result<()> {
         let snapshot = format!("1_{}", path.to_string_lossy());
@@ -367,8 +394,32 @@ mod tests {
             &Settings {
                 isort: super::settings::Settings {
                     known_modules: KnownModules::new(
-                        vec!["foo.bar".to_string(), "baz".to_string()],
-                        vec!["foo".to_string(), "__future__".to_string()],
+                        vec![pattern("foo.bar"), pattern("baz")],
+                        vec![pattern("foo"), pattern("__future__")],
+                        vec![],
+                        vec![],
+                        FxHashMap::default(),
+                    ),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..Settings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("separate_subpackage_first_and_third_party_imports.py"))]
+    fn separate_modules_glob(path: &Path) -> Result<()> {
+        let snapshot = format!("glob_1_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &Settings {
+                isort: super::settings::Settings {
+                    known_modules: KnownModules::new(
+                        vec![pattern("foo.*"), pattern("baz")],
+                        vec![pattern("foo"), pattern("__future__")],
                         vec![],
                         vec![],
                         FxHashMap::default(),
@@ -391,8 +442,8 @@ mod tests {
             &Settings {
                 isort: super::settings::Settings {
                     known_modules: KnownModules::new(
-                        vec!["foo".to_string()],
-                        vec!["foo.bar".to_string()],
+                        vec![pattern("foo")],
+                        vec![pattern("foo.bar")],
                         vec![],
                         vec![],
                         FxHashMap::default(),
@@ -435,10 +486,28 @@ mod tests {
                     known_modules: KnownModules::new(
                         vec![],
                         vec![],
-                        vec!["ruff".to_string()],
+                        vec![pattern("ruff")],
                         vec![],
                         FxHashMap::default(),
                     ),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..Settings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("case_sensitive.py"))]
+    fn case_sensitive(path: &Path) -> Result<()> {
+        let snapshot = format!("case_sensitive_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &Settings {
+                isort: super::settings::Settings {
+                    case_sensitive: true,
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
@@ -721,6 +790,35 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Path::new("comment.py"))]
+    #[test_case(Path::new("docstring.py"))]
+    #[test_case(Path::new("docstring.pyi"))]
+    #[test_case(Path::new("docstring_only.py"))]
+    #[test_case(Path::new("docstring_with_continuation.py"))]
+    #[test_case(Path::new("docstring_with_semicolon.py"))]
+    #[test_case(Path::new("empty.py"))]
+    #[test_case(Path::new("existing_import.py"))]
+    #[test_case(Path::new("multiline_docstring.py"))]
+    #[test_case(Path::new("off.py"))]
+    fn required_import_with_alias(path: &Path) -> Result<()> {
+        let snapshot = format!("required_import_with_alias_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort/required_imports").join(path).as_path(),
+            &Settings {
+                src: vec![test_resource_path("fixtures/isort")],
+                isort: super::settings::Settings {
+                    required_imports: BTreeSet::from([
+                        "from __future__ import annotations as _annotations".to_string(),
+                    ]),
+                    ..super::settings::Settings::default()
+                },
+                ..Settings::for_rule(Rule::MissingRequiredImport)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test_case(Path::new("docstring.py"))]
     #[test_case(Path::new("docstring.pyi"))]
     #[test_case(Path::new("docstring_only.py"))]
@@ -933,7 +1031,7 @@ mod tests {
                         vec![],
                         vec![],
                         vec![],
-                        FxHashMap::from_iter([("django".to_string(), vec!["django".to_string()])]),
+                        FxHashMap::from_iter([("django".to_string(), vec![pattern("django")])]),
                     ),
                     section_order: vec![
                         ImportSection::Known(ImportType::Future),
@@ -962,11 +1060,11 @@ mod tests {
                 src: vec![test_resource_path("fixtures/isort")],
                 isort: super::settings::Settings {
                     known_modules: KnownModules::new(
-                        vec!["library".to_string()],
+                        vec![pattern("library")],
                         vec![],
                         vec![],
                         vec![],
-                        FxHashMap::from_iter([("django".to_string(), vec!["django".to_string()])]),
+                        FxHashMap::from_iter([("django".to_string(), vec![pattern("django")])]),
                     ),
                     section_order: vec![
                         ImportSection::Known(ImportType::Future),

@@ -1,6 +1,7 @@
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::{Indexer, Locator};
+use ruff_python_index::Indexer;
+use ruff_source_file::Locator;
 
 use crate::registry::Rule;
 use crate::settings::Settings;
@@ -48,12 +49,11 @@ fn is_standalone_comment(line: &str) -> bool {
 
 /// ERA001
 pub(crate) fn commented_out_code(
+    diagnostics: &mut Vec<Diagnostic>,
     locator: &Locator,
     indexer: &Indexer,
     settings: &Settings,
-) -> Vec<Diagnostic> {
-    let mut diagnostics = vec![];
-
+) {
     for range in indexer.comment_ranges() {
         let line = locator.full_lines(*range);
 
@@ -69,6 +69,4 @@ pub(crate) fn commented_out_code(
             diagnostics.push(diagnostic);
         }
     }
-
-    diagnostics
 }

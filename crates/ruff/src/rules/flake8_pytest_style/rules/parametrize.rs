@@ -1,10 +1,13 @@
+use ruff_python_ast::{
+    self as ast, Arguments, Constant, Decorator, Expr, ExprContext, PySourceType, Ranged,
+};
+use ruff_python_parser::{lexer, AsMode, Tok};
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Decorator, Expr, ExprContext, Ranged};
-use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::{Generator, Locator};
+use ruff_python_codegen::Generator;
+use ruff_source_file::Locator;
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
@@ -94,7 +97,12 @@ fn elts_to_csv(elts: &[Expr], generator: Generator) -> Option<String> {
 /// ```
 ///
 /// This method assumes that the first argument is a string.
-fn get_parametrize_name_range(decorator: &Decorator, expr: &Expr, locator: &Locator) -> TextRange {
+fn get_parametrize_name_range(
+    decorator: &Decorator,
+    expr: &Expr,
+    locator: &Locator,
+    source_type: PySourceType,
+) -> TextRange {
     let mut locations = Vec::new();
     let mut implicit_concat = None;
 
@@ -102,7 +110,7 @@ fn get_parametrize_name_range(decorator: &Decorator, expr: &Expr, locator: &Loca
     // decorator to find them.
     for (tok, range) in lexer::lex_starts_at(
         locator.slice(decorator.range()),
-        Mode::Module,
+        source_type.as_mode(),
         decorator.start(),
     )
     .flatten()
@@ -140,8 +148,12 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
             if names.len() > 1 {
                 match names_type {
                     types::ParametrizeNameType::Tuple => {
-                        let name_range =
-                            get_parametrize_name_range(decorator, expr, checker.locator);
+                        let name_range = get_parametrize_name_range(
+                            decorator,
+                            expr,
+                            checker.locator(),
+                            checker.source_type,
+                        );
                         let mut diagnostic = Diagnostic::new(
                             PytestParametrizeNamesWrongType {
                                 expected: names_type,
@@ -171,8 +183,12 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                         checker.diagnostics.push(diagnostic);
                     }
                     types::ParametrizeNameType::List => {
-                        let name_range =
-                            get_parametrize_name_range(decorator, expr, checker.locator);
+                        let name_range = get_parametrize_name_range(
+                            decorator,
+                            expr,
+                            checker.locator(),
+                            checker.source_type,
+                        );
                         let mut diagnostic = Diagnostic::new(
                             PytestParametrizeNamesWrongType {
                                 expected: names_type,
@@ -413,7 +429,11 @@ fn handle_value_rows(
 pub(crate) fn parametrize(checker: &mut Checker, decorators: &[Decorator]) {
     for decorator in decorators {
         if is_pytest_parametrize(decorator, checker.semantic()) {
-            if let Expr::Call(ast::ExprCall { args, .. }) = &decorator.expression {
+            if let Expr::Call(ast::ExprCall {
+                arguments: Arguments { args, .. },
+                ..
+            }) = &decorator.expression
+            {
                 if checker.enabled(Rule::PytestParametrizeNamesWrongType) {
                     if let Some(names) = args.get(0) {
                         check_names(checker, decorator, names);

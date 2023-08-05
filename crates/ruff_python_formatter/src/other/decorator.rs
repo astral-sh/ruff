@@ -1,8 +1,9 @@
+use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
 use crate::FormatNodeRule;
 use ruff_formatter::write;
-use rustpython_parser::ast::Decorator;
+use ruff_python_ast::Decorator;
 
 #[derive(Default)]
 pub struct FormatDecorator;
@@ -18,7 +19,7 @@ impl FormatNodeRule<Decorator> for FormatDecorator {
             f,
             [
                 text("@"),
-                expression.format().with_options(Parenthesize::Optional)
+                maybe_parenthesize_expression(expression, item, Parenthesize::Optional)
             ]
         )
     }

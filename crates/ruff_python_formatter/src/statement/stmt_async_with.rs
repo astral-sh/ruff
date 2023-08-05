@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use crate::statement::stmt_with::AnyStatementWith;
 use crate::FormatNodeRule;
-use rustpython_parser::ast::StmtAsyncWith;
+use ruff_python_ast::StmtAsyncWith;
 
 #[derive(Default)]
 pub struct FormatStmtAsyncWith;

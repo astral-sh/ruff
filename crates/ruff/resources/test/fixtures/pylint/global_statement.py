@@ -80,3 +80,8 @@ def multiple_assignment():
     global CONSTANT  # [global-statement]
     CONSTANT = 1
     CONSTANT = 2
+
+
+def no_assignment():
+    """Shouldn't warn"""
+    global CONSTANT

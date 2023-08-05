@@ -1,33 +1,46 @@
 use std::fmt;
 
-use rustpython_parser::ast;
-use rustpython_parser::ast::CmpOp;
-
+use ruff_python_ast as ast;
+use ruff_python_ast::{Arguments, CmpOp, Constant, Expr};
 use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::{ScopeKind, SemanticModel};
 
 use crate::settings::Settings;
 
+/// Returns the value of the `name` parameter to, e.g., a `TypeVar` constructor.
+pub(super) fn type_param_name(arguments: &Arguments) -> Option<&str> {
+    // Handle both `TypeVar("T")` and `TypeVar(name="T")`.
+    let name_param = arguments.find_argument("name", 0)?;
+    if let Expr::Constant(ast::ExprConstant {
+        value: Constant::Str(name),
+        ..
+    }) = &name_param
+    {
+        Some(name)
+    } else {
+        None
+    }
+}
+
 pub(super) fn in_dunder_init(semantic: &SemanticModel, settings: &Settings) -> bool {
     let scope = semantic.scope();
-    let (
-        ScopeKind::Function(ast::StmtFunctionDef {
-            name,
-            decorator_list,
+    let (ScopeKind::Function(ast::StmtFunctionDef {
+        name,
+        decorator_list,
         ..
-        }) |
-        ScopeKind::AsyncFunction(ast::StmtAsyncFunctionDef {
-            name,
-            decorator_list,
-            ..
-        })
-    ) = scope.kind else {
+    })
+    | ScopeKind::AsyncFunction(ast::StmtAsyncFunctionDef {
+        name,
+        decorator_list,
+        ..
+    })) = scope.kind
+    else {
         return false;
     };
     if name != "__init__" {
         return false;
     }
-    let Some(parent) = scope.parent.map(|scope_id| &semantic.scopes[scope_id]) else {
+    let Some(parent) = semantic.first_non_type_parent_scope(scope) else {
         return false;
     };
 

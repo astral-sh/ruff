@@ -1,4 +1,5 @@
 use std::io::{stdout, Read, Write};
+use std::path::Path;
 use std::{fs, io};
 
 use anyhow::{bail, Context, Result};
@@ -25,7 +26,8 @@ fn main() -> Result<()> {
             );
         }
         let input = read_from_stdin()?;
-        let formatted = format_and_debug_print(&input, &cli)?;
+        // It seems reasonable to give this a dummy name
+        let formatted = format_and_debug_print(&input, &cli, Path::new("stdin.py"))?;
         if cli.check {
             if formatted == input {
                 return Ok(());
@@ -37,7 +39,7 @@ fn main() -> Result<()> {
         for file in &cli.files {
             let input = fs::read_to_string(file)
                 .with_context(|| format!("Could not read {}: ", file.display()))?;
-            let formatted = format_and_debug_print(&input, &cli)?;
+            let formatted = format_and_debug_print(&input, &cli, file)?;
             match cli.emit {
                 Some(Emit::Stdout) => stdout().lock().write_all(formatted.as_bytes())?,
                 None | Some(Emit::Files) => {

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, Ranged};
+use ruff_python_ast::{self as ast, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -47,19 +47,19 @@ impl Violation for AssignmentToOsEnviron {
         format!("Assigning to `os.environ` doesn't clear the environment")
     }
 }
+
 /// B003
 pub(crate) fn assignment_to_os_environ(checker: &mut Checker, targets: &[Expr]) {
-    if targets.len() != 1 {
+    let [target] = targets else {
         return;
-    }
-    let target = &targets[0];
+    };
     let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = target else {
         return;
     };
     if attr != "environ" {
         return;
     }
-    let Expr::Name(ast::ExprName { id, .. } )= value.as_ref() else {
+    let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
         return;
     };
     if id != "os" {

@@ -10,6 +10,18 @@ F601.py:3:5: F601 Dictionary key literal `"a"` repeated
 4 |     "b": 3,
 5 |     ("a", "b"): 3,
   |
+  = help: Remove repeated key literal `"a"`
+
+F601.py:6:5: F601 Dictionary key literal `("a", "b")` repeated
+  |
+4 |     "b": 3,
+5 |     ("a", "b"): 3,
+6 |     ("a", "b"): 4,
+  |     ^^^^^^^^^^ F601
+7 |     1.0: 2,
+8 |     1: 0,
+  |
+  = help: Remove repeated key literal `("a", "b")`
 
 F601.py:9:5: F601 Dictionary key literal `1` repeated
    |
@@ -20,6 +32,7 @@ F601.py:9:5: F601 Dictionary key literal `1` repeated
 10 |     b"123": 1,
 11 |     b"123": 4,
    |
+   = help: Remove repeated key literal `1`
 
 F601.py:11:5: F601 Dictionary key literal `b"123"` repeated
    |
@@ -29,6 +42,7 @@ F601.py:11:5: F601 Dictionary key literal `b"123"` repeated
    |     ^^^^^^ F601
 12 | }
    |
+   = help: Remove repeated key literal `b"123"`
 
 F601.py:16:5: F601 Dictionary key literal `"a"` repeated
    |
@@ -39,6 +53,7 @@ F601.py:16:5: F601 Dictionary key literal `"a"` repeated
 17 |     "a": 3,
 18 |     "a": 3,
    |
+   = help: Remove repeated key literal `"a"`
 
 F601.py:17:5: F601 Dictionary key literal `"a"` repeated
    |
@@ -49,6 +64,7 @@ F601.py:17:5: F601 Dictionary key literal `"a"` repeated
 18 |     "a": 3,
 19 | }
    |
+   = help: Remove repeated key literal `"a"`
 
 F601.py:18:5: F601 [*] Dictionary key literal `"a"` repeated
    |
@@ -78,6 +94,7 @@ F601.py:23:5: F601 Dictionary key literal `"a"` repeated
 24 |     "a": 3,
 25 |     "a": 3,
    |
+   = help: Remove repeated key literal `"a"`
 
 F601.py:24:5: F601 Dictionary key literal `"a"` repeated
    |
@@ -88,6 +105,7 @@ F601.py:24:5: F601 Dictionary key literal `"a"` repeated
 25 |     "a": 3,
 26 |     "a": 4,
    |
+   = help: Remove repeated key literal `"a"`
 
 F601.py:25:5: F601 [*] Dictionary key literal `"a"` repeated
    |
@@ -117,6 +135,7 @@ F601.py:26:5: F601 Dictionary key literal `"a"` repeated
    |     ^^^ F601
 27 | }
    |
+   = help: Remove repeated key literal `"a"`
 
 F601.py:31:5: F601 [*] Dictionary key literal `"a"` repeated
    |
@@ -147,6 +166,7 @@ F601.py:32:5: F601 Dictionary key literal `"a"` repeated
 33 |     "a": 3,
 34 |     "a": 4,
    |
+   = help: Remove repeated key literal `"a"`
 
 F601.py:33:5: F601 Dictionary key literal `"a"` repeated
    |
@@ -157,6 +177,7 @@ F601.py:33:5: F601 Dictionary key literal `"a"` repeated
 34 |     "a": 4,
 35 | }
    |
+   = help: Remove repeated key literal `"a"`
 
 F601.py:34:5: F601 Dictionary key literal `"a"` repeated
    |
@@ -166,6 +187,7 @@ F601.py:34:5: F601 Dictionary key literal `"a"` repeated
    |     ^^^ F601
 35 | }
    |
+   = help: Remove repeated key literal `"a"`
 
 F601.py:41:5: F601 Dictionary key literal `"a"` repeated
    |
@@ -176,6 +198,7 @@ F601.py:41:5: F601 Dictionary key literal `"a"` repeated
 42 |     a: 2,
 43 |     "a": 3,
    |
+   = help: Remove repeated key literal `"a"`
 
 F601.py:43:5: F601 Dictionary key literal `"a"` repeated
    |
@@ -186,6 +209,7 @@ F601.py:43:5: F601 Dictionary key literal `"a"` repeated
 44 |     a: 3,
 45 |     "a": 3,
    |
+   = help: Remove repeated key literal `"a"`
 
 F601.py:45:5: F601 [*] Dictionary key literal `"a"` repeated
    |
@@ -224,12 +248,16 @@ F601.py:49:14: F601 [*] Dictionary key literal `"a"` repeated
 49    |-x = {"a": 1, "a": 1}
    49 |+x = {"a": 1}
 50 50 | x = {"a": 1, "b": 2, "a": 1}
+51 51 | 
+52 52 | x = {
 
 F601.py:50:22: F601 [*] Dictionary key literal `"a"` repeated
    |
 49 | x = {"a": 1, "a": 1}
 50 | x = {"a": 1, "b": 2, "a": 1}
    |                      ^^^ F601
+51 | 
+52 | x = {
    |
    = help: Remove repeated key literal `"a"`
 
@@ -239,5 +267,18 @@ F601.py:50:22: F601 [*] Dictionary key literal `"a"` repeated
 49 49 | x = {"a": 1, "a": 1}
 50    |-x = {"a": 1, "b": 2, "a": 1}
    50 |+x = {"a": 1, "b": 2}
+51 51 | 
+52 52 | x = {
+53 53 |     ('a', 'b'): 'asdf',
+
+F601.py:54:5: F601 Dictionary key literal `('a', 'b')` repeated
+   |
+52 | x = {
+53 |     ('a', 'b'): 'asdf',
+54 |     ('a', 'b'): 'qwer',
+   |     ^^^^^^^^^^ F601
+55 | }
+   |
+   = help: Remove repeated key literal `('a', 'b')`
 
 

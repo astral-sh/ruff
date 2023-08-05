@@ -26,3 +26,9 @@ def f():
     import os  # isort:skip
     import collections
     import abc
+
+
+def f():
+    import sys; import os  # isort:skip
+    import sys; import os  # isort:skip  # isort:skip
+    import sys; import os

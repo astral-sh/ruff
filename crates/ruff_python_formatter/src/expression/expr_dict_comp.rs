@@ -1,20 +1,52 @@
-use crate::comments::Comments;
-use crate::expression::parentheses::{
-    default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
+use ruff_formatter::prelude::{
+    format_args, format_with, group, soft_line_break_or_space, space, text,
 };
-use crate::{not_yet_implemented_custom_text, FormatNodeRule, PyFormatter};
 use ruff_formatter::{write, Buffer, FormatResult};
-use rustpython_parser::ast::ExprDictComp;
+use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::ExprDictComp;
+
+use crate::context::PyFormatContext;
+use crate::expression::parentheses::{
+    parenthesized_with_dangling_comments, NeedsParentheses, OptionalParentheses,
+};
+use crate::AsFormat;
+use crate::{FormatNodeRule, FormattedIterExt, PyFormatter};
 
 #[derive(Default)]
 pub struct FormatExprDictComp;
 
 impl FormatNodeRule<ExprDictComp> for FormatExprDictComp {
-    fn fmt_fields(&self, _item: &ExprDictComp, f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_fields(&self, item: &ExprDictComp, f: &mut PyFormatter) -> FormatResult<()> {
+        let ExprDictComp {
+            range: _,
+            key,
+            value,
+            generators,
+        } = item;
+
+        let joined = format_with(|f| {
+            f.join_with(soft_line_break_or_space())
+                .entries(generators.iter().formatted())
+                .finish()
+        });
+
+        let comments = f.context().comments().clone();
+        let dangling = comments.dangling_comments(item);
+
         write!(
             f,
-            [not_yet_implemented_custom_text(
-                "{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}"
+            [parenthesized_with_dangling_comments(
+                "{",
+                dangling,
+                &group(&format_args!(
+                    group(&key.format()),
+                    text(":"),
+                    space(),
+                    value.format(),
+                    soft_line_break_or_space(),
+                    &joined
+                )),
+                "}"
             )]
         )
     }
@@ -23,13 +55,9 @@ impl FormatNodeRule<ExprDictComp> for FormatExprDictComp {
 impl NeedsParentheses for ExprDictComp {
     fn needs_parentheses(
         &self,
-        parenthesize: Parenthesize,
-        source: &str,
-        comments: &Comments,
-    ) -> Parentheses {
-        match default_expression_needs_parentheses(self.into(), parenthesize, source, comments) {
-            Parentheses::Optional => Parentheses::Never,
-            parentheses => parentheses,
-        }
+        _parent: AnyNodeRef,
+        _context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        OptionalParentheses::Never
     }
 }

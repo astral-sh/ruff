@@ -1,11 +1,9 @@
-use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Expr};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::has_non_none_keyword;
+use ruff_python_ast::{self as ast, Constant, Expr, Ranged};
 
 use crate::checkers::ast::Checker;
+use crate::rules::flake8_datetimez::rules::helpers::has_non_none_keyword;
 
 #[violation]
 pub struct CallDatetimeStrptimeWithoutZone;
@@ -21,16 +19,11 @@ impl Violation for CallDatetimeStrptimeWithoutZone {
 }
 
 /// DTZ007
-pub(crate) fn call_datetime_strptime_without_zone(
-    checker: &mut Checker,
-    func: &Expr,
-    args: &[Expr],
-    location: TextRange,
-) {
+pub(crate) fn call_datetime_strptime_without_zone(checker: &mut Checker, call: &ast::ExprCall) {
     if !checker
         .semantic()
-        .resolve_call_path(func)
-        .map_or(false, |call_path| {
+        .resolve_call_path(&call.func)
+        .is_some_and(|call_path| {
             matches!(call_path.as_slice(), ["datetime", "datetime", "strptime"])
         })
     {
@@ -42,22 +35,25 @@ pub(crate) fn call_datetime_strptime_without_zone(
         value: Constant::Str(format),
         kind: None,
         range: _,
-    })) = args.get(1).as_ref()
+    })) = call.arguments.args.get(1).as_ref()
     {
         if format.contains("%z") {
             return;
         }
     };
 
-    let (Some(grandparent), Some(parent)) = (checker.semantic().expr_grandparent(), checker.semantic().expr_parent()) else {
+    let (Some(grandparent), Some(parent)) = (
+        checker.semantic().expr_grandparent(),
+        checker.semantic().expr_parent(),
+    ) else {
         checker.diagnostics.push(Diagnostic::new(
             CallDatetimeStrptimeWithoutZone,
-            location,
+            call.range(),
         ));
         return;
     };
 
-    if let Expr::Call(ast::ExprCall { keywords, .. }) = grandparent {
+    if let Expr::Call(ast::ExprCall { arguments, .. }) = grandparent {
         if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = parent {
             let attr = attr.as_str();
             // Ex) `datetime.strptime(...).astimezone()`
@@ -67,14 +63,15 @@ pub(crate) fn call_datetime_strptime_without_zone(
 
             // Ex) `datetime.strptime(...).replace(tzinfo=UTC)`
             if attr == "replace" {
-                if has_non_none_keyword(keywords, "tzinfo") {
+                if has_non_none_keyword(arguments, "tzinfo") {
                     return;
                 }
             }
         }
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(CallDatetimeStrptimeWithoutZone, location));
+    checker.diagnostics.push(Diagnostic::new(
+        CallDatetimeStrptimeWithoutZone,
+        call.range(),
+    ));
 }

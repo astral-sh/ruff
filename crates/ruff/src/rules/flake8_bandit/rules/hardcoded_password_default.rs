@@ -1,10 +1,42 @@
-use rustpython_parser::ast::{Arg, ArgWithDefault, Arguments, Expr, Ranged};
+use ruff_python_ast::{Expr, Parameter, ParameterWithDefault, Parameters, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
+use crate::checkers::ast::Checker;
+
 use super::super::helpers::{matches_password_name, string_literal};
 
+/// ## What it does
+/// Checks for potential uses of hardcoded passwords in function argument
+/// defaults.
+///
+/// ## Why is this bad?
+/// Including a hardcoded password in source code is a security risk, as an
+/// attacker could discover the password and use it to gain unauthorized
+/// access.
+///
+/// Instead, store passwords and other secrets in configuration files,
+/// environment variables, or other sources that are excluded from version
+/// control.
+///
+/// ## Example
+/// ```python
+/// def connect_to_server(password="hunter2"):
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import os
+///
+///
+/// def connect_to_server(password=os.environ["PASSWORD"]):
+///     ...
+/// ```
+///
+/// ## References
+/// - [Common Weakness Enumeration: CWE-259](https://cwe.mitre.org/data/definitions/259.html)
 #[violation]
 pub struct HardcodedPasswordDefault {
     name: String,
@@ -21,9 +53,9 @@ impl Violation for HardcodedPasswordDefault {
     }
 }
 
-fn check_password_kwarg(arg: &Arg, default: &Expr) -> Option<Diagnostic> {
+fn check_password_kwarg(parameter: &Parameter, default: &Expr) -> Option<Diagnostic> {
     string_literal(default).filter(|string| !string.is_empty())?;
-    let kwarg_name = &arg.arg;
+    let kwarg_name = &parameter.name;
     if !matches_password_name(kwarg_name) {
         return None;
     }
@@ -36,26 +68,22 @@ fn check_password_kwarg(arg: &Arg, default: &Expr) -> Option<Diagnostic> {
 }
 
 /// S107
-pub(crate) fn hardcoded_password_default(arguments: &Arguments) -> Vec<Diagnostic> {
-    let mut diagnostics: Vec<Diagnostic> = Vec::new();
-
-    for ArgWithDefault {
-        def,
+pub(crate) fn hardcoded_password_default(checker: &mut Checker, parameters: &Parameters) {
+    for ParameterWithDefault {
+        parameter,
         default,
         range: _,
-    } in arguments
+    } in parameters
         .posonlyargs
         .iter()
-        .chain(&arguments.args)
-        .chain(&arguments.kwonlyargs)
+        .chain(&parameters.args)
+        .chain(&parameters.kwonlyargs)
     {
         let Some(default) = default else {
             continue;
         };
-        if let Some(diagnostic) = check_password_kwarg(def, default) {
-            diagnostics.push(diagnostic);
+        if let Some(diagnostic) = check_password_kwarg(parameter, default) {
+            checker.diagnostics.push(diagnostic);
         }
     }
-
-    diagnostics
 }

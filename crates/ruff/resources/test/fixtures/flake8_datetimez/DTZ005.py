@@ -16,3 +16,6 @@ from datetime import datetime
 
 # no args unqualified
 datetime.now()
+
+# uses `astimezone` method
+datetime.now().astimezone()

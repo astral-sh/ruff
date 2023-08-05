@@ -4,6 +4,7 @@ changelog:
     labels:
       - internal
       - documentation
+      - formatter
   categories:
     - title: Breaking Changes
       labels:

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::Stmt;
+use ruff_python_ast::Stmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -62,7 +62,7 @@ pub(crate) fn invalid_class_name(
     }
 
     let stripped = name.strip_prefix('_').unwrap_or(name);
-    if !stripped.chars().next().map_or(false, char::is_uppercase) || stripped.contains('_') {
+    if !stripped.chars().next().is_some_and(char::is_uppercase) || stripped.contains('_') {
         return Some(Diagnostic::new(
             InvalidClassName {
                 name: name.to_string(),

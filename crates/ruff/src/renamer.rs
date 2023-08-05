@@ -242,14 +242,16 @@ impl Renamer {
             // By default, replace the binding's name with the target name.
             BindingKind::Annotation
             | BindingKind::Argument
+            | BindingKind::TypeParam
             | BindingKind::NamedExprAssignment
             | BindingKind::UnpackedAssignment
             | BindingKind::Assignment
+            | BindingKind::BoundException
             | BindingKind::LoopVar
             | BindingKind::Global
             | BindingKind::Nonlocal(_)
-            | BindingKind::ClassDefinition
-            | BindingKind::FunctionDefinition
+            | BindingKind::ClassDefinition(_)
+            | BindingKind::FunctionDefinition(_)
             | BindingKind::Deletion
             | BindingKind::UnboundException(_) => {
                 Some(Edit::range_replacement(target.to_string(), binding.range))

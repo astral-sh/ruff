@@ -19,3 +19,6 @@ from datetime import datetime
 
 # no args unqualified
 datetime(2000, 1, 1, 0, 0, 0)
+
+# uses `astimezone` method
+datetime(2000, 1, 1, 0, 0, 0).astimezone()

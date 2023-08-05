@@ -98,3 +98,4 @@ field27 = list[str]
 field28 = builtins.str
 field29 = str
 field30 = str | bytes | None
+field31: typing.Final = field30

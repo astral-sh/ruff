@@ -33,6 +33,16 @@ pub enum Tag {
     StartGroup(Group),
     EndGroup,
 
+    /// Creates a logical group similar to [`Tag::StartGroup`] but only if the condition is met.
+    /// This is an optimized representation for (assuming the content should only be grouped if another group fits):
+    ///
+    /// ```text
+    /// if_group_breaks(content, other_group_id),
+    /// if_group_fits_on_line(group(&content), other_group_id)
+    /// ```
+    StartConditionalGroup(ConditionalGroup),
+    EndConditionalGroup,
+
     /// Allows to specify content that gets printed depending on whatever the enclosing group
     /// is printed on a single line or multiple lines. See [crate::builders::if_group_breaks] for examples.
     StartConditionalContent(Condition),
@@ -67,6 +77,9 @@ pub enum Tag {
     /// See [crate::builders::labelled] for documentation.
     StartLabelled(LabelId),
     EndLabelled,
+
+    StartFitsExpanded(FitsExpanded),
+    EndFitsExpanded,
 }
 
 impl Tag {
@@ -77,7 +90,8 @@ impl Tag {
             Tag::StartIndent
                 | Tag::StartAlign(_)
                 | Tag::StartDedent(_)
-                | Tag::StartGroup { .. }
+                | Tag::StartGroup(_)
+                | Tag::StartConditionalGroup(_)
                 | Tag::StartConditionalContent(_)
                 | Tag::StartIndentIfGroupBreaks(_)
                 | Tag::StartFill
@@ -85,6 +99,7 @@ impl Tag {
                 | Tag::StartLineSuffix
                 | Tag::StartVerbatim(_)
                 | Tag::StartLabelled(_)
+                | Tag::StartFitsExpanded(_)
         )
     }
 
@@ -101,6 +116,7 @@ impl Tag {
             StartAlign(_) | EndAlign => TagKind::Align,
             StartDedent(_) | EndDedent => TagKind::Dedent,
             StartGroup(_) | EndGroup => TagKind::Group,
+            StartConditionalGroup(_) | EndConditionalGroup => TagKind::ConditionalGroup,
             StartConditionalContent(_) | EndConditionalContent => TagKind::ConditionalContent,
             StartIndentIfGroupBreaks(_) | EndIndentIfGroupBreaks => TagKind::IndentIfGroupBreaks,
             StartFill | EndFill => TagKind::Fill,
@@ -108,6 +124,7 @@ impl Tag {
             StartLineSuffix | EndLineSuffix => TagKind::LineSuffix,
             StartVerbatim(_) | EndVerbatim => TagKind::Verbatim,
             StartLabelled(_) | EndLabelled => TagKind::Labelled,
+            StartFitsExpanded { .. } | EndFitsExpanded => TagKind::FitsExpanded,
         }
     }
 }
@@ -122,6 +139,7 @@ pub enum TagKind {
     Align,
     Dedent,
     Group,
+    ConditionalGroup,
     ConditionalContent,
     IndentIfGroupBreaks,
     Fill,
@@ -129,6 +147,7 @@ pub enum TagKind {
     LineSuffix,
     Verbatim,
     Labelled,
+    FitsExpanded,
 }
 
 #[derive(Debug, Copy, Default, Clone, Eq, PartialEq)]
@@ -147,6 +166,27 @@ pub enum GroupMode {
 impl GroupMode {
     pub const fn is_flat(&self) -> bool {
         matches!(self, GroupMode::Flat)
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Default)]
+pub struct FitsExpanded {
+    pub(crate) condition: Option<Condition>,
+    pub(crate) propagate_expand: Cell<bool>,
+}
+
+impl FitsExpanded {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_condition(mut self, condition: Option<Condition>) -> Self {
+        self.condition = condition;
+        self
+    }
+
+    pub fn propagate_expand(&self) {
+        self.propagate_expand.set(true)
     }
 }
 
@@ -189,6 +229,33 @@ impl Group {
     }
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ConditionalGroup {
+    mode: Cell<GroupMode>,
+    condition: Condition,
+}
+
+impl ConditionalGroup {
+    pub fn new(condition: Condition) -> Self {
+        Self {
+            mode: Cell::new(GroupMode::Flat),
+            condition,
+        }
+    }
+
+    pub fn condition(&self) -> Condition {
+        self.condition
+    }
+
+    pub fn propagate_expand(&self) {
+        self.mode.set(GroupMode::Propagated)
+    }
+
+    pub fn mode(&self) -> GroupMode {
+        self.mode.get()
+    }
+}
+
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum DedentMode {
     /// Reduces the indent by a level (if the current indent is > 0)
@@ -198,7 +265,7 @@ pub enum DedentMode {
     Root,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Condition {
     /// - `Flat` -> Omitted if the enclosing group is a multiline group, printed for groups fitting on a single line
     /// - `Expanded` -> Omitted if the enclosing group fits on a single line, printed if the group breaks over multiple lines.
@@ -214,6 +281,34 @@ impl Condition {
         Self {
             mode,
             group_id: None,
+        }
+    }
+
+    pub fn if_fits_on_line() -> Self {
+        Self {
+            mode: PrintMode::Flat,
+            group_id: None,
+        }
+    }
+
+    pub fn if_group_fits_on_line(group_id: GroupId) -> Self {
+        Self {
+            mode: PrintMode::Flat,
+            group_id: Some(group_id),
+        }
+    }
+
+    pub fn if_breaks() -> Self {
+        Self {
+            mode: PrintMode::Expanded,
+            group_id: None,
+        }
+    }
+
+    pub fn if_group_breaks(group_id: GroupId) -> Self {
+        Self {
+            mode: PrintMode::Expanded,
+            group_id: Some(group_id),
         }
     }
 

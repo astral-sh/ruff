@@ -6,7 +6,7 @@ use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 use serde_json::json;
 
-use ruff_python_ast::source_code::SourceLocation;
+use ruff_source_file::SourceLocation;
 
 use crate::fs::{relativize_path, relativize_path_to};
 use crate::message::{Emitter, EmitterContext, Message};

@@ -226,7 +226,7 @@ C414.py:12:1: C414 [*] Unnecessary `list` call within `sorted()`
    12 |+sorted(x)
 13 13 | sorted(tuple(x))
 14 14 | sorted(sorted(x))
-15 15 | sorted(sorted(x, key=lambda y: y))
+15 15 | sorted(sorted(x, key=foo, reverse=False), reverse=False, key=foo)
 
 C414.py:13:1: C414 [*] Unnecessary `tuple` call within `sorted()`
    |
@@ -235,7 +235,7 @@ C414.py:13:1: C414 [*] Unnecessary `tuple` call within `sorted()`
 13 | sorted(tuple(x))
    | ^^^^^^^^^^^^^^^^ C414
 14 | sorted(sorted(x))
-15 | sorted(sorted(x, key=lambda y: y))
+15 | sorted(sorted(x, key=foo, reverse=False), reverse=False, key=foo)
    |
    = help: Remove the inner `tuple` call
 
@@ -246,8 +246,8 @@ C414.py:13:1: C414 [*] Unnecessary `tuple` call within `sorted()`
 13    |-sorted(tuple(x))
    13 |+sorted(x)
 14 14 | sorted(sorted(x))
-15 15 | sorted(sorted(x, key=lambda y: y))
-16 16 | sorted(reversed(x))
+15 15 | sorted(sorted(x, key=foo, reverse=False), reverse=False, key=foo)
+16 16 | sorted(sorted(x, reverse=True), reverse=True)
 
 C414.py:14:1: C414 [*] Unnecessary `sorted` call within `sorted()`
    |
@@ -255,8 +255,8 @@ C414.py:14:1: C414 [*] Unnecessary `sorted` call within `sorted()`
 13 | sorted(tuple(x))
 14 | sorted(sorted(x))
    | ^^^^^^^^^^^^^^^^^ C414
-15 | sorted(sorted(x, key=lambda y: y))
-16 | sorted(reversed(x))
+15 | sorted(sorted(x, key=foo, reverse=False), reverse=False, key=foo)
+16 | sorted(sorted(x, reverse=True), reverse=True)
    |
    = help: Remove the inner `sorted` call
 
@@ -266,18 +266,18 @@ C414.py:14:1: C414 [*] Unnecessary `sorted` call within `sorted()`
 13 13 | sorted(tuple(x))
 14    |-sorted(sorted(x))
    14 |+sorted(x)
-15 15 | sorted(sorted(x, key=lambda y: y))
-16 16 | sorted(reversed(x))
-17 17 | sorted(list(x), key=lambda y: y)
+15 15 | sorted(sorted(x, key=foo, reverse=False), reverse=False, key=foo)
+16 16 | sorted(sorted(x, reverse=True), reverse=True)
+17 17 | sorted(reversed(x))
 
 C414.py:15:1: C414 [*] Unnecessary `sorted` call within `sorted()`
    |
 13 | sorted(tuple(x))
 14 | sorted(sorted(x))
-15 | sorted(sorted(x, key=lambda y: y))
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C414
-16 | sorted(reversed(x))
-17 | sorted(list(x), key=lambda y: y)
+15 | sorted(sorted(x, key=foo, reverse=False), reverse=False, key=foo)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C414
+16 | sorted(sorted(x, reverse=True), reverse=True)
+17 | sorted(reversed(x))
    |
    = help: Remove the inner `sorted` call
 
@@ -285,77 +285,103 @@ C414.py:15:1: C414 [*] Unnecessary `sorted` call within `sorted()`
 12 12 | sorted(list(x))
 13 13 | sorted(tuple(x))
 14 14 | sorted(sorted(x))
-15    |-sorted(sorted(x, key=lambda y: y))
-   15 |+sorted(x, )
-16 16 | sorted(reversed(x))
-17 17 | sorted(list(x), key=lambda y: y)
-18 18 | tuple(
+15    |-sorted(sorted(x, key=foo, reverse=False), reverse=False, key=foo)
+   15 |+sorted(x, reverse=False, key=foo)
+16 16 | sorted(sorted(x, reverse=True), reverse=True)
+17 17 | sorted(reversed(x))
+18 18 | sorted(list(x), key=lambda y: y)
 
-C414.py:16:1: C414 [*] Unnecessary `reversed` call within `sorted()`
+C414.py:16:1: C414 [*] Unnecessary `sorted` call within `sorted()`
    |
 14 | sorted(sorted(x))
-15 | sorted(sorted(x, key=lambda y: y))
-16 | sorted(reversed(x))
-   | ^^^^^^^^^^^^^^^^^^^ C414
-17 | sorted(list(x), key=lambda y: y)
-18 | tuple(
+15 | sorted(sorted(x, key=foo, reverse=False), reverse=False, key=foo)
+16 | sorted(sorted(x, reverse=True), reverse=True)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C414
+17 | sorted(reversed(x))
+18 | sorted(list(x), key=lambda y: y)
    |
-   = help: Remove the inner `reversed` call
+   = help: Remove the inner `sorted` call
 
 ℹ Suggested fix
 13 13 | sorted(tuple(x))
 14 14 | sorted(sorted(x))
-15 15 | sorted(sorted(x, key=lambda y: y))
-16    |-sorted(reversed(x))
-   16 |+sorted(x)
-17 17 | sorted(list(x), key=lambda y: y)
-18 18 | tuple(
-19 19 |     list(
+15 15 | sorted(sorted(x, key=foo, reverse=False), reverse=False, key=foo)
+16    |-sorted(sorted(x, reverse=True), reverse=True)
+   16 |+sorted(x, reverse=True)
+17 17 | sorted(reversed(x))
+18 18 | sorted(list(x), key=lambda y: y)
+19 19 | tuple(
 
-C414.py:17:1: C414 [*] Unnecessary `list` call within `sorted()`
+C414.py:17:1: C414 [*] Unnecessary `reversed` call within `sorted()`
    |
-15 | sorted(sorted(x, key=lambda y: y))
-16 | sorted(reversed(x))
-17 | sorted(list(x), key=lambda y: y)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C414
-18 | tuple(
-19 |     list(
+15 | sorted(sorted(x, key=foo, reverse=False), reverse=False, key=foo)
+16 | sorted(sorted(x, reverse=True), reverse=True)
+17 | sorted(reversed(x))
+   | ^^^^^^^^^^^^^^^^^^^ C414
+18 | sorted(list(x), key=lambda y: y)
+19 | tuple(
    |
-   = help: Remove the inner `list` call
+   = help: Remove the inner `reversed` call
 
 ℹ Suggested fix
 14 14 | sorted(sorted(x))
-15 15 | sorted(sorted(x, key=lambda y: y))
-16 16 | sorted(reversed(x))
-17    |-sorted(list(x), key=lambda y: y)
-   17 |+sorted(x, key=lambda y: y)
-18 18 | tuple(
-19 19 |     list(
-20 20 |         [x, 3, "hell"\
+15 15 | sorted(sorted(x, key=foo, reverse=False), reverse=False, key=foo)
+16 16 | sorted(sorted(x, reverse=True), reverse=True)
+17    |-sorted(reversed(x))
+   17 |+sorted(x)
+18 18 | sorted(list(x), key=lambda y: y)
+19 19 | tuple(
+20 20 |     list(
 
-C414.py:18:1: C414 [*] Unnecessary `list` call within `tuple()`
+C414.py:18:1: C414 [*] Unnecessary `list` call within `sorted()`
    |
-16 |   sorted(reversed(x))
-17 |   sorted(list(x), key=lambda y: y)
-18 | / tuple(
-19 | |     list(
-20 | |         [x, 3, "hell"\
-21 | |         "o"]
-22 | |     )
-23 | | )
-   | |_^ C414
+16 | sorted(sorted(x, reverse=True), reverse=True)
+17 | sorted(reversed(x))
+18 | sorted(list(x), key=lambda y: y)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C414
+19 | tuple(
+20 |     list(
    |
    = help: Remove the inner `list` call
 
 ℹ Suggested fix
-16 16 | sorted(reversed(x))
-17 17 | sorted(list(x), key=lambda y: y)
-18 18 | tuple(
-19    |-    list(
-20    |-        [x, 3, "hell"\
-   19 |+    [x, 3, "hell"\
-21 20 |         "o"]
-22 21 |     )
-23    |-)
+15 15 | sorted(sorted(x, key=foo, reverse=False), reverse=False, key=foo)
+16 16 | sorted(sorted(x, reverse=True), reverse=True)
+17 17 | sorted(reversed(x))
+18    |-sorted(list(x), key=lambda y: y)
+   18 |+sorted(x, key=lambda y: y)
+19 19 | tuple(
+20 20 |     list(
+21 21 |         [x, 3, "hell"\
+
+C414.py:19:1: C414 [*] Unnecessary `list` call within `tuple()`
+   |
+17 |   sorted(reversed(x))
+18 |   sorted(list(x), key=lambda y: y)
+19 | / tuple(
+20 | |     list(
+21 | |         [x, 3, "hell"\
+22 | |         "o"]
+23 | |     )
+24 | | )
+   | |_^ C414
+25 |   
+26 |   # Nested sorts with differing keyword arguments. Not flagged.
+   |
+   = help: Remove the inner `list` call
+
+ℹ Suggested fix
+17 17 | sorted(reversed(x))
+18 18 | sorted(list(x), key=lambda y: y)
+19 19 | tuple(
+20    |-    list(
+21    |-        [x, 3, "hell"\
+   20 |+    [x, 3, "hell"\
+22 21 |         "o"]
+23 22 |     )
+24    |-)
+25 23 | 
+26 24 | # Nested sorts with differing keyword arguments. Not flagged.
+27 25 | sorted(sorted(x, key=lambda y: y))
 
 

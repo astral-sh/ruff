@@ -1,19 +1,21 @@
 use std::iter::Peekable;
 
-use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{
-    Alias, Arg, ArgWithDefault, Arguments, Comprehension, Decorator, ExceptHandler, Expr, Keyword,
-    MatchCase, Mod, Pattern, Ranged, Stmt, WithItem,
+use ruff_python_ast::{
+    Alias, Arguments, Comprehension, Decorator, ElifElseClause, ExceptHandler, Expr, Keyword,
+    MatchCase, Mod, Parameter, ParameterWithDefault, Parameters, Pattern, Ranged, Stmt, TypeParam,
+    TypeParams, WithItem,
 };
+use ruff_text_size::{TextRange, TextSize};
 
 use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::source_code::{CommentRanges, Locator};
+use ruff_python_index::CommentRanges;
+use ruff_source_file::Locator;
 // The interface is designed to only export the members relevant for iterating nodes in
 // pre-order.
 #[allow(clippy::wildcard_imports)]
 use ruff_python_ast::visitor::preorder::*;
-use ruff_python_whitespace::is_python_whitespace;
+use ruff_python_trivia::is_python_whitespace;
 
 use crate::comments::node_key::NodeRefEqualityKey;
 use crate::comments::placement::place_comment;
@@ -235,18 +237,25 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast> {
         self.finish_node(arguments);
     }
 
-    fn visit_arg(&mut self, arg: &'ast Arg) {
+    fn visit_parameters(&mut self, parameters: &'ast Parameters) {
+        if self.start_node(parameters).is_traverse() {
+            walk_parameters(self, parameters);
+        }
+        self.finish_node(parameters);
+    }
+
+    fn visit_parameter(&mut self, arg: &'ast Parameter) {
         if self.start_node(arg).is_traverse() {
-            walk_arg(self, arg);
+            walk_parameter(self, arg);
         }
         self.finish_node(arg);
     }
 
-    fn visit_arg_with_default(&mut self, arg_with_default: &'ast ArgWithDefault) {
-        if self.start_node(arg_with_default).is_traverse() {
-            walk_arg_with_default(self, arg_with_default);
+    fn visit_parameter_with_default(&mut self, parameter_with_default: &'ast ParameterWithDefault) {
+        if self.start_node(parameter_with_default).is_traverse() {
+            walk_parameter_with_default(self, parameter_with_default);
         }
-        self.finish_node(arg_with_default);
+        self.finish_node(parameter_with_default);
     }
 
     fn visit_keyword(&mut self, keyword: &'ast Keyword) {
@@ -283,6 +292,27 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast> {
             walk_pattern(self, pattern);
         }
         self.finish_node(pattern);
+    }
+
+    fn visit_elif_else_clause(&mut self, elif_else_clause: &'ast ElifElseClause) {
+        if self.start_node(elif_else_clause).is_traverse() {
+            walk_elif_else_clause(self, elif_else_clause);
+        }
+        self.finish_node(elif_else_clause);
+    }
+
+    fn visit_type_params(&mut self, type_params: &'ast TypeParams) {
+        if self.start_node(type_params).is_traverse() {
+            walk_type_params(self, type_params);
+        }
+        self.finish_node(type_params);
+    }
+
+    fn visit_type_param(&mut self, type_param: &'ast TypeParam) {
+        if self.start_node(type_param).is_traverse() {
+            walk_type_param(self, type_param);
+        }
+        self.finish_node(type_param);
     }
 }
 
@@ -454,6 +484,13 @@ impl<'a> DecoratedComment<'a> {
     }
 }
 
+impl Ranged for DecoratedComment<'_> {
+    #[inline]
+    fn range(&self) -> TextRange {
+        self.slice.range()
+    }
+}
+
 impl From<DecoratedComment<'_>> for SourceComment {
     fn from(decorated: DecoratedComment) -> Self {
         Self::new(decorated.slice, decorated.line_position)
@@ -598,27 +635,38 @@ pub(super) enum CommentPlacement<'a> {
 impl<'a> CommentPlacement<'a> {
     /// Makes `comment` a [leading comment](self#leading-comments) of `node`.
     #[inline]
-    pub(super) fn leading(node: AnyNodeRef<'a>, comment: impl Into<SourceComment>) -> Self {
+    pub(super) fn leading(node: impl Into<AnyNodeRef<'a>>, comment: DecoratedComment) -> Self {
         Self::Leading {
-            node,
+            node: node.into(),
             comment: comment.into(),
         }
     }
 
     /// Makes `comment` a [dangling comment](self::dangling-comments) of `node`.
-    pub(super) fn dangling(node: AnyNodeRef<'a>, comment: impl Into<SourceComment>) -> Self {
+    pub(super) fn dangling(node: impl Into<AnyNodeRef<'a>>, comment: DecoratedComment) -> Self {
         Self::Dangling {
-            node,
+            node: node.into(),
             comment: comment.into(),
         }
     }
 
     /// Makes `comment` a [trailing comment](self::trailing-comments) of `node`.
     #[inline]
-    pub(super) fn trailing(node: AnyNodeRef<'a>, comment: impl Into<SourceComment>) -> Self {
+    pub(super) fn trailing(node: impl Into<AnyNodeRef<'a>>, comment: DecoratedComment) -> Self {
         Self::Trailing {
-            node,
+            node: node.into(),
             comment: comment.into(),
+        }
+    }
+
+    /// Chains the placement with the given function.
+    ///
+    /// Returns `self` when the placement is non-[`CommentPlacement::Default`]. Otherwise, calls the
+    /// function with the comment and returns the result.
+    pub(super) fn or_else<F: FnOnce(DecoratedComment<'a>) -> Self>(self, f: F) -> Self {
+        match self {
+            Self::Default(comment) => f(comment),
+            _ => self,
         }
     }
 }

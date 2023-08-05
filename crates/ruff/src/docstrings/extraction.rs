@@ -1,6 +1,6 @@
 //! Extract docstrings from an AST.
 
-use rustpython_parser::ast::{self, Constant, Expr, Stmt};
+use ruff_python_ast::{self as ast, Constant, Expr, Stmt};
 
 use ruff_python_semantic::{Definition, DefinitionId, Definitions, Member, MemberKind};
 

@@ -1,0 +1,55 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/miscellaneous/blackd_diff.py
+---
+## Input
+
+```py
+def abc ():
+    return ["hello", "world",
+            "!"]
+
+print(   "Incorrect formatting"    
+)
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -1,6 +1,5 @@
+-def abc ():
+-    return ["hello", "world",
+-            "!"]
++def abc():
++    return ["hello", "world", "!"]
+ 
+-print(   "Incorrect formatting"    
+-)
++
++print("Incorrect formatting")
+```
+
+## Ruff Output
+
+```py
+def abc():
+    return ["hello", "world", "!"]
+
+
+print("Incorrect formatting")
+```
+
+## Black Output
+
+```py
+def abc ():
+    return ["hello", "world",
+            "!"]
+
+print(   "Incorrect formatting"    
+)
+```
+
+

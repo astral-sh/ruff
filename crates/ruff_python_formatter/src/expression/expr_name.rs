@@ -1,11 +1,9 @@
-use crate::comments::Comments;
-use crate::expression::parentheses::{
-    default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
-};
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 use crate::FormatNodeRule;
 use ruff_formatter::{write, FormatContext};
-use rustpython_parser::ast::ExprName;
+use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::ExprName;
 
 #[derive(Default)]
 pub struct FormatExprName;
@@ -29,23 +27,22 @@ impl FormatNodeRule<ExprName> for FormatExprName {
 impl NeedsParentheses for ExprName {
     fn needs_parentheses(
         &self,
-        parenthesize: Parenthesize,
-        source: &str,
-        comments: &Comments,
-    ) -> Parentheses {
-        default_expression_needs_parentheses(self.into(), parenthesize, source, comments)
+        _parent: AnyNodeRef,
+        _context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        OptionalParentheses::Never
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use ruff_python_ast::Ranged;
+    use ruff_python_parser::parse_program;
     use ruff_text_size::{TextRange, TextSize};
-    use rustpython_parser::ast::{ModModule, Ranged};
-    use rustpython_parser::Parse;
 
     #[test]
     fn name_range_with_comments() {
-        let source = ModModule::parse("a # comment", "file.py").unwrap();
+        let source = parse_program("a # comment", "file.py").unwrap();
 
         let expression_statement = source
             .body

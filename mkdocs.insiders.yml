@@ -1,0 +1,4 @@
+INHERIT: mkdocs.generated.yml
+plugins:
+  - search
+  - typeset

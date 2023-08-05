@@ -3,7 +3,7 @@ use std::path::Path;
 
 use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite};
 
-use ruff_python_ast::source_code::SourceLocation;
+use ruff_source_file::SourceLocation;
 
 use crate::message::{
     group_messages_by_filename, Emitter, EmitterContext, Message, MessageWithLocation,
@@ -93,7 +93,7 @@ mod tests {
 
     #[test]
     fn output() {
-        let mut emitter = JunitEmitter::default();
+        let mut emitter = JunitEmitter;
         let content = capture_emitter_output(&mut emitter, &create_messages());
 
         assert_snapshot!(content);

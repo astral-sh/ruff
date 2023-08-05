@@ -1,7 +1,8 @@
 use crate::comments::Comments;
 use crate::PyFormatOptions;
-use ruff_formatter::{FormatContext, SourceCode};
-use ruff_python_ast::source_code::Locator;
+use ruff_formatter::prelude::*;
+use ruff_formatter::{Arguments, Buffer, FormatContext, GroupId, SourceCode};
+use ruff_source_file::Locator;
 use std::fmt::{Debug, Formatter};
 
 #[derive(Clone)]
@@ -22,7 +23,7 @@ impl<'a> PyFormatContext<'a> {
         }
     }
 
-    pub(crate) fn contents(&self) -> &'a str {
+    pub(crate) fn source(&self) -> &'a str {
         self.contents
     }
 
@@ -78,6 +79,67 @@ pub(crate) enum NodeLevel {
     /// (`if`, `while`, `match`, etc.).
     CompoundStatement,
 
-    /// Formatting nodes that are enclosed in a parenthesized expression.
-    Expression,
+    /// The root or any sub-expression.
+    Expression(Option<GroupId>),
+
+    /// Formatting nodes that are enclosed by a parenthesized (any `[]`, `{}` or `()`) expression.
+    ParenthesizedExpression,
+}
+
+impl NodeLevel {
+    /// Returns `true` if the expression is in a parenthesized context.
+    pub(crate) const fn is_parenthesized(self) -> bool {
+        matches!(
+            self,
+            NodeLevel::Expression(Some(_)) | NodeLevel::ParenthesizedExpression
+        )
+    }
+}
+
+pub(crate) struct WithNodeLevel<'ast, 'buf, B>
+where
+    B: Buffer<Context = PyFormatContext<'ast>>,
+{
+    buffer: &'buf mut B,
+    saved_level: NodeLevel,
+}
+
+impl<'ast, 'buf, B> WithNodeLevel<'ast, 'buf, B>
+where
+    B: Buffer<Context = PyFormatContext<'ast>>,
+{
+    pub(crate) fn new(level: NodeLevel, buffer: &'buf mut B) -> Self {
+        let context = buffer.state_mut().context_mut();
+        let saved_level = context.node_level();
+
+        context.set_node_level(level);
+
+        Self {
+            buffer,
+            saved_level,
+        }
+    }
+
+    #[inline]
+    pub(crate) fn write_fmt(&mut self, arguments: Arguments<B::Context>) -> FormatResult<()> {
+        self.buffer.write_fmt(arguments)
+    }
+
+    #[allow(unused)]
+    #[inline]
+    pub(crate) fn write_element(&mut self, element: FormatElement) -> FormatResult<()> {
+        self.buffer.write_element(element)
+    }
+}
+
+impl<'ast, B> Drop for WithNodeLevel<'ast, '_, B>
+where
+    B: Buffer<Context = PyFormatContext<'ast>>,
+{
+    fn drop(&mut self) {
+        self.buffer
+            .state_mut()
+            .context_mut()
+            .set_node_level(self.saved_level);
+    }
 }

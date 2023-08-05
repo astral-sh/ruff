@@ -5,7 +5,7 @@ use itertools::Either::{Left, Right};
 
 use ruff_text_size::TextRange;
 
-use rustpython_parser::ast::{self, BoolOp, Expr, ExprContext, Identifier, Ranged};
+use ruff_python_ast::{self as ast, Arguments, BoolOp, Expr, ExprContext, Identifier, Ranged};
 
 use ruff_diagnostics::AlwaysAutofixableViolation;
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
@@ -60,7 +60,12 @@ impl AlwaysAutofixableViolation for MultipleStartsEndsWith {
 
 /// PIE810
 pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
-    let Expr::BoolOp(ast::ExprBoolOp { op: BoolOp::Or, values, range: _ }) = expr else {
+    let Expr::BoolOp(ast::ExprBoolOp {
+        op: BoolOp::Or,
+        values,
+        range: _,
+    }) = expr
+    else {
         return;
     };
 
@@ -68,26 +73,31 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
     for (index, call) in values.iter().enumerate() {
         let Expr::Call(ast::ExprCall {
             func,
-            args,
-            keywords,
-            range: _
-        }) = &call else {
-            continue
+            arguments:
+                Arguments {
+                    args,
+                    keywords,
+                    range: _,
+                },
+            range: _,
+        }) = &call
+        else {
+            continue;
         };
 
         if !(args.len() == 1 && keywords.is_empty()) {
             continue;
         }
 
-        let Expr::Attribute(ast::ExprAttribute { value, attr, .. } )= func.as_ref() else {
-            continue
+        let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
+            continue;
         };
         if attr != "startswith" && attr != "endswith" {
             continue;
         }
 
-        let Expr::Name(ast::ExprName { id: arg_name, .. } )= value.as_ref() else {
-            continue
+        let Expr::Name(ast::ExprName { id: arg_name, .. }) = value.as_ref() else {
+            continue;
         };
 
         duplicates
@@ -110,8 +120,21 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                     .iter()
                     .map(|index| &values[*index])
                     .map(|expr| {
-                        let Expr::Call(ast::ExprCall { func: _, args, keywords: _, range: _}) = expr else {
-                            unreachable!("{}", format!("Indices should only contain `{attr_name}` calls"))
+                        let Expr::Call(ast::ExprCall {
+                            func: _,
+                            arguments:
+                                Arguments {
+                                    args,
+                                    keywords: _,
+                                    range: _,
+                                },
+                            range: _,
+                        }) = expr
+                        else {
+                            unreachable!(
+                                "{}",
+                                format!("Indices should only contain `{attr_name}` calls")
+                            )
                         };
                         args.get(0)
                             .unwrap_or_else(|| panic!("`{attr_name}` should have one argument"))
@@ -146,8 +169,11 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                 });
                 let node3 = Expr::Call(ast::ExprCall {
                     func: Box::new(node2),
-                    args: vec![node],
-                    keywords: vec![],
+                    arguments: Arguments {
+                        args: vec![node],
+                        keywords: vec![],
+                        range: TextRange::default(),
+                    },
                     range: TextRange::default(),
                 });
                 let call = node3;

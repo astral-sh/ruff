@@ -1,27 +1,30 @@
 use std::ops::{Deref, DerefMut};
 
 use bitflags::bitflags;
+use ruff_python_ast::Ranged;
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::Ranged;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
+use ruff_source_file::Locator;
 
 use crate::context::ExecutionContext;
 use crate::model::SemanticModel;
 use crate::node::NodeId;
-use crate::reference::ReferenceId;
+use crate::reference::ResolvedReferenceId;
 use crate::ScopeId;
 
 #[derive(Debug, Clone)]
 pub struct Binding<'a> {
     pub kind: BindingKind<'a>,
     pub range: TextRange,
+    /// The [`ScopeId`] of the scope in which the [`Binding`] was defined.
+    pub scope: ScopeId,
     /// The context in which the [`Binding`] was created.
     pub context: ExecutionContext,
     /// The statement in which the [`Binding`] was defined.
     pub source: Option<NodeId>,
     /// The references to the [`Binding`].
-    pub references: Vec<ReferenceId>,
+    pub references: Vec<ResolvedReferenceId>,
     /// The exceptions that were handled when the [`Binding`] was defined.
     pub exceptions: Exceptions,
     /// Flags for the [`Binding`].
@@ -35,39 +38,51 @@ impl<'a> Binding<'a> {
     }
 
     /// Returns an iterator over all references for the current [`Binding`].
-    pub fn references(&self) -> impl Iterator<Item = ReferenceId> + '_ {
+    pub fn references(&self) -> impl Iterator<Item = ResolvedReferenceId> + '_ {
         self.references.iter().copied()
     }
 
     /// Return `true` if this [`Binding`] represents an explicit re-export
     /// (e.g., `FastAPI` in `from fastapi import FastAPI as FastAPI`).
     pub const fn is_explicit_export(&self) -> bool {
-        self.flags.contains(BindingFlags::EXPLICIT_EXPORT)
+        self.flags.intersects(BindingFlags::EXPLICIT_EXPORT)
     }
 
     /// Return `true` if this [`Binding`] represents an external symbol
     /// (e.g., `FastAPI` in `from fastapi import FastAPI`).
     pub const fn is_external(&self) -> bool {
-        self.flags.contains(BindingFlags::EXTERNAL)
+        self.flags.intersects(BindingFlags::EXTERNAL)
     }
 
     /// Return `true` if this [`Binding`] represents an aliased symbol
     /// (e.g., `app` in `from fastapi import FastAPI as app`).
     pub const fn is_alias(&self) -> bool {
-        self.flags.contains(BindingFlags::ALIAS)
+        self.flags.intersects(BindingFlags::ALIAS)
     }
 
     /// Return `true` if this [`Binding`] represents a `nonlocal`. A [`Binding`] is a `nonlocal`
     /// if it's declared by a `nonlocal` statement, or shadows a [`Binding`] declared by a
     /// `nonlocal` statement.
     pub const fn is_nonlocal(&self) -> bool {
-        self.flags.contains(BindingFlags::NONLOCAL)
+        self.flags.intersects(BindingFlags::NONLOCAL)
     }
 
     /// Return `true` if this [`Binding`] represents a `global`. A [`Binding`] is a `global` if it's
     /// declared by a `global` statement, or shadows a [`Binding`] declared by a `global` statement.
     pub const fn is_global(&self) -> bool {
-        self.flags.contains(BindingFlags::GLOBAL)
+        self.flags.intersects(BindingFlags::GLOBAL)
+    }
+
+    /// Return `true` if this [`Binding`] represents an assignment to `__all__` with an invalid
+    /// value (e.g., `__all__ = "Foo"`).
+    pub const fn is_invalid_all_format(&self) -> bool {
+        self.flags.intersects(BindingFlags::INVALID_ALL_FORMAT)
+    }
+
+    /// Return `true` if this [`Binding`] represents an assignment to `__all__` that includes an
+    /// invalid member (e.g., `__all__ = ["Foo", 1]`).
+    pub const fn is_invalid_all_object(&self) -> bool {
+        self.flags.intersects(BindingFlags::INVALID_ALL_OBJECT)
     }
 
     /// Return `true` if this [`Binding`] represents an unbound variable
@@ -79,43 +94,68 @@ impl<'a> Binding<'a> {
         )
     }
 
-    /// Return `true` if this binding redefines the given binding.
+    /// Return `true` if this [`Binding`] represents an private declaration
+    /// (e.g., `_x` in `_x = "private variable"`)
+    pub const fn is_private_declaration(&self) -> bool {
+        self.flags.contains(BindingFlags::PRIVATE_DECLARATION)
+    }
+
+    /// Return `true` if this binding "redefines" the given binding, as per Pyflake's definition of
+    /// redefinition.
     pub fn redefines(&self, existing: &'a Binding) -> bool {
         match &self.kind {
-            BindingKind::Import(Import { qualified_name }) => {
+            // Submodule imports are only considered redefinitions if they import the same
+            // submodule. For example, this is a redefinition:
+            // ```python
+            // import foo.bar
+            // import foo.bar
+            // ```
+            //
+            // This, however, is not:
+            // ```python
+            // import foo.bar
+            // import foo.baz
+            // ```
+            BindingKind::Import(Import {
+                qualified_name: redefinition,
+            }) => {
                 if let BindingKind::SubmoduleImport(SubmoduleImport {
-                    qualified_name: existing,
+                    qualified_name: definition,
                 }) = &existing.kind
                 {
-                    return qualified_name == existing;
+                    return redefinition == definition;
                 }
             }
-            BindingKind::FromImport(FromImport { qualified_name }) => {
+            BindingKind::FromImport(FromImport {
+                qualified_name: redefinition,
+            }) => {
                 if let BindingKind::SubmoduleImport(SubmoduleImport {
-                    qualified_name: existing,
+                    qualified_name: definition,
                 }) = &existing.kind
                 {
-                    return qualified_name == existing;
+                    return redefinition == definition;
                 }
             }
-            BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }) => {
-                match &existing.kind {
-                    BindingKind::Import(Import {
-                        qualified_name: existing,
-                    })
-                    | BindingKind::SubmoduleImport(SubmoduleImport {
-                        qualified_name: existing,
-                    }) => {
-                        return qualified_name == existing;
-                    }
-                    BindingKind::FromImport(FromImport {
-                        qualified_name: existing,
-                    }) => {
-                        return qualified_name == existing;
-                    }
-                    _ => {}
+            BindingKind::SubmoduleImport(SubmoduleImport {
+                qualified_name: redefinition,
+            }) => match &existing.kind {
+                BindingKind::Import(Import {
+                    qualified_name: definition,
+                })
+                | BindingKind::SubmoduleImport(SubmoduleImport {
+                    qualified_name: definition,
+                }) => {
+                    return redefinition == definition;
                 }
-            }
+                BindingKind::FromImport(FromImport {
+                    qualified_name: definition,
+                }) => {
+                    return redefinition == definition;
+                }
+                _ => {}
+            },
+            // Deletions, annotations, `__future__` imports, and builtins are never considered
+            // redefinitions.
             BindingKind::Deletion
             | BindingKind::Annotation
             | BindingKind::FutureImport
@@ -124,13 +164,14 @@ impl<'a> Binding<'a> {
             }
             _ => {}
         }
+        // Otherwise, the shadowed binding must be a class definition, function definition, or
+        // import to be considered a redefinition.
         matches!(
             existing.kind,
-            BindingKind::ClassDefinition
-                | BindingKind::FunctionDefinition
-                | BindingKind::Import(..)
-                | BindingKind::FromImport(..)
-                | BindingKind::SubmoduleImport(..)
+            BindingKind::ClassDefinition(_)
+                | BindingKind::FunctionDefinition(_)
+                | BindingKind::Import(_)
+                | BindingKind::FromImport(_)
         )
     }
 
@@ -161,6 +202,11 @@ impl<'a> Binding<'a> {
             ),
             _ => None,
         }
+    }
+
+    /// Returns the name of the binding (e.g., `x` in `x = 1`).
+    pub fn name<'b>(&self, locator: &'b Locator) -> &'b str {
+        locator.slice(self.range)
     }
 
     /// Returns the range of the binding's parent.
@@ -226,6 +272,32 @@ bitflags! {
         ///     x = 1
         /// ```
         const GLOBAL = 1 << 4;
+
+        /// The binding represents an export via `__all__`, but the assigned value uses an invalid
+        /// expression (i.e., a non-container type).
+        ///
+        /// For example:
+        /// ```python
+        /// __all__ = 1
+        /// ```
+        const INVALID_ALL_FORMAT = 1 << 5;
+
+        /// The binding represents an export via `__all__`, but the assigned value contains an
+        /// invalid member (i.e., a non-string).
+        ///
+        /// For example:
+        /// ```python
+        /// __all__ = [1]
+        /// ```
+        const INVALID_ALL_OBJECT = 1 << 6;
+
+        /// The binding represents a private declaration.
+        ///
+        /// For example, the binding could be `_T` in:
+        /// ```python
+        /// _T = "This is a private variable"
+        /// ```
+        const PRIVATE_DECLARATION = 1 << 7;
     }
 }
 
@@ -236,8 +308,6 @@ bitflags! {
 /// bindings because bindings must be separated by whitespace (and have an assignment).
 #[newtype_index]
 pub struct BindingId;
-
-impl nohash_hasher::IsEnabled for BindingId {}
 
 /// The bindings in a program.
 ///
@@ -275,7 +345,7 @@ impl<'a> FromIterator<Binding<'a>> for Bindings<'a> {
 #[derive(Debug, Clone)]
 pub struct Export<'a> {
     /// The names of the bindings exported via `__all__`.
-    pub names: Vec<&'a str>,
+    pub names: Box<[&'a str]>,
 }
 
 /// A binding for an `import`, keyed on the name to which the import is bound.
@@ -343,6 +413,18 @@ pub enum BindingKind<'a> {
     /// ```
     Assignment,
 
+    /// A binding for a generic type parameter, like `X` in:
+    /// ```python
+    /// def foo[X](x: X):
+    ///    ...
+    ///
+    /// class Foo[X](x: X):
+    ///   ...
+    ///
+    /// type Foo[X] = ...
+    /// ```
+    TypeParam,
+
     /// A binding for a for-loop variable, like `x` in:
     /// ```python
     /// for x in range(10):
@@ -372,14 +454,14 @@ pub enum BindingKind<'a> {
     /// class Foo:
     ///     ...
     /// ```
-    ClassDefinition,
+    ClassDefinition(ScopeId),
 
     /// A binding for a function, like `foo` in:
     /// ```python
     /// def foo():
     ///     ...
     /// ```
-    FunctionDefinition,
+    FunctionDefinition(ScopeId),
 
     /// A binding for an `__all__` export, like `__all__` in:
     /// ```python
@@ -417,7 +499,16 @@ pub enum BindingKind<'a> {
     /// ```
     Deletion,
 
-    /// A binding to unbind the local variable, like `x` in:
+    /// A binding to bind an exception to a local variable, like `x` in:
+    /// ```python
+    /// try:
+    ///    ...
+    /// except Exception as x:
+    ///   ...
+    /// ```
+    BoundException,
+
+    /// A binding to unbind a bound local exception, like `x` in:
     /// ```python
     /// try:
     ///    ...
@@ -427,7 +518,6 @@ pub enum BindingKind<'a> {
     ///
     /// After the `except` block, `x` is unbound, despite the lack
     /// of an explicit `del` statement.
-    ///
     ///
     /// Stores the ID of the binding that was shadowed in the enclosing
     /// scope, if any.

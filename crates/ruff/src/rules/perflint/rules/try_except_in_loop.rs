@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -27,20 +27,26 @@ use crate::settings::types::PythonVersion;
 ///
 /// ## Example
 /// ```python
-/// for i in range(10):
+/// string_numbers: list[str] = ["1", "2", "three", "4", "5"]
+///
+/// int_numbers: list[int] = []
+/// for num in string_numbers:
 ///     try:
-///         print(i * i)
-///     except:
-///         break
+///         int_numbers.append(int(num))
+///     except ValueError as e:
+///         print(f"Couldn't convert to integer: {e}")
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// string_numbers: list[str] = ["1", "2", "three", "4", "5"]
+///
+/// int_numbers: list[int] = []
 /// try:
-///     for i in range(10):
-///         print(i * i)
-/// except:
-///     break
+///     for num in string_numbers:
+///         int_numbers.append(int(num))
+/// except ValueError as e:
+///     print(f"Couldn't convert to integer: {e}")
 /// ```
 ///
 /// ## Options
@@ -61,14 +67,15 @@ pub(crate) fn try_except_in_loop(checker: &mut Checker, body: &[Stmt]) {
         return;
     }
 
-    checker.diagnostics.extend(body.iter().filter_map(|stmt| {
-        if let Stmt::Try(ast::StmtTry { handlers, .. }) = stmt {
-            handlers
-                .iter()
-                .next()
-                .map(|handler| Diagnostic::new(TryExceptInLoop, handler.range()))
-        } else {
-            None
-        }
-    }));
+    let [Stmt::Try(ast::StmtTry { handlers, .. })] = body else {
+        return;
+    };
+
+    let Some(handler) = handlers.first() else {
+        return;
+    };
+
+    checker
+        .diagnostics
+        .push(Diagnostic::new(TryExceptInLoop, handler.range()));
 }

@@ -1,11 +1,11 @@
+use ruff_python_ast::Ranged;
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::Ranged;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{is_triple_quote, leading_quote};
 use ruff_python_semantic::{Definition, Member};
-use ruff_python_whitespace::{NewlineWithTrailingNewline, UniversalNewlineIterator};
+use ruff_source_file::{NewlineWithTrailingNewline, UniversalNewlineIterator};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
@@ -132,10 +132,7 @@ pub(crate) fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstr
     };
     let mut content_lines = UniversalNewlineIterator::with_offset(contents, docstring.start());
 
-    let Some(first_line) = content_lines
-        .next()
-         else
-    {
+    let Some(first_line) = content_lines.next() else {
         return;
     };
 
@@ -168,15 +165,15 @@ pub(crate) fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstr
                     // If the docstring isn't on its own line, look at the statement indentation,
                     // and add the default indentation to get the "right" level.
                     if let Definition::Member(Member { stmt, .. }) = &docstring.definition {
-                        let stmt_line_start = checker.locator.line_start(stmt.start());
+                        let stmt_line_start = checker.locator().line_start(stmt.start());
                         let stmt_indentation = checker
-                            .locator
+                            .locator()
                             .slice(TextRange::new(stmt_line_start, stmt.start()));
 
                         if stmt_indentation.chars().all(char::is_whitespace) {
                             indentation.clear();
                             indentation.push_str(stmt_indentation);
-                            indentation.push_str(checker.stylist.indentation());
+                            indentation.push_str(checker.stylist().indentation());
                             fixable = true;
                         }
                     };
@@ -188,7 +185,7 @@ pub(crate) fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstr
                     // quote and text.
                     let repl = format!(
                         "{}{}{}",
-                        checker.stylist.line_ending().as_str(),
+                        checker.stylist().line_ending().as_str(),
                         indentation,
                         first_line.strip_prefix(prefix).unwrap().trim_start()
                     );

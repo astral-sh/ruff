@@ -48,6 +48,10 @@ def f(arg: typing.Optional[int] = None):
 # Union
 
 
+def f(arg: Union[None] = None):
+    pass
+
+
 def f(arg: Union[None, int] = None):
     pass
 
@@ -65,6 +69,10 @@ def f(arg: Union[int, str, Any] = None):
 
 
 def f(arg: Union = None):  # RUF013
+    pass
+
+
+def f(arg: Union[int] = None):  # RUF013
     pass
 
 
@@ -106,7 +114,15 @@ def f(arg: None = None):
     pass
 
 
+def f(arg: Literal[None] = None):
+    pass
+
+
 def f(arg: Literal[1, 2, None, 3] = None):
+    pass
+
+
+def f(arg: Literal[1] = None):  # RUF013
     pass
 
 

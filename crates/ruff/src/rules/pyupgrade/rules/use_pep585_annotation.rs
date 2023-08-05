@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, Ranged};
+use ruff_python_ast::{Expr, Ranged};
 
 use log::error;
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -38,6 +38,7 @@ use crate::registry::AsRule;
 ///
 /// ## Options
 /// - `target-version`
+/// - `pyupgrade.keep-runtime-typing`
 ///
 /// [PEP 585]: https://peps.python.org/pep-0585/
 #[violation]
@@ -91,7 +92,7 @@ pub(crate) fn use_pep585_annotation(
                 }
                 ModuleMember::Member(module, member) => {
                     // Imported type, like `collections.deque`.
-                    let result = checker.importer.get_or_import_symbol(
+                    let result = checker.importer().get_or_import_symbol(
                         &ImportRequest::import_from(module, member),
                         expr.start(),
                         checker.semantic(),

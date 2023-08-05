@@ -9,7 +9,7 @@ concurrency:
 env:
   PACKAGE_NAME: flake8-to-ruff
   CRATE_NAME: flake8_to_ruff
-  PYTHON_VERSION: "3.7" # to build abi3 wheels
+  PYTHON_VERSION: "3.11"
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
   CARGO_TERM_COLOR: always
@@ -66,7 +66,7 @@ jobs:
     runs-on: windows-latest
     strategy:
       matrix:
-        target: [ x64, x86 ]
+        target: [x64, x86]
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
@@ -94,7 +94,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target: [ x86_64, i686 ]
+        target: [x86_64, i686]
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
@@ -121,7 +121,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target: [ aarch64, armv7, s390x, ppc64le, ppc64 ]
+        target: [aarch64, armv7, s390x, ppc64le, ppc64]
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4

@@ -1,41 +1,23 @@
 //! Extract [`TextRange`] information from AST nodes.
 //!
-//! In the `RustPython` AST, each node has a `range` field that contains the
-//! start and end byte offsets of the node. However, attributes on those
-//! nodes may not have their own ranges. In particular, identifiers are
-//! not given their own ranges, unless they're part of a name expression.
-//!
 //! For example, given:
 //! ```python
-//! def f():
+//! try:
+//!     ...
+//! except Exception as e:
 //!     ...
 //! ```
 //!
-//! The statement defining `f` has a range, but the identifier `f` does not.
-//!
-//! This module assists with extracting [`TextRange`] ranges from AST nodes
-//! via manual lexical analysis.
+//! This module can be used to identify the [`TextRange`] of the `except` token.
 
-use std::ops::{Add, Sub};
-use std::str::Chars;
-
+use crate::{self as ast, Alias, ExceptHandler, Parameter, ParameterWithDefault, Ranged, Stmt};
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_ast::{Alias, Arg, ArgWithDefault, Pattern};
-use rustpython_parser::ast::{self, ExceptHandler, Ranged, Stmt};
 
-use ruff_python_whitespace::is_python_whitespace;
-
-use crate::source_code::Locator;
+use ruff_python_trivia::{is_python_whitespace, Cursor};
 
 pub trait Identifier {
     /// Return the [`TextRange`] of the identifier in the given AST node.
     fn identifier(&self) -> TextRange;
-}
-
-pub trait TryIdentifier {
-    /// Return the [`TextRange`] of the identifier in the given AST node, or `None` if
-    /// the node does not have an identifier.
-    fn try_identifier(&self) -> Option<TextRange>;
 }
 
 impl Identifier for Stmt {
@@ -56,8 +38,8 @@ impl Identifier for Stmt {
     }
 }
 
-impl Identifier for Arg {
-    /// Return the [`TextRange`] for the identifier defining an [`Arg`].
+impl Identifier for Parameter {
+    /// Return the [`TextRange`] for the identifier defining an [`Parameter`].
     ///
     /// For example, return the range of `x` in:
     /// ```python
@@ -65,12 +47,12 @@ impl Identifier for Arg {
     ///     ...
     /// ```
     fn identifier(&self) -> TextRange {
-        self.arg.range()
+        self.name.range()
     }
 }
 
-impl Identifier for ArgWithDefault {
-    /// Return the [`TextRange`] for the identifier defining an [`ArgWithDefault`].
+impl Identifier for ParameterWithDefault {
+    /// Return the [`TextRange`] for the identifier defining an [`ParameterWithDefault`].
     ///
     /// For example, return the range of `x` in:
     /// ```python
@@ -78,7 +60,7 @@ impl Identifier for ArgWithDefault {
     ///     ...
     /// ```
     fn identifier(&self) -> TextRange {
-        self.def.identifier()
+        self.parameter.identifier()
     }
 }
 
@@ -96,99 +78,19 @@ impl Identifier for Alias {
     }
 }
 
-impl TryIdentifier for Pattern {
-    /// Return the [`TextRange`] of the identifier in the given pattern.
-    ///
-    /// For example, return the range of `z` in:
-    /// ```python
-    /// match x:
-    ///     # Pattern::MatchAs
-    ///     case z:
-    ///         ...
-    /// ```
-    ///
-    /// Or:
-    /// ```python
-    /// match x:
-    ///     # Pattern::MatchAs
-    ///     case y as z:
-    ///         ...
-    /// ```
-    ///
-    /// Or :
-    /// ```python
-    /// match x:
-    ///     # Pattern::MatchMapping
-    ///     case {"a": 1, **z}
-    ///         ...
-    /// ```
-    ///
-    /// Or :
-    /// ```python
-    /// match x:
-    ///     # Pattern::MatchStar
-    ///     case *z:
-    ///         ...
-    /// ```
-    fn try_identifier(&self) -> Option<TextRange> {
-        let name = match self {
-            Pattern::MatchAs(ast::PatternMatchAs {
-                name: Some(name), ..
-            }) => Some(name),
-            Pattern::MatchMapping(ast::PatternMatchMapping {
-                rest: Some(rest), ..
-            }) => Some(rest),
-            Pattern::MatchStar(ast::PatternMatchStar {
-                name: Some(name), ..
-            }) => Some(name),
-            _ => None,
-        };
-        name.map(Ranged::range)
-    }
-}
-
-impl TryIdentifier for ExceptHandler {
-    /// Return the [`TextRange`] of a named exception in an [`ExceptHandler`].
-    ///
-    /// For example, return the range of `e` in:
-    /// ```python
-    /// try:
-    ///     ...
-    /// except ValueError as e:
-    ///     ...
-    /// ```
-    fn try_identifier(&self) -> Option<TextRange> {
-        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { name, .. }) = self;
-        name.as_ref().map(Ranged::range)
-    }
-}
-
-/// Return the [`TextRange`] for every name in a [`Stmt`].
-///
-/// Intended to be used for `global` and `nonlocal` statements.
-///
-/// For example, return the ranges of `x` and `y` in:
-/// ```python
-/// global x, y
-/// ```
-pub fn names<'a>(stmt: &Stmt, locator: &'a Locator<'a>) -> impl Iterator<Item = TextRange> + 'a {
-    // Given `global x, y`, the first identifier is `global`, and the remaining identifiers are
-    // the names.
-    IdentifierTokenizer::new(locator.contents(), stmt.range()).skip(1)
-}
-
 /// Return the [`TextRange`] of the `except` token in an [`ExceptHandler`].
-pub fn except(handler: &ExceptHandler, locator: &Locator) -> TextRange {
-    IdentifierTokenizer::new(locator.contents(), handler.range())
+pub fn except(handler: &ExceptHandler, source: &str) -> TextRange {
+    IdentifierTokenizer::new(source, handler.range())
         .next()
         .expect("Failed to find `except` token in `ExceptHandler`")
 }
 
 /// Return the [`TextRange`] of the `else` token in a `For`, `AsyncFor`, or `While` statement.
-pub fn else_(stmt: &Stmt, locator: &Locator) -> Option<TextRange> {
+pub fn else_(stmt: &Stmt, source: &str) -> Option<TextRange> {
     let (Stmt::For(ast::StmtFor { body, orelse, .. })
-        | Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. })
-        | Stmt::While(ast::StmtWhile { body, orelse, .. })) = stmt else {
+    | Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. })
+    | Stmt::While(ast::StmtWhile { body, orelse, .. })) = stmt
+    else {
         return None;
     };
 
@@ -198,7 +100,7 @@ pub fn else_(stmt: &Stmt, locator: &Locator) -> Option<TextRange> {
 
     IdentifierTokenizer::starts_at(
         body.last().expect("Expected body to be non-empty").end(),
-        locator.contents(),
+        source,
     )
     .next()
 }
@@ -247,13 +149,15 @@ impl<'a> IdentifierTokenizer<'a> {
     }
 
     fn next_token(&mut self) -> Option<TextRange> {
-        while let Some(c) = self.cursor.bump() {
+        while let Some(c) = {
+            self.offset += self.cursor.token_len();
+            self.cursor.start_token();
+            self.cursor.bump()
+        } {
             match c {
                 c if is_python_identifier_start(c) => {
-                    let start = self.offset.add(self.cursor.offset()).sub(c.text_len());
                     self.cursor.eat_while(is_python_identifier_continue);
-                    let end = self.offset.add(self.cursor.offset());
-                    return Some(TextRange::new(start, end));
+                    return Some(TextRange::at(self.offset, self.cursor.token_len()));
                 }
 
                 c if is_python_whitespace(c) => {
@@ -294,92 +198,37 @@ impl Iterator for IdentifierTokenizer<'_> {
     }
 }
 
-const EOF_CHAR: char = '\0';
-
-#[derive(Debug, Clone)]
-struct Cursor<'a> {
-    chars: Chars<'a>,
-    offset: TextSize,
-}
-
-impl<'a> Cursor<'a> {
-    fn new(source: &'a str) -> Self {
-        Self {
-            chars: source.chars(),
-            offset: TextSize::from(0),
-        }
-    }
-
-    const fn offset(&self) -> TextSize {
-        self.offset
-    }
-
-    /// Peeks the next character from the input stream without consuming it.
-    /// Returns [`EOF_CHAR`] if the file is at the end of the file.
-    fn first(&self) -> char {
-        self.chars.clone().next().unwrap_or(EOF_CHAR)
-    }
-
-    /// Returns `true` if the file is at the end of the file.
-    fn is_eof(&self) -> bool {
-        self.chars.as_str().is_empty()
-    }
-
-    /// Consumes the next character.
-    fn bump(&mut self) -> Option<char> {
-        if let Some(char) = self.chars.next() {
-            self.offset += char.text_len();
-            Some(char)
-        } else {
-            None
-        }
-    }
-
-    /// Eats the next character if it matches the given character.
-    fn eat_char(&mut self, c: char) -> bool {
-        if self.first() == c {
-            self.bump();
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Eats symbols while predicate returns true or until the end of file is reached.
-    fn eat_while(&mut self, mut predicate: impl FnMut(char) -> bool) {
-        while predicate(self.first()) && !self.is_eof() {
-            self.bump();
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use anyhow::Result;
-    use ruff_text_size::{TextRange, TextSize};
-    use rustpython_ast::Stmt;
-    use rustpython_parser::Parse;
-
-    use crate::identifier;
-    use crate::source_code::Locator;
+    use super::IdentifierTokenizer;
+    use ruff_text_size::{TextLen, TextRange, TextSize};
 
     #[test]
-    fn extract_else_range() -> Result<()> {
-        let contents = r#"
-for x in y:
-    pass
-else:
-    pass
-"#
-        .trim();
-        let stmt = Stmt::parse(contents, "<filename>")?;
-        let locator = Locator::new(contents);
-        let range = identifier::else_(&stmt, &locator).unwrap();
-        assert_eq!(&contents[range], "else");
+    fn extract_global_names() {
+        let contents = r#"global X,Y, Z"#.trim();
+
+        let mut names = IdentifierTokenizer::new(
+            contents,
+            TextRange::new(TextSize::new(0), contents.text_len()),
+        );
+
+        let range = names.next_token().unwrap();
+        assert_eq!(&contents[range], "global");
+        assert_eq!(range, TextRange::new(TextSize::from(0), TextSize::from(6)));
+
+        let range = names.next_token().unwrap();
+        assert_eq!(&contents[range], "X");
+        assert_eq!(range, TextRange::new(TextSize::from(7), TextSize::from(8)));
+
+        let range = names.next_token().unwrap();
+        assert_eq!(&contents[range], "Y");
+        assert_eq!(range, TextRange::new(TextSize::from(9), TextSize::from(10)));
+
+        let range = names.next_token().unwrap();
+        assert_eq!(&contents[range], "Z");
         assert_eq!(
             range,
-            TextRange::new(TextSize::from(21), TextSize::from(25))
+            TextRange::new(TextSize::from(12), TextSize::from(13))
         );
-        Ok(())
     }
 }

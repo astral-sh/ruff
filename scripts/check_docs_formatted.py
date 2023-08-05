@@ -37,8 +37,13 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "indentation-with-invalid-multiple",
     "line-too-long",
     "missing-trailing-comma",
+    "missing-whitespace-around-arithmetic-operator",
+    "missing-whitespace-around-bitwise-or-shift-operator",
+    "missing-whitespace-around-modulo-operator",
+    "missing-whitespace-around-operator",
     "multi-line-implicit-string-concatenation",
     "multiple-leading-hashes-for-block-comment",
+    "multiple-spaces-after-comma",
     "multiple-spaces-after-keyword",
     "multiple-spaces-after-operator",
     "multiple-spaces-before-keyword",
@@ -55,6 +60,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "prohibited-trailing-comma",
     "shebang-leading-whitespace",
     "surrounding-whitespace",
+    "tab-indentation",
     "too-few-spaces-before-inline-comment",
     "trailing-comma-on-bare-tuple",
     "triple-single-quotes",
@@ -65,6 +71,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "useless-semicolon",
     "whitespace-after-open-bracket",
     "whitespace-before-close-bracket",
+    "whitespace-before-parameters",
     "whitespace-before-punctuation",
 ]
 
@@ -75,6 +82,8 @@ KNOWN_PARSE_ERRORS = [
     "missing-newline-at-end-of-file",
     "mixed-spaces-and-tabs",
     "no-indented-block",
+    "non-pep695-type-alias",  # requires Python 3.12
+    "tab-after-comma",
     "tab-after-keyword",
     "tab-after-operator",
     "tab-before-keyword",
@@ -144,15 +153,19 @@ def format_file(
     if errors and not args.skip_errors and not error_known:
         for error in errors:
             rule_name = file.name.split(".")[0]
-            print(f"Docs parse error for `{rule_name}` docs: {error}")
+            print(
+                f"Docs parse error for `{rule_name}` docs. Either fix or add to "
+                f"`KNOWN_PARSE_ERRORS`. {error}",
+            )
 
         return 2
 
     if contents != new_contents:
         rule_name = file.name.split(".")[0]
         print(
-            f"Rule `{rule_name}` docs are not formatted. The example section "
-            f"should be rewritten to:",
+            f"Rule `{rule_name}` docs are not formatted. Either format the rule or add "
+            f"to `KNOWN_FORMATTING_VIOLATIONS`. The example section should be "
+            f"rewritten to:",
         )
 
         # Add indentation so that snipped can be copied directly to docs
@@ -186,10 +199,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         generate_docs()
 
     # Get static docs
-    static_docs = []
-    for file in os.listdir("docs"):
-        if file.endswith(".md"):
-            static_docs.append(Path("docs") / file)
+    static_docs = [Path("docs") / f for f in os.listdir("docs") if f.endswith(".md")]
 
     # Check rules generated
     if not Path("docs/rules").exists():
@@ -197,10 +207,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
 
     # Get generated rules
-    generated_docs = []
-    for file in os.listdir("docs/rules"):
-        if file.endswith(".md"):
-            generated_docs.append(Path("docs/rules") / file)
+    generated_docs = [
+        Path("docs/rules") / f for f in os.listdir("docs/rules") if f.endswith(".md")
+    ]
 
     if len(generated_docs) == 0:
         print("Please generate rules first.")

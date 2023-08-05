@@ -1,11 +1,11 @@
 use crate::comments::trailing_comments;
+use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
 use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::FormatRuleWithOptions;
 use ruff_formatter::{write, Buffer, FormatResult};
-use ruff_python_ast::node::AstNode;
-use rustpython_parser::ast::ExceptHandlerExceptHandler;
+use ruff_python_ast::ExceptHandlerExceptHandler;
 
 #[derive(Copy, Clone, Default)]
 pub enum ExceptHandlerKind {
@@ -44,7 +44,7 @@ impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHan
         } = item;
 
         let comments_info = f.context().comments().clone();
-        let dangling_comments = comments_info.dangling_comments(item.as_any_node_ref());
+        let dangling_comments = comments_info.dangling_comments(item);
 
         write!(
             f,
@@ -60,7 +60,10 @@ impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHan
         if let Some(type_) = type_ {
             write!(
                 f,
-                [space(), type_.format().with_options(Parenthesize::IfBreaks)]
+                [
+                    space(),
+                    maybe_parenthesize_expression(type_, item, Parenthesize::IfBreaks)
+                ]
             )?;
             if let Some(name) = name {
                 write!(f, [space(), text("as"), space(), name.format()])?;
@@ -71,7 +74,7 @@ impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHan
             [
                 text(":"),
                 trailing_comments(dangling_comments),
-                block_indent(&body.format())
+                block_indent(&body.format()),
             ]
         )
     }

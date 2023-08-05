@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, Ranged, Stmt};
+use ruff_python_ast::{Arguments, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -53,9 +53,8 @@ impl Violation for MixedCaseVariableInClassScope {
 pub(crate) fn mixed_case_variable_in_class_scope(
     checker: &mut Checker,
     expr: &Expr,
-    stmt: &Stmt,
     name: &str,
-    bases: &[Expr],
+    arguments: Option<&Arguments>,
 ) {
     if checker
         .settings
@@ -66,15 +65,22 @@ pub(crate) fn mixed_case_variable_in_class_scope(
     {
         return;
     }
-    if helpers::is_mixed_case(name)
-        && !helpers::is_named_tuple_assignment(stmt, checker.semantic())
-        && !helpers::is_typed_dict_class(bases, checker.semantic())
-    {
-        checker.diagnostics.push(Diagnostic::new(
-            MixedCaseVariableInClassScope {
-                name: name.to_string(),
-            },
-            expr.range(),
-        ));
+    if !helpers::is_mixed_case(name) {
+        return;
     }
+
+    let parent = checker.semantic().stmt();
+
+    if helpers::is_named_tuple_assignment(parent, checker.semantic())
+        || helpers::is_typed_dict_class(arguments, checker.semantic())
+    {
+        return;
+    }
+
+    checker.diagnostics.push(Diagnostic::new(
+        MixedCaseVariableInClassScope {
+            name: name.to_string(),
+        },
+        expr.range(),
+    ));
 }

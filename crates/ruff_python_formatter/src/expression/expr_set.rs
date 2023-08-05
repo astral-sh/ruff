@@ -1,13 +1,11 @@
-use crate::comments::Comments;
+use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::{ExprSet, Ranged};
+
 use crate::expression::parentheses::{
-    default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
+    parenthesized_with_dangling_comments, NeedsParentheses, OptionalParentheses,
 };
-use crate::{FormatNodeRule, FormattedIterExt, PyFormatter};
-use ruff_formatter::prelude::{
-    format_with, group, if_group_breaks, soft_block_indent, soft_line_break_or_space, text,
-};
-use ruff_formatter::{format_args, write, Buffer, FormatResult};
-use rustpython_parser::ast::ExprSet;
+use crate::prelude::*;
+use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatExprSet;
@@ -18,32 +16,30 @@ impl FormatNodeRule<ExprSet> for FormatExprSet {
         // That would be a dict expression
         assert!(!elts.is_empty());
         // Avoid second mutable borrow of f
-        let joined = format_with(|f| {
-            f.join_with(format_args!(text(","), soft_line_break_or_space()))
-                .entries(elts.iter().formatted())
+        let joined = format_with(|f: &mut PyFormatter| {
+            f.join_comma_separated(item.end())
+                .nodes(elts.iter())
                 .finish()
         });
-        write!(
-            f,
-            [group(&format_args![
-                text("{"),
-                soft_block_indent(&format_args![joined, if_group_breaks(&text(",")),]),
-                text("}")
-            ])]
-        )
+
+        let comments = f.context().comments().clone();
+        let dangling = comments.dangling_comments(item);
+
+        parenthesized_with_dangling_comments("{", dangling, &joined, "}").fmt(f)
+    }
+
+    fn fmt_dangling_comments(&self, _node: &ExprSet, _f: &mut PyFormatter) -> FormatResult<()> {
+        // Handled as part of `fmt_fields`
+        Ok(())
     }
 }
 
 impl NeedsParentheses for ExprSet {
     fn needs_parentheses(
         &self,
-        parenthesize: Parenthesize,
-        source: &str,
-        comments: &Comments,
-    ) -> Parentheses {
-        match default_expression_needs_parentheses(self.into(), parenthesize, source, comments) {
-            Parentheses::Optional => Parentheses::Never,
-            parentheses => parentheses,
-        }
+        _parent: AnyNodeRef,
+        _context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        OptionalParentheses::Never
     }
 }

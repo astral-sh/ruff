@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
+use log::debug;
 use path_absolutize::path_dedot;
 
 use ruff::resolver::{
@@ -25,6 +26,7 @@ pub fn resolve(
         let mut config = Configuration::default();
         overrides.process_config(&mut config);
         let settings = AllSettings::from_configuration(config, &path_dedot::CWD)?;
+        debug!("Isolated mode, not reading any pyproject.toml");
         return Ok(PyprojectConfig::new(
             PyprojectDiscoveryStrategy::Fixed,
             settings,
@@ -41,6 +43,10 @@ pub fn resolve(
         .transpose()?
     {
         let settings = resolve_settings_with_processor(&pyproject, &Relativity::Cwd, overrides)?;
+        debug!(
+            "Using user specified pyproject.toml at {}",
+            pyproject.display()
+        );
         return Ok(PyprojectConfig::new(
             PyprojectDiscoveryStrategy::Fixed,
             settings,
@@ -58,6 +64,7 @@ pub fn resolve(
             .as_ref()
             .unwrap_or(&path_dedot::CWD.as_path()),
     )? {
+        debug!("Using pyproject.toml (parent) at {}", pyproject.display());
         let settings = resolve_settings_with_processor(&pyproject, &Relativity::Parent, overrides)?;
         return Ok(PyprojectConfig::new(
             PyprojectDiscoveryStrategy::Hierarchical,
@@ -71,6 +78,7 @@ pub fn resolve(
     // end up the "closest" `pyproject.toml` file for every Python file later on, so
     // these act as the "default" settings.)
     if let Some(pyproject) = pyproject::find_user_settings_toml() {
+        debug!("Using pyproject.toml (cwd) at {}", pyproject.display());
         let settings = resolve_settings_with_processor(&pyproject, &Relativity::Cwd, overrides)?;
         return Ok(PyprojectConfig::new(
             PyprojectDiscoveryStrategy::Hierarchical,
@@ -83,6 +91,7 @@ pub fn resolve(
     // current working directory. (With `Strategy::Hierarchical`, we'll end up the
     // "closest" `pyproject.toml` file for every Python file later on, so these act
     // as the "default" settings.)
+    debug!("Using Ruff default settings");
     let mut config = Configuration::default();
     overrides.process_config(&mut config);
     let settings = AllSettings::from_configuration(config, &path_dedot::CWD)?;

@@ -20,7 +20,7 @@ use crate::rules::{
     flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
     flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
-    pycodestyle, pydocstyle, pyflakes, pylint,
+    pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
 };
 use crate::settings::configuration::Configuration;
 use crate::settings::types::{FilePatternSet, PerFileIgnore, PythonVersion, SerializationFormat};
@@ -101,9 +101,10 @@ pub struct Settings {
     pub external: FxHashSet<String>,
     pub ignore_init_module_imports: bool,
     pub line_length: LineLength,
-    pub tab_size: TabSize,
+    pub logger_objects: Vec<String>,
     pub namespace_packages: Vec<PathBuf>,
     pub src: Vec<PathBuf>,
+    pub tab_size: TabSize,
     pub task_tags: Vec<String>,
     pub typing_modules: Vec<String>,
     // Plugins
@@ -130,6 +131,7 @@ pub struct Settings {
     pub pydocstyle: pydocstyle::settings::Settings,
     pub pyflakes: pyflakes::settings::Settings,
     pub pylint: pylint::settings::Settings,
+    pub pyupgrade: pyupgrade::settings::Settings,
 }
 
 impl Settings {
@@ -188,6 +190,7 @@ impl Settings {
                     .map(ToString::to_string)
                     .collect()
             }),
+            logger_objects: config.logger_objects.unwrap_or_default(),
             typing_modules: config.typing_modules.unwrap_or_default(),
             // Plugins
             flake8_annotations: config
@@ -257,7 +260,8 @@ impl Settings {
                 .unwrap_or_default(),
             isort: config
                 .isort
-                .map(isort::settings::Settings::from)
+                .map(isort::settings::Settings::try_from)
+                .transpose()?
                 .unwrap_or_default(),
             mccabe: config
                 .mccabe
@@ -284,10 +288,13 @@ impl Settings {
                 .pylint
                 .map(pylint::settings::Settings::from)
                 .unwrap_or_default(),
+            pyupgrade: config
+                .pyupgrade
+                .map(pyupgrade::settings::Settings::from)
+                .unwrap_or_default(),
         })
     }
 
-    #[cfg(test)]
     pub fn for_rule(rule_code: Rule) -> Self {
         Self {
             rules: RuleTable::from_iter([rule_code]),
@@ -295,7 +302,6 @@ impl Settings {
         }
     }
 
-    #[cfg(test)]
     pub fn for_rules(rules: impl IntoIterator<Item = Rule>) -> Self {
         Self {
             rules: RuleTable::from_iter(rules),
@@ -311,7 +317,7 @@ impl From<&Configuration> for RuleTable {
         // The fixable set keeps track of which rules are fixable.
         let mut fixable_set: RuleSet = RuleSelector::All
             .into_iter()
-            .chain(RuleSelector::Nursery.into_iter())
+            .chain(&RuleSelector::Nursery)
             .collect();
 
         // Ignores normally only subtract from the current set of selected

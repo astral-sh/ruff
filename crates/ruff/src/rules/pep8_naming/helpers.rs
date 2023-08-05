@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use rustpython_parser::ast::{self, Expr, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::str::{is_cased_lowercase, is_cased_uppercase};
@@ -26,10 +26,10 @@ pub(super) fn is_named_tuple_assignment(stmt: &Stmt, semantic: &SemanticModel) -
     let Stmt::Assign(ast::StmtAssign { value, .. }) = stmt else {
         return false;
     };
-    let Expr::Call(ast::ExprCall {func, ..}) = value.as_ref() else {
+    let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
         return false;
     };
-    semantic.resolve_call_path(func).map_or(false, |call_path| {
+    semantic.resolve_call_path(func).is_some_and(|call_path| {
         matches!(
             call_path.as_slice(),
             ["collections", "namedtuple"] | ["typing", "NamedTuple"]
@@ -41,30 +41,33 @@ pub(super) fn is_typed_dict_assignment(stmt: &Stmt, semantic: &SemanticModel) ->
     let Stmt::Assign(ast::StmtAssign { value, .. }) = stmt else {
         return false;
     };
-    let Expr::Call(ast::ExprCall {func, ..}) = value.as_ref() else {
+    let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
         return false;
     };
-    semantic.resolve_call_path(func).map_or(false, |call_path| {
-        matches!(call_path.as_slice(), ["typing", "TypedDict"])
-    })
+    semantic
+        .resolve_call_path(func)
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["typing", "TypedDict"]))
 }
 
 pub(super) fn is_type_var_assignment(stmt: &Stmt, semantic: &SemanticModel) -> bool {
     let Stmt::Assign(ast::StmtAssign { value, .. }) = stmt else {
         return false;
     };
-    let Expr::Call(ast::ExprCall {func, ..}) = value.as_ref() else {
+    let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
         return false;
     };
-    semantic.resolve_call_path(func).map_or(false, |call_path| {
-        matches!(call_path.as_slice(), ["typing", "TypeVar" | "NewType"])
-    })
+    semantic
+        .resolve_call_path(func)
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["typing", "TypeVar" | "NewType"]))
 }
 
-pub(super) fn is_typed_dict_class(bases: &[Expr], semantic: &SemanticModel) -> bool {
-    bases
-        .iter()
-        .any(|base| semantic.match_typing_expr(base, "TypedDict"))
+pub(super) fn is_typed_dict_class(arguments: Option<&Arguments>, semantic: &SemanticModel) -> bool {
+    arguments.is_some_and(|arguments| {
+        arguments
+            .args
+            .iter()
+            .any(|base| semantic.match_typing_expr(base, "TypedDict"))
+    })
 }
 
 #[cfg(test)]

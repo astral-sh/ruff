@@ -1,5 +1,5 @@
 use num_bigint::BigInt;
-use rustpython_parser::ast::{self, Constant, Expr, Ranged, UnaryOp};
+use ruff_python_ast::{self as ast, Constant, Expr, Ranged, UnaryOp};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -64,9 +64,15 @@ pub(crate) fn unnecessary_subscript_reversal(
     let Expr::Subscript(ast::ExprSubscript { slice, .. }) = first_arg else {
         return;
     };
-    let Expr::Slice(ast::ExprSlice { lower, upper, step, range: _ }) = slice.as_ref() else {
-            return;
-        };
+    let Expr::Slice(ast::ExprSlice {
+        lower,
+        upper,
+        step,
+        range: _,
+    }) = slice.as_ref()
+    else {
+        return;
+    };
     if lower.is_some() || upper.is_some() {
         return;
     }
@@ -77,13 +83,15 @@ pub(crate) fn unnecessary_subscript_reversal(
         op: UnaryOp::USub,
         operand,
         range: _,
-    }) = step.as_ref() else {
+    }) = step.as_ref()
+    else {
         return;
     };
     let Expr::Constant(ast::ExprConstant {
         value: Constant::Int(val),
         ..
-    }) = operand.as_ref() else {
+    }) = operand.as_ref()
+    else {
         return;
     };
     if *val != BigInt::from(1) {

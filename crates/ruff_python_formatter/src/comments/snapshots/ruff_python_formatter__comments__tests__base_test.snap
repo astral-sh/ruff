@@ -34,8 +34,8 @@ expression: comments.debug(test_case.source_code)
         "trailing": [],
     },
     Node {
-        kind: StmtIf,
-        range: 144..212,
+        kind: ElifElseClause,
+        range: 144..177,
         source: `elif x < y:⏎`,
     }: {
         "leading": [

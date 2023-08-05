@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::fmt::Display;
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::iter;
@@ -10,7 +11,9 @@ use serde::Serialize;
 use serde_json::error::Category;
 
 use ruff_diagnostics::Diagnostic;
-use ruff_python_whitespace::{NewlineWithTrailingNewline, UniversalNewlineIterator};
+use ruff_python_parser::lexer::lex;
+use ruff_python_parser::Mode;
+use ruff_source_file::{NewlineWithTrailingNewline, UniversalNewlineIterator};
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::autofix::source_map::{SourceMap, SourceMarker};
@@ -20,8 +23,6 @@ use crate::rules::pycodestyle::rules::SyntaxError;
 use crate::IOError;
 
 pub const JUPYTER_NOTEBOOK_EXT: &str = "ipynb";
-
-const MAGIC_PREFIX: [&str; 3] = ["%", "!", "?"];
 
 /// Run round-trip source code generation on a given Jupyter notebook file path.
 pub fn round_trip(path: &Path) -> anyhow::Result<String> {
@@ -37,6 +38,20 @@ pub fn round_trip(path: &Path) -> anyhow::Result<String> {
     let mut writer = Vec::new();
     notebook.write_inner(&mut writer)?;
     Ok(String::from_utf8(writer)?)
+}
+
+impl Display for SourceValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SourceValue::String(string) => f.write_str(string),
+            SourceValue::StringArray(string_array) => {
+                for string in string_array {
+                    f.write_str(string)?;
+                }
+                Ok(())
+            }
+        }
+    }
 }
 
 impl Cell {
@@ -61,26 +76,21 @@ impl Cell {
     /// Return `true` if it's a valid code cell.
     ///
     /// A valid code cell is a cell where the cell type is [`Cell::Code`] and the
-    /// source doesn't contain a magic, shell or help command.
+    /// source doesn't contain a cell magic.
     fn is_valid_code_cell(&self) -> bool {
         let source = match self {
             Cell::Code(cell) => &cell.source,
             _ => return false,
         };
-        // Ignore a cell if it contains a magic command. There could be valid
-        // Python code as well, but we'll ignore that for now.
-        // TODO(dhruvmanila): https://github.com/psf/black/blob/main/src/black/handle_ipynb_magics.py
+        // Ignore cells containing cell magic. This is different from line magic
+        // which is allowed and ignored by the parser.
         !match source {
-            SourceValue::String(string) => string.lines().any(|line| {
-                MAGIC_PREFIX
-                    .iter()
-                    .any(|prefix| line.trim_start().starts_with(prefix))
-            }),
-            SourceValue::StringArray(string_array) => string_array.iter().any(|line| {
-                MAGIC_PREFIX
-                    .iter()
-                    .any(|prefix| line.trim_start().starts_with(prefix))
-            }),
+            SourceValue::String(string) => string
+                .lines()
+                .any(|line| line.trim_start().starts_with("%%")),
+            SourceValue::StringArray(string_array) => string_array
+                .iter()
+                .any(|line| line.trim_start().starts_with("%%")),
         }
     }
 }
@@ -158,10 +168,7 @@ impl Notebook {
                                 )
                             })?;
                             // Check if tokenizing was successful and the file is non-empty
-                            if (ruff_rustpython::tokenize(&contents))
-                                .last()
-                                .map_or(true, Result::is_err)
-                            {
+                            if lex(&contents, Mode::Module).any(|result| result.is_err()) {
                                 Diagnostic::new(
                                     SyntaxError {
                                         message: format!(
@@ -268,11 +275,12 @@ impl Notebook {
                         .markers()
                         .iter()
                         .rev()
-                        .find(|m| m.source <= *offset) else {
-                            // There are no markers above the current offset, so we can
-                            // stop here.
-                            break;
-                        };
+                        .find(|m| m.source <= *offset)
+                    else {
+                        // There are no markers above the current offset, so we can
+                        // stop here.
+                        break;
+                    };
                     last_marker = Some(marker);
                     marker
                 }
@@ -361,7 +369,7 @@ impl Notebook {
                         1
                     } else {
                         let trailing_newline =
-                            usize::from(string_array.last().map_or(false, |s| s.ends_with('\n')));
+                            usize::from(string_array.last().is_some_and(|s| s.ends_with('\n')));
                         u32::try_from(string_array.len() + trailing_newline).unwrap()
                     }
                 }
@@ -405,6 +413,11 @@ impl Notebook {
         self.update_cell_offsets(source_map);
         self.update_cell_content(transformed);
         self.content = transformed.to_string();
+    }
+
+    /// Return a slice of [`Cell`] in the Jupyter notebook.
+    pub fn cells(&self) -> &[Cell] {
+        &self.raw.cells
     }
 
     /// Return `true` if the notebook is a Python notebook, `false` otherwise.
@@ -493,9 +506,10 @@ mod tests {
     }
 
     #[test_case(Path::new("markdown.json"), false; "markdown")]
-    #[test_case(Path::new("only_magic.json"), false; "only_magic")]
-    #[test_case(Path::new("code_and_magic.json"), false; "code_and_magic")]
+    #[test_case(Path::new("only_magic.json"), true; "only_magic")]
+    #[test_case(Path::new("code_and_magic.json"), true; "code_and_magic")]
     #[test_case(Path::new("only_code.json"), true; "only_code")]
+    #[test_case(Path::new("cell_magic.json"), false; "cell_magic")]
     fn test_is_valid_code_cell(path: &Path, expected: bool) -> Result<()> {
         assert_eq!(read_jupyter_cell(path)?.is_valid_code_cell(), expected);
         Ok(())
@@ -547,7 +561,7 @@ print("after empty cells")
     #[test]
     fn test_import_sorting() -> Result<()> {
         let path = "isort.ipynb".to_string();
-        let (diagnostics, source_kind) = test_notebook_path(
+        let (diagnostics, source_kind, _) = test_notebook_path(
             &path,
             Path::new("isort_expected.ipynb"),
             &settings::Settings::for_rule(Rule::UnsortedImports),
@@ -557,9 +571,33 @@ print("after empty cells")
     }
 
     #[test]
+    fn test_line_magics() -> Result<()> {
+        let path = "line_magics.ipynb".to_string();
+        let (diagnostics, source_kind, _) = test_notebook_path(
+            &path,
+            Path::new("line_magics_expected.ipynb"),
+            &settings::Settings::for_rule(Rule::UnusedImport),
+        )?;
+        assert_messages!(diagnostics, path, source_kind);
+        Ok(())
+    }
+
+    #[test]
+    fn test_unused_variable() -> Result<()> {
+        let path = "unused_variable.ipynb".to_string();
+        let (diagnostics, source_kind, _) = test_notebook_path(
+            &path,
+            Path::new("unused_variable_expected.ipynb"),
+            &settings::Settings::for_rule(Rule::UnusedVariable),
+        )?;
+        assert_messages!(diagnostics, path, source_kind);
+        Ok(())
+    }
+
+    #[test]
     fn test_json_consistency() -> Result<()> {
         let path = "before_fix.ipynb".to_string();
-        let (_, source_kind) = test_notebook_path(
+        let (_, _, source_kind) = test_notebook_path(
             path,
             Path::new("after_fix.ipynb"),
             &settings::Settings::for_rule(Rule::UnusedImport),

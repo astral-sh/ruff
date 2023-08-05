@@ -1,0 +1,76 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/py_310/remove_newline_after_match.py
+---
+## Input
+
+```py
+def http_status(status):
+
+    match status:
+
+        case 400:
+
+            return "Bad request"
+
+        case 401:
+
+            return "Unauthorized"
+
+        case 403:
+
+            return "Forbidden"
+
+        case 404:
+
+            return "Not found"
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -1,13 +1,2 @@
+ def http_status(status):
+-    match status:
+-        case 400:
+-            return "Bad request"
+-
+-        case 401:
+-            return "Unauthorized"
+-
+-        case 403:
+-            return "Forbidden"
+-
+-        case 404:
+-            return "Not found"
++    NOT_YET_IMPLEMENTED_StmtMatch
+```
+
+## Ruff Output
+
+```py
+def http_status(status):
+    NOT_YET_IMPLEMENTED_StmtMatch
+```
+
+## Black Output
+
+```py
+def http_status(status):
+    match status:
+        case 400:
+            return "Bad request"
+
+        case 401:
+            return "Unauthorized"
+
+        case 403:
+            return "Forbidden"
+
+        case 404:
+            return "Not found"
+```
+
+

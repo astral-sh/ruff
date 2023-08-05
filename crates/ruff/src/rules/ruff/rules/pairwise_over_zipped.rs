@@ -1,5 +1,5 @@
 use num_traits::ToPrimitive;
-use rustpython_parser::ast::{self, Constant, Expr, Ranged, UnaryOp};
+use ruff_python_ast::{self as ast, Constant, Expr, Ranged, UnaryOp};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -67,7 +67,7 @@ fn match_slice_info(expr: &Expr) -> Option<SliceInfo> {
         return None;
     };
 
-    let Expr::Slice(ast::ExprSlice { lower,  step, .. }) = slice.as_ref() else {
+    let Expr::Slice(ast::ExprSlice { lower, step, .. }) = slice.as_ref() else {
         return None;
     };
 

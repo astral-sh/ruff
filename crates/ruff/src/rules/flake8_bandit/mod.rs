@@ -39,6 +39,7 @@ mod tests {
     #[test_case(Rule::SubprocessPopenWithShellEqualsTrue, Path::new("S602.py"))]
     #[test_case(Rule::SubprocessWithoutShellEqualsTrue, Path::new("S603.py"))]
     #[test_case(Rule::SuspiciousPickleUsage, Path::new("S301.py"))]
+    #[test_case(Rule::SuspiciousEvalUsage, Path::new("S307.py"))]
     #[test_case(Rule::SuspiciousTelnetUsage, Path::new("S312.py"))]
     #[test_case(Rule::TryExceptContinue, Path::new("S112.py"))]
     #[test_case(Rule::TryExceptPass, Path::new("S110.py"))]

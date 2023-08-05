@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use rustpython_parser::ast::{Alias, Ranged, Stmt};
+use ruff_python_ast::{Alias, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -132,9 +132,9 @@ pub(crate) fn unnecessary_builtin_import(
                 unused_imports.iter().map(String::as_str),
                 stmt,
                 parent,
-                checker.locator,
-                checker.stylist,
-                checker.indexer,
+                checker.locator(),
+                checker.stylist(),
+                checker.indexer(),
             )?;
             Ok(Fix::suggested(edit).isolate(checker.isolation(parent)))
         });

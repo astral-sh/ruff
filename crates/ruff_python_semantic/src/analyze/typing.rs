@@ -1,15 +1,15 @@
 //! Analysis rules for the `typing` module.
 
 use num_traits::identities::Zero;
-use rustpython_parser::ast::{self, Constant, Expr, Operator};
+use ruff_python_ast::{self as ast, Constant, Expr, Operator};
 
 use ruff_python_ast::call_path::{from_qualified_name, from_unqualified_name, CallPath};
 use ruff_python_ast::helpers::is_const_false;
 use ruff_python_stdlib::typing::{
     as_pep_585_generic, has_pep_585_generic, is_immutable_generic_type,
-    is_immutable_non_generic_type, is_immutable_return_type, is_mutable_return_type,
-    is_pep_593_generic_member, is_pep_593_generic_type, is_standard_library_generic,
-    is_standard_library_generic_member,
+    is_immutable_non_generic_type, is_immutable_return_type, is_literal_member,
+    is_mutable_return_type, is_pep_593_generic_member, is_pep_593_generic_type,
+    is_standard_library_generic, is_standard_library_generic_member, is_standard_library_literal,
 };
 
 use crate::model::SemanticModel;
@@ -27,8 +27,12 @@ pub enum Callable {
 
 #[derive(Copy, Clone)]
 pub enum SubscriptKind {
-    AnnotatedSubscript,
-    PEP593AnnotatedSubscript,
+    /// A subscript of the form `typing.Literal["foo", "bar"]`, i.e., a literal.
+    Literal,
+    /// A subscript of the form `typing.List[int]`, i.e., a generic.
+    Generic,
+    /// A subscript of the form `typing.Annotated[int, "foo"]`, i.e., a PEP 593 annotation.
+    PEP593Annotation,
 }
 
 pub fn match_annotated_subscript<'a>(
@@ -38,28 +42,35 @@ pub fn match_annotated_subscript<'a>(
     extend_generics: &[String],
 ) -> Option<SubscriptKind> {
     semantic.resolve_call_path(expr).and_then(|call_path| {
+        if is_standard_library_literal(call_path.as_slice()) {
+            return Some(SubscriptKind::Literal);
+        }
+
         if is_standard_library_generic(call_path.as_slice())
             || extend_generics
                 .iter()
                 .map(|target| from_qualified_name(target))
                 .any(|target| call_path == target)
         {
-            return Some(SubscriptKind::AnnotatedSubscript);
+            return Some(SubscriptKind::Generic);
         }
 
         if is_pep_593_generic_type(call_path.as_slice()) {
-            return Some(SubscriptKind::PEP593AnnotatedSubscript);
+            return Some(SubscriptKind::PEP593Annotation);
         }
 
         for module in typing_modules {
             let module_call_path: CallPath = from_unqualified_name(module);
             if call_path.starts_with(&module_call_path) {
                 if let Some(member) = call_path.last() {
+                    if is_literal_member(member) {
+                        return Some(SubscriptKind::Literal);
+                    }
                     if is_standard_library_generic_member(member) {
-                        return Some(SubscriptKind::AnnotatedSubscript);
+                        return Some(SubscriptKind::Generic);
                     }
                     if is_pep_593_generic_member(member) {
-                        return Some(SubscriptKind::PEP593AnnotatedSubscript);
+                        return Some(SubscriptKind::PEP593Annotation);
                     }
                 }
             }
@@ -105,7 +116,7 @@ pub fn to_pep585_generic(expr: &Expr, semantic: &SemanticModel) -> Option<Module
 
 /// Return whether a given expression uses a PEP 585 standard library generic.
 pub fn is_pep585_generic(expr: &Expr, semantic: &SemanticModel) -> bool {
-    semantic.resolve_call_path(expr).map_or(false, |call_path| {
+    semantic.resolve_call_path(expr).is_some_and(|call_path| {
         let [module, name] = call_path.as_slice() else {
             return false;
         };
@@ -127,22 +138,36 @@ pub fn to_pep604_operator(
     slice: &Expr,
     semantic: &SemanticModel,
 ) -> Option<Pep604Operator> {
-    /// Returns `true` if any argument in the slice is a string.
-    fn any_arg_is_str(slice: &Expr) -> bool {
+    /// Returns `true` if any argument in the slice is a quoted annotation).
+    fn quoted_annotation(slice: &Expr) -> bool {
         match slice {
             Expr::Constant(ast::ExprConstant {
                 value: Constant::Str(_),
                 ..
             }) => true,
-            Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().any(any_arg_is_str),
+            Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().any(quoted_annotation),
             _ => false,
         }
     }
 
-    // If any of the _arguments_ are forward references, we can't use PEP 604.
-    // Ex) `Union["str", "int"]` can't be converted to `"str" | "int"`.
-    if any_arg_is_str(slice) {
-        return None;
+    // If the slice is a forward reference (e.g., `Optional["Foo"]`), it can only be rewritten
+    // if we're in a typing-only context.
+    //
+    // This, for example, is invalid, as Python will evaluate `"Foo" | None` at runtime in order to
+    // populate the function's `__annotations__`:
+    // ```python
+    // def f(x: "Foo" | None): ...
+    // ```
+    //
+    // This, however, is valid:
+    // ```python
+    // def f():
+    //     x: "Foo" | None
+    // ```
+    if quoted_annotation(slice) {
+        if semantic.execution_context().is_runtime() {
+            return None;
+        }
     }
 
     semantic
@@ -164,14 +189,13 @@ pub fn to_pep604_operator(
 pub fn is_immutable_annotation(expr: &Expr, semantic: &SemanticModel) -> bool {
     match expr {
         Expr::Name(_) | Expr::Attribute(_) => {
-            semantic.resolve_call_path(expr).map_or(false, |call_path| {
+            semantic.resolve_call_path(expr).is_some_and(|call_path| {
                 is_immutable_non_generic_type(call_path.as_slice())
                     || is_immutable_generic_type(call_path.as_slice())
             })
         }
-        Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => semantic
-            .resolve_call_path(value)
-            .map_or(false, |call_path| {
+        Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+            semantic.resolve_call_path(value).is_some_and(|call_path| {
                 if is_immutable_generic_type(call_path.as_slice()) {
                     true
                 } else if matches!(call_path.as_slice(), ["typing", "Union"]) {
@@ -186,19 +210,20 @@ pub fn is_immutable_annotation(expr: &Expr, semantic: &SemanticModel) -> bool {
                 } else if matches!(call_path.as_slice(), ["typing", "Annotated"]) {
                     if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
                         elts.first()
-                            .map_or(false, |elt| is_immutable_annotation(elt, semantic))
+                            .is_some_and(|elt| is_immutable_annotation(elt, semantic))
                     } else {
                         false
                     }
                 } else {
                     false
                 }
-            }),
+            })
+        }
         Expr::BinOp(ast::ExprBinOp {
             left,
             op: Operator::BitOr,
             right,
-            range: _range,
+            range: _,
         }) => is_immutable_annotation(left, semantic) && is_immutable_annotation(right, semantic),
         Expr::Constant(ast::ExprConstant {
             value: Constant::None,
@@ -214,7 +239,7 @@ pub fn is_immutable_func(
     semantic: &SemanticModel,
     extend_immutable_calls: &[CallPath],
 ) -> bool {
-    semantic.resolve_call_path(func).map_or(false, |call_path| {
+    semantic.resolve_call_path(func).is_some_and(|call_path| {
         is_immutable_return_type(call_path.as_slice())
             || extend_immutable_calls
                 .iter()
@@ -228,7 +253,7 @@ pub fn is_mutable_func(func: &Expr, semantic: &SemanticModel) -> bool {
         .resolve_call_path(func)
         .as_ref()
         .map(CallPath::as_slice)
-        .map_or(false, is_mutable_return_type)
+        .is_some_and(is_mutable_return_type)
 }
 
 /// Return `true` if `expr` is an expression that resolves to a mutable value.
@@ -266,9 +291,10 @@ pub fn is_type_checking_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> b
     }
 
     // Ex) `if typing.TYPE_CHECKING:`
-    if semantic.resolve_call_path(test).map_or(false, |call_path| {
-        matches!(call_path.as_slice(), ["typing", "TYPE_CHECKING"])
-    }) {
+    if semantic
+        .resolve_call_path(test)
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["typing", "TYPE_CHECKING"]))
+    {
         return true;
     }
 

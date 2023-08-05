@@ -42,6 +42,8 @@ DTZ006.py:18:1: DTZ006 The use of `datetime.datetime.fromtimestamp()` without `t
 17 | # no args unqualified
 18 | datetime.fromtimestamp(1234)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ006
+19 | 
+20 | # uses `astimezone` method
    |
 
 

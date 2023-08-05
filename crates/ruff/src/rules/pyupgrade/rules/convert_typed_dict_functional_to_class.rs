@@ -1,16 +1,16 @@
 use anyhow::{bail, Result};
 use log::debug;
-use ruff_text_size::TextRange;
-use rustpython_parser::ast::{
-    self, Constant, Expr, ExprContext, Identifier, Keyword, Ranged, Stmt,
-};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_dunder;
-use ruff_python_ast::source_code::Generator;
+use ruff_python_ast::{
+    self as ast, Arguments, Constant, Expr, ExprContext, Identifier, Keyword, Ranged, Stmt,
+};
+use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::identifiers::is_identifier;
+use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -70,26 +70,26 @@ fn match_typed_dict_assign<'a>(
     targets: &'a [Expr],
     value: &'a Expr,
     semantic: &SemanticModel,
-) -> Option<(&'a str, &'a [Expr], &'a [Keyword], &'a Expr)> {
+) -> Option<(&'a str, &'a Arguments, &'a Expr)> {
     let target = targets.get(0)?;
     let Expr::Name(ast::ExprName { id: class_name, .. }) = target else {
         return None;
     };
     let Expr::Call(ast::ExprCall {
         func,
-        args,
-        keywords,
-        range: _
-    }) = value else {
+        arguments,
+        range: _,
+    }) = value
+    else {
         return None;
     };
     if !semantic.match_typing_expr(func, "TypedDict") {
         return None;
     }
-    Some((class_name, args, keywords, func))
+    Some((class_name, arguments, func))
 }
 
-/// Generate a `Stmt::AnnAssign` representing the provided property
+/// Generate a [`Stmt::AnnAssign`] representing the provided property
 /// definition.
 fn create_property_assignment_stmt(property: &str, annotation: &Expr) -> Stmt {
     ast::StmtAnnAssign {
@@ -117,15 +117,18 @@ fn create_class_def_stmt(
     total_keyword: Option<&Keyword>,
     base_class: &Expr,
 ) -> Stmt {
-    let keywords = match total_keyword {
-        Some(keyword) => vec![keyword.clone()],
-        None => vec![],
-    };
     ast::StmtClassDef {
         name: Identifier::new(class_name.to_string(), TextRange::default()),
-        bases: vec![base_class.clone()],
-        keywords,
+        arguments: Some(Box::new(Arguments {
+            args: vec![base_class.clone()],
+            keywords: match total_keyword {
+                Some(keyword) => vec![keyword.clone()],
+                None => vec![],
+            },
+            range: TextRange::default(),
+        })),
         body,
+        type_params: None,
         decorator_list: vec![],
         range: TextRange::default(),
     }
@@ -198,43 +201,29 @@ fn properties_from_keywords(keywords: &[Keyword]) -> Result<Vec<Stmt>> {
         .collect()
 }
 
-// The only way to have the `total` keyword is to use the args version, like:
-// ```
-// TypedDict('name', {'a': int}, total=True)
-// ```
-fn match_total_from_only_keyword(keywords: &[Keyword]) -> Option<&Keyword> {
-    keywords.iter().find(|keyword| {
-        let Some(arg) = &keyword.arg else {
-           return  false
-        };
-        arg.as_str() == "total"
-    })
-}
-
-fn match_properties_and_total<'a>(
-    args: &'a [Expr],
-    keywords: &'a [Keyword],
-) -> Result<(Vec<Stmt>, Option<&'a Keyword>)> {
+fn match_properties_and_total(arguments: &Arguments) -> Result<(Vec<Stmt>, Option<&Keyword>)> {
     // We don't have to manage the hybrid case because it's not possible to have a
     // dict and keywords. For example, the following is illegal:
     // ```
     // MyType = TypedDict('MyType', {'a': int, 'b': str}, a=int, b=str)
     // ```
-    if let Some(dict) = args.get(1) {
-        let total = match_total_from_only_keyword(keywords);
+    if let Some(dict) = arguments.args.get(1) {
+        let total = arguments.find_keyword("total");
         match dict {
             Expr::Dict(ast::ExprDict {
                 keys,
                 values,
                 range: _,
             }) => Ok((properties_from_dict_literal(keys, values)?, total)),
-            Expr::Call(ast::ExprCall { func, keywords, .. }) => {
-                Ok((properties_from_dict_call(func, keywords)?, total))
-            }
+            Expr::Call(ast::ExprCall {
+                func,
+                arguments: Arguments { keywords, .. },
+                ..
+            }) => Ok((properties_from_dict_call(func, keywords)?, total)),
             _ => bail!("Expected `arg` to be `Expr::Dict` or `Expr::Call`"),
         }
-    } else if !keywords.is_empty() {
-        Ok((properties_from_keywords(keywords)?, None))
+    } else if !arguments.keywords.is_empty() {
+        Ok((properties_from_keywords(&arguments.keywords)?, None))
     } else {
         let node = Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
@@ -270,13 +259,13 @@ pub(crate) fn convert_typed_dict_functional_to_class(
     targets: &[Expr],
     value: &Expr,
 ) {
-    let Some((class_name, args, keywords, base_class)) =
-        match_typed_dict_assign(targets, value, checker.semantic()) else
-    {
+    let Some((class_name, arguments, base_class)) =
+        match_typed_dict_assign(targets, value, checker.semantic())
+    else {
         return;
     };
 
-    let (body, total_keyword) = match match_properties_and_total(args, keywords) {
+    let (body, total_keyword) = match match_properties_and_total(arguments) {
         Ok((body, total_keyword)) => (body, total_keyword),
         Err(err) => {
             debug!("Skipping ineligible `TypedDict` \"{class_name}\": {err}");
@@ -292,7 +281,7 @@ pub(crate) fn convert_typed_dict_functional_to_class(
     );
     if checker.patch(diagnostic.kind.rule()) {
         // TODO(charlie): Preserve indentation, to remove the first-column requirement.
-        if checker.locator.is_at_start_of_line(stmt.start()) {
+        if checker.locator().is_at_start_of_line(stmt.start()) {
             diagnostic.set_fix(convert_to_class(
                 stmt,
                 class_name,

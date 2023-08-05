@@ -31,14 +31,30 @@ struct Rule {
 
 pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
     let Some(last_stmt) = func.block.stmts.last() else {
-        return Err(Error::new(func.block.span(), "expected body to end in an expression"));
+        return Err(Error::new(
+            func.block.span(),
+            "expected body to end in an expression",
+        ));
     };
-    let Stmt::Expr(Expr::Call(ExprCall { args: some_args, .. }), _) = last_stmt else {
-        return Err(Error::new(last_stmt.span(), "expected last expression to be `Some(match (..) { .. })`"));
+    let Stmt::Expr(
+        Expr::Call(ExprCall {
+            args: some_args, ..
+        }),
+        _,
+    ) = last_stmt
+    else {
+        return Err(Error::new(
+            last_stmt.span(),
+            "expected last expression to be `Some(match (..) { .. })`",
+        ));
     };
     let mut some_args = some_args.into_iter();
-    let (Some(Expr::Match(ExprMatch { arms, .. })), None) = (some_args.next(), some_args.next()) else {
-        return Err(Error::new(last_stmt.span(), "expected last expression to be `Some(match (..) { .. })`"));
+    let (Some(Expr::Match(ExprMatch { arms, .. })), None) = (some_args.next(), some_args.next())
+    else {
+        return Err(Error::new(
+            last_stmt.span(),
+            "expected last expression to be `Some(match (..) { .. })`",
+        ));
     };
 
     // Map from: linter (e.g., `Flake8Bugbear`) to rule code (e.g.,`"002"`) to rule data (e.g.,
@@ -139,30 +155,13 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
         }
 
         output.extend(quote! {
-            impl IntoIterator for &#linter {
-                type Item = Rule;
-                type IntoIter = ::std::vec::IntoIter<Self::Item>;
-
-                fn into_iter(self) -> Self::IntoIter {
+            impl #linter {
+                pub fn rules(self) -> ::std::vec::IntoIter<Rule> {
                     match self { #prefix_into_iter_match_arms }
                 }
             }
         });
     }
-
-    output.extend(quote! {
-        impl IntoIterator for &RuleCodePrefix {
-            type Item = Rule;
-            type IntoIter = ::std::vec::IntoIter<Self::Item>;
-
-            fn into_iter(self) -> Self::IntoIter {
-                match self {
-                    #(RuleCodePrefix::#linter_idents(prefix) => prefix.into_iter(),)*
-                }
-            }
-        }
-    });
-
     output.extend(quote! {
         impl RuleCodePrefix {
             pub fn parse(linter: &Linter, code: &str) -> Result<Self, crate::registry::FromCodeError> {
@@ -171,6 +170,12 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
                 Ok(match linter {
                     #(Linter::#linter_idents => RuleCodePrefix::#linter_idents(#linter_idents::from_str(code).map_err(|_| crate::registry::FromCodeError::Unknown)?),)*
                 })
+            }
+
+            pub fn rules(self) -> ::std::vec::IntoIter<Rule> {
+                match self {
+                    #(RuleCodePrefix::#linter_idents(prefix) => prefix.clone().rules(),)*
+                }
             }
         }
     });
@@ -328,32 +333,39 @@ fn generate_iter_impl(
     linter_to_rules: &BTreeMap<Ident, BTreeMap<String, Rule>>,
     linter_idents: &[&Ident],
 ) -> TokenStream {
-    let mut linter_into_iter_match_arms = quote!();
+    let mut linter_rules_match_arms = quote!();
+    let mut linter_all_rules_match_arms = quote!();
     for (linter, map) in linter_to_rules {
-        let rule_paths = map
-            .values()
-            .filter(|rule| {
-                // Nursery rules have to be explicitly selected, so we ignore them when looking at
-                // linter-level selectors (e.g., `--select SIM`).
-                !is_nursery(&rule.group)
-            })
-            .map(|Rule { attrs, path, .. }| {
+        let rule_paths = map.values().filter(|rule| !is_nursery(&rule.group)).map(
+            |Rule { attrs, path, .. }| {
                 let rule_name = path.segments.last().unwrap();
                 quote!(#(#attrs)* Rule::#rule_name)
-            });
-        linter_into_iter_match_arms.extend(quote! {
+            },
+        );
+        linter_rules_match_arms.extend(quote! {
+            Linter::#linter => vec![#(#rule_paths,)*].into_iter(),
+        });
+        let rule_paths = map.values().map(|Rule { attrs, path, .. }| {
+            let rule_name = path.segments.last().unwrap();
+            quote!(#(#attrs)* Rule::#rule_name)
+        });
+        linter_all_rules_match_arms.extend(quote! {
             Linter::#linter => vec![#(#rule_paths,)*].into_iter(),
         });
     }
 
     quote! {
-        impl IntoIterator for &Linter {
-            type Item = Rule;
-            type IntoIter = ::std::vec::IntoIter<Self::Item>;
-
-            fn into_iter(self) -> Self::IntoIter {
+        impl Linter {
+            /// Rules not in the nursery.
+            pub fn rules(self: &Linter) -> ::std::vec::IntoIter<Rule> {
                 match self {
-                    #linter_into_iter_match_arms
+                    #linter_rules_match_arms
+                }
+            }
+            /// All rules, including those in the nursery.
+            pub fn all_rules(self: &Linter) -> ::std::vec::IntoIter<Rule> {
+                match self {
+                    #linter_all_rules_match_arms
                 }
             }
         }

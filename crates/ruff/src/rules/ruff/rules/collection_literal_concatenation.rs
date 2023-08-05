@@ -1,9 +1,8 @@
+use ruff_python_ast::{self as ast, Expr, ExprContext, Operator, Ranged};
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Expr, ExprContext, Operator, Ranged};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::has_comments;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -86,7 +85,13 @@ enum Type {
 
 /// Recursively merge all the tuples and lists in the expression.
 fn concatenate_expressions(expr: &Expr) -> Option<(Expr, Type)> {
-    let Expr::BinOp(ast::ExprBinOp { left, op: Operator::Add, right, range: _ }) = expr else {
+    let Expr::BinOp(ast::ExprBinOp {
+        left,
+        op: Operator::Add,
+        right,
+        range: _,
+    }) = expr
+    else {
         return None;
     };
 
@@ -171,7 +176,7 @@ pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Exp
     }
 
     let Some((new_expr, type_)) = concatenate_expressions(expr) else {
-        return
+        return;
     };
 
     let contents = match type_ {
@@ -186,7 +191,7 @@ pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Exp
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        if !has_comments(expr, checker.locator) {
+        if !checker.indexer().has_comments(expr, checker.locator()) {
             // This suggestion could be unsafe if the non-literal expression in the
             // expression has overridden the `__add__` (or `__radd__`) magic methods.
             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(

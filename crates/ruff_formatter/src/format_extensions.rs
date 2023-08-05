@@ -42,7 +42,7 @@ pub trait MemoizeFormat<Context> {
     /// # fn main() -> FormatResult<()> {
     /// let normal = MyFormat::new();
     ///
-    /// // Calls `format` for everytime the object gets formatted
+    /// // Calls `format` every time the object gets formatted
     /// assert_eq!(
     ///     "Formatted 1 times. Formatted 2 times.",
     ///     format!(SimpleFormatContext::default(), [normal, space(), normal])?.print()?.as_code()

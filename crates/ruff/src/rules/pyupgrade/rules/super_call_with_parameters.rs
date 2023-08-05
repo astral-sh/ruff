@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Arg, ArgWithDefault, Expr, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Expr, Parameter, ParameterWithDefault, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -98,23 +98,29 @@ pub(crate) fn super_call_with_parameters(
 
     // Find the enclosing function definition (if any).
     let Some(Stmt::FunctionDef(ast::StmtFunctionDef {
-        args: parent_args, ..
-    })) = parents.find(|stmt| stmt.is_function_def_stmt()) else {
+        parameters: parent_parameters,
+        ..
+    })) = parents.find(|stmt| stmt.is_function_def_stmt())
+    else {
         return;
     };
 
     // Extract the name of the first argument to the enclosing function.
-    let Some(ArgWithDefault {
-        def: Arg { arg: parent_arg, .. },
+    let Some(ParameterWithDefault {
+        parameter: Parameter {
+            name: parent_arg, ..
+        },
         ..
-    }) = parent_args.args.first() else {
+    }) = parent_parameters.args.first()
+    else {
         return;
     };
 
     // Find the enclosing class definition (if any).
     let Some(Stmt::ClassDef(ast::StmtClassDef {
         name: parent_name, ..
-    })) = parents.find(|stmt| stmt.is_class_def_stmt()) else {
+    })) = parents.find(|stmt| stmt.is_class_def_stmt())
+    else {
         return;
     };
 
@@ -125,7 +131,8 @@ pub(crate) fn super_call_with_parameters(
         Expr::Name(ast::ExprName {
             id: second_arg_id, ..
         }),
-    ) = (first_arg, second_arg) else {
+    ) = (first_arg, second_arg)
+    else {
         return;
     };
 
@@ -137,7 +144,9 @@ pub(crate) fn super_call_with_parameters(
 
     let mut diagnostic = Diagnostic::new(SuperCallWithParameters, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
-        if let Some(edit) = fixes::remove_super_arguments(checker.locator, checker.stylist, expr) {
+        if let Some(edit) =
+            fixes::remove_super_arguments(checker.locator(), checker.stylist(), expr)
+        {
             diagnostic.set_fix(Fix::suggested(edit));
         }
     }

@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use ruff_python_ast::source_code::SourceLocation;
+use ruff_source_file::SourceLocation;
 
 use crate::message::{Emitter, EmitterContext, Message};
 use crate::registry::AsRule;
@@ -51,7 +51,7 @@ mod tests {
 
     #[test]
     fn output() {
-        let mut emitter = AzureEmitter::default();
+        let mut emitter = AzureEmitter;
         let content = capture_emitter_output(&mut emitter, &create_messages());
 
         assert_snapshot!(content);

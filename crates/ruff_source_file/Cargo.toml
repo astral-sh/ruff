@@ -1,0 +1,26 @@
+[package]
+name = "ruff_source_file"
+version = "0.0.0"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[lib]
+
+[dependencies]
+memchr = { workspace = true }
+once_cell = { workspace = true }
+ruff_text_size = { path = "../ruff_text_size" }
+serde = { workspace = true, optional = true }
+
+[dev-dependencies]
+insta = { workspace = true }
+
+
+[features]
+serde = ["dep:serde", "ruff_text_size/serde"]

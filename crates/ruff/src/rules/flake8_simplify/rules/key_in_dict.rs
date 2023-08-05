@@ -1,12 +1,12 @@
 use anyhow::Result;
-use log::error;
+use ruff_python_ast::{self as ast, Arguments, CmpOp, Expr, Ranged};
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, CmpOp, Expr, Ranged};
 
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python_codegen::Stylist;
+use ruff_source_file::Locator;
 
 use crate::autofix::codemods::CodegenStylist;
 use crate::checkers::ast::Checker;
@@ -37,70 +37,82 @@ use crate::registry::AsRule;
 pub struct InDictKeys {
     key: String,
     dict: String,
+    operator: String,
 }
 
 impl AlwaysAutofixableViolation for InDictKeys {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let InDictKeys { key, dict } = self;
-        format!("Use `{key} in {dict}` instead of `{key} in {dict}.keys()`")
+        let InDictKeys {
+            key,
+            dict,
+            operator,
+        } = self;
+        format!("Use `{key} {operator} {dict}` instead of `{key} {operator} {dict}.keys()`")
     }
 
     fn autofix_title(&self) -> String {
-        let InDictKeys { key, dict } = self;
-        format!("Convert to `{key} in {dict}`")
+        let InDictKeys {
+            key,
+            dict,
+            operator,
+        } = self;
+        format!("Convert to `{key} {operator} {dict}`")
     }
 }
 
-fn get_value_content_for_key_in_dict(
-    locator: &Locator,
-    stylist: &Stylist,
-    expr: &Expr,
-) -> Result<String> {
-    let content = locator.slice(expr.range());
-    let mut expression = match_expression(content)?;
-    let call = match_call_mut(&mut expression)?;
-    let attribute = match_attribute(&mut call.func)?;
-
-    Ok(attribute.value.codegen_stylist(stylist))
-}
-
 /// SIM118
-fn key_in_dict(checker: &mut Checker, left: &Expr, right: &Expr, range: TextRange) {
+fn key_in_dict(
+    checker: &mut Checker,
+    left: &Expr,
+    right: &Expr,
+    operator: CmpOp,
+    range: TextRange,
+) {
     let Expr::Call(ast::ExprCall {
         func,
-        args,
-        keywords,
-        range: _
-    }) = &right else {
+        arguments: Arguments { args, keywords, .. },
+        range: _,
+    }) = &right
+    else {
         return;
     };
     if !(args.is_empty() && keywords.is_empty()) {
         return;
     }
 
-    let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() else {
+    let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() else {
         return;
     };
     if attr != "keys" {
         return;
     }
 
+    // Ignore `self.keys()`, which will almost certainly be intentional, as in:
+    // ```python
+    // def __contains__(self, key: object) -> bool:
+    //     return key in self.keys()
+    // ```
+    if value
+        .as_name_expr()
+        .is_some_and(|name| matches!(name.id.as_str(), "self"))
+    {
+        return;
+    }
+
     // Slice exact content to preserve formatting.
-    let left_content = checker.locator.slice(left.range());
-    let value_content =
-        match get_value_content_for_key_in_dict(checker.locator, checker.stylist, right) {
-            Ok(value_content) => value_content,
-            Err(err) => {
-                error!("Failed to get value content for key in dict: {}", err);
-                return;
-            }
-        };
+    let left_content = checker.locator().slice(left.range());
+    let Ok(value_content) =
+        value_content_for_key_in_dict(checker.locator(), checker.stylist(), right)
+    else {
+        return;
+    };
 
     let mut diagnostic = Diagnostic::new(
         InDictKeys {
             key: left_content.to_string(),
-            dict: value_content.clone(),
+            dict: value_content.to_string(),
+            operator: operator.as_str().to_string(),
         },
         range,
     );
@@ -119,6 +131,7 @@ pub(crate) fn key_in_dict_for(checker: &mut Checker, target: &Expr, iter: &Expr)
         checker,
         target,
         iter,
+        CmpOp::In,
         TextRange::new(target.start(), iter.end()),
     );
 }
@@ -131,14 +144,29 @@ pub(crate) fn key_in_dict_compare(
     ops: &[CmpOp],
     comparators: &[Expr],
 ) {
-    if !matches!(ops[..], [CmpOp::In]) {
+    let [op] = ops else {
+        return;
+    };
+
+    if !matches!(op, CmpOp::In | CmpOp::NotIn) {
         return;
     }
 
-    if comparators.len() != 1 {
+    let [right] = comparators else {
         return;
-    }
-    let right = comparators.first().unwrap();
+    };
 
-    key_in_dict(checker, left, right, expr.range());
+    key_in_dict(checker, left, right, *op, expr.range());
+}
+
+fn value_content_for_key_in_dict(
+    locator: &Locator,
+    stylist: &Stylist,
+    expr: &Expr,
+) -> Result<String> {
+    let content = locator.slice(expr.range());
+    let mut expression = match_expression(content)?;
+    let call = match_call_mut(&mut expression)?;
+    let attribute = match_attribute(&mut call.func)?;
+    Ok(attribute.value.codegen_stylist(stylist))
 }

@@ -7,7 +7,7 @@ use itertools::Itertools;
 use serde::Serialize;
 use strum::IntoEnumIterator;
 
-use ruff::registry::{Linter, RuleNamespace, UpstreamCategory};
+use ruff::registry::{Linter, RuleNamespace};
 
 use crate::args::HelpFormat;
 
@@ -37,7 +37,7 @@ pub(crate) fn linter(format: HelpFormat) -> Result<()> {
                         .upstream_categories()
                         .unwrap()
                         .iter()
-                        .map(|UpstreamCategory(prefix, ..)| prefix.short_code())
+                        .map(|c| c.prefix)
                         .join("/"),
                     prefix => prefix.to_string(),
                 };
@@ -52,9 +52,9 @@ pub(crate) fn linter(format: HelpFormat) -> Result<()> {
                     name: linter_info.name(),
                     categories: linter_info.upstream_categories().map(|cats| {
                         cats.iter()
-                            .map(|UpstreamCategory(prefix, name)| LinterCategoryInfo {
-                                prefix: prefix.short_code(),
-                                name,
+                            .map(|c| LinterCategoryInfo {
+                                prefix: c.prefix,
+                                name: c.category,
                             })
                             .collect()
                     }),

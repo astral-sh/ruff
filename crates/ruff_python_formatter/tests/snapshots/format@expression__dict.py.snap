@@ -32,7 +32,7 @@ b
 }
 
 {
-    **a # comment before preceeding node's comma
+    **a # comment before preceding node's comma
  ,
     # before
     ** # between
@@ -62,14 +62,16 @@ a = {
     # comment
     3: True,
 }
+
+x={  # dangling end of line comment
+}
 ```
 
 ## Output
 ```py
 # before
-{
-    # open
-    key: value,  # key  # colon  # value
+{  # open
+    key: value  # key  # colon  # value
 }  # close
 # after
 
@@ -82,7 +84,7 @@ a = {
 }
 
 {
-    **b,  # middle with single item
+    **b  # middle with single item
 }
 
 {
@@ -91,7 +93,7 @@ a = {
 }
 
 {
-    **a,  # comment before preceeding node's comma
+    **a,  # comment before preceding node's comma
     # before
     **b,  # between
 }
@@ -126,6 +128,8 @@ a = {
     # comment
     3: True,
 }
+
+x = {}  # dangling end of line comment
 ```
 
 

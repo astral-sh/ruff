@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, Keyword, Ranged};
+use ruff_python_ast::{Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
@@ -49,7 +49,9 @@ pub(crate) fn unnecessary_generator_list(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    let Some(argument) = helpers::exactly_one_argument_with_matching_function("list", func, args, keywords) else {
+    let Some(argument) =
+        helpers::exactly_one_argument_with_matching_function("list", func, args, keywords)
+    else {
         return;
     };
     if !checker.semantic().is_builtin("list") {
@@ -60,7 +62,7 @@ pub(crate) fn unnecessary_generator_list(
         if checker.patch(diagnostic.kind.rule()) {
             #[allow(deprecated)]
             diagnostic.try_set_fix_from_edit(|| {
-                fixes::fix_unnecessary_generator_list(checker.locator, checker.stylist, expr)
+                fixes::fix_unnecessary_generator_list(checker.locator(), checker.stylist(), expr)
             });
         }
         checker.diagnostics.push(diagnostic);

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, ExceptHandler, MatchCase, Stmt};
+use ruff_python_ast::{self as ast, ExceptHandler, MatchCase, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -53,8 +53,15 @@ impl Violation for UselessElseOnLoop {
 
 fn loop_exits_early(body: &[Stmt]) -> bool {
     body.iter().any(|stmt| match stmt {
-        Stmt::If(ast::StmtIf { body, orelse, .. }) => {
-            loop_exits_early(body) || loop_exits_early(orelse)
+        Stmt::If(ast::StmtIf {
+            body,
+            elif_else_clauses,
+            ..
+        }) => {
+            loop_exits_early(body)
+                || elif_else_clauses
+                    .iter()
+                    .any(|clause| loop_exits_early(&clause.body))
         }
         Stmt::With(ast::StmtWith { body, .. })
         | Stmt::AsyncWith(ast::StmtAsyncWith { body, .. }) => loop_exits_early(body),
@@ -102,7 +109,7 @@ pub(crate) fn useless_else_on_loop(
     if !orelse.is_empty() && !loop_exits_early(body) {
         checker.diagnostics.push(Diagnostic::new(
             UselessElseOnLoop,
-            identifier::else_(stmt, checker.locator).unwrap(),
+            identifier::else_(stmt, checker.locator().contents()).unwrap(),
         ));
     }
 }

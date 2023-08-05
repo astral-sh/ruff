@@ -80,15 +80,15 @@ If it doesn't, we get something like
 ```
 
 For a list of expression, you don't need to format it manually but can use the `JoinBuilder` util,
-accessible through `.join_with`. Finish will write to the formatter internally.
+accessible through `.join_comma_separated`. Finish will write to the formatter internally.
 
 ```rust
-f.join_with(&format_args!(text(","), soft_line_break_or_space()))
-    .entries(self.elts.iter().formatted())
-    .finish()?;
-// Here we need a trailing comma on the last entry of an expanded group since we have more
-// than one element
-write!(f, [if_group_breaks(&text(","))])
+f.join_comma_separated(item.end())
+    .nodes(elts.iter())
+    .finish()
+// Here we have a builder that separates each element by a `,` and a [`soft_line_break_or_space`].
+// It emits a trailing `,` that is only shown if the enclosing group expands. It forces the enclosing
+// group to expand if the last item has a trailing `comma` and the magical comma option is enabled.
 ```
 
 If you need avoid second mutable borrows with a builder, you can use `format_with(|f| { ... })` as
@@ -231,6 +231,14 @@ additional test cases in `resources/test/fixtures/ruff`.
 
 The full Ruff test suite is slow, `cargo test -p ruff_python_formatter` is a lot faster.
 
+You can check the black compatibility on a number of projects using
+`scripts/formatter_ecosystem_checks.sh`. It will print the similarity index, the percentage of lines
+that remains unchanged between black's formatting and our formatting. You could compute it as the
+number of neutral lines in a diff divided by the neutral plus the removed lines. It also checks for
+common problems such unstable formatting, internal formatter errors and printing invalid syntax. We
+run this script in CI and you can view the results in a PR page under "Checks" > "CI" > "Summary" at
+the bottom of the page.
+
 There is a `ruff_python_formatter` binary that avoid building and linking the main `ruff` crate.
 
 You can use `scratch.py` as a playground, e.g.
@@ -239,7 +247,68 @@ and `--print-comments` options.
 
 The origin of Ruff's formatter is the [Rome formatter](https://github.com/rome/tools/tree/main/crates/rome_json_formatter),
 e.g. the ruff_formatter crate is forked from the [rome_formatter crate](https://github.com/rome/tools/tree/main/crates/rome_formatter).
-The Rome repository can be a helpful reference when implementing something in the Ruff formatter
+The Rome repository can be a helpful reference when implementing something in the Ruff formatter.
+
+### Checking entire projects
+
+It's possible to format an entire project:
+
+```shell
+cargo run --bin ruff_dev -- format-dev --write my_project
+```
+
+This will format all files that `ruff check` would lint and computes the similarity index, the
+fraction of changed lines. The similarity index is 1 if there were no changes at all, while 0 means
+we changed every single line. If you run this on a black formatted projects, this tells you how
+similar the ruff formatter is to black for the given project, with our goal being as close to 1 as
+possible.
+
+There are three common problems with the formatter: The second formatting pass looks different than
+the first (formatter instability or lack of idempotency), we print invalid syntax (e.g. missing
+parentheses around multiline expressions) and panics (mostly in debug assertions). We test for all
+of these using the `--stability-check` option in the `format-dev` subcommand:
+
+The easiest is to check CPython:
+
+```shell
+git clone --branch 3.10 https://github.com/python/cpython.git crates/ruff/resources/test/cpython
+cargo run --bin ruff_dev -- format-dev --stability-check crates/ruff/resources/test/cpython
+```
+
+Compared to `ruff check`, `cargo run --bin ruff_dev -- format-dev` has 4 additional options:
+
+- `--write`: Format the files and write them back to disk
+- `--stability-check`: Format twice (but don't write to disk) and check for differences and crashes
+- `--multi-project`: Treat every subdirectory as a separate project. Useful for ecosystem checks.
+- `--error-file`: Use together with `--multi-project`, this writes all errors (but not status
+    messages) to a file.
+
+It is also possible to check a large number of repositories. This dataset is large (~60GB), so we
+only do this occasionally:
+
+```shell
+# Get the list of projects
+curl https://raw.githubusercontent.com/akx/ruff-usage-aggregate/master/data/known-github-tomls-clean.jsonl > github_search.jsonl
+# Repurpose this script to download the repositories for us
+python scripts/check_ecosystem.py --checkouts target/checkouts --projects github_search.jsonl -v $(which true) $(which true)
+# Check each project for formatter stability
+cargo run --bin ruff_dev -- format-dev --stability-check --error-file target/formatter-ecosystem-errors.txt --multi-project target/checkouts
+```
+
+To shrink a formatter error from an entire file to a minimal reproducible example, you can use
+`ruff_shrinking`:
+
+```shell
+cargo run --bin ruff_shrinking -- <your_file> target/shrinking.py "Unstable formatting" "target/release/ruff_dev format-dev --stability-check target/shrinking.py"
+```
+
+The first argument is the input file, the second is the output file where the candidates
+and the eventual minimized version will be written to. The third argument is a regex matching the
+error message, e.g. "Unstable formatting" or "Formatter error". The last argument is the command
+with the error, e.g. running the stability check on the candidate file. The script will try various
+strategies to remove parts of the code. If the output of the command still matches, it will use that
+slightly smaller code as starting point for the next iteration, otherwise it will revert and try
+a different strategy until all strategies are exhausted.
 
 ## The orphan rules and trait structure
 

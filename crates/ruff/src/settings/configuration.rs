@@ -20,7 +20,7 @@ use crate::rules::{
     flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
     flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
-    pycodestyle, pydocstyle, pyflakes, pylint,
+    pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
 };
 use crate::settings::options::Options;
 use crate::settings::types::{
@@ -59,13 +59,14 @@ pub struct Configuration {
     pub ignore_init_module_imports: Option<bool>,
     pub include: Option<Vec<FilePattern>>,
     pub line_length: Option<LineLength>,
-    pub tab_size: Option<TabSize>,
+    pub logger_objects: Option<Vec<String>>,
     pub namespace_packages: Option<Vec<PathBuf>>,
     pub required_version: Option<Version>,
     pub respect_gitignore: Option<bool>,
     pub show_fixes: Option<bool>,
     pub show_source: Option<bool>,
     pub src: Option<Vec<PathBuf>>,
+    pub tab_size: Option<TabSize>,
     pub target_version: Option<PythonVersion>,
     pub task_tags: Option<Vec<String>>,
     pub typing_modules: Option<Vec<String>>,
@@ -93,6 +94,7 @@ pub struct Configuration {
     pub pydocstyle: Option<pydocstyle::settings::Options>,
     pub pyflakes: Option<pyflakes::settings::Options>,
     pub pylint: Option<pylint::settings::Options>,
+    pub pyupgrade: Option<pyupgrade::settings::Options>,
 }
 
 impl Configuration {
@@ -222,6 +224,7 @@ impl Configuration {
                 .transpose()?,
             target_version: options.target_version,
             task_tags: options.task_tags,
+            logger_objects: options.logger_objects,
             typing_modules: options.typing_modules,
             // Plugins
             flake8_annotations: options.flake8_annotations,
@@ -247,6 +250,7 @@ impl Configuration {
             pydocstyle: options.pydocstyle,
             pyflakes: options.pyflakes,
             pylint: options.pylint,
+            pyupgrade: options.pyupgrade,
         })
     }
 
@@ -256,7 +260,7 @@ impl Configuration {
             rule_selections: config
                 .rule_selections
                 .into_iter()
-                .chain(self.rule_selections.into_iter())
+                .chain(self.rule_selections)
                 .collect(),
             allowed_confusables: self.allowed_confusables.or(config.allowed_confusables),
             builtins: self.builtins.or(config.builtins),
@@ -267,17 +271,17 @@ impl Configuration {
             extend_exclude: config
                 .extend_exclude
                 .into_iter()
-                .chain(self.extend_exclude.into_iter())
+                .chain(self.extend_exclude)
                 .collect(),
             extend_include: config
                 .extend_include
                 .into_iter()
-                .chain(self.extend_include.into_iter())
+                .chain(self.extend_include)
                 .collect(),
             extend_per_file_ignores: config
                 .extend_per_file_ignores
                 .into_iter()
-                .chain(self.extend_per_file_ignores.into_iter())
+                .chain(self.extend_per_file_ignores)
                 .collect(),
             external: self.external.or(config.external),
             fix: self.fix.or(config.fix),
@@ -289,6 +293,7 @@ impl Configuration {
                 .ignore_init_module_imports
                 .or(config.ignore_init_module_imports),
             line_length: self.line_length.or(config.line_length),
+            logger_objects: self.logger_objects.or(config.logger_objects),
             tab_size: self.tab_size.or(config.tab_size),
             namespace_packages: self.namespace_packages.or(config.namespace_packages),
             per_file_ignores: self.per_file_ignores.or(config.per_file_ignores),
@@ -334,6 +339,7 @@ impl Configuration {
             pydocstyle: self.pydocstyle.combine(config.pydocstyle),
             pyflakes: self.pyflakes.combine(config.pyflakes),
             pylint: self.pylint.combine(config.pylint),
+            pyupgrade: self.pyupgrade.combine(config.pyupgrade),
         }
     }
 }

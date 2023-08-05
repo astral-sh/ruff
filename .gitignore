@@ -1,8 +1,7 @@
 # Benchmarking cpython (CONTRIBUTING.md)
 crates/ruff/resources/test/cpython
 # generate_mkdocs.py
-mkdocs.yml
-.overrides
+mkdocs.generated.yml
 # check_ecosystem.py
 ruff-old
 github_search*.jsonl
@@ -11,7 +10,7 @@ schemastore
 # `maturin develop` and ecosystem_all_check.sh
 .venv*
 # Formatter debugging (crates/ruff_python_formatter/README.md)
-scratch.py
+scratch.*
 # Created by `perf` (CONTRIBUTING.md)
 perf.data
 perf.data.old

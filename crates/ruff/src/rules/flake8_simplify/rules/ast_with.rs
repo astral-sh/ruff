@@ -1,12 +1,12 @@
 use log::error;
+use ruff_python_ast::{self as ast, Ranged, Stmt, WithItem};
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Ranged, Stmt, WithItem};
 
 use ruff_diagnostics::{AutofixKind, Violation};
 use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{first_colon_range, has_comments_in};
-use ruff_python_whitespace::UniversalNewlines;
+use ruff_python_parser::first_colon_range;
+use ruff_source_file::UniversalNewlines;
 
 use crate::checkers::ast::Checker;
 use crate::line_width::LineWidth;
@@ -118,7 +118,8 @@ pub(crate) fn multiple_with_statements(
                     .map_or(last_item.context_expr.end(), |v| v.end()),
                 body.first().expect("Expected body to be non-empty").start(),
             ),
-            checker.locator,
+            checker.locator().contents(),
+            checker.source_type.is_jupyter(),
         );
 
         let mut diagnostic = Diagnostic::new(
@@ -129,13 +130,14 @@ pub(crate) fn multiple_with_statements(
             ),
         );
         if checker.patch(diagnostic.kind.rule()) {
-            if !has_comments_in(
-                TextRange::new(with_stmt.start(), with_body[0].start()),
-                checker.locator,
-            ) {
+            if !checker
+                .indexer()
+                .comment_ranges()
+                .intersects(TextRange::new(with_stmt.start(), with_body[0].start()))
+            {
                 match fix_with::fix_multiple_with_statements(
-                    checker.locator,
-                    checker.stylist,
+                    checker.locator(),
+                    checker.stylist(),
                     with_stmt,
                 ) {
                     Ok(edit) => {

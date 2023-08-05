@@ -584,4 +584,22 @@ F841_3.py:139:17: F841 Local variable `x` is assigned to but never used
     |
     = help: Remove assignment to unused variable `x`
 
+F841_3.py:155:17: F841 [*] Local variable `e` is assigned to but never used
+    |
+153 |     try:
+154 |         print("hello")
+155 |     except A as e :
+    |                 ^ F841
+156 |         print("oh no!")
+    |
+    = help: Remove assignment to unused variable `e`
+
+ℹ Fix
+152 152 | def f() -> None:
+153 153 |     try:
+154 154 |         print("hello")
+155     |-    except A as e :
+    155 |+    except A:
+156 156 |         print("oh no!")
+
 

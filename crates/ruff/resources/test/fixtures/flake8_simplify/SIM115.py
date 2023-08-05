@@ -1,7 +1,15 @@
 import contextlib
+import pathlib
+import pathlib as pl
+from pathlib import Path
+from pathlib import Path as P
 
 # SIM115
 f = open("foo.txt")
+f = Path("foo.txt").open()
+f = pathlib.Path("foo.txt").open()
+f = pl.Path("foo.txt").open()
+f = P("foo.txt").open()
 data = f.read()
 f.close()
 

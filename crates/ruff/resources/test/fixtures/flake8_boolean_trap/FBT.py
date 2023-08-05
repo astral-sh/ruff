@@ -67,7 +67,8 @@ cfg.getboolean("hello", True)
 os.set_blocking(0, False)
 g_action.set_enabled(True)
 settings.set_enable_developer_extras(True)
-
+foo.is_(True)
+bar.is_not(False)
 
 class Registry:
     def __init__(self) -> None:

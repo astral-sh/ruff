@@ -81,7 +81,7 @@ fn find_site_packages_path(
         if let Some(preferred_dir) = candidate_dirs.iter().find(|dir| {
             dir.file_name()
                 .and_then(OsStr::to_str)
-                .map_or(false, |name| name == python_version.dir())
+                .is_some_and(|name| name == python_version.dir())
         }) {
             debug!("Found path `{}`", preferred_dir.display());
             return Some(preferred_dir.join(SITE_PACKAGES));
@@ -235,7 +235,7 @@ fn build_typeshed_third_party_package_map(
                     if inner_entry
                         .path()
                         .extension()
-                        .map_or(false, |extension| extension == "pyi")
+                        .is_some_and(|extension| extension == "pyi")
                     {
                         if let Some(stripped_file_name) = inner_entry
                             .path()

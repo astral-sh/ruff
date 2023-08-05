@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -54,8 +54,17 @@ fn traverse_body(checker: &mut Checker, body: &[Stmt]) {
         }
 
         match stmt {
-            Stmt::If(ast::StmtIf { body, orelse, .. })
-            | Stmt::Try(ast::StmtTry { body, orelse, .. })
+            Stmt::If(ast::StmtIf {
+                body,
+                elif_else_clauses,
+                ..
+            }) => {
+                traverse_body(checker, body);
+                for clause in elif_else_clauses {
+                    traverse_body(checker, &clause.body);
+                }
+            }
+            Stmt::Try(ast::StmtTry { body, orelse, .. })
             | Stmt::TryStar(ast::StmtTryStar { body, orelse, .. }) => {
                 traverse_body(checker, body);
                 traverse_body(checker, orelse);

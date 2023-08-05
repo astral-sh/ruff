@@ -1,14 +1,16 @@
-use crate::comments::{trailing_comments, Comments};
-use crate::expression::parentheses::{
-    default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
-};
-use crate::trivia::{SimpleTokenizer, TokenKind};
-use crate::{AsFormat, FormatNodeRule, PyFormatter};
+use ruff_python_ast::UnaryOp;
+use ruff_python_ast::{ExprUnaryOp, Ranged};
+use ruff_text_size::{TextLen, TextRange};
+
 use ruff_formatter::prelude::{hard_line_break, space, text};
 use ruff_formatter::{Format, FormatContext, FormatResult};
-use ruff_text_size::{TextLen, TextRange};
-use rustpython_parser::ast::UnaryOp;
-use rustpython_parser::ast::{ExprUnaryOp, Ranged};
+use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
+
+use crate::comments::trailing_comments;
+use crate::context::PyFormatContext;
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
+use crate::{AsFormat, FormatNodeRule, PyFormatter};
 
 #[derive(Default)]
 pub struct FormatExprUnaryOp;
@@ -69,20 +71,14 @@ impl FormatNodeRule<ExprUnaryOp> for FormatExprUnaryOp {
 impl NeedsParentheses for ExprUnaryOp {
     fn needs_parentheses(
         &self,
-        parenthesize: Parenthesize,
-        source: &str,
-        comments: &Comments,
-    ) -> Parentheses {
-        match default_expression_needs_parentheses(self.into(), parenthesize, source, comments) {
-            Parentheses::Optional => {
-                // We preserve the parentheses of the operand. It should not be necessary to break this expression.
-                if is_operand_parenthesized(self, source) {
-                    Parentheses::Never
-                } else {
-                    Parentheses::Optional
-                }
-            }
-            parentheses => parentheses,
+        _parent: AnyNodeRef,
+        context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        // We preserve the parentheses of the operand. It should not be necessary to break this expression.
+        if is_operand_parenthesized(self, context.source()) {
+            OptionalParentheses::Never
+        } else {
+            OptionalParentheses::Multiline
         }
     }
 }
@@ -101,7 +97,7 @@ fn is_operand_parenthesized(unary: &ExprUnaryOp, source: &str) -> bool {
         .skip_trivia()
         .next()
     {
-        debug_assert_eq!(token.kind(), TokenKind::LParen);
+        debug_assert_eq!(token.kind(), SimpleTokenKind::LParen);
         true
     } else {
         false

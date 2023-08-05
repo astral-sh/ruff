@@ -1,5 +1,5 @@
+use ruff_python_ast::{self as ast, Expr, ExprContext, Ranged, Stmt};
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{self, Expr, ExprContext, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -99,11 +99,10 @@ impl<'a> StatementVisitor<'a> for YieldFromVisitor<'a> {
                     return;
                 }
                 // If there's any logic besides a yield, don't rewrite.
-                if body.len() != 1 {
+                let [body] = body.as_slice() else {
                     return;
-                }
+                };
                 // If the body is not a yield, don't rewrite.
-                let body = &body[0];
                 if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = &body {
                     if let Expr::Yield(ast::ExprYield {
                         value: Some(value),
@@ -188,7 +187,7 @@ pub(crate) fn yield_in_for_loop(checker: &mut Checker, stmt: &Stmt) {
 
             let mut diagnostic = Diagnostic::new(YieldInForLoop, item.stmt.range());
             if checker.patch(diagnostic.kind.rule()) {
-                let contents = checker.locator.slice(item.iter.range());
+                let contents = checker.locator().slice(item.iter.range());
                 let contents = format!("yield from {contents}");
                 diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                     contents,

@@ -26,7 +26,7 @@ b
 }
 
 {
-    **a # comment before preceeding node's comma
+    **a # comment before preceding node's comma
  ,
     # before
     ** # between
@@ -55,4 +55,7 @@ a = {
     1: (2),
     # comment
     3: True,
+}
+
+x={  # dangling end of line comment
 }

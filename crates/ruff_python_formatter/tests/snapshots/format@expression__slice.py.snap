@@ -76,16 +76,27 @@ def a():
 e00 = "e"[:]
 e01 = "e"[:1]
 e02 = "e"[: a()]
+e03 = "e"[:-1]
 e10 = "e"[1:]
 e11 = "e"[1:1]
 e12 = "e"[1 : a()]
+e13 = "e"[1:-1]
 e20 = "e"[a() :]
 e21 = "e"[a() : 1]
 e22 = "e"[a() : a()]
+e23 = "e"[a() : -1]
 e200 = "e"[a() :: ]
 e201 = "e"[a() :: 1]
 e202 = "e"[a() :: a()]
 e210 = "e"[a() : 1 :]
+
+# Regression test for https://github.com/astral-sh/ruff/issues/5605
+f = "f"[:,]
+
+# Regression test for https://github.com/astral-sh/ruff/issues/5733
+g1 = "g"[(1):(2)]
+g2 = "g"[(1):(2):(3)]
+
 ```
 
 ## Output
@@ -159,17 +170,27 @@ def a():
 
 e00 = "e"[:]
 e01 = "e"[:1]
-e02 = "e"[ : a()]
+e02 = "e"[: a()]
+e03 = "e"[:-1]
 e10 = "e"[1:]
 e11 = "e"[1:1]
 e12 = "e"[1 : a()]
+e13 = "e"[1:-1]
 e20 = "e"[a() :]
 e21 = "e"[a() : 1]
 e22 = "e"[a() : a()]
+e23 = "e"[a() : -1]
 e200 = "e"[a() : :]
 e201 = "e"[a() :: 1]
 e202 = "e"[a() :: a()]
 e210 = "e"[a() : 1 :]
+
+# Regression test for https://github.com/astral-sh/ruff/issues/5605
+f = "f"[:,]
+
+# Regression test for https://github.com/astral-sh/ruff/issues/5733
+g1 = "g"[(1):(2)]
+g2 = "g"[(1):(2):(3)]
 ```
 
 

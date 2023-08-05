@@ -40,6 +40,7 @@ defaults.py:6:8: ICN001 `pandas` should be imported as `pd`
 6 | import pandas  # unconventional
   |        ^^^^^^ ICN001
 7 | import seaborn  # unconventional
+8 | import tkinter  # unconventional
   |
   = help: Alias `pandas` to `pd`
 
@@ -49,62 +50,83 @@ defaults.py:7:8: ICN001 `seaborn` should be imported as `sns`
 6 | import pandas  # unconventional
 7 | import seaborn  # unconventional
   |        ^^^^^^^ ICN001
-8 | 
-9 | import altair as altr  # unconventional
+8 | import tkinter  # unconventional
   |
   = help: Alias `seaborn` to `sns`
 
-defaults.py:9:18: ICN001 `altair` should be imported as `alt`
+defaults.py:8:8: ICN001 `tkinter` should be imported as `tk`
    |
+ 6 | import pandas  # unconventional
  7 | import seaborn  # unconventional
- 8 | 
- 9 | import altair as altr  # unconventional
+ 8 | import tkinter  # unconventional
+   |        ^^^^^^^ ICN001
+ 9 | 
+10 | import altair as altr  # unconventional
+   |
+   = help: Alias `tkinter` to `tk`
+
+defaults.py:10:18: ICN001 `altair` should be imported as `alt`
+   |
+ 8 | import tkinter  # unconventional
+ 9 | 
+10 | import altair as altr  # unconventional
    |                  ^^^^ ICN001
-10 | import matplotlib.pyplot as plot  # unconventional
-11 | import numpy as nmp  # unconventional
+11 | import matplotlib.pyplot as plot  # unconventional
+12 | import numpy as nmp  # unconventional
    |
    = help: Alias `altair` to `alt`
 
-defaults.py:10:29: ICN001 `matplotlib.pyplot` should be imported as `plt`
+defaults.py:11:29: ICN001 `matplotlib.pyplot` should be imported as `plt`
    |
- 9 | import altair as altr  # unconventional
-10 | import matplotlib.pyplot as plot  # unconventional
+10 | import altair as altr  # unconventional
+11 | import matplotlib.pyplot as plot  # unconventional
    |                             ^^^^ ICN001
-11 | import numpy as nmp  # unconventional
-12 | import pandas as pdas  # unconventional
+12 | import numpy as nmp  # unconventional
+13 | import pandas as pdas  # unconventional
    |
    = help: Alias `matplotlib.pyplot` to `plt`
 
-defaults.py:11:17: ICN001 `numpy` should be imported as `np`
+defaults.py:12:17: ICN001 `numpy` should be imported as `np`
    |
- 9 | import altair as altr  # unconventional
-10 | import matplotlib.pyplot as plot  # unconventional
-11 | import numpy as nmp  # unconventional
+10 | import altair as altr  # unconventional
+11 | import matplotlib.pyplot as plot  # unconventional
+12 | import numpy as nmp  # unconventional
    |                 ^^^ ICN001
-12 | import pandas as pdas  # unconventional
-13 | import seaborn as sbrn  # unconventional
+13 | import pandas as pdas  # unconventional
+14 | import seaborn as sbrn  # unconventional
    |
    = help: Alias `numpy` to `np`
 
-defaults.py:12:18: ICN001 `pandas` should be imported as `pd`
+defaults.py:13:18: ICN001 `pandas` should be imported as `pd`
    |
-10 | import matplotlib.pyplot as plot  # unconventional
-11 | import numpy as nmp  # unconventional
-12 | import pandas as pdas  # unconventional
+11 | import matplotlib.pyplot as plot  # unconventional
+12 | import numpy as nmp  # unconventional
+13 | import pandas as pdas  # unconventional
    |                  ^^^^ ICN001
-13 | import seaborn as sbrn  # unconventional
+14 | import seaborn as sbrn  # unconventional
+15 | import tkinter as tkr  # unconventional
    |
    = help: Alias `pandas` to `pd`
 
-defaults.py:13:19: ICN001 `seaborn` should be imported as `sns`
+defaults.py:14:19: ICN001 `seaborn` should be imported as `sns`
    |
-11 | import numpy as nmp  # unconventional
-12 | import pandas as pdas  # unconventional
-13 | import seaborn as sbrn  # unconventional
+12 | import numpy as nmp  # unconventional
+13 | import pandas as pdas  # unconventional
+14 | import seaborn as sbrn  # unconventional
    |                   ^^^^ ICN001
-14 | 
-15 | import altair as alt  # conventional
+15 | import tkinter as tkr  # unconventional
    |
    = help: Alias `seaborn` to `sns`
+
+defaults.py:15:19: ICN001 `tkinter` should be imported as `tk`
+   |
+13 | import pandas as pdas  # unconventional
+14 | import seaborn as sbrn  # unconventional
+15 | import tkinter as tkr  # unconventional
+   |                   ^^^ ICN001
+16 | 
+17 | import altair as alt  # conventional
+   |
+   = help: Alias `tkinter` to `tk`
 
 

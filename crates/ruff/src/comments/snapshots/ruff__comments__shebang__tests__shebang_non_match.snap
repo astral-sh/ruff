@@ -1,0 +1,5 @@
+---
+source: crates/ruff/src/comments/shebang.rs
+expression: "ShebangDirective::try_extract(source)"
+---
+None

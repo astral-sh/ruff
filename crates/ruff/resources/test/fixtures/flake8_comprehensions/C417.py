@@ -25,10 +25,15 @@ map(lambda x=2, y=1: x + y, nums, nums)
 set(map(lambda x, y: x, nums, nums))
 
 
-def myfunc(arg1: int, arg2: int = 4):
+def func(arg1: int, arg2: int = 4):
     return 2 * arg1 + arg2
 
 
-list(map(myfunc, nums))
+# Non-error: `func` is not a lambda.
+list(map(func, nums))
 
-[x for x in nums]
+# False positive: need to preserve the late-binding of `x` in the inner lambda.
+map(lambda x: lambda: x, range(4))
+
+# Error: the `x` is overridden by the inner lambda.
+map(lambda x: lambda x: x, range(4))

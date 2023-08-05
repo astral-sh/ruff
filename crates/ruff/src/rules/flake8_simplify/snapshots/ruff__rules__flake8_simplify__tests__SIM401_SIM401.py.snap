@@ -114,7 +114,7 @@ SIM401.py:36:1: SIM401 [*] Use `vars[idx] = a_dict.get(key, "defaultß9💣2ℝ6
 39 | |     vars[idx] = "defaultß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789"
    | |___________________________________________________________________________^ SIM401
 40 |   
-41 |   ###
+41 |   # SIM401
    |
    = help: Replace with `vars[idx] = a_dict.get(key, "defaultß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789")`
 
@@ -128,7 +128,35 @@ SIM401.py:36:1: SIM401 [*] Use `vars[idx] = a_dict.get(key, "defaultß9💣2ℝ6
 39    |-    vars[idx] = "defaultß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789"
    36 |+vars[idx] = a_dict.get(key, "defaultß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789")
 40 37 | 
-41 38 | ###
-42 39 | # Negative cases
+41 38 | # SIM401
+42 39 | if foo():
+
+SIM401.py:45:5: SIM401 [*] Use `vars[idx] = a_dict.get(key, "default")` instead of an `if` block
+   |
+43 |       pass
+44 |   else:
+45 |       if key in a_dict:
+   |  _____^
+46 | |         vars[idx] = a_dict[key]
+47 | |     else:
+48 | |         vars[idx] = "default"
+   | |_____________________________^ SIM401
+49 |   
+50 |   ###
+   |
+   = help: Replace with `vars[idx] = a_dict.get(key, "default")`
+
+ℹ Suggested fix
+42 42 | if foo():
+43 43 |     pass
+44 44 | else:
+45    |-    if key in a_dict:
+46    |-        vars[idx] = a_dict[key]
+47    |-    else:
+48    |-        vars[idx] = "default"
+   45 |+    vars[idx] = a_dict.get(key, "default")
+49 46 | 
+50 47 | ###
+51 48 | # Negative cases
 
 

@@ -2,10 +2,10 @@
 use std::convert::TryFrom;
 use std::str::FromStr;
 
-use rustc_hash::FxHashSet;
-use rustpython_format::cformat::{
+use ruff_python_literal::cformat::{
     CFormatError, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatSpec, CFormatString,
 };
+use rustc_hash::FxHashSet;
 
 pub(crate) struct CFormatSummary {
     pub(crate) starred: bool,
@@ -25,8 +25,8 @@ impl From<&CFormatString> for CFormatSummary {
                 ref min_field_width,
                 ref precision,
                 ..
-            }) = format_part.1 else
-            {
+            }) = format_part.1
+            else {
                 continue;
             };
             match mapping_key {

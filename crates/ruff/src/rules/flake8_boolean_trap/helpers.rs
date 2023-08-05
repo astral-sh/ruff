@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Constant, Expr, Ranged};
+use ruff_python_ast::{self as ast, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 
@@ -28,6 +28,8 @@ pub(super) fn is_allowed_func_call(name: &str) -> bool {
             | "index"
             | "insert"
             | "int"
+            | "is_"
+            | "is_not"
             | "param"
             | "pop"
             | "remove"

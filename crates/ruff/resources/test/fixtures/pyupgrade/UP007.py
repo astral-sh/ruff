@@ -27,6 +27,14 @@ def f(x: typing.Union[(str, int), float]) -> None:
     ...
 
 
+def f(x: typing.Union[(int,)]) -> None:
+    ...
+
+
+def f(x: typing.Union[()]) -> None:
+    ...
+
+
 def f(x: "Union[str, int, Union[float, bytes]]") -> None:
     ...
 

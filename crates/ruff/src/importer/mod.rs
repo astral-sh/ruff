@@ -7,14 +7,15 @@ use std::error::Error;
 
 use anyhow::Result;
 use libcst_native::{ImportAlias, Name, NameOrAttribute};
+use ruff_python_ast::{self as ast, PySourceType, Ranged, Stmt, Suite};
 use ruff_text_size::TextSize;
-use rustpython_parser::ast::{self, Ranged, Stmt, Suite};
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::imports::{AnyImport, Import, ImportFrom};
-use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python_codegen::Stylist;
 use ruff_python_semantic::SemanticModel;
-use ruff_textwrap::indent;
+use ruff_python_trivia::textwrap::indent;
+use ruff_source_file::Locator;
 
 use crate::autofix;
 use crate::autofix::codemods::CodegenStylist;
@@ -120,6 +121,7 @@ impl<'a> Importer<'a> {
         import: &StmtImports,
         at: TextSize,
         semantic: &SemanticModel,
+        source_type: PySourceType,
     ) -> Result<TypingImportEdit> {
         // Generate the modified import statement.
         let content = autofix::codemods::retain_imports(
@@ -139,7 +141,7 @@ impl<'a> Importer<'a> {
         // Add the import to a `TYPE_CHECKING` block.
         let add_import_edit = if let Some(block) = self.preceding_type_checking_block(at) {
             // Add the import to the `TYPE_CHECKING` block.
-            self.add_to_type_checking_block(&content, block.start())
+            self.add_to_type_checking_block(&content, block.start(), source_type)
         } else {
             // Add the import to a new `TYPE_CHECKING` block.
             self.add_type_checking_block(
@@ -304,7 +306,7 @@ impl<'a> Importer<'a> {
             }) = stmt
             {
                 if level.map_or(true, |level| level.to_u32() == 0)
-                    && name.as_ref().map_or(false, |name| name == module)
+                    && name.as_ref().is_some_and(|name| name == module)
                 {
                     import_from = Some(*stmt);
                 }
@@ -352,8 +354,13 @@ impl<'a> Importer<'a> {
     }
 
     /// Add an import statement to an existing `TYPE_CHECKING` block.
-    fn add_to_type_checking_block(&self, content: &str, at: TextSize) -> Edit {
-        Insertion::start_of_block(at, self.locator, self.stylist).into_edit(content)
+    fn add_to_type_checking_block(
+        &self,
+        content: &str,
+        at: TextSize,
+        source_type: PySourceType,
+    ) -> Edit {
+        Insertion::start_of_block(at, self.locator, self.stylist, source_type).into_edit(content)
     }
 
     /// Return the import statement that precedes the given position, if any.

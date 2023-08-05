@@ -1,13 +1,16 @@
-use crate::comments::{dangling_node_comments, leading_comments, Comments};
+use ruff_formatter::{format_args, write};
+use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::Ranged;
+use ruff_python_ast::{Expr, ExprDict};
+use ruff_text_size::TextRange;
+
+use crate::builders::empty_parenthesized_with_dangling_comments;
+use crate::comments::leading_comments;
 use crate::expression::parentheses::{
-    default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
+    parenthesized_with_dangling_comments, NeedsParentheses, OptionalParentheses,
 };
 use crate::prelude::*;
 use crate::FormatNodeRule;
-use ruff_formatter::{format_args, write};
-use ruff_text_size::TextRange;
-use rustpython_parser::ast::Ranged;
-use rustpython_parser::ast::{Expr, ExprDict};
 
 #[derive(Default)]
 pub struct FormatExprDict;
@@ -28,7 +31,7 @@ impl Ranged for KeyValuePair<'_> {
 }
 
 impl Format<PyFormatContext<'_>> for KeyValuePair<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         if let Some(key) = self.key {
             write!(
                 f,
@@ -64,19 +67,16 @@ impl FormatNodeRule<ExprDict> for FormatExprDict {
 
         debug_assert_eq!(keys.len(), values.len());
 
+        let comments = f.context().comments().clone();
+        let dangling = comments.dangling_comments(item);
+
         if values.is_empty() {
-            return write!(
-                f,
-                [
-                    &text("{"),
-                    block_indent(&dangling_node_comments(item)),
-                    &text("}"),
-                ]
-            );
+            return empty_parenthesized_with_dangling_comments(text("{"), dangling, text("}"))
+                .fmt(f);
         }
 
         let format_pairs = format_with(|f| {
-            let mut joiner = f.join_comma_separated();
+            let mut joiner = f.join_comma_separated(item.end());
 
             for (key, value) in keys.iter().zip(values) {
                 let key_value_pair = KeyValuePair { key, value };
@@ -86,14 +86,7 @@ impl FormatNodeRule<ExprDict> for FormatExprDict {
             joiner.finish()
         });
 
-        write!(
-            f,
-            [group(&format_args![
-                text("{"),
-                soft_block_indent(&format_pairs),
-                text("}")
-            ])]
-        )
+        parenthesized_with_dangling_comments("{", dangling, &format_pairs, "}").fmt(f)
     }
 
     fn fmt_dangling_comments(&self, _node: &ExprDict, _f: &mut PyFormatter) -> FormatResult<()> {
@@ -105,13 +98,9 @@ impl FormatNodeRule<ExprDict> for FormatExprDict {
 impl NeedsParentheses for ExprDict {
     fn needs_parentheses(
         &self,
-        parenthesize: Parenthesize,
-        source: &str,
-        comments: &Comments,
-    ) -> Parentheses {
-        match default_expression_needs_parentheses(self.into(), parenthesize, source, comments) {
-            Parentheses::Optional => Parentheses::Never,
-            parentheses => parentheses,
-        }
+        _parent: AnyNodeRef,
+        _context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        OptionalParentheses::Never
     }
 }

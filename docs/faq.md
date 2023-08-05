@@ -94,8 +94,8 @@ There are a few other minor incompatibilities between Ruff and the originating F
 
 - Ruff doesn't implement all the "opinionated" lint rules from flake8-bugbear.
 - Depending on your project structure, Ruff and isort can differ in their detection of first-party
-  code. (This is often solved by modifying the `src` property, e.g., to `src = ["src"]`, if your
-  code is nested in a `src` directory.)
+    code. (This is often solved by modifying the `src` property, e.g., to `src = ["src"]`, if your
+    code is nested in a `src` directory.)
 
 ## How does Ruff compare to Pylint?
 
@@ -270,42 +270,54 @@ first-party.
 For example, if you have a project with the following structure:
 
 ```tree
-.
+my_project
 ├── pyproject.toml
-├── src
-│   ├── __init__.py
-│   ├── module1.py
-│   └── module2.py
-└── tests
-    ├── __init__.py
-    ├── test_module1.py
-    └── test_module2.py
+└── src
+    └── foo
+        ├── __init__.py
+        └── bar
+            ├── __init__.py
+            └── baz.py
 ```
 
-When Ruff sees an import like `import module1`, it will then iterate over the `src` directories,
-looking for a corresponding Python module. You can configure Ruff to consider `src` and `tests` as
-first-party sources like so:
-
-```toml
-[tool.ruff]
-src = ["src", "tests"]
-```
+When Ruff sees an import like `import foo`, it will then iterate over the `src` directories,
+looking for a corresponding Python module (in reality, a directory named `foo` or a file named
+`foo.py`).
 
 If the `src` field is omitted, Ruff will default to using the "project root" as the only
 first-party source. The "project root" is typically the directory containing your `pyproject.toml`,
 `ruff.toml`, or `.ruff.toml` file, unless a configuration file is provided on the command-line via
 the `--config` option, in which case, the current working directory is used as the project root.
 
+In this case, Ruff would only check the top-level directory. Instead, we can configure Ruff to
+consider `src` as a first-party source like so:
+
+```toml
+[tool.ruff]
+# All paths are relative to the project root, which is the directory containing the pyproject.toml.
+src = ["src"]
+```
+
 If your `pyproject.toml`, `ruff.toml`, or `.ruff.toml` extends another configuration file, Ruff
-will still use the "extended" configuration file's directory as the project root. For example, if
-you add a `ruff.toml` to the `tests` directory in the above example, you'll want to explicitly
-set the `src` option in the extended configuration file:
+will still use the directory containing your `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file as
+the project root (as opposed to the directory of the file pointed to via the `extends` option).
+
+For example, if you add a `ruff.toml` to the `tests` directory in the above example, you'll want to
+explicitly set the `src` option in the extended configuration file:
 
 ```toml
 # tests/ruff.toml
 extend = "../pyproject.toml"
-src = ["../src", "../test"]
+src = ["../src"]
 ```
+
+Beyond this `src`-based detection, Ruff will also attempt to determine the current Python package
+for a given Python file, and mark imports from within the same package as first-party. For example,
+above, `baz.py` would be identified as part of the Python package beginning at
+`./my_project/src/foo`, and so any imports in `baz.py` that begin with `foo` (like `import foo.bar`)
+would be considered first-party based on this same-package heuristic.
+
+For a detailed explanation, see the [contributing guide](contributing.md).
 
 ## Does Ruff support Jupyter Notebooks?
 
@@ -369,6 +381,38 @@ Setting a `convention` force-disables any rules that are incompatible with that 
 matter how they're provided, which avoids accidental incompatibilities and simplifies configuration.
 By default, no `convention` is set, and so the enabled rules are determined by the `select` setting
 alone.
+
+## What is the "nursery"?
+
+The "nursery" is a collection of newer rules that are considered experimental or unstable.
+
+If a rule is marked as part of the "nursery", it can only be enabled via direct selection. For
+example, consider a hypothetical rule, `HYP001`. If `HYP001` were included in the "nursery", it
+could be enabled by adding the following to your `pyproject.toml`:
+
+```toml
+[tool.ruff]
+extend-select = ["HYP001"]
+```
+
+However, it would _not_ be enabled by selecting the `HYP` category, like so:
+
+```toml
+[tool.ruff]
+extend-select = ["HYP"]
+```
+
+Similarly, it would _not_ be enabled via the `ALL` selector:
+
+```toml
+[tool.ruff]
+select = ["ALL"]
+```
+
+(The "nursery" terminology comes from [Clippy](https://doc.rust-lang.org/nightly/clippy/), a similar
+tool for linting Rust code.)
+
+To see which rules are currently in the "nursery", visit the [rules reference](https://beta.ruff.rs/docs/rules/).
 
 ## How can I tell what settings Ruff is using to check my code?
 

@@ -1,6 +1,6 @@
 use std::fmt;
 
-use rustpython_parser::ast::{Expr, Ranged};
+use ruff_python_ast::{Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -9,7 +9,7 @@ use ruff_python_semantic::ScopeKind;
 use crate::checkers::ast::Checker;
 
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) enum DeferralKeyword {
+enum DeferralKeyword {
     Yield,
     YieldFrom,
     Await,

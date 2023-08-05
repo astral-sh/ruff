@@ -13,15 +13,16 @@ license = { workspace = true }
 [lib]
 
 [dependencies]
+ruff_index = { path = "../ruff_index" }
 ruff_python_ast = { path = "../ruff_python_ast" }
 ruff_python_stdlib = { path = "../ruff_python_stdlib" }
-ruff_text_size = { workspace = true }
-ruff_index = { path = "../ruff_index" }
+ruff_source_file = { path = "../ruff_source_file" }
+ruff_text_size = { path = "../ruff_text_size" }
 
 bitflags = { workspace = true }
 is-macro = { workspace = true }
-nohash-hasher = { workspace = true }
 num-traits = { workspace = true }
 rustc-hash = { workspace = true }
-rustpython-parser = { workspace = true }
+
+
 smallvec = { workspace = true }

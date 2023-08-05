@@ -70,3 +70,8 @@ print("foo".encode())  # print(b"foo")
     "abc"
     "def"
 )).encode()
+
+(f"foo{bar}").encode("utf-8")
+(f"foo{bar}").encode(encoding="utf-8")
+("unicode text©").encode("utf-8")
+("unicode text©").encode(encoding="utf-8")

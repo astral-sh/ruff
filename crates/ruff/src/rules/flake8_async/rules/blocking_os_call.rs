@@ -1,5 +1,5 @@
-use rustpython_parser::ast;
-use rustpython_parser::ast::{Expr, Ranged};
+use ruff_python_ast as ast;
+use ruff_python_ast::{Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -48,7 +48,7 @@ pub(crate) fn blocking_os_call(checker: &mut Checker, expr: &Expr) {
                 .semantic()
                 .resolve_call_path(func)
                 .as_ref()
-                .map_or(false, is_unsafe_os_method)
+                .is_some_and(is_unsafe_os_method)
             {
                 checker
                     .diagnostics

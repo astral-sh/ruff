@@ -111,3 +111,19 @@ class PerfectlyFine(models.Model):
     @property
     def random_property(self):
         return "%s" % self
+
+
+class MultipleConsecutiveFields(models.Model):
+    """Model that contains multiple out-of-order field definitions in a row."""
+
+
+    class Meta:
+        verbose_name = "test"
+
+    first_name = models.CharField(max_length=32)
+    last_name = models.CharField(max_length=32)
+
+    def get_absolute_url(self):
+        pass
+
+    middle_name = models.CharField(max_length=32)

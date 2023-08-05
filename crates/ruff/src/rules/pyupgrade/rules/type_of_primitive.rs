@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, Ranged};
+use ruff_python_ast::{self as ast, Expr, Ranged};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -60,13 +60,11 @@ pub(crate) fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr,
     if !checker
         .semantic()
         .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            matches!(call_path.as_slice(), ["", "type"])
-        })
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["", "type"]))
     {
         return;
     }
-    let Expr::Constant(ast::ExprConstant { value, .. } )= &args[0] else {
+    let Expr::Constant(ast::ExprConstant { value, .. }) = &args[0] else {
         return;
     };
     let Some(primitive) = Primitive::from_constant(value) else {

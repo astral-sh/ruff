@@ -1,14 +1,28 @@
-use crate::comments::{leading_comments, trailing_comments, Comments};
+use ruff_formatter::{write, FormatRuleWithOptions};
+use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::{Constant, Expr, ExprAttribute, ExprConstant};
+
+use crate::comments::{leading_comments, trailing_comments};
 use crate::expression::parentheses::{
-    default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
+    is_expression_parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
 };
+use crate::expression::CallChainLayout;
 use crate::prelude::*;
 use crate::FormatNodeRule;
-use ruff_formatter::write;
-use rustpython_parser::ast::{Constant, Expr, ExprAttribute, ExprConstant};
 
 #[derive(Default)]
-pub struct FormatExprAttribute;
+pub struct FormatExprAttribute {
+    call_chain_layout: CallChainLayout,
+}
+
+impl FormatRuleWithOptions<ExprAttribute, PyFormatContext<'_>> for FormatExprAttribute {
+    type Options = CallChainLayout;
+
+    fn with_options(mut self, options: Self::Options) -> Self {
+        self.call_chain_layout = options;
+        self
+    }
+}
 
 impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
     fn fmt_fields(&self, item: &ExprAttribute, f: &mut PyFormatter) -> FormatResult<()> {
@@ -18,6 +32,8 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
             attr,
             ctx: _,
         } = item;
+
+        let call_chain_layout = self.call_chain_layout.apply_in_node(item, f);
 
         let needs_parentheses = matches!(
             value.as_ref(),
@@ -35,12 +51,37 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
             dangling_comments.split_at(leading_attribute_comments_start);
 
         if needs_parentheses {
-            value.format().with_options(Parenthesize::Always).fmt(f)?;
-        } else if let Expr::Attribute(expr_attribute) = value.as_ref() {
-            // We're in a attribute chain (`a.b.c`). The outermost node adds parentheses if
-            // required, the inner ones don't need them so we skip the `Expr` formatting that
-            // normally adds the parentheses.
-            expr_attribute.format().fmt(f)?;
+            value.format().with_options(Parentheses::Always).fmt(f)?;
+        } else if call_chain_layout == CallChainLayout::Fluent {
+            match value.as_ref() {
+                Expr::Attribute(expr) => {
+                    expr.format().with_options(call_chain_layout).fmt(f)?;
+                }
+                Expr::Call(expr) => {
+                    expr.format().with_options(call_chain_layout).fmt(f)?;
+                    if call_chain_layout == CallChainLayout::Fluent {
+                        // Format the dot on its own line
+                        soft_line_break().fmt(f)?;
+                    }
+                }
+                Expr::Subscript(expr) => {
+                    expr.format().with_options(call_chain_layout).fmt(f)?;
+                    if call_chain_layout == CallChainLayout::Fluent {
+                        // Format the dot on its own line
+                        soft_line_break().fmt(f)?;
+                    }
+                }
+                _ => {
+                    // This matches [`CallChainLayout::from_expression`]
+                    if is_expression_parenthesized(value.as_ref().into(), f.context().source()) {
+                        value.format().with_options(Parentheses::Always).fmt(f)?;
+                        // Format the dot on its own line
+                        soft_line_break().fmt(f)?;
+                    } else {
+                        value.format().fmt(f)?;
+                    }
+                }
+            }
         } else {
             value.format().fmt(f)?;
         }
@@ -49,16 +90,51 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
             hard_line_break().fmt(f)?;
         }
 
-        write!(
-            f,
-            [
-                text("."),
-                trailing_comments(trailing_dot_comments),
-                (!leading_attribute_comments.is_empty()).then_some(hard_line_break()),
-                leading_comments(leading_attribute_comments),
-                attr.format()
-            ]
-        )
+        if call_chain_layout == CallChainLayout::Fluent {
+            // Fluent style has line breaks before the dot
+            // ```python
+            // blogs3 = (
+            //     Blog.objects.filter(
+            //         entry__headline__contains="Lennon",
+            //     )
+            //     .filter(
+            //         entry__pub_date__year=2008,
+            //     )
+            //     .filter(
+            //         entry__pub_date__year=2008,
+            //     )
+            // )
+            // ```
+            write!(
+                f,
+                [
+                    (!leading_attribute_comments.is_empty()).then_some(hard_line_break()),
+                    leading_comments(leading_attribute_comments),
+                    text("."),
+                    trailing_comments(trailing_dot_comments),
+                    attr.format()
+                ]
+            )
+        } else {
+            // Regular style
+            // ```python
+            // blogs2 = Blog.objects.filter(
+            //     entry__headline__contains="Lennon",
+            // ).filter(
+            //     entry__pub_date__year=2008,
+            // )
+            // ```
+            write!(
+                f,
+                [
+                    text("."),
+                    trailing_comments(trailing_dot_comments),
+                    (!leading_attribute_comments.is_empty()).then_some(hard_line_break()),
+                    leading_comments(leading_attribute_comments),
+                    attr.format()
+                ]
+            )
+        }
     }
 
     fn fmt_dangling_comments(
@@ -71,42 +147,27 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
     }
 }
 
-/// Checks if there are any own line comments in an attribute chain (a.b.c). This method is
-/// recursive up to the innermost expression that the attribute chain starts behind.
-fn has_breaking_comments_attribute_chain(
-    expr_attribute: &ExprAttribute,
-    comments: &Comments,
-) -> bool {
-    if comments
-        .dangling_comments(expr_attribute)
-        .iter()
-        .any(|comment| comment.line_position().is_own_line())
-        || comments.has_trailing_own_line_comments(expr_attribute)
-    {
-        return true;
-    }
-
-    if let Expr::Attribute(inner) = expr_attribute.value.as_ref() {
-        return has_breaking_comments_attribute_chain(inner, comments);
-    }
-
-    return comments.has_trailing_own_line_comments(expr_attribute.value.as_ref());
-}
-
 impl NeedsParentheses for ExprAttribute {
     fn needs_parentheses(
         &self,
-        parenthesize: Parenthesize,
-        source: &str,
-        comments: &Comments,
-    ) -> Parentheses {
-        if has_breaking_comments_attribute_chain(self, comments) {
-            return Parentheses::Always;
-        }
-
-        match default_expression_needs_parentheses(self.into(), parenthesize, source, comments) {
-            Parentheses::Optional => Parentheses::Never,
-            parentheses => parentheses,
+        _parent: AnyNodeRef,
+        context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        // Checks if there are any own line comments in an attribute chain (a.b.c).
+        if CallChainLayout::from_expression(self.into(), context.source())
+            == CallChainLayout::Fluent
+        {
+            OptionalParentheses::Multiline
+        } else if context
+            .comments()
+            .dangling_comments(self)
+            .iter()
+            .any(|comment| comment.line_position().is_own_line())
+            || context.comments().has_trailing_own_line_comments(self)
+        {
+            OptionalParentheses::Always
+        } else {
+            self.value.needs_parentheses(self.into(), context)
         }
     }
 }

@@ -166,7 +166,7 @@ fn test_ruff_black_compatibility() -> Result<()> {
             entry
                 .path()
                 .extension()
-                .map_or(false, |ext| ext == "py" || ext == "pyi")
+                .is_some_and(|ext| ext == "py" || ext == "pyi")
                 && !excludes.contains(&entry.path().file_name().unwrap().to_str().unwrap())
         });
 

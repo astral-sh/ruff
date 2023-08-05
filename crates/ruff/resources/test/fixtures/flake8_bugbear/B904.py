@@ -14,9 +14,10 @@ except AssertionError:
 except Exception as err:
     assert err
     raise Exception("No cause here...")
-except BaseException as base_err:
-    # Might use this instead of bare raise with the `.with_traceback()` method
-    raise base_err
+except BaseException as err:
+    raise err
+except BaseException as err:
+    raise some_other_err
 finally:
     raise Exception("Nothing to chain from, so no warning here")
 

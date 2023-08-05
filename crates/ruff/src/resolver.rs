@@ -262,6 +262,7 @@ pub fn python_files_in_path(
         builder.add(path);
     }
     builder.standard_filters(pyproject_config.settings.lib.respect_gitignore);
+    builder.require_git(false);
     builder.hidden(false);
     let walker = builder.build_parallel();
 
@@ -303,7 +304,7 @@ pub fn python_files_in_path(
                 if let Ok(entry) = &result {
                     if entry
                         .file_type()
-                        .map_or(false, |file_type| file_type.is_dir())
+                        .is_some_and(|file_type| file_type.is_dir())
                     {
                         match settings_toml(entry.path()) {
                             Ok(Some(pyproject)) => match resolve_scoped_settings(
@@ -330,9 +331,12 @@ pub fn python_files_in_path(
             }
 
             if result.as_ref().map_or(true, |entry| {
-                if entry.depth() == 0 {
+                // Ignore directories
+                if entry.file_type().map_or(true, |ft| ft.is_dir()) {
+                    false
+                } else if entry.depth() == 0 {
                     // Accept all files that are passed-in directly.
-                    entry.file_type().map_or(false, |ft| ft.is_file())
+                    true
                 } else {
                     // Otherwise, check if the file is included.
                     let path = entry.path();
@@ -427,18 +431,22 @@ fn is_file_excluded(
 
 #[cfg(test)]
 mod tests {
+    use std::fs::{create_dir, File};
     use std::path::Path;
 
     use anyhow::Result;
     use globset::GlobSet;
+    use itertools::Itertools;
     use path_absolutize::Absolutize;
+    use tempfile::TempDir;
 
     use crate::resolver::{
-        is_file_excluded, match_exclusion, resolve_settings_with_processor, NoOpProcessor,
-        PyprojectConfig, PyprojectDiscoveryStrategy, Relativity, Resolver,
+        is_file_excluded, match_exclusion, python_files_in_path, resolve_settings_with_processor,
+        NoOpProcessor, PyprojectConfig, PyprojectDiscoveryStrategy, Relativity, Resolver,
     };
     use crate::settings::pyproject::find_settings_toml;
     use crate::settings::types::FilePattern;
+    use crate::settings::AllSettings;
     use crate::test::test_resource_path;
 
     fn make_exclusion(file_pattern: FilePattern) -> GlobSet {
@@ -600,6 +608,45 @@ mod tests {
             &resolver,
             &pyproject_config,
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn find_python_files() -> Result<()> {
+        // Initialize the filesystem:
+        //   root
+        //   ├── file1.py
+        //   ├── dir1.py
+        //   │   └── file2.py
+        //   └── dir2.py
+        let tmp_dir = TempDir::new()?;
+        let root = tmp_dir.path();
+        let file1 = root.join("file1.py");
+        let dir1 = root.join("dir1.py");
+        let file2 = dir1.join("file2.py");
+        let dir2 = root.join("dir2.py");
+        File::create(&file1)?;
+        create_dir(dir1)?;
+        File::create(&file2)?;
+        create_dir(dir2)?;
+
+        let (paths, _) = python_files_in_path(
+            &[root.to_path_buf()],
+            &PyprojectConfig::new(
+                PyprojectDiscoveryStrategy::Fixed,
+                AllSettings::default(),
+                None,
+            ),
+            &NoOpProcessor,
+        )?;
+        let paths = paths
+            .iter()
+            .flatten()
+            .map(ignore::DirEntry::path)
+            .sorted()
+            .collect::<Vec<_>>();
+        assert_eq!(paths, &[file2, file1]);
+
         Ok(())
     }
 }

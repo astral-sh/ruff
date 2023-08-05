@@ -23,7 +23,9 @@ pub(crate) fn show_settings(
     let Some(entry) = paths
         .iter()
         .flatten()
-        .sorted_by(|a, b| a.path().cmp(b.path())).next() else {
+        .sorted_by(|a, b| a.path().cmp(b.path()))
+        .next()
+    else {
         bail!("No files found under the given path");
     };
     let path = entry.path();

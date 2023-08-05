@@ -9,21 +9,6 @@ use ruff_macros::{CacheKey, CombineOptions, ConfigurationOptions};
 
 use crate::settings::types::IdentifierPattern;
 
-const IGNORE_NAMES: [&str; 12] = [
-    "setUp",
-    "tearDown",
-    "setUpClass",
-    "tearDownClass",
-    "setUpModule",
-    "tearDownModule",
-    "asyncSetUp",
-    "asyncTearDown",
-    "setUpTestData",
-    "failureException",
-    "longMessage",
-    "maxDiff",
-];
-
 #[derive(
     Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, CombineOptions,
 )]
@@ -43,6 +28,14 @@ pub struct Options {
     )]
     /// A list of names (or patterns) to ignore when considering `pep8-naming` violations.
     pub ignore_names: Option<Vec<String>>,
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"extend-ignore-names = ["callMethod"]"#
+    )]
+    /// Additional names (or patterns) to ignore when considering `pep8-naming` violations,
+    /// in addition to those included in `ignore-names`.
+    pub extend_ignore_names: Option<Vec<String>>,
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
@@ -82,12 +75,29 @@ pub struct Settings {
     pub staticmethod_decorators: Vec<String>,
 }
 
+fn default_ignore_names() -> Vec<String> {
+    vec![
+        "setUp".to_string(),
+        "tearDown".to_string(),
+        "setUpClass".to_string(),
+        "tearDownClass".to_string(),
+        "setUpModule".to_string(),
+        "tearDownModule".to_string(),
+        "asyncSetUp".to_string(),
+        "asyncTearDown".to_string(),
+        "setUpTestData".to_string(),
+        "failureException".to_string(),
+        "longMessage".to_string(),
+        "maxDiff".to_string(),
+    ]
+}
+
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            ignore_names: IGNORE_NAMES
-                .iter()
-                .map(|name| IdentifierPattern::new(name).unwrap())
+            ignore_names: default_ignore_names()
+                .into_iter()
+                .map(|name| IdentifierPattern::new(&name).unwrap())
                 .collect(),
             classmethod_decorators: Vec::new(),
             staticmethod_decorators: Vec::new(),
@@ -100,18 +110,13 @@ impl TryFrom<Options> for Settings {
 
     fn try_from(options: Options) -> Result<Self, Self::Error> {
         Ok(Self {
-            ignore_names: match options.ignore_names {
-                Some(names) => names
-                    .into_iter()
-                    .map(|name| {
-                        IdentifierPattern::new(&name).map_err(SettingsError::InvalidIgnoreName)
-                    })
-                    .collect::<Result<Vec<_>, Self::Error>>()?,
-                None => IGNORE_NAMES
-                    .into_iter()
-                    .map(|name| IdentifierPattern::new(name).unwrap())
-                    .collect(),
-            },
+            ignore_names: options
+                .ignore_names
+                .unwrap_or_else(default_ignore_names)
+                .into_iter()
+                .chain(options.extend_ignore_names.unwrap_or_default().into_iter())
+                .map(|name| IdentifierPattern::new(&name).map_err(SettingsError::InvalidIgnoreName))
+                .collect::<Result<Vec<_>, Self::Error>>()?,
             classmethod_decorators: options.classmethod_decorators.unwrap_or_default(),
             staticmethod_decorators: options.staticmethod_decorators.unwrap_or_default(),
         })
@@ -152,6 +157,7 @@ impl From<Settings> for Options {
                     .map(|pattern| pattern.as_str().to_owned())
                     .collect(),
             ),
+            extend_ignore_names: None,
             classmethod_decorators: Some(settings.classmethod_decorators),
             staticmethod_decorators: Some(settings.staticmethod_decorators),
         }

@@ -84,7 +84,8 @@ pub(crate) fn if_needed(checker: &mut Checker, docstring: &Docstring) {
         kind: MemberKind::Function | MemberKind::NestedFunction | MemberKind::Method,
         stmt,
         ..
-    }) = docstring.definition else {
+    }) = docstring.definition
+    else {
         return;
     };
     if !is_overload(cast::decorator_list(stmt), checker.semantic()) {

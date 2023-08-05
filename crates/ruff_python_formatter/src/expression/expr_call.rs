@@ -1,100 +1,75 @@
-use crate::builders::PyFormatterExtensions;
-use crate::comments::{dangling_comments, Comments};
-use crate::expression::parentheses::{
-    default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
-};
-use crate::{AsFormat, FormatNodeRule, PyFormatter};
-use ruff_formatter::prelude::{format_with, group, soft_block_indent, text};
-use ruff_formatter::{write, Buffer, FormatResult};
-use rustpython_parser::ast::ExprCall;
+use crate::expression::CallChainLayout;
+use ruff_formatter::FormatRuleWithOptions;
+use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::{Expr, ExprCall};
+
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
+use crate::prelude::*;
+use crate::FormatNodeRule;
 
 #[derive(Default)]
-pub struct FormatExprCall;
+pub struct FormatExprCall {
+    call_chain_layout: CallChainLayout,
+}
+
+impl FormatRuleWithOptions<ExprCall, PyFormatContext<'_>> for FormatExprCall {
+    type Options = CallChainLayout;
+
+    fn with_options(mut self, options: Self::Options) -> Self {
+        self.call_chain_layout = options;
+        self
+    }
+}
 
 impl FormatNodeRule<ExprCall> for FormatExprCall {
     fn fmt_fields(&self, item: &ExprCall, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprCall {
             range: _,
             func,
-            args,
-            keywords,
+            arguments,
         } = item;
 
-        // We have a case with `f()` without any argument, which is a special case because we can
-        // have a comment with no node attachment inside:
-        // ```python
-        // f(
-        //      # This function has a dangling comment
-        // )
-        // ```
-        if args.is_empty() && keywords.is_empty() {
-            let comments = f.context().comments().clone();
-            let comments = comments.dangling_comments(item);
-            return write!(
-                f,
-                [
-                    func.format(),
-                    text("("),
-                    dangling_comments(comments),
-                    text(")")
-                ]
-            );
-        }
+        let call_chain_layout = self.call_chain_layout.apply_in_node(item, f);
 
-        let all_args = format_with(|f| {
-            f.join_comma_separated()
-                .entries(
-                    // We have the parentheses from the call so the arguments never need any
-                    args.iter()
-                        .map(|arg| (arg, arg.format().with_options(Parenthesize::Never))),
-                )
-                .nodes(keywords.iter())
-                .finish()
+        let fmt_inner = format_with(|f| {
+            match func.as_ref() {
+                Expr::Attribute(expr) => expr.format().with_options(call_chain_layout).fmt(f)?,
+                Expr::Call(expr) => expr.format().with_options(call_chain_layout).fmt(f)?,
+                Expr::Subscript(expr) => expr.format().with_options(call_chain_layout).fmt(f)?,
+                _ => func.format().fmt(f)?,
+            }
+
+            arguments.format().fmt(f)
         });
 
-        write!(
-            f,
-            [
-                func.format(),
-                text("("),
-                // The outer group is for things like
-                // ```python
-                // get_collection(
-                //     hey_this_is_a_very_long_call,
-                //     it_has_funny_attributes_asdf_asdf,
-                //     too_long_for_the_line,
-                //     really=True,
-                // )
-                // ```
-                // The inner group is for things like:
-                // ```python
-                // get_collection(
-                //     hey_this_is_a_very_long_call, it_has_funny_attributes_asdf_asdf, really=True
-                // )
-                // ```
-                // TODO(konstin): Doesn't work see wrongly formatted test
-                &group(&soft_block_indent(&group(&all_args))),
-                text(")")
-            ]
-        )
-    }
-
-    fn fmt_dangling_comments(&self, _node: &ExprCall, _f: &mut PyFormatter) -> FormatResult<()> {
-        // Handled in `fmt_fields`
-        Ok(())
+        // Allow to indent the parentheses while
+        // ```python
+        // g1 = (
+        //     queryset.distinct().order_by(field.name).values_list(field_name_flat_long_long=True)
+        // )
+        // ```
+        if call_chain_layout == CallChainLayout::Fluent
+            && self.call_chain_layout == CallChainLayout::Default
+        {
+            group(&fmt_inner).fmt(f)
+        } else {
+            fmt_inner.fmt(f)
+        }
     }
 }
 
 impl NeedsParentheses for ExprCall {
     fn needs_parentheses(
         &self,
-        parenthesize: Parenthesize,
-        source: &str,
-        comments: &Comments,
-    ) -> Parentheses {
-        match default_expression_needs_parentheses(self.into(), parenthesize, source, comments) {
-            Parentheses::Optional => Parentheses::Never,
-            parentheses => parentheses,
+        _parent: AnyNodeRef,
+        context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        if CallChainLayout::from_expression(self.into(), context.source())
+            == CallChainLayout::Fluent
+        {
+            OptionalParentheses::Multiline
+        } else {
+            self.func.needs_parentheses(self.into(), context)
         }
     }
 }

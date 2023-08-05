@@ -50,7 +50,7 @@ def main() -> None:
     successes = 0
     errors = 0
     for repository in tqdm(repositories):
-        project_dir = checkouts.joinpath(repository.org).joinpath(repository.repo)
+        project_dir = checkouts.joinpath(f"{repository.org}:{repository.repo}")
         if not project_dir.is_dir():
             tqdm.write(f"Missing {project_dir}")
             errors += 1

@@ -28,7 +28,7 @@ pub(crate) fn is_native_module_file_name(module_name: &str, file_name: &Path) ->
     // The file name must be that of a native module.
     if !file_name
         .extension()
-        .map_or(false, is_native_module_file_extension)
+        .is_some_and(is_native_module_file_extension)
     {
         return false;
     };
@@ -45,7 +45,7 @@ pub(crate) fn find_native_module(
     Ok(dir_path
         .read_dir()?
         .flatten()
-        .filter(|entry| entry.file_type().map_or(false, |ft| ft.is_file()))
+        .filter(|entry| entry.file_type().is_ok_and(|ft| ft.is_file()))
         .map(|entry| entry.path())
         .find(|path| is_native_module_file_name(module_name, path)))
 }

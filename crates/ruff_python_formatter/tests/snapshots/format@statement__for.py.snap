@@ -55,11 +55,7 @@ else:  # trailing else comment
     # trailing else body comment
 
 
-for (
-    aVeryLongNameThatSpillsOverToTheNextLineBecauseItIsExtremelyLongAndGoesOnAndOnAndOnAndOnAndOnAndOnAndOnAndOnAndOn
-) in (
-    anotherVeryLongNameThatSpillsOverToTheNextLineBecauseItIsExtremelyLongAndGoesOnAndOnAndOnAndOnAndOnAndOnAndOnAndOnAndOn
-):  # trailing comment
+for aVeryLongNameThatSpillsOverToTheNextLineBecauseItIsExtremelyLongAndGoesOnAndOnAndOnAndOnAndOnAndOnAndOnAndOnAndOn in anotherVeryLongNameThatSpillsOverToTheNextLineBecauseItIsExtremelyLongAndGoesOnAndOnAndOnAndOnAndOnAndOnAndOnAndOnAndOn:  # trailing comment
     pass
 
 else:

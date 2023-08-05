@@ -4,3 +4,4 @@ crates/ruff/resources/test/fixtures/isort/line_ending_crlf.py text eol=crlf
 crates/ruff/resources/test/fixtures/pycodestyle/W605_1.py text eol=crlf
 
 ruff.schema.json linguist-generated=true text=auto eol=lf
+*.md.snap linguist-language=Markdown

@@ -1,0 +1,61 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/starred.py
+---
+## Input
+```py
+call(
+    # Leading starred comment
+    * # Trailing star comment
+    [
+        # Leading value comment
+        [What, i, this, s, very, long, aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa]
+    ] # trailing value comment
+)
+
+call(
+    # Leading starred comment
+    * ( # Leading value comment
+        [What, i, this, s, very, long, aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa]
+    ) # trailing value comment
+)
+```
+
+## Output
+```py
+call(
+    # Leading starred comment
+    # Trailing star comment
+    *[
+        # Leading value comment
+        [
+            What,
+            i,
+            this,
+            s,
+            very,
+            long,
+            aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+        ]
+    ]  # trailing value comment
+)
+
+call(
+    # Leading starred comment
+    # Leading value comment
+    *(
+        [
+            What,
+            i,
+            this,
+            s,
+            very,
+            long,
+            aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+        ]
+    )  # trailing value comment
+)
+```
+
+
+
