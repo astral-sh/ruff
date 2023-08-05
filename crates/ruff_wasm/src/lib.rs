@@ -22,10 +22,10 @@ use ruff::settings::configuration::Configuration;
 use ruff::settings::options::Options;
 use ruff::settings::{defaults, flags, Settings};
 use ruff_python_ast::PySourceType;
-use ruff_python_parser::AsMode;
 use ruff_python_codegen::Stylist;
 use ruff_python_formatter::{format_module, format_node, PyFormatOptions};
 use ruff_python_index::{CommentRangesBuilder, Indexer};
+use ruff_python_parser::AsMode;
 use ruff_source_file::{Locator, SourceLocation};
 
 #[wasm_bindgen(typescript_custom_section)]

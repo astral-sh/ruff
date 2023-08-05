@@ -8,8 +8,8 @@ use criterion::{
 use ruff::linter::lint_only;
 use ruff::settings::{flags, Settings};
 use ruff::RuleSelector;
-use ruff_python_ast::PySourceType;
 use ruff_benchmark::{TestCase, TestCaseSpeed, TestFile, TestFileDownloadError};
+use ruff_python_ast::PySourceType;
 
 #[cfg(target_os = "windows")]
 #[global_allocator]
