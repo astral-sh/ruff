@@ -571,6 +571,17 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         alias,
                     );
                 }
+
+                if checker.enabled(Rule::BannedModuleLevelImports) {
+                    flake8_tidy_imports::rules::name_or_parent_is_banned_at_module_level(
+                        checker,
+                        &alias.name,
+                        stmt,
+                        alias,
+                        checker.locator,
+                    );
+                }
+
                 if !checker.source_type.is_stub() {
                     if checker.enabled(Rule::UselessImportAlias) {
                         pylint::rules::useless_import_alias(checker, alias);
@@ -735,6 +746,32 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                             checker,
                             format!("{module}.{}", alias.name),
                             alias,
+                        );
+                    }
+                }
+            }
+            if checker.enabled(Rule::BannedModuleLevelImports) {
+                if let Some(module) =
+                    helpers::resolve_imported_module_path(level, module, checker.module_path)
+                {
+                    flake8_tidy_imports::rules::name_or_parent_is_banned_at_module_level(
+                        checker,
+                        &module,
+                        stmt,
+                        stmt,
+                        checker.locator,
+                    );
+
+                    for alias in names {
+                        if &alias.name == "*" {
+                            continue;
+                        }
+                        flake8_tidy_imports::rules::name_is_banned_at_module_level(
+                            checker,
+                            &format!("{module}.{}", alias.name),
+                            stmt,
+                            alias,
+                            checker.locator,
                         );
                     }
                 }

@@ -26,4 +26,5 @@ pub enum Strictness {
 pub struct Settings {
     pub ban_relative_imports: Strictness,
     pub banned_api: FxHashMap<String, ApiBan>,
+    pub banned_module_level_imports: Vec<String>,
 }
