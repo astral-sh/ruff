@@ -15,10 +15,10 @@ use super::helpers::is_empty_or_null_string;
 /// Checks for `pytest.raises` context managers with multiple statements.
 ///
 /// ## Why is this bad?
-/// When a `pytest.raises` is used as a context manager and contains multiple statements, it can
-/// lead to the test passing when it actually should fail. To avoid this, a `pytest.raises`
-/// context manager should only contain a single simple statement that raises the expected
-/// exception.
+/// When a `pytest.raises` is used as a context manager and contains multiple
+/// statements, it can lead to the test passing when it actually should fail.
+/// To avoid this, a `pytest.raises` context manager should only contain
+/// a single simple statement that raises the expected exception.
 ///
 /// ## Example
 /// ```python
@@ -54,9 +54,10 @@ impl Violation for PytestRaisesWithMultipleStatements {
 /// Checks for `pytest.raises` calls without a `match` parameter.
 ///
 /// ## Why is this bad?
-/// `pytest.raises(Error)` will catch any `Error` and may catch errors that are unrelated to the
-/// code under test. To avoid this, `pytest.raises` should be called with a `match` parameter.
-/// The exception names that require a `match` parameter can be configured via the
+/// `pytest.raises(Error)` will catch any `Error` and may catch errors that are
+/// unrelated to the code under test. To avoid this, `pytest.raises` should be
+/// called with a `match` parameter. The exception names that require a `match`
+/// parameter can be configured via the
 /// `flake8-pytest-style.raises-require-match-for` and
 /// `flake8-pytest-style.raises-extend-require-match-for` settings.
 ///
