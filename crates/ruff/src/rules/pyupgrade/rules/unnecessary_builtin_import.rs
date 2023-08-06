@@ -124,12 +124,11 @@ pub(crate) fn unnecessary_builtin_import(
         diagnostic.try_set_fix(|| {
             let stmt = checker.semantic().stmt();
             let parent = checker.semantic().stmt_parent();
-            let unused_imports: Vec<String> = unused_imports
-                .iter()
-                .map(|alias| format!("{module}.{}", alias.name))
-                .collect();
             let edit = autofix::edits::remove_unused_imports(
-                unused_imports.iter().map(String::as_str),
+                unused_imports
+                    .iter()
+                    .map(|alias| &alias.name)
+                    .map(ruff_python_ast::Identifier::as_str),
                 stmt,
                 parent,
                 checker.locator(),

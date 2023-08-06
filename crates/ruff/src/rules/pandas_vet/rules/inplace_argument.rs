@@ -2,7 +2,8 @@ use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_true;
 use ruff_python_ast::{self as ast, Keyword, PySourceType, Ranged};
-use ruff_python_semantic::{BindingKind, Import};
+use ruff_python_semantic::BindingKind;
+use ruff_python_semantic::Imported;
 use ruff_source_file::Locator;
 
 use crate::autofix::edits::{remove_argument, Parentheses};
@@ -57,12 +58,11 @@ pub(crate) fn inplace_argument(checker: &mut Checker, call: &ast::ExprCall) {
             .first()
             .and_then(|module| checker.semantic().find_binding(module))
             .is_some_and(|binding| {
-                matches!(
-                    binding.kind,
-                    BindingKind::Import(Import {
-                        qualified_name: "pandas"
-                    })
-                )
+                if let BindingKind::Import(import) = &binding.kind {
+                    matches!(import.call_path(), ["pandas"])
+                } else {
+                    false
+                }
             })
         {
             return;
@@ -94,10 +94,10 @@ pub(crate) fn inplace_argument(checker: &mut Checker, call: &ast::ExprCall) {
                         && !checker.semantic().scope().kind.is_lambda()
                     {
                         if let Some(fix) = convert_inplace_argument_to_assignment(
-                            checker.locator(),
                             call,
                             keyword,
                             checker.source_type,
+                            checker.locator(),
                         ) {
                             diagnostic.set_fix(fix);
                         }
@@ -116,10 +116,10 @@ pub(crate) fn inplace_argument(checker: &mut Checker, call: &ast::ExprCall) {
 /// Remove the `inplace` argument from a function call and replace it with an
 /// assignment.
 fn convert_inplace_argument_to_assignment(
-    locator: &Locator,
     call: &ast::ExprCall,
     keyword: &Keyword,
     source_type: PySourceType,
+    locator: &Locator,
 ) -> Option<Fix> {
     // Add the assignment.
     let attr = call.func.as_attribute_expr()?;

@@ -207,7 +207,7 @@ pub fn is_immutable_annotation(expr: &Expr, semantic: &SemanticModel) -> bool {
                     }
                 } else if matches!(call_path.as_slice(), ["typing", "Optional"]) {
                     is_immutable_annotation(slice, semantic)
-                } else if matches!(call_path.as_slice(), ["typing", "Annotated"]) {
+                } else if is_pep_593_generic_type(call_path.as_slice()) {
                     if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
                         elts.first()
                             .is_some_and(|elt| is_immutable_annotation(elt, semantic))

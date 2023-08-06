@@ -318,7 +318,10 @@ pub(crate) fn f_strings(
         return;
     }
 
-    let Expr::Call(ast::ExprCall { func, arguments, .. }) = expr else {
+    let Expr::Call(ast::ExprCall {
+        func, arguments, ..
+    }) = expr
+    else {
         return;
     };
 

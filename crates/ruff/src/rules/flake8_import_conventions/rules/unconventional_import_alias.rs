@@ -2,7 +2,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::Binding;
+use ruff_python_semantic::{Binding, Imported};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -56,11 +56,13 @@ pub(crate) fn unconventional_import_alias(
     binding: &Binding,
     conventions: &FxHashMap<String, String>,
 ) -> Option<Diagnostic> {
-    let Some(qualified_name) = binding.qualified_name() else {
+    let Some(import) = binding.as_any_import() else {
         return None;
     };
 
-    let Some(expected_alias) = conventions.get(qualified_name) else {
+    let qualified_name = import.qualified_name();
+
+    let Some(expected_alias) = conventions.get(qualified_name.as_str()) else {
         return None;
     };
 
@@ -71,7 +73,7 @@ pub(crate) fn unconventional_import_alias(
 
     let mut diagnostic = Diagnostic::new(
         UnconventionalImportAlias {
-            name: qualified_name.to_string(),
+            name: qualified_name,
             asname: expected_alias.to_string(),
         },
         binding.range,

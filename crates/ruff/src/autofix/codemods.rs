@@ -33,7 +33,7 @@ impl<'a, T: Codegen<'a>> CodegenStylist<'a> for T {
 ///
 /// Returns `Ok(None)` if the statement is empty after removing the imports.
 pub(crate) fn remove_imports<'a>(
-    imports: impl Iterator<Item = &'a str>,
+    member_names: impl Iterator<Item = &'a str>,
     stmt: &Stmt,
     locator: &Locator,
     stylist: &Stylist,
@@ -45,27 +45,20 @@ pub(crate) fn remove_imports<'a>(
         bail!("Expected Statement::Simple");
     };
 
-    let (aliases, import_module) = match body.body.first_mut() {
-        Some(SmallStatement::Import(import_body)) => (&mut import_body.names, None),
+    let aliases = match body.body.first_mut() {
+        Some(SmallStatement::Import(import_body)) => &mut import_body.names,
         Some(SmallStatement::ImportFrom(import_body)) => {
             if let ImportNames::Aliases(names) = &mut import_body.names {
-                (
-                    names,
-                    Some((&import_body.relative, import_body.module.as_ref())),
-                )
+                names
             } else if let ImportNames::Star(..) = &import_body.names {
                 // Special-case: if the import is a `from ... import *`, then we delete the
                 // entire statement.
                 let mut found_star = false;
-                for import in imports {
-                    let qualified_name = match import_body.module.as_ref() {
-                        Some(module_name) => format!("{}.*", compose_module_path(module_name)),
-                        None => "*".to_string(),
-                    };
-                    if import == qualified_name {
+                for member in member_names {
+                    if member == "*" {
                         found_star = true;
                     } else {
-                        bail!("Expected \"*\" for unused import (got: \"{}\")", import);
+                        bail!("Expected \"*\" for unused import (got: \"{}\")", member);
                     }
                 }
                 if !found_star {
@@ -82,30 +75,10 @@ pub(crate) fn remove_imports<'a>(
     // Preserve the trailing comma (or not) from the last entry.
     let trailing_comma = aliases.last().and_then(|alias| alias.comma.clone());
 
-    for import in imports {
-        let alias_index = aliases.iter().position(|alias| {
-            let qualified_name = match import_module {
-                Some((relative, module)) => {
-                    let module = module.map(compose_module_path);
-                    let member = compose_module_path(&alias.name);
-                    let mut qualified_name = String::with_capacity(
-                        relative.len() + module.as_ref().map_or(0, String::len) + member.len() + 1,
-                    );
-                    for _ in 0..relative.len() {
-                        qualified_name.push('.');
-                    }
-                    if let Some(module) = module {
-                        qualified_name.push_str(&module);
-                        qualified_name.push('.');
-                    }
-                    qualified_name.push_str(&member);
-                    qualified_name
-                }
-                None => compose_module_path(&alias.name),
-            };
-            qualified_name == import
-        });
-
+    for member in member_names {
+        let alias_index = aliases
+            .iter()
+            .position(|alias| member == compose_module_path(&alias.name));
         if let Some(index) = alias_index {
             aliases.remove(index);
         }
@@ -139,7 +112,7 @@ pub(crate) fn remove_imports<'a>(
 ///
 /// Returns the modified import statement.
 pub(crate) fn retain_imports(
-    imports: &[&str],
+    member_names: &[&str],
     stmt: &Stmt,
     locator: &Locator,
     stylist: &Stylist,
@@ -151,14 +124,11 @@ pub(crate) fn retain_imports(
         bail!("Expected Statement::Simple");
     };
 
-    let (aliases, import_module) = match body.body.first_mut() {
-        Some(SmallStatement::Import(import_body)) => (&mut import_body.names, None),
+    let aliases = match body.body.first_mut() {
+        Some(SmallStatement::Import(import_body)) => &mut import_body.names,
         Some(SmallStatement::ImportFrom(import_body)) => {
             if let ImportNames::Aliases(names) = &mut import_body.names {
-                (
-                    names,
-                    Some((&import_body.relative, import_body.module.as_ref())),
-                )
+                names
             } else {
                 bail!("Expected: ImportNames::Aliases");
             }
@@ -170,28 +140,9 @@ pub(crate) fn retain_imports(
     let trailing_comma = aliases.last().and_then(|alias| alias.comma.clone());
 
     aliases.retain(|alias| {
-        imports.iter().any(|import| {
-            let qualified_name = match import_module {
-                Some((relative, module)) => {
-                    let module = module.map(compose_module_path);
-                    let member = compose_module_path(&alias.name);
-                    let mut qualified_name = String::with_capacity(
-                        relative.len() + module.as_ref().map_or(0, String::len) + member.len() + 1,
-                    );
-                    for _ in 0..relative.len() {
-                        qualified_name.push('.');
-                    }
-                    if let Some(module) = module {
-                        qualified_name.push_str(&module);
-                        qualified_name.push('.');
-                    }
-                    qualified_name.push_str(&member);
-                    qualified_name
-                }
-                None => compose_module_path(&alias.name),
-            };
-            qualified_name == *import
-        })
+        member_names
+            .iter()
+            .any(|member| *member == compose_module_path(&alias.name))
     });
 
     // But avoid destroying any trailing comments.

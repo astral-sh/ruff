@@ -790,42 +790,81 @@ pub fn to_module_path(package: &Path, path: &Path) -> Option<Vec<String>> {
         .collect::<Option<Vec<String>>>()
 }
 
-/// Create a [`CallPath`] from a relative import reference name (like `".foo.bar"`).
-///
-/// Returns an empty [`CallPath`] if the import is invalid (e.g., a relative import that
-/// extends beyond the top-level module).
+/// Format the call path for a relative import.
 ///
 /// # Examples
 ///
 /// ```rust
-/// # use smallvec::{smallvec, SmallVec};
-/// # use ruff_python_ast::helpers::from_relative_import;
+/// # use ruff_python_ast::helpers::collect_import_from_member;
 ///
-/// assert_eq!(from_relative_import(&[], "bar"), SmallVec::from_buf(["bar"]));
-/// assert_eq!(from_relative_import(&["foo".to_string()], "bar"), SmallVec::from_buf(["foo", "bar"]));
-/// assert_eq!(from_relative_import(&["foo".to_string()], "bar.baz"), SmallVec::from_buf(["foo", "bar", "baz"]));
-/// assert_eq!(from_relative_import(&["foo".to_string()], ".bar"), SmallVec::from_buf(["bar"]));
-/// assert!(from_relative_import(&["foo".to_string()], "..bar").is_empty());
-/// assert!(from_relative_import(&["foo".to_string()], "...bar").is_empty());
+/// assert_eq!(collect_import_from_member(None, None, "bar").as_slice(), ["bar"]);
+/// assert_eq!(collect_import_from_member(Some(1), None, "bar").as_slice(), [".", "bar"]);
+/// assert_eq!(collect_import_from_member(Some(1), Some("foo"), "bar").as_slice(), [".", "foo", "bar"]);
 /// ```
-pub fn from_relative_import<'a>(module: &'a [String], name: &'a str) -> CallPath<'a> {
-    let mut call_path: CallPath = SmallVec::with_capacity(module.len() + 1);
+pub fn collect_import_from_member<'a>(
+    level: Option<u32>,
+    module: Option<&'a str>,
+    member: &'a str,
+) -> CallPath<'a> {
+    let mut call_path: CallPath = SmallVec::with_capacity(
+        level.unwrap_or_default() as usize
+            + module
+                .map(|module| module.split('.').count())
+                .unwrap_or_default()
+            + 1,
+    );
+
+    // Include the dots as standalone segments.
+    if let Some(level) = level {
+        if level > 0 {
+            for _ in 0..level {
+                call_path.push(".");
+            }
+        }
+    }
+
+    // Add the remaining segments.
+    if let Some(module) = module {
+        call_path.extend(module.split('.'));
+    }
+
+    // Add the member.
+    call_path.push(member);
+
+    call_path
+}
+
+/// Format the call path for a relative import, or `None` if the relative import extends beyond
+/// the root module.
+pub fn from_relative_import<'a>(
+    // The path from which the import is relative.
+    module: &'a [String],
+    // The path of the import itself (e.g., given `from ..foo import bar`, `[".", ".", "foo", "bar]`).
+    import: &[&'a str],
+    // The remaining segments to the call path (e.g., given `bar.baz`, `["baz"]`).
+    tail: &[&'a str],
+) -> Option<CallPath<'a>> {
+    let mut call_path: CallPath = SmallVec::with_capacity(module.len() + import.len() + tail.len());
 
     // Start with the module path.
     call_path.extend(module.iter().map(String::as_str));
 
     // Remove segments based on the number of dots.
-    for _ in 0..name.chars().take_while(|c| *c == '.').count() {
-        if call_path.is_empty() {
-            return SmallVec::new();
+    for segment in import {
+        if *segment == "." {
+            if call_path.is_empty() {
+                return None;
+            }
+            call_path.pop();
+        } else {
+            call_path.push(segment);
         }
-        call_path.pop();
     }
 
     // Add the remaining segments.
-    call_path.extend(name.trim_start_matches('.').split('.'));
+    call_path.extend_from_slice(tail);
 
-    call_path
+    Some(call_path)
 }
 
 /// Given an imported module (based on its relative import level and module name), return the

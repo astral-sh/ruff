@@ -111,14 +111,13 @@ pub(crate) fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, name
 
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {
-            let unused_imports: Vec<String> = unused_imports
-                .iter()
-                .map(|alias| format!("__future__.{}", alias.name))
-                .collect();
             let stmt = checker.semantic().stmt();
             let parent = checker.semantic().stmt_parent();
             let edit = autofix::edits::remove_unused_imports(
-                unused_imports.iter().map(String::as_str),
+                unused_imports
+                    .iter()
+                    .map(|alias| &alias.name)
+                    .map(ruff_python_ast::Identifier::as_str),
                 stmt,
                 parent,
                 checker.locator(),

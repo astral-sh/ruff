@@ -58,14 +58,14 @@ pub(crate) fn delete_stmt(
 
 /// Generate a `Fix` to remove the specified imports from an `import` statement.
 pub(crate) fn remove_unused_imports<'a>(
-    unused_imports: impl Iterator<Item = &'a str>,
+    member_names: impl Iterator<Item = &'a str>,
     stmt: &Stmt,
     parent: Option<&Stmt>,
     locator: &Locator,
     stylist: &Stylist,
     indexer: &Indexer,
 ) -> Result<Edit> {
-    match codemods::remove_imports(unused_imports, stmt, locator, stylist)? {
+    match codemods::remove_imports(member_names, stmt, locator, stylist)? {
         None => Ok(delete_stmt(stmt, parent, locator, indexer)),
         Some(content) => Ok(Edit::range_replacement(content, stmt.range())),
     }
