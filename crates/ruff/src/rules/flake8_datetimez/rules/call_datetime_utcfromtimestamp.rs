@@ -12,14 +12,11 @@ use super::helpers;
 /// Checks for usage of `datetime.datetime.utcfromtimestamp()`.
 ///
 /// ## Why is this bad?
-/// `datetime` objects are "naive" by default, in that they do not include
-/// timezone information. "Naive" objects are easy to understand, but ignore
-/// some aspects of reality, which can lead to subtle bugs. Timezone-aware
-/// `datetime` objects are preferred, as they represent a specific moment in
-/// time, unlike "naive" objects.
-///
-/// `datetime.datetime.utcfromtimestamp()` creates a "naive" object; instead,
-/// use `datetime.datetime.fromtimestamp(timestamp, tz=timezone.utc)`.
+/// Python datetime objects can be naive or timezone-aware. While an aware
+/// object represents a specific moment in time, a naive object does not
+/// contain enough information to unambiguously locate itself relative to other
+/// datetime objects. Since this can lead to errors, it is recommended to
+/// always use timezone-aware objects.
 ///
 /// ## Example
 /// ```python
@@ -41,6 +38,9 @@ use super::helpers;
 ///
 /// datetime.datetime.fromtimestamp(946684800, tz=datetime.UTC)
 /// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/library/datetime.html#aware-and-naive-objects)
 #[violation]
 pub struct CallDatetimeUtcfromtimestamp;
 
