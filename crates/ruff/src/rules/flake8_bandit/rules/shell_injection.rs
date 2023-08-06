@@ -61,6 +61,10 @@ impl Violation for SubprocessPopenWithShellEqualsTrue {
 /// arbitrary shell commands; however, it is still error-prone. Consider
 /// validating the input.
 ///
+/// ## Known problems
+/// Prone to false positives as it is difficult to determine whether the
+/// passed arguments have been validated ([#4045]).
+///
 /// ## Example
 /// ```python
 /// import subprocess
@@ -71,6 +75,8 @@ impl Violation for SubprocessPopenWithShellEqualsTrue {
 ///
 /// ## References
 /// - [Python documentation: `subprocess` — Subprocess management](https://docs.python.org/3/library/subprocess.html)
+///
+/// [#4045]: https://github.com/astral-sh/ruff/issues/4045
 #[violation]
 pub struct SubprocessWithoutShellEqualsTrue;
 
