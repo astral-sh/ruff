@@ -14,8 +14,8 @@ use crate::{
 /// Check for starting a subprocess with a shell.
 ///
 /// ## Why is this bad?
-/// Starting a process with a shell can allow attackers to execute arbitrary
-/// shell commands. Consider starting the process without a shell call. Else,
+/// Starting a subprocess with a shell can allow attackers to execute arbitrary
+/// shell commands. Consider starting the process without a shell call and
 /// sanitize the input to mitigate the risk of shell injection.
 ///
 /// ## Example
@@ -57,7 +57,7 @@ impl Violation for SubprocessPopenWithShellEqualsTrue {
 /// Checks for starting a subprocess without a shell.
 ///
 /// ## Why is this bad?
-/// Starting a process without a shell can prevent attackers from executing
+/// Starting a subprocess without a shell can prevent attackers from executing
 /// arbitrary shell commands; however, it is still error-prone. Consider
 /// validating the input.
 ///
