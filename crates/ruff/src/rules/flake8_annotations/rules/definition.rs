@@ -1,11 +1,9 @@
-use ruff_python_ast::{self as ast, Constant, Expr, ParameterWithDefault, Ranged, Stmt};
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::cast;
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::statement_visitor::StatementVisitor;
+use ruff_python_ast::{self as ast, Constant, Expr, ParameterWithDefault, Ranged, Stmt};
 use ruff_python_parser::typing::parse_type_annotation;
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{Definition, Member, MemberKind};
@@ -13,10 +11,8 @@ use ruff_python_stdlib::typing::simple_magic_return_type;
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
+use crate::rules::flake8_annotations::fixes;
 use crate::rules::ruff::typing::type_hint_resolves_to_any;
-
-use super::super::fixes;
-use super::super::helpers::match_function_def;
 
 /// ## What it does
 /// Checks that function arguments have type annotations.
@@ -498,20 +494,30 @@ pub(crate) fn definition(
     definition: &Definition,
     visibility: visibility::Visibility,
 ) -> Vec<Diagnostic> {
-    // TODO(charlie): Consider using the AST directly here rather than `Definition`.
-    // We could adhere more closely to `flake8-annotations` by defining public
-    // vs. secret vs. protected.
-    let Definition::Member(Member { kind, stmt, .. }) = definition else {
+    let Definition::Member(Member { kind, .. }) = definition else {
         return vec![];
     };
 
-    let is_method = match kind {
-        MemberKind::Method => true,
-        MemberKind::Function | MemberKind::NestedFunction => false,
-        _ => return vec![],
+    let (MemberKind::Function(function)
+    | MemberKind::NestedFunction(function)
+    | MemberKind::Method(function)) = kind
+    else {
+        return vec![];
     };
 
-    let (name, arguments, returns, body, decorator_list) = match_function_def(stmt);
+    let is_method = kind.is_method();
+
+    let ast::StmtFunctionDef {
+        range: _,
+        is_async: _,
+        decorator_list,
+        name,
+        type_params: _,
+        parameters,
+        returns,
+        body,
+    } = function;
+
     // Keep track of whether we've seen any typed arguments or return values.
     let mut has_any_typed_arg = false; // Any argument has been typed?
     let mut has_typed_return = false; // Return value has been typed?
@@ -528,20 +534,19 @@ pub(crate) fn definition(
         parameter,
         default: _,
         range: _,
-    } in arguments
+    } in parameters
         .posonlyargs
         .iter()
-        .chain(&arguments.args)
-        .chain(&arguments.kwonlyargs)
+        .chain(&parameters.args)
+        .chain(&parameters.kwonlyargs)
         .skip(
             // If this is a non-static method, skip `cls` or `self`.
             usize::from(
-                is_method
-                    && !visibility::is_staticmethod(cast::decorator_list(stmt), checker.semantic()),
+                is_method && !visibility::is_staticmethod(decorator_list, checker.semantic()),
             ),
         )
     {
-        // ANN401 for dynamically typed arguments
+        // ANN401 for dynamically typed parameters
         if let Some(annotation) = &parameter.annotation {
             has_any_typed_arg = true;
             if checker.enabled(Rule::AnyType) && !is_overridden {
@@ -572,7 +577,7 @@ pub(crate) fn definition(
     }
 
     // ANN002, ANN401
-    if let Some(arg) = &arguments.vararg {
+    if let Some(arg) = &parameters.vararg {
         if let Some(expr) = &arg.annotation {
             has_any_typed_arg = true;
             if !checker.settings.flake8_annotations.allow_star_arg_any {
@@ -598,7 +603,7 @@ pub(crate) fn definition(
     }
 
     // ANN003, ANN401
-    if let Some(arg) = &arguments.kwarg {
+    if let Some(arg) = &parameters.kwarg {
         if let Some(expr) = &arg.annotation {
             has_any_typed_arg = true;
             if !checker.settings.flake8_annotations.allow_star_arg_any {
@@ -629,18 +634,18 @@ pub(crate) fn definition(
     }
 
     // ANN101, ANN102
-    if is_method && !visibility::is_staticmethod(cast::decorator_list(stmt), checker.semantic()) {
+    if is_method && !visibility::is_staticmethod(decorator_list, checker.semantic()) {
         if let Some(ParameterWithDefault {
             parameter,
             default: _,
             range: _,
-        }) = arguments
+        }) = parameters
             .posonlyargs
             .first()
-            .or_else(|| arguments.args.first())
+            .or_else(|| parameters.args.first())
         {
             if parameter.annotation.is_none() {
-                if visibility::is_classmethod(cast::decorator_list(stmt), checker.semantic()) {
+                if visibility::is_classmethod(decorator_list, checker.semantic()) {
                     if checker.enabled(Rule::MissingTypeCls) {
                         diagnostics.push(Diagnostic::new(
                             MissingTypeCls {
@@ -676,24 +681,22 @@ pub(crate) fn definition(
         // (explicitly or implicitly).
         checker.settings.flake8_annotations.suppress_none_returning && is_none_returning(body)
     ) {
-        if is_method && visibility::is_classmethod(cast::decorator_list(stmt), checker.semantic()) {
+        if is_method && visibility::is_classmethod(decorator_list, checker.semantic()) {
             if checker.enabled(Rule::MissingReturnTypeClassMethod) {
                 diagnostics.push(Diagnostic::new(
                     MissingReturnTypeClassMethod {
                         name: name.to_string(),
                     },
-                    stmt.identifier(),
+                    function.identifier(),
                 ));
             }
-        } else if is_method
-            && visibility::is_staticmethod(cast::decorator_list(stmt), checker.semantic())
-        {
+        } else if is_method && visibility::is_staticmethod(decorator_list, checker.semantic()) {
             if checker.enabled(Rule::MissingReturnTypeStaticMethod) {
                 diagnostics.push(Diagnostic::new(
                     MissingReturnTypeStaticMethod {
                         name: name.to_string(),
                     },
-                    stmt.identifier(),
+                    function.identifier(),
                 ));
             }
         } else if is_method && visibility::is_init(name) {
@@ -705,15 +708,15 @@ pub(crate) fn definition(
                         MissingReturnTypeSpecialMethod {
                             name: name.to_string(),
                         },
-                        stmt.identifier(),
+                        function.identifier(),
                     );
                     if checker.patch(diagnostic.kind.rule()) {
                         diagnostic.try_set_fix(|| {
                             fixes::add_return_annotation(
-                                checker.locator(),
-                                stmt,
+                                function,
                                 "None",
                                 checker.source_type,
+                                checker.locator(),
                             )
                             .map(Fix::suggested)
                         });
@@ -727,16 +730,16 @@ pub(crate) fn definition(
                     MissingReturnTypeSpecialMethod {
                         name: name.to_string(),
                     },
-                    stmt.identifier(),
+                    function.identifier(),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(return_type) = simple_magic_return_type(name) {
                         diagnostic.try_set_fix(|| {
                             fixes::add_return_annotation(
-                                checker.locator(),
-                                stmt,
+                                function,
                                 return_type,
                                 checker.source_type,
+                                checker.locator(),
                             )
                             .map(Fix::suggested)
                         });
@@ -752,7 +755,7 @@ pub(crate) fn definition(
                             MissingReturnTypeUndocumentedPublicFunction {
                                 name: name.to_string(),
                             },
-                            stmt.identifier(),
+                            function.identifier(),
                         ));
                     }
                 }
@@ -762,7 +765,7 @@ pub(crate) fn definition(
                             MissingReturnTypePrivateFunction {
                                 name: name.to_string(),
                             },
-                            stmt.identifier(),
+                            function.identifier(),
                         ));
                     }
                 }

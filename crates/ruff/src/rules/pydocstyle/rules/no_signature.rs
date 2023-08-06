@@ -1,5 +1,3 @@
-use ruff_python_ast::{self as ast, Stmt};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::{Definition, Member, MemberKind};
@@ -55,14 +53,13 @@ impl Violation for NoSignature {
 /// D402
 pub(crate) fn no_signature(checker: &mut Checker, docstring: &Docstring) {
     let Definition::Member(Member {
-        kind: MemberKind::Function | MemberKind::NestedFunction | MemberKind::Method,
-        stmt,
+        kind:
+            MemberKind::Function(function)
+            | MemberKind::NestedFunction(function)
+            | MemberKind::Method(function),
         ..
     }) = docstring.definition
     else {
-        return;
-    };
-    let Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) = stmt else {
         return;
     };
 
@@ -75,8 +72,8 @@ pub(crate) fn no_signature(checker: &mut Checker, docstring: &Docstring) {
     // Search for occurrences of the function name followed by an open parenthesis (e.g., `foo(` for
     // a function named `foo`).
     if first_line
-        .match_indices(name.as_str())
-        .any(|(index, _)| first_line[index + name.len()..].starts_with('('))
+        .match_indices(function.name.as_str())
+        .any(|(index, _)| first_line[index + function.name.len()..].starts_with('('))
     {
         checker
             .diagnostics

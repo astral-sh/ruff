@@ -1,6 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::cast;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::is_overload;
 use ruff_python_semantic::{Definition, Member, MemberKind};
@@ -81,17 +80,20 @@ impl Violation for OverloadWithDocstring {
 /// D418
 pub(crate) fn if_needed(checker: &mut Checker, docstring: &Docstring) {
     let Definition::Member(Member {
-        kind: MemberKind::Function | MemberKind::NestedFunction | MemberKind::Method,
-        stmt,
+        kind:
+            MemberKind::Function(function)
+            | MemberKind::NestedFunction(function)
+            | MemberKind::Method(function),
         ..
     }) = docstring.definition
     else {
         return;
     };
-    if !is_overload(cast::decorator_list(stmt), checker.semantic()) {
+    if !is_overload(&function.decorator_list, checker.semantic()) {
         return;
     }
-    checker
-        .diagnostics
-        .push(Diagnostic::new(OverloadWithDocstring, stmt.identifier()));
+    checker.diagnostics.push(Diagnostic::new(
+        OverloadWithDocstring,
+        function.identifier(),
+    ));
 }

@@ -105,8 +105,10 @@ static INNER_FUNCTION_OR_CLASS_REGEX: Lazy<Regex> =
 /// D201, D202
 pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring) {
     let Definition::Member(Member {
-        kind: MemberKind::Function | MemberKind::NestedFunction | MemberKind::Method,
-        stmt,
+        kind:
+            MemberKind::Function(function)
+            | MemberKind::NestedFunction(function)
+            | MemberKind::Method(function),
         ..
     }) = docstring.definition
     else {
@@ -116,9 +118,9 @@ pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Doc
     if checker.enabled(Rule::NoBlankLineBeforeFunction) {
         let before = checker
             .locator()
-            .slice(TextRange::new(stmt.start(), docstring.start()));
+            .slice(TextRange::new(function.start(), docstring.start()));
 
-        let mut lines = UniversalNewlineIterator::with_offset(before, stmt.start()).rev();
+        let mut lines = UniversalNewlineIterator::with_offset(before, function.start()).rev();
         let mut blank_lines_before = 0usize;
         let mut blank_lines_start = lines.next().map(|l| l.end()).unwrap_or_default();
 
@@ -152,7 +154,7 @@ pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Doc
     if checker.enabled(Rule::NoBlankLineAfterFunction) {
         let after = checker
             .locator()
-            .slice(TextRange::new(docstring.end(), stmt.end()));
+            .slice(TextRange::new(docstring.end(), function.end()));
 
         // If the docstring is only followed by blank and commented lines, abort.
         let all_blank_after = after.universal_newlines().skip(1).all(|line| {

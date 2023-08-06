@@ -1,16 +1,17 @@
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff_python_ast::{self as ast, ParameterWithDefault, Stmt};
+use ruff_python_ast::ParameterWithDefault;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::cast;
+
 use ruff_python_ast::docstrings::{clean_space, leading_space};
 use ruff_python_ast::identifier::Identifier;
+
 use ruff_python_semantic::analyze::visibility::is_staticmethod;
 use ruff_python_semantic::{Definition, Member, MemberKind};
 use ruff_python_trivia::{textwrap::dedent, PythonWhitespace};
@@ -1718,15 +1719,13 @@ fn common_section(
 
 fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &FxHashSet<String>) {
     let Definition::Member(Member {
-        kind: MemberKind::Function | MemberKind::NestedFunction | MemberKind::Method,
-        stmt,
+        kind:
+            MemberKind::Function(function)
+            | MemberKind::NestedFunction(function)
+            | MemberKind::Method(function),
         ..
     }) = docstring.definition
     else {
-        return;
-    };
-
-    let Stmt::FunctionDef(ast::StmtFunctionDef { parameters, .. }) = stmt else {
         return;
     };
 
@@ -1736,16 +1735,17 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
         parameter,
         default: _,
         range: _,
-    } in parameters
+    } in function
+        .parameters
         .posonlyargs
         .iter()
-        .chain(&parameters.args)
-        .chain(&parameters.kwonlyargs)
+        .chain(&function.parameters.args)
+        .chain(&function.parameters.kwonlyargs)
         .skip(
             // If this is a non-static method, skip `cls` or `self`.
             usize::from(
                 docstring.definition.is_method()
-                    && !is_staticmethod(cast::decorator_list(stmt), checker.semantic()),
+                    && !is_staticmethod(&function.decorator_list, checker.semantic()),
             ),
         )
     {
@@ -1757,7 +1757,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
 
     // Check specifically for `vararg` and `kwarg`, which can be prefixed with a
     // single or double star, respectively.
-    if let Some(arg) = &parameters.vararg {
+    if let Some(arg) = function.parameters.vararg.as_ref() {
         let arg_name = arg.name.as_str();
         let starred_arg_name = format!("*{arg_name}");
         if !arg_name.starts_with('_')
@@ -1767,7 +1767,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
             missing_arg_names.insert(starred_arg_name);
         }
     }
-    if let Some(arg) = &parameters.kwarg {
+    if let Some(arg) = function.parameters.kwarg.as_ref() {
         let arg_name = arg.name.as_str();
         let starred_arg_name = format!("**{arg_name}");
         if !arg_name.starts_with('_')
@@ -1786,7 +1786,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
                     definition: definition.to_string(),
                     names,
                 },
-                stmt.identifier(),
+                function.identifier(),
             ));
         }
     }

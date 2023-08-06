@@ -1,13 +1,11 @@
-use ruff_text_size::TextRange;
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::cast;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::{
     is_call, is_init, is_magic, is_new, is_overload, is_override, Visibility,
 };
 use ruff_python_semantic::{Definition, Member, MemberKind, Module, ModuleKind};
+use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -557,82 +555,82 @@ pub(crate) fn not_missing(
             false
         }
         Definition::Member(Member {
-            kind: MemberKind::Class,
-            stmt,
+            kind: MemberKind::Class(class),
             ..
         }) => {
             if checker.enabled(Rule::UndocumentedPublicClass) {
                 checker
                     .diagnostics
-                    .push(Diagnostic::new(UndocumentedPublicClass, stmt.identifier()));
+                    .push(Diagnostic::new(UndocumentedPublicClass, class.identifier()));
             }
             false
         }
         Definition::Member(Member {
-            kind: MemberKind::NestedClass,
-            stmt,
+            kind: MemberKind::NestedClass(function),
             ..
         }) => {
             if checker.enabled(Rule::UndocumentedPublicNestedClass) {
                 checker.diagnostics.push(Diagnostic::new(
                     UndocumentedPublicNestedClass,
-                    stmt.identifier(),
+                    function.identifier(),
                 ));
             }
             false
         }
         Definition::Member(Member {
-            kind: MemberKind::Function | MemberKind::NestedFunction,
-            stmt,
+            kind: MemberKind::Function(function) | MemberKind::NestedFunction(function),
             ..
         }) => {
-            if is_overload(cast::decorator_list(stmt), checker.semantic()) {
+            if is_overload(&function.decorator_list, checker.semantic()) {
                 true
             } else {
                 if checker.enabled(Rule::UndocumentedPublicFunction) {
                     checker.diagnostics.push(Diagnostic::new(
                         UndocumentedPublicFunction,
-                        stmt.identifier(),
+                        function.identifier(),
                     ));
                 }
                 false
             }
         }
         Definition::Member(Member {
-            kind: MemberKind::Method,
-            stmt,
+            kind: MemberKind::Method(function),
             ..
         }) => {
-            if is_overload(cast::decorator_list(stmt), checker.semantic())
-                || is_override(cast::decorator_list(stmt), checker.semantic())
+            if is_overload(&function.decorator_list, checker.semantic())
+                || is_override(&function.decorator_list, checker.semantic())
             {
                 true
-            } else if is_init(cast::name(stmt)) {
+            } else if is_init(&function.name) {
                 if checker.enabled(Rule::UndocumentedPublicInit) {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(UndocumentedPublicInit, stmt.identifier()));
+                    checker.diagnostics.push(Diagnostic::new(
+                        UndocumentedPublicInit,
+                        function.identifier(),
+                    ));
                 }
                 true
-            } else if is_new(cast::name(stmt)) || is_call(cast::name(stmt)) {
+            } else if is_new(&function.name) || is_call(&function.name) {
                 if checker.enabled(Rule::UndocumentedPublicMethod) {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(UndocumentedPublicMethod, stmt.identifier()));
+                    checker.diagnostics.push(Diagnostic::new(
+                        UndocumentedPublicMethod,
+                        function.identifier(),
+                    ));
                 }
                 true
-            } else if is_magic(cast::name(stmt)) {
+            } else if is_magic(&function.name) {
                 if checker.enabled(Rule::UndocumentedMagicMethod) {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(UndocumentedMagicMethod, stmt.identifier()));
+                    checker.diagnostics.push(Diagnostic::new(
+                        UndocumentedMagicMethod,
+                        function.identifier(),
+                    ));
                 }
                 true
             } else {
                 if checker.enabled(Rule::UndocumentedPublicMethod) {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(UndocumentedPublicMethod, stmt.identifier()));
+                    checker.diagnostics.push(Diagnostic::new(
+                        UndocumentedPublicMethod,
+                        function.identifier(),
+                    ));
                 }
                 true
             }

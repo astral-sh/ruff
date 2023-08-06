@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use ruff_python_ast::call_path::from_qualified_name;
-use ruff_python_ast::cast;
+
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::str::is_implicit_concatenation;
 use ruff_python_semantic::{Definition, Member, MemberKind, SemanticModel};
@@ -49,12 +49,14 @@ pub(crate) fn should_ignore_definition(
     }
 
     if let Definition::Member(Member {
-        kind: MemberKind::Function | MemberKind::NestedFunction | MemberKind::Method,
-        stmt,
+        kind:
+            MemberKind::Function(function)
+            | MemberKind::NestedFunction(function)
+            | MemberKind::Method(function),
         ..
     }) = definition
     {
-        for decorator in cast::decorator_list(stmt) {
+        for decorator in &function.decorator_list {
             if let Some(call_path) = semantic.resolve_call_path(map_callable(&decorator.expression))
             {
                 if ignore_decorators

@@ -4,7 +4,7 @@ use ruff_text_size::{TextRange, TextSize};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{is_triple_quote, leading_quote};
-use ruff_python_semantic::{Definition, Member};
+use ruff_python_semantic::Definition;
 use ruff_source_file::{NewlineWithTrailingNewline, UniversalNewlineIterator};
 
 use crate::checkers::ast::Checker;
@@ -164,11 +164,11 @@ pub(crate) fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstr
 
                     // If the docstring isn't on its own line, look at the statement indentation,
                     // and add the default indentation to get the "right" level.
-                    if let Definition::Member(Member { stmt, .. }) = &docstring.definition {
-                        let stmt_line_start = checker.locator().line_start(stmt.start());
+                    if let Definition::Member(member) = &docstring.definition {
+                        let stmt_line_start = checker.locator().line_start(member.start());
                         let stmt_indentation = checker
                             .locator()
-                            .slice(TextRange::new(stmt_line_start, stmt.start()));
+                            .slice(TextRange::new(stmt_line_start, member.start()));
 
                         if stmt_indentation.chars().all(char::is_whitespace) {
                             indentation.clear();

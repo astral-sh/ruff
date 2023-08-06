@@ -156,8 +156,7 @@ impl AlwaysAutofixableViolation for BlankLineBeforeClass {
 /// D203, D204, D211
 pub(crate) fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
     let Definition::Member(Member {
-        kind: MemberKind::Class | MemberKind::NestedClass,
-        stmt,
+        kind: MemberKind::Class(class) | MemberKind::NestedClass(class),
         ..
     }) = docstring.definition
     else {
@@ -168,7 +167,7 @@ pub(crate) fn blank_before_after_class(checker: &mut Checker, docstring: &Docstr
     // ```python
     // class PhotoMetadata: """Metadata about a photo."""
     // ```
-    let between_range = TextRange::new(stmt.start(), docstring.start());
+    let between_range = TextRange::new(class.start(), docstring.start());
     if !checker.locator().contains_line_break(between_range) {
         return;
     }
@@ -223,7 +222,7 @@ pub(crate) fn blank_before_after_class(checker: &mut Checker, docstring: &Docstr
     }
 
     if checker.enabled(Rule::OneBlankLineAfterClass) {
-        let after_range = TextRange::new(docstring.end(), stmt.end());
+        let after_range = TextRange::new(docstring.end(), class.end());
 
         let after = checker.locator().slice(after_range);
 

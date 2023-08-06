@@ -60,7 +60,7 @@ pub(crate) fn capitalized(checker: &mut Checker, docstring: &Docstring) {
     if !matches!(
         docstring.definition,
         Definition::Member(Member {
-            kind: MemberKind::Function | MemberKind::NestedFunction | MemberKind::Method,
+            kind: MemberKind::Function(_) | MemberKind::NestedFunction(_) | MemberKind::Method(_),
             ..
         })
     ) {
