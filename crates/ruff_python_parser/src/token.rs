@@ -64,7 +64,7 @@ pub enum Tok {
     /// Token value for a dedent.
     Dedent,
     EndOfFile,
-    /// Token value for a question mark `?`.
+    /// Token value for a question mark `?`. This is only used in [`Mode::Jupyter`].
     Question,
     /// Token value for a left parenthesis `(`.
     Lpar,
