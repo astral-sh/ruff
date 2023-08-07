@@ -72,11 +72,14 @@ pub(crate) fn no_signature(checker: &mut Checker, docstring: &Docstring) {
         return;
     };
 
-    if !first_line.contains(&format!("{name}(")) {
-        return;
-    };
-
-    checker
-        .diagnostics
-        .push(Diagnostic::new(NoSignature, docstring.range()));
+    // Search for occurrences of the function name followed by an open parenthesis (e.g., `foo(` for
+    // a function named `foo`).
+    if first_line
+        .match_indices(name.as_str())
+        .any(|(index, _)| first_line[index + name.len()..].starts_with('('))
+    {
+        checker
+            .diagnostics
+            .push(Diagnostic::new(NoSignature, docstring.range()));
+    }
 }
