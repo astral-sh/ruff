@@ -11,7 +11,7 @@ use crate::comments::{
     leading_comments, leading_node_comments, trailing_comments, CommentLinePosition, SourceComment,
 };
 use crate::context::{NodeLevel, WithNodeLevel};
-use crate::expression::parentheses::parenthesized_with_dangling_comments;
+use crate::expression::parentheses::parenthesized;
 use crate::prelude::*;
 use crate::FormatNodeRule;
 
@@ -256,12 +256,8 @@ impl FormatNodeRule<Parameters> for FormatParameters {
         } else {
             write!(
                 f,
-                [parenthesized_with_dangling_comments(
-                    "(",
-                    parenthesis_dangling,
-                    &group(&format_inner),
-                    ")"
-                )]
+                [parenthesized("(", &group(&format_inner), ")")
+                    .with_dangling_comments(parenthesis_dangling)]
             )
         }
     }

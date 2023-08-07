@@ -6,9 +6,7 @@ use ruff_text_size::TextRange;
 
 use crate::builders::empty_parenthesized_with_dangling_comments;
 use crate::comments::leading_comments;
-use crate::expression::parentheses::{
-    parenthesized_with_dangling_comments, NeedsParentheses, OptionalParentheses,
-};
+use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 use crate::FormatNodeRule;
 
@@ -86,7 +84,9 @@ impl FormatNodeRule<ExprDict> for FormatExprDict {
             joiner.finish()
         });
 
-        parenthesized_with_dangling_comments("{", dangling, &format_pairs, "}").fmt(f)
+        parenthesized("{", &format_pairs, "}")
+            .with_dangling_comments(dangling)
+            .fmt(f)
     }
 
     fn fmt_dangling_comments(&self, _node: &ExprDict, _f: &mut PyFormatter) -> FormatResult<()> {
