@@ -91,7 +91,7 @@ struct FormatValue<'a> {
     value: &'a Expr,
 }
 
-impl FormatValue<'_> {
+impl Format<PyFormatContext<'_>> for FormatValue<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         match self.value {
             Expr::BoolOp(bool_op)
