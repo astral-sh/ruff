@@ -35,6 +35,7 @@ pub(crate) mod pattern;
 mod prelude;
 pub(crate) mod statement;
 pub(crate) mod type_param;
+mod verbatim;
 
 include!("../../ruff_formatter/shared_traits.rs");
 
@@ -237,7 +238,7 @@ impl Format<PyFormatContext<'_>> for NotYetImplementedCustomText<'_> {
 pub(crate) struct VerbatimText(TextRange);
 
 #[allow(unused)]
-pub(crate) fn verbatim_text<T>(item: &T) -> VerbatimText
+pub(crate) fn verbatim_text<T>(item: T) -> VerbatimText
 where
     T: Ranged,
 {
