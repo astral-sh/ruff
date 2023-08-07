@@ -85,7 +85,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
         write!(
             f,
             [
-                // The outer group is for things like
+                // The outer group is for things like:
                 // ```python
                 // get_collection(
                 //     hey_this_is_a_very_long_call,
@@ -100,7 +100,6 @@ impl FormatNodeRule<Arguments> for FormatArguments {
                 //     hey_this_is_a_very_long_call, it_has_funny_attributes_asdf_asdf, really=True
                 // )
                 // ```
-                // TODO(konstin): Doesn't work see wrongly formatted test
                 parenthesized_with_dangling_comments(
                     "(",
                     dangling_comments,
