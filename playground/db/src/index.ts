@@ -33,10 +33,20 @@ export default {
       }
     }
 
+    // URLs take the form `https://db.astral-1ad.workers.dev/<key>`. A `GET` request
+    // will return the value associated with the key, while a `POST` request will
+    // set the value associated with the key.
+    const { pathname } = new URL(request.url);
+    const key = pathname.slice(1);
+    if (!key) {
+      return new Response("Not Found", {
+        status: 404,
+        headers: HEADERS,
+      });
+    }
+
     switch (request.method) {
       case "GET": {
-        const { pathname } = new URL(request.url);
-        const key = pathname.slice(1);
         const value = await PLAYGROUND.get(key);
         if (value === null) {
           return new Response("Not Found", {
@@ -51,8 +61,6 @@ export default {
       }
 
       case "POST": {
-        const { pathname } = new URL(request.url);
-        const key = pathname.slice(1);
         const value = await request.text();
         await PLAYGROUND.put(key, value);
         return new Response("OK", {

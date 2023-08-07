@@ -1,3 +1,4 @@
+import lzstring from "lz-string";
 import { v4 as uuidv4 } from "uuid";
 import { get, set } from "./db";
 
@@ -36,20 +37,34 @@ export async function persist(
  * Restore the configuration from a URL.
  */
 export async function restore(): Promise<[string, string] | null> {
-  const id = window.location.pathname.slice(1);
-  if (!id) {
-    return restoreLocal();
+  // Legacy URLs, stored as encoded strings in the hash, like:
+  //     https://play.ruff.rs/#eyJzZXR0aW5nc1NvdXJjZ...
+  const hash = window.location.hash.slice(1);
+  if (hash) {
+    const value = lzstring.decompressFromEncodedURIComponent(
+      window.location.hash.slice(1),
+    )!;
+    const [settingsSource, pythonSource] = value.split("$$$");
+    return [settingsSource.replaceAll("$$$$$$", "$$$"), pythonSource];
   }
 
-  const response = await get<{
-    settingsSource: string;
-    pythonSource: string;
-  }>(id);
-  if (response == null) {
-    return null;
+  // URLs stored in the database, like:
+  //     https://play.ruff.rs/1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed
+  const id = window.location.pathname.slice(1);
+  if (id) {
+    const response = await get<{
+      settingsSource: string;
+      pythonSource: string;
+    }>(id);
+    if (response == null) {
+      return null;
+    }
+    const { settingsSource, pythonSource } = response;
+    return [settingsSource, pythonSource];
   }
-  const { settingsSource, pythonSource } = response;
-  return [settingsSource, pythonSource];
+
+  // If no URL is present, restore from local storage.
+  return restoreLocal();
 }
 
 function restoreLocal(): [string, string] | null {
