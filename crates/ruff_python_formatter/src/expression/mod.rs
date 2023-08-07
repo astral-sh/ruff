@@ -178,10 +178,9 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
             Parenthesize::Optional | Parenthesize::IfBreaks => needs_parentheses,
         };
 
-        let can_omit_optional_parentheses = can_omit_optional_parentheses(expression, f.context());
         match needs_parentheses {
             OptionalParentheses::Multiline if *parenthesize != Parenthesize::IfRequired => {
-                if can_omit_optional_parentheses {
+                if can_omit_optional_parentheses(expression, f.context()) {
                     optional_parentheses(&expression.format().with_options(Parentheses::Never))
                         .fmt(f)
                 } else {
@@ -407,9 +406,12 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 attr: _,
                 ctx: _,
             }) => {
+                self.visit_expr(value);
                 if has_parentheses(value, self.source) {
                     self.update_max_priority(OperatorPriority::Attribute);
                 }
+                self.last = Some(expr);
+                return;
             }
 
             Expr::NamedExpr(_)
