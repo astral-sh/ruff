@@ -67,7 +67,7 @@ def foo():
 ```py
 # leading match comment
 match foo:  # dangling match comment
-    case NOT_YET_IMPLEMENTED_MatchCase:
+    case NOT_YET_IMPLEMENTED_Pattern:
         pass
 
 
@@ -78,7 +78,7 @@ match (
     foo  # trailing expr comment
     # another trailing expr comment
 ):  # dangling match comment
-    case NOT_YET_IMPLEMENTED_MatchCase:
+    case NOT_YET_IMPLEMENTED_Pattern:
         pass
 
 
@@ -86,19 +86,19 @@ match (
 match (  # hello
     foo,  # trailing expr comment  # another
 ):  # dangling match comment
-    case NOT_YET_IMPLEMENTED_MatchCase:
+    case NOT_YET_IMPLEMENTED_Pattern:
         pass
 
 
 match [first, second, third]:  # another comment  # comment
-    case NOT_YET_IMPLEMENTED_MatchCase:
+    case NOT_YET_IMPLEMENTED_Pattern:
         pass
 
 match (
     # comment
     "a b c"
 ).split():  # another comment
-    case NOT_YET_IMPLEMENTED_MatchCase:
+    case NOT_YET_IMPLEMENTED_Pattern:
         pass
 
 
@@ -107,18 +107,18 @@ match (
     # let's go
     yield foo
 ):  # another comment
-    case NOT_YET_IMPLEMENTED_MatchCase:
+    case NOT_YET_IMPLEMENTED_Pattern:
         pass
 
 
 match aaaaaaaaahhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh:  # comment
-    case NOT_YET_IMPLEMENTED_MatchCase:
+    case NOT_YET_IMPLEMENTED_Pattern:
         pass
 
 
 def foo():
     match inside_func:  # comment
-        case NOT_YET_IMPLEMENTED_MatchCase:
+        case NOT_YET_IMPLEMENTED_Pattern:
             pass
 ```
 
