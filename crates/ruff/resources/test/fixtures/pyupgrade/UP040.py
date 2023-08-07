@@ -9,6 +9,10 @@ x: TypeAlias = int
 T = typing.TypeVar["T"]
 x: typing.TypeAlias = list[T]
 
+# UP040 call style generic (todo)
+T = typing.TypeVar("T")
+x: typing.TypeAlias = list[T]
+
 # UP040 bounded generic (todo)
 T = typing.TypeVar("T", bound=int)
 x: typing.TypeAlias = list[T]

@@ -48,7 +48,7 @@ UP040.py:10:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
 10 | x: typing.TypeAlias = list[T]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
 11 | 
-12 | # UP040 bounded generic (todo)
+12 | # UP040 call style generic (todo)
    |
    = help: Use the `type` keyword
 
@@ -59,128 +59,149 @@ UP040.py:10:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
 10    |-x: typing.TypeAlias = list[T]
    10 |+type x[T] = list[T]
 11 11 | 
-12 12 | # UP040 bounded generic (todo)
-13 13 | T = typing.TypeVar("T", bound=int)
+12 12 | # UP040 call style generic (todo)
+13 13 | T = typing.TypeVar("T")
 
 UP040.py:14:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
    |
-12 | # UP040 bounded generic (todo)
-13 | T = typing.TypeVar("T", bound=int)
+12 | # UP040 call style generic (todo)
+13 | T = typing.TypeVar("T")
 14 | x: typing.TypeAlias = list[T]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
 15 | 
-16 | T = typing.TypeVar("T", int, str)
+16 | # UP040 bounded generic (todo)
    |
    = help: Use the `type` keyword
 
 ℹ Fix
 11 11 | 
-12 12 | # UP040 bounded generic (todo)
-13 13 | T = typing.TypeVar("T", bound=int)
+12 12 | # UP040 call style generic (todo)
+13 13 | T = typing.TypeVar("T")
 14    |-x: typing.TypeAlias = list[T]
    14 |+type x = list[T]
 15 15 | 
-16 16 | T = typing.TypeVar("T", int, str)
-17 17 | x: typing.TypeAlias = list[T]
+16 16 | # UP040 bounded generic (todo)
+17 17 | T = typing.TypeVar("T", bound=int)
 
-UP040.py:17:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+UP040.py:18:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
    |
-16 | T = typing.TypeVar("T", int, str)
-17 | x: typing.TypeAlias = list[T]
+16 | # UP040 bounded generic (todo)
+17 | T = typing.TypeVar("T", bound=int)
+18 | x: typing.TypeAlias = list[T]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
-18 | 
-19 | # UP040 contravariant generic (todo)
+19 | 
+20 | T = typing.TypeVar("T", int, str)
    |
    = help: Use the `type` keyword
 
 ℹ Fix
-14 14 | x: typing.TypeAlias = list[T]
 15 15 | 
-16 16 | T = typing.TypeVar("T", int, str)
-17    |-x: typing.TypeAlias = list[T]
-   17 |+type x = list[T]
-18 18 | 
-19 19 | # UP040 contravariant generic (todo)
-20 20 | T = typing.TypeVar("T", contravariant=True)
+16 16 | # UP040 bounded generic (todo)
+17 17 | T = typing.TypeVar("T", bound=int)
+18    |-x: typing.TypeAlias = list[T]
+   18 |+type x = list[T]
+19 19 | 
+20 20 | T = typing.TypeVar("T", int, str)
+21 21 | x: typing.TypeAlias = list[T]
 
 UP040.py:21:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
    |
-19 | # UP040 contravariant generic (todo)
-20 | T = typing.TypeVar("T", contravariant=True)
+20 | T = typing.TypeVar("T", int, str)
 21 | x: typing.TypeAlias = list[T]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
 22 | 
-23 | # UP040 covariant generic (todo)
+23 | # UP040 contravariant generic (todo)
    |
    = help: Use the `type` keyword
 
 ℹ Fix
-18 18 | 
-19 19 | # UP040 contravariant generic (todo)
-20 20 | T = typing.TypeVar("T", contravariant=True)
+18 18 | x: typing.TypeAlias = list[T]
+19 19 | 
+20 20 | T = typing.TypeVar("T", int, str)
 21    |-x: typing.TypeAlias = list[T]
    21 |+type x = list[T]
 22 22 | 
-23 23 | # UP040 covariant generic (todo)
-24 24 | T = typing.TypeVar("T", covariant=True)
+23 23 | # UP040 contravariant generic (todo)
+24 24 | T = typing.TypeVar("T", contravariant=True)
 
 UP040.py:25:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
    |
-23 | # UP040 covariant generic (todo)
-24 | T = typing.TypeVar("T", covariant=True)
+23 | # UP040 contravariant generic (todo)
+24 | T = typing.TypeVar("T", contravariant=True)
 25 | x: typing.TypeAlias = list[T]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
+26 | 
+27 | # UP040 covariant generic (todo)
+   |
+   = help: Use the `type` keyword
+
+ℹ Fix
+22 22 | 
+23 23 | # UP040 contravariant generic (todo)
+24 24 | T = typing.TypeVar("T", contravariant=True)
+25    |-x: typing.TypeAlias = list[T]
+   25 |+type x = list[T]
+26 26 | 
+27 27 | # UP040 covariant generic (todo)
+28 28 | T = typing.TypeVar("T", covariant=True)
+
+UP040.py:29:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+   |
+27 | # UP040 covariant generic (todo)
+28 | T = typing.TypeVar("T", covariant=True)
+29 | x: typing.TypeAlias = list[T]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
    |
    = help: Use the `type` keyword
 
 ℹ Fix
-22 22 | 
-23 23 | # UP040 covariant generic (todo)
-24 24 | T = typing.TypeVar("T", covariant=True)
-25    |-x: typing.TypeAlias = list[T]
-   25 |+type x = list[T]
 26 26 | 
-27 27 | 
-28 28 | # UP040 in class scope
+27 27 | # UP040 covariant generic (todo)
+28 28 | T = typing.TypeVar("T", covariant=True)
+29    |-x: typing.TypeAlias = list[T]
+   29 |+type x = list[T]
+30 30 | 
+31 31 | 
+32 32 | # UP040 in class scope
 
-UP040.py:32:5: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+UP040.py:36:5: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
    |
-30 | class Foo:
-31 |     # reference to global variable
-32 |     x: typing.TypeAlias = list[T]
+34 | class Foo:
+35 |     # reference to global variable
+36 |     x: typing.TypeAlias = list[T]
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
-33 | 
-34 |     # reference to class variable
+37 | 
+38 |     # reference to class variable
    |
    = help: Use the `type` keyword
 
 ℹ Fix
-29 29 | T = typing.TypeVar["T"]
-30 30 | class Foo:
-31 31 |     # reference to global variable
-32    |-    x: typing.TypeAlias = list[T]
-   32 |+    type x[T] = list[T]
-33 33 | 
-34 34 |     # reference to class variable
-35 35 |     TCLS = typing.TypeVar["TCLS"]
+33 33 | T = typing.TypeVar["T"]
+34 34 | class Foo:
+35 35 |     # reference to global variable
+36    |-    x: typing.TypeAlias = list[T]
+   36 |+    type x[T] = list[T]
+37 37 | 
+38 38 |     # reference to class variable
+39 39 |     TCLS = typing.TypeVar["TCLS"]
 
-UP040.py:36:5: UP040 [*] Type alias `y` uses `TypeAlias` annotation instead of the `type` keyword
+UP040.py:40:5: UP040 [*] Type alias `y` uses `TypeAlias` annotation instead of the `type` keyword
    |
-34 |     # reference to class variable
-35 |     TCLS = typing.TypeVar["TCLS"]
-36 |     y: typing.TypeAlias = list[TCLS]
+38 |     # reference to class variable
+39 |     TCLS = typing.TypeVar["TCLS"]
+40 |     y: typing.TypeAlias = list[TCLS]
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
    |
    = help: Use the `type` keyword
 
 ℹ Fix
-33 33 | 
-34 34 |     # reference to class variable
-35 35 |     TCLS = typing.TypeVar["TCLS"]
-36    |-    y: typing.TypeAlias = list[TCLS]
-   36 |+    type y[TCLS] = list[TCLS]
 37 37 | 
-38 38 | 
-39 39 | 
+38 38 |     # reference to class variable
+39 39 |     TCLS = typing.TypeVar["TCLS"]
+40    |-    y: typing.TypeAlias = list[TCLS]
+   40 |+    type y[TCLS] = list[TCLS]
+41 41 | 
+42 42 | 
+43 43 | 
 
 
