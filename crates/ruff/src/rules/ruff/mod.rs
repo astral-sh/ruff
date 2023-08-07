@@ -157,6 +157,16 @@ mod tests {
     }
 
     #[test]
+    fn ruf100_4() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF100_4.py"),
+            &settings::Settings::for_rules(vec![Rule::UnusedNOQA, Rule::UnusedImport]),
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn flake8_noqa() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/flake8_noqa.py"),
