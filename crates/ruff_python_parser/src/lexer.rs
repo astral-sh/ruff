@@ -428,6 +428,18 @@ impl<'source> Lexer<'source> {
                     self.cursor.bump();
                     value.push('\\');
                 }
+                // Help end escape commands are those that end with 1 or 2 question marks.
+                // Here, we're only looking for a subset of help end escape commands which
+                // are the ones that has the escape token at the start of the line as well.
+                // On the other hand, we're not looking for help end escape commands that
+                // are strict in the sense that the escape token is only at the end. For example,
+                //
+                //   * `%foo?` is recognized as a help end escape command but not as a strict one.
+                //   * `foo?` is recognized as a strict help end escape command which is not
+                //     lexed here but is identified at the parser level.
+                //
+                // Help end escape commands implemented in the IPython codebase using regex:
+                // https://github.com/ipython/ipython/blob/292e3a23459ca965b8c1bfe2c3707044c510209a/IPython/core/inputtransformer2.py#L454-L462
                 '?' => {
                     self.cursor.bump();
                     let mut question_count = 1u32;
@@ -435,14 +447,23 @@ impl<'source> Lexer<'source> {
                         question_count += 1;
                     }
 
-                    // The help end magic command is valid if it has 1 or 2 question marks.
-                    // If the `value` is empty i.e., we are at the start of the line,
-                    // then we can't be sure if it is a help end magic command or not.
+                    // The original implementation in the IPython codebase is based on regex which
+                    // means that it's strict in the sense that it won't recognize a help end escape:
+                    //   * If there's any whitespace before the escape token (e.g. `%foo ?`)
+                    //   * If there are more than 2 question mark tokens (e.g. `%foo???`)
+                    // which is what we're doing here as well. In that case, we'll continue with
+                    // the prefixed escape token.
+                    //
+                    // Now, the whitespace and empty value check also makes sure that an empty
+                    // command (e.g. `%?` or `? ??`, no value after/between the escape tokens)
+                    // is not recognized as a help end escape command. So, `%?` and `? ??` are
+                    // `MagicKind::Magic` and `MagicKind::Help` because of the initial `%` and `??`
+                    // tokens.
                     if question_count > 2
                         || value.chars().last().map_or(true, is_python_whitespace)
                         || !matches!(self.cursor.first(), '\n' | '\r' | EOF_CHAR)
                     {
-                        // Not a help end magic command, so continue with the lexing.
+                        // Not a help end escape command, so continue with the lexing.
                         value.reserve(question_count as usize);
                         for _ in 0..question_count {
                             value.push('?');
@@ -451,10 +472,21 @@ impl<'source> Lexer<'source> {
                     }
 
                     if kind.is_help() {
+                        // If we've recognize this as a help end escape command, then
+                        // any question mark token / whitespaces at the start are not
+                        // considered as part of the value.
+                        //
+                        // For example, `??foo?` is recognized as `MagicKind::Help` and
+                        // `value` is `foo` instead of `??foo`.
                         value = value.trim_start_matches([' ', '?']).to_string();
                     } else if kind.is_magic() {
+                        // Between `%` and `?` (at the end), the `?` takes priority
+                        // over the `%` so `%foo?` is recognized as `MagicKind::Help`
+                        // and `value` is `%foo` instead of `foo`. So, we need to
+                        // insert the magic escape token at the start.
                         value.insert_str(0, kind.as_str());
                     }
+
                     let kind = match question_count {
                         1 => MagicKind::Help,
                         2 => MagicKind::Help2,
