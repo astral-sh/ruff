@@ -44,11 +44,7 @@ impl FormatNodeRule<ExprBoolOp> for FormatExprBoolOp {
                 return Ok(());
             };
 
-            if self.wrap.is_some_and(|value| value) {
-                write!(f, [&first.format()])?;
-            } else {
-                write!(f, [in_parentheses_only_group(&first.format())])?;
-            }
+            write!(f, [in_parentheses_only_group(&first.format())])?;
 
             for value in values {
                 let leading_value_comments = comments.leading_comments(value);
@@ -80,7 +76,11 @@ impl FormatNodeRule<ExprBoolOp> for FormatExprBoolOp {
             Ok(())
         });
 
-        in_parentheses_only_group(&inner).fmt(f)
+        if self.wrap.is_some_and(|value| value) {
+            inner.fmt(f)
+        } else {
+            in_parentheses_only_group(&inner).fmt(f)
+        }
     }
 }
 
