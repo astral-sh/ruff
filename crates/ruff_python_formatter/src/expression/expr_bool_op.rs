@@ -5,18 +5,27 @@ use crate::expression::parentheses::{
 };
 use crate::prelude::*;
 use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
-use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{BoolOp, ExprBoolOp};
+use ruff_python_ast::node::{AnyNodeRef, AstNode};
+use ruff_python_ast::{BoolOp, Expr, ExprBoolOp};
+
+use super::parentheses::is_expression_parenthesized;
 
 #[derive(Default)]
 pub struct FormatExprBoolOp {
     parentheses: Option<Parentheses>,
+    chained: bool,
+}
+
+pub struct BoolOpLayout {
+    pub(crate) parentheses: Option<Parentheses>,
+    pub(crate) chained: bool,
 }
 
 impl FormatRuleWithOptions<ExprBoolOp, PyFormatContext<'_>> for FormatExprBoolOp {
-    type Options = Option<Parentheses>;
+    type Options = BoolOpLayout;
     fn with_options(mut self, options: Self::Options) -> Self {
-        self.parentheses = options;
+        self.parentheses = options.parentheses;
+        self.chained = options.chained;
         self
     }
 }
@@ -37,7 +46,7 @@ impl FormatNodeRule<ExprBoolOp> for FormatExprBoolOp {
                 return Ok(());
             };
 
-            write!(f, [in_parentheses_only_group(&first.format())])?;
+            FormatValue { value: first }.fmt(f)?;
 
             for value in values {
                 let leading_value_comments = comments.leading_comments(value);
@@ -51,20 +60,20 @@ impl FormatNodeRule<ExprBoolOp> for FormatExprBoolOp {
                     )?;
                 }
 
-                write!(
-                    f,
-                    [
-                        op.format(),
-                        space(),
-                        in_parentheses_only_group(&value.format())
-                    ]
-                )?;
+                write!(f, [op.format(), space(),])?;
+
+                FormatValue { value }.fmt(f)?;
             }
 
             Ok(())
         });
 
-        in_parentheses_only_group(&inner).fmt(f)
+        if self.chained {
+            // Chained boolean operations should not be given a new group
+            inner.fmt(f)
+        } else {
+            in_parentheses_only_group(&inner).fmt(f)
+        }
     }
 }
 
@@ -75,6 +84,33 @@ impl NeedsParentheses for ExprBoolOp {
         _context: &PyFormatContext,
     ) -> OptionalParentheses {
         OptionalParentheses::Multiline
+    }
+}
+
+struct FormatValue<'a> {
+    value: &'a Expr,
+}
+
+impl Format<PyFormatContext<'_>> for FormatValue<'_> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
+        match self.value {
+            Expr::BoolOp(bool_op)
+                if !is_expression_parenthesized(
+                    bool_op.as_any_node_ref(),
+                    f.context().source(),
+                ) =>
+            {
+                // Mark chained boolean operations e.g. `x and y or z` and avoid creating a new group
+                write!(
+                    f,
+                    [bool_op.format().with_options(BoolOpLayout {
+                        parentheses: None,
+                        chained: true,
+                    })]
+                )
+            }
+            _ => write!(f, [in_parentheses_only_group(&self.value.format())]),
+        }
     }
 }
 
