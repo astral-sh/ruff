@@ -63,7 +63,7 @@ pub(crate) fn invalid_index_type(checker: &mut Checker, expr: &ExprSubscript) {
         Expr::List(_)
             | Expr::ListComp(_)
             | Expr::Tuple(_)
-            | Expr::JoinedStr(_)
+            | Expr::FString(_)
             | Expr::Constant(ExprConstant {
                 value: Constant::Str(_) | Constant::Bytes(_),
                 ..
@@ -156,7 +156,7 @@ pub(crate) fn invalid_index_type(checker: &mut Checker, expr: &ExprSubscript) {
 #[derive(Debug)]
 enum CheckableExprType<'a> {
     Constant(&'a Constant),
-    JoinedStr,
+    FString,
     List,
     ListComp,
     SetComp,
@@ -171,7 +171,7 @@ impl fmt::Display for CheckableExprType<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Constant(constant) => f.write_str(constant_type_name(constant)),
-            Self::JoinedStr => f.write_str("str"),
+            Self::FString => f.write_str("str"),
             Self::List => f.write_str("list"),
             Self::SetComp => f.write_str("set comprehension"),
             Self::ListComp => f.write_str("list comprehension"),
@@ -188,7 +188,7 @@ impl<'a> CheckableExprType<'a> {
     fn try_from(expr: &'a Expr) -> Option<Self> {
         match expr {
             Expr::Constant(ExprConstant { value, .. }) => Some(Self::Constant(value)),
-            Expr::JoinedStr(_) => Some(Self::JoinedStr),
+            Expr::FString(_) => Some(Self::FString),
             Expr::List(_) => Some(Self::List),
             Expr::ListComp(_) => Some(Self::ListComp),
             Expr::SetComp(_) => Some(Self::SetComp),

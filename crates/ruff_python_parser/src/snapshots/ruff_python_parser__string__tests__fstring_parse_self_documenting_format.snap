@@ -21,8 +21,8 @@ expression: parse_ast
             ),
             conversion: None,
             format_spec: Some(
-                JoinedStr(
-                    ExprJoinedStr {
+                FString(
+                    ExprFString {
                         range: 9..12,
                         values: [
                             Constant(

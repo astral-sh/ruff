@@ -54,7 +54,7 @@ impl From<&Expr> for PythonType {
             Expr::ListComp(_) => PythonType::List,
             Expr::Tuple(_) => PythonType::Tuple,
             Expr::GeneratorExp(_) => PythonType::Generator,
-            Expr::JoinedStr(_) => PythonType::String,
+            Expr::FString(_) => PythonType::String,
             Expr::BinOp(ast::ExprBinOp { left, op, .. }) => {
                 // Ex) "a" % "b"
                 if op.is_mod() {

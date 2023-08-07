@@ -616,7 +616,7 @@ pub struct ExprFormattedValue<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprJoinedStr<'a> {
+pub struct ExprFString<'a> {
     values: Vec<ComparableExpr<'a>>,
 }
 
@@ -697,7 +697,7 @@ pub enum ComparableExpr<'a> {
     Compare(ExprCompare<'a>),
     Call(ExprCall<'a>),
     FormattedValue(ExprFormattedValue<'a>),
-    JoinedStr(ExprJoinedStr<'a>),
+    FString(ExprFString<'a>),
     Constant(ExprConstant<'a>),
     Attribute(ExprAttribute<'a>),
     Subscript(ExprSubscript<'a>),
@@ -865,8 +865,8 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 debug_text: debug_text.as_ref(),
                 format_spec: format_spec.as_ref().map(Into::into),
             }),
-            ast::Expr::JoinedStr(ast::ExprJoinedStr { values, range: _ }) => {
-                Self::JoinedStr(ExprJoinedStr {
+            ast::Expr::FString(ast::ExprFString { values, range: _ }) => {
+                Self::FString(ExprFString {
                     values: values.iter().map(Into::into).collect(),
                 })
             }

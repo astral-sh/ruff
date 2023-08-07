@@ -68,7 +68,7 @@ where
             if !matches!(
                 left.as_ref(),
                 Expr::Constant(_)
-                    | Expr::JoinedStr(_)
+                    | Expr::FString(_)
                     | Expr::List(_)
                     | Expr::Tuple(_)
                     | Expr::Set(_)
@@ -82,7 +82,7 @@ where
             if !matches!(
                 right.as_ref(),
                 Expr::Constant(_)
-                    | Expr::JoinedStr(_)
+                    | Expr::FString(_)
                     | Expr::List(_)
                     | Expr::Tuple(_)
                     | Expr::Set(_)
@@ -126,7 +126,7 @@ where
         Expr::BoolOp(ast::ExprBoolOp {
             values, range: _, ..
         })
-        | Expr::JoinedStr(ast::ExprJoinedStr { values, range: _ }) => {
+        | Expr::FString(ast::ExprFString { values, range: _ }) => {
             values.iter().any(|expr| any_over_expr(expr, func))
         }
         Expr::NamedExpr(ast::ExprNamedExpr {
@@ -1094,7 +1094,7 @@ impl Truthiness {
                 Constant::Complex { real, imag } => Some(*real != 0.0 || *imag != 0.0),
                 Constant::Ellipsis => Some(true),
             },
-            Expr::JoinedStr(ast::ExprJoinedStr { values, range: _ }) => {
+            Expr::FString(ast::ExprFString { values, range: _ }) => {
                 if values.is_empty() {
                     Some(false)
                 } else if values.iter().any(|value| {

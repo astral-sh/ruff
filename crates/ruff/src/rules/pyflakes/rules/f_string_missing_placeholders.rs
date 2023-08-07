@@ -48,7 +48,7 @@ impl AlwaysAutofixableViolation for FStringMissingPlaceholders {
     }
 }
 
-/// Find f-strings that don't contain any formatted values in a `JoinedStr`.
+/// Find f-strings that don't contain any formatted values in an [`FString`].
 fn find_useless_f_strings<'a>(
     expr: &'a Expr,
     locator: &'a Locator,

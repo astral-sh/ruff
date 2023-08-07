@@ -87,7 +87,7 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
     let mut first = true;
 
     for expr in joinees {
-        if expr.is_joined_str_expr() {
+        if expr.is_f_string_expr() {
             // Oops, already an f-string. We don't know how to handle those
             // gracefully right now.
             return None;
@@ -95,10 +95,10 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
         if !std::mem::take(&mut first) {
             fstring_elems.push(helpers::to_constant_string(joiner));
         }
-        fstring_elems.push(helpers::to_fstring_elem(expr)?);
+        fstring_elems.push(helpers::to_f_string_element(expr)?);
     }
 
-    let node = ast::ExprJoinedStr {
+    let node = ast::ExprFString {
         values: fstring_elems,
         range: TextRange::default(),
     };

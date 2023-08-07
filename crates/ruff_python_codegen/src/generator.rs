@@ -1104,8 +1104,8 @@ impl<'a> Generator<'a> {
                 *conversion,
                 format_spec.as_deref(),
             ),
-            Expr::JoinedStr(ast::ExprJoinedStr { values, range: _ }) => {
-                self.unparse_joinedstr(values, false);
+            Expr::FString(ast::ExprFString { values, range: _ }) => {
+                self.unparse_f_string(values, false);
             }
             Expr::Constant(ast::ExprConstant {
                 value,
@@ -1289,9 +1289,9 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_fstring_body(&mut self, values: &[Expr], is_spec: bool) {
+    fn unparse_f_string_body(&mut self, values: &[Expr], is_spec: bool) {
         for value in values {
-            self.unparse_fstring_elem(value, is_spec);
+            self.unparse_f_string_elem(value, is_spec);
         }
     }
 
@@ -1330,23 +1330,23 @@ impl<'a> Generator<'a> {
 
         if let Some(spec) = spec {
             self.p(":");
-            self.unparse_fstring_elem(spec, true);
+            self.unparse_f_string_elem(spec, true);
         }
 
         self.p("}");
     }
 
-    fn unparse_fstring_elem(&mut self, expr: &Expr, is_spec: bool) {
+    fn unparse_f_string_elem(&mut self, expr: &Expr, is_spec: bool) {
         match expr {
             Expr::Constant(ast::ExprConstant { value, .. }) => {
                 if let Constant::Str(s) = value {
-                    self.unparse_fstring_str(s);
+                    self.unparse_f_string_literal(s);
                 } else {
                     unreachable!()
                 }
             }
-            Expr::JoinedStr(ast::ExprJoinedStr { values, range: _ }) => {
-                self.unparse_joinedstr(values, is_spec);
+            Expr::FString(ast::ExprFString { values, range: _ }) => {
+                self.unparse_f_string(values, is_spec);
             }
             Expr::FormattedValue(ast::ExprFormattedValue {
                 value,
@@ -1364,14 +1364,14 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_fstring_str(&mut self, s: &str) {
+    fn unparse_f_string_literal(&mut self, s: &str) {
         let s = s.replace('{', "{{").replace('}', "}}");
         self.p(&s);
     }
 
-    fn unparse_joinedstr(&mut self, values: &[Expr], is_spec: bool) {
+    fn unparse_f_string(&mut self, values: &[Expr], is_spec: bool) {
         if is_spec {
-            self.unparse_fstring_body(values, is_spec);
+            self.unparse_f_string_body(values, is_spec);
         } else {
             self.p("f");
             let mut generator = Generator::new(
@@ -1382,7 +1382,7 @@ impl<'a> Generator<'a> {
                 },
                 self.line_ending,
             );
-            generator.unparse_fstring_body(values, is_spec);
+            generator.unparse_f_string_body(values, is_spec);
             let body = &generator.buffer;
             self.p_str_repr(body);
         }

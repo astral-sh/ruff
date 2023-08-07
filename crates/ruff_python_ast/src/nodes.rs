@@ -550,8 +550,8 @@ pub enum Expr {
     Call(ExprCall),
     #[is(name = "formatted_value_expr")]
     FormattedValue(ExprFormattedValue),
-    #[is(name = "joined_str_expr")]
-    JoinedStr(ExprJoinedStr),
+    #[is(name = "f_string_expr")]
+    FString(ExprFString),
     #[is(name = "constant_expr")]
     Constant(ExprConstant),
     #[is(name = "attribute_expr")]
@@ -878,14 +878,14 @@ pub struct DebugText {
 
 /// See also [JoinedStr](https://docs.python.org/3/library/ast.html#ast.JoinedStr)
 #[derive(Clone, Debug, PartialEq)]
-pub struct ExprJoinedStr {
+pub struct ExprFString {
     pub range: TextRange,
     pub values: Vec<Expr>,
 }
 
-impl From<ExprJoinedStr> for Expr {
-    fn from(payload: ExprJoinedStr) -> Self {
-        Expr::JoinedStr(payload)
+impl From<ExprFString> for Expr {
+    fn from(payload: ExprFString) -> Self {
+        Expr::FString(payload)
     }
 }
 
@@ -2814,7 +2814,7 @@ impl Ranged for crate::nodes::ExprFormattedValue {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprJoinedStr {
+impl Ranged for crate::nodes::ExprFString {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -2885,7 +2885,7 @@ impl Ranged for crate::Expr {
             Self::Compare(node) => node.range(),
             Self::Call(node) => node.range(),
             Self::FormattedValue(node) => node.range(),
-            Self::JoinedStr(node) => node.range(),
+            Self::FString(node) => node.range(),
             Self::Constant(node) => node.range(),
             Self::Attribute(node) => node.range(),
             Self::Subscript(node) => node.range(),

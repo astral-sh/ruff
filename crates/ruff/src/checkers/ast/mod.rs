@@ -1197,7 +1197,7 @@ where
                     ));
                 }
             }
-            Expr::JoinedStr(_) => {
+            Expr::FString(_) => {
                 self.semantic.flags |= SemanticModelFlags::F_STRING;
                 visitor::walk_expr(self, expr);
             }
@@ -1276,7 +1276,7 @@ where
 
     fn visit_format_spec(&mut self, format_spec: &'b Expr) {
         match format_spec {
-            Expr::JoinedStr(ast::ExprJoinedStr { values, range: _ }) => {
+            Expr::FString(ast::ExprFString { values, range: _ }) => {
                 for value in values {
                     self.visit_expr(value);
                 }

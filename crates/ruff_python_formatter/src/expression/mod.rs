@@ -25,10 +25,10 @@ pub(crate) mod expr_compare;
 pub(crate) mod expr_constant;
 pub(crate) mod expr_dict;
 pub(crate) mod expr_dict_comp;
+pub(crate) mod expr_f_string;
 pub(crate) mod expr_formatted_value;
 pub(crate) mod expr_generator_exp;
 pub(crate) mod expr_if_exp;
-pub(crate) mod expr_joined_str;
 pub(crate) mod expr_lambda;
 pub(crate) mod expr_line_magic;
 pub(crate) mod expr_list;
@@ -85,7 +85,7 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             Expr::Compare(expr) => expr.format().with_options(Some(parentheses)).fmt(f),
             Expr::Call(expr) => expr.format().fmt(f),
             Expr::FormattedValue(expr) => expr.format().fmt(f),
-            Expr::JoinedStr(expr) => expr.format().fmt(f),
+            Expr::FString(expr) => expr.format().fmt(f),
             Expr::Constant(expr) => expr.format().fmt(f),
             Expr::Attribute(expr) => expr.format().fmt(f),
             Expr::Subscript(expr) => expr.format().fmt(f),
@@ -223,7 +223,7 @@ impl NeedsParentheses for Expr {
             Expr::Compare(expr) => expr.needs_parentheses(parent, context),
             Expr::Call(expr) => expr.needs_parentheses(parent, context),
             Expr::FormattedValue(expr) => expr.needs_parentheses(parent, context),
-            Expr::JoinedStr(expr) => expr.needs_parentheses(parent, context),
+            Expr::FString(expr) => expr.needs_parentheses(parent, context),
             Expr::Constant(expr) => expr.needs_parentheses(parent, context),
             Expr::Attribute(expr) => expr.needs_parentheses(parent, context),
             Expr::Subscript(expr) => expr.needs_parentheses(parent, context),
@@ -421,7 +421,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             | Expr::Yield(_)
             | Expr::YieldFrom(_)
             | Expr::FormattedValue(_)
-            | Expr::JoinedStr(_)
+            | Expr::FString(_)
             | Expr::Constant(_)
             | Expr::Starred(_)
             | Expr::Name(_)

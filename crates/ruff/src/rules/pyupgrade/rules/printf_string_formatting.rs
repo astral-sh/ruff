@@ -400,7 +400,7 @@ pub(crate) fn printf_string_formatting(
 
     // Parse the parameters.
     let params_string = match right {
-        Expr::Constant(_) | Expr::JoinedStr(_) => {
+        Expr::Constant(_) | Expr::FString(_) => {
             format!("({})", checker.locator().slice(right.range()))
         }
         Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) | Expr::Call(_) => {

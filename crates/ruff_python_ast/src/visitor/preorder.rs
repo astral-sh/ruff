@@ -570,7 +570,7 @@ where
             }
         }
 
-        Expr::JoinedStr(ast::ExprJoinedStr { values, range: _ }) => {
+        Expr::FString(ast::ExprFString { values, range: _ }) => {
             for expr in values {
                 visitor.visit_expr(expr);
             }

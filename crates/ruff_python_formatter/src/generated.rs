@@ -1606,38 +1606,38 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprFormattedValue {
     }
 }
 
-impl FormatRule<ast::ExprJoinedStr, PyFormatContext<'_>>
-    for crate::expression::expr_joined_str::FormatExprJoinedStr
+impl FormatRule<ast::ExprFString, PyFormatContext<'_>>
+    for crate::expression::expr_f_string::FormatExprFString
 {
     #[inline]
-    fn fmt(&self, node: &ast::ExprJoinedStr, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprJoinedStr>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprFString, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::ExprFString>::fmt(self, node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprJoinedStr {
+impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprFString {
     type Format<'a> = FormatRefWithRule<
         'a,
-        ast::ExprJoinedStr,
-        crate::expression::expr_joined_str::FormatExprJoinedStr,
+        ast::ExprFString,
+        crate::expression::expr_f_string::FormatExprFString,
         PyFormatContext<'ast>,
     >;
     fn format(&self) -> Self::Format<'_> {
         FormatRefWithRule::new(
             self,
-            crate::expression::expr_joined_str::FormatExprJoinedStr::default(),
+            crate::expression::expr_f_string::FormatExprFString::default(),
         )
     }
 }
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprJoinedStr {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprFString {
     type Format = FormatOwnedWithRule<
-        ast::ExprJoinedStr,
-        crate::expression::expr_joined_str::FormatExprJoinedStr,
+        ast::ExprFString,
+        crate::expression::expr_f_string::FormatExprFString,
         PyFormatContext<'ast>,
     >;
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(
             self,
-            crate::expression::expr_joined_str::FormatExprJoinedStr::default(),
+            crate::expression::expr_f_string::FormatExprFString::default(),
         )
     }
 }

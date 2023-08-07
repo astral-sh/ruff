@@ -80,7 +80,7 @@ fn matches_string_format_expression(expr: &Expr, model: &SemanticModel) -> bool 
             attr == "format" && string_literal(value).is_some()
         }
         // f"select * from table where val = {val}"
-        Expr::JoinedStr(_) => true,
+        Expr::FString(_) => true,
         _ => false,
     }
 }
