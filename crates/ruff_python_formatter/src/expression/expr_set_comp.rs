@@ -3,9 +3,7 @@ use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::ExprSetComp;
 
 use crate::context::PyFormatContext;
-use crate::expression::parentheses::{
-    parenthesized_with_dangling_comments, NeedsParentheses, OptionalParentheses,
-};
+use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 use crate::AsFormat;
 use crate::{FormatNodeRule, PyFormatter};
@@ -32,16 +30,16 @@ impl FormatNodeRule<ExprSetComp> for FormatExprSetComp {
 
         write!(
             f,
-            [parenthesized_with_dangling_comments(
+            [parenthesized(
                 "{",
-                dangling,
                 &group(&format_args!(
                     group(&elt.format()),
                     soft_line_break_or_space(),
                     &joined
                 )),
                 "}"
-            )]
+            )
+            .with_dangling_comments(dangling)]
         )
     }
 

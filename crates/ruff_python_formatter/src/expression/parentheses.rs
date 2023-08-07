@@ -116,30 +116,29 @@ where
     }
 }
 
-/// Formats `content` enclosed by the `left` and `right` parentheses, along with any dangling
-/// comments on the opening parenthesis itself.
-pub(crate) fn parenthesized_with_dangling_comments<'content, 'ast, Content>(
-    left: &'static str,
-    comments: &'content [SourceComment],
-    content: &'content Content,
-    right: &'static str,
-) -> FormatParenthesized<'content, 'ast>
-where
-    Content: Format<PyFormatContext<'ast>>,
-{
-    FormatParenthesized {
-        left,
-        comments,
-        content: Argument::new(content),
-        right,
-    }
-}
-
 pub(crate) struct FormatParenthesized<'content, 'ast> {
     left: &'static str,
     comments: &'content [SourceComment],
     content: Argument<'content, PyFormatContext<'ast>>,
     right: &'static str,
+}
+
+impl<'content, 'ast> FormatParenthesized<'content, 'ast> {
+    /// Inserts any dangling comments that should be placed immediately after the open parenthesis.
+    /// For example:
+    /// ```python
+    /// [  # comment
+    ///     1,
+    ///     2,
+    ///     3,
+    /// ]
+    /// ```
+    pub(crate) fn with_dangling_comments(
+        self,
+        comments: &'content [SourceComment],
+    ) -> FormatParenthesized<'content, 'ast> {
+        FormatParenthesized { comments, ..self }
+    }
 }
 
 impl<'ast> Format<PyFormatContext<'ast>> for FormatParenthesized<'_, 'ast> {

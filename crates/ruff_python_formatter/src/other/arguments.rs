@@ -6,7 +6,7 @@ use ruff_text_size::{TextRange, TextSize};
 
 use crate::builders::empty_parenthesized_with_dangling_comments;
 use crate::expression::expr_generator_exp::GeneratorExpParentheses;
-use crate::expression::parentheses::{parenthesized_with_dangling_comments, Parentheses};
+use crate::expression::parentheses::{parenthesized, Parentheses};
 use crate::prelude::*;
 use crate::FormatNodeRule;
 
@@ -100,12 +100,8 @@ impl FormatNodeRule<Arguments> for FormatArguments {
                 //     hey_this_is_a_very_long_call, it_has_funny_attributes_asdf_asdf, really=True
                 // )
                 // ```
-                parenthesized_with_dangling_comments(
-                    "(",
-                    dangling_comments,
-                    &group(&all_arguments),
-                    ")"
-                )
+                parenthesized("(", &group(&all_arguments), ")")
+                    .with_dangling_comments(dangling_comments)
             ]
         )
     }
