@@ -38,8 +38,6 @@ impl FormatNodeRule<ExprBoolOp> for FormatExprBoolOp {
             values,
         } = item;
 
-        let source = f.context().source();
-
         let inner = format_with(|f: &mut PyFormatter| {
             let mut values = values.iter();
             let comments = f.context().comments().clone();
@@ -48,22 +46,7 @@ impl FormatNodeRule<ExprBoolOp> for FormatExprBoolOp {
                 return Ok(());
             };
 
-            match first {
-                Expr::BoolOp(bool_op)
-                    if !is_expression_parenthesized(bool_op.as_any_node_ref(), source) =>
-                {
-                    // Mark chained boolean operations e.g. `x and y or z`
-                    // and avoid creating a new group
-                    write!(
-                        f,
-                        [bool_op.format().with_options(BoolOpLayout {
-                            parentheses: None,
-                            chained: true,
-                        })]
-                    )?;
-                }
-                _ => write!(f, [in_parentheses_only_group(&first.format())])?,
-            }
+            FormatValue { value: first }.fmt(f)?;
 
             for value in values {
                 let leading_value_comments = comments.leading_comments(value);
@@ -79,22 +62,7 @@ impl FormatNodeRule<ExprBoolOp> for FormatExprBoolOp {
 
                 write!(f, [op.format(), space(),])?;
 
-                match value {
-                    Expr::BoolOp(bool_op)
-                        if !is_expression_parenthesized(bool_op.as_any_node_ref(), source) =>
-                    {
-                        // Mark chained boolean operations e.g. `x and y or z`
-                        // and avoid creating a new group
-                        write!(
-                            f,
-                            [bool_op.format().with_options(BoolOpLayout {
-                                parentheses: None,
-                                chained: true,
-                            })]
-                        )?;
-                    }
-                    _ => write!(f, [in_parentheses_only_group(&value.format())])?,
-                }
+                FormatValue { value }.fmt(f)?;
             }
 
             Ok(())
@@ -116,6 +84,33 @@ impl NeedsParentheses for ExprBoolOp {
         _context: &PyFormatContext,
     ) -> OptionalParentheses {
         OptionalParentheses::Multiline
+    }
+}
+
+struct FormatValue<'a> {
+    value: &'a Expr,
+}
+
+impl FormatValue<'_> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
+        match self.value {
+            Expr::BoolOp(bool_op)
+                if !is_expression_parenthesized(
+                    bool_op.as_any_node_ref(),
+                    f.context().source(),
+                ) =>
+            {
+                // Mark chained boolean operations e.g. `x and y or z` and avoid creating a new group
+                write!(
+                    f,
+                    [bool_op.format().with_options(BoolOpLayout {
+                        parentheses: None,
+                        chained: true,
+                    })]
+                )
+            }
+            _ => write!(f, [in_parentheses_only_group(&self.value.format())]),
+        }
     }
 }
 
