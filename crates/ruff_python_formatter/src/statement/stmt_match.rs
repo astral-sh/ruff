@@ -1,7 +1,7 @@
 use ruff_formatter::{write, Buffer, FormatResult};
 use ruff_python_ast::StmtMatch;
 
-use crate::comments::dangling_comments;
+use crate::comments::trailing_comments;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
@@ -31,7 +31,7 @@ impl FormatNodeRule<StmtMatch> for FormatStmtMatch {
                 space(),
                 maybe_parenthesize_expression(subject, item, Parenthesize::IfBreaks),
                 text(":"),
-                dangling_comments(dangling_item_comments)
+                trailing_comments(dangling_item_comments)
             ]
         )?;
 
