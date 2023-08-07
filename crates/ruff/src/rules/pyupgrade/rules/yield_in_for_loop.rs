@@ -4,9 +4,9 @@ use rustc_hash::FxHashMap;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::statement_visitor::StatementVisitor;
-use ruff_python_ast::types::RefEquality;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{statement_visitor, visitor};
+use ruff_python_semantic::StatementKey;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -131,7 +131,7 @@ impl<'a> StatementVisitor<'a> for YieldFromVisitor<'a> {
 #[derive(Default)]
 struct ReferenceVisitor<'a> {
     parent: Option<&'a Stmt>,
-    references: FxHashMap<RefEquality<'a, Stmt>, Vec<&'a str>>,
+    references: FxHashMap<StatementKey, Vec<&'a str>>,
 }
 
 impl<'a> Visitor<'a> for ReferenceVisitor<'a> {
@@ -148,7 +148,7 @@ impl<'a> Visitor<'a> for ReferenceVisitor<'a> {
                 if matches!(ctx, ExprContext::Load | ExprContext::Del) {
                     if let Some(parent) = self.parent {
                         self.references
-                            .entry(RefEquality(parent))
+                            .entry(StatementKey::from(parent))
                             .or_default()
                             .push(id);
                     }
@@ -177,9 +177,9 @@ pub(crate) fn yield_in_for_loop(checker: &mut Checker, stmt: &Stmt) {
 
         for item in yields {
             // If any of the bound names are used outside of the loop, don't rewrite.
-            if references.iter().any(|(stmt, names)| {
-                stmt != &RefEquality(item.stmt)
-                    && stmt != &RefEquality(item.body)
+            if references.iter().any(|(statement, names)| {
+                *statement != StatementKey::from(item.stmt)
+                    && *statement != StatementKey::from(item.body)
                     && item.names.iter().any(|name| names.contains(name))
             }) {
                 continue;
