@@ -62,9 +62,6 @@ pub(super) fn place_comment<'a>(
                 CommentPlacement::Default(comment)
             }
         }
-        AnyNodeRef::MatchCase(match_case) => {
-            handle_match_case_comment(comment, match_case, locator)
-        }
         AnyNodeRef::ModModule(_) => {
             handle_module_level_own_line_comment_before_class_or_function_comment(comment, locator)
         }
@@ -410,105 +407,6 @@ fn handle_own_line_comment_in_clause<'a>(
     }
 
     CommentPlacement::Default(comment)
-}
-
-/// Handles leading comments in front of a match case or a trailing comment of the `match` statement.
-/// ```python
-/// match pt:
-///     # Leading `case(x, y)` comment
-///     case (x, y):
-///         return Point3d(x, y, 0)
-///     # Leading `case (x, y, z)` comment
-///     case _:
-/// ```
-fn handle_match_case_comment<'a>(
-    comment: DecoratedComment<'a>,
-    match_case: &'a MatchCase,
-    locator: &Locator,
-) -> CommentPlacement<'a> {
-    // Must be an own line comment after the last statement in a match case
-    if comment.line_position().is_end_of_line() || comment.following_node().is_some() {
-        return CommentPlacement::Default(comment);
-    }
-
-    // And its parent match statement.
-    let Some(match_stmt) = comment.enclosing_parent().and_then(AnyNodeRef::stmt_match) else {
-        return CommentPlacement::Default(comment);
-    };
-
-    // Get the next sibling (sibling traversal would be really nice)
-    let current_case_index = match_stmt
-        .cases
-        .iter()
-        .position(|case| case == match_case)
-        .expect("Expected case to belong to parent match statement.");
-
-    let next_case = match_stmt.cases.get(current_case_index + 1);
-
-    let comment_indentation = indentation_at_offset(comment.slice().range().start(), locator)
-        .unwrap_or_default()
-        .len();
-    let match_case_indentation = indentation(locator, match_case).unwrap().len();
-
-    if let Some(next_case) = next_case {
-        // The comment's indentation is less or equal to the `case` indention and there's a following
-        // `case` arm.
-        // ```python
-        // match pt:
-        //     case (x, y):
-        //         return Point3d(x, y, 0)
-        //     # Leading `case (x, y, z)` comment
-        //     case _:
-        //         pass
-        // ```
-        // Attach the `comment` as leading comment to the next case.
-        if comment_indentation <= match_case_indentation {
-            CommentPlacement::leading(next_case, comment)
-        } else {
-            // Otherwise, delegate to `handle_trailing_body_comment`
-            // ```python
-            // match pt:
-            //     case (x, y):
-            //         return Point3d(x, y, 0)
-            //         # Trailing case body comment
-            //     case _:
-            //         pass
-            // ```
-            CommentPlacement::Default(comment)
-        }
-    } else {
-        // Comment after the last statement in a match case...
-        let match_stmt_indentation = indentation(locator, match_stmt).unwrap_or_default().len();
-
-        if comment_indentation <= match_case_indentation
-            && comment_indentation > match_stmt_indentation
-        {
-            // The comment's indent matches the `case` indent (or is larger than the `match`'s indent).
-            // ```python
-            // match pt:
-            //     case (x, y):
-            //         return Point3d(x, y, 0)
-            //     case _:
-            //         pass
-            //     # Trailing match comment
-            // ```
-            // This is a trailing comment of the last case.
-            CommentPlacement::trailing(match_case, comment)
-        } else {
-            // Delegate to `handle_trailing_body_comment` because it's either a trailing indent
-            // for the last statement in the `case` body or a comment for the parent of the `match`
-            //
-            // ```python
-            // match pt:
-            //     case (x, y):
-            //         return Point3d(x, y, 0)
-            //     case _:
-            //         pass
-            //         # trailing case comment
-            // ```
-            CommentPlacement::Default(comment)
-        }
-    }
 }
 
 /// Determine where to attach an own line comment after a branch depending on its indentation
