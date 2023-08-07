@@ -136,7 +136,7 @@ impl<'a> Visitor<'a> for TypeVarReferenceVisitor<'a> {
                             self.semantic
                                 .binding(binding_id)
                                 .source
-                                .map(|node_id| self.semantic.stmts[node_id])
+                                .map(|node_id| self.semantic.statement(node_id))
                         }) else {
                             return;
                         };
