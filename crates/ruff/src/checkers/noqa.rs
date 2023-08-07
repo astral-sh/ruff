@@ -94,8 +94,15 @@ pub(crate) fn check_noqa(
         }
     }
 
-    // Enforce that the noqa directive was actually used (RUF100).
-    if analyze_directives && settings.rules.enabled(Rule::UnusedNOQA) {
+    // Enforce that the noqa directive was actually used (RUF100), unless RUF100 was itself
+    // suppressed.
+    if settings.rules.enabled(Rule::UnusedNOQA)
+        && analyze_directives
+        && !exemption.is_some_and(|exemption| match exemption {
+            FileExemption::All => true,
+            FileExemption::Codes(codes) => codes.contains(&Rule::UnusedNOQA.noqa_code()),
+        })
+    {
         for line in noqa_directives.lines() {
             match &line.directive {
                 Directive::All(directive) => {
