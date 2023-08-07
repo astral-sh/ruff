@@ -11,7 +11,7 @@ use crate::{
 };
 
 /// ## What it does
-/// Check for starting a subprocess with a shell.
+/// Check for method calls that initiate a subprocess with a shell.
 ///
 /// ## Why is this bad?
 /// Starting a subprocess with a shell can allow attackers to execute arbitrary
@@ -54,7 +54,7 @@ impl Violation for SubprocessPopenWithShellEqualsTrue {
 }
 
 /// ## What it does
-/// Checks for starting a subprocess without a shell.
+/// Check for method calls that initiate a subprocess without a shell.
 ///
 /// ## Why is this bad?
 /// Starting a subprocess without a shell can prevent attackers from executing
