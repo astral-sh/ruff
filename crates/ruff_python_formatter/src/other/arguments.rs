@@ -5,9 +5,8 @@ use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::builders::empty_parenthesized_with_dangling_comments;
-use crate::comments::trailing_comments;
 use crate::expression::expr_generator_exp::GeneratorExpParentheses;
-use crate::expression::parentheses::{parenthesized, Parentheses};
+use crate::expression::parentheses::{parenthesized_with_dangling_comments, Parentheses};
 use crate::prelude::*;
 use crate::FormatNodeRule;
 
@@ -34,18 +33,6 @@ impl FormatNodeRule<Arguments> for FormatArguments {
                 )]
             );
         }
-
-        // If the arguments are non-empty, then a dangling comment indicates a comment on the
-        // same line as the opening parenthesis, e.g.:
-        // ```python
-        // f(  # This call has a dangling comment.
-        //     a,
-        //     b,
-        //     c,
-        // )
-        let comments = f.context().comments().clone();
-        let dangling_comments = comments.dangling_comments(item.as_any_node_ref());
-        write!(f, [trailing_comments(dangling_comments)])?;
 
         let all_arguments = format_with(|f: &mut PyFormatter| {
             let source = f.context().source();
@@ -84,6 +71,17 @@ impl FormatNodeRule<Arguments> for FormatArguments {
             joiner.finish()
         });
 
+        // If the arguments are non-empty, then a dangling comment indicates a comment on the
+        // same line as the opening parenthesis, e.g.:
+        // ```python
+        // f(  # This call has a dangling comment.
+        //     a,
+        //     b,
+        //     c,
+        // )
+        let comments = f.context().comments().clone();
+        let dangling_comments = comments.dangling_comments(item.as_any_node_ref());
+
         write!(
             f,
             [
@@ -103,7 +101,12 @@ impl FormatNodeRule<Arguments> for FormatArguments {
                 // )
                 // ```
                 // TODO(konstin): Doesn't work see wrongly formatted test
-                parenthesized("(", &group(&all_arguments), ")")
+                parenthesized_with_dangling_comments(
+                    "(",
+                    dangling_comments,
+                    &group(&all_arguments),
+                    ")"
+                )
             ]
         )
     }
