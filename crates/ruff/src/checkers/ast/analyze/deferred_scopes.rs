@@ -1,5 +1,4 @@
 use ruff_diagnostics::Diagnostic;
-use ruff_python_ast::cast;
 use ruff_python_semantic::analyze::{branch_detection, visibility};
 use ruff_python_semantic::{Binding, BindingKind, ScopeKind};
 
@@ -172,18 +171,25 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                             continue;
                         }
 
-                        let Some(source) = shadowed.source else {
+                        let Some(statement_id) = shadowed.source else {
                             continue;
                         };
 
                         // If this is an overloaded function, abort.
-                        if shadowed.kind.is_function_definition()
-                            && visibility::is_overload(
-                                cast::decorator_list(checker.semantic.statement(source)),
-                                &checker.semantic,
-                            )
-                        {
-                            continue;
+                        if shadowed.kind.is_function_definition() {
+                            if checker
+                                .semantic
+                                .statement(statement_id)
+                                .as_function_def_stmt()
+                                .is_some_and(|function| {
+                                    visibility::is_overload(
+                                        &function.decorator_list,
+                                        &checker.semantic,
+                                    )
+                                })
+                            {
+                                continue;
+                            }
                         }
                     } else {
                         // Only enforce cross-scope shadowing for imports.

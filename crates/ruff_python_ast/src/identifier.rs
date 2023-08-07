@@ -20,6 +20,32 @@ pub trait Identifier {
     fn identifier(&self) -> TextRange;
 }
 
+impl Identifier for ast::StmtFunctionDef {
+    /// Return the [`TextRange`] of the identifier in the given function definition.
+    ///
+    /// For example, return the range of `f` in:
+    /// ```python
+    /// def f():
+    ///     ...
+    /// ```
+    fn identifier(&self) -> TextRange {
+        self.name.range()
+    }
+}
+
+impl Identifier for ast::StmtClassDef {
+    /// Return the [`TextRange`] of the identifier in the given class definition.
+    ///
+    /// For example, return the range of `C` in:
+    /// ```python
+    /// class C():
+    ///     ...
+    /// ```
+    fn identifier(&self) -> TextRange {
+        self.name.range()
+    }
+}
+
 impl Identifier for Stmt {
     /// Return the [`TextRange`] of the identifier in the given statement.
     ///
@@ -30,8 +56,8 @@ impl Identifier for Stmt {
     /// ```
     fn identifier(&self) -> TextRange {
         match self {
-            Stmt::ClassDef(ast::StmtClassDef { name, .. })
-            | Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) => name.range(),
+            Stmt::ClassDef(class) => class.identifier(),
+            Stmt::FunctionDef(function) => function.identifier(),
             _ => self.range(),
         }
     }

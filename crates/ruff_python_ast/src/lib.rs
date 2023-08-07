@@ -3,7 +3,6 @@ use std::path::Path;
 
 pub mod all;
 pub mod call_path;
-pub mod cast;
 pub mod comparable;
 pub mod docstrings;
 pub mod hashable;

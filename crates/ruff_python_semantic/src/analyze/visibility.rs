@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use ruff_python_ast::{self as ast, Decorator, Stmt};
+use ruff_python_ast::{self as ast, Decorator};
 
 use ruff_python_ast::call_path::{collect_call_path, CallPath};
 use ruff_python_ast::helpers::map_callable;
@@ -176,57 +176,40 @@ impl ModuleSource<'_> {
     }
 }
 
-pub(crate) fn function_visibility(stmt: &Stmt) -> Visibility {
-    match stmt {
-        Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) => {
-            if name.starts_with('_') {
-                Visibility::Private
-            } else {
-                Visibility::Public
-            }
-        }
-        _ => panic!("Found non-FunctionDef in function_visibility"),
+pub(crate) fn function_visibility(function: &ast::StmtFunctionDef) -> Visibility {
+    if function.name.starts_with('_') {
+        Visibility::Private
+    } else {
+        Visibility::Public
     }
 }
 
-pub(crate) fn method_visibility(stmt: &Stmt) -> Visibility {
-    let Stmt::FunctionDef(ast::StmtFunctionDef {
-        name,
-        decorator_list,
-        ..
-    }) = stmt
-    else {
-        panic!("Found non-FunctionDef in method_visibility")
-    };
-
+pub(crate) fn method_visibility(function: &ast::StmtFunctionDef) -> Visibility {
     // Is this a setter or deleter?
-    if decorator_list.iter().any(|decorator| {
+    if function.decorator_list.iter().any(|decorator| {
         collect_call_path(&decorator.expression).is_some_and(|call_path| {
-            call_path.as_slice() == [name, "setter"] || call_path.as_slice() == [name, "deleter"]
+            call_path.as_slice() == [function.name.as_str(), "setter"]
+                || call_path.as_slice() == [function.name.as_str(), "deleter"]
         })
     }) {
         return Visibility::Private;
     }
 
     // Is the method non-private?
-    if !name.starts_with('_') {
+    if !function.name.starts_with('_') {
         return Visibility::Public;
     }
 
     // Is this a magic method?
-    if name.starts_with("__") && name.ends_with("__") {
+    if function.name.starts_with("__") && function.name.ends_with("__") {
         return Visibility::Public;
     }
 
     Visibility::Private
 }
 
-pub(crate) fn class_visibility(stmt: &Stmt) -> Visibility {
-    let Stmt::ClassDef(ast::StmtClassDef { name, .. }) = stmt else {
-        panic!("Found non-ClassDef in class_visibility")
-    };
-
-    if name.starts_with('_') {
+pub(crate) fn class_visibility(class: &ast::StmtClassDef) -> Visibility {
+    if class.name.starts_with('_') {
         Visibility::Private
     } else {
         Visibility::Public

@@ -62,7 +62,7 @@ pub(crate) fn yield_outside_function(checker: &mut Checker, expr: &Expr) {
             Expr::Yield(_) => DeferralKeyword::Yield,
             Expr::YieldFrom(_) => DeferralKeyword::YieldFrom,
             Expr::Await(_) => DeferralKeyword::Await,
-            _ => panic!("Expected Expr::Yield | Expr::YieldFrom | Expr::Await"),
+            _ => return,
         };
         checker.diagnostics.push(Diagnostic::new(
             YieldOutsideFunction { keyword },

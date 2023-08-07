@@ -455,14 +455,16 @@ where
 
         // Step 2: Traversal
         match stmt {
-            Stmt::FunctionDef(ast::StmtFunctionDef {
-                body,
-                parameters,
-                decorator_list,
-                returns,
-                type_params,
-                ..
-            }) => {
+            Stmt::FunctionDef(
+                function_def @ ast::StmtFunctionDef {
+                    body,
+                    parameters,
+                    decorator_list,
+                    returns,
+                    type_params,
+                    ..
+                },
+            ) => {
                 // Visit the decorators and arguments, but avoid the body, which will be
                 // deferred.
                 for decorator in decorator_list {
@@ -523,8 +525,7 @@ where
                 }
 
                 let definition = docstrings::extraction::extract_definition(
-                    ExtractionTarget::Function,
-                    stmt,
+                    ExtractionTarget::Function(function_def),
                     self.semantic.definition_id,
                     &self.semantic.definitions,
                 );
@@ -566,8 +567,7 @@ where
                 }
 
                 let definition = docstrings::extraction::extract_definition(
-                    ExtractionTarget::Class,
-                    stmt,
+                    ExtractionTarget::Class(class_def),
                     self.semantic.definition_id,
                     &self.semantic.definitions,
                 );
