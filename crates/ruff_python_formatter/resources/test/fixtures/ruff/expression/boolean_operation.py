@@ -83,3 +83,14 @@ if not (
     isinstance(aaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbb) and xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx + yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy or isinstance(ccccccccccc, dddddd)
 ):
     pass
+
+
+if not (
+    isinstance(aaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbb) or (xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx + yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy) and isinstance(ccccccccccc, dddddd)
+):
+    pass
+
+if not (
+    isinstance(aaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbb) and (xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx + yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy) or isinstance(ccccccccccc, dddddd)
+):
+    pass
