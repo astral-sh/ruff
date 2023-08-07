@@ -5,8 +5,10 @@ use crate::expression::parentheses::{
 };
 use crate::prelude::*;
 use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::node::{AnyNodeRef, AstNode};
 use ruff_python_ast::{BoolOp, Expr, ExprBoolOp};
+
+use super::parentheses::is_expression_parenthesized;
 
 #[derive(Default)]
 pub struct FormatExprBoolOp {
@@ -36,6 +38,8 @@ impl FormatNodeRule<ExprBoolOp> for FormatExprBoolOp {
             values,
         } = item;
 
+        let source = f.context().source();
+
         let inner = format_with(|f: &mut PyFormatter| {
             let mut values = values.iter();
             let comments = f.context().comments().clone();
@@ -44,18 +48,21 @@ impl FormatNodeRule<ExprBoolOp> for FormatExprBoolOp {
                 return Ok(());
             };
 
-            if let Expr::BoolOp(value) = first {
-                // Mark chained boolean operations e.g. `x and y or z`
-                // and avoid creating a new group
-                write!(
-                    f,
-                    [value.format().with_options(BoolOpLayout {
-                        parentheses: None,
-                        chained: true,
-                    })]
-                )?;
-            } else {
-                write!(f, [in_parentheses_only_group(&first.format())])?;
+            match first {
+                Expr::BoolOp(bool_op)
+                    if !is_expression_parenthesized(bool_op.as_any_node_ref(), source) =>
+                {
+                    // Mark chained boolean operations e.g. `x and y or z`
+                    // and avoid creating a new group
+                    write!(
+                        f,
+                        [bool_op.format().with_options(BoolOpLayout {
+                            parentheses: None,
+                            chained: true,
+                        })]
+                    )?;
+                }
+                _ => write!(f, [in_parentheses_only_group(&first.format())])?,
             }
 
             for value in values {
@@ -72,16 +79,21 @@ impl FormatNodeRule<ExprBoolOp> for FormatExprBoolOp {
 
                 write!(f, [op.format(), space(),])?;
 
-                if let Expr::BoolOp(value) = value {
-                    write!(
-                        f,
-                        [value.format().with_options(BoolOpLayout {
-                            parentheses: None,
-                            chained: true,
-                        })]
-                    )?;
-                } else {
-                    write!(f, [value.format()])?;
+                match value {
+                    Expr::BoolOp(bool_op)
+                        if !is_expression_parenthesized(bool_op.as_any_node_ref(), source) =>
+                    {
+                        // Mark chained boolean operations e.g. `x and y or z`
+                        // and avoid creating a new group
+                        write!(
+                            f,
+                            [bool_op.format().with_options(BoolOpLayout {
+                                parentheses: None,
+                                chained: true,
+                            })]
+                        )?;
+                    }
+                    _ => write!(f, [in_parentheses_only_group(&value.format())])?,
                 }
             }
 
