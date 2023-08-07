@@ -1,3 +1,4 @@
+use ast::{Constant, ExprCall, ExprConstant};
 use ruff_python_ast::{
     self as ast,
     visitor::{self, Visitor},
@@ -140,15 +141,37 @@ impl<'a> Visitor<'a> for TypeVarReferenceVisitor<'a> {
                             return;
                         };
 
-                // Only support type variables declared as TypeVar['<name>'] for now
-                // Type variables declared with `TypeVar(<name>, ...)` can include more complex features
-                // like bounds and variance
-                let Expr::Subscript(ExprSubscript {value: ref subscript_value, .. })= value.as_ref() else {
-                    return;
-                };
-
-                if self.semantic.match_typing_expr(subscript_value, "TypeVar") {
-                    self.names.push(name);
+                match value.as_ref() {
+                    Expr::Subscript(ExprSubscript {
+                        value: ref subscript_value,
+                        ..
+                    }) => {
+                        if self.semantic.match_typing_expr(subscript_value, "TypeVar") {
+                            self.names.push(name);
+                        }
+                    }
+                    Expr::Call(ExprCall {
+                        func, arguments, ..
+                    }) => {
+                        // TODO(zanieb): Add support for bounds and variance declarations
+                        //               for now this only supports `TypeVar("...")`
+                        if self.semantic.match_typing_expr(func, "TypeVar")
+                            && arguments.args.len() == 1
+                            && arguments.args.first().is_some_and(|arg| {
+                                matches!(
+                                    arg,
+                                    Expr::Constant(ExprConstant {
+                                        value: Constant::Str(_),
+                                        ..
+                                    })
+                                )
+                            })
+                            && arguments.keywords.len() == 0
+                        {
+                            self.names.push(name);
+                        }
+                    }
+                    _ => {}
                 }
             }
             _ => visitor::walk_expr(self, expr),

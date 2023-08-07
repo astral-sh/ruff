@@ -9,7 +9,7 @@ x: TypeAlias = int
 T = typing.TypeVar["T"]
 x: typing.TypeAlias = list[T]
 
-# UP040 call style generic (todo)
+# UP040 call style generic
 T = typing.TypeVar("T")
 x: typing.TypeAlias = list[T]
 
@@ -28,7 +28,6 @@ x: typing.TypeAlias = list[T]
 T = typing.TypeVar("T", covariant=True)
 x: typing.TypeAlias = list[T]
 
-
 # UP040 in class scope
 T = typing.TypeVar["T"]
 class Foo:
@@ -39,7 +38,9 @@ class Foo:
     TCLS = typing.TypeVar["TCLS"]
     y: typing.TypeAlias = list[TCLS]
 
-
+# UP040 wont add generics in fix
+T = typing.TypeVar(*args)
+x: typing.TypeAlias = list[T]
 
 # OK
 x: TypeAlias
