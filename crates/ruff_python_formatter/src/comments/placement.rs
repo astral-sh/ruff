@@ -32,6 +32,7 @@ pub(super) fn place_comment<'a>(
     comment.or_else(|comment| match comment.enclosing_node() {
         AnyNodeRef::Parameters(arguments) => {
             handle_parameters_separator_comment(comment, arguments, locator)
+                .or_else(|comment| handle_bracketed_end_of_line_comment(comment, locator))
         }
         AnyNodeRef::Arguments(_) | AnyNodeRef::TypeParams(_) => {
             handle_bracketed_end_of_line_comment(comment, locator)
