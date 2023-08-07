@@ -174,7 +174,7 @@ pub(crate) fn unused_private_type_var(
             continue;
         };
         let Stmt::Assign(ast::StmtAssign { targets, value, .. }) =
-            checker.semantic().statements[source]
+            checker.semantic().statement(source)
         else {
             continue;
         };
@@ -218,7 +218,7 @@ pub(crate) fn unused_private_protocol(
             continue;
         };
 
-        let Stmt::ClassDef(class_def) = checker.semantic().statements[source] else {
+        let Stmt::ClassDef(class_def) = checker.semantic().statement(source) else {
             continue;
         };
 
@@ -261,7 +261,7 @@ pub(crate) fn unused_private_type_alias(
         };
         let Stmt::AnnAssign(ast::StmtAnnAssign {
             target, annotation, ..
-        }) = checker.semantic().statements[source]
+        }) = checker.semantic().statement(source)
         else {
             continue;
         };
@@ -305,7 +305,7 @@ pub(crate) fn unused_private_typed_dict(
         let Some(source) = binding.source else {
             continue;
         };
-        let Stmt::ClassDef(class_def) = checker.semantic().statements[source] else {
+        let Stmt::ClassDef(class_def) = checker.semantic().statement(source) else {
             continue;
         };
 

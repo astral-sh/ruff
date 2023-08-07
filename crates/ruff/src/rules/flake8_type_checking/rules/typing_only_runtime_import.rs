@@ -403,11 +403,13 @@ fn is_exempt(name: &str, exempt_modules: &[&str]) -> bool {
 
 /// Generate a [`Fix`] to remove typing-only imports from a runtime context.
 fn fix_imports(checker: &Checker, statement_id: NodeId, imports: &[ImportBinding]) -> Result<Fix> {
-    let statement = checker.semantic().statements[statement_id];
-    let parent = checker.semantic().statements.parent(statement);
+    let statement = checker.semantic().statement(statement_id);
+    let parent = checker.semantic().parent_statement(statement);
+
     let member_names: Vec<Cow<'_, str>> = imports
         .iter()
-        .map(|ImportBinding { import, .. }| import.member_name())
+        .map(|ImportBinding { import, .. }| import)
+        .map(Imported::member_name)
         .collect();
 
     // Find the first reference across all imports.

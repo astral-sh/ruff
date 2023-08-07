@@ -202,7 +202,7 @@ impl<'a> Checker<'a> {
     /// thus be applied whenever we delete a statement, but can otherwise be omitted.
     pub(crate) fn isolation(&self, parent: Option<&Stmt>) -> IsolationLevel {
         parent
-            .and_then(|stmt| self.semantic.statements.node_id(stmt))
+            .and_then(|stmt| self.semantic.statement_id(stmt))
             .map_or(IsolationLevel::default(), |node_id| {
                 IsolationLevel::Group(node_id.into())
             })
