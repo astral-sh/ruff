@@ -3,8 +3,15 @@
  */
 
 export interface Env {
+  // The Workers KV namespace to use for storing code snippets.
   PLAYGROUND: KVNamespace;
+  // Whether or not we're in a development environment.
+  DEV?: boolean;
 }
+
+const HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+};
 
 export default {
   async fetch(
@@ -12,55 +19,52 @@ export default {
     env: Env,
     ctx: ExecutionContext,
   ): Promise<Response> {
-    const headers = {
-      "Access-Control-Allow-Origin": "*",
-    };
+    const { DEV, PLAYGROUND } = env;
+
+    // Verify that we're either in a development environment or that the request
+    // came from `https://play.ruff.rs`.
+    if (!DEV) {
+      const { origin } = new URL(request.url);
+      if (origin !== "https://play.ruff.rs") {
+        return new Response("Unauthorized", {
+          status: 401,
+          headers: HEADERS,
+        });
+      }
+    }
 
     switch (request.method) {
       case "GET": {
-        const { PLAYGROUND } = env;
         const { pathname } = new URL(request.url);
         const key = pathname.slice(1);
         const value = await PLAYGROUND.get(key);
         if (value === null) {
           return new Response("Not Found", {
             status: 404,
-            headers,
+            headers: HEADERS,
           });
         }
         return new Response(value, {
           status: 200,
-          headers,
+          headers: HEADERS,
         });
       }
 
       case "POST": {
-        const { PLAYGROUND } = env;
         const { pathname } = new URL(request.url);
         const key = pathname.slice(1);
         const value = await request.text();
         await PLAYGROUND.put(key, value);
         return new Response("OK", {
           status: 200,
-          headers,
-        });
-      }
-
-      case "DELETE": {
-        const { PLAYGROUND } = env;
-        const { pathname } = new URL(request.url);
-        const key = pathname.slice(1);
-        await PLAYGROUND.delete(key);
-        return new Response("OK", {
-          status: 200,
-          headers,
+          headers: HEADERS,
         });
       }
 
       default: {
         return new Response("Method Not Allowed", {
           status: 405,
-          headers,
+          headers: HEADERS,
         });
       }
     }

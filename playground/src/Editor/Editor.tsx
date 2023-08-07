@@ -88,21 +88,22 @@ export default function Editor() {
   };
 
   useEffect(() => {
-    init()
-      .then(restore)
-      .then((response) => {
-        const [settingsSource, pythonSource] = response ?? [
-          stringify(Workspace.defaultSettings()),
-          DEFAULT_PYTHON_SOURCE,
-        ];
+    async function initAsync() {
+      await init();
+      const response = await restore();
+      const [settingsSource, pythonSource] = response ?? [
+        stringify(Workspace.defaultSettings()),
+        DEFAULT_PYTHON_SOURCE,
+      ];
 
-        setSource({
-          pythonSource,
-          revision: 0,
-          settingsSource,
-        });
-        setRuffVersion(Workspace.version());
+      setSource({
+        pythonSource,
+        revision: 0,
+        settingsSource,
       });
+      setRuffVersion(Workspace.version());
+    }
+    initAsync().catch(console.error);
   }, []);
 
   const deferredSource = useDeferredValue(source);
