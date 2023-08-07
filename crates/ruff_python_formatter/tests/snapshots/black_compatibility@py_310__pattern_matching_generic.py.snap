@@ -124,10 +124,10 @@ with match() as match:
  
      match match:
 -        case case:
-+        case NOT_YET_IMPLEMENTED_MatchCase:
++        case NOT_YET_IMPLEMENTED_Pattern:
              match match:
 -                case case:
-+                case NOT_YET_IMPLEMENTED_MatchCase:
++                case NOT_YET_IMPLEMENTED_Pattern:
                      pass
  
      if all(version.is_python2() for version in target_versions):
@@ -136,7 +136,7 @@ with match() as match:
          x = False
          match x:
 -            case bool(z):
-+            case NOT_YET_IMPLEMENTED_MatchCase:
++            case NOT_YET_IMPLEMENTED_Pattern:
                  y = 0
          self.assertIs(x, False)
          self.assertEqual(y, 0)
@@ -145,7 +145,7 @@ with match() as match:
          y = None
          match x:
 -            case 1e1000:
-+            case NOT_YET_IMPLEMENTED_MatchCase:
++            case NOT_YET_IMPLEMENTED_Pattern:
                  y = 0
          self.assertEqual(x, 0)
          self.assertIs(y, None)
@@ -153,7 +153,7 @@ with match() as match:
          x = range(3)
          match x:
 -            case [y, case as x, z]:
-+            case NOT_YET_IMPLEMENTED_MatchCase:
++            case NOT_YET_IMPLEMENTED_Pattern:
                  w = 0
  
      # At least one of the above branches must have been taken, because every Python
@@ -188,9 +188,9 @@ def get_grammars(target_versions: Set[TargetVersion]) -> List[Grammar]:
         ]
 
     match match:
-        case NOT_YET_IMPLEMENTED_MatchCase:
+        case NOT_YET_IMPLEMENTED_Pattern:
             match match:
-                case NOT_YET_IMPLEMENTED_MatchCase:
+                case NOT_YET_IMPLEMENTED_Pattern:
                     pass
 
     if all(version.is_python2() for version in target_versions):
@@ -210,7 +210,7 @@ def get_grammars(target_versions: Set[TargetVersion]) -> List[Grammar]:
     def test_patma_139(self):
         x = False
         match x:
-            case NOT_YET_IMPLEMENTED_MatchCase:
+            case NOT_YET_IMPLEMENTED_Pattern:
                 y = 0
         self.assertIs(x, False)
         self.assertEqual(y, 0)
@@ -237,14 +237,14 @@ def get_grammars(target_versions: Set[TargetVersion]) -> List[Grammar]:
         x = 0
         y = None
         match x:
-            case NOT_YET_IMPLEMENTED_MatchCase:
+            case NOT_YET_IMPLEMENTED_Pattern:
                 y = 0
         self.assertEqual(x, 0)
         self.assertIs(y, None)
 
         x = range(3)
         match x:
-            case NOT_YET_IMPLEMENTED_MatchCase:
+            case NOT_YET_IMPLEMENTED_Pattern:
                 w = 0
 
     # At least one of the above branches must have been taken, because every Python

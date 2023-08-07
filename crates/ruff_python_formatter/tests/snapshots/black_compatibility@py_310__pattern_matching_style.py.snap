@@ -68,21 +68,21 @@ match match(
 @@ -1,35 +1,34 @@
  match something:
 -    case b():
-+    case NOT_YET_IMPLEMENTED_MatchCase:
++    case NOT_YET_IMPLEMENTED_Pattern:
          print(1 + 1)
 -    case c(
 -        very_complex=True, perhaps_even_loooooooooooooooooooooooooooooooooooooong=-1
 -    ):
-+    case NOT_YET_IMPLEMENTED_MatchCase:
++    case NOT_YET_IMPLEMENTED_Pattern:
          print(1)
 -    case c(
 -        very_complex=True,
 -        perhaps_even_loooooooooooooooooooooooooooooooooooooong=-1,
 -    ):
-+    case NOT_YET_IMPLEMENTED_MatchCase:
++    case NOT_YET_IMPLEMENTED_Pattern:
          print(2)
 -    case a:
-+    case NOT_YET_IMPLEMENTED_MatchCase:
++    case NOT_YET_IMPLEMENTED_Pattern:
          pass
  
 -match(arg)  # comment
@@ -113,7 +113,7 @@ match match(
 -    case case(
 -        arg,  # comment
 -    ):
-+    case NOT_YET_IMPLEMENTED_MatchCase:
++    case NOT_YET_IMPLEMENTED_Pattern:
          pass
 ```
 
@@ -121,13 +121,13 @@ match match(
 
 ```py
 match something:
-    case NOT_YET_IMPLEMENTED_MatchCase:
+    case NOT_YET_IMPLEMENTED_Pattern:
         print(1 + 1)
-    case NOT_YET_IMPLEMENTED_MatchCase:
+    case NOT_YET_IMPLEMENTED_Pattern:
         print(1)
-    case NOT_YET_IMPLEMENTED_MatchCase:
+    case NOT_YET_IMPLEMENTED_Pattern:
         print(2)
-    case NOT_YET_IMPLEMENTED_MatchCase:
+    case NOT_YET_IMPLEMENTED_Pattern:
         pass
 
 match(
@@ -152,7 +152,7 @@ re.match(
 )
 re.match()
 match match():
-    case NOT_YET_IMPLEMENTED_MatchCase:
+    case NOT_YET_IMPLEMENTED_Pattern:
         pass
 ```
 

@@ -1,10 +1,9 @@
-use ruff_formatter::{format_args, write, Buffer, FormatResult};
+use ruff_formatter::{write, Buffer, FormatResult};
 use ruff_python_ast::StmtMatch;
 
-use crate::comments::dangling_comments;
+use crate::comments::trailing_comments;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
-use crate::not_yet_implemented_custom_text;
 use crate::prelude::*;
 use crate::{FormatNodeRule, PyFormatter};
 
@@ -22,6 +21,9 @@ impl FormatNodeRule<StmtMatch> for FormatStmtMatch {
         let comments = f.context().comments().clone();
         let dangling_item_comments = comments.dangling_comments(item);
 
+        // There can be at most one dangling comment after the colon in a match statement.
+        debug_assert!(dangling_item_comments.len() <= 1);
+
         write!(
             f,
             [
@@ -29,22 +31,14 @@ impl FormatNodeRule<StmtMatch> for FormatStmtMatch {
                 space(),
                 maybe_parenthesize_expression(subject, item, Parenthesize::IfBreaks),
                 text(":"),
-                dangling_comments(dangling_item_comments)
+                trailing_comments(dangling_item_comments)
             ]
         )?;
 
         for case in cases {
-            write!(
-                f,
-                [block_indent(&format_args![
-                    text("case"),
-                    space(),
-                    not_yet_implemented_custom_text("NOT_YET_IMPLEMENTED_MatchCase"),
-                    text(":"),
-                    block_indent(&case.body.format())
-                ])]
-            )?;
+            write!(f, [block_indent(&case.format())])?;
         }
+
         Ok(())
     }
 
