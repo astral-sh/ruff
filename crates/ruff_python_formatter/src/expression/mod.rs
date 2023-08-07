@@ -31,8 +31,8 @@ pub(crate) mod expr_f_string;
 pub(crate) mod expr_formatted_value;
 pub(crate) mod expr_generator_exp;
 pub(crate) mod expr_if_exp;
+pub(crate) mod expr_ipy_escape_command;
 pub(crate) mod expr_lambda;
-pub(crate) mod expr_line_magic;
 pub(crate) mod expr_list;
 pub(crate) mod expr_list_comp;
 pub(crate) mod expr_name;
@@ -102,7 +102,7 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             Expr::List(expr) => expr.format().fmt(f),
             Expr::Tuple(expr) => expr.format().fmt(f),
             Expr::Slice(expr) => expr.format().fmt(f),
-            Expr::LineMagic(_) => todo!(),
+            Expr::IpyEscapeCommand(_) => todo!(),
         });
 
         let parenthesize = match parentheses {
@@ -240,7 +240,7 @@ impl NeedsParentheses for Expr {
             Expr::List(expr) => expr.needs_parentheses(parent, context),
             Expr::Tuple(expr) => expr.needs_parentheses(parent, context),
             Expr::Slice(expr) => expr.needs_parentheses(parent, context),
-            Expr::LineMagic(_) => todo!(),
+            Expr::IpyEscapeCommand(_) => todo!(),
         }
     }
 }
@@ -434,7 +434,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             | Expr::Starred(_)
             | Expr::Name(_)
             | Expr::Slice(_) => {}
-            Expr::LineMagic(_) => todo!(),
+            Expr::IpyEscapeCommand(_) => todo!(),
         };
 
         walk_expr(self, expr);

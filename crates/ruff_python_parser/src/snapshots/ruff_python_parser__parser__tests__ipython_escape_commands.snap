@@ -4,7 +4,7 @@ expression: parse_ast
 ---
 Module(
     ModModule {
-        range: 0..919,
+        range: 0..929,
         body: [
             Expr(
                 StmtExpr {
@@ -31,92 +31,92 @@ Module(
                     ),
                 },
             ),
-            LineMagic(
-                StmtLineMagic {
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
                     range: 66..73,
                     kind: Help2,
                     value: "a.foo",
                 },
             ),
-            LineMagic(
-                StmtLineMagic {
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
                     range: 74..80,
                     kind: Help,
                     value: "a.foo",
                 },
             ),
-            LineMagic(
-                StmtLineMagic {
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
                     range: 81..88,
                     kind: Help,
                     value: "a.foo",
                 },
             ),
-            LineMagic(
-                StmtLineMagic {
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
                     range: 89..100,
                     kind: Help2,
                     value: "a.foo()",
                 },
             ),
-            LineMagic(
-                StmtLineMagic {
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
                     range: 115..128,
                     kind: Magic,
                     value: "timeit a = b",
                 },
             ),
-            LineMagic(
-                StmtLineMagic {
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
                     range: 129..147,
                     kind: Magic,
                     value: "timeit foo(b) % 3",
                 },
             ),
-            LineMagic(
-                StmtLineMagic {
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
                     range: 148..176,
                     kind: Magic,
                     value: "alias showPath pwd && ls -a",
                 },
             ),
-            LineMagic(
-                StmtLineMagic {
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
                     range: 177..205,
                     kind: Magic,
                     value: "timeit a =  foo(b); b = 2",
                 },
             ),
-            LineMagic(
-                StmtLineMagic {
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
                     range: 206..226,
                     kind: Magic,
                     value: "matplotlib --inline",
                 },
             ),
-            LineMagic(
-                StmtLineMagic {
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
                     range: 227..253,
                     kind: Magic,
                     value: "matplotlib     --inline",
                 },
             ),
-            LineMagic(
-                StmtLineMagic {
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
                     range: 277..309,
                     kind: Shell,
                     value: "pwd && ls -a | sed 's/^/\\    /'",
                 },
             ),
-            LineMagic(
-                StmtLineMagic {
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
                     range: 310..347,
                     kind: Shell,
                     value: "pwd   && ls -a | sed 's/^/\\\\    /'",
                 },
             ),
-            LineMagic(
-                StmtLineMagic {
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
                     range: 348..393,
                     kind: ShCap,
                     value: "cd /Users/foo/Library/Application\\ Support/",
@@ -176,22 +176,22 @@ Module(
                     ],
                 },
             ),
-            LineMagic(
-                StmtLineMagic {
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
                     range: 656..664,
                     kind: Paren,
                     value: "foo 1 2",
                 },
             ),
-            LineMagic(
-                StmtLineMagic {
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
                     range: 665..673,
                     kind: Quote2,
                     value: "foo 1 2",
                 },
             ),
-            LineMagic(
-                StmtLineMagic {
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
                     range: 674..682,
                     kind: Quote,
                     value: "foo 1 2",
@@ -199,31 +199,31 @@ Module(
             ),
             For(
                 StmtFor {
-                    range: 701..727,
+                    range: 711..737,
                     is_async: false,
                     target: Name(
                         ExprName {
-                            range: 705..706,
+                            range: 715..716,
                             id: "a",
                             ctx: Store,
                         },
                     ),
                     iter: Call(
                         ExprCall {
-                            range: 710..718,
+                            range: 720..728,
                             func: Name(
                                 ExprName {
-                                    range: 710..715,
+                                    range: 720..725,
                                     id: "range",
                                     ctx: Load,
                                 },
                             ),
                             arguments: Arguments {
-                                range: 715..718,
+                                range: 725..728,
                                 args: [
                                     Constant(
                                         ExprConstant {
-                                            range: 716..717,
+                                            range: 726..727,
                                             value: Int(
                                                 5,
                                             ),
@@ -236,9 +236,9 @@ Module(
                         },
                     ),
                     body: [
-                        LineMagic(
-                            StmtLineMagic {
-                                range: 724..727,
+                        IpyEscapeCommand(
+                            StmtIpyEscapeCommand {
+                                range: 734..737,
                                 kind: Shell,
                                 value: "ls",
                             },
@@ -249,19 +249,19 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    range: 729..738,
+                    range: 739..748,
                     targets: [
                         Name(
                             ExprName {
-                                range: 729..731,
+                                range: 739..741,
                                 id: "p1",
                                 ctx: Store,
                             },
                         ),
                     ],
-                    value: LineMagic(
-                        ExprLineMagic {
-                            range: 734..738,
+                    value: IpyEscapeCommand(
+                        ExprIpyEscapeCommand {
+                            range: 744..748,
                             kind: Shell,
                             value: "pwd",
                         },
@@ -270,25 +270,25 @@ Module(
             ),
             AnnAssign(
                 StmtAnnAssign {
-                    range: 739..753,
+                    range: 749..763,
                     target: Name(
                         ExprName {
-                            range: 739..741,
+                            range: 749..751,
                             id: "p2",
                             ctx: Store,
                         },
                     ),
                     annotation: Name(
                         ExprName {
-                            range: 743..746,
+                            range: 753..756,
                             id: "str",
                             ctx: Load,
                         },
                     ),
                     value: Some(
-                        LineMagic(
-                            ExprLineMagic {
-                                range: 749..753,
+                        IpyEscapeCommand(
+                            ExprIpyEscapeCommand {
+                                range: 759..763,
                                 kind: Shell,
                                 value: "pwd",
                             },
@@ -299,98 +299,98 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    range: 754..774,
+                    range: 764..784,
                     targets: [
                         Name(
                             ExprName {
-                                range: 754..757,
+                                range: 764..767,
                                 id: "foo",
                                 ctx: Store,
                             },
                         ),
                     ],
-                    value: LineMagic(
-                        ExprLineMagic {
-                            range: 760..774,
+                    value: IpyEscapeCommand(
+                        ExprIpyEscapeCommand {
+                            range: 770..784,
                             kind: Magic,
                             value: "foo     bar",
                         },
                     ),
                 },
             ),
-            LineMagic(
-                StmtLineMagic {
-                    range: 776..781,
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    range: 786..791,
                     kind: Magic,
                     value: " foo",
                 },
             ),
             Assign(
                 StmtAssign {
-                    range: 782..803,
+                    range: 792..813,
                     targets: [
                         Name(
                             ExprName {
-                                range: 782..785,
+                                range: 792..795,
                                 id: "foo",
                                 ctx: Store,
                             },
                         ),
                     ],
-                    value: LineMagic(
-                        ExprLineMagic {
-                            range: 788..803,
+                    value: IpyEscapeCommand(
+                        ExprIpyEscapeCommand {
+                            range: 798..813,
                             kind: Magic,
                             value: "foo  # comment",
                         },
                     ),
                 },
             ),
-            LineMagic(
-                StmtLineMagic {
-                    range: 828..832,
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    range: 838..842,
                     kind: Help,
                     value: "foo",
                 },
             ),
-            LineMagic(
-                StmtLineMagic {
-                    range: 833..842,
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    range: 843..852,
                     kind: Help2,
                     value: "foo.bar",
                 },
             ),
-            LineMagic(
-                StmtLineMagic {
-                    range: 843..855,
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    range: 853..865,
                     kind: Help,
                     value: "foo.bar.baz",
                 },
             ),
-            LineMagic(
-                StmtLineMagic {
-                    range: 856..864,
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    range: 866..874,
                     kind: Help2,
                     value: "foo[0]",
                 },
             ),
-            LineMagic(
-                StmtLineMagic {
-                    range: 865..875,
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    range: 875..885,
                     kind: Help,
                     value: "foo[0][1]",
                 },
             ),
-            LineMagic(
-                StmtLineMagic {
-                    range: 876..895,
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    range: 886..905,
                     kind: Help2,
                     value: "foo.bar[0].baz[1]",
                 },
             ),
-            LineMagic(
-                StmtLineMagic {
-                    range: 896..919,
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    range: 906..929,
                     kind: Help2,
                     value: "foo.bar[0].baz[2].egg",
                 },

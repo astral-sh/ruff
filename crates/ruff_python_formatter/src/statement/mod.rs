@@ -17,7 +17,7 @@ pub(crate) mod stmt_global;
 pub(crate) mod stmt_if;
 pub(crate) mod stmt_import;
 pub(crate) mod stmt_import_from;
-pub(crate) mod stmt_line_magic;
+pub(crate) mod stmt_ipy_escape_command;
 pub(crate) mod stmt_match;
 pub(crate) mod stmt_nonlocal;
 pub(crate) mod stmt_pass;
@@ -61,7 +61,7 @@ impl FormatRule<Stmt, PyFormatContext<'_>> for FormatStmt {
             Stmt::Break(x) => x.format().fmt(f),
             Stmt::Continue(x) => x.format().fmt(f),
             Stmt::TypeAlias(x) => x.format().fmt(f),
-            Stmt::LineMagic(_) => todo!(),
+            Stmt::IpyEscapeCommand(_) => todo!(),
         }
     }
 }

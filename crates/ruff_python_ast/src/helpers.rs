@@ -108,7 +108,7 @@ where
                 | Expr::Subscript(_)
                 | Expr::Yield(_)
                 | Expr::YieldFrom(_)
-                | Expr::LineMagic(_)
+                | Expr::IpyEscapeCommand(_)
         )
     })
 }
@@ -247,7 +247,7 @@ where
                     .is_some_and(|value| any_over_expr(value, func))
         }
         Expr::Name(_) | Expr::Constant(_) => false,
-        Expr::LineMagic(_) => false,
+        Expr::IpyEscapeCommand(_) => false,
     }
 }
 
@@ -534,7 +534,7 @@ where
         Stmt::Nonlocal(_) => false,
         Stmt::Expr(ast::StmtExpr { value, range: _ }) => any_over_expr(value, func),
         Stmt::Pass(_) | Stmt::Break(_) | Stmt::Continue(_) => false,
-        Stmt::LineMagic(_) => false,
+        Stmt::IpyEscapeCommand(_) => false,
     }
 }
 

@@ -653,13 +653,13 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                         | Expr::Await(_)
                         | Expr::Yield(_)
                         | Expr::YieldFrom(_) => self.unconditional_next_block(after),
-                        Expr::LineMagic(_) => todo!(),
+                        Expr::IpyEscapeCommand(_) => todo!(),
                     }
                 }
                 // The tough branches are done, here is an easy one.
                 Stmt::Return(_) => NextBlock::Terminate,
                 Stmt::TypeAlias(_) => todo!(),
-                Stmt::LineMagic(_) => todo!(),
+                Stmt::IpyEscapeCommand(_) => todo!(),
             };
 
             // Include any statements in the block that don't divert the control flow.
@@ -903,7 +903,7 @@ fn needs_next_block(stmts: &[Stmt]) -> bool {
         | Stmt::TryStar(_)
         | Stmt::Assert(_) => true,
         Stmt::TypeAlias(_) => todo!(),
-        Stmt::LineMagic(_) => todo!(),
+        Stmt::IpyEscapeCommand(_) => todo!(),
     }
 }
 
@@ -936,7 +936,7 @@ fn is_control_flow_stmt(stmt: &Stmt) -> bool {
         | Stmt::Break(_)
         | Stmt::Continue(_) => true,
         Stmt::TypeAlias(_) => todo!(),
-        Stmt::LineMagic(_) => todo!(),
+        Stmt::IpyEscapeCommand(_) => todo!(),
     }
 }
 

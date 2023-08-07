@@ -5,7 +5,7 @@
 
 use num_bigint::BigInt;
 use ruff_text_size::TextSize;
-use ruff_python_ast::{self as ast, Ranged, MagicKind};
+use ruff_python_ast::{self as ast, Ranged, IpyEscapeKind};
 use crate::{
     Mode,
     lexer::{LexicalError, LexicalErrorType},
@@ -89,8 +89,8 @@ SmallStatement: ast::Stmt = {
     NonlocalStatement,
     AssertStatement,
     TypeAliasStatement,
-    LineMagicStatement,
-    HelpEndLineMagic,
+    IpyEscapeCommandStatement,
+    IpyHelpEndEscapeCommandStatement,
 };
 
 PassStatement: ast::Stmt = {
@@ -155,7 +155,7 @@ ExpressionStatement: ast::Stmt = {
 
 AssignSuffix: ast::Expr = {
     "=" <e:TestListOrYieldExpr> => e,
-    "=" <e:LineMagicExpr> => e
+    "=" <e:IpyEscapeCommandExpr> => e
 };
 
 TestListOrYieldExpr: ast::Expr = {
@@ -323,52 +323,52 @@ AssertStatement: ast::Stmt = {
     },
 };
 
-LineMagicStatement: ast::Stmt = {
-    <location:@L> <m:line_magic> <end_location:@R> =>? {
+IpyEscapeCommandStatement: ast::Stmt = {
+    <location:@L> <c:ipy_escape_command> <end_location:@R> =>? {
         if mode == Mode::Jupyter {
-            Ok(ast::Stmt::LineMagic(
-                ast::StmtLineMagic {
-                    kind: m.0,
-                    value: m.1,
+            Ok(ast::Stmt::IpyEscapeCommand(
+                ast::StmtIpyEscapeCommand {
+                    kind: c.0,
+                    value: c.1,
                     range: (location..end_location).into()
                 }
             ))
         } else {
             Err(LexicalError {
-                error: LexicalErrorType::OtherError("line magics are only allowed in Jupyter mode".to_string()),
+                error: LexicalErrorType::OtherError("IPython escape commands are only allowed in Jupyter mode".to_string()),
                 location,
             })?
         }
     }
 }
 
-LineMagicExpr: ast::Expr = {
-    <location:@L> <m:line_magic> <end_location:@R> =>? {
+IpyEscapeCommandExpr: ast::Expr = {
+    <location:@L> <c:ipy_escape_command> <end_location:@R> =>? {
         if mode == Mode::Jupyter {
             // This should never occur as the lexer won't allow it.
-            if !matches!(m.0, MagicKind::Magic | MagicKind::Shell) {
+            if !matches!(c.0, IpyEscapeKind::Magic | IpyEscapeKind::Shell) {
                 return Err(LexicalError {
-                    error: LexicalErrorType::OtherError("expr line magics are only allowed for % and !".to_string()),
+                    error: LexicalErrorType::OtherError("IPython escape command expr is only allowed for % and !".to_string()),
                     location,
                 })?;
             }
-            Ok(ast::Expr::LineMagic(
-                ast::ExprLineMagic {
-                    kind: m.0,
-                    value: m.1,
+            Ok(ast::Expr::IpyEscapeCommand(
+                ast::ExprIpyEscapeCommand {
+                    kind: c.0,
+                    value: c.1,
                     range: (location..end_location).into()
                 }
             ))
         } else {
             Err(LexicalError {
-                error: LexicalErrorType::OtherError("line magics are only allowed in Jupyter mode".to_string()),
+                error: LexicalErrorType::OtherError("IPython escape commands are only allowed in Jupyter mode".to_string()),
                 location,
             })?
         }
     }
 }
 
-HelpEndLineMagic: ast::Stmt = {
+IpyHelpEndEscapeCommandStatement: ast::Stmt = {
     // We are permissive than the original implementation because we would allow whitespace
     // between the expression and the suffix while the IPython implementation doesn't allow it.
     // For example, `foo ?` would be valid in our case but invalid from IPython.
@@ -404,7 +404,7 @@ HelpEndLineMagic: ast::Stmt = {
             }
             Ok(())
         }
-        
+
         if mode != Mode::Jupyter {
             return Err(ParseError::User {
                 error: LexicalError {
@@ -415,8 +415,8 @@ HelpEndLineMagic: ast::Stmt = {
         }
 
         let kind = match suffix.len() {
-            1 => MagicKind::Help,
-            2 => MagicKind::Help2,
+            1 => IpyEscapeKind::Help,
+            2 => IpyEscapeKind::Help2,
             _ => {
                 return Err(ParseError::User {
                     error: LexicalError {
@@ -429,9 +429,9 @@ HelpEndLineMagic: ast::Stmt = {
 
         let mut value = String::new();
         unparse_expr(&e, &mut value)?;
-        
-        Ok(ast::Stmt::LineMagic(
-            ast::StmtLineMagic {
+
+        Ok(ast::Stmt::IpyEscapeCommand(
+            ast::StmtIpyEscapeCommand {
                 kind,
                 value,
                 range: (location..end_location).into()
@@ -1900,8 +1900,8 @@ extern {
             triple_quoted: <bool>
         },
         name => token::Tok::Name { name: <String> },
-        line_magic => token::Tok::MagicCommand {
-            kind: <MagicKind>,
+        ipy_escape_command => token::Tok::IpyEscapeCommand {
+            kind: <IpyEscapeKind>,
             value: <String>
         },
         "\n" => token::Tok::Newline,

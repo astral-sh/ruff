@@ -673,7 +673,7 @@ pub struct ExprSlice<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprLineMagic<'a> {
-    kind: ast::MagicKind,
+    kind: ast::IpyEscapeKind,
     value: &'a str,
 }
 
@@ -936,7 +936,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 upper: upper.as_ref().map(Into::into),
                 step: step.as_ref().map(Into::into),
             }),
-            ast::Expr::LineMagic(ast::ExprLineMagic {
+            ast::Expr::IpyEscapeCommand(ast::ExprIpyEscapeCommand {
                 kind,
                 value,
                 range: _,
@@ -1166,7 +1166,7 @@ pub struct StmtExpr<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct StmtLineMagic<'a> {
-    kind: ast::MagicKind,
+    kind: ast::IpyEscapeKind,
     value: &'a str,
 }
 
@@ -1394,7 +1394,7 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                     names: names.iter().map(ast::Identifier::as_str).collect(),
                 })
             }
-            ast::Stmt::LineMagic(ast::StmtLineMagic {
+            ast::Stmt::IpyEscapeCommand(ast::StmtIpyEscapeCommand {
                 kind,
                 value,
                 range: _,
