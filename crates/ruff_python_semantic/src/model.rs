@@ -6,7 +6,7 @@ use smallvec::smallvec;
 
 use ruff_python_ast::call_path::{collect_call_path, from_unqualified_name, CallPath};
 use ruff_python_ast::helpers::from_relative_import;
-use ruff_python_ast::{self as ast, Expr, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Expr, Operator, Ranged, Stmt};
 use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_python_stdlib::typing::is_typing_extension;
 use ruff_text_size::{TextRange, TextSize};
@@ -1019,6 +1019,34 @@ impl<'a> SemanticModel<'a> {
                 return *is_async;
             }
         }
+        false
+    }
+
+    /// Return `true` if the model is in a nested union expression (e.g., the inner `Union` in
+    /// `Union[Union[int, str], float]`).
+    pub fn in_nested_union(&self) -> bool {
+        // Ex) `Union[Union[int, str], float]`
+        if self
+            .current_expression_grandparent()
+            .and_then(Expr::as_subscript_expr)
+            .is_some_and(|parent| self.match_typing_expr(&parent.value, "Union"))
+        {
+            return true;
+        }
+
+        // Ex) `int | Union[str, float]`
+        if self.current_expression_parent().is_some_and(|parent| {
+            matches!(
+                parent,
+                Expr::BinOp(ast::ExprBinOp {
+                    op: Operator::BitOr,
+                    ..
+                })
+            )
+        }) {
+            return true;
+        }
+
         false
     }
 
