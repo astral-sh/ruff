@@ -60,7 +60,7 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             kwarg,
         } = item;
 
-        let (slash, star) = find_argument_separators(f.context().source(), item);
+        let (slash, star) = find_parameter_separators(f.context().source(), item);
 
         let comments = f.context().comments().clone();
         let dangling = comments.dangling_comments(item);
@@ -318,7 +318,7 @@ impl Format<PyFormatContext<'_>> for CommentsAroundText<'_> {
 ///                           ^ star following start
 /// ```
 #[derive(Debug)]
-pub(crate) struct ArgumentSeparator {
+pub(crate) struct ParameterSeparator {
     /// The end of the last node or separator before this separator
     pub(crate) preceding_end: TextSize,
     /// The range of the separator itself
@@ -330,10 +330,10 @@ pub(crate) struct ArgumentSeparator {
 /// Finds slash and star in `f(a, /, b, *, c)` or `lambda a, /, b, *, c: 1`.
 ///
 /// Returns the location of the slash and star separators, if any.
-pub(crate) fn find_argument_separators(
+pub(crate) fn find_parameter_separators(
     contents: &str,
     parameters: &Parameters,
-) -> (Option<ArgumentSeparator>, Option<ArgumentSeparator>) {
+) -> (Option<ParameterSeparator>, Option<ParameterSeparator>) {
     // We only compute preceding_end and token location here since following_start depends on the
     // star location, but the star location depends on slash's position
     let slash = if let Some(preceding_end) = parameters.posonlyargs.last().map(Ranged::end) {
@@ -388,7 +388,7 @@ pub(crate) fn find_argument_separators(
                 .expect("The function definition can't end here");
             debug_assert!(star.kind() == SimpleTokenKind::Star, "{star:?}");
 
-            Some(ArgumentSeparator {
+            Some(ParameterSeparator {
                 preceding_end,
                 separator: star.range,
                 following_start: first_keyword_argument.start(),
@@ -411,7 +411,7 @@ pub(crate) fn find_argument_separators(
             };
             debug_assert!(star.kind() == SimpleTokenKind::Star, "{star:?}");
 
-            Some(ArgumentSeparator {
+            Some(ParameterSeparator {
                 preceding_end: parameters.range.start(),
                 separator: star.range,
                 following_start: first_keyword_argument.start(),
@@ -434,7 +434,7 @@ pub(crate) fn find_argument_separators(
         .or(parameters.vararg.as_ref().map(|first| first.start()))
         .or(star.as_ref().map(|star| star.separator.start()))
         .unwrap_or(parameters.end());
-    let slash = slash.map(|(preceding_end, slash)| ArgumentSeparator {
+    let slash = slash.map(|(preceding_end, slash)| ParameterSeparator {
         preceding_end,
         separator: slash,
         following_start: slash_following_start,
@@ -534,12 +534,12 @@ pub(crate) fn find_argument_separators(
 ///                     ^^^^^^ keyword only parameters (kwargs)
 /// ```
 pub(crate) fn assign_argument_separator_comment_placement(
-    slash: Option<&ArgumentSeparator>,
-    star: Option<&ArgumentSeparator>,
+    slash: Option<&ParameterSeparator>,
+    star: Option<&ParameterSeparator>,
     comment_range: TextRange,
     text_position: CommentLinePosition,
 ) -> Option<ArgumentSeparatorCommentLocation> {
-    if let Some(ArgumentSeparator {
+    if let Some(ParameterSeparator {
         preceding_end,
         separator: slash,
         following_start,
@@ -578,7 +578,7 @@ pub(crate) fn assign_argument_separator_comment_placement(
         }
     }
 
-    if let Some(ArgumentSeparator {
+    if let Some(ParameterSeparator {
         preceding_end,
         separator: star,
         following_start,
