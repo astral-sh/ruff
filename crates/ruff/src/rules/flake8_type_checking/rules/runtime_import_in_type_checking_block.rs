@@ -199,7 +199,7 @@ fn fix_imports(
     imports: &[ImportBinding],
 ) -> Result<Fix> {
     let statement = checker.semantic().statement(statement_id);
-    let parent = checker.semantic().parent_statement(statement);
+    let parent = checker.semantic().parent_statement(statement_id);
 
     let member_names: Vec<Cow<'_, str>> = imports
         .iter()

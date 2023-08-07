@@ -1,10 +1,10 @@
 use std::ops::Index;
 
-use ruff_index::{newtype_index, IndexVec};
-use ruff_python_ast::Stmt;
 use rustc_hash::FxHashMap;
 
+use ruff_index::{newtype_index, IndexVec};
 use ruff_python_ast::types::RefEquality;
+use ruff_python_ast::Stmt;
 
 /// Id uniquely identifying a statement AST node.
 ///
@@ -63,13 +63,6 @@ impl<'a> Statements<'a> {
     #[inline]
     pub fn parent_id(&self, statement_id: StatementId) -> Option<StatementId> {
         self.statements[statement_id].parent
-    }
-
-    /// Return the parent of the given statement.
-    pub fn parent(&self, statement: &'a Stmt) -> Option<&'a Stmt> {
-        let statement_id = self.statement_to_id.get(&RefEquality(statement))?;
-        let parent_id = self.statements[*statement_id].parent?;
-        Some(self[parent_id])
     }
 
     /// Return the depth of the statement.

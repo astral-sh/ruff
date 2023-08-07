@@ -940,8 +940,10 @@ impl<'a> SemanticModel<'a> {
 
     /// Given a [`Stmt`], return its parent, if any.
     #[inline]
-    pub fn parent_statement(&self, statement: &'a Stmt) -> Option<&'a Stmt> {
-        self.statements.parent(statement)
+    pub fn parent_statement(&self, statement_id: StatementId) -> Option<&'a Stmt> {
+        self.statements
+            .parent_id(statement_id)
+            .map(|id| self.statements[id])
     }
 
     /// Set the [`Globals`] for the current [`Scope`].
