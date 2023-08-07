@@ -33,18 +33,19 @@ print(   "111"       ) # type: ignore
 ```diff
 --- Black
 +++ Ruff
-@@ -1,10 +1,8 @@
+@@ -1,12 +1,6 @@
  # This is a regression test. Issue #3737
  
 -a = (  # type: ignore
-+a = int(  # type: ignore  # type: ignore
-     int(  # type: ignore
+-    int(  # type: ignore
 -        int(  # type: ignore
 -            int(6)  # type: ignore
 -        )
-+        int(6)  # type: ignore
-     )
- )
+-    )
+-)
++a = int(int(int(6)))  # type: ignore  # type: ignore  # type: ignore  # type: ignore
+ 
+ b = int(6)
  
 ```
 
@@ -53,11 +54,7 @@ print(   "111"       ) # type: ignore
 ```py
 # This is a regression test. Issue #3737
 
-a = int(  # type: ignore  # type: ignore
-    int(  # type: ignore
-        int(6)  # type: ignore
-    )
-)
+a = int(int(int(6)))  # type: ignore  # type: ignore  # type: ignore  # type: ignore
 
 b = int(6)
 

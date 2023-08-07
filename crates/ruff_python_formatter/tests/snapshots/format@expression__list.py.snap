@@ -50,6 +50,12 @@ c1 = [ # trailing open bracket
 [  # end-of-line comment
     1
 ]
+
+[  # inner comment
+    first,
+    second,
+    third
+]  # outer comment
 ```
 
 ## Output
@@ -94,6 +100,8 @@ c1 = [  # trailing open bracket
 ]
 
 [1]  # end-of-line comment
+
+[first, second, third]  # inner comment  # outer comment
 ```
 
 

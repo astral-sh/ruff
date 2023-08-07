@@ -4,7 +4,7 @@ use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::Ranged;
 use ruff_python_trivia::{first_non_trivia_token, SimpleToken, SimpleTokenKind, SimpleTokenizer};
 
-use crate::comments::{dangling_comments, SourceComment};
+use crate::comments::{dangling_open_parenthesis_comments, SourceComment};
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::prelude::*;
 
@@ -117,7 +117,7 @@ where
 }
 
 /// Formats `content` enclosed by the `left` and `right` parentheses, along with any dangling
-/// comments that on the parentheses themselves.
+/// comments on the opening parenthesis itself.
 pub(crate) fn parenthesized_with_dangling_comments<'content, 'ast, Content>(
     left: &'static str,
     comments: &'content [SourceComment],
@@ -155,8 +155,8 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatParenthesized<'_, 'ast> {
             } else {
                 group(&format_args![
                     text(self.left),
-                    &line_suffix(&dangling_comments(self.comments)),
-                    &group(&soft_block_indent(&Arguments::from(&self.content))),
+                    &dangling_open_parenthesis_comments(self.comments),
+                    &soft_block_indent(&Arguments::from(&self.content)),
                     text(self.right)
                 ])
                 .fmt(f)
@@ -319,9 +319,10 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatInParenthesesOnlyGroup<'_, 'a
 
 #[cfg(test)]
 mod tests {
-    use crate::expression::parentheses::is_expression_parenthesized;
     use ruff_python_ast::node::AnyNodeRef;
     use ruff_python_parser::parse_expression;
+
+    use crate::expression::parentheses::is_expression_parenthesized;
 
     #[test]
     fn test_has_parentheses() {

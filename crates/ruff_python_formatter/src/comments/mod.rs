@@ -95,8 +95,9 @@ use std::rc::Rc;
 use ruff_python_ast::{Mod, Ranged};
 
 pub(crate) use format::{
-    dangling_comments, dangling_node_comments, leading_alternate_branch_comments, leading_comments,
-    leading_node_comments, trailing_comments, trailing_node_comments,
+    dangling_comments, dangling_node_comments, dangling_open_parenthesis_comments,
+    leading_alternate_branch_comments, leading_comments, leading_node_comments, trailing_comments,
+    trailing_node_comments,
 };
 use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::node::AnyNodeRef;
