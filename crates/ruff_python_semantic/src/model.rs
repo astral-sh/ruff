@@ -17,13 +17,15 @@ use crate::binding::{
 };
 use crate::context::ExecutionContext;
 use crate::definition::{Definition, DefinitionId, Definitions, Member, Module};
+use crate::expressions::{ExpressionId, Expressions};
 use crate::globals::{Globals, GlobalsArena};
-use crate::node::{NodeId, Nodes};
 use crate::reference::{
-    ResolvedReference, ResolvedReferenceId, ResolvedReferences, UnresolvedReferences,
+    ResolvedReference, ResolvedReferenceId, ResolvedReferences, UnresolvedReference,
+    UnresolvedReferenceFlags, UnresolvedReferences,
 };
 use crate::scope::{Scope, ScopeId, ScopeKind, Scopes};
-use crate::{Imported, UnresolvedReference, UnresolvedReferenceFlags};
+use crate::statements::{StatementId, Statements};
+use crate::Imported;
 
 /// A semantic model for a Python module, to enable querying the module's semantic information.
 pub struct SemanticModel<'a> {
@@ -31,16 +33,16 @@ pub struct SemanticModel<'a> {
     module_path: Option<&'a [String]>,
 
     /// Stack of all visited statements.
-    statements: Nodes<'a, Stmt>,
+    statements: Statements<'a>,
 
     /// The identifier of the current statement.
-    statement_id: Option<NodeId>,
+    statement_id: Option<StatementId>,
 
     /// Stack of all visited expressions.
-    expressions: Nodes<'a, Expr>,
+    expressions: Expressions<'a>,
 
     /// The identifier of the current expression.
-    expression_id: Option<NodeId>,
+    expression_id: Option<ExpressionId>,
 
     /// Stack of all scopes, along with the identifier of the current scope.
     pub scopes: Scopes<'a>,
@@ -132,9 +134,9 @@ impl<'a> SemanticModel<'a> {
         Self {
             typing_modules,
             module_path: module.path(),
-            statements: Nodes::<Stmt>::default(),
+            statements: Statements::default(),
             statement_id: None,
-            expressions: Nodes::<Expr>::default(),
+            expressions: Expressions::default(),
             expression_id: None,
             scopes: Scopes::default(),
             scope_id: ScopeId::global(),
@@ -919,20 +921,20 @@ impl<'a> SemanticModel<'a> {
         None
     }
 
-    /// Return the [`Nodes`] vector of all statements.
-    pub const fn statements(&self) -> &Nodes<'a, Stmt> {
+    /// Return the [`Statements`] vector of all statements.
+    pub const fn statements(&self) -> &Statements<'a> {
         &self.statements
     }
 
-    /// Return the [`NodeId`] corresponding to the given [`Stmt`].
+    /// Return the [`StatementId`] corresponding to the given [`Stmt`].
     #[inline]
-    pub fn statement_id(&self, statement: &Stmt) -> Option<NodeId> {
-        self.statements.node_id(statement)
+    pub fn statement_id(&self, statement: &Stmt) -> Option<StatementId> {
+        self.statements.statement_id(statement)
     }
 
-    /// Return the [`Stmt]` corresponding to the given [`NodeId`].
+    /// Return the [`Stmt]` corresponding to the given [`StatementId`].
     #[inline]
-    pub fn statement(&self, statement_id: NodeId) -> &'a Stmt {
+    pub fn statement(&self, statement_id: StatementId) -> &'a Stmt {
         self.statements[statement_id]
     }
 
@@ -1519,8 +1521,8 @@ impl SemanticModelFlags {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Snapshot {
     scope_id: ScopeId,
-    stmt_id: Option<NodeId>,
-    expr_id: Option<NodeId>,
+    stmt_id: Option<StatementId>,
+    expr_id: Option<ExpressionId>,
     definition_id: DefinitionId,
     flags: SemanticModelFlags,
 }

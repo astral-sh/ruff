@@ -5,7 +5,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, DiagnosticKind, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::{AnyImport, Binding, Imported, NodeId, ResolvedReferenceId, Scope};
+use ruff_python_semantic::{AnyImport, Binding, Imported, ResolvedReferenceId, Scope, StatementId};
 use ruff_text_size::TextRange;
 
 use crate::autofix;
@@ -190,9 +190,9 @@ pub(crate) fn typing_only_runtime_import(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     // Collect all typing-only imports by statement and import type.
-    let mut errors_by_statement: FxHashMap<(NodeId, ImportType), Vec<ImportBinding>> =
+    let mut errors_by_statement: FxHashMap<(StatementId, ImportType), Vec<ImportBinding>> =
         FxHashMap::default();
-    let mut ignores_by_statement: FxHashMap<(NodeId, ImportType), Vec<ImportBinding>> =
+    let mut ignores_by_statement: FxHashMap<(StatementId, ImportType), Vec<ImportBinding>> =
         FxHashMap::default();
 
     for binding_id in scope.binding_ids() {
@@ -402,7 +402,11 @@ fn is_exempt(name: &str, exempt_modules: &[&str]) -> bool {
 }
 
 /// Generate a [`Fix`] to remove typing-only imports from a runtime context.
-fn fix_imports(checker: &Checker, statement_id: NodeId, imports: &[ImportBinding]) -> Result<Fix> {
+fn fix_imports(
+    checker: &Checker,
+    statement_id: StatementId,
+    imports: &[ImportBinding],
+) -> Result<Fix> {
     let statement = checker.semantic().statement(statement_id);
     let parent = checker.semantic().parent_statement(statement);
 

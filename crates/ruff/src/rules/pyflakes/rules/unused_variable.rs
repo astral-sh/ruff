@@ -1,13 +1,13 @@
 use itertools::Itertools;
-use ruff_python_ast::{self as ast, PySourceType, Ranged, Stmt};
-use ruff_python_parser::{lexer, AsMode, Tok};
-use ruff_text_size::{TextRange, TextSize};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::contains_effect;
+use ruff_python_ast::{self as ast, PySourceType, Ranged, Stmt};
+use ruff_python_parser::{lexer, AsMode, Tok};
 use ruff_python_semantic::Scope;
 use ruff_source_file::Locator;
+use ruff_text_size::{TextRange, TextSize};
 
 use crate::autofix::edits::delete_stmt;
 use crate::checkers::ast::Checker;
