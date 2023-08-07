@@ -25,15 +25,27 @@ T = typing.TypeVar("T", covariant=True)
 x: typing.TypeAlias = list[T]
 
 # UP040 with function scope
+T = typing.TypeVar["T"]
 def foo():
+    # reference to global variable
+    x: typing.TypeAlias = list[T]
+
+    # reference to local variable
     TFUNC = typing.TypeVar("TFUNC")
-    x: typing.TypeAlias = list[TFUNC]
+    y: typing.TypeAlias = list[TFUNC]
+
 
 
 # UP040 with class variable scope
+T = typing.TypeVar["T"]
 class Foo:
+    # reference to global variable
+    x: typing.TypeAlias = list[T]
+
+    # reference to class variable
     TCLS = typing.TypeVar("TCLS")
-    x: typing.TypeAlias = list[TCLS]
+    y: typing.TypeAlias = list[TCLS]
+
 
 
 # OK
