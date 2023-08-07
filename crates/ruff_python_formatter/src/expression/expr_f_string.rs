@@ -5,18 +5,18 @@ use crate::prelude::*;
 use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::FormatResult;
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::ExprJoinedStr;
+use ruff_python_ast::ExprFString;
 
 #[derive(Default)]
-pub struct FormatExprJoinedStr;
+pub struct FormatExprFString;
 
-impl FormatNodeRule<ExprJoinedStr> for FormatExprJoinedStr {
-    fn fmt_fields(&self, item: &ExprJoinedStr, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatString::new(&AnyString::JoinedStr(item)).fmt(f)
+impl FormatNodeRule<ExprFString> for FormatExprFString {
+    fn fmt_fields(&self, item: &ExprFString, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatString::new(&AnyString::FString(item)).fmt(f)
     }
 }
 
-impl NeedsParentheses for ExprJoinedStr {
+impl NeedsParentheses for ExprFString {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,

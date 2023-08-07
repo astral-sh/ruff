@@ -62,7 +62,7 @@ fn check_msg(checker: &mut Checker, msg: &Expr) {
             _ => {}
         },
         // Check for f-strings.
-        Expr::JoinedStr(_) => {
+        Expr::FString(_) => {
             if checker.enabled(Rule::LoggingFString) {
                 checker
                     .diagnostics

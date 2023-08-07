@@ -195,8 +195,8 @@ expression: parse_ast
                                             arguments: Arguments {
                                                 range: 132..180,
                                                 args: [
-                                                    JoinedStr(
-                                                        ExprJoinedStr {
+                                                    FString(
+                                                        ExprFString {
                                                             range: 133..179,
                                                             values: [
                                                                 Constant(
@@ -323,8 +323,8 @@ expression: parse_ast
                                             arguments: Arguments {
                                                 range: 212..260,
                                                 args: [
-                                                    JoinedStr(
-                                                        ExprJoinedStr {
+                                                    FString(
+                                                        ExprFString {
                                                             range: 213..259,
                                                             values: [
                                                                 Constant(

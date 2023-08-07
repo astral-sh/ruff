@@ -68,7 +68,7 @@ fn is_valid_key(expr: &Expr) -> bool {
         Expr::Constant(ast::ExprConstant {
             value: Constant::Str { .. },
             ..
-        }) | Expr::JoinedStr(_)
+        }) | Expr::FString(_)
     )
 }
 

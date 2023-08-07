@@ -633,7 +633,7 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                         | Expr::Compare(_)
                         | Expr::Call(_)
                         | Expr::FormattedValue(_)
-                        | Expr::JoinedStr(_)
+                        | Expr::FString(_)
                         | Expr::Constant(_)
                         | Expr::Attribute(_)
                         | Expr::Subscript(_)

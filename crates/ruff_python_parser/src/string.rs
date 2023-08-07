@@ -243,7 +243,7 @@ impl<'a> StringParser<'a> {
                     let start_location = self.get_pos();
                     let parsed_spec = self.parse_spec(nested)?;
 
-                    spec = Some(Box::new(Expr::from(ast::ExprJoinedStr {
+                    spec = Some(Box::new(Expr::from(ast::ExprFString {
                         values: parsed_spec,
                         range: self.range(start_location),
                     })));
@@ -671,7 +671,7 @@ pub(crate) fn parse_strings(
         deduped.push(take_current(&mut current, current_start, current_end));
     }
 
-    Ok(Expr::JoinedStr(ast::ExprJoinedStr {
+    Ok(Expr::FString(ast::ExprFString {
         values: deduped,
         range: TextRange::new(initial_start, last_end),
     }))

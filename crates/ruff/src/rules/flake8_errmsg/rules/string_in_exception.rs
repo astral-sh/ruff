@@ -210,7 +210,7 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
                     }
                 }
                 // Check for f-strings.
-                Expr::JoinedStr(_) => {
+                Expr::FString(_) => {
                     if checker.enabled(Rule::FStringInException) {
                         let mut diagnostic = Diagnostic::new(FStringInException, first.range());
                         if checker.patch(diagnostic.kind.rule()) {

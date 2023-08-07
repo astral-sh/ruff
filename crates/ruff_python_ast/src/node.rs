@@ -67,7 +67,7 @@ pub enum AnyNode {
     ExprCompare(ast::ExprCompare),
     ExprCall(ast::ExprCall),
     ExprFormattedValue(ast::ExprFormattedValue),
-    ExprJoinedStr(ast::ExprJoinedStr),
+    ExprFString(ast::ExprFString),
     ExprConstant(ast::ExprConstant),
     ExprAttribute(ast::ExprAttribute),
     ExprSubscript(ast::ExprSubscript),
@@ -153,7 +153,7 @@ impl AnyNode {
             | AnyNode::ExprCompare(_)
             | AnyNode::ExprCall(_)
             | AnyNode::ExprFormattedValue(_)
-            | AnyNode::ExprJoinedStr(_)
+            | AnyNode::ExprFString(_)
             | AnyNode::ExprConstant(_)
             | AnyNode::ExprAttribute(_)
             | AnyNode::ExprSubscript(_)
@@ -210,7 +210,7 @@ impl AnyNode {
             AnyNode::ExprCompare(node) => Some(Expr::Compare(node)),
             AnyNode::ExprCall(node) => Some(Expr::Call(node)),
             AnyNode::ExprFormattedValue(node) => Some(Expr::FormattedValue(node)),
-            AnyNode::ExprJoinedStr(node) => Some(Expr::JoinedStr(node)),
+            AnyNode::ExprFString(node) => Some(Expr::FString(node)),
             AnyNode::ExprConstant(node) => Some(Expr::Constant(node)),
             AnyNode::ExprAttribute(node) => Some(Expr::Attribute(node)),
             AnyNode::ExprSubscript(node) => Some(Expr::Subscript(node)),
@@ -325,7 +325,7 @@ impl AnyNode {
             | AnyNode::ExprCompare(_)
             | AnyNode::ExprCall(_)
             | AnyNode::ExprFormattedValue(_)
-            | AnyNode::ExprJoinedStr(_)
+            | AnyNode::ExprFString(_)
             | AnyNode::ExprConstant(_)
             | AnyNode::ExprAttribute(_)
             | AnyNode::ExprSubscript(_)
@@ -419,7 +419,7 @@ impl AnyNode {
             | AnyNode::ExprCompare(_)
             | AnyNode::ExprCall(_)
             | AnyNode::ExprFormattedValue(_)
-            | AnyNode::ExprJoinedStr(_)
+            | AnyNode::ExprFString(_)
             | AnyNode::ExprConstant(_)
             | AnyNode::ExprAttribute(_)
             | AnyNode::ExprSubscript(_)
@@ -498,7 +498,7 @@ impl AnyNode {
             | AnyNode::ExprCompare(_)
             | AnyNode::ExprCall(_)
             | AnyNode::ExprFormattedValue(_)
-            | AnyNode::ExprJoinedStr(_)
+            | AnyNode::ExprFString(_)
             | AnyNode::ExprConstant(_)
             | AnyNode::ExprAttribute(_)
             | AnyNode::ExprSubscript(_)
@@ -602,7 +602,7 @@ impl AnyNode {
             Self::ExprCompare(node) => AnyNodeRef::ExprCompare(node),
             Self::ExprCall(node) => AnyNodeRef::ExprCall(node),
             Self::ExprFormattedValue(node) => AnyNodeRef::ExprFormattedValue(node),
-            Self::ExprJoinedStr(node) => AnyNodeRef::ExprJoinedStr(node),
+            Self::ExprFString(node) => AnyNodeRef::ExprFString(node),
             Self::ExprConstant(node) => AnyNodeRef::ExprConstant(node),
             Self::ExprAttribute(node) => AnyNodeRef::ExprAttribute(node),
             Self::ExprSubscript(node) => AnyNodeRef::ExprSubscript(node),
@@ -1961,12 +1961,12 @@ impl AstNode for ast::ExprFormattedValue {
         AnyNode::from(self)
     }
 }
-impl AstNode for ast::ExprJoinedStr {
+impl AstNode for ast::ExprFString {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
     {
-        if let AnyNode::ExprJoinedStr(node) = kind {
+        if let AnyNode::ExprFString(node) = kind {
             Some(node)
         } else {
             None
@@ -1974,7 +1974,7 @@ impl AstNode for ast::ExprJoinedStr {
     }
 
     fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprJoinedStr(node) = kind {
+        if let AnyNodeRef::ExprFString(node) = kind {
             Some(node)
         } else {
             None
@@ -2941,7 +2941,7 @@ impl From<Expr> for AnyNode {
             Expr::Compare(node) => AnyNode::ExprCompare(node),
             Expr::Call(node) => AnyNode::ExprCall(node),
             Expr::FormattedValue(node) => AnyNode::ExprFormattedValue(node),
-            Expr::JoinedStr(node) => AnyNode::ExprJoinedStr(node),
+            Expr::FString(node) => AnyNode::ExprFString(node),
             Expr::Constant(node) => AnyNode::ExprConstant(node),
             Expr::Attribute(node) => AnyNode::ExprAttribute(node),
             Expr::Subscript(node) => AnyNode::ExprSubscript(node),
@@ -3269,9 +3269,9 @@ impl From<ast::ExprFormattedValue> for AnyNode {
     }
 }
 
-impl From<ast::ExprJoinedStr> for AnyNode {
-    fn from(node: ast::ExprJoinedStr) -> Self {
-        AnyNode::ExprJoinedStr(node)
+impl From<ast::ExprFString> for AnyNode {
+    fn from(node: ast::ExprFString) -> Self {
+        AnyNode::ExprFString(node)
     }
 }
 
@@ -3505,7 +3505,7 @@ impl Ranged for AnyNode {
             AnyNode::ExprCompare(node) => node.range(),
             AnyNode::ExprCall(node) => node.range(),
             AnyNode::ExprFormattedValue(node) => node.range(),
-            AnyNode::ExprJoinedStr(node) => node.range(),
+            AnyNode::ExprFString(node) => node.range(),
             AnyNode::ExprConstant(node) => node.range(),
             AnyNode::ExprAttribute(node) => node.range(),
             AnyNode::ExprSubscript(node) => node.range(),
@@ -3591,7 +3591,7 @@ pub enum AnyNodeRef<'a> {
     ExprCompare(&'a ast::ExprCompare),
     ExprCall(&'a ast::ExprCall),
     ExprFormattedValue(&'a ast::ExprFormattedValue),
-    ExprJoinedStr(&'a ast::ExprJoinedStr),
+    ExprFString(&'a ast::ExprFString),
     ExprConstant(&'a ast::ExprConstant),
     ExprAttribute(&'a ast::ExprAttribute),
     ExprSubscript(&'a ast::ExprSubscript),
@@ -3676,7 +3676,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::ExprCompare(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprCall(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprFormattedValue(node) => NonNull::from(*node).cast(),
-            AnyNodeRef::ExprJoinedStr(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprFString(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprConstant(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprAttribute(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprSubscript(node) => NonNull::from(*node).cast(),
@@ -3767,7 +3767,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::ExprCompare(_) => NodeKind::ExprCompare,
             AnyNodeRef::ExprCall(_) => NodeKind::ExprCall,
             AnyNodeRef::ExprFormattedValue(_) => NodeKind::ExprFormattedValue,
-            AnyNodeRef::ExprJoinedStr(_) => NodeKind::ExprJoinedStr,
+            AnyNodeRef::ExprFString(_) => NodeKind::ExprFString,
             AnyNodeRef::ExprConstant(_) => NodeKind::ExprConstant,
             AnyNodeRef::ExprAttribute(_) => NodeKind::ExprAttribute,
             AnyNodeRef::ExprSubscript(_) => NodeKind::ExprSubscript,
@@ -3853,7 +3853,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprCompare(_)
             | AnyNodeRef::ExprCall(_)
             | AnyNodeRef::ExprFormattedValue(_)
-            | AnyNodeRef::ExprJoinedStr(_)
+            | AnyNodeRef::ExprFString(_)
             | AnyNodeRef::ExprConstant(_)
             | AnyNodeRef::ExprAttribute(_)
             | AnyNodeRef::ExprSubscript(_)
@@ -3910,7 +3910,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprCompare(_)
             | AnyNodeRef::ExprCall(_)
             | AnyNodeRef::ExprFormattedValue(_)
-            | AnyNodeRef::ExprJoinedStr(_)
+            | AnyNodeRef::ExprFString(_)
             | AnyNodeRef::ExprConstant(_)
             | AnyNodeRef::ExprAttribute(_)
             | AnyNodeRef::ExprSubscript(_)
@@ -4024,7 +4024,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprCompare(_)
             | AnyNodeRef::ExprCall(_)
             | AnyNodeRef::ExprFormattedValue(_)
-            | AnyNodeRef::ExprJoinedStr(_)
+            | AnyNodeRef::ExprFString(_)
             | AnyNodeRef::ExprConstant(_)
             | AnyNodeRef::ExprAttribute(_)
             | AnyNodeRef::ExprSubscript(_)
@@ -4118,7 +4118,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprCompare(_)
             | AnyNodeRef::ExprCall(_)
             | AnyNodeRef::ExprFormattedValue(_)
-            | AnyNodeRef::ExprJoinedStr(_)
+            | AnyNodeRef::ExprFString(_)
             | AnyNodeRef::ExprConstant(_)
             | AnyNodeRef::ExprAttribute(_)
             | AnyNodeRef::ExprSubscript(_)
@@ -4197,7 +4197,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprCompare(_)
             | AnyNodeRef::ExprCall(_)
             | AnyNodeRef::ExprFormattedValue(_)
-            | AnyNodeRef::ExprJoinedStr(_)
+            | AnyNodeRef::ExprFString(_)
             | AnyNodeRef::ExprConstant(_)
             | AnyNodeRef::ExprAttribute(_)
             | AnyNodeRef::ExprSubscript(_)
@@ -4543,9 +4543,9 @@ impl<'a> From<&'a ast::ExprFormattedValue> for AnyNodeRef<'a> {
     }
 }
 
-impl<'a> From<&'a ast::ExprJoinedStr> for AnyNodeRef<'a> {
-    fn from(node: &'a ast::ExprJoinedStr) -> Self {
-        AnyNodeRef::ExprJoinedStr(node)
+impl<'a> From<&'a ast::ExprFString> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::ExprFString) -> Self {
+        AnyNodeRef::ExprFString(node)
     }
 }
 
@@ -4740,7 +4740,7 @@ impl<'a> From<&'a Expr> for AnyNodeRef<'a> {
             Expr::Compare(node) => AnyNodeRef::ExprCompare(node),
             Expr::Call(node) => AnyNodeRef::ExprCall(node),
             Expr::FormattedValue(node) => AnyNodeRef::ExprFormattedValue(node),
-            Expr::JoinedStr(node) => AnyNodeRef::ExprJoinedStr(node),
+            Expr::FString(node) => AnyNodeRef::ExprFString(node),
             Expr::Constant(node) => AnyNodeRef::ExprConstant(node),
             Expr::Attribute(node) => AnyNodeRef::ExprAttribute(node),
             Expr::Subscript(node) => AnyNodeRef::ExprSubscript(node),
@@ -4893,7 +4893,7 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::ExprCompare(node) => node.range(),
             AnyNodeRef::ExprCall(node) => node.range(),
             AnyNodeRef::ExprFormattedValue(node) => node.range(),
-            AnyNodeRef::ExprJoinedStr(node) => node.range(),
+            AnyNodeRef::ExprFString(node) => node.range(),
             AnyNodeRef::ExprConstant(node) => node.range(),
             AnyNodeRef::ExprAttribute(node) => node.range(),
             AnyNodeRef::ExprSubscript(node) => node.range(),
@@ -4981,7 +4981,7 @@ pub enum NodeKind {
     ExprCompare,
     ExprCall,
     ExprFormattedValue,
-    ExprJoinedStr,
+    ExprFString,
     ExprConstant,
     ExprAttribute,
     ExprSubscript,

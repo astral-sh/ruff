@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use bitflags::bitflags;
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{self as ast, ExprConstant, ExprJoinedStr, Ranged};
+use ruff_python_ast::{self as ast, ExprConstant, ExprFString, Ranged};
 use ruff_python_parser::lexer::{lex_starts_at, LexicalError, LexicalErrorType};
 use ruff_python_parser::{Mode, Tok};
 use ruff_source_file::Locator;
@@ -27,15 +27,15 @@ enum Quoting {
 
 pub(super) enum AnyString<'a> {
     Constant(&'a ExprConstant),
-    JoinedStr(&'a ExprJoinedStr),
+    FString(&'a ExprFString),
 }
 
 impl<'a> AnyString<'a> {
     fn quoting(&self, locator: &Locator) -> Quoting {
         match self {
             Self::Constant(_) => Quoting::CanChange,
-            Self::JoinedStr(joined_str) => {
-                if joined_str.values.iter().any(|value| match value {
+            Self::FString(f_string) => {
+                if f_string.values.iter().any(|value| match value {
                     Expr::FormattedValue(ast::ExprFormattedValue { range, .. }) => {
                         let string_content = locator.slice(*range);
                         string_content.contains(['"', '\''])
@@ -55,7 +55,7 @@ impl Ranged for AnyString<'_> {
     fn range(&self) -> TextRange {
         match self {
             Self::Constant(expr) => expr.range(),
-            Self::JoinedStr(expr) => expr.range(),
+            Self::FString(expr) => expr.range(),
         }
     }
 }
@@ -64,7 +64,7 @@ impl<'a> From<&AnyString<'a>> for AnyNodeRef<'a> {
     fn from(value: &AnyString<'a>) -> Self {
         match value {
             AnyString::Constant(expr) => AnyNodeRef::ExprConstant(expr),
-            AnyString::JoinedStr(expr) => AnyNodeRef::ExprJoinedStr(expr),
+            AnyString::FString(expr) => AnyNodeRef::ExprFString(expr),
         }
     }
 }
