@@ -45,21 +45,18 @@ assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
 ```diff
 --- Black
 +++ Ruff
-@@ -20,9 +20,10 @@
+@@ -20,9 +20,7 @@
      b,
      c,
      d,
 -) = func1(
 -    arg1
 -) and func2(arg2)
-+) = (
-+    func1(arg1)
-+    and func2(arg2)
-+)
++) = func1(arg1) and func2(arg2)
  
  
  # Example from https://github.com/psf/black/issues/3229
-@@ -45,6 +46,4 @@
+@@ -45,6 +43,4 @@
  # Regression test for https://github.com/psf/black/issues/3414.
  assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
      xxxxxxxxx
@@ -94,10 +91,7 @@ func1(arg1).func2(arg1, (one_tuple,)).func3(arg3)
     b,
     c,
     d,
-) = (
-    func1(arg1)
-    and func2(arg2)
-)
+) = func1(arg1) and func2(arg2)
 
 
 # Example from https://github.com/psf/black/issues/3229
