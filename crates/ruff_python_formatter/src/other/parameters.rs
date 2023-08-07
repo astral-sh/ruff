@@ -1,18 +1,17 @@
 use std::usize;
 
-use ruff_python_ast::{Parameters, Ranged};
-use ruff_text_size::{TextRange, TextSize};
-
 use ruff_formatter::{format_args, write, FormatRuleWithOptions};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
+use ruff_python_ast::{Parameters, Ranged};
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
+use ruff_text_size::{TextRange, TextSize};
 
+use crate::builders::empty_parenthesized_with_dangling_comments;
 use crate::comments::{
-    dangling_comments, leading_comments, leading_node_comments, trailing_comments,
-    CommentLinePosition, SourceComment,
+    leading_comments, leading_node_comments, trailing_comments, CommentLinePosition, SourceComment,
 };
 use crate::context::{NodeLevel, WithNodeLevel};
-use crate::expression::parentheses::parenthesized;
+use crate::expression::parentheses::parenthesized_with_dangling_comments;
 use crate::prelude::*;
 use crate::FormatNodeRule;
 
@@ -61,9 +60,47 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             kwarg,
         } = item;
 
+        let (slash, star) = find_argument_separators(f.context().source(), item);
+
         let comments = f.context().comments().clone();
         let dangling = comments.dangling_comments(item);
-        let (slash, star) = find_argument_separators(f.context().source(), item);
+
+        // First dangling comment: trailing the opening parenthesis, e.g.:
+        // ```python
+        // def f(  # comment
+        //     x,
+        //     y,
+        //     z,
+        // ): ...
+        // TODO(charlie): We already identified this comment as such in placement.rs. Consider
+        // labeling it as such. See: https://github.com/astral-sh/ruff/issues/5247.
+        let parenthesis_comments_end = usize::from(dangling.first().is_some_and(|comment| {
+            if comment.line_position().is_end_of_line() {
+                // Ensure that there are no tokens between the open bracket and the comment.
+                let mut lexer = SimpleTokenizer::new(
+                    f.context().source(),
+                    TextRange::new(item.start(), comment.start()),
+                )
+                .skip_trivia()
+                .skip_while(|t| {
+                    matches!(
+                        t.kind(),
+                        SimpleTokenKind::LParen
+                            | SimpleTokenKind::LBrace
+                            | SimpleTokenKind::LBracket
+                    )
+                });
+                if lexer.next().is_none() {
+                    return true;
+                }
+            }
+            false
+        }));
+
+        // Separate into (dangling comments on the open parenthesis) and (dangling comments on the
+        // argument separators, e.g., `*` or `/`).
+        let (parenthesis_dangling, parameters_dangling) =
+            dangling.split_at(parenthesis_comments_end);
 
         let format_inner = format_with(|f: &mut PyFormatter| {
             let separator = format_with(|f| write!(f, [text(","), soft_line_break_or_space()]));
@@ -76,10 +113,18 @@ impl FormatNodeRule<Parameters> for FormatParameters {
                 last_node = Some(parameter_with_default.into());
             }
 
+            // Second dangling comment: trailing the slash, e.g.:
+            // ```python
+            // def f(
+            //     x,
+            //     /,  # comment
+            //     y,
+            //     z,
+            // ): ...
             let slash_comments_end = if posonlyargs.is_empty() {
                 0
             } else {
-                let slash_comments_end = dangling.partition_point(|comment| {
+                let slash_comments_end = parameters_dangling.partition_point(|comment| {
                     let assignment = assign_argument_separator_comment_placement(
                         slash.as_ref(),
                         star.as_ref(),
@@ -95,7 +140,7 @@ impl FormatNodeRule<Parameters> for FormatParameters {
                 });
                 joiner.entry(&CommentsAroundText {
                     text: "/",
-                    comments: &dangling[..slash_comments_end],
+                    comments: &parameters_dangling[..slash_comments_end],
                 });
                 slash_comments_end
             };
@@ -135,7 +180,7 @@ impl FormatNodeRule<Parameters> for FormatParameters {
                 // ```
                 joiner.entry(&CommentsAroundText {
                     text: "*",
-                    comments: &dangling[slash_comments_end..],
+                    comments: &parameters_dangling[slash_comments_end..],
                 });
             }
 
@@ -202,14 +247,22 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             // No parameters, format any dangling comments between `()`
             write!(
                 f,
-                [
+                [empty_parenthesized_with_dangling_comments(
                     text("("),
-                    block_indent(&dangling_comments(dangling)),
-                    text(")")
-                ]
+                    dangling,
+                    text(")"),
+                )]
             )
         } else {
-            write!(f, [parenthesized("(", &group(&format_inner), ")")])
+            write!(
+                f,
+                [parenthesized_with_dangling_comments(
+                    "(",
+                    parenthesis_dangling,
+                    &group(&format_inner),
+                    ")"
+                )]
+            )
         }
     }
 
