@@ -227,6 +227,57 @@ impl Format<PyFormatContext<'_>> for FormatDanglingComments<'_> {
     }
 }
 
+/// Formats the dangling comments within a parenthesized expression, for example:
+/// ```python
+/// [  # comment
+///     1,
+///     2,
+///     3,
+/// ]
+/// ```
+pub(crate) fn dangling_open_parenthesis_comments(
+    comments: &[SourceComment],
+) -> FormatDanglingOpenParenthesisComments {
+    FormatDanglingOpenParenthesisComments { comments }
+}
+
+pub(crate) struct FormatDanglingOpenParenthesisComments<'a> {
+    comments: &'a [SourceComment],
+}
+
+impl Format<PyFormatContext<'_>> for FormatDanglingOpenParenthesisComments<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext>) -> FormatResult<()> {
+        let mut comments = self
+            .comments
+            .iter()
+            .filter(|comment| comment.is_unformatted());
+
+        if let Some(comment) = comments.next() {
+            debug_assert!(
+                comment.line_position().is_end_of_line(),
+                "Expected dangling comment to be at the end of the line"
+            );
+
+            write!(
+                f,
+                [line_suffix(&format_args![
+                    space(),
+                    space(),
+                    format_comment(comment)
+                ])]
+            )?;
+            comment.mark_formatted();
+
+            debug_assert!(
+                comments.next().is_none(),
+                "Expected at most one dangling comment"
+            );
+        }
+
+        Ok(())
+    }
+}
+
 /// Formats the content of the passed comment.
 ///
 /// * Adds a whitespace between `#` and the comment text except if the first character is a `#`, `:`, `'`, or `!`
