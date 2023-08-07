@@ -130,8 +130,6 @@ UP040.py:25:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
 24 | T = typing.TypeVar("T", covariant=True)
 25 | x: typing.TypeAlias = list[T]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
-26 | 
-27 | # UP040 with function scope
    |
    = help: Use the `type` keyword
 
@@ -142,87 +140,47 @@ UP040.py:25:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
 25    |-x: typing.TypeAlias = list[T]
    25 |+type x = list[T]
 26 26 | 
-27 27 | # UP040 with function scope
-28 28 | T = typing.TypeVar["T"]
+27 27 | 
+28 28 | # UP040 in class scope
 
-UP040.py:31:5: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+UP040.py:32:5: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
    |
-29 | def foo():
-30 |     # reference to global variable
-31 |     x: typing.TypeAlias = list[T]
+30 | class Foo:
+31 |     # reference to global variable
+32 |     x: typing.TypeAlias = list[T]
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
-32 | 
-33 |     # reference to local variable
+33 | 
+34 |     # reference to class variable
    |
    = help: Use the `type` keyword
 
 ℹ Fix
-28 28 | T = typing.TypeVar["T"]
-29 29 | def foo():
-30 30 |     # reference to global variable
-31    |-    x: typing.TypeAlias = list[T]
-   31 |+    type x[T] = list[T]
-32 32 | 
-33 33 |     # reference to local variable
-34 34 |     TFUNC = typing.TypeVar("TFUNC")
+29 29 | T = typing.TypeVar["T"]
+30 30 | class Foo:
+31 31 |     # reference to global variable
+32    |-    x: typing.TypeAlias = list[T]
+   32 |+    type x[T] = list[T]
+33 33 | 
+34 34 |     # reference to class variable
+35 35 |     TCLS = typing.TypeVar["TCLS"]
 
-UP040.py:35:5: UP040 [*] Type alias `y` uses `TypeAlias` annotation instead of the `type` keyword
+UP040.py:36:5: UP040 [*] Type alias `y` uses `TypeAlias` annotation instead of the `type` keyword
    |
-33 |     # reference to local variable
-34 |     TFUNC = typing.TypeVar("TFUNC")
-35 |     y: typing.TypeAlias = list[TFUNC]
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
-   |
-   = help: Use the `type` keyword
-
-ℹ Fix
-32 32 | 
-33 33 |     # reference to local variable
-34 34 |     TFUNC = typing.TypeVar("TFUNC")
-35    |-    y: typing.TypeAlias = list[TFUNC]
-   35 |+    type y = list[TFUNC]
-36 36 | 
-37 37 | 
-38 38 | 
-
-UP040.py:43:5: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
-   |
-41 | class Foo:
-42 |     # reference to global variable
-43 |     x: typing.TypeAlias = list[T]
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
-44 | 
-45 |     # reference to class variable
-   |
-   = help: Use the `type` keyword
-
-ℹ Fix
-40 40 | T = typing.TypeVar["T"]
-41 41 | class Foo:
-42 42 |     # reference to global variable
-43    |-    x: typing.TypeAlias = list[T]
-   43 |+    type x[T] = list[T]
-44 44 | 
-45 45 |     # reference to class variable
-46 46 |     TCLS = typing.TypeVar("TCLS")
-
-UP040.py:47:5: UP040 [*] Type alias `y` uses `TypeAlias` annotation instead of the `type` keyword
-   |
-45 |     # reference to class variable
-46 |     TCLS = typing.TypeVar("TCLS")
-47 |     y: typing.TypeAlias = list[TCLS]
+34 |     # reference to class variable
+35 |     TCLS = typing.TypeVar["TCLS"]
+36 |     y: typing.TypeAlias = list[TCLS]
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
    |
    = help: Use the `type` keyword
 
 ℹ Fix
-44 44 | 
-45 45 |     # reference to class variable
-46 46 |     TCLS = typing.TypeVar("TCLS")
-47    |-    y: typing.TypeAlias = list[TCLS]
-   47 |+    type y = list[TCLS]
-48 48 | 
-49 49 | 
-50 50 | 
+33 33 | 
+34 34 |     # reference to class variable
+35 35 |     TCLS = typing.TypeVar["TCLS"]
+36    |-    y: typing.TypeAlias = list[TCLS]
+   36 |+    type y[TCLS] = list[TCLS]
+37 37 | 
+38 38 | 
+39 39 | 
 
 
