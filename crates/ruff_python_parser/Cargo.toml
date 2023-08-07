@@ -15,7 +15,6 @@ build = "build.rs"
 
 [dependencies]
 ruff_python_ast = { path = "../ruff_python_ast" }
-ruff_python_trivia = { path = "../ruff_python_trivia" }
 ruff_text_size = { path = "../ruff_text_size" }
 
 anyhow = { workspace = true }

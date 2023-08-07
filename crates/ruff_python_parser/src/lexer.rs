@@ -35,7 +35,6 @@ use std::{char, cmp::Ordering, str::FromStr};
 use num_bigint::BigInt;
 use num_traits::{Num, Zero};
 use ruff_python_ast::MagicKind;
-use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use unic_emoji_char::is_emoji_presentation;
 use unic_ucd_ident::{is_xid_continue, is_xid_start};
@@ -431,7 +430,7 @@ impl<'source> Lexer<'source> {
                 }
                 '?' => {
                     self.cursor.bump();
-                    let mut question_count: u8 = 1;
+                    let mut question_count = 1u32;
                     while self.cursor.eat_char('?') {
                         question_count += 1;
                     }
@@ -440,7 +439,7 @@ impl<'source> Lexer<'source> {
                     // If the `value` is empty i.e., we are at the start of the line,
                     // then we can't be sure if it is a help end magic command or not.
                     if question_count > 2
-                        || value.chars().next_back().map_or(true, is_python_whitespace)
+                        || value.chars().last().map_or(true, is_python_whitespace)
                         || !matches!(self.cursor.first(), '\n' | '\r' | EOF_CHAR)
                     {
                         // Not a help end magic command, so continue with the lexing.
@@ -454,7 +453,7 @@ impl<'source> Lexer<'source> {
                     if kind.is_help() {
                         value = value.trim_start_matches([' ', '?']).to_string();
                     } else if kind.is_magic() {
-                        value.insert_str(0, &kind.to_string());
+                        value.insert_str(0, kind.as_str());
                     }
                     let kind = match question_count {
                         1 => MagicKind::Help,
@@ -1155,6 +1154,20 @@ fn is_identifier_continuation(c: char) -> bool {
         'a'..='z' | 'A'..='Z' | '_' | '0'..='9' => true,
         c => is_xid_continue(c),
     }
+}
+
+/// Returns `true` for [whitespace](https://docs.python.org/3/reference/lexical_analysis.html#whitespace-between-tokens)
+/// characters.
+///
+/// This is the same as `ruff_python_trivia::is_python_whitespace` and is copied
+/// here to avoid a circular dependency as `ruff_python_trivia` has a dev-dependency
+/// on `ruff_python_lexer`.
+const fn is_python_whitespace(c: char) -> bool {
+    matches!(
+        c,
+        // Space, tab, or form-feed
+        ' ' | '\t' | '\x0C'
+    )
 }
 
 #[cfg(test)]

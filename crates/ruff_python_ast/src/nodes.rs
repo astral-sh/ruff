@@ -2348,17 +2348,7 @@ impl TryFrom<[char; 2]> for MagicKind {
 
 impl fmt::Display for MagicKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            MagicKind::Shell => f.write_str("!"),
-            MagicKind::ShCap => f.write_str("!!"),
-            MagicKind::Help => f.write_str("?"),
-            MagicKind::Help2 => f.write_str("??"),
-            MagicKind::Magic => f.write_str("%"),
-            MagicKind::Magic2 => f.write_str("%%"),
-            MagicKind::Quote => f.write_str(","),
-            MagicKind::Quote2 => f.write_str(";"),
-            MagicKind::Paren => f.write_str("/"),
-        }
+        f.write_str(self.as_str())
     }
 }
 
@@ -2385,6 +2375,20 @@ impl MagicKind {
     /// Returns `true` if the kind is a magic command i.e., `%` or `%%`.
     pub const fn is_magic(self) -> bool {
         matches!(self, MagicKind::Magic | MagicKind::Magic2)
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            MagicKind::Shell => "!",
+            MagicKind::ShCap => "!!",
+            MagicKind::Help => "?",
+            MagicKind::Help2 => "??",
+            MagicKind::Magic => "%",
+            MagicKind::Magic2 => "%%",
+            MagicKind::Quote => ",",
+            MagicKind::Quote2 => ";",
+            MagicKind::Paren => "/",
+        }
     }
 }
 

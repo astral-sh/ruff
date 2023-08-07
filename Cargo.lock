@@ -2372,7 +2372,6 @@ dependencies = [
  "num-bigint",
  "num-traits",
  "ruff_python_ast",
- "ruff_python_trivia",
  "ruff_text_size",
  "rustc-hash",
  "static_assertions",
