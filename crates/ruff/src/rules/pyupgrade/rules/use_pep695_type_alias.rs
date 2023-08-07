@@ -166,7 +166,7 @@ impl<'a> Visitor<'a> for TypeVarReferenceVisitor<'a> {
                                     })
                                 )
                             })
-                            && arguments.keywords.len() == 0
+                            && arguments.keywords.is_empty()
                         {
                             self.names.push(name);
                         }
