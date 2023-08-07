@@ -4,8 +4,10 @@ use ruff_python_ast::ExprTuple;
 use ruff_python_ast::{Expr, Ranged};
 use ruff_text_size::TextRange;
 
-use crate::builders::{empty_parenthesized_with_dangling_comments, parenthesize_if_expands};
-use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
+use crate::builders::parenthesize_if_expands;
+use crate::expression::parentheses::{
+    empty_parenthesized, parenthesized, NeedsParentheses, OptionalParentheses,
+};
 use crate::prelude::*;
 
 #[derive(Eq, PartialEq, Debug, Default)]
@@ -117,8 +119,7 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
         // In all other cases comments get assigned to a list element
         match elts.as_slice() {
             [] => {
-                return empty_parenthesized_with_dangling_comments(text("("), dangling, text(")"))
-                    .fmt(f);
+                return empty_parenthesized("(", dangling, ")").fmt(f);
             }
             [single] => match self.parentheses {
                 TupleParentheses::Preserve

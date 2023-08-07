@@ -4,7 +4,9 @@ use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::Ranged;
 use ruff_python_trivia::{first_non_trivia_token, SimpleToken, SimpleTokenKind, SimpleTokenizer};
 
-use crate::comments::{dangling_open_parenthesis_comments, SourceComment};
+use crate::comments::{
+    dangling_comments, dangling_open_parenthesis_comments, trailing_comments, SourceComment,
+};
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::prelude::*;
 
@@ -304,6 +306,67 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatInParenthesesOnlyGroup<'_, 'a
                 Arguments::from(&self.content).fmt(f)
             }
         }
+    }
+}
+
+/// Format comments inside empty parentheses, brackets or curly braces.
+///
+/// Empty `()`, `[]` and `{}` are special because there can be dangling comments, and they can be in
+/// two positions:
+/// ```python
+/// x = [  # end-of-line
+///     # own line
+/// ]
+/// ```
+/// These comments are dangling because they can't be assigned to any element inside as they would
+/// in all other cases.
+pub(crate) fn empty_parenthesized<'content>(
+    left: &'static str,
+    comments: &'content [SourceComment],
+    right: &'static str,
+) -> FormatEmptyParenthesized<'content> {
+    FormatEmptyParenthesized {
+        left,
+        comments,
+        right,
+    }
+}
+
+pub(crate) struct FormatEmptyParenthesized<'content> {
+    left: &'static str,
+    comments: &'content [SourceComment],
+    right: &'static str,
+}
+
+impl Format<PyFormatContext<'_>> for FormatEmptyParenthesized<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext>) -> FormatResult<()> {
+        let end_of_line_split = self
+            .comments
+            .partition_point(|comment| comment.line_position().is_end_of_line());
+        debug_assert!(self.comments[end_of_line_split..]
+            .iter()
+            .all(|comment| comment.line_position().is_own_line()));
+        write!(
+            f,
+            [group(&format_args![
+                text(self.left),
+                // end-of-line comments
+                trailing_comments(&self.comments[..end_of_line_split]),
+                // Avoid unstable formatting with
+                // ```python
+                // x = () - (#
+                // )
+                // ```
+                // Without this the comment would go after the empty tuple first, but still expand
+                // the bin op. In the second formatting pass they are trailing bin op comments
+                // so the bin op collapse. Suboptimally we keep parentheses around the bin op in
+                // either case.
+                (!self.comments[..end_of_line_split].is_empty()).then_some(hard_line_break()),
+                // own line comments, which need to be indented
+                soft_block_indent(&dangling_comments(&self.comments[end_of_line_split..])),
+                text(self.right)
+            ])]
+        )
     }
 }
 

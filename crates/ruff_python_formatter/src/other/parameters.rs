@@ -6,12 +6,11 @@ use ruff_python_ast::{Parameters, Ranged};
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{TextRange, TextSize};
 
-use crate::builders::empty_parenthesized_with_dangling_comments;
 use crate::comments::{
     leading_comments, leading_node_comments, trailing_comments, CommentLinePosition, SourceComment,
 };
 use crate::context::{NodeLevel, WithNodeLevel};
-use crate::expression::parentheses::parenthesized;
+use crate::expression::parentheses::{empty_parenthesized, parenthesized};
 use crate::prelude::*;
 use crate::FormatNodeRule;
 
@@ -245,14 +244,7 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             write!(f, [group(&format_inner)])
         } else if num_parameters == 0 {
             // No parameters, format any dangling comments between `()`
-            write!(
-                f,
-                [empty_parenthesized_with_dangling_comments(
-                    text("("),
-                    dangling,
-                    text(")"),
-                )]
-            )
+            write!(f, [empty_parenthesized("(", dangling, ")")])
         } else {
             write!(
                 f,
