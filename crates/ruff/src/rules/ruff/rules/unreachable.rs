@@ -2,8 +2,8 @@ use std::{fmt, iter, usize};
 
 use log::error;
 use ruff_python_ast::{
-    Expr, Identifier, MatchCase, Pattern, PatternMatchAs, Ranged, Stmt, StmtAsyncFor,
-    StmtAsyncWith, StmtFor, StmtMatch, StmtReturn, StmtTry, StmtTryStar, StmtWhile, StmtWith,
+    Expr, Identifier, MatchCase, Pattern, PatternMatchAs, Ranged, Stmt, StmtFor, StmtMatch,
+    StmtReturn, StmtTry, StmtTryStar, StmtWhile, StmtWith,
 };
 use ruff_text_size::{TextRange, TextSize};
 
@@ -467,7 +467,6 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
             let next = match stmt {
                 // Statements that continue to the next statement after execution.
                 Stmt::FunctionDef(_)
-                | Stmt::AsyncFunctionDef(_)
                 | Stmt::Import(_)
                 | Stmt::ImportFrom(_)
                 | Stmt::ClassDef(_)
@@ -535,12 +534,6 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                     body,
                     orelse,
                     ..
-                })
-                | Stmt::AsyncFor(StmtAsyncFor {
-                    iter: condition,
-                    body,
-                    orelse,
-                    ..
                 }) => loop_block(self, Condition::Iterator(condition), body, orelse, after),
                 Stmt::Try(StmtTry {
                     body,
@@ -566,8 +559,7 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                     let _ = (body, handlers, orelse, finalbody); // Silence unused code warnings.
                     self.unconditional_next_block(after)
                 }
-                Stmt::With(StmtWith { items, body, .. })
-                | Stmt::AsyncWith(StmtAsyncWith { items, body, .. }) => {
+                Stmt::With(StmtWith { items, body, .. }) => {
                     // TODO: handle `with` statements, see
                     // <https://docs.python.org/3/reference/compound_stmts.html#the-with-statement>.
                     // I recommend to `try` statements first as `with` can desugar
@@ -889,7 +881,6 @@ fn needs_next_block(stmts: &[Stmt]) -> bool {
         Stmt::Return(_) | Stmt::Raise(_) => false,
         Stmt::If(stmt) => needs_next_block(&stmt.body) || stmt.elif_else_clauses.last().map_or(true, |clause| needs_next_block(&clause.body)),
         Stmt::FunctionDef(_)
-        | Stmt::AsyncFunctionDef(_)
         | Stmt::Import(_)
         | Stmt::ImportFrom(_)
         | Stmt::ClassDef(_)
@@ -905,10 +896,8 @@ fn needs_next_block(stmts: &[Stmt]) -> bool {
         | Stmt::Break(_)
         | Stmt::Continue(_)
         | Stmt::For(_)
-        | Stmt::AsyncFor(_)
         | Stmt::While(_)
         | Stmt::With(_)
-        | Stmt::AsyncWith(_)
         | Stmt::Match(_)
         | Stmt::Try(_)
         | Stmt::TryStar(_)
@@ -923,7 +912,6 @@ fn needs_next_block(stmts: &[Stmt]) -> bool {
 fn is_control_flow_stmt(stmt: &Stmt) -> bool {
     match stmt {
         Stmt::FunctionDef(_)
-        | Stmt::AsyncFunctionDef(_)
         | Stmt::Import(_)
         | Stmt::ImportFrom(_)
         | Stmt::ClassDef(_)
@@ -937,11 +925,9 @@ fn is_control_flow_stmt(stmt: &Stmt) -> bool {
         | Stmt::Pass(_) => false,
         Stmt::Return(_)
         | Stmt::For(_)
-        | Stmt::AsyncFor(_)
         | Stmt::While(_)
         | Stmt::If(_)
         | Stmt::With(_)
-        | Stmt::AsyncWith(_)
         | Stmt::Match(_)
         | Stmt::Raise(_)
         | Stmt::Try(_)

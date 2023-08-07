@@ -6,6 +6,7 @@ expression: parse_ast
     For(
         StmtFor {
             range: 0..24,
+            is_async: false,
             target: Name(
                 ExprName {
                     range: 4..5,

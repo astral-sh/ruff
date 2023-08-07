@@ -84,7 +84,6 @@ impl<'a> Member<'a> {
     pub fn name(&self) -> Option<&'a str> {
         match &self.stmt {
             Stmt::FunctionDef(ast::StmtFunctionDef { name, .. })
-            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { name, .. })
             | Stmt::ClassDef(ast::StmtClassDef { name, .. }) => Some(name),
             _ => None,
         }

@@ -178,8 +178,7 @@ impl ModuleSource<'_> {
 
 pub(crate) fn function_visibility(stmt: &Stmt) -> Visibility {
     match stmt {
-        Stmt::FunctionDef(ast::StmtFunctionDef { name, .. })
-        | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { name, .. }) => {
+        Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) => {
             if name.starts_with('_') {
                 Visibility::Private
             } else {
@@ -191,52 +190,45 @@ pub(crate) fn function_visibility(stmt: &Stmt) -> Visibility {
 }
 
 pub(crate) fn method_visibility(stmt: &Stmt) -> Visibility {
-    match stmt {
-        Stmt::FunctionDef(ast::StmtFunctionDef {
-            name,
-            decorator_list,
-            ..
+    let Stmt::FunctionDef(ast::StmtFunctionDef {
+        name,
+        decorator_list,
+        ..
+    }) = stmt
+    else {
+        panic!("Found non-FunctionDef in method_visibility")
+    };
+
+    // Is this a setter or deleter?
+    if decorator_list.iter().any(|decorator| {
+        collect_call_path(&decorator.expression).is_some_and(|call_path| {
+            call_path.as_slice() == [name, "setter"] || call_path.as_slice() == [name, "deleter"]
         })
-        | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-            name,
-            decorator_list,
-            ..
-        }) => {
-            // Is this a setter or deleter?
-            if decorator_list.iter().any(|decorator| {
-                collect_call_path(&decorator.expression).is_some_and(|call_path| {
-                    call_path.as_slice() == [name, "setter"]
-                        || call_path.as_slice() == [name, "deleter"]
-                })
-            }) {
-                return Visibility::Private;
-            }
-
-            // Is the method non-private?
-            if !name.starts_with('_') {
-                return Visibility::Public;
-            }
-
-            // Is this a magic method?
-            if name.starts_with("__") && name.ends_with("__") {
-                return Visibility::Public;
-            }
-
-            Visibility::Private
-        }
-        _ => panic!("Found non-FunctionDef in method_visibility"),
+    }) {
+        return Visibility::Private;
     }
+
+    // Is the method non-private?
+    if !name.starts_with('_') {
+        return Visibility::Public;
+    }
+
+    // Is this a magic method?
+    if name.starts_with("__") && name.ends_with("__") {
+        return Visibility::Public;
+    }
+
+    Visibility::Private
 }
 
 pub(crate) fn class_visibility(stmt: &Stmt) -> Visibility {
-    match stmt {
-        Stmt::ClassDef(ast::StmtClassDef { name, .. }) => {
-            if name.starts_with('_') {
-                Visibility::Private
-            } else {
-                Visibility::Public
-            }
-        }
-        _ => panic!("Found non-ClassDef in function_visibility"),
+    let Stmt::ClassDef(ast::StmtClassDef { name, .. }) = stmt else {
+        panic!("Found non-ClassDef in class_visibility")
+    };
+
+    if name.starts_with('_') {
+        Visibility::Private
+    } else {
+        Visibility::Public
     }
 }

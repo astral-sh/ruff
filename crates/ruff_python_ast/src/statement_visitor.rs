@@ -32,19 +32,12 @@ pub fn walk_stmt<'a, V: StatementVisitor<'a> + ?Sized>(visitor: &mut V, stmt: &'
         Stmt::FunctionDef(ast::StmtFunctionDef { body, .. }) => {
             visitor.visit_body(body);
         }
-        Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. }) => {
-            visitor.visit_body(body);
-        }
         Stmt::For(ast::StmtFor { body, orelse, .. }) => {
             visitor.visit_body(body);
             visitor.visit_body(orelse);
         }
         Stmt::ClassDef(ast::StmtClassDef { body, .. }) => {
             visitor.visit_body(body);
-        }
-        Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. }) => {
-            visitor.visit_body(body);
-            visitor.visit_body(orelse);
         }
         Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
             visitor.visit_body(body);
@@ -61,9 +54,6 @@ pub fn walk_stmt<'a, V: StatementVisitor<'a> + ?Sized>(visitor: &mut V, stmt: &'
             }
         }
         Stmt::With(ast::StmtWith { body, .. }) => {
-            visitor.visit_body(body);
-        }
-        Stmt::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
             visitor.visit_body(body);
         }
         Stmt::Match(ast::StmtMatch { cases, .. }) => {

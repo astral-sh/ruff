@@ -63,8 +63,7 @@ fn loop_exits_early(body: &[Stmt]) -> bool {
                     .iter()
                     .any(|clause| loop_exits_early(&clause.body))
         }
-        Stmt::With(ast::StmtWith { body, .. })
-        | Stmt::AsyncWith(ast::StmtAsyncWith { body, .. }) => loop_exits_early(body),
+        Stmt::With(ast::StmtWith { body, .. }) => loop_exits_early(body),
         Stmt::Match(ast::StmtMatch { cases, .. }) => cases
             .iter()
             .any(|MatchCase { body, .. }| loop_exits_early(body)),
@@ -91,9 +90,9 @@ fn loop_exits_early(body: &[Stmt]) -> bool {
                     }) => loop_exits_early(body),
                 })
         }
-        Stmt::For(ast::StmtFor { orelse, .. })
-        | Stmt::AsyncFor(ast::StmtAsyncFor { orelse, .. })
-        | Stmt::While(ast::StmtWhile { orelse, .. }) => loop_exits_early(orelse),
+        Stmt::For(ast::StmtFor { orelse, .. }) | Stmt::While(ast::StmtWhile { orelse, .. }) => {
+            loop_exits_early(orelse)
+        }
         Stmt::Break(_) => true,
         _ => false,
     })

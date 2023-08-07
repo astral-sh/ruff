@@ -36,14 +36,12 @@ pub(crate) fn continue_outside_loop<'a>(
     let mut child = stmt;
     for parent in parents {
         match parent {
-            Stmt::For(ast::StmtFor { orelse, .. })
-            | Stmt::AsyncFor(ast::StmtAsyncFor { orelse, .. })
-            | Stmt::While(ast::StmtWhile { orelse, .. }) => {
+            Stmt::For(ast::StmtFor { orelse, .. }) | Stmt::While(ast::StmtWhile { orelse, .. }) => {
                 if !orelse.contains(child) {
                     return None;
                 }
             }
-            Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) | Stmt::ClassDef(_) => {
+            Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {
                 break;
             }
             _ => {}

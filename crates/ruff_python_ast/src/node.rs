@@ -24,7 +24,6 @@ pub enum AnyNode {
     ModModule(ast::ModModule),
     ModExpression(ast::ModExpression),
     StmtFunctionDef(ast::StmtFunctionDef),
-    StmtAsyncFunctionDef(ast::StmtAsyncFunctionDef),
     StmtClassDef(ast::StmtClassDef),
     StmtReturn(ast::StmtReturn),
     StmtDelete(ast::StmtDelete),
@@ -33,11 +32,9 @@ pub enum AnyNode {
     StmtAugAssign(ast::StmtAugAssign),
     StmtAnnAssign(ast::StmtAnnAssign),
     StmtFor(ast::StmtFor),
-    StmtAsyncFor(ast::StmtAsyncFor),
     StmtWhile(ast::StmtWhile),
     StmtIf(ast::StmtIf),
     StmtWith(ast::StmtWith),
-    StmtAsyncWith(ast::StmtAsyncWith),
     StmtMatch(ast::StmtMatch),
     StmtRaise(ast::StmtRaise),
     StmtTry(ast::StmtTry),
@@ -110,7 +107,6 @@ impl AnyNode {
     pub fn statement(self) -> Option<Stmt> {
         match self {
             AnyNode::StmtFunctionDef(node) => Some(Stmt::FunctionDef(node)),
-            AnyNode::StmtAsyncFunctionDef(node) => Some(Stmt::AsyncFunctionDef(node)),
             AnyNode::StmtClassDef(node) => Some(Stmt::ClassDef(node)),
             AnyNode::StmtReturn(node) => Some(Stmt::Return(node)),
             AnyNode::StmtDelete(node) => Some(Stmt::Delete(node)),
@@ -119,11 +115,9 @@ impl AnyNode {
             AnyNode::StmtAugAssign(node) => Some(Stmt::AugAssign(node)),
             AnyNode::StmtAnnAssign(node) => Some(Stmt::AnnAssign(node)),
             AnyNode::StmtFor(node) => Some(Stmt::For(node)),
-            AnyNode::StmtAsyncFor(node) => Some(Stmt::AsyncFor(node)),
             AnyNode::StmtWhile(node) => Some(Stmt::While(node)),
             AnyNode::StmtIf(node) => Some(Stmt::If(node)),
             AnyNode::StmtWith(node) => Some(Stmt::With(node)),
-            AnyNode::StmtAsyncWith(node) => Some(Stmt::AsyncWith(node)),
             AnyNode::StmtMatch(node) => Some(Stmt::Match(node)),
             AnyNode::StmtRaise(node) => Some(Stmt::Raise(node)),
             AnyNode::StmtTry(node) => Some(Stmt::Try(node)),
@@ -230,7 +224,6 @@ impl AnyNode {
             AnyNode::ModModule(_)
             | AnyNode::ModExpression(_)
             | AnyNode::StmtFunctionDef(_)
-            | AnyNode::StmtAsyncFunctionDef(_)
             | AnyNode::StmtClassDef(_)
             | AnyNode::StmtReturn(_)
             | AnyNode::StmtDelete(_)
@@ -239,11 +232,9 @@ impl AnyNode {
             | AnyNode::StmtAugAssign(_)
             | AnyNode::StmtAnnAssign(_)
             | AnyNode::StmtFor(_)
-            | AnyNode::StmtAsyncFor(_)
             | AnyNode::StmtWhile(_)
             | AnyNode::StmtIf(_)
             | AnyNode::StmtWith(_)
-            | AnyNode::StmtAsyncWith(_)
             | AnyNode::StmtMatch(_)
             | AnyNode::StmtRaise(_)
             | AnyNode::StmtTry(_)
@@ -291,7 +282,6 @@ impl AnyNode {
             AnyNode::ModExpression(node) => Some(Mod::Expression(node)),
 
             AnyNode::StmtFunctionDef(_)
-            | AnyNode::StmtAsyncFunctionDef(_)
             | AnyNode::StmtClassDef(_)
             | AnyNode::StmtReturn(_)
             | AnyNode::StmtDelete(_)
@@ -300,11 +290,9 @@ impl AnyNode {
             | AnyNode::StmtAugAssign(_)
             | AnyNode::StmtAnnAssign(_)
             | AnyNode::StmtFor(_)
-            | AnyNode::StmtAsyncFor(_)
             | AnyNode::StmtWhile(_)
             | AnyNode::StmtIf(_)
             | AnyNode::StmtWith(_)
-            | AnyNode::StmtAsyncWith(_)
             | AnyNode::StmtMatch(_)
             | AnyNode::StmtRaise(_)
             | AnyNode::StmtTry(_)
@@ -388,7 +376,6 @@ impl AnyNode {
             AnyNode::ModModule(_)
             | AnyNode::ModExpression(_)
             | AnyNode::StmtFunctionDef(_)
-            | AnyNode::StmtAsyncFunctionDef(_)
             | AnyNode::StmtClassDef(_)
             | AnyNode::StmtReturn(_)
             | AnyNode::StmtDelete(_)
@@ -397,11 +384,9 @@ impl AnyNode {
             | AnyNode::StmtAugAssign(_)
             | AnyNode::StmtAnnAssign(_)
             | AnyNode::StmtFor(_)
-            | AnyNode::StmtAsyncFor(_)
             | AnyNode::StmtWhile(_)
             | AnyNode::StmtIf(_)
             | AnyNode::StmtWith(_)
-            | AnyNode::StmtAsyncWith(_)
             | AnyNode::StmtMatch(_)
             | AnyNode::StmtRaise(_)
             | AnyNode::StmtTry(_)
@@ -470,7 +455,6 @@ impl AnyNode {
             AnyNode::ModModule(_)
             | AnyNode::ModExpression(_)
             | AnyNode::StmtFunctionDef(_)
-            | AnyNode::StmtAsyncFunctionDef(_)
             | AnyNode::StmtClassDef(_)
             | AnyNode::StmtReturn(_)
             | AnyNode::StmtDelete(_)
@@ -479,11 +463,9 @@ impl AnyNode {
             | AnyNode::StmtAugAssign(_)
             | AnyNode::StmtAnnAssign(_)
             | AnyNode::StmtFor(_)
-            | AnyNode::StmtAsyncFor(_)
             | AnyNode::StmtWhile(_)
             | AnyNode::StmtIf(_)
             | AnyNode::StmtWith(_)
-            | AnyNode::StmtAsyncWith(_)
             | AnyNode::StmtMatch(_)
             | AnyNode::StmtRaise(_)
             | AnyNode::StmtTry(_)
@@ -577,7 +559,6 @@ impl AnyNode {
             Self::ModModule(node) => AnyNodeRef::ModModule(node),
             Self::ModExpression(node) => AnyNodeRef::ModExpression(node),
             Self::StmtFunctionDef(node) => AnyNodeRef::StmtFunctionDef(node),
-            Self::StmtAsyncFunctionDef(node) => AnyNodeRef::StmtAsyncFunctionDef(node),
             Self::StmtClassDef(node) => AnyNodeRef::StmtClassDef(node),
             Self::StmtReturn(node) => AnyNodeRef::StmtReturn(node),
             Self::StmtDelete(node) => AnyNodeRef::StmtDelete(node),
@@ -586,11 +567,9 @@ impl AnyNode {
             Self::StmtAugAssign(node) => AnyNodeRef::StmtAugAssign(node),
             Self::StmtAnnAssign(node) => AnyNodeRef::StmtAnnAssign(node),
             Self::StmtFor(node) => AnyNodeRef::StmtFor(node),
-            Self::StmtAsyncFor(node) => AnyNodeRef::StmtAsyncFor(node),
             Self::StmtWhile(node) => AnyNodeRef::StmtWhile(node),
             Self::StmtIf(node) => AnyNodeRef::StmtIf(node),
             Self::StmtWith(node) => AnyNodeRef::StmtWith(node),
-            Self::StmtAsyncWith(node) => AnyNodeRef::StmtAsyncWith(node),
             Self::StmtMatch(node) => AnyNodeRef::StmtMatch(node),
             Self::StmtRaise(node) => AnyNodeRef::StmtRaise(node),
             Self::StmtTry(node) => AnyNodeRef::StmtTry(node),
@@ -736,34 +715,6 @@ impl AstNode for ast::StmtFunctionDef {
 
     fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
         if let AnyNodeRef::StmtFunctionDef(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn as_any_node_ref(&self) -> AnyNodeRef {
-        AnyNodeRef::from(self)
-    }
-
-    fn into_any_node(self) -> AnyNode {
-        AnyNode::from(self)
-    }
-}
-impl AstNode for ast::StmtAsyncFunctionDef {
-    fn cast(kind: AnyNode) -> Option<Self>
-    where
-        Self: Sized,
-    {
-        if let AnyNode::StmtAsyncFunctionDef(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::StmtAsyncFunctionDef(node) = kind {
             Some(node)
         } else {
             None
@@ -1002,34 +953,6 @@ impl AstNode for ast::StmtFor {
         AnyNode::from(self)
     }
 }
-impl AstNode for ast::StmtAsyncFor {
-    fn cast(kind: AnyNode) -> Option<Self>
-    where
-        Self: Sized,
-    {
-        if let AnyNode::StmtAsyncFor(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::StmtAsyncFor(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn as_any_node_ref(&self) -> AnyNodeRef {
-        AnyNodeRef::from(self)
-    }
-
-    fn into_any_node(self) -> AnyNode {
-        AnyNode::from(self)
-    }
-}
 impl AstNode for ast::StmtWhile {
     fn cast(kind: AnyNode) -> Option<Self>
     where
@@ -1128,34 +1051,6 @@ impl AstNode for ast::StmtWith {
 
     fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
         if let AnyNodeRef::StmtWith(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn as_any_node_ref(&self) -> AnyNodeRef {
-        AnyNodeRef::from(self)
-    }
-
-    fn into_any_node(self) -> AnyNode {
-        AnyNode::from(self)
-    }
-}
-impl AstNode for ast::StmtAsyncWith {
-    fn cast(kind: AnyNode) -> Option<Self>
-    where
-        Self: Sized,
-    {
-        if let AnyNode::StmtAsyncWith(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::StmtAsyncWith(node) = kind {
             Some(node)
         } else {
             None
@@ -2996,7 +2891,6 @@ impl From<Stmt> for AnyNode {
     fn from(stmt: Stmt) -> Self {
         match stmt {
             Stmt::FunctionDef(node) => AnyNode::StmtFunctionDef(node),
-            Stmt::AsyncFunctionDef(node) => AnyNode::StmtAsyncFunctionDef(node),
             Stmt::ClassDef(node) => AnyNode::StmtClassDef(node),
             Stmt::Return(node) => AnyNode::StmtReturn(node),
             Stmt::Delete(node) => AnyNode::StmtDelete(node),
@@ -3005,11 +2899,9 @@ impl From<Stmt> for AnyNode {
             Stmt::AugAssign(node) => AnyNode::StmtAugAssign(node),
             Stmt::AnnAssign(node) => AnyNode::StmtAnnAssign(node),
             Stmt::For(node) => AnyNode::StmtFor(node),
-            Stmt::AsyncFor(node) => AnyNode::StmtAsyncFor(node),
             Stmt::While(node) => AnyNode::StmtWhile(node),
             Stmt::If(node) => AnyNode::StmtIf(node),
             Stmt::With(node) => AnyNode::StmtWith(node),
-            Stmt::AsyncWith(node) => AnyNode::StmtAsyncWith(node),
             Stmt::Match(node) => AnyNode::StmtMatch(node),
             Stmt::Raise(node) => AnyNode::StmtRaise(node),
             Stmt::Try(node) => AnyNode::StmtTry(node),
@@ -3113,12 +3005,6 @@ impl From<ast::StmtFunctionDef> for AnyNode {
     }
 }
 
-impl From<ast::StmtAsyncFunctionDef> for AnyNode {
-    fn from(node: ast::StmtAsyncFunctionDef) -> Self {
-        AnyNode::StmtAsyncFunctionDef(node)
-    }
-}
-
 impl From<ast::StmtClassDef> for AnyNode {
     fn from(node: ast::StmtClassDef) -> Self {
         AnyNode::StmtClassDef(node)
@@ -3167,12 +3053,6 @@ impl From<ast::StmtFor> for AnyNode {
     }
 }
 
-impl From<ast::StmtAsyncFor> for AnyNode {
-    fn from(node: ast::StmtAsyncFor) -> Self {
-        AnyNode::StmtAsyncFor(node)
-    }
-}
-
 impl From<ast::StmtWhile> for AnyNode {
     fn from(node: ast::StmtWhile) -> Self {
         AnyNode::StmtWhile(node)
@@ -3194,12 +3074,6 @@ impl From<ast::ElifElseClause> for AnyNode {
 impl From<ast::StmtWith> for AnyNode {
     fn from(node: ast::StmtWith) -> Self {
         AnyNode::StmtWith(node)
-    }
-}
-
-impl From<ast::StmtAsyncWith> for AnyNode {
-    fn from(node: ast::StmtAsyncWith) -> Self {
-        AnyNode::StmtAsyncWith(node)
     }
 }
 
@@ -3588,7 +3462,6 @@ impl Ranged for AnyNode {
             AnyNode::ModModule(node) => node.range(),
             AnyNode::ModExpression(node) => node.range(),
             AnyNode::StmtFunctionDef(node) => node.range(),
-            AnyNode::StmtAsyncFunctionDef(node) => node.range(),
             AnyNode::StmtClassDef(node) => node.range(),
             AnyNode::StmtReturn(node) => node.range(),
             AnyNode::StmtDelete(node) => node.range(),
@@ -3597,11 +3470,9 @@ impl Ranged for AnyNode {
             AnyNode::StmtAugAssign(node) => node.range(),
             AnyNode::StmtAnnAssign(node) => node.range(),
             AnyNode::StmtFor(node) => node.range(),
-            AnyNode::StmtAsyncFor(node) => node.range(),
             AnyNode::StmtWhile(node) => node.range(),
             AnyNode::StmtIf(node) => node.range(),
             AnyNode::StmtWith(node) => node.range(),
-            AnyNode::StmtAsyncWith(node) => node.range(),
             AnyNode::StmtMatch(node) => node.range(),
             AnyNode::StmtRaise(node) => node.range(),
             AnyNode::StmtTry(node) => node.range(),
@@ -3677,7 +3548,6 @@ pub enum AnyNodeRef<'a> {
     ModModule(&'a ast::ModModule),
     ModExpression(&'a ast::ModExpression),
     StmtFunctionDef(&'a ast::StmtFunctionDef),
-    StmtAsyncFunctionDef(&'a ast::StmtAsyncFunctionDef),
     StmtClassDef(&'a ast::StmtClassDef),
     StmtReturn(&'a ast::StmtReturn),
     StmtDelete(&'a ast::StmtDelete),
@@ -3686,11 +3556,9 @@ pub enum AnyNodeRef<'a> {
     StmtAugAssign(&'a ast::StmtAugAssign),
     StmtAnnAssign(&'a ast::StmtAnnAssign),
     StmtFor(&'a ast::StmtFor),
-    StmtAsyncFor(&'a ast::StmtAsyncFor),
     StmtWhile(&'a ast::StmtWhile),
     StmtIf(&'a ast::StmtIf),
     StmtWith(&'a ast::StmtWith),
-    StmtAsyncWith(&'a ast::StmtAsyncWith),
     StmtMatch(&'a ast::StmtMatch),
     StmtRaise(&'a ast::StmtRaise),
     StmtTry(&'a ast::StmtTry),
@@ -3765,7 +3633,6 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::ModModule(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ModExpression(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtFunctionDef(node) => NonNull::from(*node).cast(),
-            AnyNodeRef::StmtAsyncFunctionDef(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtClassDef(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtReturn(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtDelete(node) => NonNull::from(*node).cast(),
@@ -3774,11 +3641,9 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::StmtAugAssign(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtAnnAssign(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtFor(node) => NonNull::from(*node).cast(),
-            AnyNodeRef::StmtAsyncFor(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtWhile(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtIf(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtWith(node) => NonNull::from(*node).cast(),
-            AnyNodeRef::StmtAsyncWith(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtMatch(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtRaise(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtTry(node) => NonNull::from(*node).cast(),
@@ -3859,7 +3724,6 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::ModModule(_) => NodeKind::ModModule,
             AnyNodeRef::ModExpression(_) => NodeKind::ModExpression,
             AnyNodeRef::StmtFunctionDef(_) => NodeKind::StmtFunctionDef,
-            AnyNodeRef::StmtAsyncFunctionDef(_) => NodeKind::StmtAsyncFunctionDef,
             AnyNodeRef::StmtClassDef(_) => NodeKind::StmtClassDef,
             AnyNodeRef::StmtReturn(_) => NodeKind::StmtReturn,
             AnyNodeRef::StmtDelete(_) => NodeKind::StmtDelete,
@@ -3868,11 +3732,9 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::StmtAugAssign(_) => NodeKind::StmtAugAssign,
             AnyNodeRef::StmtAnnAssign(_) => NodeKind::StmtAnnAssign,
             AnyNodeRef::StmtFor(_) => NodeKind::StmtFor,
-            AnyNodeRef::StmtAsyncFor(_) => NodeKind::StmtAsyncFor,
             AnyNodeRef::StmtWhile(_) => NodeKind::StmtWhile,
             AnyNodeRef::StmtIf(_) => NodeKind::StmtIf,
             AnyNodeRef::StmtWith(_) => NodeKind::StmtWith,
-            AnyNodeRef::StmtAsyncWith(_) => NodeKind::StmtAsyncWith,
             AnyNodeRef::StmtMatch(_) => NodeKind::StmtMatch,
             AnyNodeRef::StmtRaise(_) => NodeKind::StmtRaise,
             AnyNodeRef::StmtTry(_) => NodeKind::StmtTry,
@@ -3945,7 +3807,6 @@ impl AnyNodeRef<'_> {
     pub const fn is_statement(self) -> bool {
         match self {
             AnyNodeRef::StmtFunctionDef(_)
-            | AnyNodeRef::StmtAsyncFunctionDef(_)
             | AnyNodeRef::StmtClassDef(_)
             | AnyNodeRef::StmtReturn(_)
             | AnyNodeRef::StmtDelete(_)
@@ -3954,11 +3815,9 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtAugAssign(_)
             | AnyNodeRef::StmtAnnAssign(_)
             | AnyNodeRef::StmtFor(_)
-            | AnyNodeRef::StmtAsyncFor(_)
             | AnyNodeRef::StmtWhile(_)
             | AnyNodeRef::StmtIf(_)
             | AnyNodeRef::StmtWith(_)
-            | AnyNodeRef::StmtAsyncWith(_)
             | AnyNodeRef::StmtMatch(_)
             | AnyNodeRef::StmtRaise(_)
             | AnyNodeRef::StmtTry(_)
@@ -4065,7 +3924,6 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::ModModule(_)
             | AnyNodeRef::ModExpression(_)
             | AnyNodeRef::StmtFunctionDef(_)
-            | AnyNodeRef::StmtAsyncFunctionDef(_)
             | AnyNodeRef::StmtClassDef(_)
             | AnyNodeRef::StmtReturn(_)
             | AnyNodeRef::StmtDelete(_)
@@ -4074,11 +3932,9 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtAugAssign(_)
             | AnyNodeRef::StmtAnnAssign(_)
             | AnyNodeRef::StmtFor(_)
-            | AnyNodeRef::StmtAsyncFor(_)
             | AnyNodeRef::StmtWhile(_)
             | AnyNodeRef::StmtIf(_)
             | AnyNodeRef::StmtWith(_)
-            | AnyNodeRef::StmtAsyncWith(_)
             | AnyNodeRef::StmtMatch(_)
             | AnyNodeRef::StmtRaise(_)
             | AnyNodeRef::StmtTry(_)
@@ -4125,7 +3981,6 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::ModModule(_) | AnyNodeRef::ModExpression(_) => true,
 
             AnyNodeRef::StmtFunctionDef(_)
-            | AnyNodeRef::StmtAsyncFunctionDef(_)
             | AnyNodeRef::StmtClassDef(_)
             | AnyNodeRef::StmtReturn(_)
             | AnyNodeRef::StmtDelete(_)
@@ -4134,11 +3989,9 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtAugAssign(_)
             | AnyNodeRef::StmtAnnAssign(_)
             | AnyNodeRef::StmtFor(_)
-            | AnyNodeRef::StmtAsyncFor(_)
             | AnyNodeRef::StmtWhile(_)
             | AnyNodeRef::StmtIf(_)
             | AnyNodeRef::StmtWith(_)
-            | AnyNodeRef::StmtAsyncWith(_)
             | AnyNodeRef::StmtMatch(_)
             | AnyNodeRef::StmtRaise(_)
             | AnyNodeRef::StmtTry(_)
@@ -4222,7 +4075,6 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::ModModule(_)
             | AnyNodeRef::ModExpression(_)
             | AnyNodeRef::StmtFunctionDef(_)
-            | AnyNodeRef::StmtAsyncFunctionDef(_)
             | AnyNodeRef::StmtClassDef(_)
             | AnyNodeRef::StmtReturn(_)
             | AnyNodeRef::StmtDelete(_)
@@ -4231,11 +4083,9 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtAugAssign(_)
             | AnyNodeRef::StmtAnnAssign(_)
             | AnyNodeRef::StmtFor(_)
-            | AnyNodeRef::StmtAsyncFor(_)
             | AnyNodeRef::StmtWhile(_)
             | AnyNodeRef::StmtIf(_)
             | AnyNodeRef::StmtWith(_)
-            | AnyNodeRef::StmtAsyncWith(_)
             | AnyNodeRef::StmtMatch(_)
             | AnyNodeRef::StmtRaise(_)
             | AnyNodeRef::StmtTry(_)
@@ -4304,7 +4154,6 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::ModModule(_)
             | AnyNodeRef::ModExpression(_)
             | AnyNodeRef::StmtFunctionDef(_)
-            | AnyNodeRef::StmtAsyncFunctionDef(_)
             | AnyNodeRef::StmtClassDef(_)
             | AnyNodeRef::StmtReturn(_)
             | AnyNodeRef::StmtDelete(_)
@@ -4313,11 +4162,9 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtAugAssign(_)
             | AnyNodeRef::StmtAnnAssign(_)
             | AnyNodeRef::StmtFor(_)
-            | AnyNodeRef::StmtAsyncFor(_)
             | AnyNodeRef::StmtWhile(_)
             | AnyNodeRef::StmtIf(_)
             | AnyNodeRef::StmtWith(_)
-            | AnyNodeRef::StmtAsyncWith(_)
             | AnyNodeRef::StmtMatch(_)
             | AnyNodeRef::StmtRaise(_)
             | AnyNodeRef::StmtTry(_)
@@ -4391,13 +4238,10 @@ impl AnyNodeRef<'_> {
             self,
             AnyNodeRef::StmtIf(_)
                 | AnyNodeRef::StmtFor(_)
-                | AnyNodeRef::StmtAsyncFor(_)
                 | AnyNodeRef::StmtWhile(_)
                 | AnyNodeRef::StmtWith(_)
-                | AnyNodeRef::StmtAsyncWith(_)
                 | AnyNodeRef::StmtMatch(_)
                 | AnyNodeRef::StmtFunctionDef(_)
-                | AnyNodeRef::StmtAsyncFunctionDef(_)
                 | AnyNodeRef::StmtClassDef(_)
                 | AnyNodeRef::StmtTry(_)
                 | AnyNodeRef::StmtTryStar(_)
@@ -4432,12 +4276,6 @@ impl<'a> From<&'a ast::ModExpression> for AnyNodeRef<'a> {
 impl<'a> From<&'a ast::StmtFunctionDef> for AnyNodeRef<'a> {
     fn from(node: &'a ast::StmtFunctionDef) -> Self {
         AnyNodeRef::StmtFunctionDef(node)
-    }
-}
-
-impl<'a> From<&'a ast::StmtAsyncFunctionDef> for AnyNodeRef<'a> {
-    fn from(node: &'a ast::StmtAsyncFunctionDef) -> Self {
-        AnyNodeRef::StmtAsyncFunctionDef(node)
     }
 }
 
@@ -4489,12 +4327,6 @@ impl<'a> From<&'a ast::StmtFor> for AnyNodeRef<'a> {
     }
 }
 
-impl<'a> From<&'a ast::StmtAsyncFor> for AnyNodeRef<'a> {
-    fn from(node: &'a ast::StmtAsyncFor) -> Self {
-        AnyNodeRef::StmtAsyncFor(node)
-    }
-}
-
 impl<'a> From<&'a ast::StmtWhile> for AnyNodeRef<'a> {
     fn from(node: &'a ast::StmtWhile) -> Self {
         AnyNodeRef::StmtWhile(node)
@@ -4516,12 +4348,6 @@ impl<'a> From<&'a ast::ElifElseClause> for AnyNodeRef<'a> {
 impl<'a> From<&'a ast::StmtWith> for AnyNodeRef<'a> {
     fn from(node: &'a ast::StmtWith) -> Self {
         AnyNodeRef::StmtWith(node)
-    }
-}
-
-impl<'a> From<&'a ast::StmtAsyncWith> for AnyNodeRef<'a> {
-    fn from(node: &'a ast::StmtAsyncWith) -> Self {
-        AnyNodeRef::StmtAsyncWith(node)
     }
 }
 
@@ -4864,7 +4690,6 @@ impl<'a> From<&'a Stmt> for AnyNodeRef<'a> {
     fn from(stmt: &'a Stmt) -> Self {
         match stmt {
             Stmt::FunctionDef(node) => AnyNodeRef::StmtFunctionDef(node),
-            Stmt::AsyncFunctionDef(node) => AnyNodeRef::StmtAsyncFunctionDef(node),
             Stmt::ClassDef(node) => AnyNodeRef::StmtClassDef(node),
             Stmt::Return(node) => AnyNodeRef::StmtReturn(node),
             Stmt::Delete(node) => AnyNodeRef::StmtDelete(node),
@@ -4873,11 +4698,9 @@ impl<'a> From<&'a Stmt> for AnyNodeRef<'a> {
             Stmt::AugAssign(node) => AnyNodeRef::StmtAugAssign(node),
             Stmt::AnnAssign(node) => AnyNodeRef::StmtAnnAssign(node),
             Stmt::For(node) => AnyNodeRef::StmtFor(node),
-            Stmt::AsyncFor(node) => AnyNodeRef::StmtAsyncFor(node),
             Stmt::While(node) => AnyNodeRef::StmtWhile(node),
             Stmt::If(node) => AnyNodeRef::StmtIf(node),
             Stmt::With(node) => AnyNodeRef::StmtWith(node),
-            Stmt::AsyncWith(node) => AnyNodeRef::StmtAsyncWith(node),
             Stmt::Match(node) => AnyNodeRef::StmtMatch(node),
             Stmt::Raise(node) => AnyNodeRef::StmtRaise(node),
             Stmt::Try(node) => AnyNodeRef::StmtTry(node),
@@ -5027,7 +4850,6 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::ModModule(node) => node.range(),
             AnyNodeRef::ModExpression(node) => node.range(),
             AnyNodeRef::StmtFunctionDef(node) => node.range(),
-            AnyNodeRef::StmtAsyncFunctionDef(node) => node.range(),
             AnyNodeRef::StmtClassDef(node) => node.range(),
             AnyNodeRef::StmtReturn(node) => node.range(),
             AnyNodeRef::StmtDelete(node) => node.range(),
@@ -5036,11 +4858,9 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::StmtAugAssign(node) => node.range(),
             AnyNodeRef::StmtAnnAssign(node) => node.range(),
             AnyNodeRef::StmtFor(node) => node.range(),
-            AnyNodeRef::StmtAsyncFor(node) => node.range(),
             AnyNodeRef::StmtWhile(node) => node.range(),
             AnyNodeRef::StmtIf(node) => node.range(),
             AnyNodeRef::StmtWith(node) => node.range(),
-            AnyNodeRef::StmtAsyncWith(node) => node.range(),
             AnyNodeRef::StmtMatch(node) => node.range(),
             AnyNodeRef::StmtRaise(node) => node.range(),
             AnyNodeRef::StmtTry(node) => node.range(),
@@ -5118,7 +4938,6 @@ pub enum NodeKind {
     ModExpression,
     ModFunctionType,
     StmtFunctionDef,
-    StmtAsyncFunctionDef,
     StmtClassDef,
     StmtReturn,
     StmtDelete,
@@ -5127,11 +4946,9 @@ pub enum NodeKind {
     StmtAugAssign,
     StmtAnnAssign,
     StmtFor,
-    StmtAsyncFor,
     StmtWhile,
     StmtIf,
     StmtWith,
-    StmtAsyncWith,
     StmtMatch,
     StmtRaise,
     StmtTry,

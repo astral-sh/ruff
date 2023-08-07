@@ -448,7 +448,7 @@ where
                     self.has_return_with_value = true;
                 }
             }
-            Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) => {}
+            Stmt::FunctionDef(_) => {}
             _ => visitor::walk_stmt(self, stmt),
         }
     }

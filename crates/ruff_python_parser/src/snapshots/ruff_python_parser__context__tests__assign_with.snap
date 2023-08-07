@@ -6,6 +6,7 @@ expression: parse_ast
     With(
         StmtWith {
             range: 0..17,
+            is_async: false,
             items: [
                 WithItem {
                     range: 5..11,

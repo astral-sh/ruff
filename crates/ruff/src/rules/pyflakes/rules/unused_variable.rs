@@ -299,7 +299,7 @@ fn remove_unused_variable(
 
 /// F841
 pub(crate) fn unused_variable(checker: &Checker, scope: &Scope, diagnostics: &mut Vec<Diagnostic>) {
-    if scope.uses_locals() && scope.kind.is_any_function() {
+    if scope.uses_locals() && scope.kind.is_function() {
         return;
     }
 

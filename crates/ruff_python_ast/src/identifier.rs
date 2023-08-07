@@ -31,8 +31,7 @@ impl Identifier for Stmt {
     fn identifier(&self) -> TextRange {
         match self {
             Stmt::ClassDef(ast::StmtClassDef { name, .. })
-            | Stmt::FunctionDef(ast::StmtFunctionDef { name, .. })
-            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { name, .. }) => name.range(),
+            | Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) => name.range(),
             _ => self.range(),
         }
     }
@@ -85,10 +84,9 @@ pub fn except(handler: &ExceptHandler, source: &str) -> TextRange {
         .expect("Failed to find `except` token in `ExceptHandler`")
 }
 
-/// Return the [`TextRange`] of the `else` token in a `For`, `AsyncFor`, or `While` statement.
+/// Return the [`TextRange`] of the `else` token in a `For` or `While` statement.
 pub fn else_(stmt: &Stmt, source: &str) -> Option<TextRange> {
     let (Stmt::For(ast::StmtFor { body, orelse, .. })
-    | Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. })
     | Stmt::While(ast::StmtWhile { body, orelse, .. })) = stmt
     else {
         return None;

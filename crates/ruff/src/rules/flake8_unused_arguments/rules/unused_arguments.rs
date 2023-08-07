@@ -328,13 +328,6 @@ pub(crate) fn unused_arguments(
             body,
             decorator_list,
             ..
-        })
-        | ScopeKind::AsyncFunction(ast::StmtAsyncFunctionDef {
-            name,
-            parameters,
-            body,
-            decorator_list,
-            ..
         }) => {
             match function_type::classify(
                 name,

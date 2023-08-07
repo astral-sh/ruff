@@ -69,11 +69,10 @@ fn traverse_body(checker: &mut Checker, body: &[Stmt]) {
                 traverse_body(checker, body);
                 traverse_body(checker, orelse);
             }
-            Stmt::For(ast::StmtFor { orelse, .. })
-            | Stmt::AsyncFor(ast::StmtAsyncFor { orelse, .. })
-            | Stmt::While(ast::StmtWhile { orelse, .. }) => traverse_body(checker, orelse),
-            Stmt::With(ast::StmtWith { body, .. })
-            | Stmt::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
+            Stmt::For(ast::StmtFor { orelse, .. }) | Stmt::While(ast::StmtWhile { orelse, .. }) => {
+                traverse_body(checker, orelse);
+            }
+            Stmt::With(ast::StmtWith { body, .. }) => {
                 traverse_body(checker, body);
             }
             Stmt::Match(ast::StmtMatch { cases, .. }) => {

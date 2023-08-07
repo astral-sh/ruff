@@ -69,16 +69,13 @@ fn walk_stmt(checker: &mut Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
             ));
         }
         match stmt {
-            Stmt::While(ast::StmtWhile { body, .. })
-            | Stmt::For(ast::StmtFor { body, .. })
-            | Stmt::AsyncFor(ast::StmtAsyncFor { body, .. }) => {
+            Stmt::While(ast::StmtWhile { body, .. }) | Stmt::For(ast::StmtFor { body, .. }) => {
                 walk_stmt(checker, body, Stmt::is_return_stmt);
             }
             Stmt::If(ast::StmtIf { body, .. })
             | Stmt::Try(ast::StmtTry { body, .. })
             | Stmt::TryStar(ast::StmtTryStar { body, .. })
-            | Stmt::With(ast::StmtWith { body, .. })
-            | Stmt::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
+            | Stmt::With(ast::StmtWith { body, .. }) => {
                 walk_stmt(checker, body, f);
             }
             Stmt::Match(ast::StmtMatch { cases, .. }) => {

@@ -1,9 +1,7 @@
-use ruff_python_ast::{Ranged, StmtAsyncWith, StmtWith, Suite, WithItem};
-use ruff_text_size::TextRange;
-
 use ruff_formatter::{format_args, write, FormatError};
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::{Ranged, StmtWith};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
+use ruff_text_size::TextRange;
 
 use crate::comments::trailing_comments;
 use crate::expression::parentheses::{
@@ -12,81 +10,29 @@ use crate::expression::parentheses::{
 use crate::prelude::*;
 use crate::FormatNodeRule;
 
-pub(super) enum AnyStatementWith<'a> {
-    With(&'a StmtWith),
-    AsyncWith(&'a StmtAsyncWith),
-}
+#[derive(Default)]
+pub struct FormatStmtWith;
 
-impl<'a> AnyStatementWith<'a> {
-    const fn is_async(&self) -> bool {
-        matches!(self, AnyStatementWith::AsyncWith(_))
-    }
-
-    fn items(&self) -> &[WithItem] {
-        match self {
-            AnyStatementWith::With(with) => with.items.as_slice(),
-            AnyStatementWith::AsyncWith(with) => with.items.as_slice(),
-        }
-    }
-
-    fn body(&self) -> &Suite {
-        match self {
-            AnyStatementWith::With(with) => &with.body,
-            AnyStatementWith::AsyncWith(with) => &with.body,
-        }
-    }
-}
-
-impl Ranged for AnyStatementWith<'_> {
-    fn range(&self) -> TextRange {
-        match self {
-            AnyStatementWith::With(with) => with.range(),
-            AnyStatementWith::AsyncWith(with) => with.range(),
-        }
-    }
-}
-
-impl<'a> From<&'a StmtWith> for AnyStatementWith<'a> {
-    fn from(value: &'a StmtWith) -> Self {
-        AnyStatementWith::With(value)
-    }
-}
-
-impl<'a> From<&'a StmtAsyncWith> for AnyStatementWith<'a> {
-    fn from(value: &'a StmtAsyncWith) -> Self {
-        AnyStatementWith::AsyncWith(value)
-    }
-}
-
-impl<'a> From<&AnyStatementWith<'a>> for AnyNodeRef<'a> {
-    fn from(value: &AnyStatementWith<'a>) -> Self {
-        match value {
-            AnyStatementWith::With(with) => AnyNodeRef::StmtWith(with),
-            AnyStatementWith::AsyncWith(with) => AnyNodeRef::StmtAsyncWith(with),
-        }
-    }
-}
-
-impl Format<PyFormatContext<'_>> for AnyStatementWith<'_> {
-    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
+impl FormatNodeRule<StmtWith> for FormatStmtWith {
+    fn fmt_fields(&self, item: &StmtWith, f: &mut PyFormatter) -> FormatResult<()> {
         let comments = f.context().comments().clone();
-        let dangling_comments = comments.dangling_comments(self);
+        let dangling_comments = comments.dangling_comments(item);
 
         write!(
             f,
             [
-                self.is_async()
+                item.is_async
                     .then_some(format_args![text("async"), space()]),
                 text("with"),
                 space()
             ]
         )?;
 
-        if are_with_items_parenthesized(self, f.context())? {
+        if are_with_items_parenthesized(item, f.context())? {
             optional_parentheses(&format_with(|f| {
-                let mut joiner = f.join_comma_separated(self.body().first().unwrap().start());
+                let mut joiner = f.join_comma_separated(item.body.first().unwrap().start());
 
-                for item in self.items() {
+                for item in &item.items {
                     joiner.entry_with_line_separator(
                         item,
                         &item.format(),
@@ -98,7 +44,7 @@ impl Format<PyFormatContext<'_>> for AnyStatementWith<'_> {
             .fmt(f)?;
         } else {
             f.join_with(format_args![text(","), space()])
-                .entries(self.items().iter().formatted())
+                .entries(item.items.iter().formatted())
                 .finish()?;
         }
 
@@ -107,18 +53,20 @@ impl Format<PyFormatContext<'_>> for AnyStatementWith<'_> {
             [
                 text(":"),
                 trailing_comments(dangling_comments),
-                block_indent(&self.body().format())
+                block_indent(&item.body.format())
             ]
         )
     }
+
+    fn fmt_dangling_comments(&self, _node: &StmtWith, _f: &mut PyFormatter) -> FormatResult<()> {
+        // Handled in `fmt_fields`
+        Ok(())
+    }
 }
 
-fn are_with_items_parenthesized(
-    with: &AnyStatementWith,
-    context: &PyFormatContext,
-) -> FormatResult<bool> {
+fn are_with_items_parenthesized(with: &StmtWith, context: &PyFormatContext) -> FormatResult<bool> {
     let first_with_item = with
-        .items()
+        .items
         .first()
         .ok_or(FormatError::syntax_error("Expected at least one with item"))?;
     let before_first_with_item = TextRange::new(with.start(), first_with_item.start());
@@ -143,19 +91,5 @@ fn are_with_items_parenthesized(
             Ok(true)
         }
         None => Ok(false),
-    }
-}
-
-#[derive(Default)]
-pub struct FormatStmtWith;
-
-impl FormatNodeRule<StmtWith> for FormatStmtWith {
-    fn fmt_fields(&self, item: &StmtWith, f: &mut PyFormatter) -> FormatResult<()> {
-        AnyStatementWith::from(item).fmt(f)
-    }
-
-    fn fmt_dangling_comments(&self, _node: &StmtWith, _f: &mut PyFormatter) -> FormatResult<()> {
-        // Handled in `fmt_fields`
-        Ok(())
     }
 }

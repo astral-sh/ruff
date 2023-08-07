@@ -425,9 +425,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
         }
         Stmt::Assert(ast::StmtAssert { test, .. }) if is_const_false(test) => {}
         Stmt::While(ast::StmtWhile { test, .. }) if is_const_true(test) => {}
-        Stmt::For(ast::StmtFor { orelse, .. })
-        | Stmt::AsyncFor(ast::StmtAsyncFor { orelse, .. })
-        | Stmt::While(ast::StmtWhile { orelse, .. }) => {
+        Stmt::For(ast::StmtFor { orelse, .. }) | Stmt::While(ast::StmtWhile { orelse, .. }) => {
             if let Some(last_stmt) = orelse.last() {
                 implicit_return(checker, last_stmt);
             } else {
@@ -454,8 +452,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                 }
             }
         }
-        Stmt::With(ast::StmtWith { body, .. })
-        | Stmt::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
+        Stmt::With(ast::StmtWith { body, .. }) => {
             if let Some(last_stmt) = body.last() {
                 implicit_return(checker, last_stmt);
             }

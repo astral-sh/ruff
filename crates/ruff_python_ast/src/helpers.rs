@@ -18,14 +18,11 @@ pub const fn is_compound_statement(stmt: &Stmt) -> bool {
     matches!(
         stmt,
         Stmt::FunctionDef(_)
-            | Stmt::AsyncFunctionDef(_)
             | Stmt::ClassDef(_)
             | Stmt::While(_)
             | Stmt::For(_)
-            | Stmt::AsyncFor(_)
             | Stmt::Match(_)
             | Stmt::With(_)
-            | Stmt::AsyncWith(_)
             | Stmt::If(_)
             | Stmt::Try(_)
             | Stmt::TryStar(_)
@@ -321,14 +318,6 @@ where
             decorator_list,
             returns,
             ..
-        })
-        | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-            parameters,
-            type_params,
-            body,
-            decorator_list,
-            returns,
-            ..
         }) => {
             parameters
                 .posonlyargs
@@ -439,13 +428,6 @@ where
             body,
             orelse,
             ..
-        })
-        | Stmt::AsyncFor(ast::StmtAsyncFor {
-            target,
-            iter,
-            body,
-            orelse,
-            ..
         }) => {
             any_over_expr(target, func)
                 || any_over_expr(iter, func)
@@ -474,8 +456,7 @@ where
                         || any_over_body(&clause.body, func)
                 })
         }
-        Stmt::With(ast::StmtWith { items, body, .. })
-        | Stmt::AsyncWith(ast::StmtAsyncWith { items, body, .. }) => {
+        Stmt::With(ast::StmtWith { items, body, .. }) => {
             items.iter().any(|with_item| {
                 any_over_expr(&with_item.context_expr, func)
                     || with_item
@@ -912,7 +893,7 @@ where
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         match stmt {
-            Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) | Stmt::ClassDef(_) => {
+            Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {
                 // Don't recurse.
             }
             Stmt::Return(stmt) => self.returns.push(stmt),
@@ -941,11 +922,7 @@ where
                 self.raises
                     .push((stmt.range(), exc.as_deref(), cause.as_deref()));
             }
-            Stmt::ClassDef(_)
-            | Stmt::FunctionDef(_)
-            | Stmt::AsyncFunctionDef(_)
-            | Stmt::Try(_)
-            | Stmt::TryStar(_) => {}
+            Stmt::ClassDef(_) | Stmt::FunctionDef(_) | Stmt::Try(_) | Stmt::TryStar(_) => {}
             Stmt::If(ast::StmtIf {
                 body,
                 elif_else_clauses,
@@ -958,9 +935,7 @@ where
             }
             Stmt::While(ast::StmtWhile { body, .. })
             | Stmt::With(ast::StmtWith { body, .. })
-            | Stmt::AsyncWith(ast::StmtAsyncWith { body, .. })
-            | Stmt::For(ast::StmtFor { body, .. })
-            | Stmt::AsyncFor(ast::StmtAsyncFor { body, .. }) => {
+            | Stmt::For(ast::StmtFor { body, .. }) => {
                 walk_body(self, body);
             }
             Stmt::Match(ast::StmtMatch { cases, .. }) => {

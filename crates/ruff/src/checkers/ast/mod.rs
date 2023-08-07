@@ -462,14 +462,6 @@ where
                 returns,
                 type_params,
                 ..
-            })
-            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-                body,
-                parameters,
-                decorator_list,
-                type_params,
-                returns,
-                ..
             }) => {
                 // Visit the decorators and arguments, but avoid the body, which will be
                 // deferred.
@@ -540,8 +532,7 @@ where
 
                 self.semantic.push_scope(match &stmt {
                     Stmt::FunctionDef(stmt) => ScopeKind::Function(stmt),
-                    Stmt::AsyncFunctionDef(stmt) => ScopeKind::AsyncFunction(stmt),
-                    _ => unreachable!("Expected Stmt::FunctionDef | Stmt::AsyncFunctionDef"),
+                    _ => unreachable!("Expected Stmt::FunctionDef"),
                 });
 
                 self.deferred.functions.push(self.semantic.snapshot());
@@ -743,8 +734,7 @@ where
 
         // Step 3: Clean-up
         match stmt {
-            Stmt::FunctionDef(ast::StmtFunctionDef { name, .. })
-            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { name, .. }) => {
+            Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) => {
                 let scope_id = self.semantic.scope_id;
                 self.deferred.scopes.push(scope_id);
                 self.semantic.pop_scope(); // Function scope
@@ -1626,7 +1616,7 @@ impl<'a> Checker<'a> {
             return;
         }
 
-        if matches!(parent, Stmt::For(_) | Stmt::AsyncFor(_)) {
+        if parent.is_for_stmt() {
             self.add_binding(
                 id,
                 expr.range(),
@@ -1825,19 +1815,14 @@ impl<'a> Checker<'a> {
             for snapshot in deferred_functions {
                 self.semantic.restore(snapshot);
 
-                match &self.semantic.current_statement() {
-                    Stmt::FunctionDef(ast::StmtFunctionDef {
-                        body, parameters, ..
-                    })
-                    | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-                        body, parameters, ..
-                    }) => {
-                        self.visit_parameters(parameters);
-                        self.visit_body(body);
-                    }
-                    _ => {
-                        unreachable!("Expected Stmt::FunctionDef | Stmt::AsyncFunctionDef")
-                    }
+                if let Stmt::FunctionDef(ast::StmtFunctionDef {
+                    body, parameters, ..
+                }) = self.semantic.current_statement()
+                {
+                    self.visit_parameters(parameters);
+                    self.visit_body(body);
+                } else {
+                    unreachable!("Expected Stmt::FunctionDef")
                 }
             }
         }

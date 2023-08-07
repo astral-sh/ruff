@@ -1,11 +1,8 @@
+use ruff_formatter::write;
 use ruff_python_ast::{Ranged, StmtFunctionDef};
-
-use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule};
-use ruff_python_ast::function::AnyFunctionDefinition;
 use ruff_python_trivia::lines_after_ignoring_trivia;
 
 use crate::comments::{leading_comments, trailing_comments};
-
 use crate::expression::parentheses::{optional_parentheses, Parentheses};
 use crate::prelude::*;
 use crate::statement::suite::SuiteKind;
@@ -16,24 +13,6 @@ pub struct FormatStmtFunctionDef;
 
 impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
     fn fmt_fields(&self, item: &StmtFunctionDef, f: &mut PyFormatter) -> FormatResult<()> {
-        AnyFunctionDefinition::from(item).format().fmt(f)
-    }
-
-    fn fmt_dangling_comments(
-        &self,
-        _node: &StmtFunctionDef,
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        // Handled by `AnyFunctionDef`
-        Ok(())
-    }
-}
-
-#[derive(Default)]
-pub struct FormatAnyFunctionDef;
-
-impl FormatRule<AnyFunctionDefinition<'_>, PyFormatContext<'_>> for FormatAnyFunctionDef {
-    fn fmt(&self, item: &AnyFunctionDefinition<'_>, f: &mut PyFormatter) -> FormatResult<()> {
         let comments = f.context().comments().clone();
 
         let dangling_comments = comments.dangling_comments(item);
@@ -43,9 +22,9 @@ impl FormatRule<AnyFunctionDefinition<'_>, PyFormatContext<'_>> for FormatAnyFun
         let (leading_definition_comments, trailing_definition_comments) =
             dangling_comments.split_at(trailing_definition_comments_start);
 
-        if let Some(last_decorator) = item.decorators().last() {
+        if let Some(last_decorator) = item.decorator_list.last() {
             f.join_with(hard_line_break())
-                .entries(item.decorators().iter().formatted())
+                .entries(item.decorator_list.iter().formatted())
                 .finish()?;
 
             if leading_definition_comments.is_empty() {
@@ -69,21 +48,19 @@ impl FormatRule<AnyFunctionDefinition<'_>, PyFormatContext<'_>> for FormatAnyFun
             }
         }
 
-        if item.is_async() {
+        if item.is_async {
             write!(f, [text("async"), space()])?;
         }
 
-        let name = item.name();
+        write!(f, [text("def"), space(), item.name.format()])?;
 
-        write!(f, [text("def"), space(), name.format()])?;
-
-        if let Some(type_params) = item.type_params() {
+        if let Some(type_params) = item.type_params.as_ref() {
             write!(f, [type_params.format()])?;
         }
 
-        write!(f, [item.arguments().format()])?;
+        write!(f, [item.parameters.format()])?;
 
-        if let Some(return_annotation) = item.returns() {
+        if let Some(return_annotation) = item.returns.as_ref() {
             write!(
                 f,
                 [
@@ -102,33 +79,17 @@ impl FormatRule<AnyFunctionDefinition<'_>, PyFormatContext<'_>> for FormatAnyFun
             [
                 text(":"),
                 trailing_comments(trailing_definition_comments),
-                block_indent(&item.body().format().with_options(SuiteKind::Function))
+                block_indent(&item.body.format().with_options(SuiteKind::Function))
             ]
         )
     }
-}
 
-impl<'def, 'ast> AsFormat<PyFormatContext<'ast>> for AnyFunctionDefinition<'def> {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        AnyFunctionDefinition<'def>,
-        FormatAnyFunctionDef,
-        PyFormatContext<'ast>,
-    > where Self: 'a;
-
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, FormatAnyFunctionDef)
-    }
-}
-
-impl<'def, 'ast> IntoFormat<PyFormatContext<'ast>> for AnyFunctionDefinition<'def> {
-    type Format = FormatOwnedWithRule<
-        AnyFunctionDefinition<'def>,
-        FormatAnyFunctionDef,
-        PyFormatContext<'ast>,
-    >;
-
-    fn into_format(self) -> Self::Format {
-        FormatOwnedWithRule::new(self, FormatAnyFunctionDef)
+    fn fmt_dangling_comments(
+        &self,
+        _node: &StmtFunctionDef,
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        // Handled in `fmt_fields`
+        Ok(())
     }
 }

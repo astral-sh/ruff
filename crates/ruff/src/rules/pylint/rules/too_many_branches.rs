@@ -108,7 +108,6 @@ fn num_branches(stmts: &[Stmt]) -> usize {
                     .sum::<usize>()
             }
             Stmt::For(ast::StmtFor { body, orelse, .. })
-            | Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. })
             | Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
                 1 + num_branches(body)
                     + (if orelse.is_empty() {

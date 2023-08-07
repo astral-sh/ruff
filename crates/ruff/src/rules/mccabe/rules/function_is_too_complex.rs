@@ -82,14 +82,12 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
                     complexity += get_complexity_number(&clause.body);
                 }
             }
-            Stmt::For(ast::StmtFor { body, orelse, .. })
-            | Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. }) => {
+            Stmt::For(ast::StmtFor { body, orelse, .. }) => {
                 complexity += 1;
                 complexity += get_complexity_number(body);
                 complexity += get_complexity_number(orelse);
             }
-            Stmt::With(ast::StmtWith { body, .. })
-            | Stmt::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
+            Stmt::With(ast::StmtWith { body, .. }) => {
                 complexity += get_complexity_number(body);
             }
             Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
@@ -131,8 +129,7 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
                     complexity += get_complexity_number(body);
                 }
             }
-            Stmt::FunctionDef(ast::StmtFunctionDef { body, .. })
-            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. }) => {
+            Stmt::FunctionDef(ast::StmtFunctionDef { body, .. }) => {
                 complexity += 1;
                 complexity += get_complexity_number(body);
             }

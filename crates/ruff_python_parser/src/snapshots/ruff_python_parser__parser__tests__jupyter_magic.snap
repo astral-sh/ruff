@@ -125,6 +125,7 @@ Module(
             FunctionDef(
                 StmtFunctionDef {
                     range: 566..626,
+                    is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: "foo",
@@ -199,6 +200,7 @@ Module(
             For(
                 StmtFor {
                     range: 701..727,
+                    is_async: false,
                     target: Name(
                         ExprName {
                             range: 705..706,

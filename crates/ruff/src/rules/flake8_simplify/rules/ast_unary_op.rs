@@ -160,8 +160,7 @@ pub(crate) fn negation_with_equal_op(
     }
 
     // Avoid flagging issues in dunder implementations.
-    if let ScopeKind::Function(ast::StmtFunctionDef { name, .. })
-    | ScopeKind::AsyncFunction(ast::StmtAsyncFunctionDef { name, .. }) =
+    if let ScopeKind::Function(ast::StmtFunctionDef { name, .. }) =
         &checker.semantic().current_scope().kind
     {
         if is_dunder_method(name) {
@@ -218,8 +217,7 @@ pub(crate) fn negation_with_not_equal_op(
     }
 
     // Avoid flagging issues in dunder implementations.
-    if let ScopeKind::Function(ast::StmtFunctionDef { name, .. })
-    | ScopeKind::AsyncFunction(ast::StmtAsyncFunctionDef { name, .. }) =
+    if let ScopeKind::Function(ast::StmtFunctionDef { name, .. }) =
         &checker.semantic().current_scope().kind
     {
         if is_dunder_method(name) {

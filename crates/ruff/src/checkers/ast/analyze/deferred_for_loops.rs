@@ -11,21 +11,18 @@ pub(crate) fn deferred_for_loops(checker: &mut Checker) {
         for snapshot in for_loops {
             checker.semantic.restore(snapshot);
 
-            if let Stmt::For(ast::StmtFor {
+            let Stmt::For(ast::StmtFor {
                 target, iter, body, ..
-            })
-            | Stmt::AsyncFor(ast::StmtAsyncFor {
-                target, iter, body, ..
-            }) = &checker.semantic.current_statement()
-            {
-                if checker.enabled(Rule::UnusedLoopControlVariable) {
-                    flake8_bugbear::rules::unused_loop_control_variable(checker, target, body);
-                }
-                if checker.enabled(Rule::IncorrectDictIterator) {
-                    perflint::rules::incorrect_dict_iterator(checker, target, iter);
-                }
-            } else {
-                unreachable!("Expected Expr::For | Expr::AsyncFor");
+            }) = checker.semantic.current_statement()
+            else {
+                unreachable!("Expected Stmt::For");
+            };
+
+            if checker.enabled(Rule::UnusedLoopControlVariable) {
+                flake8_bugbear::rules::unused_loop_control_variable(checker, target, body);
+            }
+            if checker.enabled(Rule::IncorrectDictIterator) {
+                perflint::rules::incorrect_dict_iterator(checker, target, iter);
             }
         }
     }

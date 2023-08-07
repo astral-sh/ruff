@@ -241,10 +241,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
             flake8_pyi::rules::unused_private_typed_dict(checker, scope, &mut diagnostics);
         }
 
-        if matches!(
-            scope.kind,
-            ScopeKind::Function(_) | ScopeKind::AsyncFunction(_) | ScopeKind::Lambda(_)
-        ) {
+        if matches!(scope.kind, ScopeKind::Function(_) | ScopeKind::Lambda(_)) {
             if checker.enabled(Rule::UnusedVariable) {
                 pyflakes::rules::unused_variable(checker, scope, &mut diagnostics);
             }
@@ -270,10 +267,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
             }
         }
 
-        if matches!(
-            scope.kind,
-            ScopeKind::Function(_) | ScopeKind::AsyncFunction(_) | ScopeKind::Module
-        ) {
+        if matches!(scope.kind, ScopeKind::Function(_) | ScopeKind::Module) {
             if enforce_typing_imports {
                 let runtime_imports: Vec<&Binding> = checker
                     .semantic
