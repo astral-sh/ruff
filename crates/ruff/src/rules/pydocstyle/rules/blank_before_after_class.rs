@@ -1,11 +1,9 @@
-use ruff_python_ast::Ranged;
-use ruff_text_size::{TextLen, TextRange};
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::{Definition, Member, MemberKind};
+use ruff_python_ast::Ranged;
 use ruff_python_trivia::PythonWhitespace;
 use ruff_source_file::{UniversalNewlineIterator, UniversalNewlines};
+use ruff_text_size::{TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
@@ -155,11 +153,7 @@ impl AlwaysAutofixableViolation for BlankLineBeforeClass {
 
 /// D203, D204, D211
 pub(crate) fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
-    let Definition::Member(Member {
-        kind: MemberKind::Class(class) | MemberKind::NestedClass(class),
-        ..
-    }) = docstring.definition
-    else {
+    let Some(class) = docstring.definition.as_class_def() else {
         return;
     };
 

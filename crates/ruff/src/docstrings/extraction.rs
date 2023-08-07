@@ -27,12 +27,7 @@ pub(crate) fn docstring_from(suite: &[Stmt]) -> Option<&Expr> {
 pub(crate) fn extract_docstring<'a>(definition: &'a Definition<'a>) -> Option<&'a Expr> {
     match definition {
         Definition::Module(module) => docstring_from(module.python_ast),
-        Definition::Member(member) => docstring_from(match member.kind {
-            MemberKind::Class(class) | MemberKind::NestedClass(class) => &class.body,
-            MemberKind::Function(function)
-            | MemberKind::NestedFunction(function)
-            | MemberKind::Method(function) => &function.body,
-        }),
+        Definition::Member(member) => docstring_from(member.body()),
     }
 }
 

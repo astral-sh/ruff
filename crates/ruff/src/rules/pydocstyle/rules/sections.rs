@@ -1,21 +1,18 @@
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff_python_ast::ParameterWithDefault;
-use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-
 use ruff_python_ast::docstrings::{clean_space, leading_space};
 use ruff_python_ast::identifier::Identifier;
-
+use ruff_python_ast::ParameterWithDefault;
 use ruff_python_semantic::analyze::visibility::is_staticmethod;
-use ruff_python_semantic::{Definition, Member, MemberKind};
 use ruff_python_trivia::{textwrap::dedent, PythonWhitespace};
 use ruff_source_file::NewlineWithTrailingNewline;
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::sections::{SectionContext, SectionContexts, SectionKind};
@@ -1718,14 +1715,7 @@ fn common_section(
 }
 
 fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &FxHashSet<String>) {
-    let Definition::Member(Member {
-        kind:
-            MemberKind::Function(function)
-            | MemberKind::NestedFunction(function)
-            | MemberKind::Method(function),
-        ..
-    }) = docstring.definition
-    else {
+    let Some(function) = docstring.definition.as_function_def() else {
         return;
     };
 

@@ -1,13 +1,12 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff_python_ast::Ranged;
-use ruff_text_size::{TextLen, TextRange};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::{Definition, Member, MemberKind};
+use ruff_python_ast::Ranged;
 use ruff_python_trivia::PythonWhitespace;
 use ruff_source_file::{UniversalNewlineIterator, UniversalNewlines};
+use ruff_text_size::{TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
@@ -104,14 +103,7 @@ static INNER_FUNCTION_OR_CLASS_REGEX: Lazy<Regex> =
 
 /// D201, D202
 pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring) {
-    let Definition::Member(Member {
-        kind:
-            MemberKind::Function(function)
-            | MemberKind::NestedFunction(function)
-            | MemberKind::Method(function),
-        ..
-    }) = docstring.definition
-    else {
+    let Some(function) = docstring.definition.as_function_def() else {
         return;
     };
 

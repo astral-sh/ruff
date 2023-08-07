@@ -1,6 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::{Definition, Member, MemberKind};
 use ruff_source_file::UniversalNewlines;
 
 use crate::checkers::ast::Checker;
@@ -52,14 +51,7 @@ impl Violation for NoSignature {
 
 /// D402
 pub(crate) fn no_signature(checker: &mut Checker, docstring: &Docstring) {
-    let Definition::Member(Member {
-        kind:
-            MemberKind::Function(function)
-            | MemberKind::NestedFunction(function)
-            | MemberKind::Method(function),
-        ..
-    }) = docstring.definition
-    else {
+    let Some(function) = docstring.definition.as_function_def() else {
         return;
     };
 

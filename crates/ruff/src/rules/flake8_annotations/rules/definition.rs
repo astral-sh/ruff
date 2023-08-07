@@ -6,7 +6,7 @@ use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::{self as ast, Constant, Expr, ParameterWithDefault, Ranged, Stmt};
 use ruff_python_parser::typing::parse_type_annotation;
 use ruff_python_semantic::analyze::visibility;
-use ruff_python_semantic::{Definition, Member, MemberKind};
+use ruff_python_semantic::Definition;
 use ruff_python_stdlib::typing::simple_magic_return_type;
 
 use crate::checkers::ast::Checker;
@@ -494,18 +494,9 @@ pub(crate) fn definition(
     definition: &Definition,
     visibility: visibility::Visibility,
 ) -> Vec<Diagnostic> {
-    let Definition::Member(Member { kind, .. }) = definition else {
+    let Some(function) = definition.as_function_def() else {
         return vec![];
     };
-
-    let (MemberKind::Function(function)
-    | MemberKind::NestedFunction(function)
-    | MemberKind::Method(function)) = kind
-    else {
-        return vec![];
-    };
-
-    let is_method = kind.is_method();
 
     let ast::StmtFunctionDef {
         range: _,
@@ -517,6 +508,8 @@ pub(crate) fn definition(
         returns,
         body,
     } = function;
+
+    let is_method = definition.is_method();
 
     // Keep track of whether we've seen any typed arguments or return values.
     let mut has_any_typed_arg = false; // Any argument has been typed?

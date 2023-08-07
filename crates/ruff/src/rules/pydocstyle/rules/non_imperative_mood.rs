@@ -7,7 +7,6 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::{from_qualified_name, CallPath};
 use ruff_python_semantic::analyze::visibility::{is_property, is_test};
-use ruff_python_semantic::{Definition, Member, MemberKind};
 use ruff_source_file::UniversalNewlines;
 
 use crate::checkers::ast::Checker;
@@ -68,14 +67,7 @@ pub(crate) fn non_imperative_mood(
     docstring: &Docstring,
     property_decorators: &BTreeSet<String>,
 ) {
-    let Definition::Member(Member {
-        kind:
-            MemberKind::Function(function)
-            | MemberKind::NestedFunction(function)
-            | MemberKind::Method(function),
-        ..
-    }) = &docstring.definition
-    else {
+    let Some(function) = docstring.definition.as_function_def() else {
         return;
     };
 

@@ -90,6 +90,17 @@ impl<'a> Member<'a> {
             MemberKind::Method(method) => &method.name,
         }
     }
+
+    /// Return the body of the member.
+    pub fn body(&self) -> &[Stmt] {
+        match self.kind {
+            MemberKind::Class(class) => &class.body,
+            MemberKind::NestedClass(class) => &class.body,
+            MemberKind::Function(function) => &function.body,
+            MemberKind::NestedFunction(function) => &function.body,
+            MemberKind::Method(method) => &method.body,
+        }
+    }
 }
 
 impl Ranged for Member<'_> {
@@ -124,10 +135,36 @@ impl Definition<'_> {
         )
     }
 
+    /// Return the name of the definition.
     pub fn name(&self) -> Option<&str> {
         match self {
             Definition::Module(module) => module.name(),
             Definition::Member(member) => Some(member.name()),
+        }
+    }
+
+    /// Return the [`ast::StmtFunctionDef`] of the definition, if it's a function definition.
+    pub fn as_function_def(&self) -> Option<&ast::StmtFunctionDef> {
+        match self {
+            Definition::Member(Member {
+                kind:
+                    MemberKind::Function(function)
+                    | MemberKind::NestedFunction(function)
+                    | MemberKind::Method(function),
+                ..
+            }) => Some(function),
+            _ => None,
+        }
+    }
+
+    /// Return the [`ast::StmtClassDef`] of the definition, if it's a class definition.
+    pub fn as_class_def(&self) -> Option<&ast::StmtClassDef> {
+        match self {
+            Definition::Member(Member {
+                kind: MemberKind::Class(class) | MemberKind::NestedClass(class),
+                ..
+            }) => Some(class),
+            _ => None,
         }
     }
 }
@@ -174,15 +211,7 @@ impl<'a> Definitions<'a> {
                         MemberKind::NestedClass(class) => {
                             let parent = &definitions[member.parent];
                             if parent.visibility.is_private()
-                                || matches!(
-                                    parent.definition,
-                                    Definition::Member(Member {
-                                        kind: MemberKind::Function(_)
-                                            | MemberKind::NestedFunction(_)
-                                            | MemberKind::Method(_),
-                                        ..
-                                    })
-                                )
+                                || parent.definition.as_function_def().is_some()
                             {
                                 Visibility::Private
                             } else {
