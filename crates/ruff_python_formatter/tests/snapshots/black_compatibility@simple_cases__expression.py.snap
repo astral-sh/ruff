@@ -266,22 +266,24 @@ last_call()
 ```diff
 --- Black
 +++ Ruff
-@@ -14,12 +14,12 @@
+@@ -12,13 +12,13 @@
+ True or False or None
+ True and False
  True and False and None
- (Name1 and Name2) or Name3
+-(Name1 and Name2) or Name3
  Name1 and Name2 or Name3
 -Name1 or (Name2 and Name3)
++Name1 and Name2 or Name3
++Name1 or Name2 and Name3
  Name1 or Name2 and Name3
 -(Name1 and Name2) or (Name3 and Name4)
-+Name1 or Name2 and Name3
-+(Name1 and Name2) or Name3 and Name4
  Name1 and Name2 or Name3 and Name4
 -Name1 or (Name2 and Name3) or Name4
- Name1 or Name2 and Name3 or Name4
++Name1 and Name2 or Name3 and Name4
 +Name1 or Name2 and Name3 or Name4
+ Name1 or Name2 and Name3 or Name4
  v1 << 2
  1 >> v2
- 1 % finished
 @@ -31,7 +31,7 @@
  -1
  ~int and not v1 ^ 123 + v2 | True
@@ -367,11 +369,11 @@ True or False
 True or False or None
 True and False
 True and False and None
-(Name1 and Name2) or Name3
+Name1 and Name2 or Name3
 Name1 and Name2 or Name3
 Name1 or Name2 and Name3
 Name1 or Name2 and Name3
-(Name1 and Name2) or Name3 and Name4
+Name1 and Name2 or Name3 and Name4
 Name1 and Name2 or Name3 and Name4
 Name1 or Name2 and Name3 or Name4
 Name1 or Name2 and Name3 or Name4

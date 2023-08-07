@@ -44,7 +44,17 @@ impl FormatNodeRule<ExprBoolOp> for FormatExprBoolOp {
                 return Ok(());
             };
 
-            write!(f, [in_parentheses_only_group(&first.format())])?;
+            if let Expr::BoolOp(value) = first {
+                write!(
+                    f,
+                    [value.format().with_options(BoolOpLayout {
+                        parentheses: None,
+                        wrap: Some(true),
+                    })]
+                )?;
+            } else {
+                write!(f, [in_parentheses_only_group(&first.format())])?;
+            }
 
             for value in values {
                 let leading_value_comments = comments.leading_comments(value);

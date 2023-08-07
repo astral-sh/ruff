@@ -157,7 +157,8 @@ if not (
     pass
 
 if not (
-    isinstance(aaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbb) and numpy
+    isinstance(aaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbb)
+    and numpy
     or isinstance(ccccccccccc, dddddd)
 ):
     pass
