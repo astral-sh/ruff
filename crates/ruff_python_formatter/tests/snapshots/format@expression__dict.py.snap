@@ -129,7 +129,8 @@ a = {
     3: True,
 }
 
-x = {}  # dangling end of line comment
+x = {  # dangling end of line comment
+}
 ```
 
 

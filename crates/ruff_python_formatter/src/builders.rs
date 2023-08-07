@@ -253,6 +253,16 @@ impl<'ast> Format<PyFormatContext<'ast>> for EmptyWithDanglingComments<'_> {
                 self.opening,
                 // end-of-line comments
                 trailing_comments(&self.comments[..end_of_line_split]),
+                // Avoid unstable formatting with
+                // ```python
+                // x = () - (#
+                // )
+                // ```
+                // Without this the comment would go after the empty tuple first, but still expand
+                // the bin op. In the second formatting pass they are trailing bin op comments
+                // so the bin op collapse. Suboptimally we keep parentheses around the bin op in
+                // either case.
+                (!self.comments[..end_of_line_split].is_empty()).then_some(hard_line_break()),
                 // own line comments, which need to be indented
                 soft_block_indent(&dangling_comments(&self.comments[end_of_line_split..])),
                 self.closing
