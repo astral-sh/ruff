@@ -11,19 +11,19 @@ use ruff_python_ast::{BoolOp, Expr, ExprBoolOp};
 #[derive(Default)]
 pub struct FormatExprBoolOp {
     parentheses: Option<Parentheses>,
-    wrap: Option<bool>,
+    chained: bool,
 }
 
 pub struct BoolOpLayout {
     pub(crate) parentheses: Option<Parentheses>,
-    pub(crate) wrap: Option<bool>,
+    pub(crate) chained: bool,
 }
 
 impl FormatRuleWithOptions<ExprBoolOp, PyFormatContext<'_>> for FormatExprBoolOp {
     type Options = BoolOpLayout;
     fn with_options(mut self, options: Self::Options) -> Self {
         self.parentheses = options.parentheses;
-        self.wrap = options.wrap;
+        self.chained = options.chained;
         self
     }
 }
@@ -45,11 +45,13 @@ impl FormatNodeRule<ExprBoolOp> for FormatExprBoolOp {
             };
 
             if let Expr::BoolOp(value) = first {
+                // Mark chained boolean operations e.g. `x and y or z`
+                // and avoid creating a new group
                 write!(
                     f,
                     [value.format().with_options(BoolOpLayout {
                         parentheses: None,
-                        wrap: Some(true),
+                        chained: true,
                     })]
                 )?;
             } else {
@@ -75,7 +77,7 @@ impl FormatNodeRule<ExprBoolOp> for FormatExprBoolOp {
                         f,
                         [value.format().with_options(BoolOpLayout {
                             parentheses: None,
-                            wrap: Some(true),
+                            chained: true,
                         })]
                     )?;
                 } else {
@@ -86,7 +88,8 @@ impl FormatNodeRule<ExprBoolOp> for FormatExprBoolOp {
             Ok(())
         });
 
-        if self.wrap.is_some_and(|value| value) {
+        if self.chained {
+            // Chained boolean operations should not be given a new group
             inner.fmt(f)
         } else {
             in_parentheses_only_group(&inner).fmt(f)
