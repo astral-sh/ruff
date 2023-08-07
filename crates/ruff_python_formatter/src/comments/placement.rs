@@ -12,7 +12,7 @@ use ruff_text_size::TextRange;
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
 use crate::expression::expr_slice::{assign_comment_in_slice, ExprSliceCommentSection};
 use crate::other::parameters::{
-    assign_argument_separator_comment_placement, find_argument_separators,
+    assign_argument_separator_comment_placement, find_parameter_separators,
 };
 
 /// Manually attach comments to nodes that the default placement gets wrong.
@@ -606,7 +606,7 @@ fn handle_parameters_separator_comment<'a>(
     parameters: &Parameters,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    let (slash, star) = find_argument_separators(locator.contents(), parameters);
+    let (slash, star) = find_parameter_separators(locator.contents(), parameters);
     let comment_range = comment.slice().range();
     let placement = assign_argument_separator_comment_placement(
         slash.as_ref(),
