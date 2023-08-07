@@ -53,7 +53,7 @@ fn matches_sql_statement(string: &str) -> bool {
     SQL_REGEX.is_match(string)
 }
 
-fn matches_string_format_expression(expr: &Expr, model: &SemanticModel) -> bool {
+fn matches_string_format_expression(expr: &Expr, semantic: &SemanticModel) -> bool {
     match expr {
         // "select * from table where val = " + "str" + ...
         // "select * from table where val = %s" % ...
@@ -62,7 +62,7 @@ fn matches_string_format_expression(expr: &Expr, model: &SemanticModel) -> bool 
             ..
         }) => {
             // Only evaluate the full BinOp, not the nested components.
-            if model
+            if semantic
                 .current_expression_parent()
                 .map_or(true, |parent| !parent.is_bin_op_expr())
             {

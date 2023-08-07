@@ -131,7 +131,7 @@ pub(crate) fn builtin_method_shadowing(
 fn is_standard_library_override(
     name: &str,
     class_def: &ast::StmtClassDef,
-    model: &SemanticModel,
+    semantic: &SemanticModel,
 ) -> bool {
     let Some(Arguments { args: bases, .. }) = class_def.arguments.as_deref() else {
         return false;
@@ -139,13 +139,13 @@ fn is_standard_library_override(
     match name {
         // Ex) `Event#set`
         "set" => bases.iter().any(|base| {
-            model
+            semantic
                 .resolve_call_path(base)
                 .is_some_and(|call_path| matches!(call_path.as_slice(), ["threading", "Event"]))
         }),
         // Ex) `Filter#filter`
         "filter" => bases.iter().any(|base| {
-            model
+            semantic
                 .resolve_call_path(base)
                 .is_some_and(|call_path| matches!(call_path.as_slice(), ["logging", "Filter"]))
         }),

@@ -149,7 +149,7 @@ struct IterationTarget {
 ///
 /// As a special-case, given `[x for x in y]`, returns the range of `y` (rather than the
 /// redundant comprehension).
-fn match_iteration_target(expr: &Expr, model: &SemanticModel) -> Option<IterationTarget> {
+fn match_iteration_target(expr: &Expr, semantic: &SemanticModel) -> Option<IterationTarget> {
     let result = match expr {
         Expr::Call(ast::ExprCall {
             func,
@@ -166,7 +166,7 @@ fn match_iteration_target(expr: &Expr, model: &SemanticModel) -> Option<Iteratio
                 return None;
             };
 
-            if !model.is_builtin(id.as_str()) {
+            if !semantic.is_builtin(id.as_str()) {
                 return None;
             }
 
