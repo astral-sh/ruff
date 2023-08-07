@@ -112,7 +112,11 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                     // If the bindings are in different forks, abort.
                     if shadowed.source.map_or(true, |left| {
                         binding.source.map_or(true, |right| {
-                            branch_detection::different_forks(left, right, &checker.semantic.stmts)
+                            branch_detection::different_forks(
+                                left,
+                                right,
+                                &checker.semantic.statements,
+                            )
                         })
                     }) {
                         continue;
@@ -172,7 +176,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                         if shadowed.kind.is_function_definition()
                             && visibility::is_overload(
                                 cast::decorator_list(
-                                    checker.semantic.stmts[shadowed.source.unwrap()],
+                                    checker.semantic.statements[shadowed.source.unwrap()],
                                 ),
                                 &checker.semantic,
                             )
@@ -195,7 +199,11 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                     // If the bindings are in different forks, abort.
                     if shadowed.source.map_or(true, |left| {
                         binding.source.map_or(true, |right| {
-                            branch_detection::different_forks(left, right, &checker.semantic.stmts)
+                            branch_detection::different_forks(
+                                left,
+                                right,
+                                &checker.semantic.statements,
+                            )
                         })
                     }) {
                         continue;

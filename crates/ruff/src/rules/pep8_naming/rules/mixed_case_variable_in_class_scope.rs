@@ -69,7 +69,7 @@ pub(crate) fn mixed_case_variable_in_class_scope(
         return;
     }
 
-    let parent = checker.semantic().stmt();
+    let parent = checker.semantic().current_statement();
 
     if helpers::is_named_tuple_assignment(parent, checker.semantic())
         || helpers::is_typed_dict_class(arguments, checker.semantic())

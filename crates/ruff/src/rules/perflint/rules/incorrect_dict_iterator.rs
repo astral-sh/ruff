@@ -167,7 +167,7 @@ fn is_unused(expr: &Expr, model: &SemanticModel) -> bool {
             //
             // print(bar)
             // ```
-            let scope = model.scope();
+            let scope = model.current_scope();
             scope
                 .get_all(id)
                 .map(|binding_id| model.binding(binding_id))

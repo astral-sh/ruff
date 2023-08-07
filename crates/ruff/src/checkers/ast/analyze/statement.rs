@@ -53,7 +53,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::BreakOutsideLoop) {
                 if let Some(diagnostic) = pyflakes::rules::break_outside_loop(
                     stmt,
-                    &mut checker.semantic.parents().skip(1),
+                    &mut checker.semantic.current_statements().skip(1),
                 ) {
                     checker.diagnostics.push(diagnostic);
                 }
@@ -63,7 +63,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::ContinueOutsideLoop) {
                 if let Some(diagnostic) = pyflakes::rules::continue_outside_loop(
                     stmt,
-                    &mut checker.semantic.parents().skip(1),
+                    &mut checker.semantic.current_statements().skip(1),
                 ) {
                     checker.diagnostics.push(diagnostic);
                 }
@@ -113,7 +113,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if let Some(diagnostic) =
                     pep8_naming::rules::invalid_first_argument_name_for_class_method(
                         checker,
-                        checker.semantic.scope(),
+                        checker.semantic.current_scope(),
                         name,
                         decorator_list,
                         parameters,
@@ -125,7 +125,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::InvalidFirstArgumentNameForMethod) {
                 if let Some(diagnostic) = pep8_naming::rules::invalid_first_argument_name_for_method(
                     checker,
-                    checker.semantic.scope(),
+                    checker.semantic.current_scope(),
                     name,
                     decorator_list,
                     parameters,
@@ -193,7 +193,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::DunderFunctionName) {
                 if let Some(diagnostic) = pep8_naming::rules::dunder_function_name(
-                    checker.semantic.scope(),
+                    checker.semantic.current_scope(),
                     stmt,
                     name,
                     &checker.settings.pep8_naming.ignore_names,
@@ -348,7 +348,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::YieldInForLoop) {
                 pyupgrade::rules::yield_in_for_loop(checker, stmt);
             }
-            if let ScopeKind::Class(class_def) = checker.semantic.scope().kind {
+            if let ScopeKind::Class(class_def) = checker.semantic.current_scope().kind {
                 if checker.enabled(Rule::BuiltinAttributeShadowing) {
                     flake8_builtins::rules::builtin_method_shadowing(
                         checker,
@@ -766,7 +766,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     }
                 } else if &alias.name == "*" {
                     if checker.enabled(Rule::UndefinedLocalWithNestedImportStarUsage) {
-                        if !matches!(checker.semantic.scope().kind, ScopeKind::Module) {
+                        if !matches!(checker.semantic.current_scope().kind, ScopeKind::Module) {
                             checker.diagnostics.push(Diagnostic::new(
                                 pyflakes::rules::UndefinedLocalWithNestedImportStarUsage {
                                     name: helpers::format_import_from(level, module),
@@ -982,7 +982,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_simplify::rules::nested_if_statements(
                     checker,
                     if_,
-                    checker.semantic.stmt_parent(),
+                    checker.semantic.current_statement_parent(),
                 );
             }
             if checker.enabled(Rule::IfWithSameArms) {
@@ -1004,7 +1004,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 tryceratops::rules::type_check_without_type_error(
                     checker,
                     if_,
-                    checker.semantic.stmt_parent(),
+                    checker.semantic.current_statement_parent(),
                 );
             }
             if checker.enabled(Rule::OutdatedVersionBlock) {
@@ -1110,7 +1110,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker,
                     stmt,
                     body,
-                    checker.semantic.stmt_parent(),
+                    checker.semantic.current_statement_parent(),
                 );
             }
             if checker.enabled(Rule::RedefinedLoopName) {
@@ -1338,7 +1338,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     // Ignore assignments in function bodies; those are covered by other rules.
                     if !checker
                         .semantic
-                        .scopes()
+                        .current_scopes()
                         .any(|scope| scope.kind.is_any_function())
                     {
                         if checker.enabled(Rule::UnprefixedTypeParam) {
@@ -1403,7 +1403,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         // Ignore assignments in function bodies; those are covered by other rules.
                         if !checker
                             .semantic
-                            .scopes()
+                            .current_scopes()
                             .any(|scope| scope.kind.is_any_function())
                         {
                             flake8_pyi::rules::annotated_assignment_default_in_stub(

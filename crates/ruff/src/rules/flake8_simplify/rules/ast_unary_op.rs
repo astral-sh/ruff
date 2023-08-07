@@ -155,14 +155,14 @@ pub(crate) fn negation_with_equal_op(
     if !matches!(&ops[..], [CmpOp::Eq]) {
         return;
     }
-    if is_exception_check(checker.semantic().stmt()) {
+    if is_exception_check(checker.semantic().current_statement()) {
         return;
     }
 
     // Avoid flagging issues in dunder implementations.
     if let ScopeKind::Function(ast::StmtFunctionDef { name, .. })
     | ScopeKind::AsyncFunction(ast::StmtAsyncFunctionDef { name, .. }) =
-        &checker.semantic().scope().kind
+        &checker.semantic().current_scope().kind
     {
         if is_dunder_method(name) {
             return;
@@ -213,14 +213,14 @@ pub(crate) fn negation_with_not_equal_op(
     if !matches!(&ops[..], [CmpOp::NotEq]) {
         return;
     }
-    if is_exception_check(checker.semantic().stmt()) {
+    if is_exception_check(checker.semantic().current_statement()) {
         return;
     }
 
     // Avoid flagging issues in dunder implementations.
     if let ScopeKind::Function(ast::StmtFunctionDef { name, .. })
     | ScopeKind::AsyncFunction(ast::StmtAsyncFunctionDef { name, .. }) =
-        &checker.semantic().scope().kind
+        &checker.semantic().current_scope().kind
     {
         if is_dunder_method(name) {
             return;

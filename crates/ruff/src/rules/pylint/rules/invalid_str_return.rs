@@ -29,7 +29,7 @@ pub(crate) fn invalid_str_return(checker: &mut Checker, name: &str, body: &[Stmt
         return;
     }
 
-    if !checker.semantic().scope().kind.is_class() {
+    if !checker.semantic().current_scope().kind.is_class() {
         return;
     }
 

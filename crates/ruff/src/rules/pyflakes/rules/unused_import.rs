@@ -116,7 +116,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             continue;
         };
 
-        let Some(stmt_id) = binding.source else {
+        let Some(statement_id) = binding.source else {
             continue;
         };
 
@@ -132,12 +132,12 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             })
         {
             ignored
-                .entry((stmt_id, binding.exceptions))
+                .entry((statement_id, binding.exceptions))
                 .or_default()
                 .push(import);
         } else {
             unused
-                .entry((stmt_id, binding.exceptions))
+                .entry((statement_id, binding.exceptions))
                 .or_default()
                 .push(import);
         }
@@ -148,13 +148,13 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
 
     // Generate a diagnostic for every import, but share a fix across all imports within the same
     // statement (excluding those that are ignored).
-    for ((stmt_id, exceptions), imports) in unused {
+    for ((statement_id, exceptions), imports) in unused {
         let in_except_handler =
             exceptions.intersects(Exceptions::MODULE_NOT_FOUND_ERROR | Exceptions::IMPORT_ERROR);
         let multiple = imports.len() > 1;
 
         let fix = if !in_init && !in_except_handler && checker.patch(Rule::UnusedImport) {
-            fix_imports(checker, stmt_id, &imports).ok()
+            fix_imports(checker, statement_id, &imports).ok()
         } else {
             None
         };
@@ -225,9 +225,9 @@ struct ImportBinding<'a> {
 }
 
 /// Generate a [`Fix`] to remove unused imports from a statement.
-fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[ImportBinding]) -> Result<Fix> {
-    let stmt = checker.semantic().stmts[stmt_id];
-    let parent = checker.semantic().stmts.parent(stmt);
+fn fix_imports(checker: &Checker, statement_id: NodeId, imports: &[ImportBinding]) -> Result<Fix> {
+    let statement = checker.semantic().statements[statement_id];
+    let parent = checker.semantic().statements.parent(statement);
 
     let member_names: Vec<Cow<'_, str>> = imports
         .iter()
@@ -236,7 +236,7 @@ fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[ImportBinding]) ->
 
     let edit = autofix::edits::remove_unused_imports(
         member_names.iter().map(AsRef::as_ref),
-        stmt,
+        statement,
         parent,
         checker.locator(),
         checker.stylist(),

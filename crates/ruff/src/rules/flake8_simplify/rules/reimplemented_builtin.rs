@@ -60,7 +60,7 @@ impl Violation for ReimplementedBuiltin {
 
 /// SIM110, SIM111
 pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
-    if !checker.semantic().scope().kind.is_any_function() {
+    if !checker.semantic().current_scope().kind.is_any_function() {
         return;
     }
 
@@ -73,7 +73,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
     // - `for` loop with an `else: return True` or `else: return False`.
     // - `for` loop followed by `return True` or `return False`.
     let Some(terminal) = match_else_return(stmt).or_else(|| {
-        let parent = checker.semantic().stmt_parent()?;
+        let parent = checker.semantic().current_statement_parent()?;
         let suite = traversal::suite(stmt, parent)?;
         let sibling = traversal::next_sibling(stmt, suite)?;
         match_sibling_return(stmt, sibling)

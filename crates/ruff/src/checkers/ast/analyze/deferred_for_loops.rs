@@ -16,7 +16,7 @@ pub(crate) fn deferred_for_loops(checker: &mut Checker) {
             })
             | Stmt::AsyncFor(ast::StmtAsyncFor {
                 target, iter, body, ..
-            }) = &checker.semantic.stmt()
+            }) = &checker.semantic.current_statement()
             {
                 if checker.enabled(Rule::UnusedLoopControlVariable) {
                     flake8_bugbear::rules::unused_loop_control_variable(checker, target, body);

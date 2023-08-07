@@ -159,7 +159,7 @@ pub(crate) fn unused_loop_control_variable(checker: &mut Checker, target: &Expr,
                 if certainty.into() {
                     // Avoid fixing if the variable, or any future bindings to the variable, are
                     // used _after_ the loop.
-                    let scope = checker.semantic().scope();
+                    let scope = checker.semantic().current_scope();
                     if scope
                         .get_all(name)
                         .map(|binding_id| checker.semantic().binding(binding_id))

@@ -62,7 +62,7 @@ pub(crate) fn self_assigning_variable(checker: &mut Checker, target: &Expr, valu
 
     // Assignments in class bodies are attributes (e.g., `x = x` assigns `x` to `self.x`, and thus
     // is not a self-assignment).
-    if checker.semantic().scope().kind.is_class() {
+    if checker.semantic().current_scope().kind.is_class() {
         return;
     }
 

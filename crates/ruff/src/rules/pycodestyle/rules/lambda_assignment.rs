@@ -116,10 +116,10 @@ pub(crate) fn lambda_assignment(
             // rewriting it as a function declaration may break type-checking.
             // See: https://github.com/astral-sh/ruff/issues/3046
             // See: https://github.com/astral-sh/ruff/issues/5421
-            if (annotation.is_some() && checker.semantic().scope().kind.is_class())
+            if (annotation.is_some() && checker.semantic().current_scope().kind.is_class())
                 || checker
                     .semantic()
-                    .scope()
+                    .current_scope()
                     .get_all(id)
                     .any(|binding_id| checker.semantic().binding(binding_id).kind.is_annotation())
             {

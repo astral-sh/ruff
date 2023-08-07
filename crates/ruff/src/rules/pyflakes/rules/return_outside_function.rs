@@ -33,7 +33,7 @@ impl Violation for ReturnOutsideFunction {
 
 pub(crate) fn return_outside_function(checker: &mut Checker, stmt: &Stmt) {
     if matches!(
-        checker.semantic().scope().kind,
+        checker.semantic().current_scope().kind,
         ScopeKind::Class(_) | ScopeKind::Module
     ) {
         checker

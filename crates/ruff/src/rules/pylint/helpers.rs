@@ -23,7 +23,7 @@ pub(super) fn type_param_name(arguments: &Arguments) -> Option<&str> {
 }
 
 pub(super) fn in_dunder_init(semantic: &SemanticModel, settings: &Settings) -> bool {
-    let scope = semantic.scope();
+    let scope = semantic.current_scope();
     let (ScopeKind::Function(ast::StmtFunctionDef {
         name,
         decorator_list,

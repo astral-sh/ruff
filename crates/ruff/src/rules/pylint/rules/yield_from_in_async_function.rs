@@ -38,7 +38,7 @@ impl Violation for YieldFromInAsyncFunction {
 
 /// PLE1700
 pub(crate) fn yield_from_in_async_function(checker: &mut Checker, expr: &ExprYieldFrom) {
-    let scope = checker.semantic().scope();
+    let scope = checker.semantic().current_scope();
     if scope.kind.is_async_function() {
         checker
             .diagnostics
