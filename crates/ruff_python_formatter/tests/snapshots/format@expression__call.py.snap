@@ -223,7 +223,9 @@ f(
     # abc
 )
 
-f(1)  # abc
+f(  # abc
+    1
+)
 
 f(
     # abc
