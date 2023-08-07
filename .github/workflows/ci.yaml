@@ -42,7 +42,7 @@ jobs:
               - "!crates/ruff_formatter/**"
               - "!crates/ruff_dev/**"
               - "!crates/ruff_shrinking/**"
-              - scripts/check_ecosystem.py
+              - scripts/*
 
             formatter:
               - Cargo.toml
@@ -56,6 +56,7 @@ jobs:
               - crates/ruff_text_size/**
               - crates/ruff_python_parser/**
               - crates/ruff_dev/**
+              - scripts/*
 
   cargo-fmt:
     name: "cargo fmt"
