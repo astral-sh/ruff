@@ -18,6 +18,9 @@ use super::helpers;
 /// datetime objects. Since this can lead to errors, it is recommended to
 /// always use timezone-aware objects.
 ///
+/// `datetime.datetime.utcnow()` returns a naive datetime object; instead, use
+/// `datetime.datetime.now(tz=)` to return a timezone-aware object.
+///
 /// ## Example
 /// ```python
 /// import datetime
@@ -40,7 +43,7 @@ use super::helpers;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/datetime.html#aware-and-naive-objects)
+/// - [Python documentation: Aware and Naive Objects](https://docs.python.org/3/library/datetime.html#aware-and-naive-objects)
 #[violation]
 pub struct CallDatetimeUtcnow;
 
