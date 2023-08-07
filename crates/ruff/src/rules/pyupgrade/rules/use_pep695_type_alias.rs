@@ -1,4 +1,5 @@
 use ruff_python_ast::{
+    self as ast,
     visitor::{self, Visitor},
     Expr, ExprName, ExprSubscript, Identifier, Ranged, Stmt, StmtAnnAssign, StmtAssign,
     StmtTypeAlias, TypeParam, TypeParamTypeVar,
@@ -80,7 +81,7 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
     //              as type params instead
     let mut diagnostic = Diagnostic::new(NonPEP695TypeAlias { name: name.clone() }, stmt.range());
     if checker.patch(diagnostic.kind.rule()) {
-        let mut visitor = TypeVarNameVisitor {
+        let mut visitor = TypeVarReferenceVisitor {
             names: vec![],
             semantic: checker.semantic(),
         };
@@ -89,7 +90,7 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
         let type_params = if visitor.names.is_empty() {
             None
         } else {
-            Some(ruff_python_ast::TypeParams {
+            Some(ast::TypeParams {
                 range: TextRange::default(),
                 type_params: visitor
                     .names
@@ -118,19 +119,18 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
     checker.diagnostics.push(diagnostic);
 }
 
-struct TypeVarNameVisitor<'a> {
+struct TypeVarReferenceVisitor<'a> {
     names: Vec<&'a ExprName>,
     semantic: &'a SemanticModel<'a>,
 }
 
-impl<'a> Visitor<'a> for TypeVarNameVisitor<'a> {
+/// Recursively collects the names of type variable references present in an expression.
+impl<'a> Visitor<'a> for TypeVarReferenceVisitor<'a> {
     fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
             Expr::Name(name) if name.ctx.is_load() => {
                 let Some(Stmt::Assign(StmtAssign { value, .. })) =
-                    self.semantic
-                        .scope()
-                        .get(name.id.as_str())
+                    self.semantic.lookup_symbol(name.id.as_str())
                         .and_then(|binding_id| {
                             self.semantic
                                 .binding(binding_id)
