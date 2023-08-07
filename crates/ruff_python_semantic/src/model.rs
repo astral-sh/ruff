@@ -1113,7 +1113,7 @@ impl<'a> SemanticModel<'a> {
         exceptions
     }
 
-    /// Generate a [`Snapshot`] of the current model.
+    /// Generate a [`Snapshot`] of the current semantic model.
     pub fn snapshot(&self) -> Snapshot {
         Snapshot {
             scope_id: self.scope_id,
@@ -1124,7 +1124,7 @@ impl<'a> SemanticModel<'a> {
         }
     }
 
-    /// Restore the model to the given [`Snapshot`].
+    /// Restore the semantic model to the given [`Snapshot`].
     pub fn restore(&mut self, snapshot: Snapshot) {
         let Snapshot {
             scope_id,

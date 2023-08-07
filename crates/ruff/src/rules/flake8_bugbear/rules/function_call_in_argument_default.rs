@@ -67,9 +67,9 @@ struct ArgumentDefaultVisitor<'a> {
 }
 
 impl<'a> ArgumentDefaultVisitor<'a> {
-    fn new(model: &'a SemanticModel<'a>, extend_immutable_calls: Vec<CallPath<'a>>) -> Self {
+    fn new(semantic: &'a SemanticModel<'a>, extend_immutable_calls: Vec<CallPath<'a>>) -> Self {
         Self {
-            semantic: model,
+            semantic,
             extend_immutable_calls,
             diagnostics: Vec::new(),
         }

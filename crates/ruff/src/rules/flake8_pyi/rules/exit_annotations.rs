@@ -242,11 +242,11 @@ fn check_positional_args(
 /// Return the non-`None` annotation element of a PEP 604-style union or `Optional` annotation.
 fn non_none_annotation_element<'a>(
     annotation: &'a Expr,
-    model: &SemanticModel,
+    semantic: &SemanticModel,
 ) -> Option<&'a Expr> {
     // E.g., `typing.Union` or `typing.Optional`
     if let Expr::Subscript(ExprSubscript { value, slice, .. }) = annotation {
-        if model.match_typing_expr(value, "Optional") {
+        if semantic.match_typing_expr(value, "Optional") {
             return if is_const_none(slice) {
                 None
             } else {
@@ -254,7 +254,7 @@ fn non_none_annotation_element<'a>(
             };
         }
 
-        if !model.match_typing_expr(value, "Union") {
+        if !semantic.match_typing_expr(value, "Union") {
             return None;
         }
 
@@ -297,8 +297,8 @@ fn non_none_annotation_element<'a>(
 }
 
 /// Return `true` if the [`Expr`] is the `object` builtin or the `_typeshed.Unused` type.
-fn is_object_or_unused(expr: &Expr, model: &SemanticModel) -> bool {
-    model
+fn is_object_or_unused(expr: &Expr, semantic: &SemanticModel) -> bool {
+    semantic
         .resolve_call_path(expr)
         .as_ref()
         .is_some_and(|call_path| {
@@ -310,34 +310,34 @@ fn is_object_or_unused(expr: &Expr, model: &SemanticModel) -> bool {
 }
 
 /// Return `true` if the [`Expr`] is `BaseException`.
-fn is_base_exception(expr: &Expr, model: &SemanticModel) -> bool {
-    model
+fn is_base_exception(expr: &Expr, semantic: &SemanticModel) -> bool {
+    semantic
         .resolve_call_path(expr)
         .as_ref()
         .is_some_and(|call_path| matches!(call_path.as_slice(), ["" | "builtins", "BaseException"]))
 }
 
 /// Return `true` if the [`Expr`] is the `types.TracebackType` type.
-fn is_traceback_type(expr: &Expr, model: &SemanticModel) -> bool {
-    model
+fn is_traceback_type(expr: &Expr, semantic: &SemanticModel) -> bool {
+    semantic
         .resolve_call_path(expr)
         .as_ref()
         .is_some_and(|call_path| matches!(call_path.as_slice(), ["types", "TracebackType"]))
 }
 
 /// Return `true` if the [`Expr`] is, e.g., `Type[BaseException]`.
-fn is_base_exception_type(expr: &Expr, model: &SemanticModel) -> bool {
+fn is_base_exception_type(expr: &Expr, semantic: &SemanticModel) -> bool {
     let Expr::Subscript(ExprSubscript { value, slice, .. }) = expr else {
         return false;
     };
 
-    if model.match_typing_expr(value, "Type")
-        || model
+    if semantic.match_typing_expr(value, "Type")
+        || semantic
             .resolve_call_path(value)
             .as_ref()
             .is_some_and(|call_path| matches!(call_path.as_slice(), ["" | "builtins", "type"]))
     {
-        is_base_exception(slice, model)
+        is_base_exception(slice, semantic)
     } else {
         false
     }

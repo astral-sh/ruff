@@ -116,11 +116,11 @@ const OPEN_FUNC_NAME: &str = "open";
 const MODE_KEYWORD_ARGUMENT: &str = "mode";
 
 /// Returns `true` if the given `call` is a call to the `open` builtin.
-fn is_open_builtin(func: &Expr, model: &SemanticModel) -> bool {
+fn is_open_builtin(func: &Expr, semantic: &SemanticModel) -> bool {
     let Some(ast::ExprName { id, .. }) = func.as_name_expr() else {
         return false;
     };
-    id.as_str() == OPEN_FUNC_NAME && model.is_builtin(id)
+    id.as_str() == OPEN_FUNC_NAME && semantic.is_builtin(id)
 }
 
 #[derive(Debug, Copy, Clone)]

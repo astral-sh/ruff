@@ -176,13 +176,12 @@ impl<'a> Checker<'a> {
     ///
     /// If the current expression in the context is not an f-string, returns ``None``.
     pub(crate) fn f_string_quote_style(&self) -> Option<Quote> {
-        let model = &self.semantic;
-        if !model.in_f_string() {
+        if !self.semantic.in_f_string() {
             return None;
         }
 
         // Find the quote character used to start the containing f-string.
-        let expr = model.current_expression()?;
+        let expr = self.semantic.current_expression()?;
         let string_range = self.indexer.f_string_range(expr.start())?;
         let trailing_quote = trailing_quote(self.locator.slice(string_range))?;
 
