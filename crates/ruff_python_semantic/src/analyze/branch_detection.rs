@@ -1,4 +1,3 @@
-use std::cmp::Ordering;
 use std::iter;
 
 use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
@@ -12,32 +11,19 @@ fn common_ancestor(
     stop: Option<StatementId>,
     node_tree: &Statements,
 ) -> Option<StatementId> {
-    if stop.is_some_and(|stop| left == stop || right == stop) {
-        return None;
-    }
-
+    // Fast path: if the nodes are the same, they are their own common ancestor.
     if left == right {
         return Some(left);
     }
 
-    let left_depth = node_tree.depth(left);
-    let right_depth = node_tree.depth(right);
+    // Grab all the ancestors of `right`.
+    let candidates = node_tree.ancestor_ids(right).collect::<Vec<_>>();
 
-    match left_depth.cmp(&right_depth) {
-        Ordering::Less => {
-            let right = node_tree.parent_id(right)?;
-            common_ancestor(left, right, stop, node_tree)
-        }
-        Ordering::Equal => {
-            let left = node_tree.parent_id(left)?;
-            let right = node_tree.parent_id(right)?;
-            common_ancestor(left, right, stop, node_tree)
-        }
-        Ordering::Greater => {
-            let left = node_tree.parent_id(left)?;
-            common_ancestor(left, right, stop, node_tree)
-        }
-    }
+    // Find the first ancestor of `left` that is also an ancestor of `right`.
+    node_tree
+        .ancestor_ids(left)
+        .take_while(|id| stop != Some(*id))
+        .find(|id| candidates.contains(id))
 }
 
 /// Return the alternative branches for a given node.

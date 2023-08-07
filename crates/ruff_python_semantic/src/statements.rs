@@ -22,8 +22,6 @@ struct StatementWithParent<'a> {
     statement: &'a Stmt,
     /// The ID of the parent of this node, if any.
     parent: Option<StatementId>,
-    /// The depth of this node in the tree.
-    depth: u32,
 }
 
 /// The statements of a program indexed by [`StatementId`]
@@ -46,11 +44,8 @@ impl<'a> Statements<'a> {
         if let Some(existing_id) = self.statement_to_id.insert(RefEquality(statement), next_id) {
             panic!("Statements already exists with ID: {existing_id:?}");
         }
-        self.statements.push(StatementWithParent {
-            statement,
-            parent,
-            depth: parent.map_or(0, |parent| self.statements[parent].depth + 1),
-        })
+        self.statements
+            .push(StatementWithParent { statement, parent })
     }
 
     /// Returns the [`StatementId`] of the given statement.
@@ -63,12 +58,6 @@ impl<'a> Statements<'a> {
     #[inline]
     pub fn parent_id(&self, statement_id: StatementId) -> Option<StatementId> {
         self.statements[statement_id].parent
-    }
-
-    /// Return the depth of the statement.
-    #[inline]
-    pub(crate) fn depth(&self, id: StatementId) -> u32 {
-        self.statements[id].depth
     }
 
     /// Returns an iterator over all [`StatementId`] ancestors, starting from the given [`StatementId`].
