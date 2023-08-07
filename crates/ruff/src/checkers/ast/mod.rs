@@ -1696,11 +1696,7 @@ impl<'a> Checker<'a> {
             return;
         }
 
-        if self
-            .semantic
-            .expr_ancestors()
-            .any(|expr| expr.is_named_expr_expr())
-        {
+        if self.semantic.expr_ancestors().any(Expr::is_named_expr_expr) {
             self.add_binding(
                 id,
                 expr.range(),

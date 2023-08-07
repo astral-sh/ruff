@@ -84,14 +84,9 @@ pub(crate) fn inplace_argument(checker: &mut Checker, call: &ast::ExprCall) {
                     //    the star argument _doesn't_ contain an override).
                     // 2. The call is part of a larger expression (we're converting an expression to a
                     //    statement, and expressions can't contain statements).
-                    // 3. The call is in a lambda (we can't assign to a variable in a lambda). This
-                    //    should be unnecessary, as lambdas are expressions, and so (2) should apply,
-                    //    but we don't currently restore expression stacks when parsing deferred nodes,
-                    //    and so the parent is lost.
                     if !seen_star
                         && checker.semantic().stmt().is_expr_stmt()
                         && checker.semantic().expr_parent().is_none()
-                        && !checker.semantic().scope().kind.is_lambda()
                     {
                         if let Some(fix) = convert_inplace_argument_to_assignment(
                             call,
