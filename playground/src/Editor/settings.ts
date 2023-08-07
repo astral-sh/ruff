@@ -1,4 +1,5 @@
-import lzstring from "lz-string";
+import { v4 as uuidv4 } from "uuid";
+import { get, set } from "./db";
 
 export type Settings = { [K: string]: any };
 
@@ -22,29 +23,33 @@ export function stringify(settings: Settings): string {
 /**
  * Persist the configuration to a URL.
  */
-export async function persist(settingsSource: string, pythonSource: string) {
-  const hash = lzstring.compressToEncodedURIComponent(
-    settingsSource.replaceAll("$$$", "$$$$$$") + "$$$" + pythonSource,
-  );
-  await navigator.clipboard.writeText(
-    window.location.href.split("#")[0] + "#" + hash,
-  );
+export async function persist(
+  settingsSource: string,
+  pythonSource: string,
+): Promise<void> {
+  const id = uuidv4();
+  await set(id, { settingsSource, pythonSource });
+  await navigator.clipboard.writeText(`${window.location.origin}/${id}`);
 }
 
 /**
  * Restore the configuration from a URL.
  */
-export function restore(): [string, string] | null {
-  const value = lzstring.decompressFromEncodedURIComponent(
-    window.location.hash.slice(1),
-  );
-
-  if (value == null) {
+export async function restore(): Promise<[string, string] | null> {
+  const id = window.location.pathname.slice(1);
+  if (!id) {
     return restoreLocal();
-  } else {
-    const [settingsSource, pythonSource] = value.split("$$$");
-    return [settingsSource.replaceAll("$$$$$$", "$$$"), pythonSource];
   }
+
+  const response = await get<{
+    settingsSource: string;
+    pythonSource: string;
+  }>(id);
+  if (response == null) {
+    return null;
+  }
+  const { settingsSource, pythonSource } = response;
+  return [settingsSource, pythonSource];
 }
 
 function restoreLocal(): [string, string] | null {
