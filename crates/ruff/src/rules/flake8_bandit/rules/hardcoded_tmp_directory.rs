@@ -1,4 +1,4 @@
-use ruff_python_ast::{Expr, Ranged};
+use ruff_python_ast::{self as ast, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -56,20 +56,16 @@ pub(crate) fn hardcoded_tmp_directory(
     expr: &Expr,
     value: &str,
 ) -> Option<Diagnostic> {
-    if checker
-        .semantic()
-        .current_expression_parent()
-        .is_some_and(|expr| {
-            let Some(call) = expr.as_call_expr() else {
-                return false;
-            };
-            checker
-                .semantic()
-                .resolve_call_path(&call.func)
-                .is_some_and(|call_path| call_path.as_slice().starts_with(&["tempfile"]))
-        })
+    if let Some(Expr::Call(ast::ExprCall { func, .. })) =
+        checker.semantic().current_expression_parent()
     {
-        return None;
+        if checker
+            .semantic()
+            .resolve_call_path(func)
+            .is_some_and(|call_path| call_path.as_slice().starts_with(&["tempfile"]))
+        {
+            return None;
+        }
     }
 
     if checker
