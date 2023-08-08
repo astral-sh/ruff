@@ -1,15 +1,15 @@
 use std::borrow::Cow;
 
 use bitflags::bitflags;
+
+use ruff_formatter::{format_args, write, FormatError};
 use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::str::is_implicit_concatenation;
 use ruff_python_ast::{self as ast, ExprConstant, ExprFString, Ranged};
 use ruff_python_parser::lexer::{lex_starts_at, LexicalError, LexicalErrorType};
 use ruff_python_parser::{Mode, Tok};
 use ruff_source_file::Locator;
 use ruff_text_size::{TextLen, TextRange, TextSize};
-
-use ruff_formatter::{format_args, write, FormatError};
-use ruff_python_ast::str::is_implicit_concatenation;
 
 use crate::comments::{leading_comments, trailing_comments};
 use crate::expression::parentheses::{
@@ -78,7 +78,7 @@ pub(super) struct FormatString<'a> {
 pub enum StringLayout {
     #[default]
     Default,
-
+    DocString,
     ImplicitConcatenatedBinaryLeftSide,
 }
 
@@ -109,10 +109,16 @@ impl<'a> Format<PyFormatContext<'_>> for FormatString<'a> {
                 if is_implicit_concatenation(string_content) {
                     in_parentheses_only_group(&FormatStringContinuation::new(self.string)).fmt(f)
                 } else {
-                    FormatStringPart::new(string_range, self.string.quoting(&f.context().locator()))
-                        .fmt(f)
+                    FormatStringPart::new(
+                        string_range,
+                        self.string.quoting(&f.context().locator()),
+                        &f.context().locator(),
+                        f.options().quote_style(),
+                    )
+                    .fmt(f)
                 }
             }
+            StringLayout::DocString => format_docstring(self.string.range(), f),
             StringLayout::ImplicitConcatenatedBinaryLeftSide => {
                 FormatStringContinuation::new(self.string).fmt(f)
             }
@@ -137,6 +143,7 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let comments = f.context().comments().clone();
         let locator = f.context().locator();
+        let quote_style = f.options().quote_style();
         let mut dangling_comments = comments.dangling_comments(self.string);
 
         let string_range = self.string.range();
@@ -213,7 +220,12 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
                     joiner.entry(&format_args![
                         line_suffix_boundary(),
                         leading_comments(leading_part_comments),
-                        FormatStringPart::new(token_range, self.string.quoting(&locator)),
+                        FormatStringPart::new(
+                            token_range,
+                            self.string.quoting(&locator),
+                            &locator,
+                            quote_style,
+                        ),
                         trailing_comments(trailing_part_comments)
                     ]);
 
@@ -235,63 +247,67 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
 }
 
 struct FormatStringPart {
-    part_range: TextRange,
-    quoting: Quoting,
+    prefix: StringPrefix,
+    preferred_quotes: StringQuotes,
+    range: TextRange,
+    is_raw_string: bool,
 }
 
 impl FormatStringPart {
-    const fn new(range: TextRange, quoting: Quoting) -> Self {
+    fn new(range: TextRange, quoting: Quoting, locator: &Locator, quote_style: QuoteStyle) -> Self {
+        let string_content = locator.slice(range);
+
+        let prefix = StringPrefix::parse(string_content);
+        let after_prefix = &string_content[usize::from(prefix.text_len())..];
+
+        let quotes =
+            StringQuotes::parse(after_prefix).expect("Didn't find string quotes after prefix");
+        let relative_raw_content_range = TextRange::new(
+            prefix.text_len() + quotes.text_len(),
+            string_content.text_len() - quotes.text_len(),
+        );
+        let raw_content_range = relative_raw_content_range + range.start();
+
+        let raw_content = &string_content[relative_raw_content_range];
+        let is_raw_string = prefix.is_raw_string();
+        let preferred_quotes = match quoting {
+            Quoting::Preserve => quotes,
+            Quoting::CanChange => {
+                if is_raw_string {
+                    preferred_quotes_raw(raw_content, quotes, quote_style)
+                } else {
+                    preferred_quotes(raw_content, quotes, quote_style)
+                }
+            }
+        };
+
         Self {
-            part_range: range,
-            quoting,
+            prefix,
+            range: raw_content_range,
+            preferred_quotes,
+            is_raw_string,
         }
     }
 }
 
 impl Format<PyFormatContext<'_>> for FormatStringPart {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let string_content = f.context().locator().slice(self.part_range);
-
-        let prefix = StringPrefix::parse(string_content);
-        let after_prefix = &string_content[usize::from(prefix.text_len())..];
-
-        let quotes = StringQuotes::parse(after_prefix).ok_or(FormatError::syntax_error(
-            "Didn't find string quotes after prefix",
-        ))?;
-        let relative_raw_content_range = TextRange::new(
-            prefix.text_len() + quotes.text_len(),
-            string_content.text_len() - quotes.text_len(),
+        let (normalized, contains_newlines) = normalize_string(
+            f.context().locator().slice(self.range),
+            self.preferred_quotes,
+            self.is_raw_string,
         );
-        let raw_content_range = relative_raw_content_range + self.part_range.start();
 
-        let raw_content = &string_content[relative_raw_content_range];
-        let is_raw_string = prefix.is_raw_string();
-        let preferred_quotes = match self.quoting {
-            Quoting::Preserve => quotes,
-            Quoting::CanChange => {
-                if is_raw_string {
-                    preferred_quotes_raw(raw_content, quotes, f.options().quote_style())
-                } else {
-                    preferred_quotes(raw_content, quotes, f.options().quote_style())
-                }
-            }
-        };
-
-        write!(f, [prefix, preferred_quotes])?;
-
-        let (normalized, contains_newlines) =
-            normalize_string(raw_content, preferred_quotes, is_raw_string);
-
+        write!(f, [self.prefix, self.preferred_quotes])?;
         match normalized {
             Cow::Borrowed(_) => {
-                source_text_slice(raw_content_range, contains_newlines).fmt(f)?;
+                source_text_slice(self.range, contains_newlines).fmt(f)?;
             }
             Cow::Owned(normalized) => {
-                dynamic_text(&normalized, Some(raw_content_range.start())).fmt(f)?;
+                dynamic_text(&normalized, Some(self.range.start())).fmt(f)?;
             }
         }
-
-        preferred_quotes.fmt(f)
+        self.preferred_quotes.fmt(f)
     }
 }
 
@@ -638,4 +654,298 @@ fn normalize_string(
     };
 
     (normalized, newlines)
+}
+
+/// After the main indentation, docstring indentation in black is counted by padding tabs to the
+/// next multiple of 8. This is effectively a port of `str.expandtabs`, which black calls.
+fn count_indentation_like_black(line: &str) -> TextSize {
+    let tab_width: u32 = 8;
+    let mut indentation = TextSize::default();
+    for char in line.chars() {
+        if char == '\t' {
+            // Pad to the next multiple of tab_width
+            indentation += TextSize::from(tab_width - (indentation.to_u32().rem_euclid(tab_width)));
+        } else if char.is_whitespace() {
+            indentation += char.text_len();
+        } else {
+            return indentation;
+        }
+    }
+    indentation
+}
+
+/// Format a docstring, for which we change the indentation after normalizing the string.
+///
+/// # Docstring indentation
+///
+/// Unlike any other string, both we and black change the indentation
+/// of docstring lines. We want to preserve the indentation inside the docstring relative to
+/// the suite statement/block indent that the docstring statement is in, but also want to
+/// apply the change of the outer indentation in the docstring, e.g.
+/// ```python
+/// def sparkle_sky():
+///   """Make a pretty sky.
+///   *       * ✨        *.    .
+///      *       *      ✨      .
+///      .  *      . ✨    * .  .
+///   """
+/// ```
+/// should become
+/// ```python
+/// def sparkle_sky():
+///     """Make a pretty sky.
+///     *       * ✨        *.    .
+///        *       *      ✨      .
+///        .  *      . ✨    * .  .
+///     """
+/// ```
+/// We can't compute the full indentation here since we don't know what the block indent of
+/// the doc comment will be yet and which we can only have added by formatting each line
+/// separately with a hard line break. This means we need to strip shared indentation from
+/// docstring, but also preserve the in-docstring after-suite-statement indentation.
+/// ```python
+/// def f():
+///  """first line
+///  line a
+///     line b
+///  """
+/// ```
+/// The docstring indentation is 2, the block indents will change this to 4 (but we can't
+/// determine this at this point). The indentation of line a is 2, so we trim `  line a`
+/// to `line a`. For line b it's 5, so we trim it to `line b` and pad with 5-2=3 spaces to
+/// `   line b`. The closing quotes, being on their own line, are stripped get only the
+/// default indentation. Fully formatted:
+/// ```python
+/// def f():
+///    """first line
+///    line a
+///       line b
+///    """
+/// ```
+///
+/// Tabs are counted by padding them to the next multiple of 8 according to black's
+/// algorithm. Whenever we see indentation that contains a tab or any other none
+/// ascii-space whitespace we rewrite the string (even if it's only for the
+/// indentation to avoid the complexity).
+///
+/// Additionally, if any line in the docstring has less indentation than the docstring
+/// (effectively a negative indentation wrt to the current level), we pad all lines to the
+/// level of the docstring with spaces.
+/// ```python
+/// def f():
+///    """first line
+/// line a
+///    line b
+///      line c
+///    """
+/// ```
+/// Here line a is 3 columns negatively indented, so we pad all lines by an extra 3 spaces:
+/// ```python
+/// def f():
+///    """first line
+///    line a
+///       line b
+///         line c
+///    """
+/// ```
+pub(crate) fn format_docstring(
+    // The start of the string prefix to after the closing quotes
+    outer_range: TextRange,
+    f: &mut PyFormatter,
+) -> FormatResult<()> {
+    let locator = f.context().locator();
+    let string_part = FormatStringPart::new(
+        outer_range,
+        // It's not an f-string
+        Quoting::CanChange,
+        &locator,
+        f.options().quote_style(),
+    );
+
+    let (normalized, contains_newlines) = normalize_string(
+        locator.slice(string_part.range),
+        string_part.preferred_quotes,
+        string_part.is_raw_string,
+    );
+
+    // Black doesn't change the indentation of docstring that contain an escaped newline
+    if normalized.contains("\\\n") {
+        write!(f, [string_part.prefix, string_part.preferred_quotes])?;
+        match normalized {
+            Cow::Borrowed(_) => {
+                source_text_slice(string_part.range, contains_newlines).fmt(f)?;
+            }
+            Cow::Owned(normalized) => {
+                dynamic_text(&normalized, Some(string_part.range.start())).fmt(f)?;
+            }
+        }
+        string_part.preferred_quotes.fmt(f)?;
+        return Ok(());
+    }
+
+    let mut lines = normalized.lines().peekable();
+
+    // Start the string
+    write!(f, [string_part.prefix, string_part.preferred_quotes])?;
+    // We track where in the source docstring we are (in source code byte offsets)
+    let mut offset = string_part.range.start();
+
+    // The first line directly after the opening quotes have different rules than the rest, mainly
+    // that we remove leading whitespace as there's no indentation
+    let first = lines.next().unwrap_or_default();
+    let trim_end = first.trim_end();
+
+    // Edge case: The first line is `""" "content`, so we need to insert chaperone whitespace to
+    // avoid `""""content`
+    if trim_end
+        .trim_start()
+        .starts_with(string_part.preferred_quotes.style.as_char())
+    {
+        space().fmt(f)?;
+    }
+
+    if !trim_end.is_empty() {
+        // For the first line of the docstring we strip the leading and trailing whitespace, e.g.
+        // `"""   content   ` to `"""content`
+        let leading_whitespace = trim_end.text_len() - trim_end.trim_start().text_len();
+        let trimmed_line_range =
+            TextRange::at(offset, trim_end.text_len()).add_start(leading_whitespace);
+        match normalized {
+            Cow::Borrowed(_) => {
+                source_text_slice(trimmed_line_range, ContainsNewlines::No).fmt(f)?;
+            }
+            Cow::Owned(_) => {
+                dynamic_text(trim_end.trim_start(), Some(trimmed_line_range.start())).fmt(f)?;
+            }
+        }
+    }
+    offset += first.text_len();
+
+    // Check if we have a single line (or empty) docstring
+    if normalized[first.len()..].trim().is_empty() {
+        // * The last line is `content" """` so we need a chaperone whitespace to avoid
+        //   `content""""`.
+        // * The last line is `content\ """` so we need a chaperone whitespace to avoid
+        //   `content\"""`. Note that `content\\ """` doesn't need one while `content\\\ """` does.
+        // * For `"""\n"""` or other whitespace between the quotes, black keeps a single whitespace,
+        //   but `""""""` doesn't get one inserted.
+        if trim_end.ends_with(string_part.preferred_quotes.style.as_char())
+            || trim_end.chars().rev().take_while(|c| *c == '\\').count() % 2 == 1
+            || (trim_end.is_empty() && !normalized.is_empty())
+        {
+            space().fmt(f)?;
+        }
+        string_part.preferred_quotes.fmt(f)?;
+        return Ok(());
+    }
+
+    hard_line_break().fmt(f)?;
+    // We know that the normalized string has \n line endings
+    offset += "\n".text_len();
+
+    // If some line of the docstring is less indented than the function body, we pad all lines to
+    // align it with the docstring statement. Conversely, if all lines are over-indented, we strip
+    // the extra indentation. We call this stripped indentation since it's relative to the block
+    // indent printer-made indentation
+    let stripped_indentation = lines
+        .clone()
+        // We don't want to count whitespace-only lines as mis-indented
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| count_indentation_like_black(line))
+        .min()
+        .unwrap_or_default();
+
+    while let Some(line) = lines.next() {
+        let is_last = lines.peek().is_none();
+        format_docstring_line(
+            line,
+            is_last,
+            offset,
+            stripped_indentation,
+            &string_part,
+            &normalized,
+            f,
+        )?;
+        // We know that the normalized string has \n line endings
+        offset += line.text_len() + "\n".text_len();
+    }
+
+    write!(f, [string_part.preferred_quotes])
+}
+
+fn format_docstring_line(
+    line: &str,
+    is_last: bool,
+    offset: TextSize,
+    stripped_indentation: TextSize,
+    string_part: &FormatStringPart,
+    normalized: &Cow<str>,
+    f: &mut PyFormatter,
+) -> FormatResult<()> {
+    let trim_end = line.trim_end();
+    if trim_end.is_empty() {
+        // We know that the normalized string has \n line endings
+        if !is_last {
+            // If the doc string ends with `    """`, the last line is `    `, but we don't want to
+            // insert an empty line (but close the docstring)
+            empty_line().fmt(f)?;
+        }
+        return Ok(());
+    }
+    let tab_or_non_ascii_space = trim_end
+        .chars()
+        .take_while(|c| c.is_whitespace())
+        .any(|c| c != ' ');
+    if tab_or_non_ascii_space {
+        // We strip the indentation that is shared with the docstring statement, unless a line
+        // was indented less than the docstring statement, in which we strip only this much
+        // indentation to implicitly pad all lines by the difference (see example above). After
+        // that we add the in-docstring indentation that is independent of the general block
+        // indent of the suite statement we are in and that indents the docstring statement.
+        let indent_len = count_indentation_like_black(trim_end) - stripped_indentation;
+        let in_docstring_indent = " ".repeat(indent_len.to_usize()) + &trim_end.trim_start();
+        dynamic_text(&in_docstring_indent, Some(offset)).fmt(f)?;
+    } else {
+        let trimmed_line_range =
+            TextRange::at(offset, trim_end.text_len()).add_start(stripped_indentation);
+        match normalized {
+            Cow::Borrowed(_) => {
+                source_text_slice(trimmed_line_range, ContainsNewlines::No).fmt(f)?;
+            }
+            Cow::Owned(_) => {
+                // All indents are ascii spaces, so the slicing is correct
+                dynamic_text(
+                    &trim_end[stripped_indentation.to_usize()..],
+                    Some(trimmed_line_range.start()),
+                )
+                .fmt(f)?;
+            }
+        }
+    }
+
+    // We handled the case that the closing quotes are on their own line above. If they are on
+    // the same line as content, we don't insert a line break.
+    if !is_last {
+        hard_line_break().fmt(f)?;
+    } else if trim_end.ends_with(string_part.preferred_quotes.style.as_char())
+        || trim_end.chars().rev().take_while(|c| *c == '\\').count() % 2 == 1
+    {
+        // Same special case in the last line as for the first line
+        space().fmt(f)?;
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::expression::string::count_indentation_like_black;
+
+    #[test]
+    fn test_indentation_like_black() {
+        assert_eq!(count_indentation_like_black("\t \t  \t").to_u32(), 24);
+        assert_eq!(count_indentation_like_black("\t        \t").to_u32(), 24);
+        assert_eq!(count_indentation_like_black("\t\t\t").to_u32(), 24);
+        assert_eq!(count_indentation_like_black("    ").to_u32(), 4);
+    }
 }

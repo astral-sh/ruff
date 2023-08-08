@@ -82,6 +82,17 @@ impl IndentStyle {
     pub const fn is_space(&self) -> bool {
         matches!(self, IndentStyle::Space(_))
     }
+
+    /// Returns `true` if this is an [IndentStyle::Space].
+    pub const fn indentation_length(&self) -> u8 {
+        match self {
+            IndentStyle::Tab => {
+                // TODO(konstin): Is that the right choice?
+                4
+            }
+            IndentStyle::Space(spaces) => *spaces,
+        }
+    }
 }
 
 impl FromStr for IndentStyle {

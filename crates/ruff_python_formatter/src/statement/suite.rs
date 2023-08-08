@@ -1,9 +1,13 @@
 use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
 use ruff_python_ast::helpers::is_compound_statement;
-use ruff_python_ast::{self as ast, Constant, Expr, Ranged, Stmt, Suite};
+use ruff_python_ast::{self as ast, Expr, Ranged, Stmt, Suite};
+use ruff_python_ast::{Constant, ExprConstant};
 use ruff_python_trivia::{lines_after_ignoring_trivia, lines_before};
 
+use crate::comments::{leading_comments, trailing_comments};
 use crate::context::{NodeLevel, WithNodeLevel};
+use crate::expression::expr_constant::ExprConstantLayout;
+use crate::expression::string::StringLayout;
 use crate::prelude::*;
 
 /// Level at which the [`Suite`] appears in the source code.
@@ -71,44 +75,76 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 }
                 write!(f, [first.format()])?;
             }
-            SuiteKind::Class if is_docstring(first) => {
-                if !comments.has_leading_comments(first) && lines_before(first.start(), source) > 1
-                {
-                    // Allow up to one empty line before a class docstring, e.g., this is
-                    // stable formatting:
+            SuiteKind::Function => {
+                if let Some(constant) = get_docstring(first) {
+                    write!(
+                        f,
+                        [
+                            leading_comments(comments.leading_comments(first)),
+                            constant
+                                .format()
+                                .with_options(ExprConstantLayout::String(StringLayout::DocString)),
+                            trailing_comments(comments.trailing_comments(first)),
+                        ]
+                    )?;
+                } else {
+                    write!(f, [first.format()])?;
+                }
+            }
+            SuiteKind::Class => {
+                if let Some(constant) = get_docstring(first) {
+                    if !comments.has_leading_comments(first)
+                        && lines_before(first.start(), source) > 1
+                    {
+                        // Allow up to one empty line before a class docstring, e.g., this is
+                        // stable formatting:
+                        // ```python
+                        // class Test:
+                        //
+                        //     """Docstring"""
+                        // ```
+                        write!(f, [empty_line()])?;
+                    }
+                    write!(
+                        f,
+                        [
+                            leading_comments(comments.leading_comments(first)),
+                            constant
+                                .format()
+                                .with_options(ExprConstantLayout::String(StringLayout::DocString)),
+                            trailing_comments(comments.trailing_comments(first)),
+                        ]
+                    )?;
+
+                    // Enforce an empty line after a class docstring, e.g., these are both stable
+                    // formatting:
                     // ```python
+                    // class Test:
+                    //     """Docstring"""
+                    //
+                    //     ...
+                    //
+                    //
                     // class Test:
                     //
                     //     """Docstring"""
+                    //
+                    //     ...
                     // ```
-                    write!(f, [empty_line()])?;
-                }
-                write!(f, [first.format()])?;
+                    if let Some(second) = iter.next() {
+                        // Format the subsequent statement immediately. This rule takes precedence
+                        // over the rules in the loop below (and most of them won't apply anyway,
+                        // e.g., we know the first statement isn't an import).
+                        write!(f, [empty_line(), second.format()])?;
+                        last = second;
+                    }
+                } else {
+                    // No docstring, use normal formatting
 
-                // Enforce an empty line after a class docstring, e.g., these are both stable
-                // formatting:
-                // ```python
-                // class Test:
-                //     """Docstring"""
-                //
-                //     ...
-                //
-                //
-                // class Test:
-                //
-                //     """Docstring"""
-                //
-                //     ...
-                // ```
-                if let Some(second) = iter.next() {
-                    // Format the subsequent statement immediately. This rule takes precedence
-                    // over the rules in the loop below (and most of them won't apply anyway,
-                    // e.g., we know the first statement isn't an import).
-                    write!(f, [empty_line(), second.format()])?;
-                    last = second;
+                    write!(f, [first.format()])?;
                 }
             }
-            _ => {
+            SuiteKind::TopLevel => {
                 write!(f, [first.format()])?;
             }
         }
@@ -218,18 +254,25 @@ const fn is_import_definition(stmt: &Stmt) -> bool {
     matches!(stmt, Stmt::Import(_) | Stmt::ImportFrom(_))
 }
 
-fn is_docstring(stmt: &Stmt) -> bool {
+fn get_docstring(stmt: &Stmt) -> Option<&ExprConstant> {
     let Stmt::Expr(ast::StmtExpr { value, .. }) = stmt else {
-        return false;
+        return None;
     };
 
-    matches!(
-        value.as_ref(),
-        Expr::Constant(ast::ExprConstant {
+    let Expr::Constant(constant) = value.as_ref()
+        else {
+            return None;
+        };
+    if matches!(
+        constant,
+        ast::ExprConstant {
             value: Constant::Str(..),
             ..
-        })
-    )
+        }
+    ) {
+        return Some(constant);
+    }
+    None
 }
 
 impl FormatRuleWithOptions<Suite, PyFormatContext<'_>> for FormatSuite {
@@ -260,7 +303,6 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Suite {
 #[cfg(test)]
 mod tests {
     use ruff_formatter::format;
-
     use ruff_python_parser::parse_suite;
 
     use crate::comments::Comments;
