@@ -42,7 +42,7 @@ jobs:
               - "!crates/ruff_formatter/**"
               - "!crates/ruff_dev/**"
               - "!crates/ruff_shrinking/**"
-              - scripts/check_ecosystem.py
+              - scripts/*
 
             formatter:
               - Cargo.toml
@@ -56,6 +56,7 @@ jobs:
               - crates/ruff_text_size/**
               - crates/ruff_python_parser/**
               - crates/ruff_dev/**
+              - scripts/*
 
   cargo-fmt:
     name: "cargo fmt"
@@ -338,8 +339,5 @@ jobs:
         run: scripts/formatter_ecosystem_checks.sh
       - name: "Github step summary"
         run: grep "similarity index" target/progress_projects_log.txt | sort > $GITHUB_STEP_SUMMARY
-      # CPython is not black formatted, so we run only the stability check
-      - name: "Clone CPython 3.10"
-        run: git clone --branch 3.10 --depth 1 https://github.com/python/cpython.git crates/ruff/resources/test/cpython
-      - name: "Check CPython stability"
-        run: cargo run --bin ruff_dev -- format-dev --stability-check crates/ruff/resources/test/cpython
+      - name: "Remove checkouts from cache"
+        run: rm -r target/progress_projects
