@@ -90,7 +90,11 @@ match (  # hello
         pass
 
 
-match [first, second, third]:  # comment  # another comment
+match [  # comment
+    first,
+    second,
+    third,
+]:  # another comment
     case NOT_YET_IMPLEMENTED_Pattern:
         pass
 
