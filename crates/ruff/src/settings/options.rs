@@ -318,7 +318,7 @@ pub struct Options {
         default = "4",
         value_type = "int",
         example = r#"
-            tab_size = 8
+            tab-size = 8
         "#
     )]
     /// The tabulation size to calculate line length.
