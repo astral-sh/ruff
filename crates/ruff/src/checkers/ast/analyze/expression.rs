@@ -1229,11 +1229,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 }
             }
             if checker.enabled(Rule::HardcodedTempFile) {
-                if let Some(diagnostic) = flake8_bandit::rules::hardcoded_tmp_directory(
-                    expr,
-                    value,
-                    &checker.settings.flake8_bandit.hardcoded_tmp_directory,
-                ) {
+                if let Some(diagnostic) =
+                    flake8_bandit::rules::hardcoded_tmp_directory(checker, expr, value)
+                {
                     checker.diagnostics.push(diagnostic);
                 }
             }
