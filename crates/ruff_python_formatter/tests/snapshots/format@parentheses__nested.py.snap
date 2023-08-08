@@ -41,14 +41,14 @@ a = int(  # type: ignore
 )
 
 # Stability and correctness checks
-#b1 = () - (  #
-#)
-#() - (  #
-#)
-#b2 = () - f(  #
-#)
-#() - f(  #
-#)
+b1 = () - (  #
+)
+() - (  #
+)
+b2 = () - f(  #
+)
+() - f(  #
+)
 b3 = (
     #
     ()
@@ -62,7 +62,8 @@ b3 = (
 ## Output
 ```py
 a1 = f(  # 1
-    g()  # 2
+    g(  # 2
+    )
 )
 a2 = f(g(x))  # 1  # 2
 a3 = f(
@@ -76,7 +77,8 @@ a3 = f(
 call(
     a,
     b,
-    [],  # Empty because of
+    [  # Empty because of
+    ],
 )
 
 a = (
@@ -90,14 +92,26 @@ a = (
 a = int(int(int(6)))  # type: ignore  # type: ignore  # type: ignore
 
 # Stability and correctness checks
-# b1 = () - (  #
-# )
-# () - (  #
-# )
-# b2 = () - f(  #
-# )
-# () - f(  #
-# )
+b1 = (
+    ()
+    - (  #
+    )
+)
+(
+    ()
+    - (  #
+    )
+)
+b2 = (
+    ()
+    - f(  #
+    )
+)
+(
+    ()
+    - f(  #
+    )
+)
 b3 = (
     #
     ()

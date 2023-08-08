@@ -35,14 +35,14 @@ a = int(  # type: ignore
 )
 
 # Stability and correctness checks
-#b1 = () - (  #
-#)
-#() - (  #
-#)
-#b2 = () - f(  #
-#)
-#() - f(  #
-#)
+b1 = () - (  #
+)
+() - (  #
+)
+b2 = () - f(  #
+)
+() - f(  #
+)
 b3 = (
     #
     ()
