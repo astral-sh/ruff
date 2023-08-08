@@ -1,0 +1,86 @@
+---
+source: crates/ruff/src/rules/ruff/mod.rs
+---
+RUF017.py:5:1: RUF017 [*] Replace quadratic list summation with list comprehension
+  |
+4 | # RUF017
+5 | sum([x, y], start=[])
+  | ^^^^^^^^^^^^^^^^^^^^^ RUF017
+6 | sum([x, y], [])
+7 | sum([[1, 2, 3], [4, 5, 6]], start=[])
+  |
+  = help: Convert to list comprehension
+
+ℹ Suggested fix
+2 2 | y = [4, 5, 6]
+3 3 | 
+4 4 | # RUF017
+5   |-sum([x, y], start=[])
+  5 |+[el for lst in [x, y] for el in lst]
+6 6 | sum([x, y], [])
+7 7 | sum([[1, 2, 3], [4, 5, 6]], start=[])
+8 8 | sum([[1, 2, 3], [4, 5, 6]], [])
+
+RUF017.py:6:1: RUF017 [*] Replace quadratic list summation with list comprehension
+  |
+4 | # RUF017
+5 | sum([x, y], start=[])
+6 | sum([x, y], [])
+  | ^^^^^^^^^^^^^^^ RUF017
+7 | sum([[1, 2, 3], [4, 5, 6]], start=[])
+8 | sum([[1, 2, 3], [4, 5, 6]], [])
+  |
+  = help: Convert to list comprehension
+
+ℹ Suggested fix
+3 3 | 
+4 4 | # RUF017
+5 5 | sum([x, y], start=[])
+6   |-sum([x, y], [])
+  6 |+[el for lst in [x, y] for el in lst]
+7 7 | sum([[1, 2, 3], [4, 5, 6]], start=[])
+8 8 | sum([[1, 2, 3], [4, 5, 6]], [])
+9 9 | 
+
+RUF017.py:7:1: RUF017 [*] Replace quadratic list summation with list comprehension
+  |
+5 | sum([x, y], start=[])
+6 | sum([x, y], [])
+7 | sum([[1, 2, 3], [4, 5, 6]], start=[])
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF017
+8 | sum([[1, 2, 3], [4, 5, 6]], [])
+  |
+  = help: Convert to list comprehension
+
+ℹ Suggested fix
+4 4 | # RUF017
+5 5 | sum([x, y], start=[])
+6 6 | sum([x, y], [])
+7   |-sum([[1, 2, 3], [4, 5, 6]], start=[])
+  7 |+[el for lst in [[1, 2, 3], [4, 5, 6]] for el in lst]
+8 8 | sum([[1, 2, 3], [4, 5, 6]], [])
+9 9 | 
+10 10 | # OK
+
+RUF017.py:8:1: RUF017 [*] Replace quadratic list summation with list comprehension
+   |
+ 6 | sum([x, y], [])
+ 7 | sum([[1, 2, 3], [4, 5, 6]], start=[])
+ 8 | sum([[1, 2, 3], [4, 5, 6]], [])
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF017
+ 9 | 
+10 | # OK
+   |
+   = help: Convert to list comprehension
+
+ℹ Suggested fix
+5 5 | sum([x, y], start=[])
+6 6 | sum([x, y], [])
+7 7 | sum([[1, 2, 3], [4, 5, 6]], start=[])
+8   |-sum([[1, 2, 3], [4, 5, 6]], [])
+  8 |+[el for lst in [[1, 2, 3], [4, 5, 6]] for el in lst]
+9 9 | 
+10 10 | # OK
+11 11 | sum([x, y])
+
+

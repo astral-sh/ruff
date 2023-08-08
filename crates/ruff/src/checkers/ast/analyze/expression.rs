@@ -870,6 +870,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::UnsupportedMethodCallOnAll) {
                 flake8_pyi::rules::unsupported_method_call_on_all(checker, func);
             }
+            if checker.enabled(Rule::QuadraticListSummation) {
+                ruff::rules::quadratic_list_summation(checker, call);
+            }
         }
         Expr::Dict(ast::ExprDict {
             keys,
