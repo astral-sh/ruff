@@ -19,8 +19,7 @@ use crate::checkers::ast::Checker;
 /// Checks for unsupported format types in format strings.
 ///
 /// ## Why is this bad?
-/// The format string is not checked at compile time, so it is easy to
-/// introduce bugs by mistyping the format string.
+/// An invalid format string character will result in an error at runtime.
 ///
 /// ## Example
 /// ```python
@@ -41,6 +40,7 @@ impl Violation for BadStringFormatCharacter {
     }
 }
 
+/// PLE1300
 /// Ex) `"{:z}".format("1")`
 pub(crate) fn call(checker: &mut Checker, string: &str, range: TextRange) {
     if let Ok(format_string) = FormatString::from_str(string) {
