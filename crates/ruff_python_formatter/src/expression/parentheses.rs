@@ -144,22 +144,13 @@ impl<'content, 'ast> FormatParenthesized<'content, 'ast> {
 impl<'ast> Format<PyFormatContext<'ast>> for FormatParenthesized<'_, 'ast> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
         let inner = format_with(|f| {
-            if self.comments.is_empty() {
-                group(&format_args![
-                    text(self.left),
-                    &soft_block_indent(&Arguments::from(&self.content)),
-                    text(self.right)
-                ])
-                .fmt(f)
-            } else {
-                group(&format_args![
-                    text(self.left),
-                    &dangling_open_parenthesis_comments(self.comments),
-                    &soft_block_indent(&Arguments::from(&self.content)),
-                    text(self.right)
-                ])
-                .fmt(f)
-            }
+            group(&format_args![
+                text(self.left),
+                &dangling_open_parenthesis_comments(self.comments),
+                &soft_block_indent(&Arguments::from(&self.content)),
+                text(self.right)
+            ])
+            .fmt(f)
         });
 
         let current_level = f.context().node_level();
