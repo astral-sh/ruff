@@ -58,24 +58,28 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
             write!(f, [type_params.format()])?;
         }
 
-        write!(f, [item.parameters.format()])?;
-
-        if let Some(return_annotation) = item.returns.as_ref() {
-            write!(f, [space(), text("->"), space()])?;
-            if return_annotation.is_tuple_expr() {
-                write!(
-                    f,
-                    [return_annotation.format().with_options(Parentheses::Never)]
-                )?;
-            } else {
-                write!(
-                    f,
-                    [optional_parentheses(
-                        &return_annotation.format().with_options(Parentheses::Never),
-                    )]
-                )?;
+        let format_inner = format_with(|f: &mut PyFormatter| {
+            write!(f, [item.parameters.format()])?;
+            if let Some(return_annotation) = item.returns.as_ref() {
+                write!(f, [space(), text("->"), space()])?;
+                if return_annotation.is_tuple_expr() {
+                    write!(
+                        f,
+                        [return_annotation.format().with_options(Parentheses::Never)]
+                    )?;
+                } else {
+                    write!(
+                        f,
+                        [optional_parentheses(
+                            &return_annotation.format().with_options(Parentheses::Never),
+                        )]
+                    )?;
+                }
             }
-        }
+            Ok(())
+        });
+
+        write!(f, [group(&format_inner)])?;
 
         write!(
             f,

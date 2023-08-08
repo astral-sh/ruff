@@ -7,14 +7,15 @@ use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::comments::{
-    leading_comments, leading_node_comments, trailing_comments, CommentLinePosition, SourceComment,
+    dangling_open_parenthesis_comments, leading_comments, leading_node_comments, trailing_comments,
+    CommentLinePosition, SourceComment,
 };
 use crate::context::{NodeLevel, WithNodeLevel};
-use crate::expression::parentheses::{empty_parenthesized, parenthesized};
+use crate::expression::parentheses::empty_parenthesized;
 use crate::prelude::*;
 use crate::FormatNodeRule;
 
-#[derive(Eq, PartialEq, Debug, Default)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
 pub enum ParametersParentheses {
     /// By default, parameters will always preserve their surrounding parentheses.
     #[default]
@@ -246,10 +247,17 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             // No parameters, format any dangling comments between `()`
             write!(f, [empty_parenthesized("(", dangling, ")")])
         } else {
+            // Intentionally avoid `parenthesized`, which groups the entire formatted contents.
+            // We want parameters to be grouped alongside return types, one level up, so we
+            // format them "inline" here.
             write!(
                 f,
-                [parenthesized("(", &group(&format_inner), ")")
-                    .with_dangling_comments(parenthesis_dangling)]
+                [
+                    text("("),
+                    &dangling_open_parenthesis_comments(parenthesis_dangling),
+                    &soft_block_indent(&format_args!(&group(&format_inner),)),
+                    text(")")
+                ]
             )
         }
     }
