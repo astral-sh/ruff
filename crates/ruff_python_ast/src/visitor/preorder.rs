@@ -1,9 +1,9 @@
 use crate::node::{AnyNodeRef, AstNode};
 use crate::{
     Alias, Arguments, BoolOp, CmpOp, Comprehension, Constant, Decorator, ElifElseClause,
-    ExceptHandler, Expr, Keyword, MatchCase, Mod, Operator, Parameter, ParameterWithDefault,
-    Parameters, Pattern, PatternArguments, PatternKeyword, Stmt, TypeParam, TypeParams, UnaryOp,
-    WithItem,
+    ExceptHandler, Expr, FStringPart, FormattedValue, Keyword, MatchCase, Mod, Operator, Parameter,
+    ParameterWithDefault, Parameters, Pattern, PatternArguments, PatternKeyword, Stmt, TypeParam,
+    TypeParams, UnaryOp, WithItem,
 };
 
 /// Visitor that traverses all nodes recursively in pre-order.
@@ -153,6 +153,11 @@ pub trait PreorderVisitor<'a> {
     fn visit_elif_else_clause(&mut self, elif_else_clause: &'a ElifElseClause) {
         walk_elif_else_clause(self, elif_else_clause);
     }
+
+    #[inline]
+    fn visit_fstring_part(&mut self, fstring_part: &'a FStringPart) {
+        walk_fstring_part(self, fstring_part);
+    }
 }
 
 pub fn walk_module<'a, V>(visitor: &mut V, module: &'a Mod)
@@ -275,7 +280,6 @@ where
             Expr::YieldFrom(expr) => expr.visit_preorder(visitor),
             Expr::Compare(expr) => expr.visit_preorder(visitor),
             Expr::Call(expr) => expr.visit_preorder(visitor),
-            Expr::FormattedValue(expr) => expr.visit_preorder(visitor),
             Expr::FString(expr) => expr.visit_preorder(visitor),
             Expr::Constant(expr) => expr.visit_preorder(visitor),
             Expr::Attribute(expr) => expr.visit_preorder(visitor),
@@ -497,6 +501,24 @@ where
         visitor.visit_pattern(&pattern_keyword.pattern);
     }
     visitor.leave_node(node);
+}
+
+pub fn walk_fstring_part<'a, V: PreorderVisitor<'a> + ?Sized>(
+    visitor: &mut V,
+    fstring_part: &'a FStringPart,
+) {
+    if let FStringPart::FormattedValue(FormattedValue {
+        expression,
+        format_spec,
+        ..
+    }) = fstring_part
+    {
+        visitor.visit_expr(expression);
+        if let Some(expr) = format_spec {
+            // TODO: why go via `visit_format_spec` as opposed to just straight to `visit_expr`?
+            visitor.visit_format_spec(expr);
+        }
+    }
 }
 
 pub fn walk_bool_op<'a, V>(_visitor: &mut V, _bool_op: &'a BoolOp)

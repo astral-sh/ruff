@@ -520,6 +520,36 @@ impl<'a> From<&'a ast::ExceptHandler> for ComparableExceptHandler<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
+pub enum ComparableFStringPart<'a> {
+    String(&'a str),
+    FormattedValue(FormattedValue<'a>),
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct FormattedValue<'a> {
+    expression: ComparableExpr<'a>,
+    debug_text: Option<&'a ast::DebugText>,
+    pub conversion: ast::ConversionFlag,
+    pub format_spec: Option<Box<ComparableExpr<'a>>>,
+}
+
+impl<'a> From<&'a ast::FStringPart> for ComparableFStringPart<'a> {
+    fn from(fstring_part: &'a ast::FStringPart) -> Self {
+        match fstring_part {
+            ast::FStringPart::String(ast::StringTodoName { value, .. }) => Self::String(value),
+            ast::FStringPart::FormattedValue(formatted_value) => {
+                Self::FormattedValue(FormattedValue {
+                    expression: (&formatted_value.expression).into(),
+                    debug_text: formatted_value.debug_text.as_ref(),
+                    conversion: formatted_value.conversion,
+                    format_spec: formatted_value.format_spec.as_ref().map(Into::into),
+                })
+            }
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ComparableElifElseClause<'a> {
     test: Option<ComparableExpr<'a>>,
     body: Vec<ComparableStmt<'a>>,
@@ -651,7 +681,7 @@ pub struct ExprFormattedValue<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprFString<'a> {
-    values: Vec<ComparableExpr<'a>>,
+    parts: Vec<ComparableFStringPart<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -880,24 +910,12 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 func: func.into(),
                 arguments: arguments.into(),
             }),
-            ast::Expr::FormattedValue(ast::ExprFormattedValue {
-                value,
-                conversion,
-                debug_text,
-                format_spec,
-                range: _,
-            }) => Self::FormattedValue(ExprFormattedValue {
-                value: value.into(),
-                conversion: *conversion,
-                debug_text: debug_text.as_ref(),
-                format_spec: format_spec.as_ref().map(Into::into),
-            }),
             ast::Expr::FString(ast::ExprFString {
-                values,
+                parts,
                 implicit_concatenated: _,
                 range: _,
             }) => Self::FString(ExprFString {
-                values: values.iter().map(Into::into).collect(),
+                parts: parts.iter().map(Into::into).collect(),
             }),
             ast::Expr::Constant(ast::ExprConstant { value, range: _ }) => {
                 Self::Constant(ExprConstant {

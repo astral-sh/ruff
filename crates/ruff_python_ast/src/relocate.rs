@@ -128,22 +128,26 @@ pub fn relocate_expr(expr: &mut Expr, location: TextRange) {
                 relocate_keyword(keyword, location);
             }
         }
-        Expr::FormattedValue(nodes::ExprFormattedValue {
-            value,
-            format_spec,
-            range,
-            ..
-        }) => {
+        Expr::FString(nodes::ExprFString { parts, range, .. }) => {
             *range = location;
-            relocate_expr(value, location);
-            if let Some(expr) = format_spec {
-                relocate_expr(expr, location);
-            }
-        }
-        Expr::FString(nodes::ExprFString { values, range, .. }) => {
-            *range = location;
-            for expr in values {
-                relocate_expr(expr, location);
+            for part in parts {
+                match part {
+                    nodes::FStringPart::String(nodes::StringTodoName { range, .. }) => {
+                        *range = location;
+                    }
+                    nodes::FStringPart::FormattedValue(nodes::FormattedValue {
+                        range,
+                        expression,
+                        format_spec,
+                        ..
+                    }) => {
+                        *range = location;
+                        relocate_expr(expression, location);
+                        if let Some(format_spec) = format_spec {
+                            relocate_expr(format_spec, location);
+                        }
+                    }
+                }
             }
         }
         Expr::Constant(nodes::ExprConstant { range, .. }) => {

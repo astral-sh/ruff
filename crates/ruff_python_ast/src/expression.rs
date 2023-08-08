@@ -23,7 +23,6 @@ pub enum ExpressionRef<'a> {
     YieldFrom(&'a ast::ExprYieldFrom),
     Compare(&'a ast::ExprCompare),
     Call(&'a ast::ExprCall),
-    FormattedValue(&'a ast::ExprFormattedValue),
     FString(&'a ast::ExprFString),
     Constant(&'a ast::ExprConstant),
     Attribute(&'a ast::ExprAttribute),
@@ -62,7 +61,6 @@ impl<'a> From<&'a Expr> for ExpressionRef<'a> {
             Expr::YieldFrom(value) => ExpressionRef::YieldFrom(value),
             Expr::Compare(value) => ExpressionRef::Compare(value),
             Expr::Call(value) => ExpressionRef::Call(value),
-            Expr::FormattedValue(value) => ExpressionRef::FormattedValue(value),
             Expr::FString(value) => ExpressionRef::FString(value),
             Expr::Constant(value) => ExpressionRef::Constant(value),
             Expr::Attribute(value) => ExpressionRef::Attribute(value),
@@ -162,11 +160,6 @@ impl<'a> From<&'a ast::ExprCall> for ExpressionRef<'a> {
         Self::Call(value)
     }
 }
-impl<'a> From<&'a ast::ExprFormattedValue> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprFormattedValue) -> Self {
-        Self::FormattedValue(value)
-    }
-}
 impl<'a> From<&'a ast::ExprFString> for ExpressionRef<'a> {
     fn from(value: &'a ast::ExprFString) -> Self {
         Self::FString(value)
@@ -238,7 +231,6 @@ impl<'a> From<ExpressionRef<'a>> for AnyNodeRef<'a> {
             ExpressionRef::YieldFrom(expression) => AnyNodeRef::ExprYieldFrom(expression),
             ExpressionRef::Compare(expression) => AnyNodeRef::ExprCompare(expression),
             ExpressionRef::Call(expression) => AnyNodeRef::ExprCall(expression),
-            ExpressionRef::FormattedValue(expression) => AnyNodeRef::ExprFormattedValue(expression),
             ExpressionRef::FString(expression) => AnyNodeRef::ExprFString(expression),
             ExpressionRef::Constant(expression) => AnyNodeRef::ExprConstant(expression),
             ExpressionRef::Attribute(expression) => AnyNodeRef::ExprAttribute(expression),
@@ -275,7 +267,6 @@ impl Ranged for ExpressionRef<'_> {
             ExpressionRef::YieldFrom(expression) => expression.range(),
             ExpressionRef::Compare(expression) => expression.range(),
             ExpressionRef::Call(expression) => expression.range(),
-            ExpressionRef::FormattedValue(expression) => expression.range(),
             ExpressionRef::FString(expression) => expression.range(),
             ExpressionRef::Constant(expression) => expression.range(),
             ExpressionRef::Attribute(expression) => expression.range(),

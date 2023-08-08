@@ -4,9 +4,9 @@ pub mod preorder;
 
 use crate::{
     self as ast, Alias, Arguments, BoolOp, CmpOp, Comprehension, Decorator, ElifElseClause,
-    ExceptHandler, Expr, ExprContext, Keyword, MatchCase, Operator, Parameter, Parameters, Pattern,
-    PatternArguments, PatternKeyword, Stmt, TypeParam, TypeParamTypeVar, TypeParams, UnaryOp,
-    WithItem,
+    ExceptHandler, Expr, ExprContext, FStringPart, Keyword, MatchCase, Operator, Parameter,
+    Parameters, Pattern, PatternArguments, PatternKeyword, Stmt, TypeParam, TypeParamTypeVar,
+    TypeParams, UnaryOp, WithItem,
 };
 
 /// A trait for AST visitors. Visits all nodes in the AST recursively in evaluation-order.
@@ -94,6 +94,9 @@ pub trait Visitor<'a> {
     }
     fn visit_elif_else_clause(&mut self, elif_else_clause: &'a ElifElseClause) {
         walk_elif_else_clause(self, elif_else_clause);
+    }
+    fn visit_fstring_part(&mut self, fstring_part: &'a FStringPart) {
+        walk_fstring_part(self, fstring_part);
     }
 }
 
@@ -464,17 +467,9 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
             visitor.visit_expr(func);
             visitor.visit_arguments(arguments);
         }
-        Expr::FormattedValue(ast::ExprFormattedValue {
-            value, format_spec, ..
-        }) => {
-            visitor.visit_expr(value);
-            if let Some(expr) = format_spec {
-                visitor.visit_format_spec(expr);
-            }
-        }
-        Expr::FString(ast::ExprFString { values, .. }) => {
-            for expr in values {
-                visitor.visit_expr(expr);
+        Expr::FString(ast::ExprFString { parts, .. }) => {
+            for part in parts {
+                visitor.visit_fstring_part(part);
             }
         }
         Expr::Constant(_) => {}
@@ -719,6 +714,24 @@ pub fn walk_pattern_keyword<'a, V: Visitor<'a> + ?Sized>(
     pattern_keyword: &'a PatternKeyword,
 ) {
     visitor.visit_pattern(&pattern_keyword.pattern);
+}
+
+pub fn walk_fstring_part<'a, V: Visitor<'a> + ?Sized>(
+    visitor: &mut V,
+    fstring_part: &'a FStringPart,
+) {
+    if let ast::FStringPart::FormattedValue(ast::FormattedValue {
+        expression,
+        format_spec,
+        ..
+    }) = fstring_part
+    {
+        visitor.visit_expr(expression);
+        if let Some(expr) = format_spec {
+            // TODO: why go via `visit_format_spec` as opposed to just straight to `visit_expr`?
+            visitor.visit_format_spec(expr);
+        }
+    }
 }
 
 #[allow(unused_variables)]
