@@ -67,7 +67,10 @@ pub(super) fn place_comment<'a>(
             handle_module_level_own_line_comment_before_class_or_function_comment(comment, locator)
         }
         AnyNodeRef::WithItem(_) => handle_with_item_comment(comment, locator),
-        AnyNodeRef::StmtFunctionDef(_) => handle_leading_function_with_decorators_comment(comment),
+        AnyNodeRef::StmtFunctionDef(function_def) => {
+            handle_leading_function_with_decorators_comment(comment)
+                .or_else(|comment| handle_leading_returns_comment(comment, function_def))
+        }
         AnyNodeRef::StmtClassDef(class_def) => {
             handle_leading_class_with_decorators_comment(comment, class_def)
         }
@@ -777,6 +780,40 @@ fn handle_leading_function_with_decorators_comment(comment: DecoratedComment) ->
         .is_some_and(|node| node.is_parameters());
 
     if comment.line_position().is_own_line() && is_preceding_decorator && is_following_parameters {
+        CommentPlacement::dangling(comment.enclosing_node(), comment)
+    } else {
+        CommentPlacement::Default(comment)
+    }
+}
+
+/// Handles end-of-line comments between function parameters and the return type annotation,
+/// attaching them as dangling comments to the function instead of making them trailing
+/// parameter comments.
+///
+/// ```python
+/// def double(a: int) -> ( # Hello
+///     int
+/// ):
+///     return 2*a
+/// ```
+fn handle_leading_returns_comment<'a>(
+    comment: DecoratedComment<'a>,
+    function_def: &'a ast::StmtFunctionDef,
+) -> CommentPlacement<'a> {
+    let parameters = function_def.parameters.as_ref();
+    let Some(returns) = function_def.returns.as_deref() else {
+        return CommentPlacement::Default(comment);
+    };
+
+    let is_preceding_parameters = comment
+        .preceding_node()
+        .is_some_and(|node| node == parameters.into());
+
+    let is_following_returns = comment
+        .following_node()
+        .is_some_and(|node| node == returns.into());
+
+    if comment.line_position().is_end_of_line() && is_preceding_parameters && is_following_returns {
         CommentPlacement::dangling(comment.enclosing_node(), comment)
     } else {
         CommentPlacement::Default(comment)

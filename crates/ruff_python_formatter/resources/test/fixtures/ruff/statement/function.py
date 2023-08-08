@@ -371,3 +371,41 @@ def f(  # first
     # third
 ):
     ...
+
+# Handle comments on empty tuple return types.
+def zrevrangebylex(self, name: _Key, max: _Value, min: _Value, start: int | None = None, num: int | None = None) -> (  # type: ignore[override]
+): ...
+
+def zrevrangebylex(self, name: _Key, max: _Value, min: _Value, start: int | None = None, num: int | None = None) -> (  # type: ignore[override]
+    # comment
+): ...
+
+def zrevrangebylex(self, name: _Key, max: _Value, min: _Value, start: int | None = None, num: int | None = None) -> (  # type: ignore[override]
+    1
+): ...
+
+def zrevrangebylex(self, name: _Key, max: _Value, min: _Value, start: int | None = None, num: int | None = None) -> (  # type: ignore[override]
+    1, 2
+): ...
+
+def zrevrangebylex(self, name: _Key, max: _Value, min: _Value, start: int | None = None, num: int | None = None) -> (  # type: ignore[override]
+    (1, 2)
+): ...
+
+def handleMatch(  # type: ignore[override] # https://github.com/python/mypy/issues/10197
+    self, m: Match[str], data: str
+) -> Union[Tuple[None, None, None], Tuple[Element, int, int]]:
+    ...
+
+def double(a: int # Hello
+) -> (int):
+    return 2 * a
+
+def double(a: int) -> ( # Hello
+    int
+):
+    return 2*a
+
+def double(a: int) -> ( # Hello
+):
+    return 2*a
