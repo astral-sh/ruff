@@ -312,7 +312,7 @@ pub struct Options {
         "#
     )]
     /// The line length to use when enforcing long-lines violations (like
-    /// `E501`).
+    /// `E501`). Must be greater than `0`.
     pub line_length: Option<LineLength>,
     #[option(
         default = "4",
