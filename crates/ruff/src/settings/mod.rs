@@ -146,6 +146,12 @@ impl Settings {
             }
         }
 
+        if let Some(tab_size) = &config.tab_size {
+            if usize::from(*tab_size) == 0 {
+                return Err(anyhow!("`tab_size` must be greater than 0"));
+            }
+        }
+
         Ok(Self {
             rules: (&config).into(),
             allowed_confusables: config
