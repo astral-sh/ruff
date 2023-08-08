@@ -376,7 +376,7 @@
       ]
     },
     "line-length": {
-      "description": "The line length to use when enforcing long-lines violations (like `E501`).",
+      "description": "The line length to use when enforcing long-lines violations (like `E501`). Must be greater than `0`.",
       "anyOf": [
         {
           "$ref": "#/definitions/LineLength"
@@ -2741,7 +2741,7 @@
       "description": "The size of a tab.",
       "type": "integer",
       "format": "uint8",
-      "minimum": 0.0
+      "minimum": 1.0
     },
     "Version": {
       "type": "string"

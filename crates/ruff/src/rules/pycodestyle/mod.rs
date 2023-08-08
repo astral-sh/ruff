@@ -6,6 +6,7 @@ pub(crate) mod helpers;
 
 #[cfg(test)]
 mod tests {
+    use std::num::NonZeroU8;
     use std::path::Path;
 
     use anyhow::Result;
@@ -204,7 +205,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pycodestyle/E501_2.py"),
             &settings::Settings {
-                tab_size: tab_size.into(),
+                tab_size: NonZeroU8::new(tab_size).unwrap().into(),
                 ..settings::Settings::for_rule(Rule::LineTooLong)
             },
         )?;
