@@ -64,6 +64,7 @@ pub(crate) fn call(checker: &mut Checker, string: &str, range: TextRange) {
     }
 }
 
+/// PLE1300
 /// Ex) `"%z" % "1"`
 pub(crate) fn percent(checker: &mut Checker, expr: &Expr) {
     // Grab each string segment (in case there's an implicit concatenation).
