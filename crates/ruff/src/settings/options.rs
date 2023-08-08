@@ -596,7 +596,7 @@ pub struct Options {
         default = "{}",
         value_type = "dict[str, list[RuleSelector]]",
         example = r#"
-            # Also ignore `E401` in all `__init__.py` files.
+            # Also ignore `E402` in all `__init__.py` files.
             [tool.ruff.extend-per-file-ignores]
             "__init__.py" = ["E402"]
         "#
