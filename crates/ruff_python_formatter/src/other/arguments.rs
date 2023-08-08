@@ -4,9 +4,8 @@ use ruff_python_ast::{Arguments, Expr, Ranged};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{TextRange, TextSize};
 
-use crate::builders::empty_parenthesized_with_dangling_comments;
 use crate::expression::expr_generator_exp::GeneratorExpParentheses;
-use crate::expression::parentheses::{parenthesized, Parentheses};
+use crate::expression::parentheses::{empty_parenthesized, parenthesized, Parentheses};
 use crate::prelude::*;
 use crate::FormatNodeRule;
 
@@ -24,14 +23,8 @@ impl FormatNodeRule<Arguments> for FormatArguments {
         // ```
         if item.args.is_empty() && item.keywords.is_empty() {
             let comments = f.context().comments().clone();
-            return write!(
-                f,
-                [empty_parenthesized_with_dangling_comments(
-                    text("("),
-                    comments.dangling_comments(item),
-                    text(")"),
-                )]
-            );
+            let dangling = comments.dangling_comments(item);
+            return write!(f, [empty_parenthesized("(", dangling, ")")]);
         }
 
         let all_arguments = format_with(|f: &mut PyFormatter| {

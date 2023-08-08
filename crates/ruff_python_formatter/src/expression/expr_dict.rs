@@ -4,9 +4,10 @@ use ruff_python_ast::Ranged;
 use ruff_python_ast::{Expr, ExprDict};
 use ruff_text_size::TextRange;
 
-use crate::builders::empty_parenthesized_with_dangling_comments;
 use crate::comments::leading_comments;
-use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
+use crate::expression::parentheses::{
+    empty_parenthesized, parenthesized, NeedsParentheses, OptionalParentheses,
+};
 use crate::prelude::*;
 use crate::FormatNodeRule;
 
@@ -69,8 +70,7 @@ impl FormatNodeRule<ExprDict> for FormatExprDict {
         let dangling = comments.dangling_comments(item);
 
         if values.is_empty() {
-            return empty_parenthesized_with_dangling_comments(text("{"), dangling, text("}"))
-                .fmt(f);
+            return empty_parenthesized("{", dangling, "}").fmt(f);
         }
 
         let format_pairs = format_with(|f| {
