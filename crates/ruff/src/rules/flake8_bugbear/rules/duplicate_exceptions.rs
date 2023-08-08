@@ -150,7 +150,9 @@ fn duplicate_handler_exceptions<'a>(
                     if unique_elts.len() == 1 {
                         checker.generator().expr(unique_elts[0])
                     } else {
-                        checker.generator().expr(&type_pattern(unique_elts))
+                        // Multiple exceptions must always be parenthesized. This is done
+                        // manually as the generator never parenthesizes lone tuples.
+                        format!("({})", checker.generator().expr(&type_pattern(unique_elts)))
                     },
                     expr.range(),
                 )));
