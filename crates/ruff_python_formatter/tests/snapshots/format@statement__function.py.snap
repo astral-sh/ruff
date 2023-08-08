@@ -845,7 +845,8 @@ def f(  # first
     ...
 
 
-def f():  # first  # second
+def f(  # first
+):  # second
     ...
 
 

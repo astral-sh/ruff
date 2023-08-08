@@ -217,6 +217,17 @@ for user_id in set(target_user_ids) - {u.user_id for u in updates}:
     log(self.price / self.strike)
     + (self.risk_free - self.div_cont + 0.5 * (self.sigma**2)) * self.exp_time
 ) / self.sigmaT
+
+# Stability with end-of-line comments between empty tuples and bin op
+x = () - (#
+)
+x = (
+    ()
+    - ()  #
+)
+x = (
+    () - ()  #
+)
 ```
 
 ## Output
@@ -488,6 +499,19 @@ for user_id in set(target_user_ids) - {u.user_id for u in updates}:
     log(self.price / self.strike)
     + (self.risk_free - self.div_cont + 0.5 * (self.sigma**2)) * self.exp_time
 ) / self.sigmaT
+
+# Stability with end-of-line comments between empty tuples and bin op
+x = (
+    ()
+    - (  #
+    )
+)
+x = (
+    () - ()  #
+)
+x = (
+    () - ()  #
+)
 ```
 
 
