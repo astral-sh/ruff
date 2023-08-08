@@ -260,11 +260,10 @@ impl Format<PyFormatContext<'_>> for FormatDanglingOpenParenthesisComments<'_> {
 
             write!(
                 f,
-                [line_suffix(&format_args![
-                    space(),
-                    space(),
-                    format_comment(comment)
-                ])]
+                [
+                    line_suffix(&format_args![space(), space(), format_comment(comment)]),
+                    expand_parent()
+                ]
             )?;
             comment.mark_formatted();
 

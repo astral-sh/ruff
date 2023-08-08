@@ -101,9 +101,15 @@ c1 = [  # trailing open bracket
     # own-line comment
 ]
 
-[1]  # end-of-line comment
+[  # end-of-line comment
+    1
+]
 
-[first, second, third]  # inner comment  # outer comment
+[  # inner comment
+    first,
+    second,
+    third,
+]  # outer comment
 ```
 
 
