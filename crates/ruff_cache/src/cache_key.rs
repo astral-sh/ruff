@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::hash::{Hash, Hasher};
+use std::num::NonZeroU8;
 use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 
@@ -202,6 +203,13 @@ impl CacheKey for i8 {
     #[inline]
     fn cache_key(&self, state: &mut CacheKeyHasher) {
         state.write_i8(*self);
+    }
+}
+
+impl CacheKey for NonZeroU8 {
+    #[inline]
+    fn cache_key(&self, state: &mut CacheKeyHasher) {
+        state.write_u8(self.get());
     }
 }
 

@@ -293,12 +293,10 @@ impl Display for MessageCodeFrame<'_> {
 }
 
 fn replace_whitespace(source: &str, annotation_range: TextRange) -> SourceCode {
-    static TAB_SIZE: TabSize = TabSize(4); // TODO(jonathan): use `tab-size`
-
     let mut result = String::new();
     let mut last_end = 0;
     let mut range = annotation_range;
-    let mut line_width = LineWidth::new(TAB_SIZE);
+    let mut line_width = LineWidth::new(TabSize::default());
 
     for (index, c) in source.char_indices() {
         let old_width = line_width.get();
