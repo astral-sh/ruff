@@ -61,17 +61,20 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
         write!(f, [item.parameters.format()])?;
 
         if let Some(return_annotation) = item.returns.as_ref() {
-            write!(
-                f,
-                [
-                    space(),
-                    text("->"),
-                    space(),
-                    optional_parentheses(
-                        &return_annotation.format().with_options(Parentheses::Never)
-                    )
-                ]
-            )?;
+            write!(f, [space(), text("->"), space()])?;
+            if return_annotation.is_tuple_expr() {
+                write!(
+                    f,
+                    [return_annotation.format().with_options(Parentheses::Never)]
+                )?;
+            } else {
+                write!(
+                    f,
+                    [optional_parentheses(
+                        &return_annotation.format().with_options(Parentheses::Never),
+                    )]
+                )?;
+            }
         }
 
         write!(
