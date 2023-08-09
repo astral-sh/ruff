@@ -77,6 +77,9 @@ class IndentMeSome:
          indentation can be incorrect, but this is also an edge case.
          """
 
+
+class IgnoreImplicitlyConcatenatedStrings:
+    """""" ""
 ```
 
 ## Output
@@ -154,6 +157,10 @@ class IndentMeSome:
            line if the target indentation. This may we incorrect since source and target
            indentation can be incorrect, but this is also an edge case.
         """
+
+
+class IgnoreImplicitlyConcatenatedStrings:
+    """""" ""
 ```
 
 

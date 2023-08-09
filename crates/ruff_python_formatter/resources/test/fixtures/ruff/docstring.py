@@ -71,3 +71,6 @@ class IndentMeSome:
          indentation can be incorrect, but this is also an edge case.
          """
 
+
+class IgnoreImplicitlyConcatenatedStrings:
+    """""" ""
