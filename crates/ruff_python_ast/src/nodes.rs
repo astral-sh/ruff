@@ -2126,23 +2126,21 @@ impl Arguments {
         })
     }
 
+    /// Return the positional argument at the given index, or `None` if no such argument exists.
+    pub fn find_positional(&self, position: usize) -> Option<&Expr> {
+        self.args
+            .iter()
+            .take_while(|expr| !expr.is_starred_expr())
+            .nth(position)
+    }
+
     /// Return the argument with the given name or at the given position, or `None` if no such
     /// argument exists. Used to retrieve arguments that can be provided _either_ as keyword or
     /// positional arguments.
     pub fn find_argument(&self, name: &str, position: usize) -> Option<&Expr> {
-        self.keywords
-            .iter()
-            .find(|keyword| {
-                let Keyword { arg, .. } = keyword;
-                arg.as_ref().is_some_and(|arg| arg == name)
-            })
+        self.find_keyword(name)
             .map(|keyword| &keyword.value)
-            .or_else(|| {
-                self.args
-                    .iter()
-                    .take_while(|expr| !expr.is_starred_expr())
-                    .nth(position)
-            })
+            .or_else(|| self.find_positional(position))
     }
 }
 
