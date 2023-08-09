@@ -19,13 +19,25 @@ use crate::registry::RuleSet;
 use crate::rule_selector::RuleSelector;
 
 #[derive(
-    Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize, CacheKey, EnumIter,
+    Clone,
+    Copy,
+    Debug,
+    PartialOrd,
+    Ord,
+    PartialEq,
+    Eq,
+    Default,
+    Serialize,
+    Deserialize,
+    CacheKey,
+    EnumIter,
 )]
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 #[serde(rename_all = "lowercase")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum PythonVersion {
     Py37,
+    #[default]
     Py38,
     Py39,
     Py310,
