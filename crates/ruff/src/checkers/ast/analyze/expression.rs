@@ -1229,11 +1229,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 }
             }
             if checker.enabled(Rule::HardcodedTempFile) {
-                if let Some(diagnostic) =
-                    flake8_bandit::rules::hardcoded_tmp_directory(checker, expr, value)
-                {
-                    checker.diagnostics.push(diagnostic);
-                }
+                flake8_bandit::rules::hardcoded_tmp_directory(checker, expr, value);
             }
             if checker.enabled(Rule::UnicodeKindPrefix) {
                 pyupgrade::rules::unicode_kind_prefix(checker, expr, kind.as_deref());
