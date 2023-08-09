@@ -1,7 +1,9 @@
-use ruff_python_ast::{Expr, Ranged};
+use ruff_python_ast::{self as ast, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for the use of hardcoded temporary file or directory paths.
@@ -49,19 +51,33 @@ impl Violation for HardcodedTempFile {
 }
 
 /// S108
-pub(crate) fn hardcoded_tmp_directory(
-    expr: &Expr,
-    value: &str,
-    prefixes: &[String],
-) -> Option<Diagnostic> {
-    if prefixes.iter().any(|prefix| value.starts_with(prefix)) {
-        Some(Diagnostic::new(
-            HardcodedTempFile {
-                string: value.to_string(),
-            },
-            expr.range(),
-        ))
-    } else {
-        None
+pub(crate) fn hardcoded_tmp_directory(checker: &mut Checker, expr: &Expr, value: &str) {
+    if !checker
+        .settings
+        .flake8_bandit
+        .hardcoded_tmp_directory
+        .iter()
+        .any(|prefix| value.starts_with(prefix))
+    {
+        return;
     }
+
+    if let Some(Expr::Call(ast::ExprCall { func, .. })) =
+        checker.semantic().current_expression_parent()
+    {
+        if checker
+            .semantic()
+            .resolve_call_path(func)
+            .is_some_and(|call_path| matches!(call_path.as_slice(), ["tempfile", ..]))
+        {
+            return;
+        }
+    }
+
+    checker.diagnostics.push(Diagnostic::new(
+        HardcodedTempFile {
+            string: value.to_string(),
+        },
+        expr.range(),
+    ));
 }
