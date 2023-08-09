@@ -585,7 +585,7 @@ impl<'a> Imported<'a> for FromImport<'a> {
 }
 
 /// A wrapper around an import [`BindingKind`] that can be any of the three types of imports.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, is_macro::Is)]
 pub enum AnyImport<'a> {
     Import(&'a Import<'a>),
     SubmoduleImport(&'a SubmoduleImport<'a>),

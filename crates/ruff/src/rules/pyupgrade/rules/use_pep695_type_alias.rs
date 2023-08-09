@@ -130,16 +130,18 @@ impl<'a> Visitor<'a> for TypeVarReferenceVisitor<'a> {
     fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
             Expr::Name(name) if name.ctx.is_load() => {
-                let Some(Stmt::Assign(StmtAssign { value, .. })) =
-                    self.semantic.lookup_symbol(name.id.as_str())
-                        .and_then(|binding_id| {
-                            self.semantic
-                                .binding(binding_id)
-                                .source
-                                .map(|node_id| self.semantic.statement(node_id))
-                        }) else {
-                            return;
-                        };
+                let Some(Stmt::Assign(StmtAssign { value, .. })) = self
+                    .semantic
+                    .lookup_symbol(name.id.as_str())
+                    .and_then(|binding_id| {
+                        self.semantic
+                            .binding(binding_id)
+                            .source
+                            .map(|node_id| self.semantic.statement(node_id))
+                    })
+                else {
+                    return;
+                };
 
                 match value.as_ref() {
                     Expr::Subscript(ExprSubscript {

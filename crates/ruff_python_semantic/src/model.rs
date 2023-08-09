@@ -590,14 +590,26 @@ impl<'a> SemanticModel<'a> {
         // print(pa.csv.read_csv("test.csv"))
         // ```
         let import = self.bindings[binding_id].as_any_import()?;
+        if !import.is_import() {
+            return None;
+        }
+
+        // Grab, e.g., `pyarrow` from `import pyarrow as pa`.
         let call_path = import.call_path();
         let segment = call_path.last()?;
         if *segment == symbol {
             return None;
         }
 
+        // Locate the submodule import (e.g., `pyarrow.csv`) that `pa` aliases.
         let binding_id = self.scopes[scope_id].get(segment)?;
-        if !self.bindings[binding_id].kind.is_submodule_import() {
+        let submodule = &self.bindings[binding_id].as_any_import()?;
+        if !submodule.is_submodule_import() {
+            return None;
+        }
+
+        // Ensure that the submodule import and the aliased import are from the same module.
+        if import.module_name() != submodule.module_name() {
             return None;
         }
 
