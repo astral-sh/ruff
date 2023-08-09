@@ -672,7 +672,7 @@ pub struct ExprSlice<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprLineMagic<'a> {
+pub struct ExprIpyEscapeCommand<'a> {
     kind: ast::IpyEscapeKind,
     value: &'a str,
 }
@@ -706,7 +706,7 @@ pub enum ComparableExpr<'a> {
     List(ExprList<'a>),
     Tuple(ExprTuple<'a>),
     Slice(ExprSlice<'a>),
-    LineMagic(ExprLineMagic<'a>),
+    IpyEscapeCommand(ExprIpyEscapeCommand<'a>),
 }
 
 impl<'a> From<&'a Box<ast::Expr>> for Box<ComparableExpr<'a>> {
@@ -940,7 +940,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 kind,
                 value,
                 range: _,
-            }) => Self::LineMagic(ExprLineMagic {
+            }) => Self::IpyEscapeCommand(ExprIpyEscapeCommand {
                 kind: *kind,
                 value: value.as_str(),
             }),
@@ -1165,7 +1165,7 @@ pub struct StmtExpr<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct StmtLineMagic<'a> {
+pub struct StmtIpyEscapeCommand<'a> {
     kind: ast::IpyEscapeKind,
     value: &'a str,
 }
@@ -1193,7 +1193,7 @@ pub enum ComparableStmt<'a> {
     ImportFrom(StmtImportFrom<'a>),
     Global(StmtGlobal<'a>),
     Nonlocal(StmtNonlocal<'a>),
-    LineMagic(StmtLineMagic<'a>),
+    IpyEscapeCommand(StmtIpyEscapeCommand<'a>),
     Expr(StmtExpr<'a>),
     Pass,
     Break,
@@ -1398,7 +1398,7 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                 kind,
                 value,
                 range: _,
-            }) => Self::LineMagic(StmtLineMagic {
+            }) => Self::IpyEscapeCommand(StmtIpyEscapeCommand {
                 kind: *kind,
                 value: value.as_str(),
             }),
