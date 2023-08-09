@@ -21,6 +21,7 @@ pub struct Options {
     )]
     /// The maximum line length to allow for line-length violations within
     /// documentation (`W505`), including standalone comments.
+    /// Defaults to `None` which disables the rule.
     pub max_doc_length: Option<LineLength>,
     #[option(
         default = "false",
