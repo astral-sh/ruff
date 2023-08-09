@@ -298,6 +298,7 @@ impl Settings {
     pub fn for_rule(rule_code: Rule) -> Self {
         Self {
             rules: RuleTable::from_iter([rule_code]),
+            target_version: PythonVersion::latest(),
             ..Self::default()
         }
     }
@@ -305,6 +306,7 @@ impl Settings {
     pub fn for_rules(rules: impl IntoIterator<Item = Rule>) -> Self {
         Self {
             rules: RuleTable::from_iter(rules),
+            target_version: PythonVersion::latest(),
             ..Self::default()
         }
     }

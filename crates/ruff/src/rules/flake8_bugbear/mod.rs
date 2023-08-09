@@ -11,7 +11,6 @@ mod tests {
 
     use crate::assert_messages;
     use crate::registry::Rule;
-    use crate::settings::types::PythonVersion;
     use crate::settings::Settings;
     use crate::test::test_path;
 
@@ -65,8 +64,7 @@ mod tests {
         let snapshot = "B905.py";
         let diagnostics = test_path(
             Path::new("flake8_bugbear").join(snapshot).as_path(),
-            &Settings::for_rule(Rule::ZipWithoutExplicitStrict)
-                .with_target_version(PythonVersion::latest()),
+            &Settings::for_rule(Rule::ZipWithoutExplicitStrict),
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -84,7 +82,7 @@ mod tests {
                         "fastapi.Query".to_string(),
                     ],
                 },
-                ..Settings::for_rules(vec![Rule::FunctionCallInDefaultArgument])
+                ..Settings::for_rule(Rule::FunctionCallInDefaultArgument)
             },
         )?;
         assert_messages!(snapshot, diagnostics);
