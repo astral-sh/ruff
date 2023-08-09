@@ -70,3 +70,13 @@ import requests_mock as rm
 
 def requests_mock(requests_mock: rm.Mocker):
     print(rm.ANY)
+
+
+import sklearn.base
+import mlflow.sklearn
+
+
+def f():
+    import sklearn
+
+    mlflow
