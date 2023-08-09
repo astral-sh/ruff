@@ -580,8 +580,8 @@ fn handle_own_line_comment_after_branch<'a>(
             Ordering::Greater => {
                 if let Some(nested_child) = last_child_in_body(last_child_in_current_body) {
                     // The comment belongs to the inner block.
-                    parent_body = current_body;
                     current_body = Some(last_child_in_current_body);
+                    parent_body = current_body;
                     last_child_in_current_body = nested_child;
                 } else {
                     // The comment is overindented, we assign it to the most indented child we have.
@@ -1399,7 +1399,7 @@ where
     right.is_some_and(|right| left.ptr_eq(right.into()))
 }
 
-/// The last child of the last branch, if the node hs multiple branches.
+/// The last child of the last branch, if the node has multiple branches.
 fn last_child_in_body(node: AnyNodeRef) -> Option<AnyNodeRef> {
     let body = match node {
         AnyNodeRef::StmtFunctionDef(ast::StmtFunctionDef { body, .. })
@@ -1546,9 +1546,7 @@ mod tests {
         );
 
         assert_eq!(
-            max_empty_lines(
-                "# trailing comment\n\n# own line comment\n\n\n# an other own line comment\n# block"
-            ),
+            max_empty_lines("# trailing comment\n\n# own line comment\n\n\n# an other own line comment\n# block"),
             2
         );
 

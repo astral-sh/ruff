@@ -569,8 +569,13 @@ def test(x, y):
 def other(y, z):
     if y == z:
         pass
-            # Trailing `if` comment
-      # Trailing `other` function comment
+            # Trailing `pass` comment
+      # Trailing `if` statement comment
+
+class Test:
+    def func():
+        pass
+       # Trailing `func` function comment
 
 test(10, 20)
 "#;
