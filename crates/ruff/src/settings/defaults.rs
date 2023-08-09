@@ -24,7 +24,7 @@ pub const PREFIXES: &[RuleSelector] = &[
     RuleSelector::Linter(Linter::Pyflakes),
 ];
 
-pub const TARGET_VERSION: PythonVersion = PythonVersion::Py310;
+pub const TARGET_VERSION: PythonVersion = PythonVersion::Py38;
 
 pub const TASK_TAGS: &[&str] = &["TODO", "FIXME", "XXX"];
 
