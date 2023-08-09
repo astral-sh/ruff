@@ -1436,18 +1436,17 @@ fn is_first_statement_in_alternate_body(statement: AnyNodeRef, has_body: AnyNode
     }
 }
 
-/// Counts the number of newlines in `contents`.
+/// Counts the number of empty lines in `contents`.
 fn max_empty_lines(contents: &str) -> u32 {
     let mut newlines = 0u32;
     let mut max_new_lines = 0;
 
-    let mut tokenizer = SimpleTokenizer::new(contents, TextRange::up_to(contents.text_len()));
-
-    while let Some(token) = tokenizer.next() {
+    for token in SimpleTokenizer::new(contents, TextRange::up_to(contents.text_len())) {
         match token.kind() {
             SimpleTokenKind::Newline => {
                 newlines += 1;
             }
+
             SimpleTokenKind::Whitespace => {}
 
             SimpleTokenKind::Comment => {
