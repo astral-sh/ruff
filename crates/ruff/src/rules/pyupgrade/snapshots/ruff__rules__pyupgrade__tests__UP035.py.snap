@@ -974,4 +974,19 @@ UP035.py:76:1: UP035 [*] Import from `collections.abc` instead: `Generator`
 78 78 | # OK
 79 79 | from a import b
 
+UP035.py:88:1: UP035 [*] Import from `typing` instead: `dataclass_transform`
+   |
+87 | # Ok: `typing_extensions` supports `frozen_default` (backported from 3.12).
+88 | from typing_extensions import dataclass_transform
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   |
+   = help: Import from `typing`
+
+ℹ Suggested fix
+85 85 | from typing_extensions import NamedTuple
+86 86 | 
+87 87 | # Ok: `typing_extensions` supports `frozen_default` (backported from 3.12).
+88    |-from typing_extensions import dataclass_transform
+   88 |+from typing import dataclass_transform
+
 

@@ -44,7 +44,7 @@ mod tests {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("ruff").join(path).as_path(),
-            &settings::Settings::for_rule(rule_code),
+            &settings::Settings::for_rule(rule_code).with_target_version(PythonVersion::latest()),
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -60,10 +60,8 @@ mod tests {
         );
         let diagnostics = test_path(
             Path::new("ruff").join(path).as_path(),
-            &settings::Settings {
-                target_version: PythonVersion::Py39,
-                ..settings::Settings::for_rule(Rule::ImplicitOptional)
-            },
+            &settings::Settings::for_rule(Rule::ImplicitOptional)
+                .with_target_version(PythonVersion::Py39),
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

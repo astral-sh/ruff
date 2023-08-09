@@ -12,6 +12,7 @@ mod tests {
     use crate::assert_messages;
     use crate::registry::Rule;
     use crate::settings;
+    use crate::settings::types::PythonVersion;
     use crate::test::test_path;
 
     #[test_case(Path::new("full_name.py"))]
@@ -48,7 +49,8 @@ mod tests {
                 Rule::OsPathSamefile,
                 Rule::OsPathSplitext,
                 Rule::BuiltinOpen,
-            ]),
+            ])
+            .with_target_version(PythonVersion::latest()),
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -67,7 +69,7 @@ mod tests {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_use_pathlib").join(path).as_path(),
-            &settings::Settings::for_rule(rule_code),
+            &settings::Settings::for_rule(rule_code).with_target_version(PythonVersion::latest()),
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

@@ -41,6 +41,10 @@ impl From<PythonVersion> for Pep440Version {
 }
 
 impl PythonVersion {
+    pub const fn latest() -> Self {
+        Self::Py312
+    }
+
     pub const fn as_tuple(&self) -> (u32, u32) {
         match self {
             Self::Py37 => (3, 7),

@@ -81,7 +81,7 @@ mod tests {
         let snapshot = path.to_string_lossy().to_string();
         let diagnostics = test_path(
             Path::new("pyupgrade").join(path).as_path(),
-            &settings::Settings::for_rule(rule_code),
+            &settings::Settings::for_rule(rule_code).with_target_version(PythonVersion::latest()),
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
