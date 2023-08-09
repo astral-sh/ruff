@@ -571,11 +571,11 @@ print("after empty cells")
     }
 
     #[test]
-    fn test_line_magics() -> Result<()> {
-        let path = "line_magics.ipynb".to_string();
+    fn test_ipy_escape_command() -> Result<()> {
+        let path = "ipy_escape_command.ipynb".to_string();
         let (diagnostics, source_kind, _) = test_notebook_path(
             &path,
-            Path::new("line_magics_expected.ipynb"),
+            Path::new("ipy_escape_command_expected.ipynb"),
             &settings::Settings::for_rule(Rule::UnusedImport),
         )?;
         assert_messages!(diagnostics, path, source_kind);

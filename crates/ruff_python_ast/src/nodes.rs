@@ -95,20 +95,20 @@ pub enum Stmt {
     Continue(StmtContinue),
 
     // Jupyter notebook specific
-    #[is(name = "line_magic_stmt")]
-    LineMagic(StmtLineMagic),
+    #[is(name = "ipy_escape_command_stmt")]
+    IpyEscapeCommand(StmtIpyEscapeCommand),
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct StmtLineMagic {
+pub struct StmtIpyEscapeCommand {
     pub range: TextRange,
-    pub kind: MagicKind,
+    pub kind: IpyEscapeKind,
     pub value: String,
 }
 
-impl From<StmtLineMagic> for Stmt {
-    fn from(payload: StmtLineMagic) -> Self {
-        Stmt::LineMagic(payload)
+impl From<StmtIpyEscapeCommand> for Stmt {
+    fn from(payload: StmtIpyEscapeCommand) -> Self {
+        Stmt::IpyEscapeCommand(payload)
     }
 }
 
@@ -570,20 +570,20 @@ pub enum Expr {
     Slice(ExprSlice),
 
     // Jupyter notebook specific
-    #[is(name = "line_magic_expr")]
-    LineMagic(ExprLineMagic),
+    #[is(name = "ipy_escape_command_expr")]
+    IpyEscapeCommand(ExprIpyEscapeCommand),
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct ExprLineMagic {
+pub struct ExprIpyEscapeCommand {
     pub range: TextRange,
-    pub kind: MagicKind,
+    pub kind: IpyEscapeKind,
     pub value: String,
 }
 
-impl From<ExprLineMagic> for Expr {
-    fn from(payload: ExprLineMagic) -> Self {
-        Expr::LineMagic(payload)
+impl From<ExprIpyEscapeCommand> for Expr {
+    fn from(payload: ExprIpyEscapeCommand) -> Self {
+        Expr::IpyEscapeCommand(payload)
     }
 }
 
@@ -2253,103 +2253,103 @@ impl Parameters {
     }
 }
 
-/// The kind of magic command as defined in [IPython Syntax] in the IPython codebase.
+/// The kind of escape command as defined in [IPython Syntax] in the IPython codebase.
 ///
 /// [IPython Syntax]: https://github.com/ipython/ipython/blob/635815e8f1ded5b764d66cacc80bbe25e9e2587f/IPython/core/inputtransformer2.py#L335-L343
 #[derive(PartialEq, Eq, Debug, Clone, Hash, Copy)]
-pub enum MagicKind {
-    /// Send line to underlying system shell.
+pub enum IpyEscapeKind {
+    /// Send line to underlying system shell (`!`).
     Shell,
-    /// Send line to system shell and capture output.
+    /// Send line to system shell and capture output (`!!`).
     ShCap,
-    /// Show help on object.
+    /// Show help on object (`?`).
     Help,
-    /// Show help on object, with extra verbosity.
+    /// Show help on object, with extra verbosity (`??`).
     Help2,
-    /// Call magic function.
+    /// Call magic function (`%`).
     Magic,
-    /// Call cell magic function.
+    /// Call cell magic function (`%%`).
     Magic2,
     /// Call first argument with rest of line as arguments after splitting on whitespace
-    /// and quote each as string.
+    /// and quote each as string (`,`).
     Quote,
-    /// Call first argument with rest of line as an argument quoted as a single string.
+    /// Call first argument with rest of line as an argument quoted as a single string (`;`).
     Quote2,
-    /// Call first argument with rest of line as arguments.
+    /// Call first argument with rest of line as arguments (`/`).
     Paren,
 }
 
-impl TryFrom<char> for MagicKind {
+impl TryFrom<char> for IpyEscapeKind {
     type Error = String;
 
     fn try_from(ch: char) -> Result<Self, Self::Error> {
         match ch {
-            '!' => Ok(MagicKind::Shell),
-            '?' => Ok(MagicKind::Help),
-            '%' => Ok(MagicKind::Magic),
-            ',' => Ok(MagicKind::Quote),
-            ';' => Ok(MagicKind::Quote2),
-            '/' => Ok(MagicKind::Paren),
+            '!' => Ok(IpyEscapeKind::Shell),
+            '?' => Ok(IpyEscapeKind::Help),
+            '%' => Ok(IpyEscapeKind::Magic),
+            ',' => Ok(IpyEscapeKind::Quote),
+            ';' => Ok(IpyEscapeKind::Quote2),
+            '/' => Ok(IpyEscapeKind::Paren),
             _ => Err(format!("Unexpected magic escape: {ch}")),
         }
     }
 }
 
-impl TryFrom<[char; 2]> for MagicKind {
+impl TryFrom<[char; 2]> for IpyEscapeKind {
     type Error = String;
 
     fn try_from(ch: [char; 2]) -> Result<Self, Self::Error> {
         match ch {
-            ['!', '!'] => Ok(MagicKind::ShCap),
-            ['?', '?'] => Ok(MagicKind::Help2),
-            ['%', '%'] => Ok(MagicKind::Magic2),
+            ['!', '!'] => Ok(IpyEscapeKind::ShCap),
+            ['?', '?'] => Ok(IpyEscapeKind::Help2),
+            ['%', '%'] => Ok(IpyEscapeKind::Magic2),
             [c1, c2] => Err(format!("Unexpected magic escape: {c1}{c2}")),
         }
     }
 }
 
-impl fmt::Display for MagicKind {
+impl fmt::Display for IpyEscapeKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.as_str())
     }
 }
 
-impl MagicKind {
-    /// Returns the length of the magic command prefix.
+impl IpyEscapeKind {
+    /// Returns the length of the escape kind token.
     pub fn prefix_len(self) -> TextSize {
         let len = match self {
-            MagicKind::Shell
-            | MagicKind::Magic
-            | MagicKind::Help
-            | MagicKind::Quote
-            | MagicKind::Quote2
-            | MagicKind::Paren => 1,
-            MagicKind::ShCap | MagicKind::Magic2 | MagicKind::Help2 => 2,
+            IpyEscapeKind::Shell
+            | IpyEscapeKind::Magic
+            | IpyEscapeKind::Help
+            | IpyEscapeKind::Quote
+            | IpyEscapeKind::Quote2
+            | IpyEscapeKind::Paren => 1,
+            IpyEscapeKind::ShCap | IpyEscapeKind::Magic2 | IpyEscapeKind::Help2 => 2,
         };
         len.into()
     }
 
-    /// Returns `true` if the kind is a help command i.e., `?` or `??`.
+    /// Returns `true` if the escape kind is help i.e., `?` or `??`.
     pub const fn is_help(self) -> bool {
-        matches!(self, MagicKind::Help | MagicKind::Help2)
+        matches!(self, IpyEscapeKind::Help | IpyEscapeKind::Help2)
     }
 
-    /// Returns `true` if the kind is a magic command i.e., `%` or `%%`.
+    /// Returns `true` if the escape kind is magic i.e., `%` or `%%`.
     pub const fn is_magic(self) -> bool {
-        matches!(self, MagicKind::Magic | MagicKind::Magic2)
+        matches!(self, IpyEscapeKind::Magic | IpyEscapeKind::Magic2)
     }
 
     pub fn as_str(self) -> &'static str {
         match self {
-            MagicKind::Shell => "!",
-            MagicKind::ShCap => "!!",
-            MagicKind::Help => "?",
-            MagicKind::Help2 => "??",
-            MagicKind::Magic => "%",
-            MagicKind::Magic2 => "%%",
-            MagicKind::Quote => ",",
-            MagicKind::Quote2 => ";",
-            MagicKind::Paren => "/",
+            IpyEscapeKind::Shell => "!",
+            IpyEscapeKind::ShCap => "!!",
+            IpyEscapeKind::Help => "?",
+            IpyEscapeKind::Help2 => "??",
+            IpyEscapeKind::Magic => "%",
+            IpyEscapeKind::Magic2 => "%%",
+            IpyEscapeKind::Quote => ",",
+            IpyEscapeKind::Quote2 => ";",
+            IpyEscapeKind::Paren => "/",
         }
     }
 }
@@ -2686,7 +2686,7 @@ impl Ranged for crate::nodes::StmtContinue {
         self.range
     }
 }
-impl Ranged for StmtLineMagic {
+impl Ranged for StmtIpyEscapeCommand {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -2719,7 +2719,7 @@ impl Ranged for crate::Stmt {
             Self::Pass(node) => node.range(),
             Self::Break(node) => node.range(),
             Self::Continue(node) => node.range(),
-            Stmt::LineMagic(node) => node.range(),
+            Stmt::IpyEscapeCommand(node) => node.range(),
         }
     }
 }
@@ -2859,7 +2859,7 @@ impl Ranged for crate::nodes::ExprSlice {
         self.range
     }
 }
-impl Ranged for ExprLineMagic {
+impl Ranged for ExprIpyEscapeCommand {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -2894,7 +2894,7 @@ impl Ranged for crate::Expr {
             Self::List(node) => node.range(),
             Self::Tuple(node) => node.range(),
             Self::Slice(node) => node.range(),
-            Expr::LineMagic(node) => node.range(),
+            Expr::IpyEscapeCommand(node) => node.range(),
         }
     }
 }

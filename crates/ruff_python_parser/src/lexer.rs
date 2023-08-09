@@ -34,7 +34,7 @@ use std::{char, cmp::Ordering, str::FromStr};
 
 use num_bigint::BigInt;
 use num_traits::{Num, Zero};
-use ruff_python_ast::MagicKind;
+use ruff_python_ast::IpyEscapeKind;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use unic_emoji_char::is_emoji_presentation;
 use unic_ucd_ident::{is_xid_continue, is_xid_start};
@@ -398,8 +398,8 @@ impl<'source> Lexer<'source> {
         Tok::Comment(self.token_text().to_string())
     }
 
-    /// Lex a single magic command.
-    fn lex_magic_command(&mut self, kind: MagicKind) -> Tok {
+    /// Lex a single IPython escape command.
+    fn lex_ipython_escape_command(&mut self, escape_kind: IpyEscapeKind) -> Tok {
         let mut value = String::new();
 
         loop {
@@ -457,7 +457,7 @@ impl<'source> Lexer<'source> {
                     // Now, the whitespace and empty value check also makes sure that an empty
                     // command (e.g. `%?` or `? ??`, no value after/between the escape tokens)
                     // is not recognized as a help end escape command. So, `%?` and `? ??` are
-                    // `MagicKind::Magic` and `MagicKind::Help` because of the initial `%` and `??`
+                    // `IpyEscapeKind::Magic` and `IpyEscapeKind::Help` because of the initial `%` and `??`
                     // tokens.
                     if question_count > 2
                         || value.chars().last().map_or(true, is_python_whitespace)
@@ -471,31 +471,34 @@ impl<'source> Lexer<'source> {
                         continue;
                     }
 
-                    if kind.is_help() {
+                    if escape_kind.is_help() {
                         // If we've recognize this as a help end escape command, then
                         // any question mark token / whitespaces at the start are not
                         // considered as part of the value.
                         //
-                        // For example, `??foo?` is recognized as `MagicKind::Help` and
+                        // For example, `??foo?` is recognized as `IpyEscapeKind::Help` and
                         // `value` is `foo` instead of `??foo`.
                         value = value.trim_start_matches([' ', '?']).to_string();
-                    } else if kind.is_magic() {
+                    } else if escape_kind.is_magic() {
                         // Between `%` and `?` (at the end), the `?` takes priority
-                        // over the `%` so `%foo?` is recognized as `MagicKind::Help`
+                        // over the `%` so `%foo?` is recognized as `IpyEscapeKind::Help`
                         // and `value` is `%foo` instead of `foo`. So, we need to
                         // insert the magic escape token at the start.
-                        value.insert_str(0, kind.as_str());
+                        value.insert_str(0, escape_kind.as_str());
                     }
 
                     let kind = match question_count {
-                        1 => MagicKind::Help,
-                        2 => MagicKind::Help2,
+                        1 => IpyEscapeKind::Help,
+                        2 => IpyEscapeKind::Help2,
                         _ => unreachable!("`question_count` is always 1 or 2"),
                     };
-                    return Tok::MagicCommand { kind, value };
+                    return Tok::IpyEscapeCommand { kind, value };
                 }
                 '\n' | '\r' | EOF_CHAR => {
-                    return Tok::MagicCommand { kind, value };
+                    return Tok::IpyEscapeCommand {
+                        kind: escape_kind,
+                        value,
+                    };
                 }
                 c => {
                     self.cursor.bump();
@@ -763,22 +766,22 @@ impl<'source> Lexer<'source> {
                     && self.state.is_after_equal()
                     && self.nesting == 0 =>
             {
-                // SAFETY: Safe because `c` has been matched against one of the possible magic command prefix
-                self.lex_magic_command(MagicKind::try_from(c).unwrap())
+                // SAFETY: Safe because `c` has been matched against one of the possible escape command token
+                self.lex_ipython_escape_command(IpyEscapeKind::try_from(c).unwrap())
             }
 
             c @ ('%' | '!' | '?' | '/' | ';' | ',')
                 if self.mode == Mode::Jupyter && self.state.is_new_logical_line() =>
             {
-                let kind = if let Ok(kind) = MagicKind::try_from([c, self.cursor.first()]) {
+                let kind = if let Ok(kind) = IpyEscapeKind::try_from([c, self.cursor.first()]) {
                     self.cursor.bump();
                     kind
                 } else {
-                    // SAFETY: Safe because `c` has been matched against one of the possible magic command prefix
-                    MagicKind::try_from(c).unwrap()
+                    // SAFETY: Safe because `c` has been matched against one of the possible escape command token
+                    IpyEscapeKind::try_from(c).unwrap()
                 };
 
-                self.lex_magic_command(kind)
+                self.lex_ipython_escape_command(kind)
             }
 
             '?' if self.mode == Mode::Jupyter => Tok::Question,
@@ -1208,7 +1211,7 @@ const fn is_python_whitespace(c: char) -> bool {
 #[cfg(test)]
 mod tests {
     use num_bigint::BigInt;
-    use ruff_python_ast::MagicKind;
+    use ruff_python_ast::IpyEscapeKind;
 
     use super::*;
 
@@ -1242,15 +1245,15 @@ mod tests {
         }
     }
 
-    fn assert_jupyter_magic_line_continuation_with_eol(eol: &str) {
+    fn assert_ipython_escape_command_line_continuation_with_eol(eol: &str) {
         let source = format!("%matplotlib \\{eol}  --inline");
         let tokens = lex_jupyter_source(&source);
         assert_eq!(
             tokens,
             vec![
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: "matplotlib   --inline".to_string(),
-                    kind: MagicKind::Magic
+                    kind: IpyEscapeKind::Magic
                 },
                 Tok::Newline
             ]
@@ -1258,29 +1261,29 @@ mod tests {
     }
 
     #[test]
-    fn test_jupyter_magic_line_continuation_unix_eol() {
-        assert_jupyter_magic_line_continuation_with_eol(UNIX_EOL);
+    fn test_ipython_escape_command_line_continuation_unix_eol() {
+        assert_ipython_escape_command_line_continuation_with_eol(UNIX_EOL);
     }
 
     #[test]
-    fn test_jupyter_magic_line_continuation_mac_eol() {
-        assert_jupyter_magic_line_continuation_with_eol(MAC_EOL);
+    fn test_ipython_escape_command_line_continuation_mac_eol() {
+        assert_ipython_escape_command_line_continuation_with_eol(MAC_EOL);
     }
 
     #[test]
-    fn test_jupyter_magic_line_continuation_windows_eol() {
-        assert_jupyter_magic_line_continuation_with_eol(WINDOWS_EOL);
+    fn test_ipython_escape_command_line_continuation_windows_eol() {
+        assert_ipython_escape_command_line_continuation_with_eol(WINDOWS_EOL);
     }
 
-    fn assert_jupyter_magic_line_continuation_with_eol_and_eof(eol: &str) {
+    fn assert_ipython_escape_command_line_continuation_with_eol_and_eof(eol: &str) {
         let source = format!("%matplotlib \\{eol}");
         let tokens = lex_jupyter_source(&source);
         assert_eq!(
             tokens,
             vec![
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: "matplotlib ".to_string(),
-                    kind: MagicKind::Magic
+                    kind: IpyEscapeKind::Magic
                 },
                 Tok::Newline
             ]
@@ -1288,70 +1291,70 @@ mod tests {
     }
 
     #[test]
-    fn test_jupyter_magic_line_continuation_unix_eol_and_eof() {
-        assert_jupyter_magic_line_continuation_with_eol_and_eof(UNIX_EOL);
+    fn test_ipython_escape_command_line_continuation_unix_eol_and_eof() {
+        assert_ipython_escape_command_line_continuation_with_eol_and_eof(UNIX_EOL);
     }
 
     #[test]
-    fn test_jupyter_magic_line_continuation_mac_eol_and_eof() {
-        assert_jupyter_magic_line_continuation_with_eol_and_eof(MAC_EOL);
+    fn test_ipython_escape_command_line_continuation_mac_eol_and_eof() {
+        assert_ipython_escape_command_line_continuation_with_eol_and_eof(MAC_EOL);
     }
 
     #[test]
-    fn test_jupyter_magic_line_continuation_windows_eol_and_eof() {
-        assert_jupyter_magic_line_continuation_with_eol_and_eof(WINDOWS_EOL);
+    fn test_ipython_escape_command_line_continuation_windows_eol_and_eof() {
+        assert_ipython_escape_command_line_continuation_with_eol_and_eof(WINDOWS_EOL);
     }
 
     #[test]
-    fn test_empty_jupyter_magic() {
+    fn test_empty_ipython_escape_command() {
         let source = "%\n%%\n!\n!!\n?\n??\n/\n,\n;";
         let tokens = lex_jupyter_source(source);
         assert_eq!(
             tokens,
             vec![
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: String::new(),
-                    kind: MagicKind::Magic,
+                    kind: IpyEscapeKind::Magic,
                 },
                 Tok::Newline,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: String::new(),
-                    kind: MagicKind::Magic2,
+                    kind: IpyEscapeKind::Magic2,
                 },
                 Tok::Newline,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: String::new(),
-                    kind: MagicKind::Shell,
+                    kind: IpyEscapeKind::Shell,
                 },
                 Tok::Newline,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: String::new(),
-                    kind: MagicKind::ShCap,
+                    kind: IpyEscapeKind::ShCap,
                 },
                 Tok::Newline,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: String::new(),
-                    kind: MagicKind::Help,
+                    kind: IpyEscapeKind::Help,
                 },
                 Tok::Newline,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: String::new(),
-                    kind: MagicKind::Help2,
+                    kind: IpyEscapeKind::Help2,
                 },
                 Tok::Newline,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: String::new(),
-                    kind: MagicKind::Paren,
+                    kind: IpyEscapeKind::Paren,
                 },
                 Tok::Newline,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: String::new(),
-                    kind: MagicKind::Quote,
+                    kind: IpyEscapeKind::Quote,
                 },
                 Tok::Newline,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: String::new(),
-                    kind: MagicKind::Quote2,
+                    kind: IpyEscapeKind::Quote2,
                 },
                 Tok::Newline,
             ]
@@ -1359,7 +1362,7 @@ mod tests {
     }
 
     #[test]
-    fn test_jupyter_magic() {
+    fn test_ipython_escape_command() {
         let source = r"
 ?foo
 ??foo
@@ -1380,59 +1383,59 @@ mod tests {
         assert_eq!(
             tokens,
             vec![
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: "foo".to_string(),
-                    kind: MagicKind::Help,
+                    kind: IpyEscapeKind::Help,
                 },
                 Tok::Newline,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: "foo".to_string(),
-                    kind: MagicKind::Help2,
+                    kind: IpyEscapeKind::Help2,
                 },
                 Tok::Newline,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: "timeit a = b".to_string(),
-                    kind: MagicKind::Magic,
+                    kind: IpyEscapeKind::Magic,
                 },
                 Tok::Newline,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: "timeit a % 3".to_string(),
-                    kind: MagicKind::Magic,
+                    kind: IpyEscapeKind::Magic,
                 },
                 Tok::Newline,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: "matplotlib     --inline".to_string(),
-                    kind: MagicKind::Magic,
+                    kind: IpyEscapeKind::Magic,
                 },
                 Tok::Newline,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: "pwd   && ls -a | sed 's/^/\\\\    /'".to_string(),
-                    kind: MagicKind::Shell,
+                    kind: IpyEscapeKind::Shell,
                 },
                 Tok::Newline,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: "cd /Users/foo/Library/Application\\ Support/".to_string(),
-                    kind: MagicKind::ShCap,
+                    kind: IpyEscapeKind::ShCap,
                 },
                 Tok::Newline,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: "foo 1 2".to_string(),
-                    kind: MagicKind::Paren,
+                    kind: IpyEscapeKind::Paren,
                 },
                 Tok::Newline,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: "foo 1 2".to_string(),
-                    kind: MagicKind::Quote,
+                    kind: IpyEscapeKind::Quote,
                 },
                 Tok::Newline,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: "foo 1 2".to_string(),
-                    kind: MagicKind::Quote2,
+                    kind: IpyEscapeKind::Quote2,
                 },
                 Tok::Newline,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: "ls".to_string(),
-                    kind: MagicKind::Shell,
+                    kind: IpyEscapeKind::Shell,
                 },
                 Tok::Newline,
             ]
@@ -1440,7 +1443,7 @@ mod tests {
     }
 
     #[test]
-    fn test_jupyter_magic_help_end() {
+    fn test_ipython_help_end_escape_command() {
         let source = r"
 ?foo?
 ??   foo?
@@ -1465,84 +1468,84 @@ mod tests {
         assert_eq!(
             tokens,
             [
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: "foo".to_string(),
-                    kind: MagicKind::Help,
+                    kind: IpyEscapeKind::Help,
                 },
                 Tok::Newline,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: "foo".to_string(),
-                    kind: MagicKind::Help,
+                    kind: IpyEscapeKind::Help,
                 },
                 Tok::Newline,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: "   foo  ?".to_string(),
-                    kind: MagicKind::Help2,
+                    kind: IpyEscapeKind::Help2,
                 },
                 Tok::Newline,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: "foo".to_string(),
-                    kind: MagicKind::Help2,
+                    kind: IpyEscapeKind::Help2,
                 },
                 Tok::Newline,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: "foo".to_string(),
-                    kind: MagicKind::Help2,
+                    kind: IpyEscapeKind::Help2,
                 },
                 Tok::Newline,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: "foo".to_string(),
-                    kind: MagicKind::Help,
+                    kind: IpyEscapeKind::Help,
                 },
                 Tok::Newline,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: "foo".to_string(),
-                    kind: MagicKind::Help2,
+                    kind: IpyEscapeKind::Help2,
                 },
                 Tok::Newline,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: "foo???".to_string(),
-                    kind: MagicKind::Help2,
+                    kind: IpyEscapeKind::Help2,
                 },
                 Tok::Newline,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: "?foo???".to_string(),
-                    kind: MagicKind::Help2,
+                    kind: IpyEscapeKind::Help2,
                 },
                 Tok::Newline,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: "foo".to_string(),
-                    kind: MagicKind::Help,
+                    kind: IpyEscapeKind::Help,
                 },
                 Tok::Newline,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: " ?".to_string(),
-                    kind: MagicKind::Help2,
+                    kind: IpyEscapeKind::Help2,
                 },
                 Tok::Newline,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: "??".to_string(),
-                    kind: MagicKind::Help2,
+                    kind: IpyEscapeKind::Help2,
                 },
                 Tok::Newline,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: "%foo".to_string(),
-                    kind: MagicKind::Help,
+                    kind: IpyEscapeKind::Help,
                 },
                 Tok::Newline,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: "%foo".to_string(),
-                    kind: MagicKind::Help2,
+                    kind: IpyEscapeKind::Help2,
                 },
                 Tok::Newline,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: "foo???".to_string(),
-                    kind: MagicKind::Magic2,
+                    kind: IpyEscapeKind::Magic2,
                 },
                 Tok::Newline,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: "pwd".to_string(),
-                    kind: MagicKind::Help,
+                    kind: IpyEscapeKind::Help,
                 },
                 Tok::Newline,
             ]
@@ -1550,7 +1553,7 @@ mod tests {
     }
 
     #[test]
-    fn test_jupyter_magic_indentation() {
+    fn test_ipython_escape_command_indentation() {
         let source = r"
 if True:
     %matplotlib \
@@ -1565,9 +1568,9 @@ if True:
                 Tok::Colon,
                 Tok::Newline,
                 Tok::Indent,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: "matplotlib         --inline".to_string(),
-                    kind: MagicKind::Magic,
+                    kind: IpyEscapeKind::Magic,
                 },
                 Tok::Newline,
                 Tok::Dedent,
@@ -1576,7 +1579,7 @@ if True:
     }
 
     #[test]
-    fn test_jupyter_magic_assignment() {
+    fn test_ipython_escape_command_assignment() {
         let source = r"
 pwd = !pwd
 foo = %timeit a = b
@@ -1592,54 +1595,54 @@ baz = %matplotlib \
                     name: "pwd".to_string()
                 },
                 Tok::Equal,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: "pwd".to_string(),
-                    kind: MagicKind::Shell,
+                    kind: IpyEscapeKind::Shell,
                 },
                 Tok::Newline,
                 Tok::Name {
                     name: "foo".to_string()
                 },
                 Tok::Equal,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: "timeit a = b".to_string(),
-                    kind: MagicKind::Magic,
+                    kind: IpyEscapeKind::Magic,
                 },
                 Tok::Newline,
                 Tok::Name {
                     name: "bar".to_string()
                 },
                 Tok::Equal,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: "timeit a % 3".to_string(),
-                    kind: MagicKind::Magic,
+                    kind: IpyEscapeKind::Magic,
                 },
                 Tok::Newline,
                 Tok::Name {
                     name: "baz".to_string()
                 },
                 Tok::Equal,
-                Tok::MagicCommand {
+                Tok::IpyEscapeCommand {
                     value: "matplotlib         inline".to_string(),
-                    kind: MagicKind::Magic,
+                    kind: IpyEscapeKind::Magic,
                 },
                 Tok::Newline,
             ]
         );
     }
 
-    fn assert_no_jupyter_magic(tokens: &[Tok]) {
+    fn assert_no_ipython_escape_command(tokens: &[Tok]) {
         for tok in tokens {
-            if let Tok::MagicCommand { .. } = tok {
-                panic!("Unexpected magic command token: {tok:?}")
+            if let Tok::IpyEscapeCommand { .. } = tok {
+                panic!("Unexpected escape command token: {tok:?}")
             }
         }
     }
 
     #[test]
-    fn test_jupyter_magic_not_an_assignment() {
+    fn test_ipython_escape_command_not_an_assignment() {
         let source = r"
-# Other magic kinds are not valid here (can't test `foo = ?str` because '?' is not a valid token)
+# Other escape kinds are not valid here (can't test `foo = ?str` because '?' is not a valid token)
 foo = /func
 foo = ;func
 foo = ,func
@@ -1650,7 +1653,7 @@ def f(arg=%timeit a = b):
     pass"
             .trim();
         let tokens = lex_jupyter_source(source);
-        assert_no_jupyter_magic(&tokens);
+        assert_no_ipython_escape_command(&tokens);
     }
 
     #[test]

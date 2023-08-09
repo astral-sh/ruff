@@ -418,7 +418,7 @@ where
             | Stmt::Continue(_)
             | Stmt::Global(_)
             | Stmt::Nonlocal(_)
-            | Stmt::LineMagic(_) => {}
+            | Stmt::IpyEscapeCommand(_) => {}
         }
     }
 
@@ -719,7 +719,7 @@ where
                     visitor.visit_expr(expr);
                 }
             }
-            Expr::LineMagic(_) => (),
+            Expr::IpyEscapeCommand(_) => (),
         }
     }
 

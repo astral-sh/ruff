@@ -656,7 +656,7 @@ impl<'a> Generator<'a> {
                     self.p("continue");
                 });
             }
-            Stmt::LineMagic(ast::StmtLineMagic { kind, value, .. }) => {
+            Stmt::IpyEscapeCommand(ast::StmtIpyEscapeCommand { kind, value, .. }) => {
                 statement!({
                     self.p(&format!("{kind}{value}"));
                 });
@@ -1184,7 +1184,7 @@ impl<'a> Generator<'a> {
                     self.unparse_expr(step, precedence::SLICE);
                 }
             }
-            Expr::LineMagic(ast::ExprLineMagic { kind, value, .. }) => {
+            Expr::IpyEscapeCommand(ast::ExprIpyEscapeCommand { kind, value, .. }) => {
                 self.p(&format!("{kind}{value}"));
             }
         }

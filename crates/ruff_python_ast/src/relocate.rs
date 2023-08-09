@@ -199,7 +199,7 @@ pub fn relocate_expr(expr: &mut Expr, location: TextRange) {
                 relocate_expr(expr, location);
             }
         }
-        Expr::LineMagic(nodes::ExprLineMagic { range, .. }) => {
+        Expr::IpyEscapeCommand(nodes::ExprIpyEscapeCommand { range, .. }) => {
             *range = location;
         }
     }

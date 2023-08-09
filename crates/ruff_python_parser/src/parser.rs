@@ -117,7 +117,7 @@ pub fn parse_expression_starts_at(
 ///
 /// This function is the most general function to parse Python code. Based on the [`Mode`] supplied,
 /// it can be used to parse a single expression, a full Python program, an interactive expression
-/// or a Python program containing Jupyter magics.
+/// or a Python program containing IPython escape commands.
 ///
 /// # Example
 ///
@@ -146,7 +146,7 @@ pub fn parse_expression_starts_at(
 /// assert!(program.is_ok());
 /// ```
 ///
-/// Additionally, we can parse a Python program containing Jupyter magics:
+/// Additionally, we can parse a Python program containing IPython escapes:
 ///
 /// ```
 /// use ruff_python_parser::{Mode, parse};
@@ -1122,7 +1122,7 @@ class Abcd:
     }
 
     #[test]
-    fn test_jupyter_magic() {
+    fn test_ipython_escape_commands() {
         let parse_ast = parse(
             r#"
 # Normal Python code
@@ -1169,7 +1169,7 @@ def foo():
 ;foo 1 2
 ,foo 1 2
 
-# Indented magic
+# Indented escape commands
 for a in range(5):
     !ls
 
@@ -1199,7 +1199,7 @@ foo.bar[0].baz[2].egg??
     }
 
     #[test]
-    fn test_jupyter_magic_parse_error() {
+    fn test_ipython_escape_command_parse_error() {
         let source = r#"
 a = 1
 %timeit a == 1
@@ -1209,7 +1209,7 @@ a = 1
         let parse_err = parse_tokens(lxr, Mode::Module, "<test>").unwrap_err();
         assert_eq!(
             parse_err.to_string(),
-            "line magics are only allowed in Jupyter mode at byte offset 6".to_string()
+            "IPython escape commands are only allowed in Jupyter mode at byte offset 6".to_string()
         );
     }
 }
