@@ -188,14 +188,23 @@ impl FormatParse for FormatType {
 
 #[derive(Debug, PartialEq)]
 pub struct FormatSpec {
+    // Ex) `!s` in `'{!s}'`
     conversion: Option<FormatConversion>,
+    // Ex) `*` in `'{:*^30}'`
     fill: Option<char>,
+    // Ex) `<` in `'{:<30}'`
     align: Option<FormatAlign>,
+    // Ex) `+` in `'{:+f}'`
     sign: Option<FormatSign>,
+    // Ex) `#` in `'{:#x}'`
     alternate_form: bool,
+    // Ex) `30` in `'{:<30}'`
     width: Option<usize>,
+    // Ex) `,` in `'{:,}'`
     grouping_option: Option<FormatGrouping>,
+    // Ex) `2` in `'{:.2}'`
     precision: Option<usize>,
+    // Ex) `f` in `'{:+f}'`
     format_type: Option<FormatType>,
 }
 
