@@ -14,6 +14,7 @@ use crate::{
     string::parse_strings,
     token::{self, StringKind},
 };
+use lalrpop_util::ParseError;
 
 grammar(mode: Mode);
 
@@ -89,6 +90,7 @@ SmallStatement: ast::Stmt = {
     AssertStatement,
     TypeAliasStatement,
     LineMagicStatement,
+    HelpEndLineMagic,
 };
 
 PassStatement: ast::Stmt = {
@@ -363,6 +365,78 @@ LineMagicExpr: ast::Expr = {
                 location,
             })?
         }
+    }
+}
+
+HelpEndLineMagic: ast::Stmt = {
+    // We are permissive than the original implementation because we would allow whitespace
+    // between the expression and the suffix while the IPython implementation doesn't allow it.
+    // For example, `foo ?` would be valid in our case but invalid from IPython.
+    <location:@L> <e:Expression<"All">> <suffix:("?")+> <end_location:@R> =>? {
+        fn unparse_expr(expr: &ast::Expr, buffer: &mut String) -> Result<(), LexicalError> {
+            match expr {
+                ast::Expr::Name(ast::ExprName { id, .. }) => {
+                    buffer.push_str(id.as_str());
+                },
+                ast::Expr::Subscript(ast::ExprSubscript { value, slice, range, .. }) => {
+                    let ast::Expr::Constant(ast::ExprConstant { value: ast::Constant::Int(integer), .. }) = slice.as_ref() else {
+                        return Err(LexicalError {
+                            error: LexicalErrorType::OtherError("only integer constants are allowed in Subscript expressions in help end escape command".to_string()),
+                            location: range.start(),
+                        });
+                    };
+                    unparse_expr(value, buffer)?;
+                    buffer.push('[');
+                    buffer.push_str(&format!("{}", integer));
+                    buffer.push(']');
+                },
+                ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
+                    unparse_expr(value, buffer)?;
+                    buffer.push('.');
+                    buffer.push_str(attr.as_str());
+                },
+                _ => {
+                    return Err(LexicalError {
+                        error: LexicalErrorType::OtherError("only Name, Subscript and Attribute expressions are allowed in help end escape command".to_string()),
+                        location: expr.range().start(),
+                    });
+                }
+            }
+            Ok(())
+        }
+        
+        if mode != Mode::Jupyter {
+            return Err(ParseError::User {
+                error: LexicalError {
+                    error: LexicalErrorType::OtherError("IPython escape commands are only allowed in Jupyter mode".to_string()),
+                    location,
+                },
+            });
+        }
+
+        let kind = match suffix.len() {
+            1 => MagicKind::Help,
+            2 => MagicKind::Help2,
+            _ => {
+                return Err(ParseError::User {
+                    error: LexicalError {
+                        error: LexicalErrorType::OtherError("maximum of 2 `?` tokens are allowed in help end escape command".to_string()),
+                        location,
+                    },
+                });
+            }
+        };
+
+        let mut value = String::new();
+        unparse_expr(&e, &mut value)?;
+        
+        Ok(ast::Stmt::LineMagic(
+            ast::StmtLineMagic {
+                kind,
+                value,
+                range: (location..end_location).into()
+            }
+        ))
     }
 }
 
@@ -1732,6 +1806,7 @@ extern {
         Dedent => token::Tok::Dedent,
         StartModule => token::Tok::StartModule,
         StartExpression => token::Tok::StartExpression,
+        "?" => token::Tok::Question,
         "+" => token::Tok::Plus,
         "-" => token::Tok::Minus,
         "~" => token::Tok::Tilde,

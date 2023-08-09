@@ -4,7 +4,7 @@ expression: parse_ast
 ---
 Module(
     ModModule {
-        range: 0..803,
+        range: 0..919,
         body: [
             Expr(
                 StmtExpr {
@@ -344,6 +344,55 @@ Module(
                             value: "foo  # comment",
                         },
                     ),
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 828..832,
+                    kind: Help,
+                    value: "foo",
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 833..842,
+                    kind: Help2,
+                    value: "foo.bar",
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 843..855,
+                    kind: Help,
+                    value: "foo.bar.baz",
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 856..864,
+                    kind: Help2,
+                    value: "foo[0]",
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 865..875,
+                    kind: Help,
+                    value: "foo[0][1]",
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 876..895,
+                    kind: Help2,
+                    value: "foo.bar[0].baz[1]",
+                },
+            ),
+            LineMagic(
+                StmtLineMagic {
+                    range: 896..919,
+                    kind: Help2,
+                    value: "foo.bar[0].baz[2].egg",
                 },
             ),
         ],

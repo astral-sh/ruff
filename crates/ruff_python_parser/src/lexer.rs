@@ -780,6 +780,9 @@ impl<'source> Lexer<'source> {
 
                 self.lex_magic_command(kind)
             }
+
+            '?' if self.mode == Mode::Jupyter => Tok::Question,
+
             '/' => {
                 if self.cursor.eat_char('=') {
                     Tok::SlashEqual
