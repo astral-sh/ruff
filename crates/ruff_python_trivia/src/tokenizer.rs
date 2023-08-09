@@ -226,7 +226,7 @@ impl SimpleTokenKind {
         }
     }
 
-    const fn is_trivia(self) -> bool {
+    pub const fn is_trivia(self) -> bool {
         matches!(
             self,
             SimpleTokenKind::Whitespace

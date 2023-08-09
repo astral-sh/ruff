@@ -3,11 +3,9 @@ use std::cmp::Ordering;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{self as ast, Comprehension, Expr, MatchCase, Parameters, Ranged};
-use ruff_python_trivia::{
-    indentation_at_offset, PythonWhitespace, SimpleToken, SimpleTokenKind, SimpleTokenizer,
-};
-use ruff_source_file::{Locator, UniversalNewlines};
-use ruff_text_size::TextRange;
+use ruff_python_trivia::{indentation_at_offset, SimpleToken, SimpleTokenKind, SimpleTokenizer};
+use ruff_source_file::Locator;
+use ruff_text_size::{TextLen, TextRange};
 
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
 use crate::expression::expr_slice::{assign_comment_in_slice, ExprSliceCommentSection};
@@ -1439,20 +1437,32 @@ fn is_first_statement_in_alternate_body(statement: AnyNodeRef, has_body: AnyNode
 }
 
 /// Counts the number of newlines in `contents`.
-fn max_empty_lines(contents: &str) -> usize {
-    let mut empty_lines = 0;
-    let mut max_empty_lines = 0;
+fn max_empty_lines(contents: &str) -> u32 {
+    let mut newlines = 0u32;
+    let mut max_new_lines = 0;
 
-    for line in contents.universal_newlines().skip(1) {
-        if line.trim_whitespace().is_empty() {
-            empty_lines += 1;
-        } else {
-            max_empty_lines = max_empty_lines.max(empty_lines);
-            empty_lines = 0;
+    let mut tokenizer = SimpleTokenizer::new(contents, TextRange::up_to(contents.text_len()));
+
+    while let Some(token) = tokenizer.next() {
+        match token.kind() {
+            SimpleTokenKind::Newline => {
+                newlines += 1;
+            }
+            SimpleTokenKind::Whitespace => {}
+
+            SimpleTokenKind::Comment => {
+                max_new_lines = newlines.max(max_new_lines);
+                newlines = 0;
+            }
+
+            _ => {
+                max_new_lines = newlines.max(max_new_lines);
+                break;
+            }
         }
     }
 
-    max_empty_lines
+    max_new_lines.saturating_sub(1)
 }
 
 #[cfg(test)]
