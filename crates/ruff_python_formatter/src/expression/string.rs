@@ -767,6 +767,7 @@ pub(crate) fn format_docstring(
         string_part.preferred_quotes,
         string_part.is_raw_string,
     );
+    let already_normalized = matches!(normalized, Cow::Borrowed(_)); // is_borrowed is unstable :/
 
     // Black doesn't change the indentation of docstring that contain an escaped newline
     if normalized.contains("\\\n") {
@@ -810,13 +811,10 @@ pub(crate) fn format_docstring(
         let leading_whitespace = trim_end.text_len() - trim_end.trim_start().text_len();
         let trimmed_line_range =
             TextRange::at(offset, trim_end.text_len()).add_start(leading_whitespace);
-        match normalized {
-            Cow::Borrowed(_) => {
-                source_text_slice(trimmed_line_range, ContainsNewlines::No).fmt(f)?;
-            }
-            Cow::Owned(_) => {
-                dynamic_text(trim_end.trim_start(), Some(trimmed_line_range.start())).fmt(f)?;
-            }
+        if already_normalized {
+            source_text_slice(trimmed_line_range, ContainsNewlines::No).fmt(f)?;
+        } else {
+            dynamic_text(trim_end.trim_start(), Some(trimmed_line_range.start())).fmt(f)?;
         }
     }
     offset += first.text_len();
@@ -849,9 +847,9 @@ pub(crate) fn format_docstring(
     // indent printer-made indentation
     let stripped_indentation = lines
         .clone()
-        // We don't want to count whitespace-only lines as mis-indented
+        // We don't want to count whitespace-only lines as miss-indented
         .filter(|line| !line.trim().is_empty())
-        .map(|line| count_indentation_like_black(line))
+        .map(count_indentation_like_black)
         .min()
         .unwrap_or_default();
 
@@ -863,7 +861,7 @@ pub(crate) fn format_docstring(
             offset,
             stripped_indentation,
             &string_part,
-            &normalized,
+            already_normalized,
             f,
         )?;
         // We know that the normalized string has \n line endings
@@ -879,7 +877,7 @@ fn format_docstring_line(
     offset: TextSize,
     stripped_indentation: TextSize,
     string_part: &FormatStringPart,
-    normalized: &Cow<str>,
+    already_normalized: bool,
     f: &mut PyFormatter,
 ) -> FormatResult<()> {
     let trim_end = line.trim_end();
@@ -903,23 +901,20 @@ fn format_docstring_line(
         // that we add the in-docstring indentation that is independent of the general block
         // indent of the suite statement we are in and that indents the docstring statement.
         let indent_len = count_indentation_like_black(trim_end) - stripped_indentation;
-        let in_docstring_indent = " ".repeat(indent_len.to_usize()) + &trim_end.trim_start();
+        let in_docstring_indent = " ".repeat(indent_len.to_usize()) + trim_end.trim_start();
         dynamic_text(&in_docstring_indent, Some(offset)).fmt(f)?;
     } else {
         let trimmed_line_range =
             TextRange::at(offset, trim_end.text_len()).add_start(stripped_indentation);
-        match normalized {
-            Cow::Borrowed(_) => {
-                source_text_slice(trimmed_line_range, ContainsNewlines::No).fmt(f)?;
-            }
-            Cow::Owned(_) => {
-                // All indents are ascii spaces, so the slicing is correct
-                dynamic_text(
-                    &trim_end[stripped_indentation.to_usize()..],
-                    Some(trimmed_line_range.start()),
-                )
-                .fmt(f)?;
-            }
+        if already_normalized {
+            source_text_slice(trimmed_line_range, ContainsNewlines::No).fmt(f)?;
+        } else {
+            // All indents are ascii spaces, so the slicing is correct
+            dynamic_text(
+                &trim_end[stripped_indentation.to_usize()..],
+                Some(trimmed_line_range.start()),
+            )
+            .fmt(f)?;
         }
     }
 
