@@ -456,7 +456,7 @@ pub struct Options {
     /// contained an `__init__.py` file.
     pub namespace_packages: Option<Vec<String>>,
     #[option(
-        default = r#""py310""#,
+        default = r#""py38""#,
         value_type = r#""py37" | "py38" | "py39" | "py310" | "py311" | "py312""#,
         example = r#"
             # Always generate Python 3.7-compatible code.
