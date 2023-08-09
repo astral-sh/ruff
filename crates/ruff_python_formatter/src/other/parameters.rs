@@ -254,8 +254,8 @@ impl FormatNodeRule<Parameters> for FormatParameters {
                 f,
                 [
                     text("("),
-                    &dangling_open_parenthesis_comments(parenthesis_dangling),
-                    &soft_block_indent(&format_args!(&group(&format_inner),)),
+                    dangling_open_parenthesis_comments(parenthesis_dangling),
+                    soft_block_indent(&group(&format_inner)),
                     text(")")
                 ]
             )
