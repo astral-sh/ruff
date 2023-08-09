@@ -142,10 +142,7 @@ with (
     # trailing
 
 
-with (
-    a,  # a  # comma
-    b,  # c
-):  # colon
+with a, b:  # a  # comma  # c  # colon
     ...
 
 
@@ -218,11 +215,9 @@ with (
     ...
 
 with (
-    (
-        a
-        # trailing own line comment
-    ) as b  # trailing as same line comment  # trailing b same line comment
-):
+    a
+    # trailing own line comment
+) as b:  # trailing as same line comment  # trailing b same line comment
     ...
 
 with (

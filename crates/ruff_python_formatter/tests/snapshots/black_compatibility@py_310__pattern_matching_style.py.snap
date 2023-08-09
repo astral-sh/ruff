@@ -65,7 +65,7 @@ match match(
 ```diff
 --- Black
 +++ Ruff
-@@ -1,35 +1,34 @@
+@@ -1,16 +1,11 @@
  match something:
 -    case b():
 +    case NOT_YET_IMPLEMENTED_Pattern:
@@ -85,29 +85,9 @@ match match(
 +    case NOT_YET_IMPLEMENTED_Pattern:
          pass
  
--match(arg)  # comment
-+match(
-+    arg  # comment
-+)
- 
- match()
- 
- match()
- 
--case(arg)  # comment
-+case(
-+    arg  # comment
-+)
- 
- case()
- 
- case()
- 
- 
--re.match(something)  # fast
-+re.match(
-+    something  # fast
-+)
+ match(arg)  # comment
+@@ -29,7 +24,5 @@
+ re.match(something)  # fast
  re.match()
  match match():
 -    case case(
@@ -130,26 +110,20 @@ match something:
     case NOT_YET_IMPLEMENTED_Pattern:
         pass
 
-match(
-    arg  # comment
-)
+match(arg)  # comment
 
 match()
 
 match()
 
-case(
-    arg  # comment
-)
+case(arg)  # comment
 
 case()
 
 case()
 
 
-re.match(
-    something  # fast
-)
+re.match(something)  # fast
 re.match()
 match match():
     case NOT_YET_IMPLEMENTED_Pattern:

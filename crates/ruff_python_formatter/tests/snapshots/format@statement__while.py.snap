@@ -61,11 +61,7 @@ while some_condition(unformatted, args) and anotherCondition or aThirdCondition:
     print("Do something")
 
 
-while (
-    some_condition(unformatted, args)  # trailing some condition
-    and anotherCondition
-    or aThirdCondition  # trailing third condition
-):  # comment
+while some_condition(unformatted, args) and anotherCondition or aThirdCondition:  # trailing some condition  # trailing third condition  # comment
     print("Do something")
 ```
 

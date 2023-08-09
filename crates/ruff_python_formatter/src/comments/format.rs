@@ -161,10 +161,11 @@ impl Format<PyFormatContext<'_>> for FormatTrailingComments<'_> {
             } else {
                 write!(
                     f,
-                    [
-                        line_suffix(&format_args![space(), space(), format_comment(trailing)]),
-                        expand_parent()
-                    ]
+                    [line_suffix(&format_args![
+                        space(),
+                        space(),
+                        format_comment(trailing)
+                    ])]
                 )?;
             }
 
@@ -210,13 +211,17 @@ impl Format<PyFormatContext<'_>> for FormatDanglingComments<'_> {
                 write!(f, [space(), space()])?;
             }
 
-            write!(
-                f,
-                [
-                    format_comment(comment),
-                    empty_lines(lines_after(comment.slice().end(), f.context().source()))
-                ]
-            )?;
+            if comment.line_position.is_end_of_line() {
+                write!(f, [format_comment(comment)])?;
+            } else {
+                write!(
+                    f,
+                    [
+                        format_comment(comment),
+                        empty_lines(lines_after(comment.slice().end(), f.context().source()))
+                    ]
+                )?;
+            }
 
             comment.mark_formatted();
 

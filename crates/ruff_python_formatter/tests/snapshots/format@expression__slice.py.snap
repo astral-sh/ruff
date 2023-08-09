@@ -111,8 +111,7 @@ a1 = "a"[
 a2 = "a"[
     # a
     # b
-    :  # c
-    # d
+    :  # c# d
 ]
 
 # Check all places where comments can exist
@@ -151,9 +150,7 @@ c4 = "c"[
 ]
 
 # End of line comments
-d1 = "d"[  # comment
-    :
-]
+d1 = "d"[:]  # comment
 d2 = "d"[  # comment
     1:
 ]

@@ -255,11 +255,7 @@ c1 = (
 # Fits, either style
 d11 = x.e().e().e()  #
 d12 = x.e().e().e()  #
-d13 = (
-    x.e()  #
-    .e()
-    .e()
-)
+d13 = x.e().e().e()  #
 
 # Doesn't fit, default
 d2 = x.e().esadjkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkfsdddd()  #

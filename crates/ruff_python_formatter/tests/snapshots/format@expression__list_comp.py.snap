@@ -92,10 +92,7 @@ aaaaaaaaaaaaaaaaaaaaa = [
     ]
 ]
 
-[
-    a  # a
-    for c in e  # for  # c  # in  # e
-]
+[a for c in e]  # a  # for  # c  # in  # e
 
 [
     # above a

@@ -158,9 +158,7 @@ lambda x: lambda y: lambda z: (
 # Trailing
 
 
-a = (
-    lambda: 1  # Dangling
-)
+a = lambda: 1  # Dangling
 
 # Regression test: lambda empty arguments ranges were too long, leading to unstable
 # formatting

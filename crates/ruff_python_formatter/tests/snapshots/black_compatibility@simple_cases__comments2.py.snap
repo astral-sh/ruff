@@ -191,21 +191,7 @@ instruction()#comment with bad spacing
  )
  
  # Please keep __all__ alphabetized within each category.
-@@ -60,8 +60,12 @@
- # Comment before function.
- def inline_comments_in_brackets_ruin_everything():
-     if typedargslist:
--        parameters.children = [children[0], body, children[-1]]  # (1  # )1
-         parameters.children = [
-+            children[0],  # (1
-+            body,
-+            children[-1],  # )1
-+        ]
-+        parameters.children = [
-             children[0],
-             body,
-             children[-1],  # type: ignore
-@@ -72,7 +76,11 @@
+@@ -72,7 +72,11 @@
              body,
              parameters.children[-1],  # )2
          ]
@@ -218,41 +204,17 @@ instruction()#comment with bad spacing
      if (
          self._proc is not None
          # has the child process finished?
-@@ -115,7 +123,9 @@
+@@ -114,9 +118,7 @@
+         # yup
          arg3=True,
      )
-     lcomp = [
+-    lcomp = [
 -        element for element in collection if element is not None  # yup  # yup  # right
-+        element  # yup
-+        for element in collection  # yup
-+        if element is not None  # right
-     ]
+-    ]
++    lcomp = [element for element in collection if element is not None]  # yup  # yup  # right
      lcomp2 = [
          # hello
-@@ -143,7 +153,10 @@
-     # let's return
-     return Node(
-         syms.simple_stmt,
--        [Node(statement, result), Leaf(token.NEWLINE, "\n")],  # FIXME: \r\n?
-+        [
-+            Node(statement, result),
-+            Leaf(token.NEWLINE, "\n"),  # FIXME: \r\n?
-+        ],
-     )
- 
- 
-@@ -158,7 +171,10 @@
- 
- class Test:
-     def _init_host(self, parsed) -> None:
--        if parsed.hostname is None or not parsed.hostname.strip():  # type: ignore
-+        if (
-+            parsed.hostname is None  # type: ignore
-+            or not parsed.hostname.strip()
-+        ):
-             pass
- 
- 
+         element
 ```
 
 ## Ruff Output
@@ -320,11 +282,7 @@ else:
 # Comment before function.
 def inline_comments_in_brackets_ruin_everything():
     if typedargslist:
-        parameters.children = [
-            children[0],  # (1
-            body,
-            children[-1],  # )1
-        ]
+        parameters.children = [children[0], body, children[-1]]  # (1  # )1
         parameters.children = [
             children[0],
             body,
@@ -382,11 +340,7 @@ short
         # yup
         arg3=True,
     )
-    lcomp = [
-        element  # yup
-        for element in collection  # yup
-        if element is not None  # right
-    ]
+    lcomp = [element for element in collection if element is not None]  # yup  # yup  # right
     lcomp2 = [
         # hello
         element
@@ -413,10 +367,7 @@ short
     # let's return
     return Node(
         syms.simple_stmt,
-        [
-            Node(statement, result),
-            Leaf(token.NEWLINE, "\n"),  # FIXME: \r\n?
-        ],
+        [Node(statement, result), Leaf(token.NEWLINE, "\n")],  # FIXME: \r\n?
     )
 
 
@@ -431,10 +382,7 @@ CONFIG_FILES = (
 
 class Test:
     def _init_host(self, parsed) -> None:
-        if (
-            parsed.hostname is None  # type: ignore
-            or not parsed.hostname.strip()
-        ):
+        if parsed.hostname is None or not parsed.hostname.strip():  # type: ignore
             pass
 
 

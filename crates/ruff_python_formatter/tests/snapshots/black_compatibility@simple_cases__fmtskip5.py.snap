@@ -21,26 +21,24 @@ else:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,7 +1,7 @@
+@@ -1,9 +1,5 @@
  a, b, c = 3, 4, 5
- if (
-     a == 3
+-if (
+-    a == 3
 -    and b    != 9  # fmt: skip
-+    and b != 9  # fmt: skip
-     and c is not None
- ):
+-    and c is not None
+-):
++if a == 3 and b != 9 and c is not None:  # fmt: skip
      print("I'm good!")
+ else:
+     print("I'm bad")
 ```
 
 ## Ruff Output
 
 ```py
 a, b, c = 3, 4, 5
-if (
-    a == 3
-    and b != 9  # fmt: skip
-    and c is not None
-):
+if a == 3 and b != 9 and c is not None:  # fmt: skip
     print("I'm good!")
 else:
     print("I'm bad")
