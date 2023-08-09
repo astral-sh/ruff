@@ -20,6 +20,7 @@ use ruff::rules::{
 };
 use ruff::settings::configuration::Configuration;
 use ruff::settings::options::Options;
+use ruff::settings::types::PythonVersion;
 use ruff::settings::{defaults, flags, Settings};
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
@@ -134,7 +135,7 @@ impl Workspace {
             line_length: Some(LineLength::default()),
             select: Some(defaults::PREFIXES.to_vec()),
             tab_size: Some(TabSize::default()),
-            target_version: Some(defaults::TARGET_VERSION),
+            target_version: Some(PythonVersion::default()),
             // Ignore a bunch of options that don't make sense in a single-file editor.
             cache_dir: None,
             exclude: None,

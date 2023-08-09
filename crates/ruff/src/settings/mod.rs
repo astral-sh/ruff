@@ -183,7 +183,7 @@ impl Settings {
                 .src
                 .unwrap_or_else(|| vec![project_root.to_path_buf()]),
             project_root: project_root.to_path_buf(),
-            target_version: config.target_version.unwrap_or(defaults::TARGET_VERSION),
+            target_version: config.target_version.unwrap_or_default(),
             task_tags: config.task_tags.unwrap_or_else(|| {
                 defaults::TASK_TAGS
                     .iter()
