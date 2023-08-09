@@ -1,5 +1,5 @@
 {
-  "name": "db",
+  "name": "api",
   "version": "0.0.0",
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20230801.0",

@@ -1,5 +1,5 @@
 const DB_URL = import.meta.env.PROD
-  ? "https://db.astral-1ad.workers.dev"
+  ? "https://api.astral-1ad.workers.dev"
   : "http://0.0.0.0:8787";
 
 /**

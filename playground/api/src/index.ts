@@ -33,7 +33,7 @@ export default {
       }
     }
 
-    // URLs take the form `https://db.astral-1ad.workers.dev/<key>`. A `GET` request
+    // URLs take the form `https://api.astral-1ad.workers.dev/<key>`. A `GET` request
     // will return the value associated with the key, while a `POST` request will
     // set the value associated with the key.
     const { pathname } = new URL(request.url);

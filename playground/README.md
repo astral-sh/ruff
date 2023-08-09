@@ -15,6 +15,15 @@ then run `npx wrangler dev --local` from the `./playground/db` directory. Note t
 only required to generate shareable URLs for code snippets. The development datastore does not
 require Cloudflare authentication or login, but in turn only persists data locally.
 
-## Implementation
+## Architecture
 
-Design based on [Tailwind Play](https://play.tailwindcss.com/).
+The playground is implemented as a single-page React application powered by
+[Vite](https://vitejs.dev/), with the editor experience itself powered by
+[Monaco](https://github.com/microsoft/monaco-editor).
+
+The playground stores state in `localStorage`, but can supports persisting code snippets to
+a persistent datastore based on [Workers KV](https://developers.cloudflare.com/workers/runtime-apis/kv/)
+and exposed via a [Cloudflare Worker](https://developers.cloudflare.com/workers/learning/how-workers-works/).
+
+The playground design is originally based on [Tailwind Play](https://play.tailwindcss.com/), with
+additional inspiration from the [Rome Tools Playground](https://docs.rome.tools/playground/).
