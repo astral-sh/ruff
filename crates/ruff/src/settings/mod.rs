@@ -308,6 +308,13 @@ impl Settings {
             ..Self::default()
         }
     }
+
+    /// Return the [`Settings`] after updating the target [`PythonVersion`].
+    #[must_use]
+    pub fn with_target_version(mut self, target_version: PythonVersion) -> Self {
+        self.target_version = target_version;
+        self
+    }
 }
 
 impl From<&Configuration> for RuleTable {
