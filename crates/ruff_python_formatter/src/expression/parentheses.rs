@@ -193,8 +193,8 @@ pub(crate) struct FormatOptionalParentheses<'content, 'ast> {
 
 impl<'ast> Format<PyFormatContext<'ast>> for FormatOptionalParentheses<'_, 'ast> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
-        // The group id is used as a condition in [`in_parentheses_only`] to create a conditional group
-        // that is only active if the optional parentheses group expands.
+        // The group id is used as a condition in [`in_parentheses_only_group`] to create a
+        // conditional group that is only active if the optional parentheses group expands.
         let parens_id = f.group_id("optional_parentheses");
 
         let mut f = WithNodeLevel::new(NodeLevel::Expression(Some(parens_id)), f);

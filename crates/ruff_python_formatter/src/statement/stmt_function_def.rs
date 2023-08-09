@@ -1,9 +1,11 @@
 use ruff_formatter::write;
-use ruff_python_ast::{Ranged, StmtFunctionDef};
-use ruff_python_trivia::lines_after_ignoring_trivia;
+
+use ruff_python_ast::{Parameters, Ranged, StmtFunctionDef};
+use ruff_python_trivia::{lines_after_ignoring_trivia, SimpleTokenKind, SimpleTokenizer};
 
 use crate::comments::{leading_comments, trailing_comments};
-use crate::expression::parentheses::{optional_parentheses, Parentheses};
+use crate::expression::maybe_parenthesize_expression;
+use crate::expression::parentheses::{optional_parentheses, Parentheses, Parenthesize};
 use crate::prelude::*;
 use crate::statement::suite::SuiteKind;
 use crate::FormatNodeRule;
@@ -60,21 +62,40 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
 
         let format_inner = format_with(|f: &mut PyFormatter| {
             write!(f, [item.parameters.format()])?;
+
             if let Some(return_annotation) = item.returns.as_ref() {
                 write!(f, [space(), text("->"), space()])?;
-                if return_annotation.is_tuple_expr() {
-                    write!(
-                        f,
-                        [return_annotation.format().with_options(Parentheses::Never)]
-                    )?;
-                } else {
+
+                if empty_parameters(&item.parameters, f.context().source()) {
+                    // If the parameters are empty, add parentheses if the return annotation
+                    // breaks at all.
                     write!(
                         f,
                         [optional_parentheses(
                             &return_annotation.format().with_options(Parentheses::Never),
                         )]
                     )?;
-                }
+                } else {
+                    // Otherwise, use our normal rules for parentheses, which allows us to break
+                    // like:
+                    // ```python
+                    // def f(
+                    //     x,
+                    // ) -> Tuple[
+                    //     int,
+                    //     int,
+                    // ]:
+                    //     ...
+                    // ```
+                    write!(
+                        f,
+                        [maybe_parenthesize_expression(
+                            return_annotation,
+                            item,
+                            Parenthesize::IfBreaks
+                        )]
+                    )?;
+                };
             }
             Ok(())
         });
@@ -99,4 +120,26 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
         // Handled in `fmt_fields`
         Ok(())
     }
+}
+
+/// Returns `true` if [`Parameters`] is empty (no parameters, no comments, etc.).
+fn empty_parameters(parameters: &Parameters, source: &str) -> bool {
+    let mut tokenizer = SimpleTokenizer::new(source, parameters.range())
+        .filter(|token| !matches!(token.kind, SimpleTokenKind::Whitespace));
+
+    let Some(lpar) = tokenizer.next() else {
+        return false;
+    };
+    if !matches!(lpar.kind, SimpleTokenKind::LParen) {
+        return false;
+    }
+
+    let Some(rpar) = tokenizer.next() else {
+        return false;
+    };
+    if !matches!(rpar.kind, SimpleTokenKind::RParen) {
+        return false;
+    }
+
+    true
 }

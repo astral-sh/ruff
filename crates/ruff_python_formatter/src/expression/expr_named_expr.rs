@@ -49,6 +49,7 @@ impl NeedsParentheses for ExprNamedExpr {
             || parent.is_expr_await()
             || parent.is_stmt_delete()
             || parent.is_stmt_for()
+            || parent.is_stmt_function_def()
         {
             OptionalParentheses::Always
         } else {

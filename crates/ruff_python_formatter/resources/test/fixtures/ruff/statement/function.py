@@ -435,3 +435,69 @@ def f[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
 def f[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa) -> a:
     ...
+
+# Breaking return type annotations. Black adds parentheses if the parameters are
+# empty; otherwise, it leverages the expressions own parentheses if possible.
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
+    Set[
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]
+):
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+]:
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
+    Set[
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]
+):
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(x) -> Set[
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+]:
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(x) -> (
+    Set[
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]
+):
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(*args) -> Set[
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+]:
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(  # foo
+) -> Set[
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]:
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
+    # bar
+) -> Set[
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]:
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx:
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx:
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
+    x) -> xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx:
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
+    x) -> xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx:
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (X + Y + foooooooooooooooooooooooooooooooooooo()):
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(x) -> (X + Y + foooooooooooooooooooooooooooooooooooo()):
+    ...
