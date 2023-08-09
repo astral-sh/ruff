@@ -4,6 +4,7 @@ use ruff_formatter::prelude::*;
 use ruff_formatter::{Arguments, Buffer, FormatContext, GroupId, SourceCode};
 use ruff_source_file::Locator;
 use std::fmt::{Debug, Formatter};
+use std::ops::{Deref, DerefMut};
 
 #[derive(Clone)]
 pub struct PyFormatContext<'a> {
@@ -129,6 +130,26 @@ where
     #[inline]
     pub(crate) fn write_element(&mut self, element: FormatElement) -> FormatResult<()> {
         self.buffer.write_element(element)
+    }
+}
+
+impl<'ast, 'buf, B> Deref for WithNodeLevel<'ast, 'buf, B>
+where
+    B: Buffer<Context = PyFormatContext<'ast>>,
+{
+    type Target = B;
+
+    fn deref(&self) -> &Self::Target {
+        self.buffer
+    }
+}
+
+impl<'ast, 'buf, B> DerefMut for WithNodeLevel<'ast, 'buf, B>
+where
+    B: Buffer<Context = PyFormatContext<'ast>>,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.buffer
     }
 }
 
