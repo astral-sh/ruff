@@ -441,6 +441,12 @@ def f[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
 def f[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa) -> a:
     ...
+
+def f(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa) -> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:
+    ...
+
+def f(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, a) -> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:
+    ...
 ```
 
 ## Output
@@ -951,7 +957,7 @@ def f(  # first
 
 
 def f(  # first
-    a
+    a,
 ):  # second
     ...
 
@@ -1050,7 +1056,7 @@ def double(a: int) -> int:  # Hello
 
 
 def double(
-    a: int
+    a: int,
 ) -> (  # Hello
 ):
     return 2 * a
@@ -1059,7 +1065,7 @@ def double(
 # Breaking over parameters and return types. (Black adds a trailing comma when the
 # function arguments break here with a single argument; we do not.)
 def f(
-    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
 ) -> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:
     ...
 
@@ -1071,13 +1077,13 @@ def f(
 
 
 def f(
-    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
 ) -> a:
     ...
 
 
 def f(
-    a
+    a,
 ) -> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:
     ...
 
@@ -1095,14 +1101,26 @@ def f[
 
 
 def f[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](
-    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
 ) -> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:
     ...
 
 
 def f[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](
-    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
 ) -> a:
+    ...
+
+
+def f(
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+) -> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:
+    ...
+
+
+def f(
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, a
+) -> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:
     ...
 ```
 

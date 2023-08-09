@@ -435,3 +435,9 @@ def f[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
 def f[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa) -> a:
     ...
+
+def f(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa) -> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:
+    ...
+
+def f(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, a) -> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:
+    ...

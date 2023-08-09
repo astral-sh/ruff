@@ -247,6 +247,14 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             // No parameters, format any dangling comments between `()`
             write!(f, [empty_parenthesized("(", dangling, ")")])
         } else {
+            let maybe_grouped = format_with(|f| {
+                if num_parameters == 1 {
+                    format_inner.fmt(f)
+                } else {
+                    group(&format_inner).fmt(f)
+                }
+            });
+
             // Intentionally avoid `parenthesized`, which groups the entire formatted contents.
             // We want parameters to be grouped alongside return types, one level up, so we
             // format them "inline" here.
@@ -254,8 +262,8 @@ impl FormatNodeRule<Parameters> for FormatParameters {
                 f,
                 [
                     text("("),
-                    &dangling_open_parenthesis_comments(parenthesis_dangling),
-                    &soft_block_indent(&format_args!(&group(&format_inner),)),
+                    dangling_open_parenthesis_comments(parenthesis_dangling),
+                    soft_block_indent(&maybe_grouped),
                     text(")")
                 ]
             )
