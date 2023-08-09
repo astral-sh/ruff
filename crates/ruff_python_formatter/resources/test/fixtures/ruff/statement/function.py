@@ -409,3 +409,29 @@ def double(a: int) -> ( # Hello
 def double(a: int) -> ( # Hello
 ):
     return 2*a
+
+# Breaking over parameters and return types. (Black adds a trailing comma when the
+# function arguments break here with a single argument; we do not.)
+def f(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa) -> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:
+    ...
+
+def f(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, a) -> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:
+    ...
+
+def f(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa) -> a:
+    ...
+
+def f(a) -> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:
+    ...
+
+def f[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa]() -> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:
+    ...
+
+def f[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa]() -> a:
+    ...
+
+def f[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa) -> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:
+    ...
+
+def f[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa) -> a:
+    ...
