@@ -1209,7 +1209,7 @@ a = 1
         let parse_err = parse_tokens(lxr, Mode::Module, "<test>").unwrap_err();
         assert_eq!(
             parse_err.to_string(),
-            "line magics are only allowed in Jupyter mode at byte offset 6".to_string()
+            "IPython escape commands are only allowed in Jupyter mode at byte offset 6".to_string()
         );
     }
 }
