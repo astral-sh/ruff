@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: c8efc71f9971d00cab941572b1adb51764e2aced1fb5cd3b3aeb9cbf9a2eff80
+// sha3: dec845ec3261934e0c3a17a15f53b12d397b19cee9a45f9d8868c93484de3fe3
 use num_bigint::BigInt;
 use ruff_text_size::TextSize;
 use ruff_python_ast::{self as ast, Ranged, MagicKind};
@@ -33691,7 +33691,7 @@ fn __action76<
                 ast::Expr::Subscript(ast::ExprSubscript { value, slice, range, .. }) => {
                     let ast::Expr::Constant(ast::ExprConstant { value: ast::Constant::Int(integer), .. }) = slice.as_ref() else {
                         return Err(LexicalError {
-                            error: LexicalErrorType::OtherError("only integer constants are allowed in Subscript expressions in help end line magic".to_string()),
+                            error: LexicalErrorType::OtherError("only integer constants are allowed in Subscript expressions in help end escape command".to_string()),
                             location: range.start(),
                         });
                     };
@@ -33707,7 +33707,7 @@ fn __action76<
                 },
                 _ => {
                     return Err(LexicalError {
-                        error: LexicalErrorType::OtherError("only Name, Subscript and Attribute expressions are allowed in help end line magic".to_string()),
+                        error: LexicalErrorType::OtherError("only Name, Subscript and Attribute expressions are allowed in help end escape command".to_string()),
                         location: expr.range().start(),
                     });
                 }
@@ -33718,7 +33718,7 @@ fn __action76<
         if mode != Mode::Jupyter {
             return Err(ParseError::User {
                 error: LexicalError {
-                    error: LexicalErrorType::OtherError("line magics are only allowed in Jupyter mode".to_string()),
+                    error: LexicalErrorType::OtherError("IPython escape commands are only allowed in Jupyter mode".to_string()),
                     location,
                 },
             });
@@ -33730,7 +33730,7 @@ fn __action76<
             _ => {
                 return Err(ParseError::User {
                     error: LexicalError {
-                        error: LexicalErrorType::OtherError("maximum of 2 `?` tokens are allowed in help end line magic".to_string()),
+                        error: LexicalErrorType::OtherError("maximum of 2 `?` tokens are allowed in help end escape command".to_string()),
                         location,
                     },
                 });

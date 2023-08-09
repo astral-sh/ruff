@@ -369,6 +369,9 @@ LineMagicExpr: ast::Expr = {
 }
 
 HelpEndLineMagic: ast::Stmt = {
+    // We are permissive than the original implementation because we would allow whitespace
+    // between the expression and the suffix while the IPython implementation doesn't allow it.
+    // For example, `foo ?` would be valid in our case but invalid from IPython.
     <location:@L> <e:Expression<"All">> <suffix:("?")+> <end_location:@R> =>? {
         fn unparse_expr(expr: &ast::Expr, buffer: &mut String) -> Result<(), LexicalError> {
             match expr {
@@ -378,7 +381,7 @@ HelpEndLineMagic: ast::Stmt = {
                 ast::Expr::Subscript(ast::ExprSubscript { value, slice, range, .. }) => {
                     let ast::Expr::Constant(ast::ExprConstant { value: ast::Constant::Int(integer), .. }) = slice.as_ref() else {
                         return Err(LexicalError {
-                            error: LexicalErrorType::OtherError("only integer constants are allowed in Subscript expressions in help end line magic".to_string()),
+                            error: LexicalErrorType::OtherError("only integer constants are allowed in Subscript expressions in help end escape command".to_string()),
                             location: range.start(),
                         });
                     };
@@ -394,7 +397,7 @@ HelpEndLineMagic: ast::Stmt = {
                 },
                 _ => {
                     return Err(LexicalError {
-                        error: LexicalErrorType::OtherError("only Name, Subscript and Attribute expressions are allowed in help end line magic".to_string()),
+                        error: LexicalErrorType::OtherError("only Name, Subscript and Attribute expressions are allowed in help end escape command".to_string()),
                         location: expr.range().start(),
                     });
                 }
@@ -405,7 +408,7 @@ HelpEndLineMagic: ast::Stmt = {
         if mode != Mode::Jupyter {
             return Err(ParseError::User {
                 error: LexicalError {
-                    error: LexicalErrorType::OtherError("line magics are only allowed in Jupyter mode".to_string()),
+                    error: LexicalErrorType::OtherError("IPython escape commands are only allowed in Jupyter mode".to_string()),
                     location,
                 },
             });
@@ -417,7 +420,7 @@ HelpEndLineMagic: ast::Stmt = {
             _ => {
                 return Err(ParseError::User {
                     error: LexicalError {
-                        error: LexicalErrorType::OtherError("maximum of 2 `?` tokens are allowed in help end line magic".to_string()),
+                        error: LexicalErrorType::OtherError("maximum of 2 `?` tokens are allowed in help end escape command".to_string()),
                         location,
                     },
                 });
