@@ -183,7 +183,9 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                     needs_parentheses
                 }
             }
-            Parenthesize::Optional | Parenthesize::IfBreaks => needs_parentheses,
+            Parenthesize::Optional
+            | Parenthesize::IfBreaks
+            | Parenthesize::IfBreaksOrIfRequired => needs_parentheses,
         };
 
         match needs_parentheses {
@@ -198,6 +200,10 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
             }
             OptionalParentheses::Always => {
                 expression.format().with_options(Parentheses::Always).fmt(f)
+            }
+            OptionalParentheses::Never if *parenthesize == Parenthesize::IfBreaksOrIfRequired => {
+                parenthesize_if_expands(&expression.format().with_options(Parentheses::Never))
+                    .fmt(f)
             }
             OptionalParentheses::Never | OptionalParentheses::Multiline => {
                 expression.format().with_options(Parentheses::Never).fmt(f)

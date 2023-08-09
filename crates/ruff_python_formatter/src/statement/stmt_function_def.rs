@@ -1,11 +1,10 @@
 use ruff_formatter::write;
-
 use ruff_python_ast::{Parameters, Ranged, StmtFunctionDef};
 use ruff_python_trivia::{lines_after_ignoring_trivia, SimpleTokenKind, SimpleTokenizer};
 
 use crate::comments::{leading_comments, trailing_comments};
 use crate::expression::maybe_parenthesize_expression;
-use crate::expression::parentheses::{optional_parentheses, Parentheses, Parenthesize};
+use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
 use crate::statement::suite::SuiteKind;
 use crate::FormatNodeRule;
@@ -65,37 +64,31 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
 
             if let Some(return_annotation) = item.returns.as_ref() {
                 write!(f, [space(), text("->"), space()])?;
-
-                if empty_parameters(&item.parameters, f.context().source()) {
-                    // If the parameters are empty, add parentheses if the return annotation
-                    // breaks at all.
-                    write!(
-                        f,
-                        [optional_parentheses(
-                            &return_annotation.format().with_options(Parentheses::Never),
-                        )]
-                    )?;
-                } else {
-                    // Otherwise, use our normal rules for parentheses, which allows us to break
-                    // like:
-                    // ```python
-                    // def f(
-                    //     x,
-                    // ) -> Tuple[
-                    //     int,
-                    //     int,
-                    // ]:
-                    //     ...
-                    // ```
-                    write!(
-                        f,
-                        [maybe_parenthesize_expression(
-                            return_annotation,
-                            item,
+                write!(
+                    f,
+                    [maybe_parenthesize_expression(
+                        return_annotation,
+                        item,
+                        if empty_parameters(&item.parameters, f.context().source()) {
+                            // If the parameters are empty, add parentheses if the return annotation
+                            // breaks at all.
+                            Parenthesize::IfBreaksOrIfRequired
+                        } else {
+                            // Otherwise, use our normal rules for parentheses, which allows us to break
+                            // like:
+                            // ```python
+                            // def f(
+                            //     x,
+                            // ) -> Tuple[
+                            //     int,
+                            //     int,
+                            // ]:
+                            //     ...
+                            // ```
                             Parenthesize::IfBreaks
-                        )]
-                    )?;
-                };
+                        }
+                    )]
+                )?;
             }
             Ok(())
         });
