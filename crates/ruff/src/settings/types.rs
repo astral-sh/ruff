@@ -53,6 +53,7 @@ impl From<PythonVersion> for Pep440Version {
 }
 
 impl PythonVersion {
+    /// Return the latest supported Python version.
     pub const fn latest() -> Self {
         Self::Py312
     }

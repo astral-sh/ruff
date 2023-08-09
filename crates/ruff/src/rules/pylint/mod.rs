@@ -130,7 +130,7 @@ mod tests {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pylint").join(path).as_path(),
-            &Settings::for_rule(rule_code).with_target_version(PythonVersion::latest()),
+            &Settings::for_rule(rule_code),
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

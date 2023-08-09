@@ -77,11 +77,12 @@ mod tests {
     #[test_case(Rule::UselessObjectInheritance, Path::new("UP004.py"))]
     #[test_case(Rule::YieldInForLoop, Path::new("UP028_0.py"))]
     #[test_case(Rule::YieldInForLoop, Path::new("UP028_1.py"))]
+    #[test_case(Rule::NonPEP695TypeAlias, Path::new("UP040.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = path.to_string_lossy().to_string();
         let diagnostics = test_path(
             Path::new("pyupgrade").join(path).as_path(),
-            &settings::Settings::for_rule(rule_code).with_target_version(PythonVersion::latest()),
+            &settings::Settings::for_rule(rule_code),
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -93,19 +94,6 @@ mod tests {
             Path::new("pyupgrade/UP040.py"),
             &settings::Settings {
                 target_version: PythonVersion::Py311,
-                ..settings::Settings::for_rule(Rule::NonPEP695TypeAlias)
-            },
-        )?;
-        assert_messages!(diagnostics);
-        Ok(())
-    }
-
-    #[test]
-    fn non_pep695_type_alias_py312() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("pyupgrade/UP040.py"),
-            &settings::Settings {
-                target_version: PythonVersion::Py312,
                 ..settings::Settings::for_rule(Rule::NonPEP695TypeAlias)
             },
         )?;
