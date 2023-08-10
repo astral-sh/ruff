@@ -20,8 +20,10 @@ pub struct Options {
         "#
     )]
     /// The maximum line length to allow for line-length violations within
-    /// documentation (`W505`), including standalone comments.
-    /// Defaults to `None` which disables the rule.
+    /// documentation (`W505`), including standalone comments. By default,
+    /// this is set to null which disables reporting violations.
+    ///
+    /// See the [`doc-line-too-long`](https://beta.ruff.rs/docs/rules/doc-line-too-long/) rule for more information.
     pub max_doc_length: Option<LineLength>,
     #[option(
         default = "false",
