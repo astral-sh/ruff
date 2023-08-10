@@ -133,6 +133,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                     //
                     //     ...
                     // ```
+                    // Unlike black, we add the newline also after single quoted docstrings
                     if let Some(second) = iter.next() {
                         // Format the subsequent statement immediately. This rule takes precedence
                         // over the rules in the loop below (and most of them won't apply anyway,
