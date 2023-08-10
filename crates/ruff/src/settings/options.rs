@@ -465,7 +465,7 @@ pub struct Options {
     )]
     /// The minimum Python version to target, e.g., when considering automatic
     /// code upgrades, like rewriting type annotations. Ruff will not propose
-    /// changes using features that are not available in the given verison.
+    /// changes using features that are not available in the given version.
     ///
     /// For example, to represent supporting Python >=3.10 or ==3.10
     /// specify `target-version = "py310"`.
