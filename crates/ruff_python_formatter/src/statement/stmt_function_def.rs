@@ -1,5 +1,5 @@
 use ruff_formatter::write;
-use ruff_python_ast::{self as ast, Expr, Parameters, Ranged, StmtFunctionDef};
+use ruff_python_ast::{Expr, Parameters, Ranged, StmtFunctionDef};
 use ruff_python_trivia::{lines_after_ignoring_trivia, SimpleTokenKind, SimpleTokenizer};
 
 use crate::comments::{leading_comments, trailing_comments};
@@ -192,8 +192,12 @@ fn should_group_function_parameters(
     if context.comments().has_trailing_own_line_comments(returns) {
         return false;
     }
+    //
+    // if has_own_parentheses(returns) {
+    //     return false;
+    // }
 
     // Only omit a group for a selected set of expressions that don't have their own
     // breakpoints.
-    matches!(returns, Expr::Name(_) | Expr::Attribute(_))
+    true
 }

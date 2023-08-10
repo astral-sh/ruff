@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
+assertion_line: 160
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/function.py
 ---
 ## Input
@@ -1137,9 +1138,7 @@ def double(a: int) -> int:  # Hello
     return 2 * a
 
 
-def double(
-    a: int
-) -> (  # Hello
+def double(a: int) -> (  # Hello
 ):
     return 2 * a
 
@@ -1220,25 +1219,19 @@ def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
     ...
 
 
-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
-    x
-) -> Set[
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(x) -> Set[
     "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 ]:
     ...
 
 
-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
-    x
-) -> Set[
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(x) -> Set[
     "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 ]:
     ...
 
 
-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
-    *args
-) -> Set[
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(*args) -> Set[
     "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 ]:
     ...
