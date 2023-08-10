@@ -501,3 +501,25 @@ def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (X + Y + foooooooooooooooooooooooooooooooo
 
 def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(x) -> (X + Y + foooooooooooooooooooooooooooooooooooo()):
     ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (X and Y and foooooooooooooooooooooooooooooooooooo()):
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(x) -> (X and Y and foooooooooooooooooooooooooooooooooooo()):
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (X | Y | foooooooooooooooooooooooooooooooooooo()):
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(x) -> (X | Y | foooooooooooooooooooooooooooooooooooo()):
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
+    X | Y | foooooooooooooooooooooooooooooooooooo()  # comment
+):
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(x) -> (
+    X | Y | foooooooooooooooooooooooooooooooooooo()  # comment
+):
+    ...
