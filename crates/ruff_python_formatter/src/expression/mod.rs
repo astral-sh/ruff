@@ -6,7 +6,8 @@ use ruff_formatter::{
 use ruff_python_ast as ast;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::visitor::preorder::{walk_expr, PreorderVisitor};
-use ruff_python_ast::{Expr, Operator};
+use ruff_python_ast::{Expr, Operator, Ranged};
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 
 use crate::builders::parenthesize_if_expands;
 use crate::context::{NodeLevel, WithNodeLevel};
@@ -415,9 +416,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 ctx: _,
             }) => {
                 self.visit_expr(value);
-                if has_parentheses(value, self.source) {
-                    self.update_max_priority(OperatorPriority::Attribute);
-                }
+                self.update_max_priority(OperatorPriority::Attribute);
                 self.last = Some(expr);
                 return;
             }
@@ -509,7 +508,7 @@ impl CallChainLayout {
                     // ```
                     // f().g
                     // ^^^ value
-                    // data[:100].T`
+                    // data[:100].T
                     // ^^^^^^^^^^ value
                     // ```
                     if matches!(value.as_ref(), Expr::Call(_) | Expr::Subscript(_)) {
@@ -577,22 +576,49 @@ impl CallChainLayout {
 }
 
 fn has_parentheses(expr: &Expr, source: &str) -> bool {
-    has_own_parentheses(expr) || is_expression_parenthesized(AnyNodeRef::from(expr), source)
+    has_own_parentheses(expr, source) || is_expression_parenthesized(AnyNodeRef::from(expr), source)
 }
 
-pub(crate) const fn has_own_parentheses(expr: &Expr) -> bool {
-    matches!(
-        expr,
-        Expr::Dict(_)
-            | Expr::List(_)
-            | Expr::Tuple(_)
-            | Expr::Set(_)
-            | Expr::ListComp(_)
-            | Expr::SetComp(_)
-            | Expr::DictComp(_)
-            | Expr::Call(_)
-            | Expr::Subscript(_)
-    )
+/// Returns `true` if an [`Expr`] has its own parentheses.
+///
+/// A node is considered to have its own parentheses if it includes a set of brackets (e.g., the
+/// opening `[` and closing `]` of a list), and the brackets are non-empty (i.e., they contain at
+/// least one element, or a comment).
+///
+/// In other words, the node must contain a set of parentheses that could be split over multiple
+/// lines (unlike empty parentheses, which are always kept on the same line).
+pub(crate) fn has_own_parentheses(expr: &Expr, source: &str) -> bool {
+    fn has_comments_in(item: AnyNodeRef, source: &str) -> bool {
+        SimpleTokenizer::new(source, item.range())
+            .any(|token| matches!(token.kind, SimpleTokenKind::Comment))
+    }
+
+    match expr {
+        // These expressions are always non-empty.
+        Expr::ListComp(_) | Expr::SetComp(_) | Expr::DictComp(_) => true,
+        Expr::Subscript(_) => true,
+
+        // These expressions "have their own parentheses" if they are non-empty (i.e., have at least
+        // one element, or a comment).
+        Expr::List(ast::ExprList { elts, .. })
+        | Expr::Set(ast::ExprSet { elts, .. })
+        | Expr::Tuple(ast::ExprTuple { elts, .. })
+            if !elts.is_empty() || has_comments_in(AnyNodeRef::from(expr), source) =>
+        {
+            true
+        }
+        Expr::Dict(ast::ExprDict { keys, .. })
+            if !keys.is_empty() || has_comments_in(AnyNodeRef::from(expr), source) =>
+        {
+            true
+        }
+        Expr::Call(ast::ExprCall { arguments, .. })
+            if !arguments.is_empty() || has_comments_in(AnyNodeRef::from(expr), source) =>
+        {
+            true
+        }
+        _ => false,
+    }
 }
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
