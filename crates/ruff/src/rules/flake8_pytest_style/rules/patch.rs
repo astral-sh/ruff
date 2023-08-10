@@ -27,7 +27,7 @@ use ruff_python_ast::{self as ast, Expr, Parameters, Ranged};
 /// ```
 ///
 /// ## References
-/// - [`unittest.mock.patch`](https://docs.python.org/3/library/unittest.mock.html#unittest.mock.patch)
+/// - [Python documentation: `unittest.mock.patch`](https://docs.python.org/3/library/unittest.mock.html#unittest.mock.patch)
 /// - [`pytest-mock`](https://pypi.org/project/pytest-mock/)
 #[violation]
 pub struct PytestPatchWithLambda;
