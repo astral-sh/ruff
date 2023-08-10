@@ -5,6 +5,30 @@ use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, Parameters, Ranged};
 
+/// ## What it does
+/// Checks for monkey patching calls that use `lambda` as the new value.
+///
+/// ## Why is this bad?
+/// `return_value` conveys the intent more clearly and allows using methods for
+/// verifying the number of calls or the arguments passed to the patched function
+/// (e.g., `assert_called_once_with`).
+///
+/// ## Example
+/// def test_foo(mocker):
+///     mocker.patch('module.target', lambda x, y: 7)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def test_foo(mocker):
+///     mocker.patch('module.target', return_value=7)
+///     # if lambda parameters are used, it's not a violation
+///     mocker.patch('module.other_target', lambda x, y: x)
+/// ```
+///
+/// ## References
+/// - [`unittest.mock.patch`](https://docs.python.org/3/library/unittest.mock.html#unittest.mock.patch)
+/// - [`pytest-mock`](https://pypi.org/project/pytest-mock/)
 #[violation]
 pub struct PytestPatchWithLambda;
 
