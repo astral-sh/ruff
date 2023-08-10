@@ -676,8 +676,15 @@ fn count_indentation_like_black(line: &str) -> TextSize {
 
 /// Format a docstring by trimming whitespace and adjusting the indentation.
 ///
-/// We trim all trailing whitespace, except for a chaperone space to avoid quotes or backslashes
-/// in the
+/// Summary of changes we make:
+/// * Normalize the string like all other strings
+/// * Ignore docstring that have an escaped newline
+/// * Trim all trailing whitespace, except for a chaperone space to avoid quotes or backslashes
+///   in the last line.
+/// * Trim leading whitespace on the first line, again except for a chaperone space
+/// * If there is only content in the first line and after that only whitespace, collapse the
+///   docstring into one line
+/// * Adjust the indentation (see below)
 ///
 /// # Docstring indentation
 ///
@@ -790,7 +797,7 @@ fn format_docstring(
     let first = lines.next().unwrap_or_default();
     let trim_end = first.trim_end();
 
-    // Edge case: The first line is `""" "content`, so we need to insert chaperone whitespace to
+    // Edge case: The first line is `""" "content`, so we need to insert chaperone space to
     // avoid `""""content`
     if trim_end
         .trim_start()
