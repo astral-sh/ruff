@@ -82,6 +82,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                     write!(
                         f,
                         [
+                            // We format the expression, but the statement carries the comments
                             leading_comments(comments.leading_comments(first)),
                             constant
                                 .format()
@@ -98,8 +99,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                     if !comments.has_leading_comments(first)
                         && lines_before(first.start(), source) > 1
                     {
-                        // Allow up to one empty line before a class docstring, e.g., this is
-                        // stable formatting:
+                        // Allow up to one empty line before a class docstring
                         // ```python
                         // class Test:
                         //
@@ -110,6 +110,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                     write!(
                         f,
                         [
+                            // We format the expression, but the statement carries the comments
                             leading_comments(comments.leading_comments(first)),
                             constant
                                 .format()
@@ -118,8 +119,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                         ]
                     )?;
 
-                    // Enforce an empty line after a class docstring, e.g., these are both stable
-                    // formatting:
+                    // Enforce an empty line after a class docstring
                     // ```python
                     // class Test:
                     //     """Docstring"""
@@ -142,7 +142,6 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                     }
                 } else {
                     // No docstring, use normal formatting
-
                     write!(f, [first.format()])?;
                 }
             }

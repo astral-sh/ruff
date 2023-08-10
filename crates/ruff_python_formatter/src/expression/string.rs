@@ -656,8 +656,8 @@ fn normalize_string(
     (normalized, newlines)
 }
 
-/// After the main indentation, docstring indentation in black is counted by padding tabs to the
-/// next multiple of 8. This is effectively a port of `str.expandtabs`, which black calls.
+/// For docstring indentation, black counts spaces as 1 and tabs by increasing the indentation up
+/// to the next multiple of 8. This is effectively a port of `str.expandtabs`, which black calls.
 fn count_indentation_like_black(line: &str) -> TextSize {
     let tab_width: u32 = 8;
     let mut indentation = TextSize::default();
@@ -674,17 +674,21 @@ fn count_indentation_like_black(line: &str) -> TextSize {
     indentation
 }
 
-/// Format a docstring, for which we change the indentation after normalizing the string.
+/// Format a docstring by trimming whitespace and adjusting the indentation.
+///
+/// We trim all trailing whitespace, except for a chaperone space to avoid quotes or backslashes
+/// in the
 ///
 /// # Docstring indentation
 ///
-/// Unlike any other string, both we and black change the indentation
-/// of docstring lines. We want to preserve the indentation inside the docstring relative to
-/// the suite statement/block indent that the docstring statement is in, but also want to
-/// apply the change of the outer indentation in the docstring, e.g.
+/// Unlike any other string, like black we change the indentation of docstring lines.
+///
+/// We want to preserve the indentation inside the docstring relative to the suite statement/block
+/// indent that the docstring statement is in, but also want to apply the change of the outer
+/// indentation in the docstring, e.g.
 /// ```python
 /// def sparkle_sky():
-///   """Make a pretty sky.
+///   """Make a pretty sparkly sky.
 ///   *       * ✨        *.    .
 ///      *       *      ✨      .
 ///      .  *      . ✨    * .  .
@@ -693,7 +697,7 @@ fn count_indentation_like_black(line: &str) -> TextSize {
 /// should become
 /// ```python
 /// def sparkle_sky():
-///     """Make a pretty sky.
+///     """Make a pretty sparkly sky.
 ///     *       * ✨        *.    .
 ///        *       *      ✨      .
 ///        .  *      . ✨    * .  .
@@ -702,7 +706,7 @@ fn count_indentation_like_black(line: &str) -> TextSize {
 /// We can't compute the full indentation here since we don't know what the block indent of
 /// the doc comment will be yet and which we can only have added by formatting each line
 /// separately with a hard line break. This means we need to strip shared indentation from
-/// docstring, but also preserve the in-docstring after-suite-statement indentation.
+/// docstring while preserving the in-docstring bigger-than-suite-statement indentation. Example:
 /// ```python
 /// def f():
 ///  """first line
@@ -723,13 +727,12 @@ fn count_indentation_like_black(line: &str) -> TextSize {
 ///    """
 /// ```
 ///
-/// Tabs are counted by padding them to the next multiple of 8 according to black's
-/// algorithm. Whenever we see indentation that contains a tab or any other none
-/// ascii-space whitespace we rewrite the string (even if it's only for the
-/// indentation to avoid the complexity).
+/// Tabs are counted by padding them to the next multiple of 8 according to `str.expandtabs`. When
+/// we see indentation that contains a tab or any other none ascii-space whitespace we rewrite the
+/// string.
 ///
 /// Additionally, if any line in the docstring has less indentation than the docstring
-/// (effectively a negative indentation wrt to the current level), we pad all lines to the
+/// (effectively a negative indentation wrt. to the current level), we pad all lines to the
 /// level of the docstring with spaces.
 /// ```python
 /// def f():
@@ -748,7 +751,7 @@ fn count_indentation_like_black(line: &str) -> TextSize {
 ///         line c
 ///    """
 /// ```
-pub(crate) fn format_docstring(
+fn format_docstring(
     // The start of the string prefix to after the closing quotes
     outer_range: TextRange,
     f: &mut PyFormatter,
@@ -762,27 +765,18 @@ pub(crate) fn format_docstring(
         f.options().quote_style(),
     );
 
-    let (normalized, contains_newlines) = normalize_string(
+    // Black doesn't change the indentation of docstrings that contain an escaped newline
+    if locator.slice(outer_range).contains("\\\n") {
+        return string_part.fmt(f);
+    }
+
+    let (normalized, _) = normalize_string(
         locator.slice(string_part.range),
         string_part.preferred_quotes,
         string_part.is_raw_string,
     );
-    let already_normalized = matches!(normalized, Cow::Borrowed(_)); // is_borrowed is unstable :/
-
-    // Black doesn't change the indentation of docstring that contain an escaped newline
-    if normalized.contains("\\\n") {
-        write!(f, [string_part.prefix, string_part.preferred_quotes])?;
-        match normalized {
-            Cow::Borrowed(_) => {
-                source_text_slice(string_part.range, contains_newlines).fmt(f)?;
-            }
-            Cow::Owned(normalized) => {
-                dynamic_text(&normalized, Some(string_part.range.start())).fmt(f)?;
-            }
-        }
-        string_part.preferred_quotes.fmt(f)?;
-        return Ok(());
-    }
+    // is_borrowed is unstable :/
+    let already_normalized = matches!(normalized, Cow::Borrowed(_));
 
     let mut lines = normalized.lines().peekable();
 
@@ -791,8 +785,8 @@ pub(crate) fn format_docstring(
     // We track where in the source docstring we are (in source code byte offsets)
     let mut offset = string_part.range.start();
 
-    // The first line directly after the opening quotes have different rules than the rest, mainly
-    // that we remove leading whitespace as there's no indentation
+    // The first line directly after the opening quotes has different rules than the rest, mainly
+    // that we remove all leading whitespace as there's no indentation
     let first = lines.next().unwrap_or_default();
     let trim_end = first.trim_end();
 
@@ -827,10 +821,10 @@ pub(crate) fn format_docstring(
         //   `content\"""`. Note that `content\\ """` doesn't need one while `content\\\ """` does.
         // * For `"""\n"""` or other whitespace between the quotes, black keeps a single whitespace,
         //   but `""""""` doesn't get one inserted.
-        if trim_end.ends_with(string_part.preferred_quotes.style.as_char())
+        let needs_space = trim_end.ends_with(string_part.preferred_quotes.style.as_char())
             || trim_end.chars().rev().take_while(|c| *c == '\\').count() % 2 == 1
-            || (trim_end.is_empty() && !normalized.is_empty())
-        {
+            || (trim_end.is_empty() && !normalized.is_empty());
+        if needs_space {
             space().fmt(f)?;
         }
         string_part.preferred_quotes.fmt(f)?;
@@ -844,7 +838,7 @@ pub(crate) fn format_docstring(
     // If some line of the docstring is less indented than the function body, we pad all lines to
     // align it with the docstring statement. Conversely, if all lines are over-indented, we strip
     // the extra indentation. We call this stripped indentation since it's relative to the block
-    // indent printer-made indentation
+    // indent printer-made indentation.
     let stripped_indentation = lines
         .clone()
         // We don't want to count whitespace-only lines as miss-indented
@@ -860,7 +854,6 @@ pub(crate) fn format_docstring(
             is_last,
             offset,
             stripped_indentation,
-            &string_part,
             already_normalized,
             f,
         )?;
@@ -868,42 +861,55 @@ pub(crate) fn format_docstring(
         offset += line.text_len() + "\n".text_len();
     }
 
+    // Same special case in the last line as for the first line
+    let trim_end = normalized.as_ref().trim_end();
+    if trim_end.ends_with(string_part.preferred_quotes.style.as_char())
+        || trim_end.chars().rev().take_while(|c| *c == '\\').count() % 2 == 1
+    {
+        space().fmt(f)?;
+    }
+
     write!(f, [string_part.preferred_quotes])
 }
 
+/// Format a docstring line that is not the first line
 fn format_docstring_line(
     line: &str,
     is_last: bool,
     offset: TextSize,
     stripped_indentation: TextSize,
-    string_part: &FormatStringPart,
     already_normalized: bool,
     f: &mut PyFormatter,
 ) -> FormatResult<()> {
     let trim_end = line.trim_end();
     if trim_end.is_empty() {
-        // We know that the normalized string has \n line endings
-        if !is_last {
+        return if is_last {
             // If the doc string ends with `    """`, the last line is `    `, but we don't want to
             // insert an empty line (but close the docstring)
-            empty_line().fmt(f)?;
-        }
-        return Ok(());
+            Ok(())
+        } else {
+            empty_line().fmt(f)
+        };
     }
+
     let tab_or_non_ascii_space = trim_end
         .chars()
         .take_while(|c| c.is_whitespace())
         .any(|c| c != ' ');
+
     if tab_or_non_ascii_space {
         // We strip the indentation that is shared with the docstring statement, unless a line
         // was indented less than the docstring statement, in which we strip only this much
-        // indentation to implicitly pad all lines by the difference (see example above). After
-        // that we add the in-docstring indentation that is independent of the general block
-        // indent of the suite statement we are in and that indents the docstring statement.
+        // indentation to implicitly pad all lines by the difference, or all lines were
+        // overindented, in which case we strip the additional whitespace (see example in
+        // [`format_docstring`] doc comment). We then prepend the in-docstring indentation to the
+        // string.
         let indent_len = count_indentation_like_black(trim_end) - stripped_indentation;
         let in_docstring_indent = " ".repeat(indent_len.to_usize()) + trim_end.trim_start();
         dynamic_text(&in_docstring_indent, Some(offset)).fmt(f)?;
     } else {
+        // Take the string with the trailing whitespace removed, then also skip the leading
+        // whitespace
         let trimmed_line_range =
             TextRange::at(offset, trim_end.text_len()).add_start(stripped_indentation);
         if already_normalized {
@@ -918,15 +924,11 @@ fn format_docstring_line(
         }
     }
 
-    // We handled the case that the closing quotes are on their own line above. If they are on
-    // the same line as content, we don't insert a line break.
+    // We handled the case that the closing quotes are on their own line above (the last line is
+    // empty except for whitespace). If they are on the same line as content, we don't insert a line
+    // break.
     if !is_last {
         hard_line_break().fmt(f)?;
-    } else if trim_end.ends_with(string_part.preferred_quotes.style.as_char())
-        || trim_end.chars().rev().take_while(|c| *c == '\\').count() % 2 == 1
-    {
-        // Same special case in the last line as for the first line
-        space().fmt(f)?;
     }
 
     Ok(())
