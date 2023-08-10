@@ -834,16 +834,11 @@ fn format_docstring(
 
     // Check if we have a single line (or empty) docstring
     if normalized[first.len()..].trim().is_empty() {
-        // * The last line is `content" """` so we need a chaperone whitespace to avoid
-        //   `content""""`.
-        // * The last line is `content\ """` so we need a chaperone whitespace to avoid
-        //   `content\"""`. Note that `content\\ """` doesn't need one while `content\\\ """` does.
-        // * For `"""\n"""` or other whitespace between the quotes, black keeps a single whitespace,
-        //   but `""""""` doesn't get one inserted.
-        let needs_space = trim_end.ends_with(string_part.preferred_quotes.style.as_char())
-            || trim_end.chars().rev().take_while(|c| *c == '\\').count() % 2 == 1
-            || (trim_end.is_empty() && !normalized.is_empty());
-        if needs_space {
+        // For `"""\n"""` or other whitespace between the quotes, black keeps a single whitespace,
+        // but `""""""` doesn't get one inserted.
+        if needs_chaperone_space(&string_part, trim_end)
+            || (trim_end.is_empty() && !normalized.is_empty())
+        {
             space().fmt(f)?;
         }
         string_part.preferred_quotes.fmt(f)?;
@@ -884,9 +879,7 @@ fn format_docstring(
     let trim_end = normalized
         .as_ref()
         .trim_end_matches(|c: char| c.is_whitespace() && c != '\n');
-    if trim_end.ends_with(string_part.preferred_quotes.style.as_char())
-        || trim_end.chars().rev().take_while(|c| *c == '\\').count() % 2 == 1
-    {
+    if needs_chaperone_space(&string_part, trim_end) {
         space().fmt(f)?;
     }
 
@@ -897,6 +890,14 @@ fn format_docstring(
             source_position(outer_range.end())
         ]
     )
+}
+
+/// If the last line of the docstring is `content" """` or `content\ """`, we need a chaperone space
+/// to avoid `content""""` and `content\"""`. This does only applies to un-escaped backslashes,
+/// so `content\\ """` doesn't need a space while `content\\\ """` does.
+fn needs_chaperone_space(string_part: &FormatStringPart, trim_end: &str) -> bool {
+    trim_end.ends_with(string_part.preferred_quotes.style.as_char())
+        || trim_end.chars().rev().take_while(|c| *c == '\\').count() % 2 == 1
 }
 
 /// Format a docstring line that is not the first line
