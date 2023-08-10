@@ -791,7 +791,14 @@ fn format_docstring(
     let mut lines = normalized.lines().peekable();
 
     // Start the string
-    write!(f, [string_part.prefix, string_part.preferred_quotes])?;
+    write!(
+        f,
+        [
+            source_position(outer_range.start()),
+            string_part.prefix,
+            string_part.preferred_quotes
+        ]
+    )?;
     // We track where in the source docstring we are (in source code byte offsets)
     let mut offset = string_part.range.start();
 
@@ -879,7 +886,13 @@ fn format_docstring(
         space().fmt(f)?;
     }
 
-    write!(f, [string_part.preferred_quotes])
+    write!(
+        f,
+        [
+            string_part.preferred_quotes,
+            source_position(outer_range.end())
+        ]
+    )
 }
 
 /// Format a docstring line that is not the first line
