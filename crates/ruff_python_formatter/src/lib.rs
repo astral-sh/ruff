@@ -12,7 +12,7 @@ use ruff_formatter::{
     PrintError,
 };
 use ruff_formatter::{Formatted, Printed, SourceCode};
-use ruff_python_ast::node::{AnyNodeRef, AstNode, NodeKind};
+use ruff_python_ast::node::{AnyNodeRef, AstNode};
 use ruff_python_ast::{Mod, Ranged};
 use ruff_python_index::{CommentRanges, CommentRangesBuilder};
 use ruff_python_parser::lexer::{lex, LexicalError};
@@ -150,25 +150,30 @@ pub fn format_node<'a>(
 
     let locator = Locator::new(source);
 
-    format!(
+    let formatted = format!(
         PyFormatContext::new(options, locator.contents(), comments),
         [root.format()]
-    )
+    )?;
+    formatted
+        .context()
+        .comments()
+        .assert_formatted_all_comments(SourceCode::new(source));
+    Ok(formatted)
 }
 
-pub(crate) struct NotYetImplemented(NodeKind);
+pub(crate) struct NotYetImplemented<'a>(AnyNodeRef<'a>);
 
 /// Formats a placeholder for nodes that have not yet been implemented
-pub(crate) fn not_yet_implemented<'a, T>(node: T) -> NotYetImplemented
+pub(crate) fn not_yet_implemented<'a, T>(node: T) -> NotYetImplemented<'a>
 where
     T: Into<AnyNodeRef<'a>>,
 {
-    NotYetImplemented(node.into().kind())
+    NotYetImplemented(node.into())
 }
 
-impl Format<PyFormatContext<'_>> for NotYetImplemented {
+impl Format<PyFormatContext<'_>> for NotYetImplemented<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let text = std::format!("NOT_YET_IMPLEMENTED_{:?}", self.0);
+        let text = std::format!("NOT_YET_IMPLEMENTED_{:?}", self.0.kind());
 
         f.write_element(FormatElement::Tag(Tag::StartVerbatim(
             tag::VerbatimKind::Verbatim {
@@ -181,31 +186,51 @@ impl Format<PyFormatContext<'_>> for NotYetImplemented {
         })?;
 
         f.write_element(FormatElement::Tag(Tag::EndVerbatim))?;
+
+        f.context()
+            .comments()
+            .mark_verbatim_node_comments_formatted(self.0);
+
         Ok(())
     }
 }
 
-pub(crate) struct NotYetImplementedCustomText(&'static str);
-
-/// Formats a placeholder for nodes that have not yet been implemented
-#[allow(dead_code)]
-pub(crate) const fn not_yet_implemented_custom_text(
+pub(crate) struct NotYetImplementedCustomText<'a> {
     text: &'static str,
-) -> NotYetImplementedCustomText {
-    NotYetImplementedCustomText(text)
+    node: AnyNodeRef<'a>,
 }
 
-impl Format<PyFormatContext<'_>> for NotYetImplementedCustomText {
+/// Formats a placeholder for nodes that have not yet been implemented
+pub(crate) fn not_yet_implemented_custom_text<'a, T>(
+    text: &'static str,
+    node: T,
+) -> NotYetImplementedCustomText<'a>
+where
+    T: Into<AnyNodeRef<'a>>,
+{
+    NotYetImplementedCustomText {
+        text,
+        node: node.into(),
+    }
+}
+
+impl Format<PyFormatContext<'_>> for NotYetImplementedCustomText<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         f.write_element(FormatElement::Tag(Tag::StartVerbatim(
             tag::VerbatimKind::Verbatim {
-                length: self.0.text_len(),
+                length: self.text.text_len(),
             },
         )))?;
 
-        text(self.0).fmt(f)?;
+        text(self.text).fmt(f)?;
 
-        f.write_element(FormatElement::Tag(Tag::EndVerbatim))
+        f.write_element(FormatElement::Tag(Tag::EndVerbatim))?;
+
+        f.context()
+            .comments()
+            .mark_verbatim_node_comments_formatted(self.node);
+
+        Ok(())
     }
 }
 

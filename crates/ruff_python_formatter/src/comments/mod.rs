@@ -101,6 +101,7 @@ pub(crate) use format::{
 };
 use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::visitor::preorder::{PreorderVisitor, TraversalSignal};
 use ruff_python_index::CommentRanges;
 
 use crate::comments::debug::{DebugComment, DebugComments};
@@ -401,6 +402,24 @@ impl<'a> Comments<'a> {
         );
     }
 
+    #[inline(always)]
+    #[cfg(not(debug_assertions))]
+    pub(crate) fn mark_verbatim_node_comments_formatted(&self, node: AnyNodeRef) {}
+
+    /// Marks the comments of a node printed in verbatim (suppressed) as formatted.
+    ///
+    /// Marks the dangling comments and the comments of all descendants as formatted.
+    /// The leading and trailing comments are not marked as formatted because they are formatted
+    /// normally if `node` is the first or last node of a suppression range.
+    #[cfg(debug_assertions)]
+    pub(crate) fn mark_verbatim_node_comments_formatted(&self, node: AnyNodeRef) {
+        for dangling in self.dangling_comments(node) {
+            dangling.mark_formatted();
+        }
+
+        node.visit_preorder(&mut MarkVerbatimCommentsAsFormattedVisitor(self));
+    }
+
     /// Returns an object that implements [Debug] for nicely printing the [`Comments`].
     pub(crate) fn debug(&'a self, source_code: SourceCode<'a>) -> DebugComments<'a> {
         DebugComments::new(&self.data.comments, source_code)
@@ -410,6 +429,18 @@ impl<'a> Comments<'a> {
 #[derive(Debug, Default)]
 struct CommentsData<'a> {
     comments: CommentsMap<'a>,
+}
+
+struct MarkVerbatimCommentsAsFormattedVisitor<'a>(&'a Comments<'a>);
+
+impl<'a> PreorderVisitor<'a> for MarkVerbatimCommentsAsFormattedVisitor<'a> {
+    fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
+        for comment in self.0.leading_dangling_trailing_comments(node) {
+            comment.mark_formatted();
+        }
+
+        TraversalSignal::Traverse
+    }
 }
 
 #[cfg(test)]
