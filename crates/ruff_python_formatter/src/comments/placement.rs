@@ -80,6 +80,7 @@ pub(super) fn place_comment<'a>(
                 CommentPlacement::Default(comment)
             }
         }
+        AnyNodeRef::ExprFString(fstring) => CommentPlacement::dangling(fstring, comment),
         AnyNodeRef::ExprList(_)
         | AnyNodeRef::ExprSet(_)
         | AnyNodeRef::ExprGeneratorExp(_)
