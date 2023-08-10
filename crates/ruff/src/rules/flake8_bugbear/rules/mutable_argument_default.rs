@@ -60,11 +60,11 @@ impl Violation for MutableArgumentDefault {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`")
+        format!("Do not use mutable data structures for argument defaults")
     }
     fn autofix_title(&self) -> Option<String> {
         Some(format!(
-            "Do not use mutable data structures for argument defaults"
+            "Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`"
         ))
     }
 }
