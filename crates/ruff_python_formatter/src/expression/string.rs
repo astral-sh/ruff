@@ -881,7 +881,9 @@ fn format_docstring(
     }
 
     // Same special case in the last line as for the first line
-    let trim_end = normalized.as_ref().trim_end();
+    let trim_end = normalized
+        .as_ref()
+        .trim_end_matches(|c: char| c.is_whitespace() && c != '\n');
     if trim_end.ends_with(string_part.preferred_quotes.style.as_char())
         || trim_end.chars().rev().take_while(|c| *c == '\\').count() % 2 == 1
     {

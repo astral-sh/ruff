@@ -74,3 +74,20 @@ class IndentMeSome:
 
 class IgnoreImplicitlyConcatenatedStrings:
     """""" ""
+
+
+def docstring_that_ends_with_quote_and_a_line_break1():
+    """
+    he said "the news of my death have been greatly exaggerated"
+    """
+
+
+def docstring_that_ends_with_quote_and_a_line_break2():
+    """he said "the news of my death have been greatly exaggerated"
+    """
+
+
+def docstring_that_ends_with_quote_and_a_line_break3():
+    """he said "the news of my death have been greatly exaggerated"
+
+    """
