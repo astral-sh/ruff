@@ -659,7 +659,7 @@ fn normalize_string(
 /// For docstring indentation, black counts spaces as 1 and tabs by increasing the indentation up
 /// to the next multiple of 8. This is effectively a port of
 /// [`str.expandtabs`](https://docs.python.org/3/library/stdtypes.html#str.expandtabs),
-/// which black calls.
+/// which black [calls with the default tab width of 8](https://github.com/psf/black/blob/c36e468794f9256d5e922c399240d49782ba04f1/src/black/strings.py#L61)
 fn count_indentation_like_black(line: &str) -> TextSize {
     let tab_width: u32 = 8;
     let mut indentation = TextSize::default();
