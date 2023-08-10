@@ -44,6 +44,7 @@ impl FormatNodeRule<StmtAssign> for FormatStmtAssign {
     }
 }
 
+#[derive(Debug)]
 struct FormatTargets<'a> {
     targets: &'a [Expr],
 }
@@ -51,9 +52,17 @@ struct FormatTargets<'a> {
 impl Format<PyFormatContext<'_>> for FormatTargets<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         if let Some((first, rest)) = self.targets.split_first() {
-            let can_omit_parentheses = has_own_parentheses(first, f.context()).is_some();
+            let comments = f.context().comments();
 
-            let group_id = if can_omit_parentheses {
+            let parenthesize = if comments.has_leading_comments(first) {
+                ParenthesizeTarget::Always
+            } else if has_own_parentheses(first, f.context()).is_some() {
+                ParenthesizeTarget::Never
+            } else {
+                ParenthesizeTarget::IfBreaks
+            };
+
+            let group_id = if parenthesize == ParenthesizeTarget::Never {
                 Some(f.group_id("assignment_parentheses"))
             } else {
                 None
@@ -61,17 +70,23 @@ impl Format<PyFormatContext<'_>> for FormatTargets<'_> {
 
             let format_first = format_with(|f: &mut PyFormatter| {
                 let mut f = WithNodeLevel::new(NodeLevel::Expression(group_id), f);
-                if can_omit_parentheses {
-                    write!(f, [first.format().with_options(Parentheses::Never)])
-                } else {
-                    write!(
-                        f,
-                        [
-                            if_group_breaks(&text("(")),
-                            soft_block_indent(&first.format().with_options(Parentheses::Never)),
-                            if_group_breaks(&text(")"))
-                        ]
-                    )
+                match parenthesize {
+                    ParenthesizeTarget::Always => {
+                        write!(f, [first.format().with_options(Parentheses::Always)])
+                    }
+                    ParenthesizeTarget::Never => {
+                        write!(f, [first.format().with_options(Parentheses::Never)])
+                    }
+                    ParenthesizeTarget::IfBreaks => {
+                        write!(
+                            f,
+                            [
+                                if_group_breaks(&text("(")),
+                                soft_block_indent(&first.format().with_options(Parentheses::Never)),
+                                if_group_breaks(&text(")"))
+                            ]
+                        )
+                    }
                 }
             });
 
@@ -90,4 +105,11 @@ impl Format<PyFormatContext<'_>> for FormatTargets<'_> {
             Ok(())
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ParenthesizeTarget {
+    Always,
+    Never,
+    IfBreaks,
 }

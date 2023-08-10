@@ -168,6 +168,9 @@ pub enum SimpleTokenKind {
     /// `:`
     Colon,
 
+    /// `;`
+    Semi,
+
     /// '/'
     Slash,
 
@@ -200,6 +203,7 @@ pub enum SimpleTokenKind {
 
     /// `^`
     Circumflex,
+
     /// `|`
     Vbar,
 
@@ -226,6 +230,7 @@ pub enum SimpleTokenKind {
 
     /// `break`
     Break,
+
     /// `class`
     Class,
 
@@ -331,6 +336,7 @@ impl SimpleTokenKind {
             '}' => SimpleTokenKind::RBrace,
             ',' => SimpleTokenKind::Comma,
             ':' => SimpleTokenKind::Colon,
+            ';' => SimpleTokenKind::Semi,
             '/' => SimpleTokenKind::Slash,
             '*' => SimpleTokenKind::Star,
             '.' => SimpleTokenKind::Dot,

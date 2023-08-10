@@ -45,6 +45,9 @@ impl FormatNodeRule<Arguments> for FormatArguments {
                                 if is_single_argument_parenthesized(arg, item.end(), source) {
                                     Parentheses::Always
                                 } else {
+                                    // Note: no need to handle opening-parenthesis comments, since
+                                    // an opening-parenthesis comment implies that the argument is
+                                    // parenthesized.
                                     Parentheses::Never
                                 };
                             joiner.entry(other, &other.format().with_options(parentheses))
