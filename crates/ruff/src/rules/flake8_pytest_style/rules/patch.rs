@@ -14,16 +14,17 @@ use ruff_python_ast::{self as ast, Expr, Parameters, Ranged};
 /// (e.g., `assert_called_once_with`).
 ///
 /// ## Example
+/// ```python
 /// def test_foo(mocker):
-///     mocker.patch('module.target', lambda x, y: 7)
+///     mocker.patch("module.target", lambda x, y: 7)
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// def test_foo(mocker):
-///     mocker.patch('module.target', return_value=7)
+///     mocker.patch("module.target", return_value=7)
 ///     # if lambda parameters are used, it's not a violation
-///     mocker.patch('module.other_target', lambda x, y: x)
+///     mocker.patch("module.other_target", lambda x, y: x)
 /// ```
 ///
 /// ## References

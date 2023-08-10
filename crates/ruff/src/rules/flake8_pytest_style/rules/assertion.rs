@@ -153,6 +153,7 @@ impl Violation for PytestAssertAlwaysFalse {
 /// preferred over `unittest`'s assertion methods.
 ///
 /// ## Example
+/// ```python
 /// class TestFoo(unittest.TestCase):
 ///     def test_foo(self):
 ///         self.assertEqual(a, b)
