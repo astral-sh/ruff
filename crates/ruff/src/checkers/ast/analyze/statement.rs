@@ -77,7 +77,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             parameters,
             body,
             type_params,
-            range: _,
+            range,
         }) => {
             if checker.enabled(Rule::DjangoNonLeadingReceiverDecorator) {
                 flake8_django::rules::non_leading_receiver_decorator(checker, decorator_list);
@@ -203,6 +203,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::CachedInstanceMethod) {
                 flake8_bugbear::rules::cached_instance_method(checker, decorator_list);
+            }
+            if checker.enabled(Rule::MutableArgumentDefault) {
+                flake8_bugbear::rules::mutable_argument_default(checker, parameters, body, *range);
             }
             if checker.any_enabled(&[
                 Rule::UnnecessaryReturnNone,
