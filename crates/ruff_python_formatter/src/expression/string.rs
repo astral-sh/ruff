@@ -805,27 +805,29 @@ fn format_docstring(
     // The first line directly after the opening quotes has different rules than the rest, mainly
     // that we remove all leading whitespace as there's no indentation
     let first = lines.next().unwrap_or_default();
+    // Black trims whitespace using [`str.strip()`](https://docs.python.org/3/library/stdtypes.html#str.strip)
+    // https://github.com/psf/black/blob/b4dca26c7d93f930bbd5a7b552807370b60d4298/src/black/strings.py#L77-L85
+    // So we use the unicode whitespace definition through `trim_{start,end}` instead of the python
+    // tokenizer whitespace definition in `trim_whitespace_{start,end}`.
     let trim_end = first.trim_end();
+    let trim_both = trim_end.trim_start();
 
     // Edge case: The first line is `""" "content`, so we need to insert chaperone space to
     // avoid `""""content`
-    if trim_end
-        .trim_start()
-        .starts_with(string_part.preferred_quotes.style.as_char())
-    {
+    if trim_both.starts_with(string_part.preferred_quotes.style.as_char()) {
         space().fmt(f)?;
     }
 
     if !trim_end.is_empty() {
         // For the first line of the docstring we strip the leading and trailing whitespace, e.g.
         // `"""   content   ` to `"""content`
-        let leading_whitespace = trim_end.text_len() - trim_end.trim_start().text_len();
+        let leading_whitespace = trim_end.text_len() - trim_both.text_len();
         let trimmed_line_range =
             TextRange::at(offset, trim_end.text_len()).add_start(leading_whitespace);
         if already_normalized {
             source_text_slice(trimmed_line_range, ContainsNewlines::No).fmt(f)?;
         } else {
-            dynamic_text(trim_end.trim_start(), Some(trimmed_line_range.start())).fmt(f)?;
+            dynamic_text(trim_both, Some(trimmed_line_range.start())).fmt(f)?;
         }
     }
     offset += first.text_len();
