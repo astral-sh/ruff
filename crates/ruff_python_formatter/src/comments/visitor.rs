@@ -77,6 +77,7 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast> {
                 enclosing: enclosing_node,
                 preceding: self.preceding_node,
                 following: Some(node),
+                parent: self.parents.iter().rev().nth(1).copied(),
                 line_position: text_position(*comment_range, self.source_code),
                 slice: self.source_code.slice(*comment_range),
             };
@@ -117,6 +118,7 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast> {
 
             let comment = DecoratedComment {
                 enclosing: node,
+                parent: self.parents.last().copied(),
                 preceding: self.preceding_node,
                 following: None,
                 line_position: text_position(*comment_range, self.source_code),
@@ -179,6 +181,7 @@ pub(super) struct DecoratedComment<'a> {
     enclosing: AnyNodeRef<'a>,
     preceding: Option<AnyNodeRef<'a>>,
     following: Option<AnyNodeRef<'a>>,
+    parent: Option<AnyNodeRef<'a>>,
     line_position: CommentLinePosition,
     slice: SourceCodeSlice,
 }
@@ -202,6 +205,11 @@ impl<'a> DecoratedComment<'a> {
     /// `a` and `b` are children of the list expression and `comment` is between the two nodes.
     pub(super) fn enclosing_node(&self) -> AnyNodeRef<'a> {
         self.enclosing
+    }
+
+    /// Returns the parent of the enclosing node, if any
+    pub(super) fn enclosing_parent(&self) -> Option<AnyNodeRef<'a>> {
+        self.parent
     }
 
     /// Returns the slice into the source code.

@@ -73,6 +73,13 @@ pub(super) fn place_comment<'a>(
             handle_leading_class_with_decorators_comment(comment, class_def)
         }
         AnyNodeRef::StmtImportFrom(import_from) => handle_import_from_comment(comment, import_from),
+        AnyNodeRef::ExprConstant(_) => {
+            if let Some(AnyNodeRef::ExprFString(fstring)) = comment.enclosing_parent() {
+                CommentPlacement::dangling(fstring, comment)
+            } else {
+                CommentPlacement::Default(comment)
+            }
+        }
         AnyNodeRef::ExprList(_)
         | AnyNodeRef::ExprSet(_)
         | AnyNodeRef::ExprGeneratorExp(_)
