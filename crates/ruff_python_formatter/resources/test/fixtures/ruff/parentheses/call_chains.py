@@ -154,4 +154,6 @@ zero(
     five,
 )
 
-
+max_message_id = (
+    Message.objects.filter(recipient=recipient).order_by("id").reverse()[0].id
+)
