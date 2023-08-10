@@ -26,6 +26,7 @@ x) from b1c
 del (  # b 2
 x)
 assert (  # b 3
+x), (  #b 4
 x)
 
 def g():
@@ -49,6 +50,25 @@ match d3:
     case (  # d 3
     x):
         pass
+while (  # d 4
+x):
+    pass
+if (  # d 5
+x):
+    pass
+elif (  # d 6
+y):
+    pass
+for (  # d 7
+x) in (  # d 8
+y):
+    pass
+try:
+    pass
+except (  # d 9
+    x
+):
+    pass
 
 
 def e1(  # e 1
@@ -103,9 +123,13 @@ f5 = {  # f5
     x
 )
 a2 = x  # a 2
-a3 = f(x)  # a 3
+a3 = f(  # a 3
+    x
+)
 a4 = x = a4  # a 4
-a5: List(x) = 5  # a 5
+a5: List(  # a 5
+    x
+) = 5
 
 raise (
     # b 1a
@@ -122,8 +146,8 @@ del (
 )
 assert (
     # b 3
-    x
-)
+    x  # b 4
+), x
 
 
 def g():
@@ -151,11 +175,47 @@ with (
     x
 ):
     pass
-NOT_YET_IMPLEMENTED_StmtMatch
-NOT_YET_IMPLEMENTED_StmtMatch
+match (
+    # d 2
+    x
+):
+    case NOT_YET_IMPLEMENTED_Pattern:
+        pass
+match d3:
+    case NOT_YET_IMPLEMENTED_Pattern:
+        pass
+while (
+    # d 4
+    x
+):
+    pass
+if (
+    # d 5
+    x
+):
+    pass
+elif (
+    # d 6
+    y
+):
+    pass
+for (
+    # d 7
+    x  # d 8
+) in y:
+    pass
+try:
+    pass
+except (
+    # d 9
+    x
+):
+    pass
 
 
-def e1(x):  # e 1
+def e1(  # e 1
+    x
+):
     pass
 
 
@@ -163,14 +223,24 @@ def e2() -> x:  # e 2
     pass
 
 
-class E3(x):  # e 3
+class E3(  # e 3
+    x
+):
     pass
 
 
-f1 = [x]  # f 1
-[x]  # f 2
-f3 = {x}  # f3
-{x}  # f 4
+f1 = [  # f 1
+    x
+]
+[  # f 2
+    x
+]
+f3 = {  # f3
+    x
+}
+{  # f 4
+    x
+}
 
 
 # Non-empty parentheses: These are not allowed without a value
@@ -178,10 +248,18 @@ def f1[T]():  # f1
     pass
 
 
-f2 = (i for i in range(10))  # f2
-f3 = [i for i in range(10)]  # f3
-f4 = {i for i in range(10)}  # f4
-f5 = {i: i**2 for i in range(10)}  # f5
+f2 = (  # f2
+    i for i in range(10)
+)
+f3 = [  # f3
+    i for i in range(10)
+]
+f4 = {  # f4
+    i for i in range(10)
+}
+f5 = {  # f5
+    i: i**2 for i in range(10)
+}
 ```
 
 

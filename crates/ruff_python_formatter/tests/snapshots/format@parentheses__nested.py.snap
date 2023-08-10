@@ -65,7 +65,11 @@ a1 = f(  # 1
     g(  # 2
     )
 )
-a2 = f(g(x))  # 1  # 2
+a2 = f(  # 1
+    g(  # 2
+        x
+    )
+)
 a3 = f(
     (
         #
@@ -89,7 +93,13 @@ a = (
     + (e + f + g)
 )
 
-a = int(int(int(6)))  # type: ignore  # type: ignore  # type: ignore
+a = int(  # type: ignore
+    int(  # type: ignore
+        int(  # type: ignore
+            6
+        )
+    )
+)
 
 # Stability and correctness checks
 b1 = (

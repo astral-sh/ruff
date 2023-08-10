@@ -20,6 +20,7 @@ raise (  # b 1c
 del (  # b 2
 )
 assert (  # b 3
+), (  #b 4
 )
 
 def g():
@@ -43,6 +44,24 @@ match d3:
     case (  # d 3
     ):
         pass
+while (  # d 4
+):
+    pass
+if (  # d 5
+):
+    pass
+elif (  # d 6
+):
+    pass
+for (  # d 7
+) in (  # d 8
+):
+    pass
+try:
+    pass
+except (  # d 9
+):
+    pass
 
 
 def e1(  # e 1

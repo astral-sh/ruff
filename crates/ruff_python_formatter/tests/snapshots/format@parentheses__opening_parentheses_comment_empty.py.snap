@@ -26,6 +26,7 @@ raise (  # b 1c
 del (  # b 2
 )
 assert (  # b 3
+), (  #b 4
 )
 
 def g():
@@ -49,6 +50,24 @@ match d3:
     case (  # d 3
     ):
         pass
+while (  # d 4
+):
+    pass
+if (  # d 5
+):
+    pass
+elif (  # d 6
+):
+    pass
+for (  # d 7
+) in (  # d 8
+):
+    pass
+try:
+    pass
+except (  # d 9
+):
+    pass
 
 
 def e1(  # e 1
@@ -97,6 +116,7 @@ raise (  # b 1c
 del (  # b 2
 )
 assert (  # b 3
+), (  # b 4
 )
 
 
@@ -117,8 +137,31 @@ async def h():
 with (  # d 1
 ):
     pass
-NOT_YET_IMPLEMENTED_StmtMatch
-NOT_YET_IMPLEMENTED_StmtMatch
+match (  # d 2
+):
+    case NOT_YET_IMPLEMENTED_Pattern:
+        pass
+match d3:
+    case NOT_YET_IMPLEMENTED_Pattern:
+        pass
+while (  # d 4
+):
+    pass
+if (  # d 5
+):
+    pass
+elif (  # d 6
+):
+    pass
+for (  # d 7
+) in (  # d 8
+):
+    pass
+try:
+    pass
+except (  # d 9
+):
+    pass
 
 
 def e1(  # e 1
@@ -126,9 +169,7 @@ def e1(  # e 1
     pass
 
 
-def e2() -> (
-    (  # e 2
-    )
+def e2() -> (  # e 2
 ):
     pass
 

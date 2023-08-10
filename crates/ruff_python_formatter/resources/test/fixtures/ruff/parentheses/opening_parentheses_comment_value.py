@@ -20,6 +20,7 @@ x) from b1c
 del (  # b 2
 x)
 assert (  # b 3
+x), (  #b 4
 x)
 
 def g():
@@ -43,6 +44,25 @@ match d3:
     case (  # d 3
     x):
         pass
+while (  # d 4
+x):
+    pass
+if (  # d 5
+x):
+    pass
+elif (  # d 6
+y):
+    pass
+for (  # d 7
+x) in (  # d 8
+y):
+    pass
+try:
+    pass
+except (  # d 9
+    x
+):
+    pass
 
 
 def e1(  # e 1
