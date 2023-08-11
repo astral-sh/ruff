@@ -226,9 +226,10 @@ return 1 == 2 and (
 
 
 def f():
-    return unicodedata.normalize("NFKC", s1).casefold() == unicodedata.normalize(
-        "NFKC", s2
-    ).casefold()
+    return (
+        unicodedata.normalize("NFKC", s1).casefold()
+        == unicodedata.normalize("NFKC", s2).casefold()
+    )
 
 
 # Call expressions with trailing attributes.
