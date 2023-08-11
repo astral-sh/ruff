@@ -377,6 +377,11 @@ def f(  # first
     # third
 ):
     ...
+
+# Walrus operator in return type.
+def this_is_unusual() -> (please := no): ...
+
+def this_is_unusual(x) -> (please := no): ...
 ```
 
 ## Output
@@ -904,6 +909,15 @@ def f(  # first
     # third
     /,  # second
 ):
+    ...
+
+
+# Walrus operator in return type.
+def this_is_unusual() -> (please := no):
+    ...
+
+
+def this_is_unusual(x) -> (please := no):
     ...
 ```
 
