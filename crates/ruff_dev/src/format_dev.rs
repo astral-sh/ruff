@@ -22,7 +22,7 @@ use std::panic::catch_unwind;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::{Duration, Instant};
-use std::{fmt, fs, io};
+use std::{fmt, fs, io, iter};
 use tempfile::NamedTempFile;
 use tracing::{debug, error, info, info_span};
 use tracing_indicatif::span_ext::IndicatifSpanExt;
@@ -187,6 +187,9 @@ pub(crate) struct Args {
     /// Write all log messages (same as cli) to this file
     #[arg(long)]
     pub(crate) log_file: Option<PathBuf>,
+    /// Write a markdown table with the similarity indices to this file
+    #[arg(long)]
+    pub(crate) stats_file: Option<PathBuf>,
     /// Assert that there are exactly this many input files with errors. This catches regressions
     /// (or improvements) in the parser.
     #[arg(long)]
@@ -302,6 +305,8 @@ fn format_dev_multi_project(args: &Args) -> anyhow::Result<bool> {
         None => None,
     };
 
+    let mut results = Vec::new();
+
     for project_path in project_paths {
         debug!(parent: None, "Starting {}", project_path.display());
 
@@ -332,6 +337,7 @@ fn format_dev_multi_project(args: &Args) -> anyhow::Result<bool> {
                     write!(error_file, "{}", result.display(args.format)).unwrap();
                     error_file.flush().unwrap();
                 }
+                results.push(result);
 
                 pb_span.pb_inc(1);
             }
@@ -352,6 +358,35 @@ fn format_dev_multi_project(args: &Args) -> anyhow::Result<bool> {
         "Finished: {total_errors} stability errors, {total_files} files, tool {}s, {total_syntax_error_in_input} input files contained syntax errors ",
         duration.as_secs_f32(),
     );
+
+    if let Some(stats_file) = &args.stats_file {
+        results.sort_by(|result1, result2| result1.name.cmp(&result2.name));
+        let project_col_len = results
+            .iter()
+            .map(|result| result.name.len())
+            .chain(iter::once("project".len()))
+            .max()
+            .unwrap_or_default();
+        let mut stats_file = BufWriter::new(File::create(stats_file)?);
+        writeln!(
+            stats_file,
+            "| {:<project_col_len$} | similarity index |",
+            "project"
+        )?;
+        writeln!(
+            stats_file,
+            "|-{:-<project_col_len$}-|------------------|",
+            ""
+        )?;
+        for result in results {
+            writeln!(
+                stats_file,
+                "| {:<project_col_len$} | {:.5}          |",
+                result.name,
+                result.statistics.similarity_index()
+            )?;
+        }
+    }
 
     if let Some(files_with_errors) = args.files_with_errors {
         if total_syntax_error_in_input != files_with_errors {
@@ -433,7 +468,13 @@ fn format_dev_project(
 
     let duration = start.elapsed();
 
+    let name = files[0]
+        .file_name()
+        .unwrap_or(files[0].as_os_str())
+        .to_string_lossy()
+        .to_string();
     Ok(CheckRepoResult {
+        name,
         duration,
         file_count: formatted_counter,
         diagnostics,
@@ -511,6 +552,7 @@ fn diff_show_only_changes(
 }
 
 struct CheckRepoResult {
+    name: String,
     duration: Duration,
     file_count: usize,
     diagnostics: Vec<Diagnostic>,
