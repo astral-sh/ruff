@@ -312,10 +312,13 @@ pub(crate) fn unused_variable(checker: &Checker, scope: &Scope, diagnostics: &mu
                 && !binding.is_global()
                 && !binding.is_used()
                 && !checker.settings.dummy_variable_rgx.is_match(name)
-                && name != "__tracebackhide__"
-                && name != "__traceback_info__"
-                && name != "__traceback_supplement__"
-                && name != "__debuggerskip__"
+                && !matches!(
+                    name,
+                    "__tracebackhide__"
+                        | "__traceback_info__"
+                        | "__traceback_supplement__"
+                        | "__debuggerskip__"
+                )
             {
                 return Some((name.to_string(), binding.range, binding.source));
             }
