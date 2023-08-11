@@ -7,7 +7,7 @@ B006_B008.py:63:25: B006 [*] Do not use mutable data structures for argument def
    |                         ^^^^^^^^^ B006
 64 |     ...
    |
-   = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
+   = help: Replace with `None`; initialize within function
 
 ℹ Possible fix
 60 60 | # Flag mutable literals/comprehensions
@@ -27,7 +27,7 @@ B006_B008.py:67:30: B006 [*] Do not use mutable data structures for argument def
    |                              ^^ B006
 68 |     ...
    |
-   = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
+   = help: Replace with `None`; initialize within function
 
 ℹ Possible fix
 64 64 |     ...
@@ -49,7 +49,7 @@ B006_B008.py:73:52: B006 [*] Do not use mutable data structures for argument def
    |                                                    ^^ B006
 74 |         pass
    |
-   = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
+   = help: Replace with `None`; initialize within function
 
 ℹ Possible fix
 70 70 | 
@@ -72,7 +72,7 @@ B006_B008.py:77:31: B006 [*] Do not use mutable data structures for argument def
    | |_^ B006
 80 |       ...
    |
-   = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
+   = help: Replace with `None`; initialize within function
 
 ℹ Possible fix
 74 74 |         pass
@@ -95,7 +95,7 @@ B006_B008.py:82:36: B006 Do not use mutable data structures for argument default
 82 | def single_line_func_wrong(value = {}): ...
    |                                    ^^ B006
    |
-   = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
+   = help: Replace with `None`; initialize within function
 
 B006_B008.py:85:20: B006 [*] Do not use mutable data structures for argument defaults
    |
@@ -103,7 +103,7 @@ B006_B008.py:85:20: B006 [*] Do not use mutable data structures for argument def
    |                    ^^^^^ B006
 86 |     ...
    |
-   = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
+   = help: Replace with `None`; initialize within function
 
 ℹ Possible fix
 82 82 | def single_line_func_wrong(value = {}): ...
@@ -123,7 +123,7 @@ B006_B008.py:89:20: B006 [*] Do not use mutable data structures for argument def
    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^ B006
 90 |     ...
    |
-   = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
+   = help: Replace with `None`; initialize within function
 
 ℹ Possible fix
 86 86 |     ...
@@ -143,7 +143,7 @@ B006_B008.py:93:32: B006 [*] Do not use mutable data structures for argument def
    |                                ^^^^^^^^^^^^^^^^^^^^^^^^^ B006
 94 |     ...
    |
-   = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
+   = help: Replace with `None`; initialize within function
 
 ℹ Possible fix
 90 90 |     ...
@@ -163,7 +163,7 @@ B006_B008.py:97:26: B006 [*] Do not use mutable data structures for argument def
    |                          ^^^^^^^^^^^^^^^^^^^ B006
 98 |     ...
    |
-   = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
+   = help: Replace with `None`; initialize within function
 
 ℹ Possible fix
 94  94  |     ...
@@ -184,7 +184,7 @@ B006_B008.py:102:46: B006 [*] Do not use mutable data structures for argument de
     |                                              ^^^^^^^^^^^^^^^^^^^^^^^^ B006
 103 |     pass
     |
-    = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
+    = help: Replace with `None`; initialize within function
 
 ℹ Possible fix
 99  99  | 
@@ -204,7 +204,7 @@ B006_B008.py:106:46: B006 [*] Do not use mutable data structures for argument de
     |                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^ B006
 107 |     pass
     |
-    = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
+    = help: Replace with `None`; initialize within function
 
 ℹ Possible fix
 103 103 |     pass
@@ -224,7 +224,7 @@ B006_B008.py:110:45: B006 [*] Do not use mutable data structures for argument de
     |                                             ^^^^^^^^^^^^^^^^^^^^^^^^ B006
 111 |     pass
     |
-    = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
+    = help: Replace with `None`; initialize within function
 
 ℹ Possible fix
 107 107 |     pass
@@ -244,7 +244,7 @@ B006_B008.py:114:33: B006 [*] Do not use mutable data structures for argument de
     |                                 ^^ B006
 115 |     ...
     |
-    = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
+    = help: Replace with `None`; initialize within function
 
 ℹ Possible fix
 111 111 |     pass
@@ -266,7 +266,7 @@ B006_B008.py:235:20: B006 [*] Do not use mutable data structures for argument de
     |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B006
 236 |     pass
     |
-    = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
+    = help: Replace with `None`; initialize within function
 
 ℹ Possible fix
 232 232 | 
@@ -288,7 +288,7 @@ B006_B008.py:272:27: B006 [*] Do not use mutable data structures for argument de
 273 |     b: Optional[Dict[int, int]] = {},
 274 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
     |
-    = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
+    = help: Replace with `None`; initialize within function
 
 ℹ Possible fix
 269 269 | 
@@ -303,6 +303,8 @@ B006_B008.py:272:27: B006 [*] Do not use mutable data structures for argument de
     277 |+    if a is None:
     278 |+        a = []
 277 279 |     pass
+278 280 | 
+279 281 | 
 
 B006_B008.py:273:35: B006 [*] Do not use mutable data structures for argument defaults
     |
@@ -313,7 +315,7 @@ B006_B008.py:273:35: B006 [*] Do not use mutable data structures for argument de
 274 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
 275 |     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
     |
-    = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
+    = help: Replace with `None`; initialize within function
 
 ℹ Possible fix
 270 270 | 
@@ -327,6 +329,8 @@ B006_B008.py:273:35: B006 [*] Do not use mutable data structures for argument de
     277 |+    if b is None:
     278 |+        b = {}
 277 279 |     pass
+278 280 | 
+279 281 | 
 
 B006_B008.py:274:62: B006 [*] Do not use mutable data structures for argument defaults
     |
@@ -337,7 +341,7 @@ B006_B008.py:274:62: B006 [*] Do not use mutable data structures for argument de
 275 |     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
 276 | ):
     |
-    = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
+    = help: Replace with `None`; initialize within function
 
 ℹ Possible fix
 271 271 | def mutable_annotations(
@@ -350,6 +354,8 @@ B006_B008.py:274:62: B006 [*] Do not use mutable data structures for argument de
     277 |+    if c is None:
     278 |+        c = set()
 277 279 |     pass
+278 280 | 
+279 281 | 
 
 B006_B008.py:275:80: B006 [*] Do not use mutable data structures for argument defaults
     |
@@ -360,7 +366,7 @@ B006_B008.py:275:80: B006 [*] Do not use mutable data structures for argument de
 276 | ):
 277 |     pass
     |
-    = help: Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`
+    = help: Replace with `None`; initialize within function
 
 ℹ Possible fix
 272 272 |     a: list[int] | None = [],
@@ -372,5 +378,102 @@ B006_B008.py:275:80: B006 [*] Do not use mutable data structures for argument de
     277 |+    if d is None:
     278 |+        d = set()
 277 279 |     pass
+278 280 | 
+279 281 | 
+
+B006_B008.py:280:52: B006 [*] Do not use mutable data structures for argument defaults
+    |
+280 | def single_line_func_wrong(value: dict[str, str] = {}):
+    |                                                    ^^ B006
+281 |     """Docstring"""
+    |
+    = help: Replace with `None`; initialize within function
+
+ℹ Possible fix
+277 277 |     pass
+278 278 | 
+279 279 | 
+280     |-def single_line_func_wrong(value: dict[str, str] = {}):
+    280 |+def single_line_func_wrong(value: dict[str, str] = None):
+281 281 |     """Docstring"""
+    282 |+    if value is None:
+    283 |+        value = {}
+282 284 | 
+283 285 | 
+284 286 | def single_line_func_wrong(value: dict[str, str] = {}):
+
+B006_B008.py:284:52: B006 [*] Do not use mutable data structures for argument defaults
+    |
+284 | def single_line_func_wrong(value: dict[str, str] = {}):
+    |                                                    ^^ B006
+285 |     """Docstring"""
+286 |     ...
+    |
+    = help: Replace with `None`; initialize within function
+
+ℹ Possible fix
+281 281 |     """Docstring"""
+282 282 | 
+283 283 | 
+284     |-def single_line_func_wrong(value: dict[str, str] = {}):
+    284 |+def single_line_func_wrong(value: dict[str, str] = None):
+285 285 |     """Docstring"""
+    286 |+    if value is None:
+    287 |+        value = {}
+286 288 |     ...
+287 289 | 
+288 290 | 
+
+B006_B008.py:289:52: B006 Do not use mutable data structures for argument defaults
+    |
+289 | def single_line_func_wrong(value: dict[str, str] = {}):
+    |                                                    ^^ B006
+290 |     """Docstring"""; ...
+    |
+    = help: Replace with `None`; initialize within function
+
+B006_B008.py:293:52: B006 Do not use mutable data structures for argument defaults
+    |
+293 | def single_line_func_wrong(value: dict[str, str] = {}):
+    |                                                    ^^ B006
+294 |     """Docstring"""; \
+295 |         ...
+    |
+    = help: Replace with `None`; initialize within function
+
+B006_B008.py:298:52: B006 [*] Do not use mutable data structures for argument defaults
+    |
+298 |   def single_line_func_wrong(value: dict[str, str] = {
+    |  ____________________________________________________^
+299 | |     # This is a comment
+300 | | }):
+    | |_^ B006
+301 |       """Docstring"""
+    |
+    = help: Replace with `None`; initialize within function
+
+ℹ Possible fix
+295 295 |         ...
+296 296 | 
+297 297 | 
+298     |-def single_line_func_wrong(value: dict[str, str] = {
+299     |-    # This is a comment
+300     |-}):
+    298 |+def single_line_func_wrong(value: dict[str, str] = None):
+301 299 |     """Docstring"""
+    300 |+    if value is None:
+    301 |+        value = {}
+302 302 | 
+303 303 | 
+304 304 | def single_line_func_wrong(value: dict[str, str] = {}) \
+
+B006_B008.py:304:52: B006 Do not use mutable data structures for argument defaults
+    |
+304 | def single_line_func_wrong(value: dict[str, str] = {}) \
+    |                                                    ^^ B006
+305 |     : \
+306 |     """Docstring"""
+    |
+    = help: Replace with `None`; initialize within function
 
 

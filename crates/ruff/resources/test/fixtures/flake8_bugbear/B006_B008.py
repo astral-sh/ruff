@@ -275,3 +275,32 @@ def mutable_annotations(
     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
 ):
     pass
+
+
+def single_line_func_wrong(value: dict[str, str] = {}):
+    """Docstring"""
+
+
+def single_line_func_wrong(value: dict[str, str] = {}):
+    """Docstring"""
+    ...
+
+
+def single_line_func_wrong(value: dict[str, str] = {}):
+    """Docstring"""; ...
+
+
+def single_line_func_wrong(value: dict[str, str] = {}):
+    """Docstring"""; \
+        ...
+
+
+def single_line_func_wrong(value: dict[str, str] = {
+    # This is a comment
+}):
+    """Docstring"""
+
+
+def single_line_func_wrong(value: dict[str, str] = {}) \
+    : \
+    """Docstring"""
