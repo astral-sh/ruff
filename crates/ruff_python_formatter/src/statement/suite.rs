@@ -1,10 +1,8 @@
 use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
 use ruff_python_ast::helpers::is_compound_statement;
-use ruff_python_ast::str::is_implicit_concatenation;
-use ruff_python_ast::{self as ast, Expr, Ranged, Stmt, Suite};
+use ruff_python_ast::{self as ast, Ranged, Stmt, Suite};
 use ruff_python_ast::{Constant, ExprConstant};
 use ruff_python_trivia::{lines_after_ignoring_trivia, lines_before};
-use ruff_source_file::Locator;
 
 use crate::comments::{leading_comments, trailing_comments};
 use crate::context::{NodeLevel, WithNodeLevel};
@@ -78,7 +76,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 write!(f, [first.format()])?;
             }
             SuiteKind::Function => {
-                if let Some(constant) = get_docstring(first, &f.context().locator()) {
+                if let Some(constant) = get_docstring(first) {
                     write!(
                         f,
                         [
@@ -95,7 +93,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 }
             }
             SuiteKind::Class => {
-                if let Some(constant) = get_docstring(first, &f.context().locator()) {
+                if let Some(constant) = get_docstring(first) {
                     if !comments.has_leading_comments(first)
                         && lines_before(first.start(), source) > 1
                     {
@@ -257,26 +255,20 @@ const fn is_import_definition(stmt: &Stmt) -> bool {
 }
 
 /// Checks if the statement is a simple string that can be formatted as a docstring
-fn get_docstring<'a>(stmt: &'a Stmt, locator: &Locator) -> Option<&'a ExprConstant> {
-    let Stmt::Expr(ast::StmtExpr { value, .. }) = stmt else {
-        return None;
-    };
-
-    let Expr::Constant(constant) = value.as_ref() else {
-        return None;
-    };
-    if let ExprConstant {
-        value: Constant::Str(..),
-        range,
-        ..
-    } = constant
-    {
-        if is_implicit_concatenation(locator.slice(*range)) {
-            return None;
-        }
-        return Some(constant);
+fn get_docstring(stmt: &Stmt) -> Option<&ExprConstant> {
+    let stmt_expr = stmt.as_expr_stmt()?;
+    let expr_constant = stmt_expr.value.as_constant_expr()?;
+    if matches!(
+        expr_constant.value,
+        Constant::Str(ast::StringConstant {
+            implicit_concatenated: false,
+            ..
+        })
+    ) {
+        Some(expr_constant)
+    } else {
+        None
     }
-    None
 }
 
 impl FormatRuleWithOptions<Suite, PyFormatContext<'_>> for FormatSuite {
