@@ -146,11 +146,11 @@ impl Violation for PytestAssertAlwaysFalse {
 }
 
 /// ## What it does
-/// Checks for `unittest`'s assertion methods.
+/// Checks for uses of assertion methods from the `unittest` module.
 ///
 /// ## Why is this bad?
-/// To make use of `pytest`'s assertion rewriting, a regular `assert` statement is
-/// preferred over `unittest`'s assertion methods.
+/// To make use of `pytest`'s assertion rewriting, a regular `assert` statement
+/// is preferred over `unittest`'s assertion methods.
 ///
 /// ## Example
 /// ```python
@@ -166,7 +166,8 @@ impl Violation for PytestAssertAlwaysFalse {
 ///         assert a == b
 /// ```
 ///
-/// - [`pytest` documentation: `Assertion introspection details`](https://docs.pytest.org/en/7.1.x/how-to/assert.html#assertion-introspection-details)
+/// ## References
+/// - [`pytest` documentation: Assertion introspection details](https://docs.pytest.org/en/7.1.x/how-to/assert.html#assertion-introspection-details)
 
 #[violation]
 pub struct PytestUnittestAssertion {

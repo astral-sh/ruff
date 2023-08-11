@@ -6,12 +6,19 @@ use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, Parameters, Ranged};
 
 /// ## What it does
-/// Checks for monkey patching calls that use `lambda` as the new value.
+/// Checks for mocked calls that use a dummy `lambda` function instead of
+/// `return_value`.
 ///
 /// ## Why is this bad?
-/// `return_value` conveys the intent more clearly and allows using methods for
-/// verifying the number of calls or the arguments passed to the patched function
-/// (e.g., `assert_called_once_with`).
+/// When patching calls, an explicit `return_value` better conveys the intent
+/// than a `lambda` function, assuming the `lambda` does not use the arguments
+/// passed to it.
+///
+/// `return_value` is also robust to changes in the patched function's
+/// signature, and enables additional assertions to verify behavior. For
+/// example, `return_value` allows for verification of the number of calls or
+/// the arguments passed to the patched function via `assert_called_once_with`
+/// and related methods.
 ///
 /// ## Example
 /// ```python
@@ -23,7 +30,8 @@ use ruff_python_ast::{self as ast, Expr, Parameters, Ranged};
 /// ```python
 /// def test_foo(mocker):
 ///     mocker.patch("module.target", return_value=7)
-///     # if lambda parameters are used, it's not a violation
+///
+///     # If the lambda makes use of the arguments, no diagnostic is emitted.
 ///     mocker.patch("module.other_target", lambda x, y: x)
 /// ```
 ///
