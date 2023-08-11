@@ -40,7 +40,7 @@ RUF017.py:6:1: RUF017 [*] Replace quadratic list summation with list comprehensi
   6 |+[el for lst in [x, y] for el in lst]
 7 7 | sum([[1, 2, 3], [4, 5, 6]], start=[])
 8 8 | sum([[1, 2, 3], [4, 5, 6]], [])
-9 9 | 
+9 9 | sum([[1, 2, 3], [4, 5, 6]],
 
 RUF017.py:7:1: RUF017 [*] Replace quadratic list summation with list comprehension
   |
@@ -49,6 +49,7 @@ RUF017.py:7:1: RUF017 [*] Replace quadratic list summation with list comprehensi
 7 | sum([[1, 2, 3], [4, 5, 6]], start=[])
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF017
 8 | sum([[1, 2, 3], [4, 5, 6]], [])
+9 | sum([[1, 2, 3], [4, 5, 6]],
   |
   = help: Convert to list comprehension
 
@@ -59,8 +60,8 @@ RUF017.py:7:1: RUF017 [*] Replace quadratic list summation with list comprehensi
 7   |-sum([[1, 2, 3], [4, 5, 6]], start=[])
   7 |+[el for lst in [[1, 2, 3], [4, 5, 6]] for el in lst]
 8 8 | sum([[1, 2, 3], [4, 5, 6]], [])
-9 9 | 
-10 10 | # OK
+9 9 | sum([[1, 2, 3], [4, 5, 6]],
+10 10 |     [])
 
 RUF017.py:8:1: RUF017 [*] Replace quadratic list summation with list comprehension
    |
@@ -68,8 +69,8 @@ RUF017.py:8:1: RUF017 [*] Replace quadratic list summation with list comprehensi
  7 | sum([[1, 2, 3], [4, 5, 6]], start=[])
  8 | sum([[1, 2, 3], [4, 5, 6]], [])
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF017
- 9 | 
-10 | # OK
+ 9 | sum([[1, 2, 3], [4, 5, 6]],
+10 |     [])
    |
    = help: Convert to list comprehension
 
@@ -79,8 +80,31 @@ RUF017.py:8:1: RUF017 [*] Replace quadratic list summation with list comprehensi
 7 7 | sum([[1, 2, 3], [4, 5, 6]], start=[])
 8   |-sum([[1, 2, 3], [4, 5, 6]], [])
   8 |+[el for lst in [[1, 2, 3], [4, 5, 6]] for el in lst]
-9 9 | 
-10 10 | # OK
-11 11 | sum([x, y])
+9 9 | sum([[1, 2, 3], [4, 5, 6]],
+10 10 |     [])
+11 11 | 
+
+RUF017.py:9:1: RUF017 [*] Replace quadratic list summation with list comprehension
+   |
+ 7 |   sum([[1, 2, 3], [4, 5, 6]], start=[])
+ 8 |   sum([[1, 2, 3], [4, 5, 6]], [])
+ 9 | / sum([[1, 2, 3], [4, 5, 6]],
+10 | |     [])
+   | |_______^ RUF017
+11 |   
+12 |   # OK
+   |
+   = help: Convert to list comprehension
+
+ℹ Suggested fix
+6  6  | sum([x, y], [])
+7  7  | sum([[1, 2, 3], [4, 5, 6]], start=[])
+8  8  | sum([[1, 2, 3], [4, 5, 6]], [])
+9     |-sum([[1, 2, 3], [4, 5, 6]],
+10    |-    [])
+   9  |+[el for lst in [[1, 2, 3], [4, 5, 6]] for el in lst]
+11 10 | 
+12 11 | # OK
+13 12 | sum([x, y])
 
 
