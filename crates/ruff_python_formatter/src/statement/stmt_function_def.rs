@@ -1,10 +1,10 @@
 use ruff_formatter::write;
-use ruff_python_ast::{Expr, Parameters, Ranged, StmtFunctionDef};
+use ruff_python_ast::{Parameters, Ranged, StmtFunctionDef};
 use ruff_python_trivia::{lines_after_ignoring_trivia, SimpleTokenKind, SimpleTokenizer};
 
 use crate::comments::{leading_comments, trailing_comments};
+use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{Parentheses, Parenthesize};
-use crate::expression::{has_own_parentheses, maybe_parenthesize_expression};
 use crate::prelude::*;
 use crate::statement::suite::SuiteKind;
 use crate::FormatNodeRule;
@@ -60,15 +60,7 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
         }
 
         let format_inner = format_with(|f: &mut PyFormatter| {
-            if should_group_function_parameters(
-                &item.parameters,
-                item.returns.as_deref(),
-                f.context(),
-            ) {
-                write!(f, [group(&item.parameters.format())])?;
-            } else {
-                write!(f, [item.parameters.format()])?;
-            }
+            write!(f, [item.parameters.format()])?;
 
             if let Some(return_annotation) = item.returns.as_ref() {
                 write!(f, [space(), text("->"), space()])?;
@@ -77,6 +69,38 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
                     write!(
                         f,
                         [return_annotation.format().with_options(Parentheses::Never)]
+                    )?;
+                } else if comments.has_trailing_comments(return_annotation.as_ref()) {
+                    // Intentionally parenthesize any return annotations with trailing comments.
+                    // This avoids an instability in cases like:
+                    // ```python
+                    // def double(
+                    //     a: int
+                    // ) -> (
+                    //     int  # Hello
+                    // ):
+                    //     pass
+                    // ```
+                    // If we allow this to break, it will be formatted as follows:
+                    // ```python
+                    // def double(
+                    //     a: int
+                    // ) -> int:  # Hello
+                    //     pass
+                    // ```
+                    // On subsequent formats, the `# Hello` will be interpreted as a dangling
+                    // comment on a function, yielding:
+                    // ```python
+                    // def double(a: int) -> int:  # Hello
+                    //     pass
+                    // ```
+                    // Ideally, we'd reach that final formatting in a single pass, but doing so
+                    // requires that the parent be aware of how the child is formatted, which
+                    // is challenging. As a compromise, we break those expressions to avoid an
+                    // instability.
+                    write!(
+                        f,
+                        [return_annotation.format().with_options(Parentheses::Always)]
                     )?;
                 } else {
                     write!(
@@ -151,49 +175,4 @@ fn empty_parameters(parameters: &Parameters, source: &str) -> bool {
     }
 
     true
-}
-
-/// Returns `true` if the [`Parameters`] should be wrapped in their own group.
-///
-/// This exists to support cases like:
-/// ```python
-/// def double(a: int) -> (
-///     int # Hello
-/// ):
-///     return 2*a
-/// ```
-///
-/// In this case, we want to put the parameters in their own group, to avoid formatting
-/// as follows:
-/// ```python
-/// def double(
-///     a: int
-/// ) -> int:  # Hello
-///     return 2 * a
-/// ```
-///
-/// The trailing comment on the return annotation causes a break, which causes the
-/// parameters to expand, unless they're placed in their own group.
-fn should_group_function_parameters(
-    parameters: &Parameters,
-    returns: Option<&Expr>,
-    context: &PyFormatContext,
-) -> bool {
-    let Some(returns) = returns else {
-        return false;
-    };
-
-    // If the parameters are empty, don't group, since they'll never break anyway.
-    if empty_parameters(parameters, context.source()) {
-        return false;
-    }
-
-    // Does the return type have any trailing comments? If so, don't group.
-    if context.comments().has_trailing_own_line_comments(returns) {
-        return false;
-    }
-
-    // Only omit a group for a selected set of expressions that don't have their own
-    // breakpoints.
-    matches!(returns, Expr::Name(_) | Expr::Attribute(_))
 }
