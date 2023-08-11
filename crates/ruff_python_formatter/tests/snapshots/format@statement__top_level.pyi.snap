@@ -1,0 +1,57 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/top_level.pyi
+---
+## Input
+```py
+class A:
+    def __init__(self):
+        pass
+
+
+class B:
+    def __init__(self):
+        pass
+
+
+def foo():
+    pass
+
+
+class Del(expr_context):
+    ...
+
+
+class Load(expr_context):
+    ...
+
+
+class Store(expr_context):
+    ...
+```
+
+## Output
+```py
+class A:
+    def __init__(self):
+        pass
+
+class B:
+    def __init__(self):
+        pass
+
+def foo():
+    pass
+
+class Del(expr_context):
+    ...
+
+class Load(expr_context):
+    ...
+
+class Store(expr_context):
+    ...
+```
+
+
+
