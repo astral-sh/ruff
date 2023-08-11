@@ -205,7 +205,7 @@ match bar1:
          assert "map" == b
  
  
-@@ -59,61 +62,47 @@
+@@ -59,61 +62,51 @@
      ),
      case,
  ):
@@ -217,11 +217,11 @@ match bar1:
 -    ):
 +    case NOT_YET_IMPLEMENTED_Pattern:
          pass
--
+ 
 -    case [a as match]:
 +    case NOT_YET_IMPLEMENTED_Pattern:
          pass
--
+ 
 -    case case:
 +    case NOT_YET_IMPLEMENTED_Pattern:
          pass
@@ -255,11 +255,11 @@ match bar1:
 -    case 1 as a:
 +    case NOT_YET_IMPLEMENTED_Pattern:
          pass
--
+ 
 -    case 2 as b, 3 as c:
 +    case NOT_YET_IMPLEMENTED_Pattern:
          pass
--
+ 
 -    case 4 as d, (5 as e), (6 | 7 as g), *h:
 +    case NOT_YET_IMPLEMENTED_Pattern:
          pass
@@ -351,8 +351,10 @@ match match(
 ):
     case NOT_YET_IMPLEMENTED_Pattern:
         pass
+
     case NOT_YET_IMPLEMENTED_Pattern:
         pass
+
     case NOT_YET_IMPLEMENTED_Pattern:
         pass
 
@@ -377,8 +379,10 @@ match something:
 match something:
     case NOT_YET_IMPLEMENTED_Pattern:
         pass
+
     case NOT_YET_IMPLEMENTED_Pattern:
         pass
+
     case NOT_YET_IMPLEMENTED_Pattern:
         pass
 

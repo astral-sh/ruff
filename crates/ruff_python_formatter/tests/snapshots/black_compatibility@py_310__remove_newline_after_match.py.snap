@@ -31,21 +31,21 @@ def http_status(status):
 ```diff
 --- Black
 +++ Ruff
-@@ -1,13 +1,10 @@
+@@ -1,13 +1,13 @@
  def http_status(status):
      match status:
 -        case 400:
 +        case NOT_YET_IMPLEMENTED_Pattern:
              return "Bad request"
--
+ 
 -        case 401:
 +        case NOT_YET_IMPLEMENTED_Pattern:
              return "Unauthorized"
--
+ 
 -        case 403:
 +        case NOT_YET_IMPLEMENTED_Pattern:
              return "Forbidden"
--
+ 
 -        case 404:
 +        case NOT_YET_IMPLEMENTED_Pattern:
              return "Not found"
@@ -58,10 +58,13 @@ def http_status(status):
     match status:
         case NOT_YET_IMPLEMENTED_Pattern:
             return "Bad request"
+
         case NOT_YET_IMPLEMENTED_Pattern:
             return "Unauthorized"
+
         case NOT_YET_IMPLEMENTED_Pattern:
             return "Forbidden"
+
         case NOT_YET_IMPLEMENTED_Pattern:
             return "Not found"
 ```
