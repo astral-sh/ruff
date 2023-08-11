@@ -46,11 +46,11 @@ pub(super) fn is_pytest_parametrize(decorator: &Decorator, semantic: &SemanticMo
 
 pub(super) fn keyword_is_literal(keyword: &Keyword, literal: &str) -> bool {
     if let Expr::Constant(ast::ExprConstant {
-        value: Constant::Str(string),
+        value: Constant::Str(ast::StringConstant { value, .. }),
         ..
     }) = &keyword.value
     {
-        string == literal
+        value == literal
     } else {
         false
     }

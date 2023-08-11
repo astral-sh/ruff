@@ -1087,7 +1087,7 @@ impl Truthiness {
             Expr::Constant(ast::ExprConstant { value, .. }) => match value {
                 Constant::Bool(value) => Some(*value),
                 Constant::None => Some(false),
-                Constant::Str(string) => Some(!string.is_empty()),
+                Constant::Str(ast::StringConstant { value, .. }) => Some(!value.is_empty()),
                 Constant::Bytes(bytes) => Some(!bytes.is_empty()),
                 Constant::Int(int) => Some(!int.is_zero()),
                 Constant::Float(float) => Some(*float != 0.0),
@@ -1098,14 +1098,15 @@ impl Truthiness {
                 if values.is_empty() {
                     Some(false)
                 } else if values.iter().any(|value| {
-                    let Expr::Constant(ast::ExprConstant {
-                        value: Constant::Str(string),
+                    if let Expr::Constant(ast::ExprConstant {
+                        value: Constant::Str(ast::StringConstant { value, .. }),
                         ..
                     }) = &value
-                    else {
-                        return false;
-                    };
-                    !string.is_empty()
+                    {
+                        !value.is_empty()
+                    } else {
+                        false
+                    }
                 }) {
                     Some(true)
                 } else {

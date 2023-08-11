@@ -28,7 +28,10 @@ expression: parse_ast
                                                 ExprConstant {
                                                     range: 30..34,
                                                     value: Str(
-                                                        "eg",
+                                                        StringConstant {
+                                                            value: "eg",
+                                                            implicit_concatenated: false,
+                                                        },
                                                     ),
                                                     kind: None,
                                                 },
@@ -203,7 +206,10 @@ expression: parse_ast
                                                                     ExprConstant {
                                                                         range: 135..142,
                                                                         value: Str(
-                                                                            "caught ",
+                                                                            StringConstant {
+                                                                                value: "caught ",
+                                                                                implicit_concatenated: false,
+                                                                            },
                                                                         ),
                                                                         kind: None,
                                                                     },
@@ -245,7 +251,10 @@ expression: parse_ast
                                                                     ExprConstant {
                                                                         range: 151..164,
                                                                         value: Str(
-                                                                            " with nested ",
+                                                                            StringConstant {
+                                                                                value: " with nested ",
+                                                                                implicit_concatenated: false,
+                                                                            },
                                                                         ),
                                                                         kind: None,
                                                                     },
@@ -331,7 +340,10 @@ expression: parse_ast
                                                                     ExprConstant {
                                                                         range: 215..222,
                                                                         value: Str(
-                                                                            "caught ",
+                                                                            StringConstant {
+                                                                                value: "caught ",
+                                                                                implicit_concatenated: false,
+                                                                            },
                                                                         ),
                                                                         kind: None,
                                                                     },
@@ -373,7 +385,10 @@ expression: parse_ast
                                                                     ExprConstant {
                                                                         range: 231..244,
                                                                         value: Str(
-                                                                            " with nested ",
+                                                                            StringConstant {
+                                                                                value: " with nested ",
+                                                                                implicit_concatenated: false,
+                                                                            },
                                                                         ),
                                                                         kind: None,
                                                                     },

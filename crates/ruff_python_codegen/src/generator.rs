@@ -1197,8 +1197,8 @@ impl<'a> Generator<'a> {
             Constant::Bytes(b) => {
                 self.p_bytes_repr(b);
             }
-            Constant::Str(s) => {
-                self.p_str_repr(s);
+            Constant::Str(ast::StringConstant { value, .. }) => {
+                self.p_str_repr(value);
             }
             Constant::None => self.p("None"),
             Constant::Bool(b) => self.p(if *b { "True" } else { "False" }),
@@ -1339,8 +1339,8 @@ impl<'a> Generator<'a> {
     fn unparse_f_string_elem(&mut self, expr: &Expr, is_spec: bool) {
         match expr {
             Expr::Constant(ast::ExprConstant { value, .. }) => {
-                if let Constant::Str(s) = value {
-                    self.unparse_f_string_literal(s);
+                if let Constant::Str(ast::StringConstant { value, .. }) = value {
+                    self.unparse_f_string_literal(value);
                 } else {
                     unreachable!()
                 }

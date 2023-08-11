@@ -264,15 +264,13 @@ fn is_main_check(expr: &Expr) -> bool {
     {
         if let Expr::Name(ast::ExprName { id, .. }) = left.as_ref() {
             if id == "__name__" {
-                if comparators.len() == 1 {
-                    if let Expr::Constant(ast::ExprConstant {
-                        value: Constant::Str(value),
-                        ..
-                    }) = &comparators[0]
-                    {
-                        if value == "__main__" {
-                            return true;
-                        }
+                if let [Expr::Constant(ast::ExprConstant {
+                    value: Constant::Str(ast::StringConstant { value, .. }),
+                    ..
+                })] = comparators.as_slice()
+                {
+                    if value == "__main__" {
+                        return true;
                     }
                 }
             }

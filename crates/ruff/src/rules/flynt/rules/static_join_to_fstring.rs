@@ -61,22 +61,21 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
         )
     }) {
         let node = ast::ExprConstant {
-            value: Constant::Str(
-                joinees
-                    .iter()
-                    .filter_map(|expr| {
-                        if let Expr::Constant(ast::ExprConstant {
-                            value: Constant::Str(string),
-                            ..
-                        }) = expr
-                        {
-                            Some(string.as_str())
-                        } else {
-                            None
-                        }
-                    })
-                    .join(joiner),
-            ),
+            value: joinees
+                .iter()
+                .filter_map(|expr| {
+                    if let Expr::Constant(ast::ExprConstant {
+                        value: Constant::Str(ast::StringConstant { value, .. }),
+                        ..
+                    }) = expr
+                    {
+                        Some(value.as_str())
+                    } else {
+                        None
+                    }
+                })
+                .join(joiner)
+                .into(),
             range: TextRange::default(),
             kind: None,
         };

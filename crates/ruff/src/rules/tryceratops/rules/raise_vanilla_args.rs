@@ -62,10 +62,10 @@ where
             }
         }
         Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(val),
+            value: Constant::Str(value),
             ..
         }) => {
-            if predicate(val.as_str()) {
+            if predicate(value) {
                 return true;
             }
         }

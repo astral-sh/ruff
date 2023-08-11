@@ -7,8 +7,8 @@ use libcst_native::{
     RightParen, RightSquareBracket, Set, SetComp, SimpleString, SimpleWhitespace,
     TrailingWhitespace, Tuple,
 };
-use ruff_python_ast::{Expr, Ranged};
-use ruff_text_size::TextRange;
+use ruff_python_ast::{self as ast, Expr, Ranged};
+use ruff_text_size::{TextRange, TextSize};
 
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_codegen::Stylist;
@@ -25,65 +25,43 @@ use crate::{
 };
 
 /// (C400) Convert `list(x for x in y)` to `[x for x in y]`.
-pub(crate) fn fix_unnecessary_generator_list(
-    locator: &Locator,
-    stylist: &Stylist,
-    expr: &Expr,
-) -> Result<Edit> {
-    // Expr(Call(GeneratorExp)))) -> Expr(ListComp)))
-    let module_text = locator.slice(expr.range());
-    let mut tree = match_expression(module_text)?;
-    let call = match_call_mut(&mut tree)?;
-    let arg = match_arg(call)?;
+pub(crate) fn fix_unnecessary_generator_list(expr: &Expr, locator: &Locator) -> Result<Edit> {
+    let Expr::Call(ast::ExprCall { arguments, .. }) = expr else {
+        bail!("Expected expression to be a call");
+    };
 
-    let generator_exp = match_generator_exp(&arg.value)?;
+    // Grab the function arguments.
+    let content = locator.slice(
+        arguments
+            .range()
+            .add_start(TextSize::from(1))
+            .sub_end(TextSize::from(1)),
+    );
 
-    tree = Expression::ListComp(Box::new(ListComp {
-        elt: generator_exp.elt.clone(),
-        for_in: generator_exp.for_in.clone(),
-        lbracket: LeftSquareBracket {
-            whitespace_after: call.whitespace_before_args.clone(),
-        },
-        rbracket: RightSquareBracket {
-            whitespace_before: arg.whitespace_after_arg.clone(),
-        },
-        lpar: generator_exp.lpar.clone(),
-        rpar: generator_exp.rpar.clone(),
-    }));
+    // Wrap in square braces.
+    let content = format!("[{content}]");
 
-    Ok(Edit::range_replacement(
-        tree.codegen_stylist(stylist),
-        expr.range(),
-    ))
+    Ok(Edit::range_replacement(content, expr.range()))
 }
 
 /// (C401) Convert `set(x for x in y)` to `{x for x in y}`.
 pub(crate) fn fix_unnecessary_generator_set(checker: &Checker, expr: &Expr) -> Result<Edit> {
     let locator = checker.locator();
-    let stylist = checker.stylist();
 
-    // Expr(Call(GeneratorExp)))) -> Expr(SetComp)))
-    let module_text = locator.slice(expr.range());
-    let mut tree = match_expression(module_text)?;
-    let call = match_call_mut(&mut tree)?;
-    let arg = match_arg(call)?;
+    let Expr::Call(ast::ExprCall { arguments, .. }) = expr else {
+        bail!("Expected expression to be a call");
+    };
 
-    let generator_exp = match_generator_exp(&arg.value)?;
+    // Grab the function arguments.
+    let content = locator.slice(
+        arguments
+            .range()
+            .add_start(TextSize::from(1))
+            .sub_end(TextSize::from(1)),
+    );
 
-    tree = Expression::SetComp(Box::new(SetComp {
-        elt: generator_exp.elt.clone(),
-        for_in: generator_exp.for_in.clone(),
-        lbrace: LeftCurlyBrace {
-            whitespace_after: call.whitespace_before_args.clone(),
-        },
-        rbrace: RightCurlyBrace {
-            whitespace_before: arg.whitespace_after_arg.clone(),
-        },
-        lpar: generator_exp.lpar.clone(),
-        rpar: generator_exp.rpar.clone(),
-    }));
-
-    let content = tree.codegen_stylist(stylist);
+    // Wrap in curly braces.
+    let content = format!("{{{content}}}");
 
     Ok(Edit::range_replacement(
         pad_expression(content, expr.range(), checker),

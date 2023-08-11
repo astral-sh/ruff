@@ -130,7 +130,7 @@ fn create_properties_from_fields_arg(fields: &Expr) -> Result<Vec<Stmt>> {
                 bail!("Expected `elts` to have exactly two elements")
             };
             let Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(property),
+                value: Constant::Str(ast::StringConstant { value: property, ..}),
                 ..
             }) = &field_name
             else {

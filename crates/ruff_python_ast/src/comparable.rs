@@ -326,8 +326,14 @@ impl<'a> From<&'a ast::Constant> for ComparableConstant<'a> {
         match constant {
             ast::Constant::None => Self::None,
             ast::Constant::Bool(value) => Self::Bool(value),
-            ast::Constant::Str(value) => Self::Str(value),
-            ast::Constant::Bytes(value) => Self::Bytes(value),
+            ast::Constant::Str(ast::StringConstant {
+                value,
+                implicit_concatenated: _,
+            }) => Self::Str(value),
+            ast::Constant::Bytes(ast::BytesConstant {
+                value,
+                implicit_concatenated: _,
+            }) => Self::Bytes(value),
             ast::Constant::Int(value) => Self::Int(value),
             ast::Constant::Float(value) => Self::Float(value.to_bits()),
             ast::Constant::Complex { real, imag } => Self::Complex {

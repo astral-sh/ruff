@@ -12,7 +12,10 @@ Call(
                     ExprConstant {
                         range: 0..3,
                         value: Str(
-                            " ",
+                            StringConstant {
+                                value: " ",
+                                implicit_concatenated: false,
+                            },
                         ),
                         kind: None,
                     },
@@ -68,7 +71,10 @@ Call(
                                                                 ExprConstant {
                                                                     range: 43..53,
                                                                     value: Str(
-                                                                        "LIMIT %d",
+                                                                        StringConstant {
+                                                                            value: "LIMIT %d",
+                                                                            implicit_concatenated: false,
+                                                                        },
                                                                     ),
                                                                     kind: None,
                                                                 },
@@ -109,7 +115,10 @@ Call(
                                                                 ExprConstant {
                                                                     range: 91..102,
                                                                     value: Str(
-                                                                        "OFFSET %d",
+                                                                        StringConstant {
+                                                                            value: "OFFSET %d",
+                                                                            implicit_concatenated: false,
+                                                                        },
                                                                     ),
                                                                     kind: None,
                                                                 },

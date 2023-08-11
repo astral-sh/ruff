@@ -14,7 +14,10 @@ expression: parse_ast
                             ExprConstant {
                                 range: 2..5,
                                 value: Str(
-                                    "aaa",
+                                    StringConstant {
+                                        value: "aaa",
+                                        implicit_concatenated: false,
+                                    },
                                 ),
                                 kind: None,
                             },
@@ -38,7 +41,10 @@ expression: parse_ast
                             ExprConstant {
                                 range: 10..13,
                                 value: Str(
-                                    "ccc",
+                                    StringConstant {
+                                        value: "ccc",
+                                        implicit_concatenated: false,
+                                    },
                                 ),
                                 kind: None,
                             },
@@ -62,7 +68,10 @@ expression: parse_ast
                             ExprConstant {
                                 range: 18..21,
                                 value: Str(
-                                    "eee",
+                                    StringConstant {
+                                        value: "eee",
+                                        implicit_concatenated: false,
+                                    },
                                 ),
                                 kind: None,
                             },

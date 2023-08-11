@@ -1,6 +1,4 @@
-use itertools::Itertools;
-
-use ruff_python_ast::{self as ast, Constant, Expr};
+use ruff_python_ast::{self as ast, BytesConstant, Constant, Expr, StringConstant};
 use ruff_python_ast::{ConversionFlag, Ranged};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
@@ -513,25 +511,25 @@ impl<'a> StringParser<'a> {
         }
 
         Ok(Expr::from(ast::ExprConstant {
-            value: Constant::Bytes(content.chars().map(|c| c as u8).collect()),
+            value: content.chars().map(|c| c as u8).collect::<Vec<u8>>().into(),
             kind: None,
             range: self.range(start_location),
         }))
     }
 
     fn parse_string(&mut self) -> Result<Expr, LexicalError> {
-        let mut content = String::new();
+        let mut value = String::new();
         let start_location = self.get_pos();
         while let Some(ch) = self.next_char() {
             match ch {
                 '\\' if !self.kind.is_raw() => {
-                    content.push_str(&self.parse_escaped_char()?);
+                    value.push_str(&self.parse_escaped_char()?);
                 }
-                ch => content.push(ch),
+                ch => value.push(ch),
             }
         }
         Ok(Expr::from(ast::ExprConstant {
-            value: Constant::Str(content),
+            value: value.into(),
             kind: self.kind.is_unicode().then(|| "u".to_string()),
             range: self.range(start_location),
         }))
@@ -577,6 +575,7 @@ pub(crate) fn parse_strings(
         .filter(|(_, (_, kind, ..), _)| kind.is_any_bytes())
         .count();
     let has_bytes = num_bytes > 0;
+    let implicit_concatenated = values.len() > 1;
 
     if has_bytes && num_bytes < values.len() {
         return Err(LexicalError {
@@ -593,7 +592,7 @@ pub(crate) fn parse_strings(
             for value in parse_string(&source, kind, triple_quoted, start)? {
                 match value {
                     Expr::Constant(ast::ExprConstant {
-                        value: Constant::Bytes(value),
+                        value: Constant::Bytes(BytesConstant { value, .. }),
                         ..
                     }) => content.extend(value),
                     _ => unreachable!("Unexpected non-bytes expression."),
@@ -601,7 +600,10 @@ pub(crate) fn parse_strings(
             }
         }
         return Ok(ast::ExprConstant {
-            value: Constant::Bytes(content),
+            value: Constant::Bytes(BytesConstant {
+                value: content,
+                implicit_concatenated,
+            }),
             kind: None,
             range: TextRange::new(initial_start, last_end),
         }
@@ -614,7 +616,7 @@ pub(crate) fn parse_strings(
             for value in parse_string(&source, kind, triple_quoted, start)? {
                 match value {
                     Expr::Constant(ast::ExprConstant {
-                        value: Constant::Str(value),
+                        value: Constant::Str(StringConstant { value, .. }),
                         ..
                     }) => content.push(value),
                     _ => unreachable!("Unexpected non-string expression."),
@@ -622,7 +624,10 @@ pub(crate) fn parse_strings(
             }
         }
         return Ok(ast::ExprConstant {
-            value: Constant::Str(content.join("")),
+            value: Constant::Str(StringConstant {
+                value: content.join(""),
+                implicit_concatenated,
+            }),
             kind: initial_kind,
             range: TextRange::new(initial_start, last_end),
         }
@@ -637,7 +642,10 @@ pub(crate) fn parse_strings(
 
     let take_current = |current: &mut Vec<String>, start, end| -> Expr {
         Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(current.drain(..).join("")),
+            value: Constant::Str(StringConstant {
+                value: current.drain(..).collect::<String>(),
+                implicit_concatenated,
+            }),
             kind: initial_kind.clone(),
             range: TextRange::new(start, end),
         })
@@ -654,14 +662,14 @@ pub(crate) fn parse_strings(
                     deduped.push(value);
                 }
                 Expr::Constant(ast::ExprConstant {
-                    value: Constant::Str(inner),
+                    value: Constant::Str(StringConstant { value, .. }),
                     ..
                 }) => {
                     if current.is_empty() {
                         current_start = value_range.start();
                     }
                     current_end = value_range.end();
-                    current.push(inner);
+                    current.push(value);
                 }
                 _ => unreachable!("Unexpected non-string expression."),
             }
@@ -959,6 +967,13 @@ mod tests {
     #[test]
     fn test_parse_f_string_concat_3() {
         let source = "'Hello ' f'world{\"!\"}'";
+        let parse_ast = parse_suite(source, "<test>").unwrap();
+        insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
+    fn test_parse_f_string_concat_4() {
+        let source = "'Hello ' f'world{\"!\"}' 'again!'";
         let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }

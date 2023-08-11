@@ -38,8 +38,14 @@ impl FromStr for LiteralType {
 impl From<LiteralType> for Constant {
     fn from(value: LiteralType) -> Self {
         match value {
-            LiteralType::Str => Constant::Str(String::new()),
-            LiteralType::Bytes => Constant::Bytes(vec![]),
+            LiteralType::Str => Constant::Str(ast::StringConstant {
+                value: String::new(),
+                implicit_concatenated: false,
+            }),
+            LiteralType::Bytes => Constant::Bytes(ast::BytesConstant {
+                value: Vec::new(),
+                implicit_concatenated: false,
+            }),
             LiteralType::Int => Constant::Int(BigInt::from(0)),
             LiteralType::Float => Constant::Float(0.0),
             LiteralType::Bool => Constant::Bool(false),

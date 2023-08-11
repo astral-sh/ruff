@@ -5,10 +5,10 @@ expression: parse_ast
 [
     Expr(
         StmtExpr {
-            range: 0..22,
+            range: 0..31,
             value: FString(
                 ExprFString {
-                    range: 0..22,
+                    range: 0..31,
                     values: [
                         Constant(
                             ExprConstant {
@@ -40,6 +40,18 @@ expression: parse_ast
                                 debug_text: None,
                                 conversion: None,
                                 format_spec: None,
+                            },
+                        ),
+                        Constant(
+                            ExprConstant {
+                                range: 24..30,
+                                value: Str(
+                                    StringConstant {
+                                        value: "again!",
+                                        implicit_concatenated: true,
+                                    },
+                                ),
+                                kind: None,
                             },
                         ),
                     ],

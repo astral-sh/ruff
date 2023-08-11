@@ -202,7 +202,10 @@ fn clean_params_dictionary(
             match key {
                 Some(key) => {
                     if let Expr::Constant(ast::ExprConstant {
-                        value: Constant::Str(key_string),
+                        value:
+                            Constant::Str(ast::StringConstant {
+                                value: key_string, ..
+                            }),
                         ..
                     }) = key
                     {

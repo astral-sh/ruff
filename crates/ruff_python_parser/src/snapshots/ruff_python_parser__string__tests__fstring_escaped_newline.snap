@@ -14,7 +14,10 @@ expression: parse_ast
                             ExprConstant {
                                 range: 2..4,
                                 value: Str(
-                                    "\n",
+                                    StringConstant {
+                                        value: "\n",
+                                        implicit_concatenated: false,
+                                    },
                                 ),
                                 kind: None,
                             },

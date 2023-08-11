@@ -64,7 +64,7 @@ pub(crate) fn getattr_with_constant(
         return;
     };
     let Expr::Constant(ast::ExprConstant {
-        value: Constant::Str(value),
+        value: Constant::Str(ast::StringConstant{value, ..}),
         ..
     }) = arg
     else {
