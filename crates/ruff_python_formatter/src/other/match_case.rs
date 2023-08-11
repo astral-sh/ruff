@@ -32,7 +32,7 @@ impl FormatNodeRule<MatchCase> for FormatMatchCase {
         )?;
 
         if let Some(guard) = guard {
-            write!(f, [space(), text("if"), space(),])?;
+            write!(f, [space(), text("if"), space()])?;
             if is_expression_parenthesized(guard.as_ref().into(), f.context().source()) {
                 guard.format().with_options(Parentheses::Always).fmt(f)?;
             } else {
@@ -48,5 +48,10 @@ impl FormatNodeRule<MatchCase> for FormatMatchCase {
                 block_indent(&body.format())
             ]
         )
+    }
+
+    fn fmt_dangling_comments(&self, _node: &MatchCase, _f: &mut PyFormatter) -> FormatResult<()> {
+        // Handled as part of `fmt_fields`
+        Ok(())
     }
 }
