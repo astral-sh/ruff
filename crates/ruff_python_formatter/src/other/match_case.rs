@@ -2,7 +2,6 @@ use ruff_formatter::{write, Buffer, FormatResult};
 use ruff_python_ast::MatchCase;
 
 use crate::comments::trailing_comments;
-use crate::expression::parentheses::{is_expression_parenthesized, Parentheses};
 use crate::not_yet_implemented_custom_text;
 use crate::prelude::*;
 use crate::{FormatNodeRule, PyFormatter};
@@ -32,12 +31,7 @@ impl FormatNodeRule<MatchCase> for FormatMatchCase {
         )?;
 
         if let Some(guard) = guard {
-            write!(f, [space(), text("if"), space()])?;
-            if is_expression_parenthesized(guard.as_ref().into(), f.context().source()) {
-                guard.format().with_options(Parentheses::Always).fmt(f)?;
-            } else {
-                guard.format().fmt(f)?;
-            }
+            write!(f, [space(), text("if"), space(), guard.format()])?;
         }
 
         write!(
