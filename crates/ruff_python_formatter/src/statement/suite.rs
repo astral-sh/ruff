@@ -118,7 +118,11 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
             if is_class_or_function_definition(last) || is_class_or_function_definition(statement) {
                 match self.kind {
                     SuiteKind::TopLevel if source_type.is_stub() => {
-                        write!(f, [empty_line(), statement.format()])?;
+                        if is_class_of_same_kind(last, statement) {
+                            write!(f, [statement.format()])?;
+                        } else {
+                            write!(f, [empty_line(), statement.format()])?;
+                        }
                     }
                     SuiteKind::TopLevel => {
                         write!(f, [empty_line(), empty_line(), statement.format()])?;
@@ -209,6 +213,32 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
         }
 
         Ok(())
+    }
+}
+
+/// Returns `true` if two given [`Stmt`]s are class definitions of the same kind.
+fn is_class_of_same_kind(last_stmt: &Stmt, stmt: &Stmt) -> bool {
+    match (last_stmt, stmt) {
+        (
+            Stmt::ClassDef(ast::StmtClassDef {
+                arguments: Some(last_args),
+                ..
+            }),
+            Stmt::ClassDef(ast::StmtClassDef {
+                arguments: Some(current_args),
+                ..
+            }),
+        ) if last_args.len() == current_args.len() => {
+            last_args.args.iter().zip(current_args.args.iter()).all(
+                |(last_arg, current_arg)| match (last_arg, current_arg) {
+                    (Expr::Name(last_name), Expr::Name(current_name)) => {
+                        last_name.id == current_name.id
+                    }
+                    _ => false,
+                },
+            )
+        }
+        _ => false,
     }
 }
 
