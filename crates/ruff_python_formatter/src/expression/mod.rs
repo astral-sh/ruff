@@ -115,7 +115,7 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
         };
 
         if parenthesize {
-            parenthesized("(", &group(&format_expr), ")").fmt(f)
+            parenthesized("(", &format_expr, ")").fmt(f)
         } else {
             let level = match f.context().node_level() {
                 NodeLevel::TopLevel | NodeLevel::CompoundStatement => NodeLevel::Expression(None),
@@ -189,15 +189,11 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
         match needs_parentheses {
             OptionalParentheses::Multiline if *parenthesize != Parenthesize::IfRequired => {
                 if can_omit_optional_parentheses(expression, f.context()) {
-                    optional_parentheses(&group(
-                        &expression.format().with_options(Parentheses::Never),
-                    ))
-                    .fmt(f)
+                    optional_parentheses(&expression.format().with_options(Parentheses::Never))
+                        .fmt(f)
                 } else {
-                    parenthesize_if_expands(&group(
-                        &expression.format().with_options(Parentheses::Never),
-                    ))
-                    .fmt(f)
+                    parenthesize_if_expands(&expression.format().with_options(Parentheses::Never))
+                        .fmt(f)
                 }
             }
             OptionalParentheses::Always => {
