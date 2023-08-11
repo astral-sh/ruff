@@ -46,7 +46,6 @@ impl NeedsParentheses for ExprNamedExpr {
             || parent.is_with_item()
             || parent.is_stmt_delete()
             || parent.is_stmt_for()
-            || parent.is_match_case()
         {
             OptionalParentheses::Always
         } else {

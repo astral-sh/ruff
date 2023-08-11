@@ -97,6 +97,12 @@ match long_lines:
     case "this is a long line for if condition with parentheses" if (aaaaaaaaahhhhhhhh == 1 and bbbbbbaaaaaaaaaaa == 2):  # comment
         pass
 
+    case "named expressions aren't special" if foo := 1:
+        pass
+
+    case "named expressions aren't that special" if (foo := 1):
+        pass
+
     case "but with already broken long lines" if (
         aaaaaaahhhhhhhhhhh == 1 and
         bbbbbbbbaaaaaahhhh == 2
