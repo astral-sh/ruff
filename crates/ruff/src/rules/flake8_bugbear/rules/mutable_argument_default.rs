@@ -1,13 +1,12 @@
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::docstrings::leading_space;
-use ruff_python_ast::{ParameterWithDefault, Parameters, Ranged, Stmt};
-use ruff_python_parser::lexer::lex_starts_at;
-use ruff_python_parser::{Mode, Tok};
+use ruff_python_ast::helpers::is_docstring_stmt;
+use ruff_python_ast::{self as ast, Expr, Parameter, ParameterWithDefault, Ranged};
+use ruff_python_codegen::{Generator, Stylist};
+use ruff_python_index::Indexer;
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
-use ruff_python_trivia::indentation_at_offset;
+use ruff_python_trivia::{indentation_at_offset, textwrap};
 use ruff_source_file::Locator;
-use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -63,29 +62,23 @@ impl Violation for MutableArgumentDefault {
         format!("Do not use mutable data structures for argument defaults")
     }
     fn autofix_title(&self) -> Option<String> {
-        Some(format!(
-            "Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`"
-        ))
+        Some(format!("Replace with `None`; initialize within function"))
     }
 }
 
 /// B006
-pub(crate) fn mutable_argument_default(
-    checker: &mut Checker,
-    parameters: &Parameters,
-    body: &[Stmt],
-    func_range: TextRange,
-) {
+pub(crate) fn mutable_argument_default(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
     // Scan in reverse order to right-align zip().
     for ParameterWithDefault {
         parameter,
         default,
         range: _,
-    } in parameters
+    } in function_def
+        .parameters
         .posonlyargs
         .iter()
-        .chain(&parameters.args)
-        .chain(&parameters.kwonlyargs)
+        .chain(&function_def.parameters.args)
+        .chain(&function_def.parameters.kwonlyargs)
     {
         let Some(default) = default else {
             continue;
@@ -100,50 +93,81 @@ pub(crate) fn mutable_argument_default(
             let mut diagnostic = Diagnostic::new(MutableArgumentDefault, default.range());
 
             // If the function body is on the same line as the function def, do not fix
-            if checker.patch(diagnostic.kind.rule())
-                && !is_single_line(checker.locator(), func_range, body)
-            {
-                // Set the default arg value to None
-                let arg_edit = Edit::range_replacement("None".to_string(), default.range());
-
-                // Add conditional check to set the default arg to its original value if still None
-                let mut check_lines = String::new();
-                let indentation =
-                    indentation_at_offset(body[0].start(), checker.locator()).unwrap_or_default();
-                let indentation = leading_space(indentation);
-                // body[0].start() starts at correct indentation so we do need to add indentation
-                // before pushing the if statement
-                check_lines.push_str(format!("if {} is None:\n", parameter.name.as_str()).as_str());
-                check_lines.push_str(indentation);
-                check_lines.push_str(checker.stylist().indentation());
-                check_lines.push_str(
-                    format!(
-                        "{} = {}",
-                        parameter.name.as_str(),
-                        checker.generator().expr(default),
-                    )
-                    .as_str(),
-                );
-                check_lines.push_str(&checker.stylist().line_ending());
-                check_lines.push_str(indentation);
-                let check_edit = Edit::insertion(check_lines, body[0].start());
-
-                diagnostic.set_fix(Fix::manual_edits(arg_edit, [check_edit]));
+            if checker.patch(diagnostic.kind.rule()) {
+                if let Some(fix) = move_initialization(
+                    function_def,
+                    parameter,
+                    default,
+                    checker.locator(),
+                    checker.stylist(),
+                    checker.indexer(),
+                    checker.generator(),
+                ) {
+                    diagnostic.set_fix(fix);
+                }
             }
             checker.diagnostics.push(diagnostic);
         }
     }
 }
 
-fn is_single_line(locator: &Locator, func_range: TextRange, body: &[Stmt]) -> bool {
-    let arg_string = locator.slice(func_range);
-    for (tok, range) in lex_starts_at(arg_string, Mode::Module, func_range.start()).flatten() {
-        match tok {
-            Tok::Colon => {
-                return !locator.contains_line_break(TextRange::new(range.end(), body[0].start()));
-            }
-            _ => continue,
-        }
+/// Generate a [`Fix`] to move a mutable argument default initialization
+/// into the function body.
+fn move_initialization(
+    function_def: &ast::StmtFunctionDef,
+    parameter: &Parameter,
+    default: &Expr,
+    locator: &Locator,
+    stylist: &Stylist,
+    indexer: &Indexer,
+    generator: Generator,
+) -> Option<Fix> {
+    let mut body = function_def.body.iter();
+
+    let statement = body.next()?;
+    if indexer.preceded_by_multi_statement_line(statement, locator) {
+        return None;
     }
-    false
+
+    // Determine the indentation depth of the function body.
+    let indentation = indentation_at_offset(statement.start(), locator)?;
+
+    // Set the default argument value to `None`.
+    let default_edit = Edit::range_replacement("None".to_string(), default.range());
+
+    // Add an `if`, to set the argument to its original value if still `None`.
+    let mut content = String::new();
+    content.push_str(&format!("if {} is None:", parameter.name.as_str()));
+    content.push_str(stylist.line_ending().as_str());
+    content.push_str(stylist.indentation());
+    content.push_str(&format!(
+        "{} = {}",
+        parameter.name.as_str(),
+        generator.expr(default)
+    ));
+    content.push_str(stylist.line_ending().as_str());
+
+    // Indent the edit to match the body indentation.
+    let content = textwrap::indent(&content, indentation).to_string();
+
+    let initialization_edit = if is_docstring_stmt(statement) {
+        // If the first statement in the function is a docstring, insert _after_ it.
+        if let Some(statement) = body.next() {
+            // If there's a second statement, insert _before_ it, but ensure this isn't a
+            // multi-statement line.
+            if indexer.preceded_by_multi_statement_line(statement, locator) {
+                return None;
+            }
+            Edit::insertion(content, locator.line_start(statement.start()))
+        } else {
+            // If the docstring is the only statement, insert _before_ it.
+            Edit::insertion(content, locator.full_line_end(statement.end()))
+        }
+    } else {
+        // Otherwise, insert before the first statement.
+        let at = locator.line_start(statement.start());
+        Edit::insertion(content, at)
+    };
+
+    Some(Fix::manual_edits(default_edit, [initialization_edit]))
 }

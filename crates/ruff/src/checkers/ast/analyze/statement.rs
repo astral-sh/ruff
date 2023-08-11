@@ -69,16 +69,18 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
         }
-        Stmt::FunctionDef(ast::StmtFunctionDef {
-            is_async,
-            name,
-            decorator_list,
-            returns,
-            parameters,
-            body,
-            type_params,
-            range,
-        }) => {
+        Stmt::FunctionDef(
+            function_def @ ast::StmtFunctionDef {
+                is_async,
+                name,
+                decorator_list,
+                returns,
+                parameters,
+                body,
+                type_params,
+                range: _,
+            },
+        ) => {
             if checker.enabled(Rule::DjangoNonLeadingReceiverDecorator) {
                 flake8_django::rules::non_leading_receiver_decorator(checker, decorator_list);
             }
@@ -205,7 +207,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_bugbear::rules::cached_instance_method(checker, decorator_list);
             }
             if checker.enabled(Rule::MutableArgumentDefault) {
-                flake8_bugbear::rules::mutable_argument_default(checker, parameters, body, *range);
+                flake8_bugbear::rules::mutable_argument_default(checker, function_def);
             }
             if checker.any_enabled(&[
                 Rule::UnnecessaryReturnNone,
