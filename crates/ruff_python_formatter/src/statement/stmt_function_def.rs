@@ -1,9 +1,10 @@
 use ruff_formatter::write;
-use ruff_python_ast::{Ranged, StmtFunctionDef};
-use ruff_python_trivia::lines_after_ignoring_trivia;
+use ruff_python_ast::{Parameters, Ranged, StmtFunctionDef};
+use ruff_python_trivia::{lines_after_ignoring_trivia, SimpleTokenKind, SimpleTokenizer};
 
 use crate::comments::{leading_comments, trailing_comments};
-use crate::expression::parentheses::{optional_parentheses, Parentheses};
+use crate::expression::maybe_parenthesize_expression;
+use crate::expression::parentheses::{Parentheses, Parenthesize};
 use crate::prelude::*;
 use crate::statement::suite::SuiteKind;
 use crate::FormatNodeRule;
@@ -60,18 +61,71 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
 
         let format_inner = format_with(|f: &mut PyFormatter| {
             write!(f, [item.parameters.format()])?;
+
             if let Some(return_annotation) = item.returns.as_ref() {
                 write!(f, [space(), text("->"), space()])?;
+
                 if return_annotation.is_tuple_expr() {
                     write!(
                         f,
                         [return_annotation.format().with_options(Parentheses::Never)]
                     )?;
+                } else if comments.has_trailing_comments(return_annotation.as_ref()) {
+                    // Intentionally parenthesize any return annotations with trailing comments.
+                    // This avoids an instability in cases like:
+                    // ```python
+                    // def double(
+                    //     a: int
+                    // ) -> (
+                    //     int  # Hello
+                    // ):
+                    //     pass
+                    // ```
+                    // If we allow this to break, it will be formatted as follows:
+                    // ```python
+                    // def double(
+                    //     a: int
+                    // ) -> int:  # Hello
+                    //     pass
+                    // ```
+                    // On subsequent formats, the `# Hello` will be interpreted as a dangling
+                    // comment on a function, yielding:
+                    // ```python
+                    // def double(a: int) -> int:  # Hello
+                    //     pass
+                    // ```
+                    // Ideally, we'd reach that final formatting in a single pass, but doing so
+                    // requires that the parent be aware of how the child is formatted, which
+                    // is challenging. As a compromise, we break those expressions to avoid an
+                    // instability.
+                    write!(
+                        f,
+                        [return_annotation.format().with_options(Parentheses::Always)]
+                    )?;
                 } else {
                     write!(
                         f,
-                        [optional_parentheses(
-                            &return_annotation.format().with_options(Parentheses::Never),
+                        [maybe_parenthesize_expression(
+                            return_annotation,
+                            item,
+                            if empty_parameters(&item.parameters, f.context().source()) {
+                                // If the parameters are empty, add parentheses if the return annotation
+                                // breaks at all.
+                                Parenthesize::IfBreaksOrIfRequired
+                            } else {
+                                // Otherwise, use our normal rules for parentheses, which allows us to break
+                                // like:
+                                // ```python
+                                // def f(
+                                //     x,
+                                // ) -> Tuple[
+                                //     int,
+                                //     int,
+                                // ]:
+                                //     ...
+                                // ```
+                                Parenthesize::IfBreaks
+                            },
                         )]
                     )?;
                 }
@@ -99,4 +153,26 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
         // Handled in `fmt_fields`
         Ok(())
     }
+}
+
+/// Returns `true` if [`Parameters`] is empty (no parameters, no comments, etc.).
+fn empty_parameters(parameters: &Parameters, source: &str) -> bool {
+    let mut tokenizer = SimpleTokenizer::new(source, parameters.range())
+        .filter(|token| !matches!(token.kind, SimpleTokenKind::Whitespace));
+
+    let Some(lpar) = tokenizer.next() else {
+        return false;
+    };
+    if !matches!(lpar.kind, SimpleTokenKind::LParen) {
+        return false;
+    }
+
+    let Some(rpar) = tokenizer.next() else {
+        return false;
+    };
+    if !matches!(rpar.kind, SimpleTokenKind::RParen) {
+        return false;
+    }
+
+    true
 }
