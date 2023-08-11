@@ -88,3 +88,17 @@ match newlines:
         pass
     case _:
         pass
+
+
+match long_lines:
+    case "this is a long line for if condition" if aaaaaaaaahhhhhhhh == 1 and bbbbbbaaaaaaaaaaa == 2:  # comment
+        pass
+
+    case "this is a long line for if condition with parentheses" if (aaaaaaaaahhhhhhhh == 1 and bbbbbbaaaaaaaaaaa == 2):  # comment
+        pass
+
+    case "but with already broken long lines" if (
+        aaaaaaahhhhhhhhhhh == 1 and
+        bbbbbbbbaaaaaahhhh == 2
+    ):  # another comment
+        pass

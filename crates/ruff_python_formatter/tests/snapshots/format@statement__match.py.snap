@@ -94,6 +94,20 @@ match newlines:
         pass
     case _:
         pass
+
+
+match long_lines:
+    case "this is a long line for if condition" if aaaaaaaaahhhhhhhh == 1 and bbbbbbaaaaaaaaaaa == 2:  # comment
+        pass
+
+    case "this is a long line for if condition with parentheses" if (aaaaaaaaahhhhhhhh == 1 and bbbbbbaaaaaaaaaaa == 2):  # comment
+        pass
+
+    case "but with already broken long lines" if (
+        aaaaaaahhhhhhhhhhh == 1 and
+        bbbbbbbbaaaaaahhhh == 2
+    ):  # another comment
+        pass
 ```
 
 ## Output
@@ -181,6 +195,21 @@ match newlines:
     case NOT_YET_IMPLEMENTED_Pattern:
         pass
     case NOT_YET_IMPLEMENTED_Pattern:
+        pass
+
+
+match long_lines:
+    case NOT_YET_IMPLEMENTED_Pattern if aaaaaaaaahhhhhhhh == 1 and bbbbbbaaaaaaaaaaa == 2:  # comment
+        pass
+
+    case NOT_YET_IMPLEMENTED_Pattern if (
+        aaaaaaaaahhhhhhhh == 1 and bbbbbbaaaaaaaaaaa == 2
+    ):  # comment
+        pass
+
+    case NOT_YET_IMPLEMENTED_Pattern if (
+        aaaaaaahhhhhhhhhhh == 1 and bbbbbbbbaaaaaahhhh == 2
+    ):  # another comment
         pass
 ```
 
