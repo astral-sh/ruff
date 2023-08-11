@@ -118,6 +118,8 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
             if is_class_or_function_definition(last) || is_class_or_function_definition(statement) {
                 match self.kind {
                     SuiteKind::TopLevel if source_type.is_stub() => match (last, statement) {
+                        // Check if the statements are class definitions of the
+                        // same type, containing only an ellipsis.
                         (
                             Stmt::ClassDef(ast::StmtClassDef {
                                 arguments: Some(last_args),
@@ -125,24 +127,26 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                                 ..
                             }),
                             Stmt::ClassDef(ast::StmtClassDef {
-                                arguments: Some(current_args),
-                                body: current_body,
+                                arguments: Some(args),
+                                body,
                                 ..
                             }),
-                        ) if last_args.len() == current_args.len()
-                            && last_args.args.iter().zip(current_args.args.iter()).all(
-                                |(last_arg, current_arg)| match (last_arg, current_arg) {
-                                    (Expr::Name(last_name), Expr::Name(current_name)) => {
-                                        last_name.id == current_name.id
+                        ) if last_args.len() == args.len()
+                            && last_args.args.iter().zip(args.args.iter()).all(
+                                |(last_arg, arg)| match (last_arg, arg) {
+                                    (Expr::Name(last_name), Expr::Name(name)) => {
+                                        last_name.id == name.id
                                     }
                                     _ => false,
                                 },
                             )
                             && contains_only_an_ellipsis(last_body)
-                            && contains_only_an_ellipsis(current_body) =>
+                            && contains_only_an_ellipsis(body) =>
                         {
                             write!(f, [statement.format()])?;
                         }
+                        // Otherwise, top-level stub items should be separated
+                        // one empty line.
                         _ => write!(f, [empty_line(), statement.format()])?,
                     },
                     SuiteKind::TopLevel => {
