@@ -1104,7 +1104,7 @@ impl<'a> Generator<'a> {
                 *conversion,
                 format_spec.as_deref(),
             ),
-            Expr::FString(ast::ExprFString { values, range: _ }) => {
+            Expr::FString(ast::ExprFString { values, .. }) => {
                 self.unparse_f_string(values, false);
             }
             Expr::Constant(ast::ExprConstant {
@@ -1345,7 +1345,7 @@ impl<'a> Generator<'a> {
                     unreachable!()
                 }
             }
-            Expr::FString(ast::ExprFString { values, range: _ }) => {
+            Expr::FString(ast::ExprFString { values, .. }) => {
                 self.unparse_f_string(values, is_spec);
             }
             Expr::FormattedValue(ast::ExprFormattedValue {

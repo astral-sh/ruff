@@ -881,6 +881,8 @@ pub struct DebugText {
 pub struct ExprFString {
     pub range: TextRange,
     pub values: Vec<Expr>,
+    /// Whether the f-string contains multiple string tokens that were implicitly concatenated.
+    pub implicit_concatenated: bool,
 }
 
 impl From<ExprFString> for Expr {
@@ -2469,6 +2471,18 @@ pub enum Constant {
     Float(f64),
     Complex { real: f64, imag: f64 },
     Ellipsis,
+}
+
+impl Constant {
+    /// Returns `true` if the constant is a string or bytes constant that contains multiple,
+    /// implicitly concatenated string tokens.
+    pub fn is_implicit_concatenated(&self) -> bool {
+        match self {
+            Constant::Str(value) => value.implicit_concatenated,
+            Constant::Bytes(value) => value.implicit_concatenated,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -243,6 +243,7 @@ impl<'a> StringParser<'a> {
 
                     spec = Some(Box::new(Expr::from(ast::ExprFString {
                         values: parsed_spec,
+                        implicit_concatenated: false,
                         range: self.range(start_location),
                     })));
                 }
@@ -681,6 +682,7 @@ pub(crate) fn parse_strings(
 
     Ok(Expr::FString(ast::ExprFString {
         values: deduped,
+        implicit_concatenated,
         range: TextRange::new(initial_start, last_end),
     }))
 }
@@ -1092,6 +1094,22 @@ mod tests {
         let source = r#"rf"\
 {x}""#;
         let parse_ast = parse_suite(source, "<test>").unwrap();
+        insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
+    fn test_parse_fstring_nested_string_spec() {
+        let source = "{foo:{''}}";
+        let parse_ast = parse_fstring(source).unwrap();
+
+        insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
+    fn test_parse_fstring_nested_concatenation_string_spec() {
+        let source = "{foo:{'' ''}}";
+        let parse_ast = parse_fstring(source).unwrap();
+
         insta::assert_debug_snapshot!(parse_ast);
     }
 

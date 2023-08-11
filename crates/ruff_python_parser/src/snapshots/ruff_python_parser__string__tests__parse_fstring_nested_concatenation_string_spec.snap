@@ -5,7 +5,7 @@ expression: parse_ast
 [
     FormattedValue(
         ExprFormattedValue {
-            range: 2..14,
+            range: 2..15,
             value: Name(
                 ExprName {
                     range: 3..6,
@@ -18,16 +18,21 @@ expression: parse_ast
             format_spec: Some(
                 FString(
                     ExprFString {
-                        range: 7..13,
+                        range: 7..14,
                         values: [
                             FormattedValue(
                                 ExprFormattedValue {
-                                    range: 7..13,
-                                    value: Name(
-                                        ExprName {
-                                            range: 8..12,
-                                            id: "spec",
-                                            ctx: Load,
+                                    range: 7..14,
+                                    value: Constant(
+                                        ExprConstant {
+                                            range: 8..13,
+                                            value: Str(
+                                                StringConstant {
+                                                    value: "",
+                                                    implicit_concatenated: true,
+                                                },
+                                            ),
+                                            kind: None,
                                         },
                                     ),
                                     debug_text: None,

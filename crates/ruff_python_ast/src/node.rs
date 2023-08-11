@@ -2676,7 +2676,11 @@ impl AstNode for ast::ExprFString {
     where
         V: PreorderVisitor<'a> + ?Sized,
     {
-        let ast::ExprFString { values, range: _ } = self;
+        let ast::ExprFString {
+            values,
+            implicit_concatenated: _,
+            range: _,
+        } = self;
 
         for expr in values {
             visitor.visit_expr(expr);

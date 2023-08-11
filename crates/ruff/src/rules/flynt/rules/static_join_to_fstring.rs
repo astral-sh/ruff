@@ -99,6 +99,7 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
 
     let node = ast::ExprFString {
         values: fstring_elems,
+        implicit_concatenated: false,
         range: TextRange::default(),
     };
     Some(node.into())

@@ -25,6 +25,7 @@ expression: parse_ast
                             },
                         ),
                     ],
+                    implicit_concatenated: true,
                 },
             ),
         },

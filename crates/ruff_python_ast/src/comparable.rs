@@ -871,11 +871,13 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 debug_text: debug_text.as_ref(),
                 format_spec: format_spec.as_ref().map(Into::into),
             }),
-            ast::Expr::FString(ast::ExprFString { values, range: _ }) => {
-                Self::FString(ExprFString {
-                    values: values.iter().map(Into::into).collect(),
-                })
-            }
+            ast::Expr::FString(ast::ExprFString {
+                values,
+                implicit_concatenated: _,
+                range: _,
+            }) => Self::FString(ExprFString {
+                values: values.iter().map(Into::into).collect(),
+            }),
             ast::Expr::Constant(ast::ExprConstant {
                 value,
                 kind,
