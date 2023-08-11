@@ -3,7 +3,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::Stmt;
 
-use crate::{checkers::ast::Checker, settings::types::PythonVersion};
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for any misspelled dunder name method and for any method
