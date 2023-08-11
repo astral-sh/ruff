@@ -108,7 +108,7 @@ impl<'a> Printer<'a> {
                     self.flush_line_suffixes(queue, stack, Some(element));
                 } else {
                     // Only print a newline if the current line isn't already empty
-                    if self.state.line_width > 0 {
+                    if self.state.line_width != 0 {
                         self.print_str("\n");
                     }
 
