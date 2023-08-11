@@ -203,7 +203,7 @@ def where_is(point):
  
  match event.get():
 -    case Click((x, y), button=Button.LEFT):  # This is a left click
-+    case NOT_YET_IMPLEMENTED_Pattern:
++    case NOT_YET_IMPLEMENTED_Pattern:  # This is a left click
          handle_click_at(x, y)
 -    case Click():
 +    case NOT_YET_IMPLEMENTED_Pattern:
@@ -306,7 +306,7 @@ match event.get():
         raise ValueError(f"Unrecognized event: {other_event}")
 
 match event.get():
-    case NOT_YET_IMPLEMENTED_Pattern:
+    case NOT_YET_IMPLEMENTED_Pattern:  # This is a left click
         handle_click_at(x, y)
     case NOT_YET_IMPLEMENTED_Pattern:
         pass  # ignore other clicks

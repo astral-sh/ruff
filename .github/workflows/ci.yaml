@@ -338,6 +338,6 @@ jobs:
       - name: "Formatter progress"
         run: scripts/formatter_ecosystem_checks.sh
       - name: "Github step summary"
-        run: grep "similarity index" target/progress_projects_log.txt | sort > $GITHUB_STEP_SUMMARY
+        run: cat target/progress_projects_stats.txt > $GITHUB_STEP_SUMMARY
       - name: "Remove checkouts from cache"
         run: rm -r target/progress_projects

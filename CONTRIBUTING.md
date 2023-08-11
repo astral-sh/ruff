@@ -571,7 +571,7 @@ An alternative is to convert the perf data to `flamegraph.svg` using
 [flamegraph](https://github.com/flamegraph-rs/flamegraph) (`cargo install flamegraph`):
 
 ```shell
-flamegraph --perfdata perf.data
+flamegraph --perfdata perf.data --no-inline
 ```
 
 #### Mac

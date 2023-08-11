@@ -271,10 +271,12 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Expr {
 ///
 /// This mimics Black's [`_maybe_split_omitting_optional_parens`](https://github.com/psf/black/blob/d1248ca9beaf0ba526d265f4108836d89cf551b7/src/black/linegen.py#L746-L820)
 fn can_omit_optional_parentheses(expr: &Expr, context: &PyFormatContext) -> bool {
-    let mut visitor = CanOmitOptionalParenthesesVisitor::new(context.source());
+    let mut visitor = CanOmitOptionalParenthesesVisitor::new(context);
     visitor.visit_subexpression(expr);
 
-    if visitor.max_priority_count > 1 {
+    if visitor.max_priority == OperatorPriority::None {
+        true
+    } else if visitor.max_priority_count > 1 {
         false
     } else if visitor.max_priority == OperatorPriority::Attribute {
         true
@@ -282,13 +284,14 @@ fn can_omit_optional_parentheses(expr: &Expr, context: &PyFormatContext) -> bool
         // Only use the more complex IR when there is any expression that we can possibly split by
         false
     } else {
-        // Only use the layout if the first or last expression has parentheses of some sort.
-        let first_parenthesized = visitor
-            .first
-            .is_some_and(|first| has_parentheses(first, visitor.source));
-        let last_parenthesized = visitor
-            .last
-            .is_some_and(|last| has_parentheses(last, visitor.source));
+        // Only use the layout if the first or last expression has parentheses of some sort, and
+        // those parentheses are non-empty.
+        let first_parenthesized = visitor.first.is_some_and(|first| {
+            has_parentheses(first, context).is_some_and(|parentheses| parentheses.is_non_empty())
+        });
+        let last_parenthesized = visitor.last.is_some_and(|last| {
+            has_parentheses(last, context).is_some_and(|parentheses| parentheses.is_non_empty())
+        });
         first_parenthesized || last_parenthesized
     }
 }
@@ -300,13 +303,13 @@ struct CanOmitOptionalParenthesesVisitor<'input> {
     any_parenthesized_expressions: bool,
     last: Option<&'input Expr>,
     first: Option<&'input Expr>,
-    source: &'input str,
+    context: &'input PyFormatContext<'input>,
 }
 
 impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
-    fn new(source: &'input str) -> Self {
+    fn new(context: &'input PyFormatContext) -> Self {
         Self {
-            source,
+            context,
             max_priority: OperatorPriority::None,
             max_priority_count: 0,
             any_parenthesized_expressions: false,
@@ -415,7 +418,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 ctx: _,
             }) => {
                 self.visit_expr(value);
-                if has_parentheses(value, self.source) {
+                if has_parentheses(value, self.context).is_some() {
                     self.update_max_priority(OperatorPriority::Attribute);
                 }
                 self.last = Some(expr);
@@ -446,7 +449,7 @@ impl<'input> PreorderVisitor<'input> for CanOmitOptionalParenthesesVisitor<'inpu
         self.last = Some(expr);
 
         // Rule only applies for non-parenthesized expressions.
-        if is_expression_parenthesized(AnyNodeRef::from(expr), self.source) {
+        if is_expression_parenthesized(AnyNodeRef::from(expr), self.context.source()) {
             self.any_parenthesized_expressions = true;
         } else {
             self.visit_subexpression(expr);
@@ -509,7 +512,7 @@ impl CallChainLayout {
                     // ```
                     // f().g
                     // ^^^ value
-                    // data[:100].T`
+                    // data[:100].T
                     // ^^^^^^^^^^ value
                     // ```
                     if matches!(value.as_ref(), Expr::Call(_) | Expr::Subscript(_)) {
@@ -576,23 +579,95 @@ impl CallChainLayout {
     }
 }
 
-fn has_parentheses(expr: &Expr, source: &str) -> bool {
-    has_own_parentheses(expr) || is_expression_parenthesized(AnyNodeRef::from(expr), source)
+#[derive(Debug, Copy, Clone, PartialEq, Eq, is_macro::Is)]
+pub(crate) enum OwnParentheses {
+    /// The node has parentheses, but they are empty (e.g., `[]` or `f()`).
+    Empty,
+    /// The node has parentheses, and they are non-empty (e.g., `[1]` or `f(1)`).
+    NonEmpty,
 }
 
-pub(crate) const fn has_own_parentheses(expr: &Expr) -> bool {
-    matches!(
-        expr,
-        Expr::Dict(_)
-            | Expr::List(_)
-            | Expr::Tuple(_)
-            | Expr::Set(_)
-            | Expr::ListComp(_)
-            | Expr::SetComp(_)
-            | Expr::DictComp(_)
-            | Expr::Call(_)
-            | Expr::Subscript(_)
-    )
+/// Returns the [`OwnParentheses`] value for a given [`Expr`], to indicate whether it has its
+/// own parentheses or is itself parenthesized.
+///
+/// Differs from [`has_own_parentheses`] in that it returns [`OwnParentheses::NonEmpty`] for
+/// parenthesized expressions, like `(1)` or `([1])`, regardless of whether those expression have
+/// their _own_ parentheses.
+fn has_parentheses(expr: &Expr, context: &PyFormatContext) -> Option<OwnParentheses> {
+    let own_parentheses = has_own_parentheses(expr, context);
+
+    // If the node has its own non-empty parentheses, we don't need to check for surrounding
+    // parentheses (e.g., `[1]`, or `([1])`).
+    if own_parentheses == Some(OwnParentheses::NonEmpty) {
+        return own_parentheses;
+    }
+
+    // Otherwise, if the node lacks parentheses (e.g., `(1)`) or only contains empty parentheses
+    // (e.g., `([])`), we need to check for surrounding parentheses.
+    if is_expression_parenthesized(AnyNodeRef::from(expr), context.source()) {
+        return Some(OwnParentheses::NonEmpty);
+    }
+
+    own_parentheses
+}
+
+/// Returns the [`OwnParentheses`] value for a given [`Expr`], to indicate whether it has its
+/// own parentheses, and whether those parentheses are empty.
+///
+/// A node is considered to have its own parentheses if it includes a `[]`, `()`, or `{}` pair
+/// that is inherent to the node (e.g., as in `f()`, `[]`, or `{1: 2}`, but not `(a.b.c)`).
+///
+/// Parentheses are considered to be non-empty if they contain any elements or comments.
+pub(crate) fn has_own_parentheses(
+    expr: &Expr,
+    context: &PyFormatContext,
+) -> Option<OwnParentheses> {
+    match expr {
+        // These expressions are always non-empty.
+        Expr::ListComp(_) | Expr::SetComp(_) | Expr::DictComp(_) | Expr::Subscript(_) => {
+            Some(OwnParentheses::NonEmpty)
+        }
+
+        // These expressions must contain _some_ child or trivia token in order to be non-empty.
+        Expr::List(ast::ExprList { elts, .. })
+        | Expr::Set(ast::ExprSet { elts, .. })
+        | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            if !elts.is_empty()
+                || context
+                    .comments()
+                    .has_dangling_comments(AnyNodeRef::from(expr))
+            {
+                Some(OwnParentheses::NonEmpty)
+            } else {
+                Some(OwnParentheses::Empty)
+            }
+        }
+
+        Expr::Dict(ast::ExprDict { keys, .. }) => {
+            if !keys.is_empty()
+                || context
+                    .comments()
+                    .has_dangling_comments(AnyNodeRef::from(expr))
+            {
+                Some(OwnParentheses::NonEmpty)
+            } else {
+                Some(OwnParentheses::Empty)
+            }
+        }
+        Expr::Call(ast::ExprCall { arguments, .. }) => {
+            if !arguments.is_empty()
+                || context
+                    .comments()
+                    .has_dangling_comments(AnyNodeRef::from(expr))
+            {
+                Some(OwnParentheses::NonEmpty)
+            } else {
+                Some(OwnParentheses::Empty)
+            }
+        }
+
+        _ => None,
+    }
 }
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
