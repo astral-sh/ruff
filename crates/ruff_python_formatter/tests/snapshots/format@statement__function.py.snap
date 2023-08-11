@@ -1297,9 +1297,9 @@ def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
     ...
 
 
-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(x) -> (
-    X and Y and foooooooooooooooooooooooooooooooooooo()
-):
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
+    x
+) -> X and Y and foooooooooooooooooooooooooooooooooooo():
     ...
 
 
@@ -1317,7 +1317,9 @@ def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
     ...
 
 
-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(x) -> (
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
+    x
+) -> (
     X | Y | foooooooooooooooooooooooooooooooooooo()  # comment
 ):
     ...
