@@ -46,6 +46,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
 
         let comments = f.context().comments().clone();
         let source = f.context().source();
+        let source_type = f.options().source_type();
 
         let mut iter = statements.iter();
         let Some(first) = iter.next() else {
@@ -116,7 +117,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
         for statement in iter {
             if is_class_or_function_definition(last) || is_class_or_function_definition(statement) {
                 match self.kind {
-                    SuiteKind::TopLevel if f.options().source_type().is_stub() => {
+                    SuiteKind::TopLevel if source_type.is_stub() => {
                         write!(f, [empty_line(), statement.format()])?;
                     }
                     SuiteKind::TopLevel => {
