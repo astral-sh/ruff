@@ -118,7 +118,16 @@ impl<'a> Format<PyFormatContext<'_>> for FormatString<'a> {
                     .fmt(f)
                 }
             }
-            StringLayout::DocString => format_docstring(self.string.range(), f),
+            StringLayout::DocString => {
+                let string_part = FormatStringPart::new(
+                    self.string.range(),
+                    // f-strings can't be docstrings
+                    Quoting::CanChange,
+                    &f.context().locator(),
+                    f.options().quote_style(),
+                );
+                format_docstring(&string_part, f)
+            }
             StringLayout::ImplicitConcatenatedBinaryLeftSide => {
                 FormatStringContinuation::new(self.string).fmt(f)
             }
@@ -761,22 +770,11 @@ fn count_indentation_like_black(line: &str) -> TextSize {
 ///         line c
 ///    """
 /// ```
-fn format_docstring(
-    // The start of the string prefix to after the closing quotes
-    outer_range: TextRange,
-    f: &mut PyFormatter,
-) -> FormatResult<()> {
+fn format_docstring(string_part: &FormatStringPart, f: &mut PyFormatter) -> FormatResult<()> {
     let locator = f.context().locator();
-    let string_part = FormatStringPart::new(
-        outer_range,
-        // It's not an f-string
-        Quoting::CanChange,
-        &locator,
-        f.options().quote_style(),
-    );
 
     // Black doesn't change the indentation of docstrings that contain an escaped newline
-    if locator.slice(outer_range).contains("\\\n") {
+    if locator.slice(string_part.range).contains("\\\n") {
         return string_part.fmt(f);
     }
 
@@ -794,7 +792,7 @@ fn format_docstring(
     write!(
         f,
         [
-            source_position(outer_range.start()),
+            source_position(string_part.range.start()),
             string_part.prefix,
             string_part.preferred_quotes
         ]
@@ -836,7 +834,7 @@ fn format_docstring(
     if normalized[first.len()..].trim().is_empty() {
         // For `"""\n"""` or other whitespace between the quotes, black keeps a single whitespace,
         // but `""""""` doesn't get one inserted.
-        if needs_chaperone_space(&string_part, trim_end)
+        if needs_chaperone_space(string_part, trim_end)
             || (trim_end.is_empty() && !normalized.is_empty())
         {
             space().fmt(f)?;
@@ -879,7 +877,7 @@ fn format_docstring(
     let trim_end = normalized
         .as_ref()
         .trim_end_matches(|c: char| c.is_whitespace() && c != '\n');
-    if needs_chaperone_space(&string_part, trim_end) {
+    if needs_chaperone_space(string_part, trim_end) {
         space().fmt(f)?;
     }
 
@@ -887,7 +885,7 @@ fn format_docstring(
         f,
         [
             string_part.preferred_quotes,
-            source_position(outer_range.end())
+            source_position(string_part.range.end())
         ]
     )
 }
