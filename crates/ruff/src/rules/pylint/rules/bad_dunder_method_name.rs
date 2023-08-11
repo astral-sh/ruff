@@ -47,165 +47,154 @@ impl Violation for BadDunderMethodName {
     }
 }
 
-const DUNDER_METHODS: &[&str] = &[
-    "__abs__",
-    "__add__",
-    "__aenter__",
-    "__aexit__",
-    "__and__",
-    "__await__",
-    "__bool__",
-    "__bytes__",
-    "__call__",
-    "__ceil__",
-    "__class__",
-    "__class_getitem__",
-    "__complex__",
-    "__contains__",
-    "__copy__",
-    "__deepcopy__",
-    "__del__",
-    "__delattr__",
-    "__delete__",
-    "__delitem__",
-    "__dict__",
-    "__dir__",
-    "__divmod__",
-    "__doc__",
-    "__enter__",
-    "__eq__",
-    "__exit__",
-    "__float__",
-    "__floor__",
-    "__floordiv__",
-    "__format__",
-    "__format__",
-    "__fspath__",
-    "__ge__",
-    "__get__",
-    "__getattr__",
-    "__getattribute__",
-    "__getitem__",
-    "__getnewargs__",
-    "__getnewargs_ex__",
-    "__getstate__",
-    "__gt__",
-    "__hash__",
-    "__iadd__",
-    "__iand__",
-    "__ifloordiv__",
-    "__ilshift__",
-    "__imatmul__",
-    "__imod__",
-    "__imul__",
-    "__init__",
-    "__init_subclass__",
-    "__instancecheck__",
-    "__int__",
-    "__invert__",
-    "__ior__",
-    "__ipow__",
-    "__irshift__",
-    "__isub__",
-    "__iter__",
-    "__itruediv__",
-    "__ixor__",
-    "__le__",
-    "__len__",
-    "__length_hint__",
-    "__lshift__",
-    "__lt__",
-    "__matmul__",
-    "__missing__",
-    "__mod__",
-    "__module__",
-    "__mul__",
-    "__ne__",
-    "__neg__",
-    "__new__",
-    "__new__",
-    "__next__",
-    "__or__",
-    "__pos__",
-    "__pow__",
-    "__radd__",
-    "__rand__",
-    "__rdivmod__",
-    "__reduce__",
-    "__reduce_ex__",
-    "__repr__",
-    "__reversed__",
-    "__rfloordiv__",
-    "__rlshift__",
-    "__rmatmul__",
-    "__rmod__",
-    "__rmul__",
-    "__ror__",
-    "__round__",
-    "__rpow__",
-    "__rrshift__",
-    "__rshift__",
-    "__rsub__",
-    "__rtruediv__",
-    "__rxor__",
-    "__set__",
-    "__set_name__",
-    "__setattr__",
-    "__setitem__",
-    "__setstate__",
-    "__sizeof__",
-    "__str__",
-    "__sub__",
-    "__subclasscheck__",
-    "__subclasses__",
-    "__subclasshook__",
-    "__truediv__",
-    "__trunc__",
-    "__weakref__",
-    "__xor__",
-    // part of `dataclasses` module
-    "__post_init__",
-];
-
-const DUNDER_METHODS_PY310: &[&str] = &["__aiter__", "__anext__"];
-
 /// PLW3201
 pub(crate) fn bad_dunder_method_name(checker: &mut Checker, class_body: &[Stmt]) {
-    // Collects all methods in a class that starts and ends with a `_` and are
-    // not one of Python's standard dunder methods.
-    let bad_dunder_methods: Vec<&Stmt> = class_body
+    for method in class_body
         .iter()
-        .filter(|stmt| stmt.is_function_def_stmt())
-        .filter(|stmt| {
-            let Some(method) = stmt.as_function_def_stmt() else {
+        .filter_map(ruff_python_ast::Stmt::as_function_def_stmt)
+        .filter(|method| {
+            if is_known_dunder_method(&method.name, checker.settings.target_version) {
                 return false;
-            };
-
-            let contains_dunder_method = if checker.settings.target_version >= PythonVersion::Py310
-            {
-                DUNDER_METHODS.contains(&method.name.as_str())
-                    || DUNDER_METHODS_PY310.contains(&method.name.as_str())
-            } else {
-                DUNDER_METHODS.contains(&method.name.as_str())
-            };
-
-            method.name.starts_with('_') && method.name.ends_with('_') && !contains_dunder_method
+            }
+            method.name.starts_with('_') && method.name.ends_with('_')
         })
-        .collect();
-
-    if bad_dunder_methods.is_empty() {
-        return;
-    }
-
-    for bad_dunder_method in bad_dunder_methods {
-        let Some(method) = bad_dunder_method.as_function_def_stmt() else {
-            break;
-        };
+    {
         checker.diagnostics.push(Diagnostic::new(
             BadDunderMethodName {
                 name: method.name.to_string(),
             },
-            bad_dunder_method.identifier(),
+            method.identifier(),
         ));
     }
+}
+
+/// Returns `true` if a method is a known dunder method.
+fn is_known_dunder_method(method: &str, target_version: PythonVersion) -> bool {
+    if matches!(
+        method,
+        "__abs__"
+            | "__add__"
+            | "__aenter__"
+            | "__aexit__"
+            | "__and__"
+            | "__await__"
+            | "__bool__"
+            | "__bytes__"
+            | "__call__"
+            | "__ceil__"
+            | "__class__"
+            | "__class_getitem__"
+            | "__complex__"
+            | "__contains__"
+            | "__copy__"
+            | "__deepcopy__"
+            | "__del__"
+            | "__delattr__"
+            | "__delete__"
+            | "__delitem__"
+            | "__dict__"
+            | "__dir__"
+            | "__divmod__"
+            | "__doc__"
+            | "__enter__"
+            | "__eq__"
+            | "__exit__"
+            | "__float__"
+            | "__floor__"
+            | "__floordiv__"
+            | "__format__"
+            | "__fspath__"
+            | "__ge__"
+            | "__get__"
+            | "__getattr__"
+            | "__getattribute__"
+            | "__getitem__"
+            | "__getnewargs__"
+            | "__getnewargs_ex__"
+            | "__getstate__"
+            | "__gt__"
+            | "__hash__"
+            | "__iadd__"
+            | "__iand__"
+            | "__ifloordiv__"
+            | "__ilshift__"
+            | "__imatmul__"
+            | "__imod__"
+            | "__imul__"
+            | "__init__"
+            | "__init_subclass__"
+            | "__instancecheck__"
+            | "__int__"
+            | "__invert__"
+            | "__ior__"
+            | "__ipow__"
+            | "__irshift__"
+            | "__isub__"
+            | "__iter__"
+            | "__itruediv__"
+            | "__ixor__"
+            | "__le__"
+            | "__len__"
+            | "__length_hint__"
+            | "__lshift__"
+            | "__lt__"
+            | "__matmul__"
+            | "__missing__"
+            | "__mod__"
+            | "__module__"
+            | "__mul__"
+            | "__ne__"
+            | "__neg__"
+            | "__new__"
+            | "__next__"
+            | "__or__"
+            | "__pos__"
+            | "__pow__"
+            | "__radd__"
+            | "__rand__"
+            | "__rdivmod__"
+            | "__reduce__"
+            | "__reduce_ex__"
+            | "__repr__"
+            | "__reversed__"
+            | "__rfloordiv__"
+            | "__rlshift__"
+            | "__rmatmul__"
+            | "__rmod__"
+            | "__rmul__"
+            | "__ror__"
+            | "__round__"
+            | "__rpow__"
+            | "__rrshift__"
+            | "__rshift__"
+            | "__rsub__"
+            | "__rtruediv__"
+            | "__rxor__"
+            | "__set__"
+            | "__set_name__"
+            | "__setattr__"
+            | "__setitem__"
+            | "__setstate__"
+            | "__sizeof__"
+            | "__str__"
+            | "__sub__"
+            | "__subclasscheck__"
+            | "__subclasses__"
+            | "__subclasshook__"
+            | "__truediv__"
+            | "__trunc__"
+            | "__weakref__"
+            | "__xor__"
+            | "__post_init__"
+    ) {
+        return true;
+    }
+
+    if target_version >= PythonVersion::Py310 {
+        if matches!(method, "__aiter__" | "__anext__") {
+            return true;
+        }
+    }
+
+    false
 }

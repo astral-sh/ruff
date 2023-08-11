@@ -229,7 +229,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "W1510") => (RuleGroup::Unspecified, rules::pylint::rules::SubprocessRunWithoutCheck),
         (Pylint, "W1641") => (RuleGroup::Nursery, rules::pylint::rules::EqWithoutHash),
         (Pylint, "W2901") => (RuleGroup::Unspecified, rules::pylint::rules::RedefinedLoopName),
-        (Pylint, "W3201") => (RuleGroup::Unspecified, rules::pylint::rules::BadDunderMethodName),
+        (Pylint, "W3201") => (RuleGroup::Nursery, rules::pylint::rules::BadDunderMethodName),
         (Pylint, "W3301") => (RuleGroup::Unspecified, rules::pylint::rules::NestedMinMax),
 
         // flake8-async
