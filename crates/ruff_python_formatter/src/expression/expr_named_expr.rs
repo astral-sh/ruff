@@ -44,6 +44,9 @@ impl NeedsParentheses for ExprNamedExpr {
             || parent.is_stmt_return()
             || parent.is_except_handler_except_handler()
             || parent.is_with_item()
+            || parent.is_expr_yield()
+            || parent.is_expr_yield_from()
+            || parent.is_expr_await()
             || parent.is_stmt_delete()
             || parent.is_stmt_for()
         {
