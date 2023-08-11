@@ -242,16 +242,17 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
 }
 
 /// Returns `true` if a function or class body contains only an ellipsis.
-fn contains_only_an_ellipsis(body: &Vec<Stmt>) -> bool {
-match body {
-	[Stmt::Expr(ast::StmtExpr { value, ..})] => matches!(
-	        value.as_ref(),
-	        Expr::Constant(ast::ExprConstant {
-	            value: Constant::Ellipsis,
-	            ..
-	        })
-	  ),
-	  _ => false
+fn contains_only_an_ellipsis(body: &[Stmt]) -> bool {
+    match body {
+        [Stmt::Expr(ast::StmtExpr { value, .. })] => matches!(
+            value.as_ref(),
+            Expr::Constant(ast::ExprConstant {
+                value: Constant::Ellipsis,
+                ..
+            })
+        ),
+        _ => false,
+    }
 }
 
 /// Returns `true` if a [`Stmt`] is a class or function definition.

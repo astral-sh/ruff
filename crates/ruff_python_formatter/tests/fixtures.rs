@@ -161,7 +161,11 @@ fn format() {
         });
     };
 
-    insta::glob!("../resources", "test/fixtures/ruff/**/*.{py,pyi}", test_file);
+    insta::glob!(
+        "../resources",
+        "test/fixtures/ruff/**/*.{py,pyi}",
+        test_file
+    );
 }
 
 /// Format another time and make sure that there are no changes anymore
