@@ -103,3 +103,15 @@ else:
 if True: print("a") # 1
 elif True: print("b") # 2
 else: print("c") # 3
+
+# Regression test for https://github.com/astral-sh/ruff/issues/5337
+if parent_body:
+    if current_body:
+        child_in_body()
+        last_child_in_current_body()  # may or may not have children on its own
+# a
+  # b
+    # c
+      # d
+        # e
+          #f
