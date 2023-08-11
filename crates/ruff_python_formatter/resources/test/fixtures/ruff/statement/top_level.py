@@ -24,3 +24,11 @@ class Baz(Qux):
 class Quux(Qux):
     def __init__(self):
         pass
+
+def bar(): ...
+def baz(): ...
+def quux():
+    """Some docstring."""
+
+def quuz():
+    """Some docstring."""

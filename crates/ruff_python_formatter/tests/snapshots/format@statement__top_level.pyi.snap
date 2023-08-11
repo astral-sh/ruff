@@ -47,6 +47,22 @@ class Baz(Qux):
 class Quux(Qux):
     def __init__(self):
         pass
+
+
+def bar():
+    ...
+
+
+def baz():
+    ...
+
+
+def quux():
+    """Some docstring."""
+
+
+def quuz():
+    """Some docstring."""
 ```
 
 ## Output
@@ -71,7 +87,6 @@ class Other(expr_context):
     ...
 class Store(expr_context):
     ...
-
 class Foo(Bar):
     ...
 
@@ -82,6 +97,16 @@ class Baz(Qux):
 class Quux(Qux):
     def __init__(self):
         pass
+
+def bar():
+    ...
+def baz():
+    ...
+def quux():
+    """Some docstring."""
+
+def quuz():
+    """Some docstring."""
 ```
 
 

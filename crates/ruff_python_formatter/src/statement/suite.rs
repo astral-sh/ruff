@@ -118,31 +118,26 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
             if is_class_or_function_definition(last) || is_class_or_function_definition(statement) {
                 match self.kind {
                     SuiteKind::TopLevel if source_type.is_stub() => match (last, statement) {
-                        // Check if the statements are class definitions of the
-                        // same type, containing only an ellipsis.
+                        // Check if the statements are class containing only an
+                        // ellipsis.
                         (
                             Stmt::ClassDef(ast::StmtClassDef {
-                                arguments: Some(last_args),
-                                body: last_body,
-                                ..
+                                body: last_body, ..
                             }),
-                            Stmt::ClassDef(ast::StmtClassDef {
-                                arguments: Some(args),
-                                body,
-                                ..
-                            }),
-                        ) if last_args.len() == args.len()
-                            && contains_only_an_ellipsis(last_body)
-                            && contains_only_an_ellipsis(body)
-                            && last_args.args.iter().zip(args.args.iter()).all(
-                                |(last_arg, arg)| match (last_arg, arg) {
-                                    (Expr::Name(last_name), Expr::Name(name)) => {
-                                        last_name.id == name.id
-                                    }
-                                    _ => false,
-                                },
-                            ) =>
+                            Stmt::ClassDef(ast::StmtClassDef { body, .. }),
+                        ) if contains_only_an_ellipsis(last_body)
+                            && contains_only_an_ellipsis(body) =>
                         {
+                            write!(f, [statement.format()])?;
+                        }
+                        // Check if the statements are functions with the last
+                        // function body containing only an ellipsis.
+                        (
+                            Stmt::FunctionDef(ast::StmtFunctionDef {
+                                body: last_body, ..
+                            }),
+                            Stmt::FunctionDef(ast::StmtFunctionDef { .. }),
+                        ) if contains_only_an_ellipsis(last_body) => {
                             write!(f, [statement.format()])?;
                         }
                         // Otherwise, top-level stub items should be separated
