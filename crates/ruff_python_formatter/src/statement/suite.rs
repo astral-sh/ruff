@@ -132,6 +132,8 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                                 ..
                             }),
                         ) if last_args.len() == args.len()
+                            && contains_only_an_ellipsis(last_body)
+                            && contains_only_an_ellipsis(body)
                             && last_args.args.iter().zip(args.args.iter()).all(
                                 |(last_arg, arg)| match (last_arg, arg) {
                                     (Expr::Name(last_name), Expr::Name(name)) => {
@@ -139,9 +141,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                                     }
                                     _ => false,
                                 },
-                            )
-                            && contains_only_an_ellipsis(last_body)
-                            && contains_only_an_ellipsis(body) =>
+                            ) =>
                         {
                             write!(f, [statement.format()])?;
                         }
