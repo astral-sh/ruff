@@ -117,13 +117,34 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
         for statement in iter {
             if is_class_or_function_definition(last) || is_class_or_function_definition(statement) {
                 match self.kind {
-                    SuiteKind::TopLevel if source_type.is_stub() => {
-                        if is_class_of_same_kind(last, statement) {
+                    SuiteKind::TopLevel if source_type.is_stub() => match (last, statement) {
+                        (
+                            Stmt::ClassDef(ast::StmtClassDef {
+                                arguments: Some(last_args),
+                                body: last_body,
+                                ..
+                            }),
+                            Stmt::ClassDef(ast::StmtClassDef {
+                                arguments: Some(current_args),
+                                body: current_body,
+                                ..
+                            }),
+                        ) if last_args.len() == current_args.len()
+                            && last_args.args.iter().zip(current_args.args.iter()).all(
+                                |(last_arg, current_arg)| match (last_arg, current_arg) {
+                                    (Expr::Name(last_name), Expr::Name(current_name)) => {
+                                        last_name.id == current_name.id
+                                    }
+                                    _ => false,
+                                },
+                            )
+                            && contains_only_an_ellipsis(last_body)
+                            && contains_only_an_ellipsis(current_body) =>
+                        {
                             write!(f, [statement.format()])?;
-                        } else {
-                            write!(f, [empty_line(), statement.format()])?;
                         }
-                    }
+                        _ => write!(f, [empty_line(), statement.format()])?,
+                    },
                     SuiteKind::TopLevel => {
                         write!(f, [empty_line(), empty_line(), statement.format()])?;
                     }
@@ -216,30 +237,21 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
     }
 }
 
-/// Returns `true` if two given [`Stmt`]s are class definitions of the same kind.
-fn is_class_of_same_kind(last_stmt: &Stmt, stmt: &Stmt) -> bool {
-    match (last_stmt, stmt) {
-        (
-            Stmt::ClassDef(ast::StmtClassDef {
-                arguments: Some(last_args),
-                ..
-            }),
-            Stmt::ClassDef(ast::StmtClassDef {
-                arguments: Some(current_args),
-                ..
-            }),
-        ) if last_args.len() == current_args.len() => {
-            last_args.args.iter().zip(current_args.args.iter()).all(
-                |(last_arg, current_arg)| match (last_arg, current_arg) {
-                    (Expr::Name(last_name), Expr::Name(current_name)) => {
-                        last_name.id == current_name.id
-                    }
-                    _ => false,
-                },
-            )
-        }
-        _ => false,
-    }
+/// Returns `true` if a function or class body contains only an ellipsis.
+fn contains_only_an_ellipsis(body: &Vec<Stmt>) -> bool {
+    body.len() == 1
+        && body.first().map_or(false, |stmt| match stmt {
+            Stmt::Expr(ast::StmtExpr { value, .. }) => {
+                matches!(
+                    value.as_ref(),
+                    Expr::Constant(ast::ExprConstant {
+                        value: Constant::Ellipsis,
+                        ..
+                    })
+                )
+            }
+            _ => false,
+        })
 }
 
 /// Returns `true` if a [`Stmt`] is a class or function definition.

@@ -22,3 +22,7 @@ class Load(expr_context):
 
 class Store(expr_context):
     ...
+
+
+class Foo(Bar):
+    ...

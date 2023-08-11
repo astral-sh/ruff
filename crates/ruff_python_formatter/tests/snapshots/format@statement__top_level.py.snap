@@ -18,6 +18,9 @@ def foo():
 class Del(expr_context): ...
 class Load(expr_context): ...
 class Store(expr_context): ...
+
+class Foo(Bar):
+    ...
 ```
 
 ## Output
@@ -45,6 +48,10 @@ class Load(expr_context):
 
 
 class Store(expr_context):
+    ...
+
+
+class Foo(Bar):
     ...
 ```
 
