@@ -523,3 +523,30 @@ def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(x) -> (
     X | Y | foooooooooooooooooooooooooooooooooooo()  # comment
 ):
     ...
+
+
+# Dangling comments on return annotations.
+def double(a: int) -> (
+    int # Hello
+):
+    return 2*a
+
+def double(a: int) -> (
+    foo.bar # Hello
+):
+    return 2*a
+
+def double(a: int) -> (
+    [int] # Hello
+):
+    return 2*a
+
+def double(a: int) -> (
+    int | list[int]  # Hello
+):
+    pass
+
+def double(a: int) -> (
+    int | list[int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int]  # Hello
+):
+    pass

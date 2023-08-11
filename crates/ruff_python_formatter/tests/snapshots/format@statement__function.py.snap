@@ -529,6 +529,21 @@ def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(x) -> (
     X | Y | foooooooooooooooooooooooooooooooooooo()  # comment
 ):
     ...
+
+
+# Dangling comments on return annotations.
+def double(a: int # Hello
+) -> (int):
+    return 2 * a
+
+def double(a: int) -> ( # Hello
+    int
+):
+    return 2*a
+
+def double(a: int) -> ( # Hello
+):
+    return 2*a
 ```
 
 ## Output
@@ -1323,6 +1338,24 @@ def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
     X | Y | foooooooooooooooooooooooooooooooooooo()  # comment
 ):
     ...
+
+
+# Dangling comments on return annotations.
+def double(
+    a: int,  # Hello
+) -> int:
+    return 2 * a
+
+
+def double(a: int) -> int:  # Hello
+    return 2 * a
+
+
+def double(
+    a: int
+) -> (  # Hello
+):
+    return 2 * a
 ```
 
 

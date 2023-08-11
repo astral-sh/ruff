@@ -3,8 +3,8 @@ use ruff_python_ast::{Expr, Parameters, Ranged, StmtFunctionDef};
 use ruff_python_trivia::{lines_after_ignoring_trivia, SimpleTokenKind, SimpleTokenizer};
 
 use crate::comments::{leading_comments, trailing_comments};
-use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{Parentheses, Parenthesize};
+use crate::expression::{has_own_parentheses, maybe_parenthesize_expression};
 use crate::prelude::*;
 use crate::statement::suite::SuiteKind;
 use crate::FormatNodeRule;
