@@ -72,6 +72,10 @@ impl PyFormatOptions {
         self.quote_style
     }
 
+    pub fn source_type(&self) -> PySourceType {
+        self.source_type
+    }
+
     #[must_use]
     pub fn with_quote_style(mut self, style: QuoteStyle) -> Self {
         self.quote_style = style;

@@ -116,6 +116,9 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
         for statement in iter {
             if is_class_or_function_definition(last) || is_class_or_function_definition(statement) {
                 match self.kind {
+                    SuiteKind::TopLevel if f.options().source_type().is_stub() => {
+                        write!(f, [empty_line(), statement.format()])?;
+                    }
                     SuiteKind::TopLevel => {
                         write!(f, [empty_line(), empty_line(), statement.format()])?;
                     }
