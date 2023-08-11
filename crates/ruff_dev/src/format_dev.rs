@@ -1,7 +1,11 @@
 use anyhow::{bail, format_err, Context, Error};
 use clap::{CommandFactory, FromArgMatches};
 use ignore::DirEntry;
+use imara_diff::intern::InternedInput;
+use imara_diff::sink::Counter;
+use imara_diff::{diff, Algorithm};
 use indicatif::ProgressStyle;
+#[cfg_attr(feature = "singlethreaded", allow(unused_imports))]
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use ruff::logging::LogLevel;
 use ruff::resolver::python_files_in_path;
@@ -99,16 +103,18 @@ impl Statistics {
                 intersection,
             }
         } else {
-            let diff = TextDiff::from_lines(black, ruff);
-            let mut statistics = Self::default();
-            for change in diff.iter_all_changes() {
-                match change.tag() {
-                    ChangeTag::Delete => statistics.black_input += 1,
-                    ChangeTag::Insert => statistics.ruff_output += 1,
-                    ChangeTag::Equal => statistics.intersection += 1,
-                }
+            // `similar` was too slow (for some files >90% diffing instead of formatting)
+            let input = InternedInput::new(black, ruff);
+            let changes = diff(Algorithm::Histogram, &input, Counter::default());
+            assert_eq!(
+                input.before.len() - (changes.removals as usize),
+                input.after.len() - (changes.insertions as usize)
+            );
+            Self {
+                black_input: changes.removals,
+                ruff_output: changes.insertions,
+                intersection: u32::try_from(input.before.len()).unwrap() - changes.removals,
             }
-            statistics
         }
     }
 
@@ -253,7 +259,10 @@ fn setup_logging(log_level_args: &LogLevelArgs, log_file: Option<&Path>) -> io::
             .with_default_directive(log_level.into())
             .parse_lossy("")
     });
-    let indicatif_layer = IndicatifLayer::new();
+    let indicatif_layer = IndicatifLayer::new().with_progress_style(
+        // Default without the spinner
+        ProgressStyle::with_template("{span_child_prefix} {span_name}{{{span_fields}}}").unwrap(),
+    );
     let indicitif_compatible_writer_layer = tracing_subscriber::fmt::layer()
         .with_writer(indicatif_layer.get_stderr_writer())
         .with_target(false);
@@ -430,14 +439,16 @@ fn format_dev_project(
         pb_span.pb_set_style(&ProgressStyle::default_bar());
         pb_span.pb_set_length(paths.len() as u64);
         let _pb_span_enter = pb_span.enter();
-        paths
-            .into_par_iter()
-            .map(|dir_entry| {
-                let result = format_dir_entry(dir_entry, stability_check, write, &black_options);
-                pb_span.pb_inc(1);
-                result
-            })
-            .collect::<anyhow::Result<Vec<_>>>()?
+        #[cfg(not(feature = "singlethreaded"))]
+        let iter = { paths.into_par_iter() };
+        #[cfg(feature = "singlethreaded")]
+        let iter = { paths.into_iter() };
+        iter.map(|dir_entry| {
+            let result = format_dir_entry(dir_entry, stability_check, write, &black_options);
+            pb_span.pb_inc(1);
+            result
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?
     };
 
     let mut statistics = Statistics::default();
