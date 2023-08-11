@@ -1,3 +1,4 @@
+use crate::visitor::preorder::PreorderVisitor;
 use crate::{
     self as ast, Alias, Arguments, Comprehension, Decorator, ExceptHandler, Expr, Keyword,
     MatchCase, Mod, Parameter, ParameterWithDefault, Parameters, Pattern, Ranged, Stmt, TypeParam,
@@ -17,6 +18,10 @@ pub trait AstNode: Ranged {
 
     /// Consumes `self` and returns its [`AnyNode`] representation.
     fn into_any_node(self) -> AnyNode;
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized;
 }
 
 #[derive(Clone, Debug, is_macro::Is, PartialEq)]
@@ -672,7 +677,16 @@ impl AstNode for ast::ModModule {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ModModule { body, range: _ } = self;
+        visitor.visit_body(body);
+    }
 }
+
 impl AstNode for ast::ModExpression {
     fn cast(kind: AnyNode) -> Option<Self>
     where
@@ -699,6 +713,14 @@ impl AstNode for ast::ModExpression {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ModExpression { body, range: _ } = self;
+        visitor.visit_expr(body);
     }
 }
 impl AstNode for ast::StmtFunctionDef {
@@ -728,6 +750,36 @@ impl AstNode for ast::StmtFunctionDef {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtFunctionDef {
+            parameters,
+            body,
+            decorator_list,
+            returns,
+            type_params,
+            ..
+        } = self;
+
+        for decorator in decorator_list {
+            visitor.visit_decorator(decorator);
+        }
+
+        if let Some(type_params) = type_params {
+            visitor.visit_type_params(type_params);
+        }
+
+        visitor.visit_parameters(parameters);
+
+        for expr in returns {
+            visitor.visit_annotation(expr);
+        }
+
+        visitor.visit_body(body);
+    }
 }
 impl AstNode for ast::StmtClassDef {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -755,6 +807,33 @@ impl AstNode for ast::StmtClassDef {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtClassDef {
+            arguments,
+            body,
+            decorator_list,
+            type_params,
+            ..
+        } = self;
+
+        for decorator in decorator_list {
+            visitor.visit_decorator(decorator);
+        }
+
+        if let Some(type_params) = type_params {
+            visitor.visit_type_params(type_params);
+        }
+
+        if let Some(arguments) = arguments {
+            visitor.visit_arguments(arguments);
+        }
+
+        visitor.visit_body(body);
     }
 }
 impl AstNode for ast::StmtReturn {
@@ -784,6 +863,16 @@ impl AstNode for ast::StmtReturn {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtReturn { value, range: _ } = self;
+        if let Some(expr) = value {
+            visitor.visit_expr(expr);
+        }
+    }
 }
 impl AstNode for ast::StmtDelete {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -811,6 +900,16 @@ impl AstNode for ast::StmtDelete {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtDelete { targets, range: _ } = self;
+        for expr in targets {
+            visitor.visit_expr(expr);
+        }
     }
 }
 impl AstNode for ast::StmtTypeAlias {
@@ -840,6 +939,24 @@ impl AstNode for ast::StmtTypeAlias {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtTypeAlias {
+            range: _,
+            name,
+            type_params,
+            value,
+        } = self;
+
+        visitor.visit_expr(name);
+        if let Some(type_params) = type_params {
+            visitor.visit_type_params(type_params);
+        }
+        visitor.visit_expr(value);
+    }
 }
 impl AstNode for ast::StmtAssign {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -867,6 +984,23 @@ impl AstNode for ast::StmtAssign {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtAssign {
+            targets,
+            value,
+            range: _,
+        } = self;
+
+        for expr in targets {
+            visitor.visit_expr(expr);
+        }
+
+        visitor.visit_expr(value);
     }
 }
 impl AstNode for ast::StmtAugAssign {
@@ -896,6 +1030,22 @@ impl AstNode for ast::StmtAugAssign {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtAugAssign {
+            target,
+            op,
+            value,
+            range: _,
+        } = self;
+
+        visitor.visit_expr(target);
+        visitor.visit_operator(op);
+        visitor.visit_expr(value);
+    }
 }
 impl AstNode for ast::StmtAnnAssign {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -923,6 +1073,25 @@ impl AstNode for ast::StmtAnnAssign {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtAnnAssign {
+            target,
+            annotation,
+            value,
+            range: _,
+            simple: _,
+        } = self;
+
+        visitor.visit_expr(target);
+        visitor.visit_annotation(annotation);
+        if let Some(expr) = value {
+            visitor.visit_expr(expr);
+        }
     }
 }
 impl AstNode for ast::StmtFor {
@@ -952,6 +1121,24 @@ impl AstNode for ast::StmtFor {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtFor {
+            target,
+            iter,
+            body,
+            orelse,
+            ..
+        } = self;
+
+        visitor.visit_expr(target);
+        visitor.visit_expr(iter);
+        visitor.visit_body(body);
+        visitor.visit_body(orelse);
+    }
 }
 impl AstNode for ast::StmtWhile {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -979,6 +1166,22 @@ impl AstNode for ast::StmtWhile {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtWhile {
+            test,
+            body,
+            orelse,
+            range: _,
+        } = self;
+
+        visitor.visit_expr(test);
+        visitor.visit_body(body);
+        visitor.visit_body(orelse);
     }
 }
 impl AstNode for ast::StmtIf {
@@ -1008,6 +1211,24 @@ impl AstNode for ast::StmtIf {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtIf {
+            test,
+            body,
+            elif_else_clauses,
+            range: _,
+        } = self;
+
+        visitor.visit_expr(test);
+        visitor.visit_body(body);
+        for clause in elif_else_clauses {
+            visitor.visit_elif_else_clause(clause);
+        }
+    }
 }
 impl AstNode for ast::ElifElseClause {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1035,6 +1256,21 @@ impl AstNode for ast::ElifElseClause {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ElifElseClause {
+            range: _,
+            test,
+            body,
+        } = self;
+        if let Some(test) = test {
+            visitor.visit_expr(test);
+        }
+        visitor.visit_body(body);
     }
 }
 impl AstNode for ast::StmtWith {
@@ -1064,6 +1300,23 @@ impl AstNode for ast::StmtWith {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtWith {
+            items,
+            body,
+            is_async: _,
+            range: _,
+        } = self;
+
+        for with_item in items {
+            visitor.visit_with_item(with_item);
+        }
+        visitor.visit_body(body);
+    }
 }
 impl AstNode for ast::StmtMatch {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1091,6 +1344,22 @@ impl AstNode for ast::StmtMatch {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtMatch {
+            subject,
+            cases,
+            range: _,
+        } = self;
+
+        visitor.visit_expr(subject);
+        for match_case in cases {
+            visitor.visit_match_case(match_case);
+        }
     }
 }
 impl AstNode for ast::StmtRaise {
@@ -1120,6 +1389,24 @@ impl AstNode for ast::StmtRaise {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtRaise {
+            exc,
+            cause,
+            range: _,
+        } = self;
+
+        if let Some(expr) = exc {
+            visitor.visit_expr(expr);
+        };
+        if let Some(expr) = cause {
+            visitor.visit_expr(expr);
+        };
+    }
 }
 impl AstNode for ast::StmtTry {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1147,6 +1434,26 @@ impl AstNode for ast::StmtTry {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtTry {
+            body,
+            handlers,
+            orelse,
+            finalbody,
+            range: _,
+        } = self;
+
+        visitor.visit_body(body);
+        for except_handler in handlers {
+            visitor.visit_except_handler(except_handler);
+        }
+        visitor.visit_body(orelse);
+        visitor.visit_body(finalbody);
     }
 }
 impl AstNode for ast::StmtTryStar {
@@ -1176,6 +1483,26 @@ impl AstNode for ast::StmtTryStar {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtTryStar {
+            body,
+            handlers,
+            orelse,
+            finalbody,
+            range: _,
+        } = self;
+
+        visitor.visit_body(body);
+        for except_handler in handlers {
+            visitor.visit_except_handler(except_handler);
+        }
+        visitor.visit_body(orelse);
+        visitor.visit_body(finalbody);
+    }
 }
 impl AstNode for ast::StmtAssert {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1203,6 +1530,21 @@ impl AstNode for ast::StmtAssert {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtAssert {
+            test,
+            msg,
+            range: _,
+        } = self;
+        visitor.visit_expr(test);
+        if let Some(expr) = msg {
+            visitor.visit_expr(expr);
+        }
     }
 }
 impl AstNode for ast::StmtImport {
@@ -1232,6 +1574,17 @@ impl AstNode for ast::StmtImport {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtImport { names, range: _ } = self;
+
+        for alias in names {
+            visitor.visit_alias(alias);
+        }
+    }
 }
 impl AstNode for ast::StmtImportFrom {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1259,6 +1612,22 @@ impl AstNode for ast::StmtImportFrom {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtImportFrom {
+            range: _,
+            module: _,
+            names,
+            level: _,
+        } = self;
+
+        for alias in names {
+            visitor.visit_alias(alias);
+        }
     }
 }
 impl AstNode for ast::StmtGlobal {
@@ -1288,6 +1657,13 @@ impl AstNode for ast::StmtGlobal {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    #[inline]
+    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+    }
 }
 impl AstNode for ast::StmtNonlocal {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1315,6 +1691,13 @@ impl AstNode for ast::StmtNonlocal {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    #[inline]
+    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
     }
 }
 impl AstNode for ast::StmtExpr {
@@ -1344,6 +1727,15 @@ impl AstNode for ast::StmtExpr {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtExpr { value, range: _ } = self;
+
+        visitor.visit_expr(value);
+    }
 }
 impl AstNode for ast::StmtPass {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1371,6 +1763,13 @@ impl AstNode for ast::StmtPass {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    #[inline]
+    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
     }
 }
 impl AstNode for ast::StmtBreak {
@@ -1400,6 +1799,13 @@ impl AstNode for ast::StmtBreak {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    #[inline]
+    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+    }
 }
 impl AstNode for ast::StmtContinue {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1427,6 +1833,13 @@ impl AstNode for ast::StmtContinue {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    #[inline]
+    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
     }
 }
 impl AstNode for ast::StmtIpyEscapeCommand {
@@ -1456,6 +1869,13 @@ impl AstNode for ast::StmtIpyEscapeCommand {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    #[inline]
+    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+    }
 }
 impl AstNode for ast::ExprBoolOp {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1483,6 +1903,29 @@ impl AstNode for ast::ExprBoolOp {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprBoolOp {
+            op,
+            values,
+            range: _,
+        } = self;
+        match values.as_slice() {
+            [left, rest @ ..] => {
+                visitor.visit_expr(left);
+                visitor.visit_bool_op(op);
+                for expr in rest {
+                    visitor.visit_expr(expr);
+                }
+            }
+            [] => {
+                visitor.visit_bool_op(op);
+            }
+        }
     }
 }
 impl AstNode for ast::ExprNamedExpr {
@@ -1512,6 +1955,19 @@ impl AstNode for ast::ExprNamedExpr {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprNamedExpr {
+            target,
+            value,
+            range: _,
+        } = self;
+        visitor.visit_expr(target);
+        visitor.visit_expr(value);
+    }
 }
 impl AstNode for ast::ExprBinOp {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1539,6 +1995,21 @@ impl AstNode for ast::ExprBinOp {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprBinOp {
+            left,
+            op,
+            right,
+            range: _,
+        } = self;
+        visitor.visit_expr(left);
+        visitor.visit_operator(op);
+        visitor.visit_expr(right);
     }
 }
 impl AstNode for ast::ExprUnaryOp {
@@ -1568,6 +2039,20 @@ impl AstNode for ast::ExprUnaryOp {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprUnaryOp {
+            op,
+            operand,
+            range: _,
+        } = self;
+
+        visitor.visit_unary_op(op);
+        visitor.visit_expr(operand);
+    }
 }
 impl AstNode for ast::ExprLambda {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1595,6 +2080,20 @@ impl AstNode for ast::ExprLambda {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprLambda {
+            parameters,
+            body,
+            range: _,
+        } = self;
+
+        visitor.visit_parameters(parameters);
+        visitor.visit_expr(body);
     }
 }
 impl AstNode for ast::ExprIfExp {
@@ -1624,6 +2123,23 @@ impl AstNode for ast::ExprIfExp {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprIfExp {
+            test,
+            body,
+            orelse,
+            range: _,
+        } = self;
+
+        // `body if test else orelse`
+        visitor.visit_expr(body);
+        visitor.visit_expr(test);
+        visitor.visit_expr(orelse);
+    }
 }
 impl AstNode for ast::ExprDict {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1651,6 +2167,24 @@ impl AstNode for ast::ExprDict {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprDict {
+            keys,
+            values,
+            range: _,
+        } = self;
+
+        for (key, value) in keys.iter().zip(values) {
+            if let Some(key) = key {
+                visitor.visit_expr(key);
+            }
+            visitor.visit_expr(value);
+        }
     }
 }
 impl AstNode for ast::ExprSet {
@@ -1680,6 +2214,17 @@ impl AstNode for ast::ExprSet {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprSet { elts, range: _ } = self;
+
+        for expr in elts {
+            visitor.visit_expr(expr);
+        }
+    }
 }
 impl AstNode for ast::ExprListComp {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1707,6 +2252,22 @@ impl AstNode for ast::ExprListComp {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprListComp {
+            elt,
+            generators,
+            range: _,
+        } = self;
+
+        visitor.visit_expr(elt);
+        for comprehension in generators {
+            visitor.visit_comprehension(comprehension);
+        }
     }
 }
 impl AstNode for ast::ExprSetComp {
@@ -1736,6 +2297,22 @@ impl AstNode for ast::ExprSetComp {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprSetComp {
+            elt,
+            generators,
+            range: _,
+        } = self;
+
+        visitor.visit_expr(elt);
+        for comprehension in generators {
+            visitor.visit_comprehension(comprehension);
+        }
+    }
 }
 impl AstNode for ast::ExprDictComp {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1763,6 +2340,25 @@ impl AstNode for ast::ExprDictComp {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprDictComp {
+            key,
+            value,
+            generators,
+            range: _,
+        } = self;
+
+        visitor.visit_expr(key);
+        visitor.visit_expr(value);
+
+        for comprehension in generators {
+            visitor.visit_comprehension(comprehension);
+        }
     }
 }
 impl AstNode for ast::ExprGeneratorExp {
@@ -1792,6 +2388,21 @@ impl AstNode for ast::ExprGeneratorExp {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprGeneratorExp {
+            elt,
+            generators,
+            range: _,
+        } = self;
+        visitor.visit_expr(elt);
+        for comprehension in generators {
+            visitor.visit_comprehension(comprehension);
+        }
+    }
 }
 impl AstNode for ast::ExprAwait {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1819,6 +2430,14 @@ impl AstNode for ast::ExprAwait {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprAwait { value, range: _ } = self;
+        visitor.visit_expr(value);
     }
 }
 impl AstNode for ast::ExprYield {
@@ -1848,6 +2467,16 @@ impl AstNode for ast::ExprYield {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprYield { value, range: _ } = self;
+        if let Some(expr) = value {
+            visitor.visit_expr(expr);
+        }
+    }
 }
 impl AstNode for ast::ExprYieldFrom {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1875,6 +2504,14 @@ impl AstNode for ast::ExprYieldFrom {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprYieldFrom { value, range: _ } = self;
+        visitor.visit_expr(value);
     }
 }
 impl AstNode for ast::ExprCompare {
@@ -1904,6 +2541,25 @@ impl AstNode for ast::ExprCompare {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprCompare {
+            left,
+            ops,
+            comparators,
+            range: _,
+        } = self;
+
+        visitor.visit_expr(left);
+
+        for (op, comparator) in ops.iter().zip(comparators) {
+            visitor.visit_cmp_op(op);
+            visitor.visit_expr(comparator);
+        }
+    }
 }
 impl AstNode for ast::ExprCall {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1931,6 +2587,19 @@ impl AstNode for ast::ExprCall {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprCall {
+            func,
+            arguments,
+            range: _,
+        } = self;
+        visitor.visit_expr(func);
+        visitor.visit_arguments(arguments);
     }
 }
 impl AstNode for ast::ExprFormattedValue {
@@ -1960,6 +2629,20 @@ impl AstNode for ast::ExprFormattedValue {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprFormattedValue {
+            value, format_spec, ..
+        } = self;
+        visitor.visit_expr(value);
+
+        if let Some(expr) = format_spec {
+            visitor.visit_format_spec(expr);
+        }
+    }
 }
 impl AstNode for ast::ExprFString {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1987,6 +2670,17 @@ impl AstNode for ast::ExprFString {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprFString { values, range: _ } = self;
+
+        for expr in values {
+            visitor.visit_expr(expr);
+        }
     }
 }
 impl AstNode for ast::ExprConstant {
@@ -2016,6 +2710,18 @@ impl AstNode for ast::ExprConstant {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprConstant {
+            value,
+            range: _,
+            kind: _,
+        } = self;
+        visitor.visit_constant(value);
+    }
 }
 impl AstNode for ast::ExprAttribute {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2043,6 +2749,20 @@ impl AstNode for ast::ExprAttribute {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprAttribute {
+            value,
+            attr: _,
+            ctx: _,
+            range: _,
+        } = self;
+
+        visitor.visit_expr(value);
     }
 }
 impl AstNode for ast::ExprSubscript {
@@ -2072,6 +2792,20 @@ impl AstNode for ast::ExprSubscript {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprSubscript {
+            value,
+            slice,
+            ctx: _,
+            range: _,
+        } = self;
+        visitor.visit_expr(value);
+        visitor.visit_expr(slice);
+    }
 }
 impl AstNode for ast::ExprStarred {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2099,6 +2833,19 @@ impl AstNode for ast::ExprStarred {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprStarred {
+            value,
+            ctx: _,
+            range: _,
+        } = self;
+
+        visitor.visit_expr(value);
     }
 }
 impl AstNode for ast::ExprName {
@@ -2128,6 +2875,18 @@ impl AstNode for ast::ExprName {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    #[inline]
+    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprName {
+            id: _,
+            ctx: _,
+            range: _,
+        } = self;
+    }
 }
 impl AstNode for ast::ExprList {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2155,6 +2914,21 @@ impl AstNode for ast::ExprList {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprList {
+            elts,
+            ctx: _,
+            range: _,
+        } = self;
+
+        for expr in elts {
+            visitor.visit_expr(expr);
+        }
     }
 }
 impl AstNode for ast::ExprTuple {
@@ -2184,6 +2958,21 @@ impl AstNode for ast::ExprTuple {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprTuple {
+            elts,
+            ctx: _,
+            range: _,
+        } = self;
+
+        for expr in elts {
+            visitor.visit_expr(expr);
+        }
+    }
 }
 impl AstNode for ast::ExprSlice {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2211,6 +3000,27 @@ impl AstNode for ast::ExprSlice {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprSlice {
+            lower,
+            upper,
+            step,
+            range: _,
+        } = self;
+
+        if let Some(expr) = lower {
+            visitor.visit_expr(expr);
+        }
+        if let Some(expr) = upper {
+            visitor.visit_expr(expr);
+        }
+        if let Some(expr) = step {
+            visitor.visit_expr(expr);
+        }
     }
 }
 impl AstNode for ast::ExprIpyEscapeCommand {
@@ -2240,6 +3050,18 @@ impl AstNode for ast::ExprIpyEscapeCommand {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    #[inline]
+    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprIpyEscapeCommand {
+            range: _,
+            kind: _,
+            value: _,
+        } = self;
+    }
 }
 impl AstNode for ast::ExceptHandlerExceptHandler {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2267,6 +3089,22 @@ impl AstNode for ast::ExceptHandlerExceptHandler {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExceptHandlerExceptHandler {
+            range: _,
+            type_,
+            name: _,
+            body,
+        } = self;
+        if let Some(expr) = type_ {
+            visitor.visit_expr(expr);
+        }
+        visitor.visit_body(body);
     }
 }
 impl AstNode for ast::PatternMatchValue {
@@ -2296,6 +3134,14 @@ impl AstNode for ast::PatternMatchValue {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::PatternMatchValue { value, range: _ } = self;
+        visitor.visit_expr(value);
+    }
 }
 impl AstNode for ast::PatternMatchSingleton {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2323,6 +3169,14 @@ impl AstNode for ast::PatternMatchSingleton {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::PatternMatchSingleton { value, range: _ } = self;
+        visitor.visit_constant(value);
     }
 }
 impl AstNode for ast::PatternMatchSequence {
@@ -2352,6 +3206,16 @@ impl AstNode for ast::PatternMatchSequence {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::PatternMatchSequence { patterns, range: _ } = self;
+        for pattern in patterns {
+            visitor.visit_pattern(pattern);
+        }
+    }
 }
 impl AstNode for ast::PatternMatchMapping {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2379,6 +3243,22 @@ impl AstNode for ast::PatternMatchMapping {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::PatternMatchMapping {
+            keys,
+            patterns,
+            range: _,
+            rest: _,
+        } = self;
+        for (key, pattern) in keys.iter().zip(patterns) {
+            visitor.visit_expr(key);
+            visitor.visit_pattern(pattern);
+        }
     }
 }
 impl AstNode for ast::PatternMatchClass {
@@ -2408,6 +3288,27 @@ impl AstNode for ast::PatternMatchClass {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::PatternMatchClass {
+            cls,
+            patterns,
+            kwd_attrs: _,
+            kwd_patterns,
+            range: _,
+        } = self;
+        visitor.visit_expr(cls);
+        for pattern in patterns {
+            visitor.visit_pattern(pattern);
+        }
+
+        for pattern in kwd_patterns {
+            visitor.visit_pattern(pattern);
+        }
+    }
 }
 impl AstNode for ast::PatternMatchStar {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2435,6 +3336,14 @@ impl AstNode for ast::PatternMatchStar {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    #[inline]
+    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::PatternMatchStar { range: _, name: _ } = self;
     }
 }
 impl AstNode for ast::PatternMatchAs {
@@ -2464,6 +3373,20 @@ impl AstNode for ast::PatternMatchAs {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::PatternMatchAs {
+            pattern,
+            range: _,
+            name: _,
+        } = self;
+        if let Some(pattern) = pattern {
+            visitor.visit_pattern(pattern);
+        }
+    }
 }
 impl AstNode for ast::PatternMatchOr {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2491,6 +3414,16 @@ impl AstNode for ast::PatternMatchOr {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::PatternMatchOr { patterns, range: _ } = self;
+        for pattern in patterns {
+            visitor.visit_pattern(pattern);
+        }
     }
 }
 
@@ -2521,6 +3454,25 @@ impl AstNode for Comprehension {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::Comprehension {
+            range: _,
+            target,
+            iter,
+            ifs,
+            is_async: _,
+        } = self;
+        visitor.visit_expr(target);
+        visitor.visit_expr(iter);
+
+        for expr in ifs {
+            visitor.visit_expr(expr);
+        }
+    }
 }
 impl AstNode for Arguments {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2548,6 +3500,25 @@ impl AstNode for Arguments {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::Arguments {
+            range: _,
+            args,
+            keywords,
+        } = self;
+
+        for arg in args {
+            visitor.visit_expr(arg);
+        }
+
+        for keyword in keywords {
+            visitor.visit_keyword(keyword);
+        }
     }
 }
 impl AstNode for Parameters {
@@ -2577,6 +3548,35 @@ impl AstNode for Parameters {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::Parameters {
+            range: _,
+            posonlyargs,
+            args,
+            vararg,
+            kwonlyargs,
+            kwarg,
+        } = self;
+        for arg in posonlyargs.iter().chain(args) {
+            visitor.visit_parameter_with_default(arg);
+        }
+
+        if let Some(arg) = vararg {
+            visitor.visit_parameter(arg);
+        }
+
+        for arg in kwonlyargs {
+            visitor.visit_parameter_with_default(arg);
+        }
+
+        if let Some(arg) = kwarg {
+            visitor.visit_parameter(arg);
+        }
+    }
 }
 impl AstNode for Parameter {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2604,6 +3604,21 @@ impl AstNode for Parameter {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::Parameter {
+            range: _,
+            name: _,
+            annotation,
+        } = self;
+
+        if let Some(expr) = annotation {
+            visitor.visit_annotation(expr);
+        }
     }
 }
 impl AstNode for ParameterWithDefault {
@@ -2633,6 +3648,21 @@ impl AstNode for ParameterWithDefault {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ParameterWithDefault {
+            range: _,
+            parameter,
+            default,
+        } = self;
+        visitor.visit_parameter(parameter);
+        if let Some(expr) = default {
+            visitor.visit_expr(expr);
+        }
+    }
 }
 impl AstNode for Keyword {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2660,6 +3690,19 @@ impl AstNode for Keyword {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::Keyword {
+            range: _,
+            arg: _,
+            value,
+        } = self;
+
+        visitor.visit_expr(value);
     }
 }
 impl AstNode for Alias {
@@ -2689,6 +3732,18 @@ impl AstNode for Alias {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    #[inline]
+    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::Alias {
+            range: _,
+            name: _,
+            asname: _,
+        } = self;
+    }
 }
 impl AstNode for WithItem {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2717,6 +3772,23 @@ impl AstNode for WithItem {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::WithItem {
+            range: _,
+            context_expr,
+            optional_vars,
+        } = self;
+
+        visitor.visit_expr(context_expr);
+
+        if let Some(expr) = optional_vars {
+            visitor.visit_expr(expr);
+        }
+    }
 }
 impl AstNode for MatchCase {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2744,6 +3816,24 @@ impl AstNode for MatchCase {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::MatchCase {
+            range: _,
+            pattern,
+            guard,
+            body,
+        } = self;
+
+        visitor.visit_pattern(pattern);
+        if let Some(expr) = guard {
+            visitor.visit_expr(expr);
+        }
+        visitor.visit_body(body);
     }
 }
 
@@ -2774,6 +3864,18 @@ impl AstNode for Decorator {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::Decorator {
+            range: _,
+            expression,
+        } = self;
+
+        visitor.visit_expr(expression);
+    }
 }
 impl AstNode for ast::TypeParams {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2801,6 +3903,20 @@ impl AstNode for ast::TypeParams {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::TypeParams {
+            range: _,
+            type_params,
+        } = self;
+
+        for type_param in type_params {
+            visitor.visit_type_param(type_param);
+        }
     }
 }
 impl AstNode for ast::TypeParamTypeVar {
@@ -2830,6 +3946,21 @@ impl AstNode for ast::TypeParamTypeVar {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::TypeParamTypeVar {
+            bound,
+            name: _,
+            range: _,
+        } = self;
+
+        if let Some(expr) = bound {
+            visitor.visit_expr(expr);
+        }
+    }
 }
 impl AstNode for ast::TypeParamTypeVarTuple {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2858,6 +3989,14 @@ impl AstNode for ast::TypeParamTypeVarTuple {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    #[inline]
+    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::TypeParamTypeVarTuple { range: _, name: _ } = self;
+    }
 }
 impl AstNode for ast::TypeParamParamSpec {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2885,6 +4024,14 @@ impl AstNode for ast::TypeParamParamSpec {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    #[inline]
+    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::TypeParamParamSpec { range: _, name: _ } = self;
     }
 }
 impl From<Stmt> for AnyNode {
@@ -4258,6 +5405,94 @@ impl AnyNodeRef<'_> {
             self,
             AnyNodeRef::ExceptHandlerExceptHandler(_) | AnyNodeRef::ElifElseClause(_)
         )
+    }
+
+    pub fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        match self {
+            AnyNodeRef::ModModule(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ModExpression(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtFunctionDef(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtClassDef(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtReturn(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtDelete(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtTypeAlias(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtAssign(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtAugAssign(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtAnnAssign(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtFor(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtWhile(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtIf(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtWith(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtMatch(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtRaise(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtTry(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtTryStar(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtAssert(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtImport(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtImportFrom(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtGlobal(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtNonlocal(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtExpr(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtPass(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtBreak(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtContinue(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtIpyEscapeCommand(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprBoolOp(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprNamedExpr(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprBinOp(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprUnaryOp(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprLambda(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprIfExp(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprDict(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprSet(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprListComp(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprSetComp(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprDictComp(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprGeneratorExp(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprAwait(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprYield(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprYieldFrom(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprCompare(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprCall(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprFormattedValue(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprFString(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprConstant(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprAttribute(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprSubscript(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprStarred(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprName(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprList(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprTuple(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprSlice(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprIpyEscapeCommand(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExceptHandlerExceptHandler(node) => node.visit_preorder(visitor),
+            AnyNodeRef::PatternMatchValue(node) => node.visit_preorder(visitor),
+            AnyNodeRef::PatternMatchSingleton(node) => node.visit_preorder(visitor),
+            AnyNodeRef::PatternMatchSequence(node) => node.visit_preorder(visitor),
+            AnyNodeRef::PatternMatchMapping(node) => node.visit_preorder(visitor),
+            AnyNodeRef::PatternMatchClass(node) => node.visit_preorder(visitor),
+            AnyNodeRef::PatternMatchStar(node) => node.visit_preorder(visitor),
+            AnyNodeRef::PatternMatchAs(node) => node.visit_preorder(visitor),
+            AnyNodeRef::PatternMatchOr(node) => node.visit_preorder(visitor),
+            AnyNodeRef::Comprehension(node) => node.visit_preorder(visitor),
+            AnyNodeRef::Arguments(node) => node.visit_preorder(visitor),
+            AnyNodeRef::Parameters(node) => node.visit_preorder(visitor),
+            AnyNodeRef::Parameter(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ParameterWithDefault(node) => node.visit_preorder(visitor),
+            AnyNodeRef::Keyword(node) => node.visit_preorder(visitor),
+            AnyNodeRef::Alias(node) => node.visit_preorder(visitor),
+            AnyNodeRef::WithItem(node) => node.visit_preorder(visitor),
+            AnyNodeRef::MatchCase(node) => node.visit_preorder(visitor),
+            AnyNodeRef::Decorator(node) => node.visit_preorder(visitor),
+            AnyNodeRef::TypeParams(node) => node.visit_preorder(visitor),
+            AnyNodeRef::TypeParamTypeVar(node) => node.visit_preorder(visitor),
+            AnyNodeRef::TypeParamTypeVarTuple(node) => node.visit_preorder(visitor),
+            AnyNodeRef::TypeParamParamSpec(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ElifElseClause(node) => node.visit_preorder(visitor),
+        }
     }
 }
 

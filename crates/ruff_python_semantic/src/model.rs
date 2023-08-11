@@ -249,14 +249,16 @@ impl<'a> SemanticModel<'a> {
 
     /// Return `true` if `member` is bound as a builtin.
     pub fn is_builtin(&self, member: &str) -> bool {
-        self.find_binding(member)
+        self.lookup_symbol(member)
+            .map(|binding_id| &self.bindings[binding_id])
             .is_some_and(|binding| binding.kind.is_builtin())
     }
 
     /// Return `true` if `member` is an "available" symbol, i.e., a symbol that has not been bound
     /// in the current scope, or in any containing scope.
     pub fn is_available(&self, member: &str) -> bool {
-        self.find_binding(member)
+        self.lookup_symbol(member)
+            .map(|binding_id| &self.bindings[binding_id])
             .map_or(true, |binding| binding.kind.is_builtin())
     }
 
