@@ -1,6 +1,5 @@
 import lzstring from "lz-string";
-import { v4 as uuidv4 } from "uuid";
-import { get, set } from "./db";
+import { fetchPlayground, savePlayground } from "./api";
 
 export type Settings = { [K: string]: any };
 
@@ -28,8 +27,7 @@ export async function persist(
   settingsSource: string,
   pythonSource: string,
 ): Promise<void> {
-  const id = uuidv4();
-  await set(id, { settingsSource, pythonSource });
+  const id = await savePlayground({ settingsSource, pythonSource });
   await navigator.clipboard.writeText(`${window.location.origin}/${id}`);
 }
 
@@ -52,14 +50,11 @@ export async function restore(): Promise<[string, string] | null> {
   //     https://play.ruff.rs/1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed
   const id = window.location.pathname.slice(1);
   if (id) {
-    const response = await get<{
-      settingsSource: string;
-      pythonSource: string;
-    }>(id);
-    if (response == null) {
+    const playground = await fetchPlayground(id);
+    if (playground == null) {
       return null;
     }
-    const { settingsSource, pythonSource } = response;
+    const { settingsSource, pythonSource } = playground;
     return [settingsSource, pythonSource];
   }
 

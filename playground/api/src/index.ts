@@ -9,8 +9,26 @@ export interface Env {
   DEV?: boolean;
 }
 
-const HEADERS = {
+// See: https://developers.cloudflare.com/workers/examples/security-headers/
+const DEFAULT_HEADERS = {
+  "Permissions-Policy": "interest-cohort=()",
+  "X-XSS-Protection": "0",
+  "X-Frame-Options": "DENY",
+  "X-Content-Type-Options": "nosniff",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Cross-Origin-Embedder-Policy": 'require-corp; report-to="default";',
+  "Cross-Origin-Opener-Policy": 'same-site; report-to="default";',
+  "Cross-Origin-Resource-Policy": "same-site",
+};
+
+const DEVELOPMENT_HEADERS = {
+  ...DEFAULT_HEADERS,
   "Access-Control-Allow-Origin": "*",
+};
+
+const PRODUCTION_HEADERS = {
+  ...DEFAULT_HEADERS,
+  "Access-Control-Allow-Origin": "https://play.ruff.rs",
 };
 
 export default {
@@ -21,58 +39,51 @@ export default {
   ): Promise<Response> {
     const { DEV, PLAYGROUND } = env;
 
-    // Verify that we're either in a development environment or that the request
-    // came from `https://play.ruff.rs`.
-    if (!DEV) {
-      const { origin } = new URL(request.url);
-      if (origin !== "https://play.ruff.rs") {
-        return new Response("Unauthorized", {
-          status: 401,
-          headers: HEADERS,
-        });
-      }
-    }
-
-    // URLs take the form `https://api.astral-1ad.workers.dev/<key>`. A `GET` request
-    // will return the value associated with the key, while a `POST` request will
-    // set the value associated with the key.
-    const { pathname } = new URL(request.url);
-    const key = pathname.slice(1);
-    if (!key) {
-      return new Response("Not Found", {
-        status: 404,
-        headers: HEADERS,
-      });
-    }
+    const headers = DEV ? DEVELOPMENT_HEADERS : PRODUCTION_HEADERS;
 
     switch (request.method) {
       case "GET": {
-        const value = await PLAYGROUND.get(key);
-        if (value === null) {
+        // Ex) `https://api.astral-1ad.workers.dev/<key>`
+        // Given an ID, return the corresponding playground.
+        const { pathname } = new URL(request.url);
+        const key = pathname.slice(1);
+        if (!key) {
           return new Response("Not Found", {
             status: 404,
-            headers: HEADERS,
+            headers,
           });
         }
-        return new Response(value, {
+
+        const playground = await PLAYGROUND.get(key);
+        if (playground === null) {
+          return new Response("Not Found", {
+            status: 404,
+            headers,
+          });
+        }
+
+        return new Response(playground, {
           status: 200,
-          headers: HEADERS,
+          headers,
         });
       }
 
+      // Ex) `https://api.astral-1ad.workers.dev`
+      // Given a playground, save it and return its ID.
       case "POST": {
-        const value = await request.text();
-        await PLAYGROUND.put(key, value);
-        return new Response("OK", {
+        const id = crypto.randomUUID();
+        const playground = await request.text();
+        await PLAYGROUND.put(id, playground);
+        return new Response(id, {
           status: 200,
-          headers: HEADERS,
+          headers,
         });
       }
 
       default: {
         return new Response("Method Not Allowed", {
           status: 405,
-          headers: HEADERS,
+          headers,
         });
       }
     }

@@ -185,7 +185,7 @@ export default function Editor() {
     }
 
     return () => {
-      persist(source.settingsSource, source.pythonSource);
+      return persist(source.settingsSource, source.pythonSource);
     };
   }, [source, initialized]);
 

@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@miniflare/kv": "^2.14.0",
-    "@miniflare/storage-memory": "^2.14.0"
+    "@miniflare/storage-memory": "^2.14.0",
+    "uuid": "^9.0.0"
   }
 }
