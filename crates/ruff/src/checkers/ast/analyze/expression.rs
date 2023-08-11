@@ -763,6 +763,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::SubprocessPopenPreexecFn) {
                 pylint::rules::subprocess_popen_preexec_fn(checker, call);
             }
+            if checker.enabled(Rule::SubprocessRunWithoutCheck) {
+                pylint::rules::subprocess_run_without_check(checker, call);
+            }
             if checker.any_enabled(&[
                 Rule::PytestRaisesWithoutException,
                 Rule::PytestRaisesTooBroad,

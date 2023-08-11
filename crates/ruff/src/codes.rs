@@ -226,6 +226,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "W0711") => (RuleGroup::Unspecified, rules::pylint::rules::BinaryOpException),
         (Pylint, "W1508") => (RuleGroup::Unspecified, rules::pylint::rules::InvalidEnvvarDefault),
         (Pylint, "W1509") => (RuleGroup::Unspecified, rules::pylint::rules::SubprocessPopenPreexecFn),
+        (Pylint, "W1510") => (RuleGroup::Unspecified, rules::pylint::rules::SubprocessRunWithoutCheck),
         (Pylint, "W1641") => (RuleGroup::Nursery, rules::pylint::rules::EqWithoutHash),
         (Pylint, "W2901") => (RuleGroup::Unspecified, rules::pylint::rules::RedefinedLoopName),
         (Pylint, "W3301") => (RuleGroup::Unspecified, rules::pylint::rules::NestedMinMax),
