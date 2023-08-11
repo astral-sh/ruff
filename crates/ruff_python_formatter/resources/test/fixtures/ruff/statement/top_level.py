@@ -15,3 +15,11 @@ class Store(expr_context): ...
 
 class Foo(Bar):
     ...
+
+class Baz(Qux):
+    def __init__(self):
+        pass
+
+class Quux(Qux):
+    def __init__(self):
+        pass
