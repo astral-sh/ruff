@@ -53,7 +53,7 @@ pub(crate) fn bad_dunder_method_name(checker: &mut Checker, class_body: &[Stmt])
         .iter()
         .filter_map(ruff_python_ast::Stmt::as_function_def_stmt)
         .filter(|method| {
-            if is_known_dunder_method(&method.name, checker.settings.target_version) {
+            if is_known_dunder_method(&method.name) {
                 return false;
             }
             method.name.starts_with('_') && method.name.ends_with('_')
@@ -69,14 +69,16 @@ pub(crate) fn bad_dunder_method_name(checker: &mut Checker, class_body: &[Stmt])
 }
 
 /// Returns `true` if a method is a known dunder method.
-fn is_known_dunder_method(method: &str, target_version: PythonVersion) -> bool {
-    if matches!(
+fn is_known_dunder_method(method: &str) -> bool {
+    matches!(
         method,
         "__abs__"
             | "__add__"
             | "__aenter__"
             | "__aexit__"
+            | "__aiter__"
             | "__and__"
+            | "__anext__"
             | "__await__"
             | "__bool__"
             | "__bytes__"
@@ -149,6 +151,7 @@ fn is_known_dunder_method(method: &str, target_version: PythonVersion) -> bool {
             | "__next__"
             | "__or__"
             | "__pos__"
+            | "__post_init__"
             | "__pow__"
             | "__radd__"
             | "__rand__"
@@ -185,16 +188,5 @@ fn is_known_dunder_method(method: &str, target_version: PythonVersion) -> bool {
             | "__trunc__"
             | "__weakref__"
             | "__xor__"
-            | "__post_init__"
-    ) {
-        return true;
-    }
-
-    if target_version >= PythonVersion::Py310 {
-        if matches!(method, "__aiter__" | "__anext__") {
-            return true;
-        }
-    }
-
-    false
+    )
 }
