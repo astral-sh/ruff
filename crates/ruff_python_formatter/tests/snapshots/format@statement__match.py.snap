@@ -92,6 +92,8 @@ match newlines:
 
     case "three newlines":
         pass
+    case _:
+        pass
 ```
 
 ## Output
@@ -176,6 +178,8 @@ match newlines:
     case NOT_YET_IMPLEMENTED_Pattern:
         pass
 
+    case NOT_YET_IMPLEMENTED_Pattern:
+        pass
     case NOT_YET_IMPLEMENTED_Pattern:
         pass
 ```
