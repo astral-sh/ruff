@@ -20,6 +20,11 @@ class Load(expr_context):
     ...
 
 
+# Some comment.
+class Other(expr_context):
+    ...
+
+
 class Store(expr_context):
     ...
 
