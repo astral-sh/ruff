@@ -52,8 +52,11 @@ pub(super) fn is_overlong(
     task_tags: &[String],
     tab_size: TabSize,
 ) -> Option<Overlong> {
-    // Each character is between 1-4 bytes. If the number of bytes is smaller than the limit, it cannot be overlong.
-    if line.len() < limit.get() {
+    // The maximum width of the line is the number of bytes multiplied by the tab size (the
+    // worst-case scenario is that the line is all tabs). If the maximum width is less than the
+    // limit, then the line is not overlong.
+    let max_width = line.len() * tab_size.as_usize();
+    if max_width < limit.get() {
         return None;
     }
 

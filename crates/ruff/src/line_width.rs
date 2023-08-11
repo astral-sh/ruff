@@ -145,10 +145,10 @@ impl PartialOrd<LineLength> for LineWidth {
 /// The size of a tab.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub struct TabSize(pub NonZeroU8);
+pub struct TabSize(NonZeroU8);
 
 impl TabSize {
-    fn as_usize(self) -> usize {
+    pub(crate) fn as_usize(self) -> usize {
         self.0.get() as usize
     }
 }

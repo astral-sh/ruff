@@ -206,6 +206,7 @@ mod tests {
             Path::new("pycodestyle/E501_2.py"),
             &settings::Settings {
                 tab_size: NonZeroU8::new(tab_size).unwrap().into(),
+                line_length: LineLength::from(6),
                 ..settings::Settings::for_rule(Rule::LineTooLong)
             },
         )?;
