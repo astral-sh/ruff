@@ -43,6 +43,12 @@ class Quux(Qux):
         pass
 
 
+# Some comment.
+class Quuz(Qux):
+    def __init__(self):
+        pass
+
+
 def bar():
     ...
 
