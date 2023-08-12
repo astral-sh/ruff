@@ -177,29 +177,141 @@ pub enum SimpleTokenKind {
     /// `.`.
     Dot,
 
-    /// `else`
-    Else,
+    /// `+`
+    Plus,
 
-    /// `if`
-    If,
+    /// `-`
+    Minus,
 
-    /// `elif`
-    Elif,
+    /// `=`
+    Equals,
 
-    /// `in`
-    In,
+    /// `>`
+    Greater,
+
+    /// `<`
+    Less,
+
+    /// `%`
+    Percent,
+
+    /// `&`
+    Ampersand,
+
+    /// `^`
+    Circumflex,
+    /// `|`
+    Vbar,
+
+    /// `@`
+    At,
+
+    /// `~`
+    Tilde,
+
+    /// `and`
+    And,
 
     /// `as`
     As,
 
+    /// `assert`
+    Assert,
+
+    /// `async`
+    Async,
+
+    /// `await`
+    Await,
+
+    /// `break`
+    Break,
+    /// `class`
+    Class,
+
+    /// `continue`
+    Continue,
+
+    /// `def`
+    Def,
+
+    /// `del`
+    Del,
+
+    /// `elif`
+    Elif,
+
+    /// `else`
+    Else,
+
+    /// `except`
+    Except,
+
+    /// `finally`
+    Finally,
+
+    /// `for`
+    For,
+
+    /// `from`
+    From,
+
+    /// `global`
+    Global,
+
+    /// `if`
+    If,
+
+    /// `import`
+    Import,
+
+    /// `in`
+    In,
+
+    /// `is`
+    Is,
+
+    /// `lambda`
+    Lambda,
+
+    /// `nonlocal`
+    Nonlocal,
+
+    /// `not`
+    Not,
+
+    /// `or`
+    Or,
+
+    /// `pass`
+    Pass,
+
+    /// `raise`
+    Raise,
+
+    /// `return`
+    Return,
+
+    /// `try`
+    Try,
+
+    /// `while`
+    While,
+
     /// `match`
     Match,
+
+    /// `type`
+    Type,
+
+    /// `case`
+    Case,
 
     /// `with`
     With,
 
-    /// `async`
-    Async,
+    /// `yield`
+    Yield,
 
     /// Any other non trivia token.
     Other,
@@ -222,6 +334,17 @@ impl SimpleTokenKind {
             '/' => SimpleTokenKind::Slash,
             '*' => SimpleTokenKind::Star,
             '.' => SimpleTokenKind::Dot,
+            '+' => SimpleTokenKind::Plus,
+            '-' => SimpleTokenKind::Minus,
+            '=' => SimpleTokenKind::Equals,
+            '>' => SimpleTokenKind::Greater,
+            '<' => SimpleTokenKind::Less,
+            '%' => SimpleTokenKind::Percent,
+            '&' => SimpleTokenKind::Ampersand,
+            '^' => SimpleTokenKind::Circumflex,
+            '|' => SimpleTokenKind::Vbar,
+            '@' => SimpleTokenKind::At,
+            '~' => SimpleTokenKind::Tilde,
             _ => SimpleTokenKind::Other,
         }
     }
@@ -289,15 +412,41 @@ impl<'a> SimpleTokenizer<'a> {
     fn to_keyword_or_other(&self, range: TextRange) -> SimpleTokenKind {
         let source = &self.source[range];
         match source {
+            "and" => SimpleTokenKind::And,
             "as" => SimpleTokenKind::As,
+            "assert" => SimpleTokenKind::Assert,
             "async" => SimpleTokenKind::Async,
-            "else" => SimpleTokenKind::Else,
+            "await" => SimpleTokenKind::Await,
+            "break" => SimpleTokenKind::Break,
+            "class" => SimpleTokenKind::Class,
+            "continue" => SimpleTokenKind::Continue,
+            "def" => SimpleTokenKind::Def,
+            "del" => SimpleTokenKind::Del,
             "elif" => SimpleTokenKind::Elif,
+            "else" => SimpleTokenKind::Else,
+            "except" => SimpleTokenKind::Except,
+            "finally" => SimpleTokenKind::Finally,
+            "for" => SimpleTokenKind::For,
+            "from" => SimpleTokenKind::From,
+            "global" => SimpleTokenKind::Global,
             "if" => SimpleTokenKind::If,
+            "import" => SimpleTokenKind::Import,
             "in" => SimpleTokenKind::In,
+            "is" => SimpleTokenKind::Is,
+            "lambda" => SimpleTokenKind::Lambda,
+            "nonlocal" => SimpleTokenKind::Nonlocal,
+            "not" => SimpleTokenKind::Not,
+            "or" => SimpleTokenKind::Or,
+            "pass" => SimpleTokenKind::Pass,
+            "raise" => SimpleTokenKind::Raise,
+            "return" => SimpleTokenKind::Return,
+            "try" => SimpleTokenKind::Try,
+            "while" => SimpleTokenKind::While,
             "match" => SimpleTokenKind::Match, // Match is a soft keyword that depends on the context but we can always lex it as a keyword and leave it to the caller (parser) to decide if it should be handled as an identifier or keyword.
+            "type" => SimpleTokenKind::Type, // Type is a soft keyword that depends on the context but we can always lex it as a keyword and leave it to the caller (parser) to decide if it should be handled as an identifier or keyword.
+            "case" => SimpleTokenKind::Case,
             "with" => SimpleTokenKind::With,
-            // ...,
+            "yield" => SimpleTokenKind::Yield,
             _ => SimpleTokenKind::Other, // Potentially an identifier, but only if it isn't a string prefix. We can ignore this for now https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals
         }
     }
@@ -794,6 +943,16 @@ mod tests {
     #[test]
     fn tokenize_continuation() {
         let source = "( \\\n )";
+
+        let test_case = tokenize(source);
+
+        assert_debug_snapshot!(test_case.tokens());
+        test_case.assert_reverse_tokenization();
+    }
+
+    #[test]
+    fn tokenize_characters() {
+        let source = "-> *= (~=)";
 
         let test_case = tokenize(source);
 

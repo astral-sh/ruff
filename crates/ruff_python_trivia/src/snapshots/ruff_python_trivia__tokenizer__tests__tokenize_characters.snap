@@ -1,0 +1,46 @@
+---
+source: crates/ruff_python_trivia/src/tokenizer.rs
+expression: test_case.tokens()
+---
+[
+    SimpleToken {
+        kind: Minus,
+        range: 0..1,
+    },
+    SimpleToken {
+        kind: Greater,
+        range: 1..2,
+    },
+    SimpleToken {
+        kind: Whitespace,
+        range: 2..3,
+    },
+    SimpleToken {
+        kind: Star,
+        range: 3..4,
+    },
+    SimpleToken {
+        kind: Equals,
+        range: 4..5,
+    },
+    SimpleToken {
+        kind: Whitespace,
+        range: 5..6,
+    },
+    SimpleToken {
+        kind: LParen,
+        range: 6..7,
+    },
+    SimpleToken {
+        kind: Tilde,
+        range: 7..8,
+    },
+    SimpleToken {
+        kind: Equals,
+        range: 8..9,
+    },
+    SimpleToken {
+        kind: RParen,
+        range: 9..10,
+    },
+]
