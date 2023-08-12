@@ -20,6 +20,13 @@ use crate::checkers::ast::Checker;
 /// annotations at evaluation time, making the code compatible with both past
 /// and future Python versions.
 ///
+/// ## ruff filters based on `target-version`
+/// As an example, packages with Python ≥ 3.10 don't need to worry about
+/// `from __future__ import annotations` to
+/// use the `|` operator to type hint unions (e.g. `int | None`).
+/// Correspondingly, ruff can be informed not to flag this as an error by
+/// setting [`target-version`](https://beta.ruff.rs/docs/settings/#target-version).
+///
 /// ## Example
 /// ```python
 /// def func(obj: dict[str, int | None]) -> None:

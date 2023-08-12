@@ -21,6 +21,13 @@ use crate::checkers::ast::Checker;
 /// migrate existing code to use the new syntax, even for older Python versions.
 /// This rule thus pairs well with pyupgrade and with Ruff's pyupgrade rules.
 ///
+/// ## ruff filters based on `target-version`
+/// As an example, packages with Python ≥ 3.10 don't need to worry about
+/// `from __future__ import annotations` to
+/// type hint `Optional[int]` as `int | None`.
+/// Correspondingly, ruff can be informed not to flag this as an error by
+/// setting [`target-version`](https://beta.ruff.rs/docs/settings/#target-version).
+///
 /// ## Example
 /// ```python
 /// from typing import List, Dict, Optional
