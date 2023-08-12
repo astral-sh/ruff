@@ -1,4 +1,5 @@
 //! Rules from [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/).
+pub(crate) mod matchers;
 pub mod options;
 pub(crate) mod rules;
 pub mod settings;
