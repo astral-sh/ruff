@@ -10,7 +10,7 @@ use ruff_python_ast::statement_visitor::StatementVisitor;
 /// Checks for functions or methods with too many return statements.
 ///
 /// By default, this rule allows up to six return statements, as configured by
-/// the `pylint.max-returns` option.
+/// the [`pylint.max-returns`] option.
 ///
 /// ## Why is this bad?
 /// Functions or methods with many return statements are harder to understand
