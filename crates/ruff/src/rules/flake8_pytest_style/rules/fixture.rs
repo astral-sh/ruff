@@ -74,6 +74,29 @@ impl AlwaysAutofixableViolation for PytestFixtureIncorrectParenthesesStyle {
     }
 }
 
+/// ## What it does
+/// Checks for `pytest.fixture` calls with positional arguments.
+///
+/// ## Why is this bad?
+/// To make the meaning of the arguments obvious and for consistency, keyword
+/// arguments are preferred over positional arguments.
+///
+/// ## Example
+/// ```python
+/// @pytest.fixture("module")
+/// def my_fixture():
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// @pytest.fixture(scope="module")
+/// def my_fixture():
+///     ...
+/// ```
+///
+/// ## References
+/// - [`pytest` documentation: `@pytest.fixture` functions](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fixture)
 #[violation]
 pub struct PytestFixturePositionalArgs {
     function: String,
@@ -87,6 +110,28 @@ impl Violation for PytestFixturePositionalArgs {
     }
 }
 
+/// ## What it does
+/// Checks for `pytest.fixture` calls with `scope="function"`.
+///
+/// ## Why is this bad?
+/// `scope="function"` can be omitted, as it is the default.
+///
+/// ## Example
+/// ```python
+/// @pytest.fixture(scope="function")
+/// def my_fixture():
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// @pytest.fixture()
+/// def my_fixture():
+///     ...
+/// ```
+///
+/// ## References
+/// - [`pytest` documentation: `@pytest.fixture` functions](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fixture)
 #[violation]
 pub struct PytestExtraneousScopeFunction;
 
@@ -101,11 +146,95 @@ impl AlwaysAutofixableViolation for PytestExtraneousScopeFunction {
     }
 }
 
+/// ## What it does
+/// Checks for `pytest` fixtures that do not return a value, but are not named
+/// with a leading underscore.
+///
+/// ## Why is this bad?
+/// To enforce a naming convention for fixtures: fixtures that don't return a
+/// value start with a leading underscore (e.g. `_patch_something`), fixtures
+/// that return a value don't start with a leading underscore
+/// (e.g. `some_object`). This rule does not fire on abstract fixtures
+/// (those decorated with `@abc.abstractmethod`), so that only the actual
+/// fixture implementations will be checked. This rule does not fire on fixtures
+/// containing `yield from` either, because there is no reasonable way to
+/// determine whether the generator yields a value.
+///
+/// ## Example
+/// ```python
+/// @pytest.fixture()
+/// def patch_something(mocker):
+///     mocker.patch("module.object")
+///
+///
+/// @pytest.fixture()
+/// def use_context():
+///     with create_context():
+///         yield
+/// ```
+///
+/// Use instead:
+/// ```python
+/// @pytest.fixture()
+/// def _patch_something(mocker):
+///     mocker.patch("module.object")
+///
+///
+/// @pytest.fixture()
+/// def _use_context():
+///     with create_context():
+///         yield
+/// ```
+///
+/// ## References
+/// - [`pytest` documentation: `@pytest.fixture` functions](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fixture)
 #[violation]
 pub struct PytestMissingFixtureNameUnderscore {
     function: String,
 }
 
+/// ## What it does
+/// Checks for `pytest` fixtures that return a value, but are named with a
+/// leading underscore.
+///
+/// ## Why is this bad?
+/// To enforce a naming convention for fixtures: fixtures that don't return a
+/// value start with a leading underscore (e.g. `_patch_something`), fixtures
+/// that return a value don't start with a leading underscore
+/// (e.g. `some_object`). This rule does not fire on abstract fixtures
+/// (those decorated with `@abc.abstractmethod`), so that only the actual
+/// fixture implementations will be checked.
+///
+/// ## Example
+/// ```python
+/// @pytest.fixture()
+/// def _some_object():
+///     return SomeClass()
+///
+///
+/// @pytest.fixture()
+/// def _some_object_with_cleanup():
+///     obj = SomeClass()
+///     yield obj
+///     obj.cleanup()
+/// ```
+///
+/// Use instead:
+/// ```python
+/// @pytest.fixture()
+/// def some_object():
+///     return SomeClass()
+///
+///
+/// @pytest.fixture()
+/// def some_object_with_cleanup():
+///     obj = SomeClass()
+///     yield obj
+///     obj.cleanup()
+/// ```
+///
+/// ## References
+/// - [`pytest` documentation: `@pytest.fixture` functions](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fixture)
 impl Violation for PytestMissingFixtureNameUnderscore {
     #[derive_message_formats]
     fn message(&self) -> String {
