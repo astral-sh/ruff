@@ -3,6 +3,7 @@ use ruff_python_ast::{Ranged, Stmt};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_source_file::Locator;
+use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
 
@@ -11,9 +12,10 @@ use crate::checkers::ast::Checker;
 /// within a function definition or an `if TYPE_CHECKING:` block.
 ///
 /// ## Why is this bad?
-/// Some modules take a long time to import. Library authors might want to ensure that you only pay
-/// the import cost for these modules if you directly use them, rather than if you import a module
-/// that happens to use an expensive module in one of its functions.
+/// Some modules take a relatively long time to import, such as `torch` or `tensorflow`. Library
+/// authors might want to ensure that you only pay the import cost for these modules if you
+/// directly use them, rather than if you import a module that happens to use an expensive module
+/// in one of its functions.
 ///
 /// ## Options
 /// - `flake8-tidy-imports.banned-module-level-imports`
@@ -35,16 +37,14 @@ enum NameMatchPolicy {
     ExactOrParents,
 }
 
-fn banned_at_module_level_with_policy<T>(
+fn banned_at_module_level_with_policy(
     checker: &mut Checker,
     name: &str,
     stmt: &Stmt,
-    located: &T,
+    text_range: &TextRange,
     locator: &Locator,
     policy: &NameMatchPolicy,
-) where
-    T: Ranged,
-{
+) {
     if !locator.is_at_start_of_line(stmt.start()) {
         return;
     }
@@ -64,7 +64,7 @@ fn banned_at_module_level_with_policy<T>(
                 BannedModuleLevelImports {
                     name: banned_module_name.to_string(),
                 },
-                located.range(),
+                *text_range,
             ));
             return;
         }
@@ -72,40 +72,36 @@ fn banned_at_module_level_with_policy<T>(
 }
 
 /// TID253
-pub(crate) fn name_is_banned_at_module_level<T>(
+pub(crate) fn name_is_banned_at_module_level(
     checker: &mut Checker,
     name: &str,
     stmt: &Stmt,
-    located: &T,
+    text_range: &TextRange,
     locator: &Locator,
-) where
-    T: Ranged,
-{
+) {
     banned_at_module_level_with_policy(
         checker,
         name,
         stmt,
-        located,
+        text_range,
         locator,
         &NameMatchPolicy::ExactOnly,
     );
 }
 
 /// TID253
-pub(crate) fn name_or_parent_is_banned_at_module_level<T>(
+pub(crate) fn name_or_parent_is_banned_at_module_level(
     checker: &mut Checker,
     name: &str,
     stmt: &Stmt,
-    located: &T,
+    text_range: &TextRange,
     locator: &Locator,
-) where
-    T: Ranged,
-{
+) {
     banned_at_module_level_with_policy(
         checker,
         name,
         stmt,
-        located,
+        text_range,
         locator,
         &NameMatchPolicy::ExactOrParents,
     );

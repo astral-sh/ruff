@@ -577,7 +577,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         checker,
                         &alias.name,
                         stmt,
-                        alias,
+                        &alias.range(),
                         checker.locator,
                     );
                 }
@@ -758,7 +758,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         checker,
                         &module,
                         stmt,
-                        stmt,
+                        &stmt.range(),
                         checker.locator,
                     );
 
@@ -770,7 +770,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                             checker,
                             &format!("{module}.{}", alias.name),
                             stmt,
-                            alias,
+                            &alias.range(),
                             checker.locator,
                         );
                     }
