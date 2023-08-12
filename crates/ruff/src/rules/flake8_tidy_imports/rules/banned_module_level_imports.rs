@@ -41,7 +41,7 @@ fn banned_at_module_level_with_policy(
     checker: &mut Checker,
     name: &str,
     stmt: &Stmt,
-    text_range: &TextRange,
+    text_range: TextRange,
     locator: &Locator,
     policy: &NameMatchPolicy,
 ) {
@@ -64,7 +64,7 @@ fn banned_at_module_level_with_policy(
                 BannedModuleLevelImports {
                     name: banned_module_name.to_string(),
                 },
-                *text_range,
+                text_range,
             ));
             return;
         }
@@ -76,7 +76,7 @@ pub(crate) fn name_is_banned_at_module_level(
     checker: &mut Checker,
     name: &str,
     stmt: &Stmt,
-    text_range: &TextRange,
+    text_range: TextRange,
     locator: &Locator,
 ) {
     banned_at_module_level_with_policy(
@@ -94,7 +94,7 @@ pub(crate) fn name_or_parent_is_banned_at_module_level(
     checker: &mut Checker,
     name: &str,
     stmt: &Stmt,
-    text_range: &TextRange,
+    text_range: TextRange,
     locator: &Locator,
 ) {
     banned_at_module_level_with_policy(
