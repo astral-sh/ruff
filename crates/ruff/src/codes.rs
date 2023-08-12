@@ -311,6 +311,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         // flake8-tidy-imports
         (Flake8TidyImports, "251") => (RuleGroup::Unspecified, rules::flake8_tidy_imports::rules::BannedApi),
         (Flake8TidyImports, "252") => (RuleGroup::Unspecified, rules::flake8_tidy_imports::rules::RelativeImports),
+        (Flake8TidyImports, "253") => (RuleGroup::Unspecified, rules::flake8_tidy_imports::rules::BannedModuleLevelImports),
 
         // flake8-return
         (Flake8Return, "501") => (RuleGroup::Unspecified, rules::flake8_return::rules::UnnecessaryReturnNone),

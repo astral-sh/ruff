@@ -124,4 +124,23 @@ mod tests {
         assert_messages!(diagnostics);
         Ok(())
     }
+
+    #[test]
+    fn banned_module_level_imports() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_tidy_imports/TID253.py"),
+            &Settings {
+                flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
+                    banned_module_level_imports: vec![
+                        "torch".to_string(),
+                        "tensorflow".to_string(),
+                    ],
+                    ..Default::default()
+                },
+                ..Settings::for_rules(vec![Rule::BannedModuleLevelImports])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
 }

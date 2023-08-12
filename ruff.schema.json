@@ -1062,6 +1062,16 @@
           "additionalProperties": {
             "$ref": "#/definitions/ApiBan"
           }
+        },
+        "banned-module-level-imports": {
+          "description": "List of specific modules that may not be imported at module level, and should instead be imported lazily (e.g., within a function definition, or an `if TYPE_CHECKING:` block, or some other nested context).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false
@@ -2610,6 +2620,7 @@
         "TID25",
         "TID251",
         "TID252",
+        "TID253",
         "TRY",
         "TRY0",
         "TRY00",
