@@ -116,3 +116,21 @@ with [
     dddddddddddddddddddddddddddddddd,
 ] as example1, aaaaaaaaaaaaaaaaaaaaaaaaaa * bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb * cccccccccccccccccccccccccccc + ddddddddddddddddd as example2, CtxManager222222222222222() as example2:
     ...
+
+# Comments on open parentheses
+with (  # comment
+    CtxManager1() as example1,
+    CtxManager2() as example2,
+    CtxManager3() as example3,
+):
+    ...
+
+
+with (  # outer comment
+    (  # inner comment
+        CtxManager1()
+    ) as example1,
+    CtxManager2() as example2,
+    CtxManager3() as example3,
+):
+    ...
