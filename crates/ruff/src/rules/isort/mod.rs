@@ -762,6 +762,7 @@ mod tests {
     }
 
     #[test_case(Path::new("comment.py"))]
+    #[test_case(Path::new("comments_and_newlines.py"))]
     #[test_case(Path::new("docstring.py"))]
     #[test_case(Path::new("docstring.pyi"))]
     #[test_case(Path::new("docstring_only.py"))]
@@ -791,6 +792,7 @@ mod tests {
     }
 
     #[test_case(Path::new("comment.py"))]
+    #[test_case(Path::new("comments_and_newlines.py"))]
     #[test_case(Path::new("docstring.py"))]
     #[test_case(Path::new("docstring.pyi"))]
     #[test_case(Path::new("docstring_only.py"))]
