@@ -1,8 +1,9 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_text_size::TextRange;
+use ruff_python_ast::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::rules::flake8_tidy_imports::matchers::NameMatchPolicy;
 
 /// ## What it does
 /// Checks for module-level imports that should instead be imported lazily
@@ -52,60 +53,28 @@ impl Violation for BannedModuleLevelImports {
 }
 
 /// TID253
-pub(crate) fn name_is_banned_at_module_level(
+pub(crate) fn banned_module_level_imports<T: Ranged>(
     checker: &mut Checker,
-    name: &str,
-    text_range: TextRange,
-) {
-    banned_at_module_level_with_policy(checker, name, text_range, &NameMatchPolicy::ExactOnly);
-}
-
-/// TID253
-pub(crate) fn name_or_parent_is_banned_at_module_level(
-    checker: &mut Checker,
-    name: &str,
-    text_range: TextRange,
-) {
-    banned_at_module_level_with_policy(checker, name, text_range, &NameMatchPolicy::ExactOrParents);
-}
-
-#[derive(Debug)]
-enum NameMatchPolicy {
-    /// Only match an exact module name (e.g., given `import foo.bar`, only match `foo.bar`).
-    ExactOnly,
-    /// Match an exact module name or any of its parents (e.g., given `import foo.bar`, match
-    /// `foo.bar` or `foo`).
-    ExactOrParents,
-}
-
-fn banned_at_module_level_with_policy(
-    checker: &mut Checker,
-    name: &str,
-    text_range: TextRange,
     policy: &NameMatchPolicy,
+    node: &T,
 ) {
     if !checker.semantic().at_top_level() {
         return;
     }
-    let banned_module_level_imports = &checker
-        .settings
-        .flake8_tidy_imports
-        .banned_module_level_imports;
-    for banned_module_name in banned_module_level_imports {
-        let name_is_banned = match policy {
-            NameMatchPolicy::ExactOnly => name == banned_module_name,
-            NameMatchPolicy::ExactOrParents => {
-                name == banned_module_name || name.starts_with(&format!("{banned_module_name}."))
-            }
-        };
-        if name_is_banned {
-            checker.diagnostics.push(Diagnostic::new(
-                BannedModuleLevelImports {
-                    name: banned_module_name.to_string(),
-                },
-                text_range,
-            ));
-            return;
-        }
+
+    if let Some(banned_module) = policy.find(
+        checker
+            .settings
+            .flake8_tidy_imports
+            .banned_module_level_imports
+            .iter()
+            .map(AsRef::as_ref),
+    ) {
+        checker.diagnostics.push(Diagnostic::new(
+            BannedModuleLevelImports {
+                name: banned_module,
+            },
+            node.range(),
+        ));
     }
 }
