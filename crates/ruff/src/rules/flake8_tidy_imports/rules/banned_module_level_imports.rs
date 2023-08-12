@@ -1,8 +1,5 @@
-use ruff_python_ast::{Ranged, Stmt};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_source_file::Locator;
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
@@ -40,12 +37,10 @@ enum NameMatchPolicy {
 fn banned_at_module_level_with_policy(
     checker: &mut Checker,
     name: &str,
-    stmt: &Stmt,
     text_range: TextRange,
-    locator: &Locator,
     policy: &NameMatchPolicy,
 ) {
-    if !locator.is_at_start_of_line(stmt.start()) {
+    if !checker.semantic().at_top_level() {
         return;
     }
     let banned_module_level_imports = &checker
@@ -75,34 +70,16 @@ fn banned_at_module_level_with_policy(
 pub(crate) fn name_is_banned_at_module_level(
     checker: &mut Checker,
     name: &str,
-    stmt: &Stmt,
     text_range: TextRange,
-    locator: &Locator,
 ) {
-    banned_at_module_level_with_policy(
-        checker,
-        name,
-        stmt,
-        text_range,
-        locator,
-        &NameMatchPolicy::ExactOnly,
-    );
+    banned_at_module_level_with_policy(checker, name, text_range, &NameMatchPolicy::ExactOnly);
 }
 
 /// TID253
 pub(crate) fn name_or_parent_is_banned_at_module_level(
     checker: &mut Checker,
     name: &str,
-    stmt: &Stmt,
     text_range: TextRange,
-    locator: &Locator,
 ) {
-    banned_at_module_level_with_policy(
-        checker,
-        name,
-        stmt,
-        text_range,
-        locator,
-        &NameMatchPolicy::ExactOrParents,
-    );
+    banned_at_module_level_with_policy(checker, name, text_range, &NameMatchPolicy::ExactOrParents);
 }

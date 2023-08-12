@@ -37,36 +37,45 @@ TID253.py:8:8: TID253 `torch` is banned at module level. Please move the import 
  8 | import torch as torch_wearing_a_trenchcoat
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID253
  9 | 
-10 | # banning a module also bans any submodules
+10 | # this should count as module level
    |
 
-TID253.py:11:8: TID253 `torch` is banned at module level. Please move the import inline.
+TID253.py:11:15: TID253 `tensorflow` is banned at module level. Please move the import inline.
    |
-10 | # banning a module also bans any submodules
-11 | import torch.foo.bar
+10 | # this should count as module level
+11 | x = 1; import tensorflow
+   |               ^^^^^^^^^^ TID253
+12 | 
+13 | # banning a module also bans any submodules
+   |
+
+TID253.py:14:8: TID253 `torch` is banned at module level. Please move the import inline.
+   |
+13 | # banning a module also bans any submodules
+14 | import torch.foo.bar
    |        ^^^^^^^^^^^^^ TID253
-12 | 
-13 | from tensorflow.foo import bar
+15 | 
+16 | from tensorflow.foo import bar
    |
 
-TID253.py:13:1: TID253 `tensorflow` is banned at module level. Please move the import inline.
+TID253.py:16:1: TID253 `tensorflow` is banned at module level. Please move the import inline.
    |
-11 | import torch.foo.bar
-12 | 
-13 | from tensorflow.foo import bar
+14 | import torch.foo.bar
+15 | 
+16 | from tensorflow.foo import bar
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID253
-14 | 
-15 | from torch.foo.bar import *
+17 | 
+18 | from torch.foo.bar import *
    |
 
-TID253.py:15:1: TID253 `torch` is banned at module level. Please move the import inline.
+TID253.py:18:1: TID253 `torch` is banned at module level. Please move the import inline.
    |
-13 | from tensorflow.foo import bar
-14 | 
-15 | from torch.foo.bar import *
+16 | from tensorflow.foo import bar
+17 | 
+18 | from torch.foo.bar import *
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID253
-16 | 
-17 | # unlike TID251, inline imports are *not* banned
+19 | 
+20 | # unlike TID251, inline imports are *not* banned
    |
 
 

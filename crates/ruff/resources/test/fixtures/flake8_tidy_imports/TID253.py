@@ -7,6 +7,9 @@ from tensorflow import a, b, c
 
 import torch as torch_wearing_a_trenchcoat
 
+# this should count as module level
+x = 1; import tensorflow
+
 # banning a module also bans any submodules
 import torch.foo.bar
 

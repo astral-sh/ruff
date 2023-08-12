@@ -576,9 +576,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     flake8_tidy_imports::rules::name_or_parent_is_banned_at_module_level(
                         checker,
                         &alias.name,
-                        stmt,
                         alias.range(),
-                        checker.locator,
                     );
                 }
 
@@ -757,9 +755,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     flake8_tidy_imports::rules::name_or_parent_is_banned_at_module_level(
                         checker,
                         &module,
-                        stmt,
                         stmt.range(),
-                        checker.locator,
                     );
 
                     for alias in names {
@@ -769,9 +765,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         flake8_tidy_imports::rules::name_is_banned_at_module_level(
                             checker,
                             &format!("{module}.{}", alias.name),
-                            stmt,
                             alias.range(),
-                            checker.locator,
                         );
                     }
                 }
