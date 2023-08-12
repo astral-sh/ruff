@@ -6,9 +6,7 @@ use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::ExprDictComp;
 
 use crate::context::PyFormatContext;
-use crate::expression::parentheses::{
-    parenthesized_with_dangling_comments, NeedsParentheses, OptionalParentheses,
-};
+use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
 use crate::AsFormat;
 use crate::{FormatNodeRule, FormattedIterExt, PyFormatter};
 
@@ -35,9 +33,8 @@ impl FormatNodeRule<ExprDictComp> for FormatExprDictComp {
 
         write!(
             f,
-            [parenthesized_with_dangling_comments(
+            [parenthesized(
                 "{",
-                dangling,
                 &group(&format_args!(
                     group(&key.format()),
                     text(":"),
@@ -47,7 +44,8 @@ impl FormatNodeRule<ExprDictComp> for FormatExprDictComp {
                     &joined
                 )),
                 "}"
-            )]
+            )
+            .with_dangling_comments(dangling)]
         )
     }
 }

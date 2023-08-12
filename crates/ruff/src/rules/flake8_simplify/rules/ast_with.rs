@@ -63,18 +63,22 @@ impl Violation for MultipleWithStatements {
 /// Returns a boolean indicating whether it's an async with statement, the items
 /// and body.
 fn next_with(body: &[Stmt]) -> Option<(bool, &[WithItem], &[Stmt])> {
-    match body {
-        [Stmt::With(ast::StmtWith { items, body, .. })] => Some((false, items, body)),
-        [Stmt::AsyncWith(ast::StmtAsyncWith { items, body, .. })] => Some((true, items, body)),
-        _ => None,
-    }
+    let [Stmt::With(ast::StmtWith {
+        is_async,
+        items,
+        body,
+        ..
+    })] = body
+    else {
+        return None;
+    };
+    Some((*is_async, items, body))
 }
 
 /// SIM117
 pub(crate) fn multiple_with_statements(
     checker: &mut Checker,
-    with_stmt: &Stmt,
-    with_body: &[Stmt],
+    with_stmt: &ast::StmtWith,
     with_parent: Option<&Stmt>,
 ) {
     // Make sure we fix from top to bottom for nested with statements, e.g. for
@@ -102,8 +106,8 @@ pub(crate) fn multiple_with_statements(
         }
     }
 
-    if let Some((is_async, items, body)) = next_with(with_body) {
-        if is_async != with_stmt.is_async_with_stmt() {
+    if let Some((is_async, items, body)) = next_with(&with_stmt.body) {
+        if is_async != with_stmt.is_async {
             // One of the statements is an async with, while the other is not,
             // we can't merge those statements.
             return;
@@ -133,7 +137,7 @@ pub(crate) fn multiple_with_statements(
             if !checker
                 .indexer()
                 .comment_ranges()
-                .intersects(TextRange::new(with_stmt.start(), with_body[0].start()))
+                .intersects(TextRange::new(with_stmt.start(), with_stmt.body[0].start()))
             {
                 match fix_with::fix_multiple_with_statements(
                     checker.locator(),

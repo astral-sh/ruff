@@ -6,8 +6,8 @@ expression: parse_ast
     Expr(
         StmtExpr {
             range: 0..17,
-            value: JoinedStr(
-                ExprJoinedStr {
+            value: FString(
+                ExprFString {
                     range: 0..17,
                     values: [
                         Constant(

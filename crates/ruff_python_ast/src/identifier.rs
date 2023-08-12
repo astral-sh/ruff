@@ -20,6 +20,32 @@ pub trait Identifier {
     fn identifier(&self) -> TextRange;
 }
 
+impl Identifier for ast::StmtFunctionDef {
+    /// Return the [`TextRange`] of the identifier in the given function definition.
+    ///
+    /// For example, return the range of `f` in:
+    /// ```python
+    /// def f():
+    ///     ...
+    /// ```
+    fn identifier(&self) -> TextRange {
+        self.name.range()
+    }
+}
+
+impl Identifier for ast::StmtClassDef {
+    /// Return the [`TextRange`] of the identifier in the given class definition.
+    ///
+    /// For example, return the range of `C` in:
+    /// ```python
+    /// class C():
+    ///     ...
+    /// ```
+    fn identifier(&self) -> TextRange {
+        self.name.range()
+    }
+}
+
 impl Identifier for Stmt {
     /// Return the [`TextRange`] of the identifier in the given statement.
     ///
@@ -30,9 +56,8 @@ impl Identifier for Stmt {
     /// ```
     fn identifier(&self) -> TextRange {
         match self {
-            Stmt::ClassDef(ast::StmtClassDef { name, .. })
-            | Stmt::FunctionDef(ast::StmtFunctionDef { name, .. })
-            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { name, .. }) => name.range(),
+            Stmt::ClassDef(class) => class.identifier(),
+            Stmt::FunctionDef(function) => function.identifier(),
             _ => self.range(),
         }
     }
@@ -85,10 +110,9 @@ pub fn except(handler: &ExceptHandler, source: &str) -> TextRange {
         .expect("Failed to find `except` token in `ExceptHandler`")
 }
 
-/// Return the [`TextRange`] of the `else` token in a `For`, `AsyncFor`, or `While` statement.
+/// Return the [`TextRange`] of the `else` token in a `For` or `While` statement.
 pub fn else_(stmt: &Stmt, source: &str) -> Option<TextRange> {
     let (Stmt::For(ast::StmtFor { body, orelse, .. })
-    | Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. })
     | Stmt::While(ast::StmtWhile { body, orelse, .. })) = stmt
     else {
         return None;

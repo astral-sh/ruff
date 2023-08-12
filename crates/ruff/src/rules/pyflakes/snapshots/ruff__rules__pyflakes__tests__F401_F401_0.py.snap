@@ -151,6 +151,8 @@ F401_0.py:93:16: F401 [*] `x` imported but unused
 92 92 |     case 0,:
 93    |-        import x
 94 93 |         import y
+95 94 | 
+96 95 | 
 
 F401_0.py:94:16: F401 [*] `y` imported but unused
    |
@@ -166,5 +168,27 @@ F401_0.py:94:16: F401 [*] `y` imported but unused
 92 92 |     case 0,:
 93 93 |         import x
 94    |-        import y
+95 94 | 
+96 95 | 
+97 96 | # Test: access a sub-importation via an alias.
+
+F401_0.py:99:8: F401 [*] `foo.bar.baz` imported but unused
+    |
+ 97 | # Test: access a sub-importation via an alias.
+ 98 | import foo.bar as bop
+ 99 | import foo.bar.baz
+    |        ^^^^^^^^^^^ F401
+100 | 
+101 | print(bop.baz.read_csv("test.csv"))
+    |
+    = help: Remove unused import: `foo.bar.baz`
+
+ℹ Fix
+96  96  | 
+97  97  | # Test: access a sub-importation via an alias.
+98  98  | import foo.bar as bop
+99      |-import foo.bar.baz
+100 99  | 
+101 100 | print(bop.baz.read_csv("test.csv"))
 
 

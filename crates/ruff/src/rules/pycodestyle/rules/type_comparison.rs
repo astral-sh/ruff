@@ -103,7 +103,15 @@ pub(crate) fn type_comparison(checker: &mut Checker, compare: &ast::ExprCompare)
                 // Ex) `type(obj) is int`
                 if matches!(
                     id.as_str(),
-                    "int" | "str" | "float" | "bool" | "complex" | "bytes"
+                    "int"
+                        | "str"
+                        | "float"
+                        | "bool"
+                        | "complex"
+                        | "bytes"
+                        | "list"
+                        | "dict"
+                        | "set"
                 ) && checker.semantic().is_builtin(id)
                 {
                     checker

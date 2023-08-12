@@ -349,8 +349,8 @@ fn is_type_var_like_call(expr: &Expr, semantic: &SemanticModel) -> bool {
 fn is_special_assignment(target: &Expr, semantic: &SemanticModel) -> bool {
     if let Expr::Name(ast::ExprName { id, .. }) = target {
         match id.as_str() {
-            "__all__" => semantic.scope().kind.is_module(),
-            "__match_args__" | "__slots__" => semantic.scope().kind.is_class(),
+            "__all__" => semantic.current_scope().kind.is_module(),
+            "__match_args__" | "__slots__" => semantic.current_scope().kind.is_class(),
             _ => false,
         }
     } else {
@@ -569,7 +569,9 @@ pub(crate) fn unannotated_assignment_in_stub(
         return;
     }
 
-    if let ScopeKind::Class(ast::StmtClassDef { arguments, .. }) = checker.semantic().scope().kind {
+    if let ScopeKind::Class(ast::StmtClassDef { arguments, .. }) =
+        checker.semantic().current_scope().kind
+    {
         if is_enum(arguments.as_deref(), checker.semantic()) {
             return;
         }

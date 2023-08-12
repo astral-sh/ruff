@@ -5,18 +5,8 @@ use crate::{self as ast, ExceptHandler, Stmt, Suite};
 pub fn suite<'a>(stmt: &'a Stmt, parent: &'a Stmt) -> Option<&'a Suite> {
     match parent {
         Stmt::FunctionDef(ast::StmtFunctionDef { body, .. }) => Some(body),
-        Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. }) => Some(body),
         Stmt::ClassDef(ast::StmtClassDef { body, .. }) => Some(body),
         Stmt::For(ast::StmtFor { body, orelse, .. }) => {
-            if body.contains(stmt) {
-                Some(body)
-            } else if orelse.contains(stmt) {
-                Some(orelse)
-            } else {
-                None
-            }
-        }
-        Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. }) => {
             if body.contains(stmt) {
                 Some(body)
             } else if orelse.contains(stmt) {
@@ -49,7 +39,6 @@ pub fn suite<'a>(stmt: &'a Stmt, parent: &'a Stmt) -> Option<&'a Suite> {
             }
         }
         Stmt::With(ast::StmtWith { body, .. }) => Some(body),
-        Stmt::AsyncWith(ast::StmtAsyncWith { body, .. }) => Some(body),
         Stmt::Match(ast::StmtMatch { cases, .. }) => cases
             .iter()
             .map(|case| &case.body)

@@ -121,7 +121,7 @@ impl fmt::Display for ExprType {
 
 /// Return the [`ExprType`] of an [`Expr]` if it is a builtin type (e.g. `int`, `bool`, `float`,
 /// `str`, `bytes`, or `complex`).
-fn match_builtin_type(expr: &Expr, model: &SemanticModel) -> Option<ExprType> {
+fn match_builtin_type(expr: &Expr, semantic: &SemanticModel) -> Option<ExprType> {
     let name = expr.as_name_expr()?;
     let result = match name.id.as_str() {
         "int" => ExprType::Int,
@@ -132,7 +132,7 @@ fn match_builtin_type(expr: &Expr, model: &SemanticModel) -> Option<ExprType> {
         "complex" => ExprType::Complex,
         _ => return None,
     };
-    if !model.is_builtin(name.id.as_str()) {
+    if !semantic.is_builtin(name.id.as_str()) {
         return None;
     }
     Some(result)

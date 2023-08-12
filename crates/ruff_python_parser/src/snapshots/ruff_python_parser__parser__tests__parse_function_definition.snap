@@ -6,6 +6,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
     FunctionDef(
         StmtFunctionDef {
             range: 0..20,
+            is_async: false,
             decorator_list: [],
             name: Identifier {
                 id: "func",
@@ -53,6 +54,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
     FunctionDef(
         StmtFunctionDef {
             range: 22..53,
+            is_async: false,
             decorator_list: [],
             name: Identifier {
                 id: "func",
@@ -132,6 +134,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
     FunctionDef(
         StmtFunctionDef {
             range: 55..91,
+            is_async: false,
             decorator_list: [],
             name: Identifier {
                 id: "func",
@@ -219,6 +222,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
     FunctionDef(
         StmtFunctionDef {
             range: 93..138,
+            is_async: false,
             decorator_list: [],
             name: Identifier {
                 id: "func",
@@ -321,6 +325,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
     FunctionDef(
         StmtFunctionDef {
             range: 140..171,
+            is_async: false,
             decorator_list: [],
             name: Identifier {
                 id: "func",
@@ -393,6 +398,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
     FunctionDef(
         StmtFunctionDef {
             range: 173..230,
+            is_async: false,
             decorator_list: [],
             name: Identifier {
                 id: "func",
@@ -496,6 +502,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
     FunctionDef(
         StmtFunctionDef {
             range: 232..273,
+            is_async: false,
             decorator_list: [],
             name: Identifier {
                 id: "func",

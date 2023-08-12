@@ -1,13 +1,13 @@
 use itertools::Itertools;
-use ruff_python_ast::{self as ast, PySourceType, Ranged, Stmt};
-use ruff_python_parser::{lexer, AsMode, Tok};
-use ruff_text_size::{TextRange, TextSize};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::contains_effect;
+use ruff_python_ast::{self as ast, PySourceType, Ranged, Stmt};
+use ruff_python_parser::{lexer, AsMode, Tok};
 use ruff_python_semantic::Scope;
 use ruff_source_file::Locator;
+use ruff_text_size::{TextRange, TextSize};
 
 use crate::autofix::edits::delete_stmt;
 use crate::checkers::ast::Checker;
@@ -299,7 +299,7 @@ fn remove_unused_variable(
 
 /// F841
 pub(crate) fn unused_variable(checker: &Checker, scope: &Scope, diagnostics: &mut Vec<Diagnostic>) {
-    if scope.uses_locals() && scope.kind.is_any_function() {
+    if scope.uses_locals() && scope.kind.is_function() {
         return;
     }
 
@@ -312,10 +312,13 @@ pub(crate) fn unused_variable(checker: &Checker, scope: &Scope, diagnostics: &mu
                 && !binding.is_global()
                 && !binding.is_used()
                 && !checker.settings.dummy_variable_rgx.is_match(name)
-                && name != "__tracebackhide__"
-                && name != "__traceback_info__"
-                && name != "__traceback_supplement__"
-                && name != "__debuggerskip__"
+                && !matches!(
+                    name,
+                    "__tracebackhide__"
+                        | "__traceback_info__"
+                        | "__traceback_supplement__"
+                        | "__debuggerskip__"
+                )
             {
                 return Some((name.to_string(), binding.range, binding.source));
             }
@@ -325,10 +328,10 @@ pub(crate) fn unused_variable(checker: &Checker, scope: &Scope, diagnostics: &mu
     {
         let mut diagnostic = Diagnostic::new(UnusedVariable { name }, range);
         if checker.patch(diagnostic.kind.rule()) {
-            if let Some(source) = source {
-                let stmt = checker.semantic().stmts[source];
-                let parent = checker.semantic().stmts.parent(stmt);
-                if let Some(fix) = remove_unused_variable(stmt, parent, range, checker) {
+            if let Some(statement_id) = source {
+                let statement = checker.semantic().statement(statement_id);
+                let parent = checker.semantic().parent_statement(statement_id);
+                if let Some(fix) = remove_unused_variable(statement, parent, range, checker) {
                     diagnostic.set_fix(fix);
                 }
             }

@@ -92,7 +92,13 @@ impl FromStr for IndentStyle {
             "tab" | "Tabs" => Ok(Self::Tab),
             "space" | "Spaces" => Ok(Self::Space(IndentStyle::DEFAULT_SPACES)),
             // TODO: replace this error with a diagnostic
-            _ => Err("Value not supported for IndentStyle"),
+            v => {
+                let v = v.strip_prefix("Spaces, size: ").unwrap_or(v);
+
+                u8::from_str(v)
+                    .map(Self::Space)
+                    .map_err(|_| "Value not supported for IndentStyle")
+            }
         }
     }
 }

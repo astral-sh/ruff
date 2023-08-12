@@ -53,7 +53,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::BreakOutsideLoop) {
                 if let Some(diagnostic) = pyflakes::rules::break_outside_loop(
                     stmt,
-                    &mut checker.semantic.parents().skip(1),
+                    &mut checker.semantic.current_statements().skip(1),
                 ) {
                     checker.diagnostics.push(diagnostic);
                 }
@@ -63,30 +63,24 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::ContinueOutsideLoop) {
                 if let Some(diagnostic) = pyflakes::rules::continue_outside_loop(
                     stmt,
-                    &mut checker.semantic.parents().skip(1),
+                    &mut checker.semantic.current_statements().skip(1),
                 ) {
                     checker.diagnostics.push(diagnostic);
                 }
             }
         }
-        Stmt::FunctionDef(ast::StmtFunctionDef {
-            name,
-            decorator_list,
-            returns,
-            parameters,
-            body,
-            type_params,
-            ..
-        })
-        | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-            name,
-            decorator_list,
-            returns,
-            parameters,
-            body,
-            type_params,
-            ..
-        }) => {
+        Stmt::FunctionDef(
+            function_def @ ast::StmtFunctionDef {
+                is_async,
+                name,
+                decorator_list,
+                returns,
+                parameters,
+                body,
+                type_params,
+                range: _,
+            },
+        ) => {
             if checker.enabled(Rule::DjangoNonLeadingReceiverDecorator) {
                 flake8_django::rules::non_leading_receiver_decorator(checker, decorator_list);
             }
@@ -113,7 +107,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if let Some(diagnostic) =
                     pep8_naming::rules::invalid_first_argument_name_for_class_method(
                         checker,
-                        checker.semantic.scope(),
+                        checker.semantic.current_scope(),
                         name,
                         decorator_list,
                         parameters,
@@ -125,7 +119,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::InvalidFirstArgumentNameForMethod) {
                 if let Some(diagnostic) = pep8_naming::rules::invalid_first_argument_name_for_method(
                     checker,
-                    checker.semantic.scope(),
+                    checker.semantic.current_scope(),
                     name,
                     decorator_list,
                     parameters,
@@ -151,11 +145,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_pyi::rules::non_self_return_type(
                     checker,
                     stmt,
+                    *is_async,
                     name,
                     decorator_list,
                     returns.as_ref().map(AsRef::as_ref),
                     parameters,
-                    stmt.is_async_function_def_stmt(),
                 );
             }
             if checker.enabled(Rule::CustomTypeVarReturnType) {
@@ -181,19 +175,14 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             if checker.enabled(Rule::BadExitAnnotation) {
-                flake8_pyi::rules::bad_exit_annotation(
-                    checker,
-                    stmt.is_async_function_def_stmt(),
-                    name,
-                    parameters,
-                );
+                flake8_pyi::rules::bad_exit_annotation(checker, *is_async, name, parameters);
             }
             if checker.enabled(Rule::RedundantNumericUnion) {
                 flake8_pyi::rules::redundant_numeric_union(checker, parameters);
             }
             if checker.enabled(Rule::DunderFunctionName) {
                 if let Some(diagnostic) = pep8_naming::rules::dunder_function_name(
-                    checker.semantic.scope(),
+                    checker.semantic.current_scope(),
                     stmt,
                     name,
                     &checker.settings.pep8_naming.ignore_names,
@@ -216,6 +205,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::CachedInstanceMethod) {
                 flake8_bugbear::rules::cached_instance_method(checker, decorator_list);
+            }
+            if checker.enabled(Rule::MutableArgumentDefault) {
+                flake8_bugbear::rules::mutable_argument_default(checker, function_def);
             }
             if checker.any_enabled(&[
                 Rule::UnnecessaryReturnNone,
@@ -348,7 +340,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::YieldInForLoop) {
                 pyupgrade::rules::yield_in_for_loop(checker, stmt);
             }
-            if let ScopeKind::Class(class_def) = checker.semantic.scope().kind {
+            if let ScopeKind::Class(class_def) = checker.semantic.current_scope().kind {
                 if checker.enabled(Rule::BuiltinAttributeShadowing) {
                     flake8_builtins::rules::builtin_method_shadowing(
                         checker,
@@ -518,6 +510,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::SingleStringSlots) {
                 pylint::rules::single_string_slots(checker, class_def);
+            }
+            if checker.enabled(Rule::BadDunderMethodName) {
+                pylint::rules::bad_dunder_method_name(checker, body);
             }
         }
         Stmt::Import(ast::StmtImport { names, range: _ }) => {
@@ -797,7 +792,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     }
                 } else if &alias.name == "*" {
                     if checker.enabled(Rule::UndefinedLocalWithNestedImportStarUsage) {
-                        if !matches!(checker.semantic.scope().kind, ScopeKind::Module) {
+                        if !matches!(checker.semantic.current_scope().kind, ScopeKind::Module) {
                             checker.diagnostics.push(Diagnostic::new(
                                 pyflakes::rules::UndefinedLocalWithNestedImportStarUsage {
                                     name: helpers::format_import_from(level, module),
@@ -1013,7 +1008,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_simplify::rules::nested_if_statements(
                     checker,
                     if_,
-                    checker.semantic.stmt_parent(),
+                    checker.semantic.current_statement_parent(),
                 );
             }
             if checker.enabled(Rule::IfWithSameArms) {
@@ -1035,7 +1030,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 tryceratops::rules::type_check_without_type_error(
                     checker,
                     if_,
-                    checker.semantic.stmt_parent(),
+                    checker.semantic.current_statement_parent(),
                 );
             }
             if checker.enabled(Rule::OutdatedVersionBlock) {
@@ -1128,8 +1123,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pygrep_hooks::rules::non_existent_mock_method(checker, test);
             }
         }
-        Stmt::With(ast::StmtWith { items, body, .. })
-        | Stmt::AsyncWith(ast::StmtAsyncWith { items, body, .. }) => {
+        Stmt::With(with_ @ ast::StmtWith { items, body, .. }) => {
             if checker.enabled(Rule::AssertRaisesException) {
                 flake8_bugbear::rules::assert_raises_exception(checker, items);
             }
@@ -1139,9 +1133,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::MultipleWithStatements) {
                 flake8_simplify::rules::multiple_with_statements(
                     checker,
-                    stmt,
-                    body,
-                    checker.semantic.stmt_parent(),
+                    with_,
+                    checker.semantic.current_statement_parent(),
                 );
             }
             if checker.enabled(Rule::RedefinedLoopName) {
@@ -1160,13 +1153,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         Stmt::For(ast::StmtFor {
-            target,
-            body,
-            iter,
-            orelse,
-            ..
-        })
-        | Stmt::AsyncFor(ast::StmtAsyncFor {
             target,
             body,
             iter,
@@ -1369,8 +1355,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     // Ignore assignments in function bodies; those are covered by other rules.
                     if !checker
                         .semantic
-                        .scopes()
-                        .any(|scope| scope.kind.is_any_function())
+                        .current_scopes()
+                        .any(|scope| scope.kind.is_function())
                     {
                         if checker.enabled(Rule::UnprefixedTypeParam) {
                             flake8_pyi::rules::prefix_type_params(checker, value, targets);
@@ -1434,8 +1420,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         // Ignore assignments in function bodies; those are covered by other rules.
                         if !checker
                             .semantic
-                            .scopes()
-                            .any(|scope| scope.kind.is_any_function())
+                            .current_scopes()
+                            .any(|scope| scope.kind.is_function())
                         {
                             flake8_pyi::rules::annotated_assignment_default_in_stub(
                                 checker, target, value, annotation,

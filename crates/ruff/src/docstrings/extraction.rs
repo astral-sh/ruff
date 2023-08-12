@@ -1,7 +1,6 @@
 //! Extract docstrings from an AST.
 
 use ruff_python_ast::{self as ast, Constant, Expr, Stmt};
-
 use ruff_python_semantic::{Definition, DefinitionId, Definitions, Member, MemberKind};
 
 /// Extract a docstring from a function or class body.
@@ -28,63 +27,48 @@ pub(crate) fn docstring_from(suite: &[Stmt]) -> Option<&Expr> {
 pub(crate) fn extract_docstring<'a>(definition: &'a Definition<'a>) -> Option<&'a Expr> {
     match definition {
         Definition::Module(module) => docstring_from(module.python_ast),
-        Definition::Member(member) => {
-            if let Stmt::ClassDef(ast::StmtClassDef { body, .. })
-            | Stmt::FunctionDef(ast::StmtFunctionDef { body, .. })
-            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. }) = &member.stmt
-            {
-                docstring_from(body)
-            } else {
-                None
-            }
-        }
+        Definition::Member(member) => docstring_from(member.body()),
     }
 }
 
 #[derive(Copy, Clone)]
-pub(crate) enum ExtractionTarget {
-    Class,
-    Function,
+pub(crate) enum ExtractionTarget<'a> {
+    Class(&'a ast::StmtClassDef),
+    Function(&'a ast::StmtFunctionDef),
 }
 
 /// Extract a `Definition` from the AST node defined by a `Stmt`.
 pub(crate) fn extract_definition<'a>(
-    target: ExtractionTarget,
-    stmt: &'a Stmt,
+    target: ExtractionTarget<'a>,
     parent: DefinitionId,
     definitions: &Definitions<'a>,
 ) -> Member<'a> {
     match target {
-        ExtractionTarget::Function => match &definitions[parent] {
+        ExtractionTarget::Function(function) => match &definitions[parent] {
             Definition::Module(..) => Member {
                 parent,
-                kind: MemberKind::Function,
-                stmt,
+                kind: MemberKind::Function(function),
             },
             Definition::Member(Member {
-                kind: MemberKind::Class | MemberKind::NestedClass,
+                kind: MemberKind::Class(_) | MemberKind::NestedClass(_),
                 ..
             }) => Member {
                 parent,
-                kind: MemberKind::Method,
-                stmt,
+                kind: MemberKind::Method(function),
             },
-            Definition::Member(..) => Member {
+            Definition::Member(_) => Member {
                 parent,
-                kind: MemberKind::NestedFunction,
-                stmt,
+                kind: MemberKind::NestedFunction(function),
             },
         },
-        ExtractionTarget::Class => match &definitions[parent] {
-            Definition::Module(..) => Member {
+        ExtractionTarget::Class(class) => match &definitions[parent] {
+            Definition::Module(_) => Member {
                 parent,
-                kind: MemberKind::Class,
-                stmt,
+                kind: MemberKind::Class(class),
             },
-            Definition::Member(..) => Member {
+            Definition::Member(_) => Member {
                 parent,
-                kind: MemberKind::NestedClass,
-                stmt,
+                kind: MemberKind::NestedClass(class),
             },
         },
     }

@@ -3,7 +3,6 @@ use ruff_python_ast::Ranged;
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{TextRange, TextSize};
 
-use crate::comments::{dangling_comments, trailing_comments, SourceComment};
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::prelude::*;
 use crate::MagicTrailingComma;
@@ -207,56 +206,5 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
 
             Ok(())
         })
-    }
-}
-
-/// Format comments inside empty parentheses, brackets or curly braces.
-///
-/// Empty `()`, `[]` and `{}` are special because there can be dangling comments, and they can be in
-/// two positions:
-/// ```python
-/// x = [  # end-of-line
-///     # own line
-/// ]
-/// ```
-/// These comments are dangling because they can't be assigned to any element inside as they would
-/// in all other cases.
-pub(crate) fn empty_parenthesized_with_dangling_comments(
-    opening: StaticText,
-    comments: &[SourceComment],
-    closing: StaticText,
-) -> EmptyWithDanglingComments {
-    EmptyWithDanglingComments {
-        opening,
-        comments,
-        closing,
-    }
-}
-
-pub(crate) struct EmptyWithDanglingComments<'a> {
-    opening: StaticText,
-    comments: &'a [SourceComment],
-    closing: StaticText,
-}
-
-impl<'ast> Format<PyFormatContext<'ast>> for EmptyWithDanglingComments<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext>) -> FormatResult<()> {
-        let end_of_line_split = self
-            .comments
-            .partition_point(|comment| comment.line_position().is_end_of_line());
-        debug_assert!(self.comments[end_of_line_split..]
-            .iter()
-            .all(|comment| comment.line_position().is_own_line()));
-        write!(
-            f,
-            [group(&format_args![
-                self.opening,
-                // end-of-line comments
-                trailing_comments(&self.comments[..end_of_line_split]),
-                // own line comments, which need to be indented
-                soft_block_indent(&dangling_comments(&self.comments[end_of_line_split..])),
-                self.closing
-            ])]
-        )
     }
 }

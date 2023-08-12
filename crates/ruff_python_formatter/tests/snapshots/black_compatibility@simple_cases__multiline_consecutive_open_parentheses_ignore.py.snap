@@ -33,19 +33,18 @@ print(   "111"       ) # type: ignore
 ```diff
 --- Black
 +++ Ruff
-@@ -1,10 +1,8 @@
+@@ -1,9 +1,9 @@
  # This is a regression test. Issue #3737
  
 -a = (  # type: ignore
 +a = int(  # type: ignore  # type: ignore
      int(  # type: ignore
--        int(  # type: ignore
+         int(  # type: ignore
 -            int(6)  # type: ignore
--        )
-+        int(6)  # type: ignore
++            6
+         )
      )
  )
- 
 ```
 
 ## Ruff Output
@@ -55,7 +54,9 @@ print(   "111"       ) # type: ignore
 
 a = int(  # type: ignore  # type: ignore
     int(  # type: ignore
-        int(6)  # type: ignore
+        int(  # type: ignore
+            6
+        )
     )
 )
 

@@ -50,14 +50,14 @@ pub(crate) fn explicit(expr: &Expr, locator: &Locator) -> Option<Diagnostic> {
         if matches!(op, Operator::Add) {
             if matches!(
                 left.as_ref(),
-                Expr::JoinedStr(_)
+                Expr::FString(_)
                     | Expr::Constant(ast::ExprConstant {
                         value: Constant::Str(..) | Constant::Bytes(..),
                         ..
                     })
             ) && matches!(
                 right.as_ref(),
-                Expr::JoinedStr(_)
+                Expr::FString(_)
                     | Expr::Constant(ast::ExprConstant {
                         value: Constant::Str(..) | Constant::Bytes(..),
                         ..

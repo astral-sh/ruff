@@ -6,7 +6,7 @@
 //! [CPython source]: https://github.com/python/cpython/blob/dfc2e065a2e71011017077e549cd2f9bf4944c54/Include/internal/pycore_token.h;
 use crate::Mode;
 use num_bigint::BigInt;
-use ruff_python_ast::MagicKind;
+use ruff_python_ast::IpyEscapeKind;
 use ruff_text_size::TextSize;
 use std::fmt;
 
@@ -44,13 +44,13 @@ pub enum Tok {
         /// Whether the string is triple quoted.
         triple_quoted: bool,
     },
-    /// Token value for a Jupyter magic commands. These are filtered out of the token stream
-    /// prior to parsing when the mode is [`Mode::Jupyter`].
-    MagicCommand {
+    /// Token value for IPython escape commands. These are recognized by the lexer
+    /// only when the mode is [`Mode::Jupyter`].
+    IpyEscapeCommand {
         /// The magic command value.
         value: String,
         /// The kind of magic command.
-        kind: MagicKind,
+        kind: IpyEscapeKind,
     },
     /// Token value for a comment. These are filtered out of the token stream prior to parsing.
     Comment(String),
@@ -64,6 +64,8 @@ pub enum Tok {
     /// Token value for a dedent.
     Dedent,
     EndOfFile,
+    /// Token value for a question mark `?`. This is only used in [`Mode::Jupyter`].
+    Question,
     /// Token value for a left parenthesis `(`.
     Lpar,
     /// Token value for a right parenthesis `)`.
@@ -232,7 +234,7 @@ impl fmt::Display for Tok {
                 let quotes = "\"".repeat(if *triple_quoted { 3 } else { 1 });
                 write!(f, "{kind}{quotes}{value}{quotes}")
             }
-            MagicCommand { kind, value } => write!(f, "{kind}{value}"),
+            IpyEscapeCommand { kind, value } => write!(f, "{kind}{value}"),
             Newline => f.write_str("Newline"),
             NonLogicalNewline => f.write_str("NonLogicalNewline"),
             Indent => f.write_str("Indent"),
@@ -240,6 +242,7 @@ impl fmt::Display for Tok {
             StartModule => f.write_str("StartProgram"),
             StartExpression => f.write_str("StartExpression"),
             EndOfFile => f.write_str("EOF"),
+            Question => f.write_str("'?'"),
             Lpar => f.write_str("'('"),
             Rpar => f.write_str("')'"),
             Lsqb => f.write_str("'['"),
@@ -447,8 +450,8 @@ pub enum TokenKind {
     Complex,
     /// Token value for a string.
     String,
-    /// Token value for a Jupyter magic command.
-    MagicCommand,
+    /// Token value for a IPython escape command.
+    EscapeCommand,
     /// Token value for a comment. These are filtered out of the token stream prior to parsing.
     Comment,
     /// Token value for a newline.
@@ -461,6 +464,8 @@ pub enum TokenKind {
     /// Token value for a dedent.
     Dedent,
     EndOfFile,
+    /// Token value for a question mark `?`.
+    Question,
     /// Token value for a left parenthesis `(`.
     Lpar,
     /// Token value for a right parenthesis `)`.
@@ -776,13 +781,14 @@ impl TokenKind {
             Tok::Float { .. } => TokenKind::Float,
             Tok::Complex { .. } => TokenKind::Complex,
             Tok::String { .. } => TokenKind::String,
-            Tok::MagicCommand { .. } => TokenKind::MagicCommand,
+            Tok::IpyEscapeCommand { .. } => TokenKind::EscapeCommand,
             Tok::Comment(_) => TokenKind::Comment,
             Tok::Newline => TokenKind::Newline,
             Tok::NonLogicalNewline => TokenKind::NonLogicalNewline,
             Tok::Indent => TokenKind::Indent,
             Tok::Dedent => TokenKind::Dedent,
             Tok::EndOfFile => TokenKind::EndOfFile,
+            Tok::Question => TokenKind::Question,
             Tok::Lpar => TokenKind::Lpar,
             Tok::Rpar => TokenKind::Rpar,
             Tok::Lsqb => TokenKind::Lsqb,

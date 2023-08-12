@@ -86,9 +86,6 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
         match stmt {
             Stmt::FunctionDef(ast::StmtFunctionDef {
                 parameters, body, ..
-            })
-            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-                parameters, body, ..
             }) => {
                 // Collect all loaded variable names.
                 let mut visitor = LoadedNamesVisitor::default();
@@ -236,7 +233,7 @@ struct AssignedNamesVisitor<'a> {
 /// `Visitor` to collect all used identifiers in a statement.
 impl<'a> Visitor<'a> for AssignedNamesVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        if matches!(stmt, Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_)) {
+        if stmt.is_function_def_stmt() {
             // Don't recurse.
             return;
         }
@@ -251,8 +248,7 @@ impl<'a> Visitor<'a> for AssignedNamesVisitor<'a> {
             }
             Stmt::AugAssign(ast::StmtAugAssign { target, .. })
             | Stmt::AnnAssign(ast::StmtAnnAssign { target, .. })
-            | Stmt::For(ast::StmtFor { target, .. })
-            | Stmt::AsyncFor(ast::StmtAsyncFor { target, .. }) => {
+            | Stmt::For(ast::StmtFor { target, .. }) => {
                 let mut visitor = NamesFromAssignmentsVisitor::default();
                 visitor.visit_expr(target);
                 self.names.extend(visitor.names);

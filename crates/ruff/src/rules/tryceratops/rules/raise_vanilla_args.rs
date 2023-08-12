@@ -54,7 +54,7 @@ where
     F: (Fn(&str) -> bool) + Copy,
 {
     match expr {
-        Expr::JoinedStr(ast::ExprJoinedStr { values, range: _ }) => {
+        Expr::FString(ast::ExprFString { values, range: _ }) => {
             for value in values {
                 if any_string(value, predicate) {
                     return true;

@@ -45,8 +45,6 @@ impl From<ModExpression> for Mod {
 pub enum Stmt {
     #[is(name = "function_def_stmt")]
     FunctionDef(StmtFunctionDef),
-    #[is(name = "async_function_def_stmt")]
-    AsyncFunctionDef(StmtAsyncFunctionDef),
     #[is(name = "class_def_stmt")]
     ClassDef(StmtClassDef),
     #[is(name = "return_stmt")]
@@ -63,16 +61,12 @@ pub enum Stmt {
     TypeAlias(StmtTypeAlias),
     #[is(name = "for_stmt")]
     For(StmtFor),
-    #[is(name = "async_for_stmt")]
-    AsyncFor(StmtAsyncFor),
     #[is(name = "while_stmt")]
     While(StmtWhile),
     #[is(name = "if_stmt")]
     If(StmtIf),
     #[is(name = "with_stmt")]
     With(StmtWith),
-    #[is(name = "async_with_stmt")]
-    AsyncWith(StmtAsyncWith),
     #[is(name = "match_stmt")]
     Match(StmtMatch),
     #[is(name = "raise_stmt")]
@@ -101,27 +95,32 @@ pub enum Stmt {
     Continue(StmtContinue),
 
     // Jupyter notebook specific
-    #[is(name = "line_magic_stmt")]
-    LineMagic(StmtLineMagic),
+    #[is(name = "ipy_escape_command_stmt")]
+    IpyEscapeCommand(StmtIpyEscapeCommand),
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct StmtLineMagic {
+pub struct StmtIpyEscapeCommand {
     pub range: TextRange,
-    pub kind: MagicKind,
+    pub kind: IpyEscapeKind,
     pub value: String,
 }
 
-impl From<StmtLineMagic> for Stmt {
-    fn from(payload: StmtLineMagic) -> Self {
-        Stmt::LineMagic(payload)
+impl From<StmtIpyEscapeCommand> for Stmt {
+    fn from(payload: StmtIpyEscapeCommand) -> Self {
+        Stmt::IpyEscapeCommand(payload)
     }
 }
 
-/// See also [FunctionDef](https://docs.python.org/3/library/ast.html#ast.FunctionDef)
+/// See also [FunctionDef](https://docs.python.org/3/library/ast.html#ast.FunctionDef) and
+/// [AsyncFunctionDef](https://docs.python.org/3/library/ast.html#ast.AsyncFunctionDef).
+///
+/// This type differs from the original Python AST, as it collapses the
+/// synchronous and asynchronous variants into a single type.
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtFunctionDef {
     pub range: TextRange,
+    pub is_async: bool,
     pub decorator_list: Vec<Decorator>,
     pub name: Identifier,
     pub type_params: Option<TypeParams>,
@@ -133,24 +132,6 @@ pub struct StmtFunctionDef {
 impl From<StmtFunctionDef> for Stmt {
     fn from(payload: StmtFunctionDef) -> Self {
         Stmt::FunctionDef(payload)
-    }
-}
-
-/// See also [AsyncFunctionDef](https://docs.python.org/3/library/ast.html#ast.AsyncFunctionDef)
-#[derive(Clone, Debug, PartialEq)]
-pub struct StmtAsyncFunctionDef {
-    pub range: TextRange,
-    pub decorator_list: Vec<Decorator>,
-    pub name: Identifier,
-    pub type_params: Option<TypeParams>,
-    pub parameters: Box<Parameters>,
-    pub returns: Option<Box<Expr>>,
-    pub body: Vec<Stmt>,
-}
-
-impl From<StmtAsyncFunctionDef> for Stmt {
-    fn from(payload: StmtAsyncFunctionDef) -> Self {
-        Stmt::AsyncFunctionDef(payload)
     }
 }
 
@@ -275,10 +256,15 @@ impl From<StmtAnnAssign> for Stmt {
     }
 }
 
-/// See also [For](https://docs.python.org/3/library/ast.html#ast.For)
+/// See also [For](https://docs.python.org/3/library/ast.html#ast.For) and
+/// [AsyncFor](https://docs.python.org/3/library/ast.html#ast.AsyncFor).
+///
+/// This type differs from the original Python AST, as it collapses the
+/// synchronous and asynchronous variants into a single type.
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtFor {
     pub range: TextRange,
+    pub is_async: bool,
     pub target: Box<Expr>,
     pub iter: Box<Expr>,
     pub body: Vec<Stmt>,
@@ -291,23 +277,8 @@ impl From<StmtFor> for Stmt {
     }
 }
 
-/// See also [AsyncFor](https://docs.python.org/3/library/ast.html#ast.AsyncFor)
-#[derive(Clone, Debug, PartialEq)]
-pub struct StmtAsyncFor {
-    pub range: TextRange,
-    pub target: Box<Expr>,
-    pub iter: Box<Expr>,
-    pub body: Vec<Stmt>,
-    pub orelse: Vec<Stmt>,
-}
-
-impl From<StmtAsyncFor> for Stmt {
-    fn from(payload: StmtAsyncFor) -> Self {
-        Stmt::AsyncFor(payload)
-    }
-}
-
-/// See also [While](https://docs.python.org/3/library/ast.html#ast.While)
+/// See also [While](https://docs.python.org/3/library/ast.html#ast.While) and
+/// [AsyncWhile](https://docs.python.org/3/library/ast.html#ast.AsyncWhile).
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtWhile {
     pub range: TextRange,
@@ -344,10 +315,15 @@ pub struct ElifElseClause {
     pub body: Vec<Stmt>,
 }
 
-/// See also [With](https://docs.python.org/3/library/ast.html#ast.With)
+/// See also [With](https://docs.python.org/3/library/ast.html#ast.With) and
+/// [AsyncWith](https://docs.python.org/3/library/ast.html#ast.AsyncWith).
+///
+/// This type differs from the original Python AST, as it collapses the
+/// synchronous and asynchronous variants into a single type.
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtWith {
     pub range: TextRange,
+    pub is_async: bool,
     pub items: Vec<WithItem>,
     pub body: Vec<Stmt>,
 }
@@ -355,20 +331,6 @@ pub struct StmtWith {
 impl From<StmtWith> for Stmt {
     fn from(payload: StmtWith) -> Self {
         Stmt::With(payload)
-    }
-}
-
-/// See also [AsyncWith](https://docs.python.org/3/library/ast.html#ast.AsyncWith)
-#[derive(Clone, Debug, PartialEq)]
-pub struct StmtAsyncWith {
-    pub range: TextRange,
-    pub items: Vec<WithItem>,
-    pub body: Vec<Stmt>,
-}
-
-impl From<StmtAsyncWith> for Stmt {
-    fn from(payload: StmtAsyncWith) -> Self {
-        Stmt::AsyncWith(payload)
     }
 }
 
@@ -588,8 +550,8 @@ pub enum Expr {
     Call(ExprCall),
     #[is(name = "formatted_value_expr")]
     FormattedValue(ExprFormattedValue),
-    #[is(name = "joined_str_expr")]
-    JoinedStr(ExprJoinedStr),
+    #[is(name = "f_string_expr")]
+    FString(ExprFString),
     #[is(name = "constant_expr")]
     Constant(ExprConstant),
     #[is(name = "attribute_expr")]
@@ -608,20 +570,20 @@ pub enum Expr {
     Slice(ExprSlice),
 
     // Jupyter notebook specific
-    #[is(name = "line_magic_expr")]
-    LineMagic(ExprLineMagic),
+    #[is(name = "ipy_escape_command_expr")]
+    IpyEscapeCommand(ExprIpyEscapeCommand),
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct ExprLineMagic {
+pub struct ExprIpyEscapeCommand {
     pub range: TextRange,
-    pub kind: MagicKind,
+    pub kind: IpyEscapeKind,
     pub value: String,
 }
 
-impl From<ExprLineMagic> for Expr {
-    fn from(payload: ExprLineMagic) -> Self {
-        Expr::LineMagic(payload)
+impl From<ExprIpyEscapeCommand> for Expr {
+    fn from(payload: ExprIpyEscapeCommand) -> Self {
+        Expr::IpyEscapeCommand(payload)
     }
 }
 
@@ -916,14 +878,14 @@ pub struct DebugText {
 
 /// See also [JoinedStr](https://docs.python.org/3/library/ast.html#ast.JoinedStr)
 #[derive(Clone, Debug, PartialEq)]
-pub struct ExprJoinedStr {
+pub struct ExprFString {
     pub range: TextRange,
     pub values: Vec<Expr>,
 }
 
-impl From<ExprJoinedStr> for Expr {
-    fn from(payload: ExprJoinedStr) -> Self {
-        Expr::JoinedStr(payload)
+impl From<ExprFString> for Expr {
+    fn from(payload: ExprFString) -> Self {
+        Expr::FString(payload)
     }
 }
 
@@ -2164,23 +2126,21 @@ impl Arguments {
         })
     }
 
+    /// Return the positional argument at the given index, or `None` if no such argument exists.
+    pub fn find_positional(&self, position: usize) -> Option<&Expr> {
+        self.args
+            .iter()
+            .take_while(|expr| !expr.is_starred_expr())
+            .nth(position)
+    }
+
     /// Return the argument with the given name or at the given position, or `None` if no such
     /// argument exists. Used to retrieve arguments that can be provided _either_ as keyword or
     /// positional arguments.
     pub fn find_argument(&self, name: &str, position: usize) -> Option<&Expr> {
-        self.keywords
-            .iter()
-            .find(|keyword| {
-                let Keyword { arg, .. } = keyword;
-                arg.as_ref().is_some_and(|arg| arg == name)
-            })
+        self.find_keyword(name)
             .map(|keyword| &keyword.value)
-            .or_else(|| {
-                self.args
-                    .iter()
-                    .take_while(|expr| !expr.is_starred_expr())
-                    .nth(position)
-            })
+            .or_else(|| self.find_positional(position))
     }
 }
 
@@ -2291,90 +2251,104 @@ impl Parameters {
     }
 }
 
-/// The kind of magic command as defined in [IPython Syntax] in the IPython codebase.
+/// The kind of escape command as defined in [IPython Syntax] in the IPython codebase.
 ///
 /// [IPython Syntax]: https://github.com/ipython/ipython/blob/635815e8f1ded5b764d66cacc80bbe25e9e2587f/IPython/core/inputtransformer2.py#L335-L343
 #[derive(PartialEq, Eq, Debug, Clone, Hash, Copy)]
-pub enum MagicKind {
-    /// Send line to underlying system shell.
+pub enum IpyEscapeKind {
+    /// Send line to underlying system shell (`!`).
     Shell,
-    /// Send line to system shell and capture output.
+    /// Send line to system shell and capture output (`!!`).
     ShCap,
-    /// Show help on object.
+    /// Show help on object (`?`).
     Help,
-    /// Show help on object, with extra verbosity.
+    /// Show help on object, with extra verbosity (`??`).
     Help2,
-    /// Call magic function.
+    /// Call magic function (`%`).
     Magic,
-    /// Call cell magic function.
+    /// Call cell magic function (`%%`).
     Magic2,
     /// Call first argument with rest of line as arguments after splitting on whitespace
-    /// and quote each as string.
+    /// and quote each as string (`,`).
     Quote,
-    /// Call first argument with rest of line as an argument quoted as a single string.
+    /// Call first argument with rest of line as an argument quoted as a single string (`;`).
     Quote2,
-    /// Call first argument with rest of line as arguments.
+    /// Call first argument with rest of line as arguments (`/`).
     Paren,
 }
 
-impl TryFrom<char> for MagicKind {
+impl TryFrom<char> for IpyEscapeKind {
     type Error = String;
 
     fn try_from(ch: char) -> Result<Self, Self::Error> {
         match ch {
-            '!' => Ok(MagicKind::Shell),
-            '?' => Ok(MagicKind::Help),
-            '%' => Ok(MagicKind::Magic),
-            ',' => Ok(MagicKind::Quote),
-            ';' => Ok(MagicKind::Quote2),
-            '/' => Ok(MagicKind::Paren),
+            '!' => Ok(IpyEscapeKind::Shell),
+            '?' => Ok(IpyEscapeKind::Help),
+            '%' => Ok(IpyEscapeKind::Magic),
+            ',' => Ok(IpyEscapeKind::Quote),
+            ';' => Ok(IpyEscapeKind::Quote2),
+            '/' => Ok(IpyEscapeKind::Paren),
             _ => Err(format!("Unexpected magic escape: {ch}")),
         }
     }
 }
 
-impl TryFrom<[char; 2]> for MagicKind {
+impl TryFrom<[char; 2]> for IpyEscapeKind {
     type Error = String;
 
     fn try_from(ch: [char; 2]) -> Result<Self, Self::Error> {
         match ch {
-            ['!', '!'] => Ok(MagicKind::ShCap),
-            ['?', '?'] => Ok(MagicKind::Help2),
-            ['%', '%'] => Ok(MagicKind::Magic2),
+            ['!', '!'] => Ok(IpyEscapeKind::ShCap),
+            ['?', '?'] => Ok(IpyEscapeKind::Help2),
+            ['%', '%'] => Ok(IpyEscapeKind::Magic2),
             [c1, c2] => Err(format!("Unexpected magic escape: {c1}{c2}")),
         }
     }
 }
 
-impl fmt::Display for MagicKind {
+impl fmt::Display for IpyEscapeKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            MagicKind::Shell => f.write_str("!"),
-            MagicKind::ShCap => f.write_str("!!"),
-            MagicKind::Help => f.write_str("?"),
-            MagicKind::Help2 => f.write_str("??"),
-            MagicKind::Magic => f.write_str("%"),
-            MagicKind::Magic2 => f.write_str("%%"),
-            MagicKind::Quote => f.write_str(","),
-            MagicKind::Quote2 => f.write_str(";"),
-            MagicKind::Paren => f.write_str("/"),
-        }
+        f.write_str(self.as_str())
     }
 }
 
-impl MagicKind {
-    /// Returns the length of the magic command prefix.
+impl IpyEscapeKind {
+    /// Returns the length of the escape kind token.
     pub fn prefix_len(self) -> TextSize {
         let len = match self {
-            MagicKind::Shell
-            | MagicKind::Magic
-            | MagicKind::Help
-            | MagicKind::Quote
-            | MagicKind::Quote2
-            | MagicKind::Paren => 1,
-            MagicKind::ShCap | MagicKind::Magic2 | MagicKind::Help2 => 2,
+            IpyEscapeKind::Shell
+            | IpyEscapeKind::Magic
+            | IpyEscapeKind::Help
+            | IpyEscapeKind::Quote
+            | IpyEscapeKind::Quote2
+            | IpyEscapeKind::Paren => 1,
+            IpyEscapeKind::ShCap | IpyEscapeKind::Magic2 | IpyEscapeKind::Help2 => 2,
         };
         len.into()
+    }
+
+    /// Returns `true` if the escape kind is help i.e., `?` or `??`.
+    pub const fn is_help(self) -> bool {
+        matches!(self, IpyEscapeKind::Help | IpyEscapeKind::Help2)
+    }
+
+    /// Returns `true` if the escape kind is magic i.e., `%` or `%%`.
+    pub const fn is_magic(self) -> bool {
+        matches!(self, IpyEscapeKind::Magic | IpyEscapeKind::Magic2)
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            IpyEscapeKind::Shell => "!",
+            IpyEscapeKind::ShCap => "!!",
+            IpyEscapeKind::Help => "?",
+            IpyEscapeKind::Help2 => "??",
+            IpyEscapeKind::Magic => "%",
+            IpyEscapeKind::Magic2 => "%%",
+            IpyEscapeKind::Quote => ",",
+            IpyEscapeKind::Quote2 => ";",
+            IpyEscapeKind::Paren => "/",
+        }
     }
 }
 
@@ -2585,11 +2559,6 @@ impl Ranged for crate::nodes::StmtFunctionDef {
         self.range
     }
 }
-impl Ranged for crate::nodes::StmtAsyncFunctionDef {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
 impl Ranged for crate::nodes::StmtClassDef {
     fn range(&self) -> TextRange {
         self.range
@@ -2630,11 +2599,6 @@ impl Ranged for crate::nodes::StmtFor {
         self.range
     }
 }
-impl Ranged for crate::nodes::StmtAsyncFor {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
 impl Ranged for crate::nodes::StmtWhile {
     fn range(&self) -> TextRange {
         self.range
@@ -2651,11 +2615,6 @@ impl Ranged for crate::nodes::ElifElseClause {
     }
 }
 impl Ranged for crate::nodes::StmtWith {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::StmtAsyncWith {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -2725,7 +2684,7 @@ impl Ranged for crate::nodes::StmtContinue {
         self.range
     }
 }
-impl Ranged for StmtLineMagic {
+impl Ranged for StmtIpyEscapeCommand {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -2734,7 +2693,6 @@ impl Ranged for crate::Stmt {
     fn range(&self) -> TextRange {
         match self {
             Self::FunctionDef(node) => node.range(),
-            Self::AsyncFunctionDef(node) => node.range(),
             Self::ClassDef(node) => node.range(),
             Self::Return(node) => node.range(),
             Self::Delete(node) => node.range(),
@@ -2743,11 +2701,9 @@ impl Ranged for crate::Stmt {
             Self::AugAssign(node) => node.range(),
             Self::AnnAssign(node) => node.range(),
             Self::For(node) => node.range(),
-            Self::AsyncFor(node) => node.range(),
             Self::While(node) => node.range(),
             Self::If(node) => node.range(),
             Self::With(node) => node.range(),
-            Self::AsyncWith(node) => node.range(),
             Self::Match(node) => node.range(),
             Self::Raise(node) => node.range(),
             Self::Try(node) => node.range(),
@@ -2761,7 +2717,7 @@ impl Ranged for crate::Stmt {
             Self::Pass(node) => node.range(),
             Self::Break(node) => node.range(),
             Self::Continue(node) => node.range(),
-            Stmt::LineMagic(node) => node.range(),
+            Stmt::IpyEscapeCommand(node) => node.range(),
         }
     }
 }
@@ -2856,7 +2812,7 @@ impl Ranged for crate::nodes::ExprFormattedValue {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprJoinedStr {
+impl Ranged for crate::nodes::ExprFString {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -2901,7 +2857,7 @@ impl Ranged for crate::nodes::ExprSlice {
         self.range
     }
 }
-impl Ranged for ExprLineMagic {
+impl Ranged for ExprIpyEscapeCommand {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -2927,7 +2883,7 @@ impl Ranged for crate::Expr {
             Self::Compare(node) => node.range(),
             Self::Call(node) => node.range(),
             Self::FormattedValue(node) => node.range(),
-            Self::JoinedStr(node) => node.range(),
+            Self::FString(node) => node.range(),
             Self::Constant(node) => node.range(),
             Self::Attribute(node) => node.range(),
             Self::Subscript(node) => node.range(),
@@ -2936,7 +2892,7 @@ impl Ranged for crate::Expr {
             Self::List(node) => node.range(),
             Self::Tuple(node) => node.range(),
             Self::Slice(node) => node.range(),
-            Expr::LineMagic(node) => node.range(),
+            Expr::IpyEscapeCommand(node) => node.range(),
         }
     }
 }
@@ -3096,8 +3052,7 @@ mod size_assertions {
     use static_assertions::assert_eq_size;
 
     assert_eq_size!(Stmt, [u8; 144]);
-    assert_eq_size!(StmtFunctionDef, [u8; 136]);
-    assert_eq_size!(StmtAsyncFunctionDef, [u8; 136]);
+    assert_eq_size!(StmtFunctionDef, [u8; 144]);
     assert_eq_size!(StmtClassDef, [u8; 104]);
     assert_eq_size!(StmtTry, [u8; 104]);
     assert_eq_size!(Expr, [u8; 80]);

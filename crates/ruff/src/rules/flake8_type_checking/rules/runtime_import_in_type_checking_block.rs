@@ -1,11 +1,12 @@
-use anyhow::Result;
-use ruff_text_size::TextRange;
-use rustc_hash::FxHashMap;
 use std::borrow::Cow;
+
+use anyhow::Result;
+use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::{AnyImport, Imported, NodeId, ResolvedReferenceId, Scope};
+use ruff_python_semantic::{AnyImport, Imported, ResolvedReferenceId, Scope, StatementId};
+use ruff_text_size::TextRange;
 
 use crate::autofix;
 use crate::checkers::ast::Checker;
@@ -70,8 +71,8 @@ pub(crate) fn runtime_import_in_type_checking_block(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     // Collect all runtime imports by statement.
-    let mut errors_by_statement: FxHashMap<NodeId, Vec<ImportBinding>> = FxHashMap::default();
-    let mut ignores_by_statement: FxHashMap<NodeId, Vec<ImportBinding>> = FxHashMap::default();
+    let mut errors_by_statement: FxHashMap<StatementId, Vec<ImportBinding>> = FxHashMap::default();
+    let mut ignores_by_statement: FxHashMap<StatementId, Vec<ImportBinding>> = FxHashMap::default();
 
     for binding_id in scope.binding_ids() {
         let binding = checker.semantic().binding(binding_id);
@@ -93,7 +94,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
                     .is_runtime()
             })
         {
-            let Some(stmt_id) = binding.source else {
+            let Some(statement_id) = binding.source else {
                 continue;
             };
 
@@ -113,20 +114,23 @@ pub(crate) fn runtime_import_in_type_checking_block(
                 })
             {
                 ignores_by_statement
-                    .entry(stmt_id)
+                    .entry(statement_id)
                     .or_default()
                     .push(import);
             } else {
-                errors_by_statement.entry(stmt_id).or_default().push(import);
+                errors_by_statement
+                    .entry(statement_id)
+                    .or_default()
+                    .push(import);
             }
         }
     }
 
     // Generate a diagnostic for every import, but share a fix across all imports within the same
     // statement (excluding those that are ignored).
-    for (stmt_id, imports) in errors_by_statement {
+    for (statement_id, imports) in errors_by_statement {
         let fix = if checker.patch(Rule::RuntimeImportInTypeCheckingBlock) {
-            fix_imports(checker, stmt_id, &imports).ok()
+            fix_imports(checker, statement_id, &imports).ok()
         } else {
             None
         };
@@ -189,12 +193,18 @@ struct ImportBinding<'a> {
 }
 
 /// Generate a [`Fix`] to remove runtime imports from a type-checking block.
-fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[ImportBinding]) -> Result<Fix> {
-    let stmt = checker.semantic().stmts[stmt_id];
-    let parent = checker.semantic().stmts.parent(stmt);
+fn fix_imports(
+    checker: &Checker,
+    statement_id: StatementId,
+    imports: &[ImportBinding],
+) -> Result<Fix> {
+    let statement = checker.semantic().statement(statement_id);
+    let parent = checker.semantic().parent_statement(statement_id);
+
     let member_names: Vec<Cow<'_, str>> = imports
         .iter()
-        .map(|ImportBinding { import, .. }| import.member_name())
+        .map(|ImportBinding { import, .. }| import)
+        .map(Imported::member_name)
         .collect();
 
     // Find the first reference across all imports.
@@ -209,7 +219,7 @@ fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[ImportBinding]) ->
     // Step 1) Remove the import.
     let remove_import_edit = autofix::edits::remove_unused_imports(
         member_names.iter().map(AsRef::as_ref),
-        stmt,
+        statement,
         parent,
         checker.locator(),
         checker.stylist(),
@@ -219,7 +229,7 @@ fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[ImportBinding]) ->
     // Step 2) Add the import to the top-level.
     let add_import_edit = checker.importer().runtime_import_edit(
         &ImportedMembers {
-            statement: stmt,
+            statement,
             names: member_names.iter().map(AsRef::as_ref).collect(),
         },
         at,

@@ -61,3 +61,30 @@ if x == types.X:
 
 #: E721
 assert type(res) is int
+
+
+class Foo:
+    def asdf(self, value: str | None):
+        #: E721
+        if type(value) is str:
+            ...
+
+
+class Foo:
+    def type(self):
+        pass
+
+    def asdf(self, value: str | None):
+        #: E721
+        if type(value) is str:
+            ...
+
+
+class Foo:
+    def asdf(self, value: str | None):
+        def type():
+            pass
+
+        # Okay
+        if type(value) is str:
+            ...

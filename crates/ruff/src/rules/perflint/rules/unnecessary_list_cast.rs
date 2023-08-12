@@ -102,12 +102,12 @@ pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr) {
             range: iterable_range,
             ..
         }) => {
-            let scope = checker.semantic().scope();
+            let scope = checker.semantic().current_scope();
             if let Some(binding_id) = scope.get(id) {
                 let binding = checker.semantic().binding(binding_id);
                 if binding.kind.is_assignment() || binding.kind.is_named_expr_assignment() {
                     if let Some(parent_id) = binding.source {
-                        let parent = checker.semantic().stmts[parent_id];
+                        let parent = checker.semantic().statement(parent_id);
                         if let Stmt::Assign(ast::StmtAssign { value, .. })
                         | Stmt::AnnAssign(ast::StmtAnnAssign {
                             value: Some(value), ..

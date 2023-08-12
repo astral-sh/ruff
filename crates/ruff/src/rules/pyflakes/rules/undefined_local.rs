@@ -51,7 +51,7 @@ pub(crate) fn undefined_local(
     scope: &Scope,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    if scope.kind.is_any_function() {
+    if scope.kind.is_function() {
         for (name, binding_id) in scope.bindings() {
             // If the variable shadows a binding in a parent scope...
             if let Some(shadowed_id) = checker.semantic().shadowed_binding(binding_id) {

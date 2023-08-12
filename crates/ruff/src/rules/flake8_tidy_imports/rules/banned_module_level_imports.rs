@@ -5,19 +5,36 @@ use ruff_text_size::TextRange;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for module-level imports that should instead be imported within
-/// a nested block (e.g., within a function definition).
+/// Checks for module-level imports that should instead be imported lazily
+/// (e.g., within a function definition, or an `if TYPE_CHECKING:` block, or
+/// some other nested context).
 ///
 /// ## Why is this bad?
 /// Some modules are expensive to import. For example, importing `torch` or
 /// `tensorflow` can introduce a noticeable delay in the startup time of a
 /// Python program.
 ///
-/// In some cases, you may want to import a module only if it is used in a
-/// specific function, rather than importing it unconditionally. In this case,
-/// you can import the module within a function definition or conditional
-/// block, such as an `if TYPE_CHECKING` block, such that the module is only
-/// imported if it is used..
+/// In such cases, you may want to enforce that the module is imported lazily
+/// as needed, rather than at the top of the file. This could involve inlining
+/// the import into the function that uses it, rather than importing it
+/// unconditionally, to ensure that the module is only imported when necessary.
+///
+/// ## Example
+/// ```python
+/// import tensorflow as tf
+///
+///
+/// def show_version():
+///     print(tf.__version__)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def show_version():
+///     import tensorflow as tf
+///
+///     print(tf.__version__)
+/// ```
 ///
 /// ## Options
 /// - `flake8-tidy-imports.banned-module-level-imports`

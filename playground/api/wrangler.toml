@@ -1,0 +1,7 @@
+name = "api"
+main = "src/index.ts"
+compatibility_date = "2023-08-07"
+
+kv_namespaces = [
+  { binding = "PLAYGROUND", id = "672e16c4fb5e4887845973bf0e9f6021", preview_id = "0a96477e116540e5a6e1eab6d6e7523e" }
+]

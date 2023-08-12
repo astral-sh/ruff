@@ -16,8 +16,8 @@ expression: parse_ast
             debug_text: None,
             conversion: None,
             format_spec: Some(
-                JoinedStr(
-                    ExprJoinedStr {
+                FString(
+                    ExprFString {
                         range: 7..13,
                         values: [
                             FormattedValue(

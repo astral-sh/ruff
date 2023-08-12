@@ -192,7 +192,8 @@ raise aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfk < (
 )  # the other end
 # sneaky comment
 
-raise ()  # another comment
+raise (  # another comment
+)
 
 raise ()  # what now
 

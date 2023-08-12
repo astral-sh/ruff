@@ -1,25 +1,25 @@
 use anyhow::{bail, Result};
-use ruff_python_ast::{PySourceType, Ranged, Stmt};
+use ruff_python_ast::{PySourceType, Ranged};
 use ruff_python_parser::{lexer, AsMode, Tok};
 
 use ruff_diagnostics::Edit;
 use ruff_source_file::Locator;
 
 /// ANN204
-pub(crate) fn add_return_annotation(
-    locator: &Locator,
-    stmt: &Stmt,
+pub(crate) fn add_return_annotation<T: Ranged>(
+    statement: &T,
     annotation: &str,
     source_type: PySourceType,
+    locator: &Locator,
 ) -> Result<Edit> {
-    let contents = &locator.contents()[stmt.range()];
+    let contents = &locator.contents()[statement.range()];
 
     // Find the colon (following the `def` keyword).
     let mut seen_lpar = false;
     let mut seen_rpar = false;
     let mut count = 0u32;
     for (tok, range) in
-        lexer::lex_starts_at(contents, source_type.as_mode(), stmt.start()).flatten()
+        lexer::lex_starts_at(contents, source_type.as_mode(), statement.start()).flatten()
     {
         if seen_lpar && seen_rpar {
             if matches!(tok, Tok::Colon) {

@@ -77,7 +77,7 @@ fn is_cache_func(expr: &Expr, semantic: &SemanticModel) -> bool {
 
 /// B019
 pub(crate) fn cached_instance_method(checker: &mut Checker, decorator_list: &[Decorator]) {
-    if !checker.semantic().scope().kind.is_class() {
+    if !checker.semantic().current_scope().kind.is_class() {
         return;
     }
     for decorator in decorator_list {

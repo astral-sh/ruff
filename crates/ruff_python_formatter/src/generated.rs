@@ -108,42 +108,6 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtFunctionDef {
     }
 }
 
-impl FormatRule<ast::StmtAsyncFunctionDef, PyFormatContext<'_>>
-    for crate::statement::stmt_async_function_def::FormatStmtAsyncFunctionDef
-{
-    #[inline]
-    fn fmt(&self, node: &ast::StmtAsyncFunctionDef, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::StmtAsyncFunctionDef>::fmt(self, node, f)
-    }
-}
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StmtAsyncFunctionDef {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::StmtAsyncFunctionDef,
-        crate::statement::stmt_async_function_def::FormatStmtAsyncFunctionDef,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::statement::stmt_async_function_def::FormatStmtAsyncFunctionDef::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtAsyncFunctionDef {
-    type Format = FormatOwnedWithRule<
-        ast::StmtAsyncFunctionDef,
-        crate::statement::stmt_async_function_def::FormatStmtAsyncFunctionDef,
-        PyFormatContext<'ast>,
-    >;
-    fn into_format(self) -> Self::Format {
-        FormatOwnedWithRule::new(
-            self,
-            crate::statement::stmt_async_function_def::FormatStmtAsyncFunctionDef::default(),
-        )
-    }
-}
-
 impl FormatRule<ast::StmtClassDef, PyFormatContext<'_>>
     for crate::statement::stmt_class_def::FormatStmtClassDef
 {
@@ -424,42 +388,6 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtFor {
     }
 }
 
-impl FormatRule<ast::StmtAsyncFor, PyFormatContext<'_>>
-    for crate::statement::stmt_async_for::FormatStmtAsyncFor
-{
-    #[inline]
-    fn fmt(&self, node: &ast::StmtAsyncFor, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::StmtAsyncFor>::fmt(self, node, f)
-    }
-}
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StmtAsyncFor {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::StmtAsyncFor,
-        crate::statement::stmt_async_for::FormatStmtAsyncFor,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::statement::stmt_async_for::FormatStmtAsyncFor::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtAsyncFor {
-    type Format = FormatOwnedWithRule<
-        ast::StmtAsyncFor,
-        crate::statement::stmt_async_for::FormatStmtAsyncFor,
-        PyFormatContext<'ast>,
-    >;
-    fn into_format(self) -> Self::Format {
-        FormatOwnedWithRule::new(
-            self,
-            crate::statement::stmt_async_for::FormatStmtAsyncFor::default(),
-        )
-    }
-}
-
 impl FormatRule<ast::StmtWhile, PyFormatContext<'_>>
     for crate::statement::stmt_while::FormatStmtWhile
 {
@@ -551,42 +479,6 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtWith {
     >;
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, crate::statement::stmt_with::FormatStmtWith::default())
-    }
-}
-
-impl FormatRule<ast::StmtAsyncWith, PyFormatContext<'_>>
-    for crate::statement::stmt_async_with::FormatStmtAsyncWith
-{
-    #[inline]
-    fn fmt(&self, node: &ast::StmtAsyncWith, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::StmtAsyncWith>::fmt(self, node, f)
-    }
-}
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StmtAsyncWith {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::StmtAsyncWith,
-        crate::statement::stmt_async_with::FormatStmtAsyncWith,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::statement::stmt_async_with::FormatStmtAsyncWith::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtAsyncWith {
-    type Format = FormatOwnedWithRule<
-        ast::StmtAsyncWith,
-        crate::statement::stmt_async_with::FormatStmtAsyncWith,
-        PyFormatContext<'ast>,
-    >;
-    fn into_format(self) -> Self::Format {
-        FormatOwnedWithRule::new(
-            self,
-            crate::statement::stmt_async_with::FormatStmtAsyncWith::default(),
-        )
     }
 }
 
@@ -1038,38 +930,38 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtContinue {
     }
 }
 
-impl FormatRule<ast::StmtLineMagic, PyFormatContext<'_>>
-    for crate::statement::stmt_line_magic::FormatStmtLineMagic
+impl FormatRule<ast::StmtIpyEscapeCommand, PyFormatContext<'_>>
+    for crate::statement::stmt_ipy_escape_command::FormatStmtIpyEscapeCommand
 {
     #[inline]
-    fn fmt(&self, node: &ast::StmtLineMagic, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::StmtLineMagic>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::StmtIpyEscapeCommand, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::StmtIpyEscapeCommand>::fmt(self, node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StmtLineMagic {
+impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StmtIpyEscapeCommand {
     type Format<'a> = FormatRefWithRule<
         'a,
-        ast::StmtLineMagic,
-        crate::statement::stmt_line_magic::FormatStmtLineMagic,
+        ast::StmtIpyEscapeCommand,
+        crate::statement::stmt_ipy_escape_command::FormatStmtIpyEscapeCommand,
         PyFormatContext<'ast>,
     >;
     fn format(&self) -> Self::Format<'_> {
         FormatRefWithRule::new(
             self,
-            crate::statement::stmt_line_magic::FormatStmtLineMagic::default(),
+            crate::statement::stmt_ipy_escape_command::FormatStmtIpyEscapeCommand::default(),
         )
     }
 }
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtLineMagic {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtIpyEscapeCommand {
     type Format = FormatOwnedWithRule<
-        ast::StmtLineMagic,
-        crate::statement::stmt_line_magic::FormatStmtLineMagic,
+        ast::StmtIpyEscapeCommand,
+        crate::statement::stmt_ipy_escape_command::FormatStmtIpyEscapeCommand,
         PyFormatContext<'ast>,
     >;
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(
             self,
-            crate::statement::stmt_line_magic::FormatStmtLineMagic::default(),
+            crate::statement::stmt_ipy_escape_command::FormatStmtIpyEscapeCommand::default(),
         )
     }
 }
@@ -1714,38 +1606,38 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprFormattedValue {
     }
 }
 
-impl FormatRule<ast::ExprJoinedStr, PyFormatContext<'_>>
-    for crate::expression::expr_joined_str::FormatExprJoinedStr
+impl FormatRule<ast::ExprFString, PyFormatContext<'_>>
+    for crate::expression::expr_f_string::FormatExprFString
 {
     #[inline]
-    fn fmt(&self, node: &ast::ExprJoinedStr, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprJoinedStr>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprFString, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::ExprFString>::fmt(self, node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprJoinedStr {
+impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprFString {
     type Format<'a> = FormatRefWithRule<
         'a,
-        ast::ExprJoinedStr,
-        crate::expression::expr_joined_str::FormatExprJoinedStr,
+        ast::ExprFString,
+        crate::expression::expr_f_string::FormatExprFString,
         PyFormatContext<'ast>,
     >;
     fn format(&self) -> Self::Format<'_> {
         FormatRefWithRule::new(
             self,
-            crate::expression::expr_joined_str::FormatExprJoinedStr::default(),
+            crate::expression::expr_f_string::FormatExprFString::default(),
         )
     }
 }
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprJoinedStr {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprFString {
     type Format = FormatOwnedWithRule<
-        ast::ExprJoinedStr,
-        crate::expression::expr_joined_str::FormatExprJoinedStr,
+        ast::ExprFString,
+        crate::expression::expr_f_string::FormatExprFString,
         PyFormatContext<'ast>,
     >;
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(
             self,
-            crate::expression::expr_joined_str::FormatExprJoinedStr::default(),
+            crate::expression::expr_f_string::FormatExprFString::default(),
         )
     }
 }
@@ -2038,38 +1930,38 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprSlice {
     }
 }
 
-impl FormatRule<ast::ExprLineMagic, PyFormatContext<'_>>
-    for crate::expression::expr_line_magic::FormatExprLineMagic
+impl FormatRule<ast::ExprIpyEscapeCommand, PyFormatContext<'_>>
+    for crate::expression::expr_ipy_escape_command::FormatExprIpyEscapeCommand
 {
     #[inline]
-    fn fmt(&self, node: &ast::ExprLineMagic, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprLineMagic>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprIpyEscapeCommand, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::ExprIpyEscapeCommand>::fmt(self, node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprLineMagic {
+impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprIpyEscapeCommand {
     type Format<'a> = FormatRefWithRule<
         'a,
-        ast::ExprLineMagic,
-        crate::expression::expr_line_magic::FormatExprLineMagic,
+        ast::ExprIpyEscapeCommand,
+        crate::expression::expr_ipy_escape_command::FormatExprIpyEscapeCommand,
         PyFormatContext<'ast>,
     >;
     fn format(&self) -> Self::Format<'_> {
         FormatRefWithRule::new(
             self,
-            crate::expression::expr_line_magic::FormatExprLineMagic::default(),
+            crate::expression::expr_ipy_escape_command::FormatExprIpyEscapeCommand::default(),
         )
     }
 }
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprLineMagic {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprIpyEscapeCommand {
     type Format = FormatOwnedWithRule<
-        ast::ExprLineMagic,
-        crate::expression::expr_line_magic::FormatExprLineMagic,
+        ast::ExprIpyEscapeCommand,
+        crate::expression::expr_ipy_escape_command::FormatExprIpyEscapeCommand,
         PyFormatContext<'ast>,
     >;
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(
             self,
-            crate::expression::expr_line_magic::FormatExprLineMagic::default(),
+            crate::expression::expr_ipy_escape_command::FormatExprIpyEscapeCommand::default(),
         )
     }
 }

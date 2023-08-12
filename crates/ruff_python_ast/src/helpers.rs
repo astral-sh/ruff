@@ -18,14 +18,11 @@ pub const fn is_compound_statement(stmt: &Stmt) -> bool {
     matches!(
         stmt,
         Stmt::FunctionDef(_)
-            | Stmt::AsyncFunctionDef(_)
             | Stmt::ClassDef(_)
             | Stmt::While(_)
             | Stmt::For(_)
-            | Stmt::AsyncFor(_)
             | Stmt::Match(_)
             | Stmt::With(_)
-            | Stmt::AsyncWith(_)
             | Stmt::If(_)
             | Stmt::Try(_)
             | Stmt::TryStar(_)
@@ -71,7 +68,7 @@ where
             if !matches!(
                 left.as_ref(),
                 Expr::Constant(_)
-                    | Expr::JoinedStr(_)
+                    | Expr::FString(_)
                     | Expr::List(_)
                     | Expr::Tuple(_)
                     | Expr::Set(_)
@@ -85,7 +82,7 @@ where
             if !matches!(
                 right.as_ref(),
                 Expr::Constant(_)
-                    | Expr::JoinedStr(_)
+                    | Expr::FString(_)
                     | Expr::List(_)
                     | Expr::Tuple(_)
                     | Expr::Set(_)
@@ -111,7 +108,7 @@ where
                 | Expr::Subscript(_)
                 | Expr::Yield(_)
                 | Expr::YieldFrom(_)
-                | Expr::LineMagic(_)
+                | Expr::IpyEscapeCommand(_)
         )
     })
 }
@@ -129,7 +126,7 @@ where
         Expr::BoolOp(ast::ExprBoolOp {
             values, range: _, ..
         })
-        | Expr::JoinedStr(ast::ExprJoinedStr { values, range: _ }) => {
+        | Expr::FString(ast::ExprFString { values, range: _ }) => {
             values.iter().any(|expr| any_over_expr(expr, func))
         }
         Expr::NamedExpr(ast::ExprNamedExpr {
@@ -250,7 +247,7 @@ where
                     .is_some_and(|value| any_over_expr(value, func))
         }
         Expr::Name(_) | Expr::Constant(_) => false,
-        Expr::LineMagic(_) => false,
+        Expr::IpyEscapeCommand(_) => false,
     }
 }
 
@@ -315,14 +312,6 @@ where
 {
     match stmt {
         Stmt::FunctionDef(ast::StmtFunctionDef {
-            parameters,
-            type_params,
-            body,
-            decorator_list,
-            returns,
-            ..
-        })
-        | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
             parameters,
             type_params,
             body,
@@ -439,13 +428,6 @@ where
             body,
             orelse,
             ..
-        })
-        | Stmt::AsyncFor(ast::StmtAsyncFor {
-            target,
-            iter,
-            body,
-            orelse,
-            ..
         }) => {
             any_over_expr(target, func)
                 || any_over_expr(iter, func)
@@ -474,8 +456,7 @@ where
                         || any_over_body(&clause.body, func)
                 })
         }
-        Stmt::With(ast::StmtWith { items, body, .. })
-        | Stmt::AsyncWith(ast::StmtAsyncWith { items, body, .. }) => {
+        Stmt::With(ast::StmtWith { items, body, .. }) => {
             items.iter().any(|with_item| {
                 any_over_expr(&with_item.context_expr, func)
                     || with_item
@@ -553,7 +534,7 @@ where
         Stmt::Nonlocal(_) => false,
         Stmt::Expr(ast::StmtExpr { value, range: _ }) => any_over_expr(value, func),
         Stmt::Pass(_) | Stmt::Break(_) | Stmt::Continue(_) => false,
-        Stmt::LineMagic(_) => false,
+        Stmt::IpyEscapeCommand(_) => false,
     }
 }
 
@@ -912,7 +893,7 @@ where
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         match stmt {
-            Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) | Stmt::ClassDef(_) => {
+            Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {
                 // Don't recurse.
             }
             Stmt::Return(stmt) => self.returns.push(stmt),
@@ -941,11 +922,7 @@ where
                 self.raises
                     .push((stmt.range(), exc.as_deref(), cause.as_deref()));
             }
-            Stmt::ClassDef(_)
-            | Stmt::FunctionDef(_)
-            | Stmt::AsyncFunctionDef(_)
-            | Stmt::Try(_)
-            | Stmt::TryStar(_) => {}
+            Stmt::ClassDef(_) | Stmt::FunctionDef(_) | Stmt::Try(_) | Stmt::TryStar(_) => {}
             Stmt::If(ast::StmtIf {
                 body,
                 elif_else_clauses,
@@ -958,9 +935,7 @@ where
             }
             Stmt::While(ast::StmtWhile { body, .. })
             | Stmt::With(ast::StmtWith { body, .. })
-            | Stmt::AsyncWith(ast::StmtAsyncWith { body, .. })
-            | Stmt::For(ast::StmtFor { body, .. })
-            | Stmt::AsyncFor(ast::StmtAsyncFor { body, .. }) => {
+            | Stmt::For(ast::StmtFor { body, .. }) => {
                 walk_body(self, body);
             }
             Stmt::Match(ast::StmtMatch { cases, .. }) => {
@@ -1119,7 +1094,7 @@ impl Truthiness {
                 Constant::Complex { real, imag } => Some(*real != 0.0 || *imag != 0.0),
                 Constant::Ellipsis => Some(true),
             },
-            Expr::JoinedStr(ast::ExprJoinedStr { values, range: _ }) => {
+            Expr::FString(ast::ExprFString { values, range: _ }) => {
                 if values.is_empty() {
                     Some(false)
                 } else if values.iter().any(|value| {

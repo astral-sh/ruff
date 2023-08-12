@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::num::NonZeroU8;
 use unicode_width::UnicodeWidthChar;
 
 use ruff_macros::CacheKey;
@@ -83,7 +84,7 @@ impl LineWidth {
     }
 
     fn update(mut self, chars: impl Iterator<Item = char>) -> Self {
-        let tab_size: usize = self.tab_size.into();
+        let tab_size: usize = self.tab_size.as_usize();
         for c in chars {
             match c {
                 '\t' => {
@@ -144,22 +145,22 @@ impl PartialOrd<LineLength> for LineWidth {
 /// The size of a tab.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub struct TabSize(pub u8);
+pub struct TabSize(NonZeroU8);
+
+impl TabSize {
+    pub(crate) fn as_usize(self) -> usize {
+        self.0.get() as usize
+    }
+}
 
 impl Default for TabSize {
     fn default() -> Self {
-        Self(4)
+        Self(NonZeroU8::new(4).unwrap())
     }
 }
 
-impl From<u8> for TabSize {
-    fn from(tab_size: u8) -> Self {
+impl From<NonZeroU8> for TabSize {
+    fn from(tab_size: NonZeroU8) -> Self {
         Self(tab_size)
-    }
-}
-
-impl From<TabSize> for usize {
-    fn from(tab_size: TabSize) -> Self {
-        tab_size.0 as usize
     }
 }

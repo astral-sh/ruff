@@ -210,10 +210,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
 
 /// Returns `true` if a [`Stmt`] is a class or function definition.
 const fn is_class_or_function_definition(stmt: &Stmt) -> bool {
-    matches!(
-        stmt,
-        Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) | Stmt::ClassDef(_)
-    )
+    matches!(stmt, Stmt::FunctionDef(_) | Stmt::ClassDef(_))
 }
 
 /// Returns `true` if a [`Stmt`] is an import.

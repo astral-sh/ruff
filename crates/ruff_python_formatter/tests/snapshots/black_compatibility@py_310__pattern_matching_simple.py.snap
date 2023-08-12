@@ -104,111 +104,129 @@ def where_is(point):
 ```diff
 --- Black
 +++ Ruff
-@@ -1,92 +1,27 @@
+@@ -1,92 +1,92 @@
  # Cases sampled from PEP 636 examples
  
--match command.split():
+ match command.split():
 -    case [action, obj]:
--        ...  # interpret action, obj
-+NOT_YET_IMPLEMENTED_StmtMatch
++    case NOT_YET_IMPLEMENTED_Pattern:
+         ...  # interpret action, obj
  
--match command.split():
+ match command.split():
 -    case [action]:
--        ...  # interpret single-verb action
++    case NOT_YET_IMPLEMENTED_Pattern:
+         ...  # interpret single-verb action
 -    case [action, obj]:
--        ...  # interpret action, obj
-+NOT_YET_IMPLEMENTED_StmtMatch
++    case NOT_YET_IMPLEMENTED_Pattern:
+         ...  # interpret action, obj
  
--match command.split():
+ match command.split():
 -    case ["quit"]:
--        print("Goodbye!")
--        quit_game()
++    case NOT_YET_IMPLEMENTED_Pattern:
+         print("Goodbye!")
+         quit_game()
 -    case ["look"]:
--        current_room.describe()
++    case NOT_YET_IMPLEMENTED_Pattern:
+         current_room.describe()
 -    case ["get", obj]:
--        character.get(obj, current_room)
++    case NOT_YET_IMPLEMENTED_Pattern:
+         character.get(obj, current_room)
 -    case ["go", direction]:
--        current_room = current_room.neighbor(direction)
--    # The rest of your commands go here
-+NOT_YET_IMPLEMENTED_StmtMatch
++    case NOT_YET_IMPLEMENTED_Pattern:
+         current_room = current_room.neighbor(direction)
+     # The rest of your commands go here
  
--match command.split():
+ match command.split():
 -    case ["drop", *objects]:
--        for obj in objects:
--            character.drop(obj, current_room)
--    # The rest of your commands go here
-+NOT_YET_IMPLEMENTED_StmtMatch
++    case NOT_YET_IMPLEMENTED_Pattern:
+         for obj in objects:
+             character.drop(obj, current_room)
+     # The rest of your commands go here
  
--match command.split():
+ match command.split():
 -    case ["quit"]:
--        pass
++    case NOT_YET_IMPLEMENTED_Pattern:
+         pass
 -    case ["go", direction]:
--        print("Going:", direction)
++    case NOT_YET_IMPLEMENTED_Pattern:
+         print("Going:", direction)
 -    case ["drop", *objects]:
--        print("Dropping: ", *objects)
++    case NOT_YET_IMPLEMENTED_Pattern:
+         print("Dropping: ", *objects)
 -    case _:
--        print(f"Sorry, I couldn't understand {command!r}")
-+NOT_YET_IMPLEMENTED_StmtMatch
++    case NOT_YET_IMPLEMENTED_Pattern:
+         print(f"Sorry, I couldn't understand {command!r}")
  
--match command.split():
+ match command.split():
 -    case ["north"] | ["go", "north"]:
--        current_room = current_room.neighbor("north")
++    case NOT_YET_IMPLEMENTED_Pattern:
+         current_room = current_room.neighbor("north")
 -    case ["get", obj] | ["pick", "up", obj] | ["pick", obj, "up"]:
--        ...  # Code for picking up the given object
-+NOT_YET_IMPLEMENTED_StmtMatch
++    case NOT_YET_IMPLEMENTED_Pattern:
+         ...  # Code for picking up the given object
  
--match command.split():
+ match command.split():
 -    case ["go", ("north" | "south" | "east" | "west")]:
--        current_room = current_room.neighbor(...)
--        # how do I know which direction to go?
-+NOT_YET_IMPLEMENTED_StmtMatch
++    case NOT_YET_IMPLEMENTED_Pattern:
+         current_room = current_room.neighbor(...)
+         # how do I know which direction to go?
  
--match command.split():
+ match command.split():
 -    case ["go", ("north" | "south" | "east" | "west") as direction]:
--        current_room = current_room.neighbor(direction)
-+NOT_YET_IMPLEMENTED_StmtMatch
++    case NOT_YET_IMPLEMENTED_Pattern:
+         current_room = current_room.neighbor(direction)
  
--match command.split():
+ match command.split():
 -    case ["go", direction] if direction in current_room.exits:
--        current_room = current_room.neighbor(direction)
++    case NOT_YET_IMPLEMENTED_Pattern if direction in current_room.exits:
+         current_room = current_room.neighbor(direction)
 -    case ["go", _]:
--        print("Sorry, you can't go that way")
-+NOT_YET_IMPLEMENTED_StmtMatch
++    case NOT_YET_IMPLEMENTED_Pattern:
+         print("Sorry, you can't go that way")
  
--match event.get():
+ match event.get():
 -    case Click(position=(x, y)):
--        handle_click_at(x, y)
++    case NOT_YET_IMPLEMENTED_Pattern:
+         handle_click_at(x, y)
 -    case KeyPress(key_name="Q") | Quit():
--        game.quit()
++    case NOT_YET_IMPLEMENTED_Pattern:
+         game.quit()
 -    case KeyPress(key_name="up arrow"):
--        game.go_north()
++    case NOT_YET_IMPLEMENTED_Pattern:
+         game.go_north()
 -    case KeyPress():
--        pass  # Ignore other keystrokes
++    case NOT_YET_IMPLEMENTED_Pattern:
+         pass  # Ignore other keystrokes
 -    case other_event:
--        raise ValueError(f"Unrecognized event: {other_event}")
-+NOT_YET_IMPLEMENTED_StmtMatch
++    case NOT_YET_IMPLEMENTED_Pattern:
+         raise ValueError(f"Unrecognized event: {other_event}")
  
--match event.get():
+ match event.get():
 -    case Click((x, y), button=Button.LEFT):  # This is a left click
--        handle_click_at(x, y)
++    case NOT_YET_IMPLEMENTED_Pattern:  # This is a left click
+         handle_click_at(x, y)
 -    case Click():
--        pass  # ignore other clicks
-+NOT_YET_IMPLEMENTED_StmtMatch
++    case NOT_YET_IMPLEMENTED_Pattern:
+         pass  # ignore other clicks
  
  
  def where_is(point):
--    match point:
+     match point:
 -        case Point(x=0, y=0):
--            print("Origin")
++        case NOT_YET_IMPLEMENTED_Pattern:
+             print("Origin")
 -        case Point(x=0, y=y):
--            print(f"Y={y}")
++        case NOT_YET_IMPLEMENTED_Pattern:
+             print(f"Y={y}")
 -        case Point(x=x, y=0):
--            print(f"X={x}")
++        case NOT_YET_IMPLEMENTED_Pattern:
+             print(f"X={x}")
 -        case Point():
--            print("Somewhere else")
++        case NOT_YET_IMPLEMENTED_Pattern:
+             print("Somewhere else")
 -        case _:
--            print("Not a point")
-+    NOT_YET_IMPLEMENTED_StmtMatch
++        case NOT_YET_IMPLEMENTED_Pattern:
+             print("Not a point")
 ```
 
 ## Ruff Output
@@ -216,31 +234,96 @@ def where_is(point):
 ```py
 # Cases sampled from PEP 636 examples
 
-NOT_YET_IMPLEMENTED_StmtMatch
+match command.split():
+    case NOT_YET_IMPLEMENTED_Pattern:
+        ...  # interpret action, obj
 
-NOT_YET_IMPLEMENTED_StmtMatch
+match command.split():
+    case NOT_YET_IMPLEMENTED_Pattern:
+        ...  # interpret single-verb action
+    case NOT_YET_IMPLEMENTED_Pattern:
+        ...  # interpret action, obj
 
-NOT_YET_IMPLEMENTED_StmtMatch
+match command.split():
+    case NOT_YET_IMPLEMENTED_Pattern:
+        print("Goodbye!")
+        quit_game()
+    case NOT_YET_IMPLEMENTED_Pattern:
+        current_room.describe()
+    case NOT_YET_IMPLEMENTED_Pattern:
+        character.get(obj, current_room)
+    case NOT_YET_IMPLEMENTED_Pattern:
+        current_room = current_room.neighbor(direction)
+    # The rest of your commands go here
 
-NOT_YET_IMPLEMENTED_StmtMatch
+match command.split():
+    case NOT_YET_IMPLEMENTED_Pattern:
+        for obj in objects:
+            character.drop(obj, current_room)
+    # The rest of your commands go here
 
-NOT_YET_IMPLEMENTED_StmtMatch
+match command.split():
+    case NOT_YET_IMPLEMENTED_Pattern:
+        pass
+    case NOT_YET_IMPLEMENTED_Pattern:
+        print("Going:", direction)
+    case NOT_YET_IMPLEMENTED_Pattern:
+        print("Dropping: ", *objects)
+    case NOT_YET_IMPLEMENTED_Pattern:
+        print(f"Sorry, I couldn't understand {command!r}")
 
-NOT_YET_IMPLEMENTED_StmtMatch
+match command.split():
+    case NOT_YET_IMPLEMENTED_Pattern:
+        current_room = current_room.neighbor("north")
+    case NOT_YET_IMPLEMENTED_Pattern:
+        ...  # Code for picking up the given object
 
-NOT_YET_IMPLEMENTED_StmtMatch
+match command.split():
+    case NOT_YET_IMPLEMENTED_Pattern:
+        current_room = current_room.neighbor(...)
+        # how do I know which direction to go?
 
-NOT_YET_IMPLEMENTED_StmtMatch
+match command.split():
+    case NOT_YET_IMPLEMENTED_Pattern:
+        current_room = current_room.neighbor(direction)
 
-NOT_YET_IMPLEMENTED_StmtMatch
+match command.split():
+    case NOT_YET_IMPLEMENTED_Pattern if direction in current_room.exits:
+        current_room = current_room.neighbor(direction)
+    case NOT_YET_IMPLEMENTED_Pattern:
+        print("Sorry, you can't go that way")
 
-NOT_YET_IMPLEMENTED_StmtMatch
+match event.get():
+    case NOT_YET_IMPLEMENTED_Pattern:
+        handle_click_at(x, y)
+    case NOT_YET_IMPLEMENTED_Pattern:
+        game.quit()
+    case NOT_YET_IMPLEMENTED_Pattern:
+        game.go_north()
+    case NOT_YET_IMPLEMENTED_Pattern:
+        pass  # Ignore other keystrokes
+    case NOT_YET_IMPLEMENTED_Pattern:
+        raise ValueError(f"Unrecognized event: {other_event}")
 
-NOT_YET_IMPLEMENTED_StmtMatch
+match event.get():
+    case NOT_YET_IMPLEMENTED_Pattern:  # This is a left click
+        handle_click_at(x, y)
+    case NOT_YET_IMPLEMENTED_Pattern:
+        pass  # ignore other clicks
 
 
 def where_is(point):
-    NOT_YET_IMPLEMENTED_StmtMatch
+    match point:
+        case NOT_YET_IMPLEMENTED_Pattern:
+            print("Origin")
+        case NOT_YET_IMPLEMENTED_Pattern:
+            print(f"Y={y}")
+        case NOT_YET_IMPLEMENTED_Pattern:
+            print(f"X={x}")
+        case NOT_YET_IMPLEMENTED_Pattern:
+            print("Somewhere else")
+        case NOT_YET_IMPLEMENTED_Pattern:
+            print("Not a point")
 ```
 
 ## Black Output

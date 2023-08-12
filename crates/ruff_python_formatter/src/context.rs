@@ -1,9 +1,9 @@
 use crate::comments::Comments;
 use crate::PyFormatOptions;
-use ruff_formatter::prelude::*;
-use ruff_formatter::{Arguments, Buffer, FormatContext, GroupId, SourceCode};
+use ruff_formatter::{Buffer, FormatContext, GroupId, SourceCode};
 use ruff_source_file::Locator;
 use std::fmt::{Debug, Formatter};
+use std::ops::{Deref, DerefMut};
 
 #[derive(Clone)]
 pub struct PyFormatContext<'a> {
@@ -96,6 +96,7 @@ impl NodeLevel {
     }
 }
 
+/// Change the [`NodeLevel`] of the formatter for the lifetime of this struct
 pub(crate) struct WithNodeLevel<'ast, 'buf, B>
 where
     B: Buffer<Context = PyFormatContext<'ast>>,
@@ -119,16 +120,25 @@ where
             saved_level,
         }
     }
+}
 
-    #[inline]
-    pub(crate) fn write_fmt(&mut self, arguments: Arguments<B::Context>) -> FormatResult<()> {
-        self.buffer.write_fmt(arguments)
+impl<'ast, 'buf, B> Deref for WithNodeLevel<'ast, 'buf, B>
+where
+    B: Buffer<Context = PyFormatContext<'ast>>,
+{
+    type Target = B;
+
+    fn deref(&self) -> &Self::Target {
+        self.buffer
     }
+}
 
-    #[allow(unused)]
-    #[inline]
-    pub(crate) fn write_element(&mut self, element: FormatElement) -> FormatResult<()> {
-        self.buffer.write_element(element)
+impl<'ast, 'buf, B> DerefMut for WithNodeLevel<'ast, 'buf, B>
+where
+    B: Buffer<Context = PyFormatContext<'ast>>,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.buffer
     }
 }
 

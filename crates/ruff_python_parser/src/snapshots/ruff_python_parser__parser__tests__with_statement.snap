@@ -1,11 +1,12 @@
 ---
 source: crates/ruff_python_parser/src/parser.rs
-expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
+expression: "parse_suite(source, \"<test>\").unwrap()"
 ---
 [
     With(
         StmtWith {
             range: 0..12,
+            is_async: false,
             items: [
                 WithItem {
                     range: 5..6,
@@ -33,6 +34,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
     With(
         StmtWith {
             range: 13..30,
+            is_async: false,
             items: [
                 WithItem {
                     range: 18..24,
@@ -68,6 +70,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
     With(
         StmtWith {
             range: 31..46,
+            is_async: false,
             items: [
                 WithItem {
                     range: 36..37,
@@ -108,6 +111,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
     With(
         StmtWith {
             range: 47..72,
+            is_async: false,
             items: [
                 WithItem {
                     range: 52..58,
@@ -164,6 +168,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
     With(
         StmtWith {
             range: 73..97,
+            is_async: false,
             items: [
                 WithItem {
                     range: 78..91,
@@ -214,6 +219,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
     With(
         StmtWith {
             range: 98..127,
+            is_async: false,
             items: [
                 WithItem {
                     range: 103..121,
@@ -272,6 +278,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
     With(
         StmtWith {
             range: 128..141,
+            is_async: false,
             items: [
                 WithItem {
                     range: 133..135,
@@ -297,6 +304,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
     With(
         StmtWith {
             range: 142..160,
+            is_async: false,
             items: [
                 WithItem {
                     range: 147..154,
@@ -330,6 +338,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
     With(
         StmtWith {
             range: 161..175,
+            is_async: false,
             items: [
                 WithItem {
                     range: 167..168,
@@ -357,6 +366,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
     With(
         StmtWith {
             range: 176..195,
+            is_async: false,
             items: [
                 WithItem {
                     range: 181..189,
@@ -392,6 +402,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
     With(
         StmtWith {
             range: 196..211,
+            is_async: false,
             items: [
                 WithItem {
                     range: 202..203,
@@ -419,6 +430,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
     With(
         StmtWith {
             range: 212..232,
+            is_async: false,
             items: [
                 WithItem {
                     range: 217..226,
@@ -462,6 +474,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
     With(
         StmtWith {
             range: 233..250,
+            is_async: false,
             items: [
                 WithItem {
                     range: 239..243,
@@ -502,6 +515,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
     With(
         StmtWith {
             range: 251..273,
+            is_async: false,
             items: [
                 WithItem {
                     range: 256..267,
@@ -554,6 +568,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
     With(
         StmtWith {
             range: 274..290,
+            is_async: false,
             items: [
                 WithItem {
                     range: 279..284,
@@ -593,6 +608,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
     With(
         StmtWith {
             range: 291..312,
+            is_async: false,
             items: [
                 WithItem {
                     range: 296..306,
@@ -640,6 +656,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
     With(
         StmtWith {
             range: 313..331,
+            is_async: false,
             items: [
                 WithItem {
                     range: 318..325,
@@ -688,6 +705,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
     With(
         StmtWith {
             range: 332..355,
+            is_async: false,
             items: [
                 WithItem {
                     range: 337..349,
@@ -744,6 +762,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
     With(
         StmtWith {
             range: 356..375,
+            is_async: false,
             items: [
                 WithItem {
                     range: 361..369,
@@ -783,6 +802,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
     With(
         StmtWith {
             range: 376..400,
+            is_async: false,
             items: [
                 WithItem {
                     range: 381..394,
@@ -830,6 +850,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
     With(
         StmtWith {
             range: 401..428,
+            is_async: false,
             items: [
                 WithItem {
                     range: 406..422,
@@ -898,6 +919,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
     With(
         StmtWith {
             range: 429..461,
+            is_async: false,
             items: [
                 WithItem {
                     range: 434..455,
@@ -974,6 +996,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
     With(
         StmtWith {
             range: 462..481,
+            is_async: false,
             items: [
                 WithItem {
                     range: 468..474,
@@ -1009,6 +1032,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
     With(
         StmtWith {
             range: 482..502,
+            is_async: false,
             items: [
                 WithItem {
                     range: 488..494,
@@ -1044,6 +1068,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
     With(
         StmtWith {
             range: 503..530,
+            is_async: false,
             items: [
                 WithItem {
                     range: 509..515,
@@ -1100,6 +1125,7 @@ expression: "ast::Suite::parse(source, \"<test>\").unwrap()"
     With(
         StmtWith {
             range: 531..559,
+            is_async: false,
             items: [
                 WithItem {
                     range: 537..543,

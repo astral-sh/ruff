@@ -80,17 +80,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 Rule::RedundantLiteralUnion,
                 Rule::UnnecessaryTypeUnion,
             ]) {
-                // Avoid duplicate checks if the parent is an `Union[...]` since these rules
+                // Avoid duplicate checks if the parent is a union, since these rules already
                 // traverse nested unions.
-                let is_unchecked_union = checker
-                    .semantic
-                    .expr_grandparent()
-                    .and_then(Expr::as_subscript_expr)
-                    .map_or(true, |parent| {
-                        !checker.semantic.match_typing_expr(&parent.value, "Union")
-                    });
-
-                if is_unchecked_union {
+                if !checker.semantic.in_nested_union() {
                     if checker.enabled(Rule::UnnecessaryLiteralUnion) {
                         flake8_pyi::rules::unnecessary_literal_union(checker, expr);
                     }
@@ -206,11 +198,16 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 }
                 ExprContext::Store => {
                     if checker.enabled(Rule::NonLowercaseVariableInFunction) {
-                        if checker.semantic.scope().kind.is_any_function() {
+                        if checker.semantic.current_scope().kind.is_function() {
                             // Ignore globals.
-                            if !checker.semantic.scope().get(id).is_some_and(|binding_id| {
-                                checker.semantic.binding(binding_id).is_global()
-                            }) {
+                            if !checker
+                                .semantic
+                                .current_scope()
+                                .get(id)
+                                .is_some_and(|binding_id| {
+                                    checker.semantic.binding(binding_id).is_global()
+                                })
+                            {
                                 pep8_naming::rules::non_lowercase_variable_in_function(
                                     checker, expr, id,
                                 );
@@ -219,7 +216,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     }
                     if checker.enabled(Rule::MixedCaseVariableInClassScope) {
                         if let ScopeKind::Class(ast::StmtClassDef { arguments, .. }) =
-                            &checker.semantic.scope().kind
+                            &checker.semantic.current_scope().kind
                         {
                             pep8_naming::rules::mixed_case_variable_in_class_scope(
                                 checker,
@@ -230,7 +227,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                         }
                     }
                     if checker.enabled(Rule::MixedCaseVariableInGlobalScope) {
-                        if matches!(checker.semantic.scope().kind, ScopeKind::Module) {
+                        if matches!(checker.semantic.current_scope().kind, ScopeKind::Module) {
                             pep8_naming::rules::mixed_case_variable_in_global_scope(
                                 checker, expr, id,
                             );
@@ -243,7 +240,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                             checker.diagnostics.push(diagnostic);
                         }
                     }
-                    if let ScopeKind::Class(class_def) = checker.semantic.scope().kind {
+                    if let ScopeKind::Class(class_def) = checker.semantic.current_scope().kind {
                         if checker.enabled(Rule::BuiltinAttributeShadowing) {
                             flake8_builtins::rules::builtin_attribute_shadowing(
                                 checker, class_def, id, *range,
@@ -405,7 +402,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                                         );
                                     }
                                     if checker.enabled(Rule::FormatLiterals) {
-                                        pyupgrade::rules::format_literals(checker, &summary, expr);
+                                        pyupgrade::rules::format_literals(checker, &summary, call);
                                     }
                                     if checker.enabled(Rule::FString) {
                                         pyupgrade::rules::f_strings(
@@ -668,7 +665,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_comprehensions::rules::unnecessary_map(
                     checker,
                     expr,
-                    checker.semantic.expr_parent(),
+                    checker.semantic.current_expression_parent(),
                     func,
                     args,
                 );
@@ -765,6 +762,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::SubprocessPopenPreexecFn) {
                 pylint::rules::subprocess_popen_preexec_fn(checker, call);
+            }
+            if checker.enabled(Rule::SubprocessRunWithoutCheck) {
+                pylint::rules::subprocess_run_without_check(checker, call);
             }
             if checker.any_enabled(&[
                 Rule::PytestRaisesWithoutException,
@@ -918,7 +918,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 pylint::rules::await_outside_async(checker, expr);
             }
         }
-        Expr::JoinedStr(ast::ExprJoinedStr { values, range: _ }) => {
+        Expr::FString(ast::ExprFString { values, range: _ }) => {
             if checker.enabled(Rule::FStringMissingPlaceholders) {
                 pyflakes::rules::f_string_missing_placeholders(expr, values, checker);
             }
@@ -1079,29 +1079,23 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 }
             }
 
-            // Avoid duplicate checks if the parent is an `|` since these rules
+            // Avoid duplicate checks if the parent is a union, since these rules already
             // traverse nested unions.
-            let is_unchecked_union = !matches!(
-                checker.semantic.expr_parent(),
-                Some(Expr::BinOp(ast::ExprBinOp {
-                    op: Operator::BitOr,
-                    ..
-                }))
-            );
-            if checker.enabled(Rule::DuplicateUnionMember)
-                && checker.semantic.in_type_definition()
-                && is_unchecked_union
-            {
-                flake8_pyi::rules::duplicate_union_member(checker, expr);
-            }
-            if checker.enabled(Rule::UnnecessaryLiteralUnion) && is_unchecked_union {
-                flake8_pyi::rules::unnecessary_literal_union(checker, expr);
-            }
-            if checker.enabled(Rule::RedundantLiteralUnion) && is_unchecked_union {
-                flake8_pyi::rules::redundant_literal_union(checker, expr);
-            }
-            if checker.enabled(Rule::UnnecessaryTypeUnion) && is_unchecked_union {
-                flake8_pyi::rules::unnecessary_type_union(checker, expr);
+            if !checker.semantic.in_nested_union() {
+                if checker.enabled(Rule::DuplicateUnionMember)
+                    && checker.semantic.in_type_definition()
+                {
+                    flake8_pyi::rules::duplicate_union_member(checker, expr);
+                }
+                if checker.enabled(Rule::UnnecessaryLiteralUnion) {
+                    flake8_pyi::rules::unnecessary_literal_union(checker, expr);
+                }
+                if checker.enabled(Rule::RedundantLiteralUnion) {
+                    flake8_pyi::rules::redundant_literal_union(checker, expr);
+                }
+                if checker.enabled(Rule::UnnecessaryTypeUnion) {
+                    flake8_pyi::rules::unnecessary_type_union(checker, expr);
+                }
             }
         }
         Expr::UnaryOp(ast::ExprUnaryOp {
@@ -1238,13 +1232,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 }
             }
             if checker.enabled(Rule::HardcodedTempFile) {
-                if let Some(diagnostic) = flake8_bandit::rules::hardcoded_tmp_directory(
-                    expr,
-                    value,
-                    &checker.settings.flake8_bandit.hardcoded_tmp_directory,
-                ) {
-                    checker.diagnostics.push(diagnostic);
-                }
+                flake8_bandit::rules::hardcoded_tmp_directory(checker, expr, value);
             }
             if checker.enabled(Rule::UnicodeKindPrefix) {
                 pyupgrade::rules::unicode_kind_prefix(checker, expr, kind.as_deref());

@@ -95,11 +95,13 @@ use std::rc::Rc;
 use ruff_python_ast::{Mod, Ranged};
 
 pub(crate) use format::{
-    dangling_comments, dangling_node_comments, leading_alternate_branch_comments, leading_comments,
-    leading_node_comments, trailing_comments, trailing_node_comments,
+    dangling_comments, dangling_node_comments, dangling_open_parenthesis_comments,
+    leading_alternate_branch_comments, leading_comments, leading_node_comments, trailing_comments,
+    trailing_node_comments,
 };
 use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::visitor::preorder::{PreorderVisitor, TraversalSignal};
 use ruff_python_index::CommentRanges;
 
 use crate::comments::debug::{DebugComment, DebugComments};
@@ -400,6 +402,24 @@ impl<'a> Comments<'a> {
         );
     }
 
+    #[inline(always)]
+    #[cfg(not(debug_assertions))]
+    pub(crate) fn mark_verbatim_node_comments_formatted(&self, node: AnyNodeRef) {}
+
+    /// Marks the comments of a node printed in verbatim (suppressed) as formatted.
+    ///
+    /// Marks the dangling comments and the comments of all descendants as formatted.
+    /// The leading and trailing comments are not marked as formatted because they are formatted
+    /// normally if `node` is the first or last node of a suppression range.
+    #[cfg(debug_assertions)]
+    pub(crate) fn mark_verbatim_node_comments_formatted(&self, node: AnyNodeRef) {
+        for dangling in self.dangling_comments(node) {
+            dangling.mark_formatted();
+        }
+
+        node.visit_preorder(&mut MarkVerbatimCommentsAsFormattedVisitor(self));
+    }
+
     /// Returns an object that implements [Debug] for nicely printing the [`Comments`].
     pub(crate) fn debug(&'a self, source_code: SourceCode<'a>) -> DebugComments<'a> {
         DebugComments::new(&self.data.comments, source_code)
@@ -409,6 +429,18 @@ impl<'a> Comments<'a> {
 #[derive(Debug, Default)]
 struct CommentsData<'a> {
     comments: CommentsMap<'a>,
+}
+
+struct MarkVerbatimCommentsAsFormattedVisitor<'a>(&'a Comments<'a>);
+
+impl<'a> PreorderVisitor<'a> for MarkVerbatimCommentsAsFormattedVisitor<'a> {
+    fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
+        for comment in self.0.leading_dangling_trailing_comments(node) {
+            comment.mark_formatted();
+        }
+
+        TraversalSignal::Traverse
+    }
 }
 
 #[cfg(test)]
@@ -568,8 +600,13 @@ def test(x, y):
 def other(y, z):
     if y == z:
         pass
-            # Trailing `if` comment
-      # Trailing `other` function comment
+            # Trailing `pass` comment
+      # Trailing `if` statement comment
+
+class Test:
+    def func():
+        pass
+       # Trailing `func` function comment
 
 test(10, 20)
 "#;

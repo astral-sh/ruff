@@ -55,14 +55,14 @@ impl Violation for YieldOutsideFunction {
 
 pub(crate) fn yield_outside_function(checker: &mut Checker, expr: &Expr) {
     if matches!(
-        checker.semantic().scope().kind,
+        checker.semantic().current_scope().kind,
         ScopeKind::Class(_) | ScopeKind::Module
     ) {
         let keyword = match expr {
             Expr::Yield(_) => DeferralKeyword::Yield,
             Expr::YieldFrom(_) => DeferralKeyword::YieldFrom,
             Expr::Await(_) => DeferralKeyword::Await,
-            _ => panic!("Expected Expr::Yield | Expr::YieldFrom | Expr::Await"),
+            _ => return,
         };
         checker.diagnostics.push(Diagnostic::new(
             YieldOutsideFunction { keyword },

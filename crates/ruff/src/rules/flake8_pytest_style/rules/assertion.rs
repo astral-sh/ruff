@@ -145,6 +145,30 @@ impl Violation for PytestAssertAlwaysFalse {
     }
 }
 
+/// ## What it does
+/// Checks for uses of assertion methods from the `unittest` module.
+///
+/// ## Why is this bad?
+/// To make use of `pytest`'s assertion rewriting, a regular `assert` statement
+/// is preferred over `unittest`'s assertion methods.
+///
+/// ## Example
+/// ```python
+/// class TestFoo(unittest.TestCase):
+///     def test_foo(self):
+///         self.assertEqual(a, b)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class TestFoo(unittest.TestCase):
+///     def test_foo(self):
+///         assert a == b
+/// ```
+///
+/// ## References
+/// - [`pytest` documentation: Assertion introspection details](https://docs.pytest.org/en/7.1.x/how-to/assert.html#assertion-introspection-details)
+
 #[violation]
 pub struct PytestUnittestAssertion {
     assertion: String,
@@ -246,9 +270,8 @@ pub(crate) fn unittest_assertion(
                 if checker.patch(diagnostic.kind.rule()) {
                     // We're converting an expression to a statement, so avoid applying the fix if
                     // the assertion is part of a larger expression.
-                    if checker.semantic().stmt().is_expr_stmt()
-                        && checker.semantic().expr_parent().is_none()
-                        && !checker.semantic().scope().kind.is_lambda()
+                    if checker.semantic().current_statement().is_expr_stmt()
+                        && checker.semantic().current_expression_parent().is_none()
                         && !checker.indexer().comment_ranges().intersects(expr.range())
                     {
                         if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {

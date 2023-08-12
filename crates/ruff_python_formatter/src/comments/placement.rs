@@ -3,16 +3,14 @@ use std::cmp::Ordering;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{self as ast, Comprehension, Expr, MatchCase, Parameters, Ranged};
-use ruff_python_trivia::{
-    indentation_at_offset, PythonWhitespace, SimpleToken, SimpleTokenKind, SimpleTokenizer,
-};
-use ruff_source_file::{Locator, UniversalNewlines};
-use ruff_text_size::TextRange;
+use ruff_python_trivia::{indentation_at_offset, SimpleToken, SimpleTokenKind, SimpleTokenizer};
+use ruff_source_file::Locator;
+use ruff_text_size::{TextLen, TextRange};
 
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
 use crate::expression::expr_slice::{assign_comment_in_slice, ExprSliceCommentSection};
 use crate::other::parameters::{
-    assign_argument_separator_comment_placement, find_argument_separators,
+    assign_argument_separator_comment_placement, find_parameter_separators,
 };
 
 /// Manually attach comments to nodes that the default placement gets wrong.
@@ -32,6 +30,7 @@ pub(super) fn place_comment<'a>(
     comment.or_else(|comment| match comment.enclosing_node() {
         AnyNodeRef::Parameters(arguments) => {
             handle_parameters_separator_comment(comment, arguments, locator)
+                .or_else(|comment| handle_bracketed_end_of_line_comment(comment, locator))
         }
         AnyNodeRef::Arguments(_) | AnyNodeRef::TypeParams(_) => {
             handle_bracketed_end_of_line_comment(comment, locator)
@@ -62,18 +61,26 @@ pub(super) fn place_comment<'a>(
                 CommentPlacement::Default(comment)
             }
         }
-        AnyNodeRef::MatchCase(match_case) => handle_match_comment(comment, match_case, locator),
         AnyNodeRef::ModModule(_) => {
             handle_module_level_own_line_comment_before_class_or_function_comment(comment, locator)
         }
         AnyNodeRef::WithItem(_) => handle_with_item_comment(comment, locator),
-        AnyNodeRef::StmtFunctionDef(_) | AnyNodeRef::StmtAsyncFunctionDef(_) => {
+        AnyNodeRef::StmtFunctionDef(function_def) => {
             handle_leading_function_with_decorators_comment(comment)
+                .or_else(|comment| handle_leading_returns_comment(comment, function_def))
         }
         AnyNodeRef::StmtClassDef(class_def) => {
             handle_leading_class_with_decorators_comment(comment, class_def)
         }
         AnyNodeRef::StmtImportFrom(import_from) => handle_import_from_comment(comment, import_from),
+        AnyNodeRef::ExprConstant(_) => {
+            if let Some(AnyNodeRef::ExprFString(fstring)) = comment.enclosing_parent() {
+                CommentPlacement::dangling(fstring, comment)
+            } else {
+                CommentPlacement::Default(comment)
+            }
+        }
+        AnyNodeRef::ExprFString(fstring) => CommentPlacement::dangling(fstring, comment),
         AnyNodeRef::ExprList(_)
         | AnyNodeRef::ExprSet(_)
         | AnyNodeRef::ExprGeneratorExp(_)
@@ -178,7 +185,6 @@ fn handle_end_of_line_comment_around_body<'a>(
 fn is_first_statement_in_body(statement: AnyNodeRef, has_body: AnyNodeRef) -> bool {
     match has_body {
         AnyNodeRef::StmtFor(ast::StmtFor { body, orelse, .. })
-        | AnyNodeRef::StmtAsyncFor(ast::StmtAsyncFor { body, orelse, .. })
         | AnyNodeRef::StmtWhile(ast::StmtWhile { body, orelse, .. }) => {
             are_same_optional(statement, body.first())
                 || are_same_optional(statement, orelse.first())
@@ -207,10 +213,14 @@ fn is_first_statement_in_body(statement: AnyNodeRef, has_body: AnyNodeRef) -> bo
         | AnyNodeRef::ExceptHandlerExceptHandler(ast::ExceptHandlerExceptHandler {
             body, ..
         })
+        | AnyNodeRef::MatchCase(ast::MatchCase { body, .. })
         | AnyNodeRef::StmtFunctionDef(ast::StmtFunctionDef { body, .. })
-        | AnyNodeRef::StmtAsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. })
         | AnyNodeRef::StmtClassDef(ast::StmtClassDef { body, .. }) => {
             are_same_optional(statement, body.first())
+        }
+
+        AnyNodeRef::StmtMatch(ast::StmtMatch { cases, .. }) => {
+            are_same_optional(statement, cases.first())
         }
 
         _ => false,
@@ -410,105 +420,6 @@ fn handle_own_line_comment_in_clause<'a>(
     CommentPlacement::Default(comment)
 }
 
-/// Handles leading comments in front of a match case or a trailing comment of the `match` statement.
-/// ```python
-/// match pt:
-///     # Leading `case(x, y)` comment
-///     case (x, y):
-///         return Point3d(x, y, 0)
-///     # Leading `case (x, y, z)` comment
-///     case _:
-/// ```
-fn handle_match_comment<'a>(
-    comment: DecoratedComment<'a>,
-    match_case: &'a MatchCase,
-    locator: &Locator,
-) -> CommentPlacement<'a> {
-    // Must be an own line comment after the last statement in a match case
-    if comment.line_position().is_end_of_line() || comment.following_node().is_some() {
-        return CommentPlacement::Default(comment);
-    }
-
-    // And its parent match statement.
-    let Some(match_stmt) = comment.enclosing_parent().and_then(AnyNodeRef::stmt_match) else {
-        return CommentPlacement::Default(comment);
-    };
-
-    // Get the next sibling (sibling traversal would be really nice)
-    let current_case_index = match_stmt
-        .cases
-        .iter()
-        .position(|case| case == match_case)
-        .expect("Expected case to belong to parent match statement.");
-
-    let next_case = match_stmt.cases.get(current_case_index + 1);
-
-    let comment_indentation = indentation_at_offset(comment.slice().range().start(), locator)
-        .unwrap_or_default()
-        .len();
-    let match_case_indentation = indentation(locator, match_case).unwrap().len();
-
-    if let Some(next_case) = next_case {
-        // The comment's indentation is less or equal to the `case` indention and there's a following
-        // `case` arm.
-        // ```python
-        // match pt:
-        //     case (x, y):
-        //         return Point3d(x, y, 0)
-        //     # Leading `case (x, y, z)` comment
-        //     case _:
-        //         pass
-        // ```
-        // Attach the `comment` as leading comment to the next case.
-        if comment_indentation <= match_case_indentation {
-            CommentPlacement::leading(next_case, comment)
-        } else {
-            // Otherwise, delegate to `handle_trailing_body_comment`
-            // ```python
-            // match pt:
-            //     case (x, y):
-            //         return Point3d(x, y, 0)
-            //         # Trailing case body comment
-            //     case _:
-            //         pass
-            // ```
-            CommentPlacement::Default(comment)
-        }
-    } else {
-        // Comment after the last statement in a match case...
-        let match_stmt_indentation = indentation(locator, match_stmt).unwrap_or_default().len();
-
-        if comment_indentation <= match_case_indentation
-            && comment_indentation > match_stmt_indentation
-        {
-            // The comment's indent matches the `case` indent (or is larger than the `match`'s indent).
-            // ```python
-            // match pt:
-            //     case (x, y):
-            //         return Point3d(x, y, 0)
-            //     case _:
-            //         pass
-            //     # Trailing match comment
-            // ```
-            // This is a trailing comment of the last case.
-            CommentPlacement::trailing(match_case, comment)
-        } else {
-            // Delegate to `handle_trailing_body_comment` because it's either a trailing indent
-            // for the last statement in the `case` body or a comment for the parent of the `match`
-            //
-            // ```python
-            // match pt:
-            //     case (x, y):
-            //         return Point3d(x, y, 0)
-            //     case _:
-            //         pass
-            //         # trailing case comment
-            // ```
-            CommentPlacement::Default(comment)
-        }
-    }
-}
-
 /// Determine where to attach an own line comment after a branch depending on its indentation
 fn handle_own_line_comment_after_branch<'a>(
     comment: DecoratedComment<'a>,
@@ -541,12 +452,11 @@ fn handle_own_line_comment_after_branch<'a>(
         return CommentPlacement::Default(comment);
     }
 
-    let mut parent_body = None;
-    let mut current_body = Some(preceding_node);
-    let mut last_child_in_current_body = last_child;
+    let mut parent = None;
+    let mut last_child_in_parent = last_child;
 
     loop {
-        let child_indentation = indentation(locator, &last_child_in_current_body)
+        let child_indentation = indentation(locator, &last_child_in_parent)
             .unwrap_or_default()
             .len();
 
@@ -555,15 +465,16 @@ fn handle_own_line_comment_after_branch<'a>(
         // if parent_body:
         //     if current_body:
         //         child_in_body()
-        //         last_child_in_current_body # may or may not have children on its own
+        //         last_child_in_current_body  # may or may not have children on its own
         // # less: Comment belongs to the parent block.
-        //   # less
+        //   # less: Comment belongs to the parent block.
         //     # equal: The comment belongs to this block.
-        //        # greater
-        //          # greater: The comment belongs to the inner block.
+        //       # greater (but less in the next iteration)
+        //         # greater: The comment belongs to the inner block.
+        // ```
         match comment_indentation.cmp(&child_indentation) {
             Ordering::Less => {
-                return if let Some(parent_block) = parent_body {
+                return if let Some(parent_block) = parent {
                     // Comment belongs to the parent block.
                     CommentPlacement::trailing(parent_block, comment)
                 } else {
@@ -578,14 +489,13 @@ fn handle_own_line_comment_after_branch<'a>(
             }
             Ordering::Equal => {
                 // The comment belongs to this block.
-                return CommentPlacement::trailing(last_child_in_current_body, comment);
+                return CommentPlacement::trailing(last_child_in_parent, comment);
             }
             Ordering::Greater => {
-                if let Some(nested_child) = last_child_in_body(last_child_in_current_body) {
+                if let Some(nested_child) = last_child_in_body(last_child_in_parent) {
                     // The comment belongs to the inner block.
-                    parent_body = current_body;
-                    current_body = Some(last_child_in_current_body);
-                    last_child_in_current_body = nested_child;
+                    parent = Some(last_child_in_parent);
+                    last_child_in_parent = nested_child;
                 } else {
                     // The comment is overindented, we assign it to the most indented child we have.
                     // ```python
@@ -593,7 +503,7 @@ fn handle_own_line_comment_after_branch<'a>(
                     //     pass
                     //       # comment
                     // ```
-                    return CommentPlacement::trailing(last_child_in_current_body, comment);
+                    return CommentPlacement::trailing(last_child_in_parent, comment);
                 }
             }
         }
@@ -609,7 +519,7 @@ fn handle_parameters_separator_comment<'a>(
     parameters: &Parameters,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    let (slash, star) = find_argument_separators(locator.contents(), parameters);
+    let (slash, star) = find_parameter_separators(locator.contents(), parameters);
     let comment_range = comment.slice().range();
     let placement = assign_argument_separator_comment_placement(
         slash.as_ref(),
@@ -773,9 +683,7 @@ fn handle_module_level_own_line_comment_before_class_or_function_comment<'a>(
     // ... where the following is a function or class statement.
     if !matches!(
         following,
-        AnyNodeRef::StmtAsyncFunctionDef(_)
-            | AnyNodeRef::StmtFunctionDef(_)
-            | AnyNodeRef::StmtClassDef(_)
+        AnyNodeRef::StmtFunctionDef(_) | AnyNodeRef::StmtClassDef(_)
     ) {
         return CommentPlacement::Default(comment);
     }
@@ -878,6 +786,40 @@ fn handle_leading_function_with_decorators_comment(comment: DecoratedComment) ->
         .is_some_and(|node| node.is_parameters());
 
     if comment.line_position().is_own_line() && is_preceding_decorator && is_following_parameters {
+        CommentPlacement::dangling(comment.enclosing_node(), comment)
+    } else {
+        CommentPlacement::Default(comment)
+    }
+}
+
+/// Handles end-of-line comments between function parameters and the return type annotation,
+/// attaching them as dangling comments to the function instead of making them trailing
+/// parameter comments.
+///
+/// ```python
+/// def double(a: int) -> ( # Hello
+///     int
+/// ):
+///     return 2*a
+/// ```
+fn handle_leading_returns_comment<'a>(
+    comment: DecoratedComment<'a>,
+    function_def: &'a ast::StmtFunctionDef,
+) -> CommentPlacement<'a> {
+    let parameters = function_def.parameters.as_ref();
+    let Some(returns) = function_def.returns.as_deref() else {
+        return CommentPlacement::Default(comment);
+    };
+
+    let is_preceding_parameters = comment
+        .preceding_node()
+        .is_some_and(|node| node == parameters.into());
+
+    let is_following_returns = comment
+        .following_node()
+        .is_some_and(|node| node == returns.into());
+
+    if comment.line_position().is_end_of_line() && is_preceding_parameters && is_following_returns {
         CommentPlacement::dangling(comment.enclosing_node(), comment)
     } else {
         CommentPlacement::Default(comment)
@@ -1404,14 +1346,12 @@ where
     right.is_some_and(|right| left.ptr_eq(right.into()))
 }
 
-/// The last child of the last branch, if the node hs multiple branches.
+/// The last child of the last branch, if the node has multiple branches.
 fn last_child_in_body(node: AnyNodeRef) -> Option<AnyNodeRef> {
     let body = match node {
         AnyNodeRef::StmtFunctionDef(ast::StmtFunctionDef { body, .. })
-        | AnyNodeRef::StmtAsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. })
         | AnyNodeRef::StmtClassDef(ast::StmtClassDef { body, .. })
         | AnyNodeRef::StmtWith(ast::StmtWith { body, .. })
-        | AnyNodeRef::StmtAsyncWith(ast::StmtAsyncWith { body, .. })
         | AnyNodeRef::MatchCase(MatchCase { body, .. })
         | AnyNodeRef::ExceptHandlerExceptHandler(ast::ExceptHandlerExceptHandler {
             body, ..
@@ -1424,7 +1364,6 @@ fn last_child_in_body(node: AnyNodeRef) -> Option<AnyNodeRef> {
         }) => elif_else_clauses.last().map_or(body, |clause| &clause.body),
 
         AnyNodeRef::StmtFor(ast::StmtFor { body, orelse, .. })
-        | AnyNodeRef::StmtAsyncFor(ast::StmtAsyncFor { body, orelse, .. })
         | AnyNodeRef::StmtWhile(ast::StmtWhile { body, orelse, .. }) => {
             if orelse.is_empty() {
                 body
@@ -1477,7 +1416,6 @@ fn last_child_in_body(node: AnyNodeRef) -> Option<AnyNodeRef> {
 fn is_first_statement_in_alternate_body(statement: AnyNodeRef, has_body: AnyNodeRef) -> bool {
     match has_body {
         AnyNodeRef::StmtFor(ast::StmtFor { orelse, .. })
-        | AnyNodeRef::StmtAsyncFor(ast::StmtAsyncFor { orelse, .. })
         | AnyNodeRef::StmtWhile(ast::StmtWhile { orelse, .. }) => {
             are_same_optional(statement, orelse.first())
         }
@@ -1506,21 +1444,32 @@ fn is_first_statement_in_alternate_body(statement: AnyNodeRef, has_body: AnyNode
     }
 }
 
-/// Counts the number of newlines in `contents`.
-fn max_empty_lines(contents: &str) -> usize {
-    let mut empty_lines = 0;
-    let mut max_empty_lines = 0;
+/// Counts the number of empty lines in `contents`.
+fn max_empty_lines(contents: &str) -> u32 {
+    let mut newlines = 0u32;
+    let mut max_new_lines = 0;
 
-    for line in contents.universal_newlines().skip(1) {
-        if line.trim_whitespace().is_empty() {
-            empty_lines += 1;
-        } else {
-            max_empty_lines = max_empty_lines.max(empty_lines);
-            empty_lines = 0;
+    for token in SimpleTokenizer::new(contents, TextRange::up_to(contents.text_len())) {
+        match token.kind() {
+            SimpleTokenKind::Newline => {
+                newlines += 1;
+            }
+
+            SimpleTokenKind::Whitespace => {}
+
+            SimpleTokenKind::Comment => {
+                max_new_lines = newlines.max(max_new_lines);
+                newlines = 0;
+            }
+
+            _ => {
+                max_new_lines = newlines.max(max_new_lines);
+                break;
+            }
         }
     }
 
-    max_empty_lines
+    max_new_lines.saturating_sub(1)
 }
 
 #[cfg(test)]
@@ -1555,9 +1504,7 @@ mod tests {
         );
 
         assert_eq!(
-            max_empty_lines(
-                "# trailing comment\n\n# own line comment\n\n\n# an other own line comment\n# block"
-            ),
+            max_empty_lines("# trailing comment\n\n# own line comment\n\n\n# an other own line comment\n# block"),
             2
         );
 

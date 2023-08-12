@@ -117,6 +117,10 @@ f (
     1
     # abc
 )
+
+threshold_date = datetime.datetime.now() - datetime.timedelta(  # comment
+    days=threshold_days_threshold_days
+)
 ```
 
 ## Output
@@ -209,7 +213,8 @@ f(
     a.very_long_function_function_that_is_so_long_that_it_expands_the_parent_but_its_only_a_single_argument()
 )
 
-f()  # abc
+f(  # abc
+)
 
 f(  # abc
     # abc
@@ -219,7 +224,9 @@ f(
     # abc
 )
 
-f(1)  # abc
+f(  # abc
+    1
+)
 
 f(
     # abc
@@ -229,6 +236,10 @@ f(
 f(
     1
     # abc
+)
+
+threshold_date = datetime.datetime.now() - datetime.timedelta(  # comment
+    days=threshold_days_threshold_days
 )
 ```
 

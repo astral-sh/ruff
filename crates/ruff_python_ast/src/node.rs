@@ -1,3 +1,4 @@
+use crate::visitor::preorder::PreorderVisitor;
 use crate::{
     self as ast, Alias, Arguments, Comprehension, Decorator, ExceptHandler, Expr, Keyword,
     MatchCase, Mod, Parameter, ParameterWithDefault, Parameters, Pattern, Ranged, Stmt, TypeParam,
@@ -17,6 +18,10 @@ pub trait AstNode: Ranged {
 
     /// Consumes `self` and returns its [`AnyNode`] representation.
     fn into_any_node(self) -> AnyNode;
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized;
 }
 
 #[derive(Clone, Debug, is_macro::Is, PartialEq)]
@@ -24,7 +29,6 @@ pub enum AnyNode {
     ModModule(ast::ModModule),
     ModExpression(ast::ModExpression),
     StmtFunctionDef(ast::StmtFunctionDef),
-    StmtAsyncFunctionDef(ast::StmtAsyncFunctionDef),
     StmtClassDef(ast::StmtClassDef),
     StmtReturn(ast::StmtReturn),
     StmtDelete(ast::StmtDelete),
@@ -33,11 +37,9 @@ pub enum AnyNode {
     StmtAugAssign(ast::StmtAugAssign),
     StmtAnnAssign(ast::StmtAnnAssign),
     StmtFor(ast::StmtFor),
-    StmtAsyncFor(ast::StmtAsyncFor),
     StmtWhile(ast::StmtWhile),
     StmtIf(ast::StmtIf),
     StmtWith(ast::StmtWith),
-    StmtAsyncWith(ast::StmtAsyncWith),
     StmtMatch(ast::StmtMatch),
     StmtRaise(ast::StmtRaise),
     StmtTry(ast::StmtTry),
@@ -51,7 +53,7 @@ pub enum AnyNode {
     StmtPass(ast::StmtPass),
     StmtBreak(ast::StmtBreak),
     StmtContinue(ast::StmtContinue),
-    StmtLineMagic(ast::StmtLineMagic),
+    StmtIpyEscapeCommand(ast::StmtIpyEscapeCommand),
     ExprBoolOp(ast::ExprBoolOp),
     ExprNamedExpr(ast::ExprNamedExpr),
     ExprBinOp(ast::ExprBinOp),
@@ -70,7 +72,7 @@ pub enum AnyNode {
     ExprCompare(ast::ExprCompare),
     ExprCall(ast::ExprCall),
     ExprFormattedValue(ast::ExprFormattedValue),
-    ExprJoinedStr(ast::ExprJoinedStr),
+    ExprFString(ast::ExprFString),
     ExprConstant(ast::ExprConstant),
     ExprAttribute(ast::ExprAttribute),
     ExprSubscript(ast::ExprSubscript),
@@ -79,7 +81,7 @@ pub enum AnyNode {
     ExprList(ast::ExprList),
     ExprTuple(ast::ExprTuple),
     ExprSlice(ast::ExprSlice),
-    ExprLineMagic(ast::ExprLineMagic),
+    ExprIpyEscapeCommand(ast::ExprIpyEscapeCommand),
     ExceptHandlerExceptHandler(ast::ExceptHandlerExceptHandler),
     PatternMatchValue(ast::PatternMatchValue),
     PatternMatchSingleton(ast::PatternMatchSingleton),
@@ -110,7 +112,6 @@ impl AnyNode {
     pub fn statement(self) -> Option<Stmt> {
         match self {
             AnyNode::StmtFunctionDef(node) => Some(Stmt::FunctionDef(node)),
-            AnyNode::StmtAsyncFunctionDef(node) => Some(Stmt::AsyncFunctionDef(node)),
             AnyNode::StmtClassDef(node) => Some(Stmt::ClassDef(node)),
             AnyNode::StmtReturn(node) => Some(Stmt::Return(node)),
             AnyNode::StmtDelete(node) => Some(Stmt::Delete(node)),
@@ -119,11 +120,9 @@ impl AnyNode {
             AnyNode::StmtAugAssign(node) => Some(Stmt::AugAssign(node)),
             AnyNode::StmtAnnAssign(node) => Some(Stmt::AnnAssign(node)),
             AnyNode::StmtFor(node) => Some(Stmt::For(node)),
-            AnyNode::StmtAsyncFor(node) => Some(Stmt::AsyncFor(node)),
             AnyNode::StmtWhile(node) => Some(Stmt::While(node)),
             AnyNode::StmtIf(node) => Some(Stmt::If(node)),
             AnyNode::StmtWith(node) => Some(Stmt::With(node)),
-            AnyNode::StmtAsyncWith(node) => Some(Stmt::AsyncWith(node)),
             AnyNode::StmtMatch(node) => Some(Stmt::Match(node)),
             AnyNode::StmtRaise(node) => Some(Stmt::Raise(node)),
             AnyNode::StmtTry(node) => Some(Stmt::Try(node)),
@@ -137,7 +136,7 @@ impl AnyNode {
             AnyNode::StmtPass(node) => Some(Stmt::Pass(node)),
             AnyNode::StmtBreak(node) => Some(Stmt::Break(node)),
             AnyNode::StmtContinue(node) => Some(Stmt::Continue(node)),
-            AnyNode::StmtLineMagic(node) => Some(Stmt::LineMagic(node)),
+            AnyNode::StmtIpyEscapeCommand(node) => Some(Stmt::IpyEscapeCommand(node)),
 
             AnyNode::ModModule(_)
             | AnyNode::ModExpression(_)
@@ -159,7 +158,7 @@ impl AnyNode {
             | AnyNode::ExprCompare(_)
             | AnyNode::ExprCall(_)
             | AnyNode::ExprFormattedValue(_)
-            | AnyNode::ExprJoinedStr(_)
+            | AnyNode::ExprFString(_)
             | AnyNode::ExprConstant(_)
             | AnyNode::ExprAttribute(_)
             | AnyNode::ExprSubscript(_)
@@ -168,7 +167,7 @@ impl AnyNode {
             | AnyNode::ExprList(_)
             | AnyNode::ExprTuple(_)
             | AnyNode::ExprSlice(_)
-            | AnyNode::ExprLineMagic(_)
+            | AnyNode::ExprIpyEscapeCommand(_)
             | AnyNode::ExceptHandlerExceptHandler(_)
             | AnyNode::PatternMatchValue(_)
             | AnyNode::PatternMatchSingleton(_)
@@ -216,7 +215,7 @@ impl AnyNode {
             AnyNode::ExprCompare(node) => Some(Expr::Compare(node)),
             AnyNode::ExprCall(node) => Some(Expr::Call(node)),
             AnyNode::ExprFormattedValue(node) => Some(Expr::FormattedValue(node)),
-            AnyNode::ExprJoinedStr(node) => Some(Expr::JoinedStr(node)),
+            AnyNode::ExprFString(node) => Some(Expr::FString(node)),
             AnyNode::ExprConstant(node) => Some(Expr::Constant(node)),
             AnyNode::ExprAttribute(node) => Some(Expr::Attribute(node)),
             AnyNode::ExprSubscript(node) => Some(Expr::Subscript(node)),
@@ -225,12 +224,11 @@ impl AnyNode {
             AnyNode::ExprList(node) => Some(Expr::List(node)),
             AnyNode::ExprTuple(node) => Some(Expr::Tuple(node)),
             AnyNode::ExprSlice(node) => Some(Expr::Slice(node)),
-            AnyNode::ExprLineMagic(node) => Some(Expr::LineMagic(node)),
+            AnyNode::ExprIpyEscapeCommand(node) => Some(Expr::IpyEscapeCommand(node)),
 
             AnyNode::ModModule(_)
             | AnyNode::ModExpression(_)
             | AnyNode::StmtFunctionDef(_)
-            | AnyNode::StmtAsyncFunctionDef(_)
             | AnyNode::StmtClassDef(_)
             | AnyNode::StmtReturn(_)
             | AnyNode::StmtDelete(_)
@@ -239,11 +237,9 @@ impl AnyNode {
             | AnyNode::StmtAugAssign(_)
             | AnyNode::StmtAnnAssign(_)
             | AnyNode::StmtFor(_)
-            | AnyNode::StmtAsyncFor(_)
             | AnyNode::StmtWhile(_)
             | AnyNode::StmtIf(_)
             | AnyNode::StmtWith(_)
-            | AnyNode::StmtAsyncWith(_)
             | AnyNode::StmtMatch(_)
             | AnyNode::StmtRaise(_)
             | AnyNode::StmtTry(_)
@@ -257,7 +253,7 @@ impl AnyNode {
             | AnyNode::StmtPass(_)
             | AnyNode::StmtBreak(_)
             | AnyNode::StmtContinue(_)
-            | AnyNode::StmtLineMagic(_)
+            | AnyNode::StmtIpyEscapeCommand(_)
             | AnyNode::ExceptHandlerExceptHandler(_)
             | AnyNode::PatternMatchValue(_)
             | AnyNode::PatternMatchSingleton(_)
@@ -291,7 +287,6 @@ impl AnyNode {
             AnyNode::ModExpression(node) => Some(Mod::Expression(node)),
 
             AnyNode::StmtFunctionDef(_)
-            | AnyNode::StmtAsyncFunctionDef(_)
             | AnyNode::StmtClassDef(_)
             | AnyNode::StmtReturn(_)
             | AnyNode::StmtDelete(_)
@@ -300,11 +295,9 @@ impl AnyNode {
             | AnyNode::StmtAugAssign(_)
             | AnyNode::StmtAnnAssign(_)
             | AnyNode::StmtFor(_)
-            | AnyNode::StmtAsyncFor(_)
             | AnyNode::StmtWhile(_)
             | AnyNode::StmtIf(_)
             | AnyNode::StmtWith(_)
-            | AnyNode::StmtAsyncWith(_)
             | AnyNode::StmtMatch(_)
             | AnyNode::StmtRaise(_)
             | AnyNode::StmtTry(_)
@@ -318,7 +311,7 @@ impl AnyNode {
             | AnyNode::StmtPass(_)
             | AnyNode::StmtBreak(_)
             | AnyNode::StmtContinue(_)
-            | AnyNode::StmtLineMagic(_)
+            | AnyNode::StmtIpyEscapeCommand(_)
             | AnyNode::ExprBoolOp(_)
             | AnyNode::ExprNamedExpr(_)
             | AnyNode::ExprBinOp(_)
@@ -337,7 +330,7 @@ impl AnyNode {
             | AnyNode::ExprCompare(_)
             | AnyNode::ExprCall(_)
             | AnyNode::ExprFormattedValue(_)
-            | AnyNode::ExprJoinedStr(_)
+            | AnyNode::ExprFString(_)
             | AnyNode::ExprConstant(_)
             | AnyNode::ExprAttribute(_)
             | AnyNode::ExprSubscript(_)
@@ -346,7 +339,7 @@ impl AnyNode {
             | AnyNode::ExprList(_)
             | AnyNode::ExprTuple(_)
             | AnyNode::ExprSlice(_)
-            | AnyNode::ExprLineMagic(_)
+            | AnyNode::ExprIpyEscapeCommand(_)
             | AnyNode::ExceptHandlerExceptHandler(_)
             | AnyNode::PatternMatchValue(_)
             | AnyNode::PatternMatchSingleton(_)
@@ -388,7 +381,6 @@ impl AnyNode {
             AnyNode::ModModule(_)
             | AnyNode::ModExpression(_)
             | AnyNode::StmtFunctionDef(_)
-            | AnyNode::StmtAsyncFunctionDef(_)
             | AnyNode::StmtClassDef(_)
             | AnyNode::StmtReturn(_)
             | AnyNode::StmtDelete(_)
@@ -397,11 +389,9 @@ impl AnyNode {
             | AnyNode::StmtAugAssign(_)
             | AnyNode::StmtAnnAssign(_)
             | AnyNode::StmtFor(_)
-            | AnyNode::StmtAsyncFor(_)
             | AnyNode::StmtWhile(_)
             | AnyNode::StmtIf(_)
             | AnyNode::StmtWith(_)
-            | AnyNode::StmtAsyncWith(_)
             | AnyNode::StmtMatch(_)
             | AnyNode::StmtRaise(_)
             | AnyNode::StmtTry(_)
@@ -415,7 +405,7 @@ impl AnyNode {
             | AnyNode::StmtPass(_)
             | AnyNode::StmtBreak(_)
             | AnyNode::StmtContinue(_)
-            | AnyNode::StmtLineMagic(_)
+            | AnyNode::StmtIpyEscapeCommand(_)
             | AnyNode::ExprBoolOp(_)
             | AnyNode::ExprNamedExpr(_)
             | AnyNode::ExprBinOp(_)
@@ -434,7 +424,7 @@ impl AnyNode {
             | AnyNode::ExprCompare(_)
             | AnyNode::ExprCall(_)
             | AnyNode::ExprFormattedValue(_)
-            | AnyNode::ExprJoinedStr(_)
+            | AnyNode::ExprFString(_)
             | AnyNode::ExprConstant(_)
             | AnyNode::ExprAttribute(_)
             | AnyNode::ExprSubscript(_)
@@ -443,7 +433,7 @@ impl AnyNode {
             | AnyNode::ExprList(_)
             | AnyNode::ExprTuple(_)
             | AnyNode::ExprSlice(_)
-            | AnyNode::ExprLineMagic(_)
+            | AnyNode::ExprIpyEscapeCommand(_)
             | AnyNode::ExceptHandlerExceptHandler(_)
             | AnyNode::Comprehension(_)
             | AnyNode::Arguments(_)
@@ -470,7 +460,6 @@ impl AnyNode {
             AnyNode::ModModule(_)
             | AnyNode::ModExpression(_)
             | AnyNode::StmtFunctionDef(_)
-            | AnyNode::StmtAsyncFunctionDef(_)
             | AnyNode::StmtClassDef(_)
             | AnyNode::StmtReturn(_)
             | AnyNode::StmtDelete(_)
@@ -479,11 +468,9 @@ impl AnyNode {
             | AnyNode::StmtAugAssign(_)
             | AnyNode::StmtAnnAssign(_)
             | AnyNode::StmtFor(_)
-            | AnyNode::StmtAsyncFor(_)
             | AnyNode::StmtWhile(_)
             | AnyNode::StmtIf(_)
             | AnyNode::StmtWith(_)
-            | AnyNode::StmtAsyncWith(_)
             | AnyNode::StmtMatch(_)
             | AnyNode::StmtRaise(_)
             | AnyNode::StmtTry(_)
@@ -497,7 +484,7 @@ impl AnyNode {
             | AnyNode::StmtPass(_)
             | AnyNode::StmtBreak(_)
             | AnyNode::StmtContinue(_)
-            | AnyNode::StmtLineMagic(_)
+            | AnyNode::StmtIpyEscapeCommand(_)
             | AnyNode::ExprBoolOp(_)
             | AnyNode::ExprNamedExpr(_)
             | AnyNode::ExprBinOp(_)
@@ -516,7 +503,7 @@ impl AnyNode {
             | AnyNode::ExprCompare(_)
             | AnyNode::ExprCall(_)
             | AnyNode::ExprFormattedValue(_)
-            | AnyNode::ExprJoinedStr(_)
+            | AnyNode::ExprFString(_)
             | AnyNode::ExprConstant(_)
             | AnyNode::ExprAttribute(_)
             | AnyNode::ExprSubscript(_)
@@ -525,7 +512,7 @@ impl AnyNode {
             | AnyNode::ExprList(_)
             | AnyNode::ExprTuple(_)
             | AnyNode::ExprSlice(_)
-            | AnyNode::ExprLineMagic(_)
+            | AnyNode::ExprIpyEscapeCommand(_)
             | AnyNode::PatternMatchValue(_)
             | AnyNode::PatternMatchSingleton(_)
             | AnyNode::PatternMatchSequence(_)
@@ -577,7 +564,6 @@ impl AnyNode {
             Self::ModModule(node) => AnyNodeRef::ModModule(node),
             Self::ModExpression(node) => AnyNodeRef::ModExpression(node),
             Self::StmtFunctionDef(node) => AnyNodeRef::StmtFunctionDef(node),
-            Self::StmtAsyncFunctionDef(node) => AnyNodeRef::StmtAsyncFunctionDef(node),
             Self::StmtClassDef(node) => AnyNodeRef::StmtClassDef(node),
             Self::StmtReturn(node) => AnyNodeRef::StmtReturn(node),
             Self::StmtDelete(node) => AnyNodeRef::StmtDelete(node),
@@ -586,11 +572,9 @@ impl AnyNode {
             Self::StmtAugAssign(node) => AnyNodeRef::StmtAugAssign(node),
             Self::StmtAnnAssign(node) => AnyNodeRef::StmtAnnAssign(node),
             Self::StmtFor(node) => AnyNodeRef::StmtFor(node),
-            Self::StmtAsyncFor(node) => AnyNodeRef::StmtAsyncFor(node),
             Self::StmtWhile(node) => AnyNodeRef::StmtWhile(node),
             Self::StmtIf(node) => AnyNodeRef::StmtIf(node),
             Self::StmtWith(node) => AnyNodeRef::StmtWith(node),
-            Self::StmtAsyncWith(node) => AnyNodeRef::StmtAsyncWith(node),
             Self::StmtMatch(node) => AnyNodeRef::StmtMatch(node),
             Self::StmtRaise(node) => AnyNodeRef::StmtRaise(node),
             Self::StmtTry(node) => AnyNodeRef::StmtTry(node),
@@ -604,7 +588,7 @@ impl AnyNode {
             Self::StmtPass(node) => AnyNodeRef::StmtPass(node),
             Self::StmtBreak(node) => AnyNodeRef::StmtBreak(node),
             Self::StmtContinue(node) => AnyNodeRef::StmtContinue(node),
-            Self::StmtLineMagic(node) => AnyNodeRef::StmtLineMagic(node),
+            Self::StmtIpyEscapeCommand(node) => AnyNodeRef::StmtIpyEscapeCommand(node),
             Self::ExprBoolOp(node) => AnyNodeRef::ExprBoolOp(node),
             Self::ExprNamedExpr(node) => AnyNodeRef::ExprNamedExpr(node),
             Self::ExprBinOp(node) => AnyNodeRef::ExprBinOp(node),
@@ -623,7 +607,7 @@ impl AnyNode {
             Self::ExprCompare(node) => AnyNodeRef::ExprCompare(node),
             Self::ExprCall(node) => AnyNodeRef::ExprCall(node),
             Self::ExprFormattedValue(node) => AnyNodeRef::ExprFormattedValue(node),
-            Self::ExprJoinedStr(node) => AnyNodeRef::ExprJoinedStr(node),
+            Self::ExprFString(node) => AnyNodeRef::ExprFString(node),
             Self::ExprConstant(node) => AnyNodeRef::ExprConstant(node),
             Self::ExprAttribute(node) => AnyNodeRef::ExprAttribute(node),
             Self::ExprSubscript(node) => AnyNodeRef::ExprSubscript(node),
@@ -632,7 +616,7 @@ impl AnyNode {
             Self::ExprList(node) => AnyNodeRef::ExprList(node),
             Self::ExprTuple(node) => AnyNodeRef::ExprTuple(node),
             Self::ExprSlice(node) => AnyNodeRef::ExprSlice(node),
-            Self::ExprLineMagic(node) => AnyNodeRef::ExprLineMagic(node),
+            Self::ExprIpyEscapeCommand(node) => AnyNodeRef::ExprIpyEscapeCommand(node),
             Self::ExceptHandlerExceptHandler(node) => AnyNodeRef::ExceptHandlerExceptHandler(node),
             Self::PatternMatchValue(node) => AnyNodeRef::PatternMatchValue(node),
             Self::PatternMatchSingleton(node) => AnyNodeRef::PatternMatchSingleton(node),
@@ -693,7 +677,16 @@ impl AstNode for ast::ModModule {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ModModule { body, range: _ } = self;
+        visitor.visit_body(body);
+    }
 }
+
 impl AstNode for ast::ModExpression {
     fn cast(kind: AnyNode) -> Option<Self>
     where
@@ -720,6 +713,14 @@ impl AstNode for ast::ModExpression {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ModExpression { body, range: _ } = self;
+        visitor.visit_expr(body);
     }
 }
 impl AstNode for ast::StmtFunctionDef {
@@ -749,33 +750,35 @@ impl AstNode for ast::StmtFunctionDef {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
-}
-impl AstNode for ast::StmtAsyncFunctionDef {
-    fn cast(kind: AnyNode) -> Option<Self>
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
     where
-        Self: Sized,
+        V: PreorderVisitor<'a> + ?Sized,
     {
-        if let AnyNode::StmtAsyncFunctionDef(node) = kind {
-            Some(node)
-        } else {
-            None
+        let ast::StmtFunctionDef {
+            parameters,
+            body,
+            decorator_list,
+            returns,
+            type_params,
+            ..
+        } = self;
+
+        for decorator in decorator_list {
+            visitor.visit_decorator(decorator);
         }
-    }
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::StmtAsyncFunctionDef(node) = kind {
-            Some(node)
-        } else {
-            None
+        if let Some(type_params) = type_params {
+            visitor.visit_type_params(type_params);
         }
-    }
 
-    fn as_any_node_ref(&self) -> AnyNodeRef {
-        AnyNodeRef::from(self)
-    }
+        visitor.visit_parameters(parameters);
 
-    fn into_any_node(self) -> AnyNode {
-        AnyNode::from(self)
+        for expr in returns {
+            visitor.visit_annotation(expr);
+        }
+
+        visitor.visit_body(body);
     }
 }
 impl AstNode for ast::StmtClassDef {
@@ -805,6 +808,33 @@ impl AstNode for ast::StmtClassDef {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtClassDef {
+            arguments,
+            body,
+            decorator_list,
+            type_params,
+            ..
+        } = self;
+
+        for decorator in decorator_list {
+            visitor.visit_decorator(decorator);
+        }
+
+        if let Some(type_params) = type_params {
+            visitor.visit_type_params(type_params);
+        }
+
+        if let Some(arguments) = arguments {
+            visitor.visit_arguments(arguments);
+        }
+
+        visitor.visit_body(body);
+    }
 }
 impl AstNode for ast::StmtReturn {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -832,6 +862,16 @@ impl AstNode for ast::StmtReturn {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtReturn { value, range: _ } = self;
+        if let Some(expr) = value {
+            visitor.visit_expr(expr);
+        }
     }
 }
 impl AstNode for ast::StmtDelete {
@@ -861,6 +901,16 @@ impl AstNode for ast::StmtDelete {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtDelete { targets, range: _ } = self;
+        for expr in targets {
+            visitor.visit_expr(expr);
+        }
+    }
 }
 impl AstNode for ast::StmtTypeAlias {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -888,6 +938,24 @@ impl AstNode for ast::StmtTypeAlias {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtTypeAlias {
+            range: _,
+            name,
+            type_params,
+            value,
+        } = self;
+
+        visitor.visit_expr(name);
+        if let Some(type_params) = type_params {
+            visitor.visit_type_params(type_params);
+        }
+        visitor.visit_expr(value);
     }
 }
 impl AstNode for ast::StmtAssign {
@@ -917,6 +985,23 @@ impl AstNode for ast::StmtAssign {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtAssign {
+            targets,
+            value,
+            range: _,
+        } = self;
+
+        for expr in targets {
+            visitor.visit_expr(expr);
+        }
+
+        visitor.visit_expr(value);
+    }
 }
 impl AstNode for ast::StmtAugAssign {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -944,6 +1029,22 @@ impl AstNode for ast::StmtAugAssign {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtAugAssign {
+            target,
+            op,
+            value,
+            range: _,
+        } = self;
+
+        visitor.visit_expr(target);
+        visitor.visit_operator(op);
+        visitor.visit_expr(value);
     }
 }
 impl AstNode for ast::StmtAnnAssign {
@@ -973,6 +1074,25 @@ impl AstNode for ast::StmtAnnAssign {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtAnnAssign {
+            target,
+            annotation,
+            value,
+            range: _,
+            simple: _,
+        } = self;
+
+        visitor.visit_expr(target);
+        visitor.visit_annotation(annotation);
+        if let Some(expr) = value {
+            visitor.visit_expr(expr);
+        }
+    }
 }
 impl AstNode for ast::StmtFor {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1001,33 +1121,23 @@ impl AstNode for ast::StmtFor {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
-}
-impl AstNode for ast::StmtAsyncFor {
-    fn cast(kind: AnyNode) -> Option<Self>
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
     where
-        Self: Sized,
+        V: PreorderVisitor<'a> + ?Sized,
     {
-        if let AnyNode::StmtAsyncFor(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
+        let ast::StmtFor {
+            target,
+            iter,
+            body,
+            orelse,
+            ..
+        } = self;
 
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::StmtAsyncFor(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn as_any_node_ref(&self) -> AnyNodeRef {
-        AnyNodeRef::from(self)
-    }
-
-    fn into_any_node(self) -> AnyNode {
-        AnyNode::from(self)
+        visitor.visit_expr(target);
+        visitor.visit_expr(iter);
+        visitor.visit_body(body);
+        visitor.visit_body(orelse);
     }
 }
 impl AstNode for ast::StmtWhile {
@@ -1057,6 +1167,22 @@ impl AstNode for ast::StmtWhile {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtWhile {
+            test,
+            body,
+            orelse,
+            range: _,
+        } = self;
+
+        visitor.visit_expr(test);
+        visitor.visit_body(body);
+        visitor.visit_body(orelse);
+    }
 }
 impl AstNode for ast::StmtIf {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1084,6 +1210,24 @@ impl AstNode for ast::StmtIf {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtIf {
+            test,
+            body,
+            elif_else_clauses,
+            range: _,
+        } = self;
+
+        visitor.visit_expr(test);
+        visitor.visit_body(body);
+        for clause in elif_else_clauses {
+            visitor.visit_elif_else_clause(clause);
+        }
     }
 }
 impl AstNode for ast::ElifElseClause {
@@ -1113,6 +1257,21 @@ impl AstNode for ast::ElifElseClause {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ElifElseClause {
+            range: _,
+            test,
+            body,
+        } = self;
+        if let Some(test) = test {
+            visitor.visit_expr(test);
+        }
+        visitor.visit_body(body);
+    }
 }
 impl AstNode for ast::StmtWith {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1141,33 +1300,22 @@ impl AstNode for ast::StmtWith {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
-}
-impl AstNode for ast::StmtAsyncWith {
-    fn cast(kind: AnyNode) -> Option<Self>
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
     where
-        Self: Sized,
+        V: PreorderVisitor<'a> + ?Sized,
     {
-        if let AnyNode::StmtAsyncWith(node) = kind {
-            Some(node)
-        } else {
-            None
+        let ast::StmtWith {
+            items,
+            body,
+            is_async: _,
+            range: _,
+        } = self;
+
+        for with_item in items {
+            visitor.visit_with_item(with_item);
         }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::StmtAsyncWith(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn as_any_node_ref(&self) -> AnyNodeRef {
-        AnyNodeRef::from(self)
-    }
-
-    fn into_any_node(self) -> AnyNode {
-        AnyNode::from(self)
+        visitor.visit_body(body);
     }
 }
 impl AstNode for ast::StmtMatch {
@@ -1197,6 +1345,22 @@ impl AstNode for ast::StmtMatch {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtMatch {
+            subject,
+            cases,
+            range: _,
+        } = self;
+
+        visitor.visit_expr(subject);
+        for match_case in cases {
+            visitor.visit_match_case(match_case);
+        }
+    }
 }
 impl AstNode for ast::StmtRaise {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1224,6 +1388,24 @@ impl AstNode for ast::StmtRaise {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtRaise {
+            exc,
+            cause,
+            range: _,
+        } = self;
+
+        if let Some(expr) = exc {
+            visitor.visit_expr(expr);
+        };
+        if let Some(expr) = cause {
+            visitor.visit_expr(expr);
+        };
     }
 }
 impl AstNode for ast::StmtTry {
@@ -1253,6 +1435,26 @@ impl AstNode for ast::StmtTry {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtTry {
+            body,
+            handlers,
+            orelse,
+            finalbody,
+            range: _,
+        } = self;
+
+        visitor.visit_body(body);
+        for except_handler in handlers {
+            visitor.visit_except_handler(except_handler);
+        }
+        visitor.visit_body(orelse);
+        visitor.visit_body(finalbody);
+    }
 }
 impl AstNode for ast::StmtTryStar {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1280,6 +1482,26 @@ impl AstNode for ast::StmtTryStar {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtTryStar {
+            body,
+            handlers,
+            orelse,
+            finalbody,
+            range: _,
+        } = self;
+
+        visitor.visit_body(body);
+        for except_handler in handlers {
+            visitor.visit_except_handler(except_handler);
+        }
+        visitor.visit_body(orelse);
+        visitor.visit_body(finalbody);
     }
 }
 impl AstNode for ast::StmtAssert {
@@ -1309,6 +1531,21 @@ impl AstNode for ast::StmtAssert {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtAssert {
+            test,
+            msg,
+            range: _,
+        } = self;
+        visitor.visit_expr(test);
+        if let Some(expr) = msg {
+            visitor.visit_expr(expr);
+        }
+    }
 }
 impl AstNode for ast::StmtImport {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1336,6 +1573,17 @@ impl AstNode for ast::StmtImport {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtImport { names, range: _ } = self;
+
+        for alias in names {
+            visitor.visit_alias(alias);
+        }
     }
 }
 impl AstNode for ast::StmtImportFrom {
@@ -1365,6 +1613,22 @@ impl AstNode for ast::StmtImportFrom {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtImportFrom {
+            range: _,
+            module: _,
+            names,
+            level: _,
+        } = self;
+
+        for alias in names {
+            visitor.visit_alias(alias);
+        }
+    }
 }
 impl AstNode for ast::StmtGlobal {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1392,6 +1656,13 @@ impl AstNode for ast::StmtGlobal {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    #[inline]
+    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
     }
 }
 impl AstNode for ast::StmtNonlocal {
@@ -1421,6 +1692,13 @@ impl AstNode for ast::StmtNonlocal {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    #[inline]
+    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+    }
 }
 impl AstNode for ast::StmtExpr {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1448,6 +1726,15 @@ impl AstNode for ast::StmtExpr {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtExpr { value, range: _ } = self;
+
+        visitor.visit_expr(value);
     }
 }
 impl AstNode for ast::StmtPass {
@@ -1477,6 +1764,13 @@ impl AstNode for ast::StmtPass {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    #[inline]
+    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+    }
 }
 impl AstNode for ast::StmtBreak {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1504,6 +1798,13 @@ impl AstNode for ast::StmtBreak {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    #[inline]
+    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
     }
 }
 impl AstNode for ast::StmtContinue {
@@ -1533,13 +1834,20 @@ impl AstNode for ast::StmtContinue {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    #[inline]
+    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+    }
 }
-impl AstNode for ast::StmtLineMagic {
+impl AstNode for ast::StmtIpyEscapeCommand {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
     {
-        if let AnyNode::StmtLineMagic(node) = kind {
+        if let AnyNode::StmtIpyEscapeCommand(node) = kind {
             Some(node)
         } else {
             None
@@ -1547,7 +1855,7 @@ impl AstNode for ast::StmtLineMagic {
     }
 
     fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::StmtLineMagic(node) = kind {
+        if let AnyNodeRef::StmtIpyEscapeCommand(node) = kind {
             Some(node)
         } else {
             None
@@ -1560,6 +1868,13 @@ impl AstNode for ast::StmtLineMagic {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    #[inline]
+    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
     }
 }
 impl AstNode for ast::ExprBoolOp {
@@ -1589,6 +1904,29 @@ impl AstNode for ast::ExprBoolOp {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprBoolOp {
+            op,
+            values,
+            range: _,
+        } = self;
+        match values.as_slice() {
+            [left, rest @ ..] => {
+                visitor.visit_expr(left);
+                visitor.visit_bool_op(op);
+                for expr in rest {
+                    visitor.visit_expr(expr);
+                }
+            }
+            [] => {
+                visitor.visit_bool_op(op);
+            }
+        }
+    }
 }
 impl AstNode for ast::ExprNamedExpr {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1616,6 +1954,19 @@ impl AstNode for ast::ExprNamedExpr {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprNamedExpr {
+            target,
+            value,
+            range: _,
+        } = self;
+        visitor.visit_expr(target);
+        visitor.visit_expr(value);
     }
 }
 impl AstNode for ast::ExprBinOp {
@@ -1645,6 +1996,21 @@ impl AstNode for ast::ExprBinOp {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprBinOp {
+            left,
+            op,
+            right,
+            range: _,
+        } = self;
+        visitor.visit_expr(left);
+        visitor.visit_operator(op);
+        visitor.visit_expr(right);
+    }
 }
 impl AstNode for ast::ExprUnaryOp {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1672,6 +2038,20 @@ impl AstNode for ast::ExprUnaryOp {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprUnaryOp {
+            op,
+            operand,
+            range: _,
+        } = self;
+
+        visitor.visit_unary_op(op);
+        visitor.visit_expr(operand);
     }
 }
 impl AstNode for ast::ExprLambda {
@@ -1701,6 +2081,20 @@ impl AstNode for ast::ExprLambda {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprLambda {
+            parameters,
+            body,
+            range: _,
+        } = self;
+
+        visitor.visit_parameters(parameters);
+        visitor.visit_expr(body);
+    }
 }
 impl AstNode for ast::ExprIfExp {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1728,6 +2122,23 @@ impl AstNode for ast::ExprIfExp {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprIfExp {
+            test,
+            body,
+            orelse,
+            range: _,
+        } = self;
+
+        // `body if test else orelse`
+        visitor.visit_expr(body);
+        visitor.visit_expr(test);
+        visitor.visit_expr(orelse);
     }
 }
 impl AstNode for ast::ExprDict {
@@ -1757,6 +2168,24 @@ impl AstNode for ast::ExprDict {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprDict {
+            keys,
+            values,
+            range: _,
+        } = self;
+
+        for (key, value) in keys.iter().zip(values) {
+            if let Some(key) = key {
+                visitor.visit_expr(key);
+            }
+            visitor.visit_expr(value);
+        }
+    }
 }
 impl AstNode for ast::ExprSet {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1784,6 +2213,17 @@ impl AstNode for ast::ExprSet {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprSet { elts, range: _ } = self;
+
+        for expr in elts {
+            visitor.visit_expr(expr);
+        }
     }
 }
 impl AstNode for ast::ExprListComp {
@@ -1813,6 +2253,22 @@ impl AstNode for ast::ExprListComp {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprListComp {
+            elt,
+            generators,
+            range: _,
+        } = self;
+
+        visitor.visit_expr(elt);
+        for comprehension in generators {
+            visitor.visit_comprehension(comprehension);
+        }
+    }
 }
 impl AstNode for ast::ExprSetComp {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1840,6 +2296,22 @@ impl AstNode for ast::ExprSetComp {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprSetComp {
+            elt,
+            generators,
+            range: _,
+        } = self;
+
+        visitor.visit_expr(elt);
+        for comprehension in generators {
+            visitor.visit_comprehension(comprehension);
+        }
     }
 }
 impl AstNode for ast::ExprDictComp {
@@ -1869,6 +2341,25 @@ impl AstNode for ast::ExprDictComp {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprDictComp {
+            key,
+            value,
+            generators,
+            range: _,
+        } = self;
+
+        visitor.visit_expr(key);
+        visitor.visit_expr(value);
+
+        for comprehension in generators {
+            visitor.visit_comprehension(comprehension);
+        }
+    }
 }
 impl AstNode for ast::ExprGeneratorExp {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1896,6 +2387,21 @@ impl AstNode for ast::ExprGeneratorExp {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprGeneratorExp {
+            elt,
+            generators,
+            range: _,
+        } = self;
+        visitor.visit_expr(elt);
+        for comprehension in generators {
+            visitor.visit_comprehension(comprehension);
+        }
     }
 }
 impl AstNode for ast::ExprAwait {
@@ -1925,6 +2431,14 @@ impl AstNode for ast::ExprAwait {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprAwait { value, range: _ } = self;
+        visitor.visit_expr(value);
+    }
 }
 impl AstNode for ast::ExprYield {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1952,6 +2466,16 @@ impl AstNode for ast::ExprYield {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprYield { value, range: _ } = self;
+        if let Some(expr) = value {
+            visitor.visit_expr(expr);
+        }
     }
 }
 impl AstNode for ast::ExprYieldFrom {
@@ -1981,6 +2505,14 @@ impl AstNode for ast::ExprYieldFrom {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprYieldFrom { value, range: _ } = self;
+        visitor.visit_expr(value);
+    }
 }
 impl AstNode for ast::ExprCompare {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2008,6 +2540,25 @@ impl AstNode for ast::ExprCompare {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprCompare {
+            left,
+            ops,
+            comparators,
+            range: _,
+        } = self;
+
+        visitor.visit_expr(left);
+
+        for (op, comparator) in ops.iter().zip(comparators) {
+            visitor.visit_cmp_op(op);
+            visitor.visit_expr(comparator);
+        }
     }
 }
 impl AstNode for ast::ExprCall {
@@ -2037,6 +2588,19 @@ impl AstNode for ast::ExprCall {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprCall {
+            func,
+            arguments,
+            range: _,
+        } = self;
+        visitor.visit_expr(func);
+        visitor.visit_arguments(arguments);
+    }
 }
 impl AstNode for ast::ExprFormattedValue {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2065,13 +2629,27 @@ impl AstNode for ast::ExprFormattedValue {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprFormattedValue {
+            value, format_spec, ..
+        } = self;
+        visitor.visit_expr(value);
+
+        if let Some(expr) = format_spec {
+            visitor.visit_format_spec(expr);
+        }
+    }
 }
-impl AstNode for ast::ExprJoinedStr {
+impl AstNode for ast::ExprFString {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
     {
-        if let AnyNode::ExprJoinedStr(node) = kind {
+        if let AnyNode::ExprFString(node) = kind {
             Some(node)
         } else {
             None
@@ -2079,7 +2657,7 @@ impl AstNode for ast::ExprJoinedStr {
     }
 
     fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprJoinedStr(node) = kind {
+        if let AnyNodeRef::ExprFString(node) = kind {
             Some(node)
         } else {
             None
@@ -2092,6 +2670,17 @@ impl AstNode for ast::ExprJoinedStr {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprFString { values, range: _ } = self;
+
+        for expr in values {
+            visitor.visit_expr(expr);
+        }
     }
 }
 impl AstNode for ast::ExprConstant {
@@ -2121,6 +2710,18 @@ impl AstNode for ast::ExprConstant {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprConstant {
+            value,
+            range: _,
+            kind: _,
+        } = self;
+        visitor.visit_constant(value);
+    }
 }
 impl AstNode for ast::ExprAttribute {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2148,6 +2749,20 @@ impl AstNode for ast::ExprAttribute {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprAttribute {
+            value,
+            attr: _,
+            ctx: _,
+            range: _,
+        } = self;
+
+        visitor.visit_expr(value);
     }
 }
 impl AstNode for ast::ExprSubscript {
@@ -2177,6 +2792,20 @@ impl AstNode for ast::ExprSubscript {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprSubscript {
+            value,
+            slice,
+            ctx: _,
+            range: _,
+        } = self;
+        visitor.visit_expr(value);
+        visitor.visit_expr(slice);
+    }
 }
 impl AstNode for ast::ExprStarred {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2204,6 +2833,19 @@ impl AstNode for ast::ExprStarred {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprStarred {
+            value,
+            ctx: _,
+            range: _,
+        } = self;
+
+        visitor.visit_expr(value);
     }
 }
 impl AstNode for ast::ExprName {
@@ -2233,6 +2875,18 @@ impl AstNode for ast::ExprName {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    #[inline]
+    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprName {
+            id: _,
+            ctx: _,
+            range: _,
+        } = self;
+    }
 }
 impl AstNode for ast::ExprList {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2260,6 +2914,21 @@ impl AstNode for ast::ExprList {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprList {
+            elts,
+            ctx: _,
+            range: _,
+        } = self;
+
+        for expr in elts {
+            visitor.visit_expr(expr);
+        }
     }
 }
 impl AstNode for ast::ExprTuple {
@@ -2289,6 +2958,21 @@ impl AstNode for ast::ExprTuple {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprTuple {
+            elts,
+            ctx: _,
+            range: _,
+        } = self;
+
+        for expr in elts {
+            visitor.visit_expr(expr);
+        }
+    }
 }
 impl AstNode for ast::ExprSlice {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2317,13 +3001,34 @@ impl AstNode for ast::ExprSlice {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprSlice {
+            lower,
+            upper,
+            step,
+            range: _,
+        } = self;
+
+        if let Some(expr) = lower {
+            visitor.visit_expr(expr);
+        }
+        if let Some(expr) = upper {
+            visitor.visit_expr(expr);
+        }
+        if let Some(expr) = step {
+            visitor.visit_expr(expr);
+        }
+    }
 }
-impl AstNode for ast::ExprLineMagic {
+impl AstNode for ast::ExprIpyEscapeCommand {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
     {
-        if let AnyNode::ExprLineMagic(node) = kind {
+        if let AnyNode::ExprIpyEscapeCommand(node) = kind {
             Some(node)
         } else {
             None
@@ -2331,7 +3036,7 @@ impl AstNode for ast::ExprLineMagic {
     }
 
     fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprLineMagic(node) = kind {
+        if let AnyNodeRef::ExprIpyEscapeCommand(node) = kind {
             Some(node)
         } else {
             None
@@ -2344,6 +3049,18 @@ impl AstNode for ast::ExprLineMagic {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    #[inline]
+    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprIpyEscapeCommand {
+            range: _,
+            kind: _,
+            value: _,
+        } = self;
     }
 }
 impl AstNode for ast::ExceptHandlerExceptHandler {
@@ -2373,6 +3090,22 @@ impl AstNode for ast::ExceptHandlerExceptHandler {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ExceptHandlerExceptHandler {
+            range: _,
+            type_,
+            name: _,
+            body,
+        } = self;
+        if let Some(expr) = type_ {
+            visitor.visit_expr(expr);
+        }
+        visitor.visit_body(body);
+    }
 }
 impl AstNode for ast::PatternMatchValue {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2400,6 +3133,14 @@ impl AstNode for ast::PatternMatchValue {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::PatternMatchValue { value, range: _ } = self;
+        visitor.visit_expr(value);
     }
 }
 impl AstNode for ast::PatternMatchSingleton {
@@ -2429,6 +3170,14 @@ impl AstNode for ast::PatternMatchSingleton {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::PatternMatchSingleton { value, range: _ } = self;
+        visitor.visit_constant(value);
+    }
 }
 impl AstNode for ast::PatternMatchSequence {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2456,6 +3205,16 @@ impl AstNode for ast::PatternMatchSequence {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::PatternMatchSequence { patterns, range: _ } = self;
+        for pattern in patterns {
+            visitor.visit_pattern(pattern);
+        }
     }
 }
 impl AstNode for ast::PatternMatchMapping {
@@ -2485,6 +3244,22 @@ impl AstNode for ast::PatternMatchMapping {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::PatternMatchMapping {
+            keys,
+            patterns,
+            range: _,
+            rest: _,
+        } = self;
+        for (key, pattern) in keys.iter().zip(patterns) {
+            visitor.visit_expr(key);
+            visitor.visit_pattern(pattern);
+        }
+    }
 }
 impl AstNode for ast::PatternMatchClass {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2512,6 +3287,27 @@ impl AstNode for ast::PatternMatchClass {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::PatternMatchClass {
+            cls,
+            patterns,
+            kwd_attrs: _,
+            kwd_patterns,
+            range: _,
+        } = self;
+        visitor.visit_expr(cls);
+        for pattern in patterns {
+            visitor.visit_pattern(pattern);
+        }
+
+        for pattern in kwd_patterns {
+            visitor.visit_pattern(pattern);
+        }
     }
 }
 impl AstNode for ast::PatternMatchStar {
@@ -2541,6 +3337,14 @@ impl AstNode for ast::PatternMatchStar {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    #[inline]
+    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::PatternMatchStar { range: _, name: _ } = self;
+    }
 }
 impl AstNode for ast::PatternMatchAs {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2569,6 +3373,20 @@ impl AstNode for ast::PatternMatchAs {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::PatternMatchAs {
+            pattern,
+            range: _,
+            name: _,
+        } = self;
+        if let Some(pattern) = pattern {
+            visitor.visit_pattern(pattern);
+        }
+    }
 }
 impl AstNode for ast::PatternMatchOr {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2596,6 +3414,16 @@ impl AstNode for ast::PatternMatchOr {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::PatternMatchOr { patterns, range: _ } = self;
+        for pattern in patterns {
+            visitor.visit_pattern(pattern);
+        }
     }
 }
 
@@ -2626,6 +3454,25 @@ impl AstNode for Comprehension {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::Comprehension {
+            range: _,
+            target,
+            iter,
+            ifs,
+            is_async: _,
+        } = self;
+        visitor.visit_expr(target);
+        visitor.visit_expr(iter);
+
+        for expr in ifs {
+            visitor.visit_expr(expr);
+        }
+    }
 }
 impl AstNode for Arguments {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2653,6 +3500,25 @@ impl AstNode for Arguments {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::Arguments {
+            range: _,
+            args,
+            keywords,
+        } = self;
+
+        for arg in args {
+            visitor.visit_expr(arg);
+        }
+
+        for keyword in keywords {
+            visitor.visit_keyword(keyword);
+        }
     }
 }
 impl AstNode for Parameters {
@@ -2682,6 +3548,35 @@ impl AstNode for Parameters {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::Parameters {
+            range: _,
+            posonlyargs,
+            args,
+            vararg,
+            kwonlyargs,
+            kwarg,
+        } = self;
+        for arg in posonlyargs.iter().chain(args) {
+            visitor.visit_parameter_with_default(arg);
+        }
+
+        if let Some(arg) = vararg {
+            visitor.visit_parameter(arg);
+        }
+
+        for arg in kwonlyargs {
+            visitor.visit_parameter_with_default(arg);
+        }
+
+        if let Some(arg) = kwarg {
+            visitor.visit_parameter(arg);
+        }
+    }
 }
 impl AstNode for Parameter {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2709,6 +3604,21 @@ impl AstNode for Parameter {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::Parameter {
+            range: _,
+            name: _,
+            annotation,
+        } = self;
+
+        if let Some(expr) = annotation {
+            visitor.visit_annotation(expr);
+        }
     }
 }
 impl AstNode for ParameterWithDefault {
@@ -2738,6 +3648,21 @@ impl AstNode for ParameterWithDefault {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::ParameterWithDefault {
+            range: _,
+            parameter,
+            default,
+        } = self;
+        visitor.visit_parameter(parameter);
+        if let Some(expr) = default {
+            visitor.visit_expr(expr);
+        }
+    }
 }
 impl AstNode for Keyword {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2765,6 +3690,19 @@ impl AstNode for Keyword {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::Keyword {
+            range: _,
+            arg: _,
+            value,
+        } = self;
+
+        visitor.visit_expr(value);
     }
 }
 impl AstNode for Alias {
@@ -2794,6 +3732,18 @@ impl AstNode for Alias {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    #[inline]
+    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::Alias {
+            range: _,
+            name: _,
+            asname: _,
+        } = self;
+    }
 }
 impl AstNode for WithItem {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2822,6 +3772,23 @@ impl AstNode for WithItem {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::WithItem {
+            range: _,
+            context_expr,
+            optional_vars,
+        } = self;
+
+        visitor.visit_expr(context_expr);
+
+        if let Some(expr) = optional_vars {
+            visitor.visit_expr(expr);
+        }
+    }
 }
 impl AstNode for MatchCase {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2849,6 +3816,24 @@ impl AstNode for MatchCase {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::MatchCase {
+            range: _,
+            pattern,
+            guard,
+            body,
+        } = self;
+
+        visitor.visit_pattern(pattern);
+        if let Some(expr) = guard {
+            visitor.visit_expr(expr);
+        }
+        visitor.visit_body(body);
     }
 }
 
@@ -2879,6 +3864,18 @@ impl AstNode for Decorator {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::Decorator {
+            range: _,
+            expression,
+        } = self;
+
+        visitor.visit_expr(expression);
+    }
 }
 impl AstNode for ast::TypeParams {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2906,6 +3903,20 @@ impl AstNode for ast::TypeParams {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::TypeParams {
+            range: _,
+            type_params,
+        } = self;
+
+        for type_param in type_params {
+            visitor.visit_type_param(type_param);
+        }
     }
 }
 impl AstNode for ast::TypeParamTypeVar {
@@ -2935,6 +3946,21 @@ impl AstNode for ast::TypeParamTypeVar {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::TypeParamTypeVar {
+            bound,
+            name: _,
+            range: _,
+        } = self;
+
+        if let Some(expr) = bound {
+            visitor.visit_expr(expr);
+        }
+    }
 }
 impl AstNode for ast::TypeParamTypeVarTuple {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2962,6 +3988,14 @@ impl AstNode for ast::TypeParamTypeVarTuple {
 
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
+    }
+
+    #[inline]
+    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::TypeParamTypeVarTuple { range: _, name: _ } = self;
     }
 }
 impl AstNode for ast::TypeParamParamSpec {
@@ -2991,12 +4025,19 @@ impl AstNode for ast::TypeParamParamSpec {
     fn into_any_node(self) -> AnyNode {
         AnyNode::from(self)
     }
+
+    #[inline]
+    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::TypeParamParamSpec { range: _, name: _ } = self;
+    }
 }
 impl From<Stmt> for AnyNode {
     fn from(stmt: Stmt) -> Self {
         match stmt {
             Stmt::FunctionDef(node) => AnyNode::StmtFunctionDef(node),
-            Stmt::AsyncFunctionDef(node) => AnyNode::StmtAsyncFunctionDef(node),
             Stmt::ClassDef(node) => AnyNode::StmtClassDef(node),
             Stmt::Return(node) => AnyNode::StmtReturn(node),
             Stmt::Delete(node) => AnyNode::StmtDelete(node),
@@ -3005,11 +4046,9 @@ impl From<Stmt> for AnyNode {
             Stmt::AugAssign(node) => AnyNode::StmtAugAssign(node),
             Stmt::AnnAssign(node) => AnyNode::StmtAnnAssign(node),
             Stmt::For(node) => AnyNode::StmtFor(node),
-            Stmt::AsyncFor(node) => AnyNode::StmtAsyncFor(node),
             Stmt::While(node) => AnyNode::StmtWhile(node),
             Stmt::If(node) => AnyNode::StmtIf(node),
             Stmt::With(node) => AnyNode::StmtWith(node),
-            Stmt::AsyncWith(node) => AnyNode::StmtAsyncWith(node),
             Stmt::Match(node) => AnyNode::StmtMatch(node),
             Stmt::Raise(node) => AnyNode::StmtRaise(node),
             Stmt::Try(node) => AnyNode::StmtTry(node),
@@ -3023,7 +4062,7 @@ impl From<Stmt> for AnyNode {
             Stmt::Pass(node) => AnyNode::StmtPass(node),
             Stmt::Break(node) => AnyNode::StmtBreak(node),
             Stmt::Continue(node) => AnyNode::StmtContinue(node),
-            Stmt::LineMagic(node) => AnyNode::StmtLineMagic(node),
+            Stmt::IpyEscapeCommand(node) => AnyNode::StmtIpyEscapeCommand(node),
         }
     }
 }
@@ -3049,7 +4088,7 @@ impl From<Expr> for AnyNode {
             Expr::Compare(node) => AnyNode::ExprCompare(node),
             Expr::Call(node) => AnyNode::ExprCall(node),
             Expr::FormattedValue(node) => AnyNode::ExprFormattedValue(node),
-            Expr::JoinedStr(node) => AnyNode::ExprJoinedStr(node),
+            Expr::FString(node) => AnyNode::ExprFString(node),
             Expr::Constant(node) => AnyNode::ExprConstant(node),
             Expr::Attribute(node) => AnyNode::ExprAttribute(node),
             Expr::Subscript(node) => AnyNode::ExprSubscript(node),
@@ -3058,7 +4097,7 @@ impl From<Expr> for AnyNode {
             Expr::List(node) => AnyNode::ExprList(node),
             Expr::Tuple(node) => AnyNode::ExprTuple(node),
             Expr::Slice(node) => AnyNode::ExprSlice(node),
-            Expr::LineMagic(node) => AnyNode::ExprLineMagic(node),
+            Expr::IpyEscapeCommand(node) => AnyNode::ExprIpyEscapeCommand(node),
         }
     }
 }
@@ -3113,12 +4152,6 @@ impl From<ast::StmtFunctionDef> for AnyNode {
     }
 }
 
-impl From<ast::StmtAsyncFunctionDef> for AnyNode {
-    fn from(node: ast::StmtAsyncFunctionDef) -> Self {
-        AnyNode::StmtAsyncFunctionDef(node)
-    }
-}
-
 impl From<ast::StmtClassDef> for AnyNode {
     fn from(node: ast::StmtClassDef) -> Self {
         AnyNode::StmtClassDef(node)
@@ -3167,12 +4200,6 @@ impl From<ast::StmtFor> for AnyNode {
     }
 }
 
-impl From<ast::StmtAsyncFor> for AnyNode {
-    fn from(node: ast::StmtAsyncFor) -> Self {
-        AnyNode::StmtAsyncFor(node)
-    }
-}
-
 impl From<ast::StmtWhile> for AnyNode {
     fn from(node: ast::StmtWhile) -> Self {
         AnyNode::StmtWhile(node)
@@ -3194,12 +4221,6 @@ impl From<ast::ElifElseClause> for AnyNode {
 impl From<ast::StmtWith> for AnyNode {
     fn from(node: ast::StmtWith) -> Self {
         AnyNode::StmtWith(node)
-    }
-}
-
-impl From<ast::StmtAsyncWith> for AnyNode {
-    fn from(node: ast::StmtAsyncWith) -> Self {
-        AnyNode::StmtAsyncWith(node)
     }
 }
 
@@ -3281,9 +4302,9 @@ impl From<ast::StmtContinue> for AnyNode {
     }
 }
 
-impl From<ast::StmtLineMagic> for AnyNode {
-    fn from(node: ast::StmtLineMagic) -> Self {
-        AnyNode::StmtLineMagic(node)
+impl From<ast::StmtIpyEscapeCommand> for AnyNode {
+    fn from(node: ast::StmtIpyEscapeCommand) -> Self {
+        AnyNode::StmtIpyEscapeCommand(node)
     }
 }
 
@@ -3395,9 +4416,9 @@ impl From<ast::ExprFormattedValue> for AnyNode {
     }
 }
 
-impl From<ast::ExprJoinedStr> for AnyNode {
-    fn from(node: ast::ExprJoinedStr) -> Self {
-        AnyNode::ExprJoinedStr(node)
+impl From<ast::ExprFString> for AnyNode {
+    fn from(node: ast::ExprFString) -> Self {
+        AnyNode::ExprFString(node)
     }
 }
 
@@ -3449,9 +4470,9 @@ impl From<ast::ExprSlice> for AnyNode {
     }
 }
 
-impl From<ast::ExprLineMagic> for AnyNode {
-    fn from(node: ast::ExprLineMagic) -> Self {
-        AnyNode::ExprLineMagic(node)
+impl From<ast::ExprIpyEscapeCommand> for AnyNode {
+    fn from(node: ast::ExprIpyEscapeCommand) -> Self {
+        AnyNode::ExprIpyEscapeCommand(node)
     }
 }
 
@@ -3588,7 +4609,6 @@ impl Ranged for AnyNode {
             AnyNode::ModModule(node) => node.range(),
             AnyNode::ModExpression(node) => node.range(),
             AnyNode::StmtFunctionDef(node) => node.range(),
-            AnyNode::StmtAsyncFunctionDef(node) => node.range(),
             AnyNode::StmtClassDef(node) => node.range(),
             AnyNode::StmtReturn(node) => node.range(),
             AnyNode::StmtDelete(node) => node.range(),
@@ -3597,11 +4617,9 @@ impl Ranged for AnyNode {
             AnyNode::StmtAugAssign(node) => node.range(),
             AnyNode::StmtAnnAssign(node) => node.range(),
             AnyNode::StmtFor(node) => node.range(),
-            AnyNode::StmtAsyncFor(node) => node.range(),
             AnyNode::StmtWhile(node) => node.range(),
             AnyNode::StmtIf(node) => node.range(),
             AnyNode::StmtWith(node) => node.range(),
-            AnyNode::StmtAsyncWith(node) => node.range(),
             AnyNode::StmtMatch(node) => node.range(),
             AnyNode::StmtRaise(node) => node.range(),
             AnyNode::StmtTry(node) => node.range(),
@@ -3615,7 +4633,7 @@ impl Ranged for AnyNode {
             AnyNode::StmtPass(node) => node.range(),
             AnyNode::StmtBreak(node) => node.range(),
             AnyNode::StmtContinue(node) => node.range(),
-            AnyNode::StmtLineMagic(node) => node.range(),
+            AnyNode::StmtIpyEscapeCommand(node) => node.range(),
             AnyNode::ExprBoolOp(node) => node.range(),
             AnyNode::ExprNamedExpr(node) => node.range(),
             AnyNode::ExprBinOp(node) => node.range(),
@@ -3634,7 +4652,7 @@ impl Ranged for AnyNode {
             AnyNode::ExprCompare(node) => node.range(),
             AnyNode::ExprCall(node) => node.range(),
             AnyNode::ExprFormattedValue(node) => node.range(),
-            AnyNode::ExprJoinedStr(node) => node.range(),
+            AnyNode::ExprFString(node) => node.range(),
             AnyNode::ExprConstant(node) => node.range(),
             AnyNode::ExprAttribute(node) => node.range(),
             AnyNode::ExprSubscript(node) => node.range(),
@@ -3643,7 +4661,7 @@ impl Ranged for AnyNode {
             AnyNode::ExprList(node) => node.range(),
             AnyNode::ExprTuple(node) => node.range(),
             AnyNode::ExprSlice(node) => node.range(),
-            AnyNode::ExprLineMagic(node) => node.range(),
+            AnyNode::ExprIpyEscapeCommand(node) => node.range(),
             AnyNode::ExceptHandlerExceptHandler(node) => node.range(),
             AnyNode::PatternMatchValue(node) => node.range(),
             AnyNode::PatternMatchSingleton(node) => node.range(),
@@ -3677,7 +4695,6 @@ pub enum AnyNodeRef<'a> {
     ModModule(&'a ast::ModModule),
     ModExpression(&'a ast::ModExpression),
     StmtFunctionDef(&'a ast::StmtFunctionDef),
-    StmtAsyncFunctionDef(&'a ast::StmtAsyncFunctionDef),
     StmtClassDef(&'a ast::StmtClassDef),
     StmtReturn(&'a ast::StmtReturn),
     StmtDelete(&'a ast::StmtDelete),
@@ -3686,11 +4703,9 @@ pub enum AnyNodeRef<'a> {
     StmtAugAssign(&'a ast::StmtAugAssign),
     StmtAnnAssign(&'a ast::StmtAnnAssign),
     StmtFor(&'a ast::StmtFor),
-    StmtAsyncFor(&'a ast::StmtAsyncFor),
     StmtWhile(&'a ast::StmtWhile),
     StmtIf(&'a ast::StmtIf),
     StmtWith(&'a ast::StmtWith),
-    StmtAsyncWith(&'a ast::StmtAsyncWith),
     StmtMatch(&'a ast::StmtMatch),
     StmtRaise(&'a ast::StmtRaise),
     StmtTry(&'a ast::StmtTry),
@@ -3704,7 +4719,7 @@ pub enum AnyNodeRef<'a> {
     StmtPass(&'a ast::StmtPass),
     StmtBreak(&'a ast::StmtBreak),
     StmtContinue(&'a ast::StmtContinue),
-    StmtLineMagic(&'a ast::StmtLineMagic),
+    StmtIpyEscapeCommand(&'a ast::StmtIpyEscapeCommand),
     ExprBoolOp(&'a ast::ExprBoolOp),
     ExprNamedExpr(&'a ast::ExprNamedExpr),
     ExprBinOp(&'a ast::ExprBinOp),
@@ -3723,7 +4738,7 @@ pub enum AnyNodeRef<'a> {
     ExprCompare(&'a ast::ExprCompare),
     ExprCall(&'a ast::ExprCall),
     ExprFormattedValue(&'a ast::ExprFormattedValue),
-    ExprJoinedStr(&'a ast::ExprJoinedStr),
+    ExprFString(&'a ast::ExprFString),
     ExprConstant(&'a ast::ExprConstant),
     ExprAttribute(&'a ast::ExprAttribute),
     ExprSubscript(&'a ast::ExprSubscript),
@@ -3732,7 +4747,7 @@ pub enum AnyNodeRef<'a> {
     ExprList(&'a ast::ExprList),
     ExprTuple(&'a ast::ExprTuple),
     ExprSlice(&'a ast::ExprSlice),
-    ExprLineMagic(&'a ast::ExprLineMagic),
+    ExprIpyEscapeCommand(&'a ast::ExprIpyEscapeCommand),
     ExceptHandlerExceptHandler(&'a ast::ExceptHandlerExceptHandler),
     PatternMatchValue(&'a ast::PatternMatchValue),
     PatternMatchSingleton(&'a ast::PatternMatchSingleton),
@@ -3765,7 +4780,6 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::ModModule(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ModExpression(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtFunctionDef(node) => NonNull::from(*node).cast(),
-            AnyNodeRef::StmtAsyncFunctionDef(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtClassDef(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtReturn(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtDelete(node) => NonNull::from(*node).cast(),
@@ -3774,11 +4788,9 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::StmtAugAssign(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtAnnAssign(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtFor(node) => NonNull::from(*node).cast(),
-            AnyNodeRef::StmtAsyncFor(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtWhile(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtIf(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtWith(node) => NonNull::from(*node).cast(),
-            AnyNodeRef::StmtAsyncWith(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtMatch(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtRaise(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtTry(node) => NonNull::from(*node).cast(),
@@ -3792,7 +4804,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::StmtPass(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtBreak(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtContinue(node) => NonNull::from(*node).cast(),
-            AnyNodeRef::StmtLineMagic(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::StmtIpyEscapeCommand(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprBoolOp(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprNamedExpr(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprBinOp(node) => NonNull::from(*node).cast(),
@@ -3811,7 +4823,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::ExprCompare(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprCall(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprFormattedValue(node) => NonNull::from(*node).cast(),
-            AnyNodeRef::ExprJoinedStr(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprFString(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprConstant(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprAttribute(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprSubscript(node) => NonNull::from(*node).cast(),
@@ -3820,7 +4832,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::ExprList(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprTuple(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprSlice(node) => NonNull::from(*node).cast(),
-            AnyNodeRef::ExprLineMagic(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprIpyEscapeCommand(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExceptHandlerExceptHandler(node) => NonNull::from(*node).cast(),
             AnyNodeRef::PatternMatchValue(node) => NonNull::from(*node).cast(),
             AnyNodeRef::PatternMatchSingleton(node) => NonNull::from(*node).cast(),
@@ -3859,7 +4871,6 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::ModModule(_) => NodeKind::ModModule,
             AnyNodeRef::ModExpression(_) => NodeKind::ModExpression,
             AnyNodeRef::StmtFunctionDef(_) => NodeKind::StmtFunctionDef,
-            AnyNodeRef::StmtAsyncFunctionDef(_) => NodeKind::StmtAsyncFunctionDef,
             AnyNodeRef::StmtClassDef(_) => NodeKind::StmtClassDef,
             AnyNodeRef::StmtReturn(_) => NodeKind::StmtReturn,
             AnyNodeRef::StmtDelete(_) => NodeKind::StmtDelete,
@@ -3868,11 +4879,9 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::StmtAugAssign(_) => NodeKind::StmtAugAssign,
             AnyNodeRef::StmtAnnAssign(_) => NodeKind::StmtAnnAssign,
             AnyNodeRef::StmtFor(_) => NodeKind::StmtFor,
-            AnyNodeRef::StmtAsyncFor(_) => NodeKind::StmtAsyncFor,
             AnyNodeRef::StmtWhile(_) => NodeKind::StmtWhile,
             AnyNodeRef::StmtIf(_) => NodeKind::StmtIf,
             AnyNodeRef::StmtWith(_) => NodeKind::StmtWith,
-            AnyNodeRef::StmtAsyncWith(_) => NodeKind::StmtAsyncWith,
             AnyNodeRef::StmtMatch(_) => NodeKind::StmtMatch,
             AnyNodeRef::StmtRaise(_) => NodeKind::StmtRaise,
             AnyNodeRef::StmtTry(_) => NodeKind::StmtTry,
@@ -3886,7 +4895,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::StmtPass(_) => NodeKind::StmtPass,
             AnyNodeRef::StmtBreak(_) => NodeKind::StmtBreak,
             AnyNodeRef::StmtContinue(_) => NodeKind::StmtContinue,
-            AnyNodeRef::StmtLineMagic(_) => NodeKind::StmtLineMagic,
+            AnyNodeRef::StmtIpyEscapeCommand(_) => NodeKind::StmtIpyEscapeCommand,
             AnyNodeRef::ExprBoolOp(_) => NodeKind::ExprBoolOp,
             AnyNodeRef::ExprNamedExpr(_) => NodeKind::ExprNamedExpr,
             AnyNodeRef::ExprBinOp(_) => NodeKind::ExprBinOp,
@@ -3905,7 +4914,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::ExprCompare(_) => NodeKind::ExprCompare,
             AnyNodeRef::ExprCall(_) => NodeKind::ExprCall,
             AnyNodeRef::ExprFormattedValue(_) => NodeKind::ExprFormattedValue,
-            AnyNodeRef::ExprJoinedStr(_) => NodeKind::ExprJoinedStr,
+            AnyNodeRef::ExprFString(_) => NodeKind::ExprFString,
             AnyNodeRef::ExprConstant(_) => NodeKind::ExprConstant,
             AnyNodeRef::ExprAttribute(_) => NodeKind::ExprAttribute,
             AnyNodeRef::ExprSubscript(_) => NodeKind::ExprSubscript,
@@ -3914,7 +4923,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::ExprList(_) => NodeKind::ExprList,
             AnyNodeRef::ExprTuple(_) => NodeKind::ExprTuple,
             AnyNodeRef::ExprSlice(_) => NodeKind::ExprSlice,
-            AnyNodeRef::ExprLineMagic(_) => NodeKind::ExprLineMagic,
+            AnyNodeRef::ExprIpyEscapeCommand(_) => NodeKind::ExprIpyEscapeCommand,
             AnyNodeRef::ExceptHandlerExceptHandler(_) => NodeKind::ExceptHandlerExceptHandler,
             AnyNodeRef::PatternMatchValue(_) => NodeKind::PatternMatchValue,
             AnyNodeRef::PatternMatchSingleton(_) => NodeKind::PatternMatchSingleton,
@@ -3945,7 +4954,6 @@ impl AnyNodeRef<'_> {
     pub const fn is_statement(self) -> bool {
         match self {
             AnyNodeRef::StmtFunctionDef(_)
-            | AnyNodeRef::StmtAsyncFunctionDef(_)
             | AnyNodeRef::StmtClassDef(_)
             | AnyNodeRef::StmtReturn(_)
             | AnyNodeRef::StmtDelete(_)
@@ -3954,11 +4962,9 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtAugAssign(_)
             | AnyNodeRef::StmtAnnAssign(_)
             | AnyNodeRef::StmtFor(_)
-            | AnyNodeRef::StmtAsyncFor(_)
             | AnyNodeRef::StmtWhile(_)
             | AnyNodeRef::StmtIf(_)
             | AnyNodeRef::StmtWith(_)
-            | AnyNodeRef::StmtAsyncWith(_)
             | AnyNodeRef::StmtMatch(_)
             | AnyNodeRef::StmtRaise(_)
             | AnyNodeRef::StmtTry(_)
@@ -3972,7 +4978,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtPass(_)
             | AnyNodeRef::StmtBreak(_)
             | AnyNodeRef::StmtContinue(_)
-            | AnyNodeRef::StmtLineMagic(_) => true,
+            | AnyNodeRef::StmtIpyEscapeCommand(_) => true,
 
             AnyNodeRef::ModModule(_)
             | AnyNodeRef::ModExpression(_)
@@ -3994,7 +5000,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprCompare(_)
             | AnyNodeRef::ExprCall(_)
             | AnyNodeRef::ExprFormattedValue(_)
-            | AnyNodeRef::ExprJoinedStr(_)
+            | AnyNodeRef::ExprFString(_)
             | AnyNodeRef::ExprConstant(_)
             | AnyNodeRef::ExprAttribute(_)
             | AnyNodeRef::ExprSubscript(_)
@@ -4003,7 +5009,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprList(_)
             | AnyNodeRef::ExprTuple(_)
             | AnyNodeRef::ExprSlice(_)
-            | AnyNodeRef::ExprLineMagic(_)
+            | AnyNodeRef::ExprIpyEscapeCommand(_)
             | AnyNodeRef::ExceptHandlerExceptHandler(_)
             | AnyNodeRef::PatternMatchValue(_)
             | AnyNodeRef::PatternMatchSingleton(_)
@@ -4051,7 +5057,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprCompare(_)
             | AnyNodeRef::ExprCall(_)
             | AnyNodeRef::ExprFormattedValue(_)
-            | AnyNodeRef::ExprJoinedStr(_)
+            | AnyNodeRef::ExprFString(_)
             | AnyNodeRef::ExprConstant(_)
             | AnyNodeRef::ExprAttribute(_)
             | AnyNodeRef::ExprSubscript(_)
@@ -4060,12 +5066,11 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprList(_)
             | AnyNodeRef::ExprTuple(_)
             | AnyNodeRef::ExprSlice(_)
-            | AnyNodeRef::ExprLineMagic(_) => true,
+            | AnyNodeRef::ExprIpyEscapeCommand(_) => true,
 
             AnyNodeRef::ModModule(_)
             | AnyNodeRef::ModExpression(_)
             | AnyNodeRef::StmtFunctionDef(_)
-            | AnyNodeRef::StmtAsyncFunctionDef(_)
             | AnyNodeRef::StmtClassDef(_)
             | AnyNodeRef::StmtReturn(_)
             | AnyNodeRef::StmtDelete(_)
@@ -4074,11 +5079,9 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtAugAssign(_)
             | AnyNodeRef::StmtAnnAssign(_)
             | AnyNodeRef::StmtFor(_)
-            | AnyNodeRef::StmtAsyncFor(_)
             | AnyNodeRef::StmtWhile(_)
             | AnyNodeRef::StmtIf(_)
             | AnyNodeRef::StmtWith(_)
-            | AnyNodeRef::StmtAsyncWith(_)
             | AnyNodeRef::StmtMatch(_)
             | AnyNodeRef::StmtRaise(_)
             | AnyNodeRef::StmtTry(_)
@@ -4092,7 +5095,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtPass(_)
             | AnyNodeRef::StmtBreak(_)
             | AnyNodeRef::StmtContinue(_)
-            | AnyNodeRef::StmtLineMagic(_)
+            | AnyNodeRef::StmtIpyEscapeCommand(_)
             | AnyNodeRef::ExceptHandlerExceptHandler(_)
             | AnyNodeRef::PatternMatchValue(_)
             | AnyNodeRef::PatternMatchSingleton(_)
@@ -4125,7 +5128,6 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::ModModule(_) | AnyNodeRef::ModExpression(_) => true,
 
             AnyNodeRef::StmtFunctionDef(_)
-            | AnyNodeRef::StmtAsyncFunctionDef(_)
             | AnyNodeRef::StmtClassDef(_)
             | AnyNodeRef::StmtReturn(_)
             | AnyNodeRef::StmtDelete(_)
@@ -4134,11 +5136,9 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtAugAssign(_)
             | AnyNodeRef::StmtAnnAssign(_)
             | AnyNodeRef::StmtFor(_)
-            | AnyNodeRef::StmtAsyncFor(_)
             | AnyNodeRef::StmtWhile(_)
             | AnyNodeRef::StmtIf(_)
             | AnyNodeRef::StmtWith(_)
-            | AnyNodeRef::StmtAsyncWith(_)
             | AnyNodeRef::StmtMatch(_)
             | AnyNodeRef::StmtRaise(_)
             | AnyNodeRef::StmtTry(_)
@@ -4152,7 +5152,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtPass(_)
             | AnyNodeRef::StmtBreak(_)
             | AnyNodeRef::StmtContinue(_)
-            | AnyNodeRef::StmtLineMagic(_)
+            | AnyNodeRef::StmtIpyEscapeCommand(_)
             | AnyNodeRef::ExprBoolOp(_)
             | AnyNodeRef::ExprNamedExpr(_)
             | AnyNodeRef::ExprBinOp(_)
@@ -4171,7 +5171,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprCompare(_)
             | AnyNodeRef::ExprCall(_)
             | AnyNodeRef::ExprFormattedValue(_)
-            | AnyNodeRef::ExprJoinedStr(_)
+            | AnyNodeRef::ExprFString(_)
             | AnyNodeRef::ExprConstant(_)
             | AnyNodeRef::ExprAttribute(_)
             | AnyNodeRef::ExprSubscript(_)
@@ -4180,7 +5180,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprList(_)
             | AnyNodeRef::ExprTuple(_)
             | AnyNodeRef::ExprSlice(_)
-            | AnyNodeRef::ExprLineMagic(_)
+            | AnyNodeRef::ExprIpyEscapeCommand(_)
             | AnyNodeRef::ExceptHandlerExceptHandler(_)
             | AnyNodeRef::PatternMatchValue(_)
             | AnyNodeRef::PatternMatchSingleton(_)
@@ -4222,7 +5222,6 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::ModModule(_)
             | AnyNodeRef::ModExpression(_)
             | AnyNodeRef::StmtFunctionDef(_)
-            | AnyNodeRef::StmtAsyncFunctionDef(_)
             | AnyNodeRef::StmtClassDef(_)
             | AnyNodeRef::StmtReturn(_)
             | AnyNodeRef::StmtDelete(_)
@@ -4231,11 +5230,9 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtAugAssign(_)
             | AnyNodeRef::StmtAnnAssign(_)
             | AnyNodeRef::StmtFor(_)
-            | AnyNodeRef::StmtAsyncFor(_)
             | AnyNodeRef::StmtWhile(_)
             | AnyNodeRef::StmtIf(_)
             | AnyNodeRef::StmtWith(_)
-            | AnyNodeRef::StmtAsyncWith(_)
             | AnyNodeRef::StmtMatch(_)
             | AnyNodeRef::StmtRaise(_)
             | AnyNodeRef::StmtTry(_)
@@ -4249,7 +5246,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtPass(_)
             | AnyNodeRef::StmtBreak(_)
             | AnyNodeRef::StmtContinue(_)
-            | AnyNodeRef::StmtLineMagic(_)
+            | AnyNodeRef::StmtIpyEscapeCommand(_)
             | AnyNodeRef::ExprBoolOp(_)
             | AnyNodeRef::ExprNamedExpr(_)
             | AnyNodeRef::ExprBinOp(_)
@@ -4268,7 +5265,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprCompare(_)
             | AnyNodeRef::ExprCall(_)
             | AnyNodeRef::ExprFormattedValue(_)
-            | AnyNodeRef::ExprJoinedStr(_)
+            | AnyNodeRef::ExprFString(_)
             | AnyNodeRef::ExprConstant(_)
             | AnyNodeRef::ExprAttribute(_)
             | AnyNodeRef::ExprSubscript(_)
@@ -4277,7 +5274,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprList(_)
             | AnyNodeRef::ExprTuple(_)
             | AnyNodeRef::ExprSlice(_)
-            | AnyNodeRef::ExprLineMagic(_)
+            | AnyNodeRef::ExprIpyEscapeCommand(_)
             | AnyNodeRef::ExceptHandlerExceptHandler(_)
             | AnyNodeRef::Comprehension(_)
             | AnyNodeRef::Arguments(_)
@@ -4304,7 +5301,6 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::ModModule(_)
             | AnyNodeRef::ModExpression(_)
             | AnyNodeRef::StmtFunctionDef(_)
-            | AnyNodeRef::StmtAsyncFunctionDef(_)
             | AnyNodeRef::StmtClassDef(_)
             | AnyNodeRef::StmtReturn(_)
             | AnyNodeRef::StmtDelete(_)
@@ -4313,11 +5309,9 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtAugAssign(_)
             | AnyNodeRef::StmtAnnAssign(_)
             | AnyNodeRef::StmtFor(_)
-            | AnyNodeRef::StmtAsyncFor(_)
             | AnyNodeRef::StmtWhile(_)
             | AnyNodeRef::StmtIf(_)
             | AnyNodeRef::StmtWith(_)
-            | AnyNodeRef::StmtAsyncWith(_)
             | AnyNodeRef::StmtMatch(_)
             | AnyNodeRef::StmtRaise(_)
             | AnyNodeRef::StmtTry(_)
@@ -4331,7 +5325,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtPass(_)
             | AnyNodeRef::StmtBreak(_)
             | AnyNodeRef::StmtContinue(_)
-            | AnyNodeRef::StmtLineMagic(_)
+            | AnyNodeRef::StmtIpyEscapeCommand(_)
             | AnyNodeRef::ExprBoolOp(_)
             | AnyNodeRef::ExprNamedExpr(_)
             | AnyNodeRef::ExprBinOp(_)
@@ -4350,7 +5344,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprCompare(_)
             | AnyNodeRef::ExprCall(_)
             | AnyNodeRef::ExprFormattedValue(_)
-            | AnyNodeRef::ExprJoinedStr(_)
+            | AnyNodeRef::ExprFString(_)
             | AnyNodeRef::ExprConstant(_)
             | AnyNodeRef::ExprAttribute(_)
             | AnyNodeRef::ExprSubscript(_)
@@ -4359,7 +5353,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprList(_)
             | AnyNodeRef::ExprTuple(_)
             | AnyNodeRef::ExprSlice(_)
-            | AnyNodeRef::ExprLineMagic(_)
+            | AnyNodeRef::ExprIpyEscapeCommand(_)
             | AnyNodeRef::PatternMatchValue(_)
             | AnyNodeRef::PatternMatchSingleton(_)
             | AnyNodeRef::PatternMatchSequence(_)
@@ -4391,13 +5385,10 @@ impl AnyNodeRef<'_> {
             self,
             AnyNodeRef::StmtIf(_)
                 | AnyNodeRef::StmtFor(_)
-                | AnyNodeRef::StmtAsyncFor(_)
                 | AnyNodeRef::StmtWhile(_)
                 | AnyNodeRef::StmtWith(_)
-                | AnyNodeRef::StmtAsyncWith(_)
                 | AnyNodeRef::StmtMatch(_)
                 | AnyNodeRef::StmtFunctionDef(_)
-                | AnyNodeRef::StmtAsyncFunctionDef(_)
                 | AnyNodeRef::StmtClassDef(_)
                 | AnyNodeRef::StmtTry(_)
                 | AnyNodeRef::StmtTryStar(_)
@@ -4414,6 +5405,94 @@ impl AnyNodeRef<'_> {
             self,
             AnyNodeRef::ExceptHandlerExceptHandler(_) | AnyNodeRef::ElifElseClause(_)
         )
+    }
+
+    pub fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        match self {
+            AnyNodeRef::ModModule(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ModExpression(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtFunctionDef(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtClassDef(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtReturn(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtDelete(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtTypeAlias(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtAssign(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtAugAssign(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtAnnAssign(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtFor(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtWhile(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtIf(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtWith(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtMatch(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtRaise(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtTry(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtTryStar(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtAssert(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtImport(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtImportFrom(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtGlobal(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtNonlocal(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtExpr(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtPass(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtBreak(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtContinue(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtIpyEscapeCommand(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprBoolOp(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprNamedExpr(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprBinOp(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprUnaryOp(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprLambda(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprIfExp(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprDict(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprSet(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprListComp(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprSetComp(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprDictComp(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprGeneratorExp(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprAwait(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprYield(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprYieldFrom(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprCompare(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprCall(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprFormattedValue(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprFString(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprConstant(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprAttribute(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprSubscript(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprStarred(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprName(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprList(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprTuple(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprSlice(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprIpyEscapeCommand(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExceptHandlerExceptHandler(node) => node.visit_preorder(visitor),
+            AnyNodeRef::PatternMatchValue(node) => node.visit_preorder(visitor),
+            AnyNodeRef::PatternMatchSingleton(node) => node.visit_preorder(visitor),
+            AnyNodeRef::PatternMatchSequence(node) => node.visit_preorder(visitor),
+            AnyNodeRef::PatternMatchMapping(node) => node.visit_preorder(visitor),
+            AnyNodeRef::PatternMatchClass(node) => node.visit_preorder(visitor),
+            AnyNodeRef::PatternMatchStar(node) => node.visit_preorder(visitor),
+            AnyNodeRef::PatternMatchAs(node) => node.visit_preorder(visitor),
+            AnyNodeRef::PatternMatchOr(node) => node.visit_preorder(visitor),
+            AnyNodeRef::Comprehension(node) => node.visit_preorder(visitor),
+            AnyNodeRef::Arguments(node) => node.visit_preorder(visitor),
+            AnyNodeRef::Parameters(node) => node.visit_preorder(visitor),
+            AnyNodeRef::Parameter(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ParameterWithDefault(node) => node.visit_preorder(visitor),
+            AnyNodeRef::Keyword(node) => node.visit_preorder(visitor),
+            AnyNodeRef::Alias(node) => node.visit_preorder(visitor),
+            AnyNodeRef::WithItem(node) => node.visit_preorder(visitor),
+            AnyNodeRef::MatchCase(node) => node.visit_preorder(visitor),
+            AnyNodeRef::Decorator(node) => node.visit_preorder(visitor),
+            AnyNodeRef::TypeParams(node) => node.visit_preorder(visitor),
+            AnyNodeRef::TypeParamTypeVar(node) => node.visit_preorder(visitor),
+            AnyNodeRef::TypeParamTypeVarTuple(node) => node.visit_preorder(visitor),
+            AnyNodeRef::TypeParamParamSpec(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ElifElseClause(node) => node.visit_preorder(visitor),
+        }
     }
 }
 
@@ -4432,12 +5511,6 @@ impl<'a> From<&'a ast::ModExpression> for AnyNodeRef<'a> {
 impl<'a> From<&'a ast::StmtFunctionDef> for AnyNodeRef<'a> {
     fn from(node: &'a ast::StmtFunctionDef) -> Self {
         AnyNodeRef::StmtFunctionDef(node)
-    }
-}
-
-impl<'a> From<&'a ast::StmtAsyncFunctionDef> for AnyNodeRef<'a> {
-    fn from(node: &'a ast::StmtAsyncFunctionDef) -> Self {
-        AnyNodeRef::StmtAsyncFunctionDef(node)
     }
 }
 
@@ -4489,12 +5562,6 @@ impl<'a> From<&'a ast::StmtFor> for AnyNodeRef<'a> {
     }
 }
 
-impl<'a> From<&'a ast::StmtAsyncFor> for AnyNodeRef<'a> {
-    fn from(node: &'a ast::StmtAsyncFor) -> Self {
-        AnyNodeRef::StmtAsyncFor(node)
-    }
-}
-
 impl<'a> From<&'a ast::StmtWhile> for AnyNodeRef<'a> {
     fn from(node: &'a ast::StmtWhile) -> Self {
         AnyNodeRef::StmtWhile(node)
@@ -4516,12 +5583,6 @@ impl<'a> From<&'a ast::ElifElseClause> for AnyNodeRef<'a> {
 impl<'a> From<&'a ast::StmtWith> for AnyNodeRef<'a> {
     fn from(node: &'a ast::StmtWith) -> Self {
         AnyNodeRef::StmtWith(node)
-    }
-}
-
-impl<'a> From<&'a ast::StmtAsyncWith> for AnyNodeRef<'a> {
-    fn from(node: &'a ast::StmtAsyncWith) -> Self {
-        AnyNodeRef::StmtAsyncWith(node)
     }
 }
 
@@ -4603,9 +5664,9 @@ impl<'a> From<&'a ast::StmtContinue> for AnyNodeRef<'a> {
     }
 }
 
-impl<'a> From<&'a ast::StmtLineMagic> for AnyNodeRef<'a> {
-    fn from(node: &'a ast::StmtLineMagic) -> Self {
-        AnyNodeRef::StmtLineMagic(node)
+impl<'a> From<&'a ast::StmtIpyEscapeCommand> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::StmtIpyEscapeCommand) -> Self {
+        AnyNodeRef::StmtIpyEscapeCommand(node)
     }
 }
 
@@ -4717,9 +5778,9 @@ impl<'a> From<&'a ast::ExprFormattedValue> for AnyNodeRef<'a> {
     }
 }
 
-impl<'a> From<&'a ast::ExprJoinedStr> for AnyNodeRef<'a> {
-    fn from(node: &'a ast::ExprJoinedStr) -> Self {
-        AnyNodeRef::ExprJoinedStr(node)
+impl<'a> From<&'a ast::ExprFString> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::ExprFString) -> Self {
+        AnyNodeRef::ExprFString(node)
     }
 }
 
@@ -4771,9 +5832,9 @@ impl<'a> From<&'a ast::ExprSlice> for AnyNodeRef<'a> {
     }
 }
 
-impl<'a> From<&'a ast::ExprLineMagic> for AnyNodeRef<'a> {
-    fn from(node: &'a ast::ExprLineMagic) -> Self {
-        AnyNodeRef::ExprLineMagic(node)
+impl<'a> From<&'a ast::ExprIpyEscapeCommand> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::ExprIpyEscapeCommand) -> Self {
+        AnyNodeRef::ExprIpyEscapeCommand(node)
     }
 }
 
@@ -4864,7 +5925,6 @@ impl<'a> From<&'a Stmt> for AnyNodeRef<'a> {
     fn from(stmt: &'a Stmt) -> Self {
         match stmt {
             Stmt::FunctionDef(node) => AnyNodeRef::StmtFunctionDef(node),
-            Stmt::AsyncFunctionDef(node) => AnyNodeRef::StmtAsyncFunctionDef(node),
             Stmt::ClassDef(node) => AnyNodeRef::StmtClassDef(node),
             Stmt::Return(node) => AnyNodeRef::StmtReturn(node),
             Stmt::Delete(node) => AnyNodeRef::StmtDelete(node),
@@ -4873,11 +5933,9 @@ impl<'a> From<&'a Stmt> for AnyNodeRef<'a> {
             Stmt::AugAssign(node) => AnyNodeRef::StmtAugAssign(node),
             Stmt::AnnAssign(node) => AnyNodeRef::StmtAnnAssign(node),
             Stmt::For(node) => AnyNodeRef::StmtFor(node),
-            Stmt::AsyncFor(node) => AnyNodeRef::StmtAsyncFor(node),
             Stmt::While(node) => AnyNodeRef::StmtWhile(node),
             Stmt::If(node) => AnyNodeRef::StmtIf(node),
             Stmt::With(node) => AnyNodeRef::StmtWith(node),
-            Stmt::AsyncWith(node) => AnyNodeRef::StmtAsyncWith(node),
             Stmt::Match(node) => AnyNodeRef::StmtMatch(node),
             Stmt::Raise(node) => AnyNodeRef::StmtRaise(node),
             Stmt::Try(node) => AnyNodeRef::StmtTry(node),
@@ -4891,7 +5949,7 @@ impl<'a> From<&'a Stmt> for AnyNodeRef<'a> {
             Stmt::Pass(node) => AnyNodeRef::StmtPass(node),
             Stmt::Break(node) => AnyNodeRef::StmtBreak(node),
             Stmt::Continue(node) => AnyNodeRef::StmtContinue(node),
-            Stmt::LineMagic(node) => AnyNodeRef::StmtLineMagic(node),
+            Stmt::IpyEscapeCommand(node) => AnyNodeRef::StmtIpyEscapeCommand(node),
         }
     }
 }
@@ -4917,7 +5975,7 @@ impl<'a> From<&'a Expr> for AnyNodeRef<'a> {
             Expr::Compare(node) => AnyNodeRef::ExprCompare(node),
             Expr::Call(node) => AnyNodeRef::ExprCall(node),
             Expr::FormattedValue(node) => AnyNodeRef::ExprFormattedValue(node),
-            Expr::JoinedStr(node) => AnyNodeRef::ExprJoinedStr(node),
+            Expr::FString(node) => AnyNodeRef::ExprFString(node),
             Expr::Constant(node) => AnyNodeRef::ExprConstant(node),
             Expr::Attribute(node) => AnyNodeRef::ExprAttribute(node),
             Expr::Subscript(node) => AnyNodeRef::ExprSubscript(node),
@@ -4926,7 +5984,7 @@ impl<'a> From<&'a Expr> for AnyNodeRef<'a> {
             Expr::List(node) => AnyNodeRef::ExprList(node),
             Expr::Tuple(node) => AnyNodeRef::ExprTuple(node),
             Expr::Slice(node) => AnyNodeRef::ExprSlice(node),
-            Expr::LineMagic(node) => AnyNodeRef::ExprLineMagic(node),
+            Expr::IpyEscapeCommand(node) => AnyNodeRef::ExprIpyEscapeCommand(node),
         }
     }
 }
@@ -5027,7 +6085,6 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::ModModule(node) => node.range(),
             AnyNodeRef::ModExpression(node) => node.range(),
             AnyNodeRef::StmtFunctionDef(node) => node.range(),
-            AnyNodeRef::StmtAsyncFunctionDef(node) => node.range(),
             AnyNodeRef::StmtClassDef(node) => node.range(),
             AnyNodeRef::StmtReturn(node) => node.range(),
             AnyNodeRef::StmtDelete(node) => node.range(),
@@ -5036,11 +6093,9 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::StmtAugAssign(node) => node.range(),
             AnyNodeRef::StmtAnnAssign(node) => node.range(),
             AnyNodeRef::StmtFor(node) => node.range(),
-            AnyNodeRef::StmtAsyncFor(node) => node.range(),
             AnyNodeRef::StmtWhile(node) => node.range(),
             AnyNodeRef::StmtIf(node) => node.range(),
             AnyNodeRef::StmtWith(node) => node.range(),
-            AnyNodeRef::StmtAsyncWith(node) => node.range(),
             AnyNodeRef::StmtMatch(node) => node.range(),
             AnyNodeRef::StmtRaise(node) => node.range(),
             AnyNodeRef::StmtTry(node) => node.range(),
@@ -5054,7 +6109,7 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::StmtPass(node) => node.range(),
             AnyNodeRef::StmtBreak(node) => node.range(),
             AnyNodeRef::StmtContinue(node) => node.range(),
-            AnyNodeRef::StmtLineMagic(node) => node.range(),
+            AnyNodeRef::StmtIpyEscapeCommand(node) => node.range(),
             AnyNodeRef::ExprBoolOp(node) => node.range(),
             AnyNodeRef::ExprNamedExpr(node) => node.range(),
             AnyNodeRef::ExprBinOp(node) => node.range(),
@@ -5073,7 +6128,7 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::ExprCompare(node) => node.range(),
             AnyNodeRef::ExprCall(node) => node.range(),
             AnyNodeRef::ExprFormattedValue(node) => node.range(),
-            AnyNodeRef::ExprJoinedStr(node) => node.range(),
+            AnyNodeRef::ExprFString(node) => node.range(),
             AnyNodeRef::ExprConstant(node) => node.range(),
             AnyNodeRef::ExprAttribute(node) => node.range(),
             AnyNodeRef::ExprSubscript(node) => node.range(),
@@ -5082,7 +6137,7 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::ExprList(node) => node.range(),
             AnyNodeRef::ExprTuple(node) => node.range(),
             AnyNodeRef::ExprSlice(node) => node.range(),
-            AnyNodeRef::ExprLineMagic(node) => node.range(),
+            AnyNodeRef::ExprIpyEscapeCommand(node) => node.range(),
             AnyNodeRef::ExceptHandlerExceptHandler(node) => node.range(),
             AnyNodeRef::PatternMatchValue(node) => node.range(),
             AnyNodeRef::PatternMatchSingleton(node) => node.range(),
@@ -5118,7 +6173,6 @@ pub enum NodeKind {
     ModExpression,
     ModFunctionType,
     StmtFunctionDef,
-    StmtAsyncFunctionDef,
     StmtClassDef,
     StmtReturn,
     StmtDelete,
@@ -5127,11 +6181,9 @@ pub enum NodeKind {
     StmtAugAssign,
     StmtAnnAssign,
     StmtFor,
-    StmtAsyncFor,
     StmtWhile,
     StmtIf,
     StmtWith,
-    StmtAsyncWith,
     StmtMatch,
     StmtRaise,
     StmtTry,
@@ -5141,7 +6193,7 @@ pub enum NodeKind {
     StmtImportFrom,
     StmtGlobal,
     StmtNonlocal,
-    StmtLineMagic,
+    StmtIpyEscapeCommand,
     StmtExpr,
     StmtPass,
     StmtBreak,
@@ -5164,7 +6216,7 @@ pub enum NodeKind {
     ExprCompare,
     ExprCall,
     ExprFormattedValue,
-    ExprJoinedStr,
+    ExprFString,
     ExprConstant,
     ExprAttribute,
     ExprSubscript,
@@ -5173,7 +6225,7 @@ pub enum NodeKind {
     ExprList,
     ExprTuple,
     ExprSlice,
-    ExprLineMagic,
+    ExprIpyEscapeCommand,
     ExceptHandlerExceptHandler,
     PatternMatchValue,
     PatternMatchSingleton,

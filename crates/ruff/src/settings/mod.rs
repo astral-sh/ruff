@@ -183,7 +183,7 @@ impl Settings {
                 .src
                 .unwrap_or_else(|| vec![project_root.to_path_buf()]),
             project_root: project_root.to_path_buf(),
-            target_version: config.target_version.unwrap_or(defaults::TARGET_VERSION),
+            target_version: config.target_version.unwrap_or_default(),
             task_tags: config.task_tags.unwrap_or_else(|| {
                 defaults::TASK_TAGS
                     .iter()
@@ -298,6 +298,7 @@ impl Settings {
     pub fn for_rule(rule_code: Rule) -> Self {
         Self {
             rules: RuleTable::from_iter([rule_code]),
+            target_version: PythonVersion::latest(),
             ..Self::default()
         }
     }
@@ -305,8 +306,16 @@ impl Settings {
     pub fn for_rules(rules: impl IntoIterator<Item = Rule>) -> Self {
         Self {
             rules: RuleTable::from_iter(rules),
+            target_version: PythonVersion::latest(),
             ..Self::default()
         }
+    }
+
+    /// Return the [`Settings`] after updating the target [`PythonVersion`].
+    #[must_use]
+    pub fn with_target_version(mut self, target_version: PythonVersion) -> Self {
+        self.target_version = target_version;
+        self
     }
 }
 

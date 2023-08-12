@@ -376,7 +376,7 @@
       ]
     },
     "line-length": {
-      "description": "The line length to use when enforcing long-lines violations (like `E501`).",
+      "description": "The line length to use when enforcing long-lines violations (like `E501`). Must be greater than `0`.",
       "anyOf": [
         {
           "$ref": "#/definitions/LineLength"
@@ -560,7 +560,7 @@
       ]
     },
     "target-version": {
-      "description": "The minimum Python version to target, e.g., when considering automatic code upgrades, like rewriting type annotations.\n\nIf omitted, and Ruff is configured via a `pyproject.toml` file, the target version will be inferred from its `project.requires-python` field (e.g., `requires-python = \">=3.8\"`). If Ruff is configured via `ruff.toml` or `.ruff.toml`, no such inference will be performed.",
+      "description": "The minimum Python version to target, e.g., when considering automatic code upgrades, like rewriting type annotations. Ruff will not propose changes using features that are not available in the given version.\n\nFor example, to represent supporting Python >=3.10 or ==3.10 specify `target-version = \"py310\"`.\n\nIf omitted, and Ruff is configured via a `pyproject.toml` file, the target version will be inferred from its `project.requires-python` field (e.g., `requires-python = \">=3.8\"`). If Ruff is configured via `ruff.toml` or `.ruff.toml`, no such inference will be performed.",
       "anyOf": [
         {
           "$ref": "#/definitions/PythonVersion"
@@ -1064,7 +1064,7 @@
           }
         },
         "banned-module-level-imports": {
-          "description": "List of specific modules that can't be imported at module level. This does not ban these modules from being imported inline.",
+          "description": "List of specific modules that may not be imported at module level, and should instead be imported lazily (e.g., within a function definition, or an `if TYPE_CHECKING:` block, or some other nested context).",
           "type": [
             "array",
             "null"
@@ -1491,7 +1491,7 @@
           ]
         },
         "max-doc-length": {
-          "description": "The maximum line length to allow for line-length violations within documentation (`W505`), including standalone comments.",
+          "description": "The maximum line length to allow for line-length violations within documentation (`W505`), including standalone comments. By default, this is set to null which disables reporting violations.\n\nSee the [`doc-line-too-long`](https://beta.ruff.rs/docs/rules/doc-line-too-long/) rule for more information.",
           "anyOf": [
             {
               "$ref": "#/definitions/LineLength"
@@ -2293,12 +2293,15 @@
         "PLW150",
         "PLW1508",
         "PLW1509",
+        "PLW151",
+        "PLW1510",
         "PLW1641",
         "PLW2",
         "PLW29",
         "PLW290",
         "PLW2901",
         "PLW3",
+        "PLW3201",
         "PLW33",
         "PLW330",
         "PLW3301",
@@ -2752,7 +2755,7 @@
       "description": "The size of a tab.",
       "type": "integer",
       "format": "uint8",
-      "minimum": 0.0
+      "minimum": 1.0
     },
     "Version": {
       "type": "string"

@@ -80,7 +80,7 @@ impl<'a> StatementVisitor<'a> for GlobalsVisitor<'a> {
                     self.0.insert(name.as_str(), *range);
                 }
             }
-            Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) | Stmt::ClassDef(_) => {
+            Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {
                 // Don't recurse.
             }
             _ => walk_stmt(self, stmt),

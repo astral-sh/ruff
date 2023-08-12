@@ -24,8 +24,6 @@ pub const PREFIXES: &[RuleSelector] = &[
     RuleSelector::Linter(Linter::Pyflakes),
 ];
 
-pub const TARGET_VERSION: PythonVersion = PythonVersion::Py310;
-
 pub const TASK_TAGS: &[&str] = &["TODO", "FIXME", "XXX"];
 
 pub static DUMMY_VARIABLE_RGX: Lazy<Regex> =
@@ -91,7 +89,7 @@ impl Default for Settings {
             respect_gitignore: true,
             src: vec![path_dedot::CWD.clone()],
             tab_size: TabSize::default(),
-            target_version: TARGET_VERSION,
+            target_version: PythonVersion::default(),
             task_tags: TASK_TAGS.iter().map(ToString::to_string).collect(),
             typing_modules: vec![],
             flake8_annotations: flake8_annotations::settings::Settings::default(),

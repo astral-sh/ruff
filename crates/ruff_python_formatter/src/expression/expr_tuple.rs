@@ -1,13 +1,12 @@
+use ruff_formatter::{format_args, write, FormatRuleWithOptions};
+use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::ExprTuple;
 use ruff_python_ast::{Expr, Ranged};
 use ruff_text_size::TextRange;
 
-use ruff_formatter::{format_args, write, FormatRuleWithOptions};
-use ruff_python_ast::node::AnyNodeRef;
-
-use crate::builders::{empty_parenthesized_with_dangling_comments, parenthesize_if_expands};
+use crate::builders::parenthesize_if_expands;
 use crate::expression::parentheses::{
-    parenthesized_with_dangling_comments, NeedsParentheses, OptionalParentheses,
+    empty_parenthesized, parenthesized, NeedsParentheses, OptionalParentheses,
 };
 use crate::prelude::*;
 
@@ -120,8 +119,7 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
         // In all other cases comments get assigned to a list element
         match elts.as_slice() {
             [] => {
-                return empty_parenthesized_with_dangling_comments(text("("), dangling, text(")"))
-                    .fmt(f);
+                return empty_parenthesized("(", dangling, ")").fmt(f);
             }
             [single] => match self.parentheses {
                 TupleParentheses::Preserve
@@ -132,13 +130,9 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                 _ =>
                 // A single element tuple always needs parentheses and a trailing comma, except when inside of a subscript
                 {
-                    parenthesized_with_dangling_comments(
-                        "(",
-                        dangling,
-                        &format_args![single.format(), text(",")],
-                        ")",
-                    )
-                    .fmt(f)
+                    parenthesized("(", &format_args![single.format(), text(",")], ")")
+                        .with_dangling_comments(dangling)
+                        .fmt(f)
                 }
             },
             // If the tuple has parentheses, we generally want to keep them. The exception are for
@@ -150,7 +144,8 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                 && !(self.parentheses == TupleParentheses::NeverPreserve
                     && dangling.is_empty()) =>
             {
-                parenthesized_with_dangling_comments("(", dangling, &ExprSequence::new(item), ")")
+                parenthesized("(", &ExprSequence::new(item), ")")
+                    .with_dangling_comments(dangling)
                     .fmt(f)
             }
             _ => match self.parentheses {

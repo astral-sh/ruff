@@ -312,13 +312,13 @@ pub struct Options {
         "#
     )]
     /// The line length to use when enforcing long-lines violations (like
-    /// `E501`).
+    /// `E501`). Must be greater than `0`.
     pub line_length: Option<LineLength>,
     #[option(
         default = "4",
         value_type = "int",
         example = r#"
-            tab_size = 8
+            tab-size = 8
         "#
     )]
     /// The tabulation size to calculate line length.
@@ -456,7 +456,7 @@ pub struct Options {
     /// contained an `__init__.py` file.
     pub namespace_packages: Option<Vec<String>>,
     #[option(
-        default = r#""py310""#,
+        default = r#""py38""#,
         value_type = r#""py37" | "py38" | "py39" | "py310" | "py311" | "py312""#,
         example = r#"
             # Always generate Python 3.7-compatible code.
@@ -464,7 +464,11 @@ pub struct Options {
         "#
     )]
     /// The minimum Python version to target, e.g., when considering automatic
-    /// code upgrades, like rewriting type annotations.
+    /// code upgrades, like rewriting type annotations. Ruff will not propose
+    /// changes using features that are not available in the given version.
+    ///
+    /// For example, to represent supporting Python >=3.10 or ==3.10
+    /// specify `target-version = "py310"`.
     ///
     /// If omitted, and Ruff is configured via a `pyproject.toml` file, the
     /// target version will be inferred from its `project.requires-python`
@@ -596,7 +600,7 @@ pub struct Options {
         default = "{}",
         value_type = "dict[str, list[RuleSelector]]",
         example = r#"
-            # Also ignore `E401` in all `__init__.py` files.
+            # Also ignore `E402` in all `__init__.py` files.
             [tool.ruff.extend-per-file-ignores]
             "__init__.py" = ["E402"]
         "#

@@ -616,7 +616,7 @@ pub struct ExprFormattedValue<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprJoinedStr<'a> {
+pub struct ExprFString<'a> {
     values: Vec<ComparableExpr<'a>>,
 }
 
@@ -672,8 +672,8 @@ pub struct ExprSlice<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprLineMagic<'a> {
-    kind: ast::MagicKind,
+pub struct ExprIpyEscapeCommand<'a> {
+    kind: ast::IpyEscapeKind,
     value: &'a str,
 }
 
@@ -697,7 +697,7 @@ pub enum ComparableExpr<'a> {
     Compare(ExprCompare<'a>),
     Call(ExprCall<'a>),
     FormattedValue(ExprFormattedValue<'a>),
-    JoinedStr(ExprJoinedStr<'a>),
+    FString(ExprFString<'a>),
     Constant(ExprConstant<'a>),
     Attribute(ExprAttribute<'a>),
     Subscript(ExprSubscript<'a>),
@@ -706,7 +706,7 @@ pub enum ComparableExpr<'a> {
     List(ExprList<'a>),
     Tuple(ExprTuple<'a>),
     Slice(ExprSlice<'a>),
-    LineMagic(ExprLineMagic<'a>),
+    IpyEscapeCommand(ExprIpyEscapeCommand<'a>),
 }
 
 impl<'a> From<&'a Box<ast::Expr>> for Box<ComparableExpr<'a>> {
@@ -865,8 +865,8 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 debug_text: debug_text.as_ref(),
                 format_spec: format_spec.as_ref().map(Into::into),
             }),
-            ast::Expr::JoinedStr(ast::ExprJoinedStr { values, range: _ }) => {
-                Self::JoinedStr(ExprJoinedStr {
+            ast::Expr::FString(ast::ExprFString { values, range: _ }) => {
+                Self::FString(ExprFString {
                     values: values.iter().map(Into::into).collect(),
                 })
             }
@@ -936,11 +936,11 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 upper: upper.as_ref().map(Into::into),
                 step: step.as_ref().map(Into::into),
             }),
-            ast::Expr::LineMagic(ast::ExprLineMagic {
+            ast::Expr::IpyEscapeCommand(ast::ExprIpyEscapeCommand {
                 kind,
                 value,
                 range: _,
-            }) => Self::LineMagic(ExprLineMagic {
+            }) => Self::IpyEscapeCommand(ExprIpyEscapeCommand {
                 kind: *kind,
                 value: value.as_str(),
             }),
@@ -950,16 +950,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct StmtFunctionDef<'a> {
-    decorator_list: Vec<ComparableDecorator<'a>>,
-    name: &'a str,
-    type_params: Option<ComparableTypeParams<'a>>,
-    parameters: ComparableParameters<'a>,
-    returns: Option<ComparableExpr<'a>>,
-    body: Vec<ComparableStmt<'a>>,
-}
-
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct StmtAsyncFunctionDef<'a> {
+    is_async: bool,
     decorator_list: Vec<ComparableDecorator<'a>>,
     name: &'a str,
     type_params: Option<ComparableTypeParams<'a>>,
@@ -1084,14 +1075,7 @@ pub struct StmtAnnAssign<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct StmtFor<'a> {
-    target: ComparableExpr<'a>,
-    iter: ComparableExpr<'a>,
-    body: Vec<ComparableStmt<'a>>,
-    orelse: Vec<ComparableStmt<'a>>,
-}
-
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct StmtAsyncFor<'a> {
+    is_async: bool,
     target: ComparableExpr<'a>,
     iter: ComparableExpr<'a>,
     body: Vec<ComparableStmt<'a>>,
@@ -1114,12 +1098,7 @@ pub struct StmtIf<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct StmtWith<'a> {
-    items: Vec<ComparableWithItem<'a>>,
-    body: Vec<ComparableStmt<'a>>,
-}
-
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct StmtAsyncWith<'a> {
+    is_async: bool,
     items: Vec<ComparableWithItem<'a>>,
     body: Vec<ComparableStmt<'a>>,
 }
@@ -1186,15 +1165,14 @@ pub struct StmtExpr<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct StmtLineMagic<'a> {
-    kind: ast::MagicKind,
+pub struct StmtIpyEscapeCommand<'a> {
+    kind: ast::IpyEscapeKind,
     value: &'a str,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum ComparableStmt<'a> {
     FunctionDef(StmtFunctionDef<'a>),
-    AsyncFunctionDef(StmtAsyncFunctionDef<'a>),
     ClassDef(StmtClassDef<'a>),
     Return(StmtReturn<'a>),
     Delete(StmtDelete<'a>),
@@ -1202,11 +1180,9 @@ pub enum ComparableStmt<'a> {
     AugAssign(StmtAugAssign<'a>),
     AnnAssign(StmtAnnAssign<'a>),
     For(StmtFor<'a>),
-    AsyncFor(StmtAsyncFor<'a>),
     While(StmtWhile<'a>),
     If(StmtIf<'a>),
     With(StmtWith<'a>),
-    AsyncWith(StmtAsyncWith<'a>),
     Match(StmtMatch<'a>),
     Raise(StmtRaise<'a>),
     Try(StmtTry<'a>),
@@ -1217,7 +1193,7 @@ pub enum ComparableStmt<'a> {
     ImportFrom(StmtImportFrom<'a>),
     Global(StmtGlobal<'a>),
     Nonlocal(StmtNonlocal<'a>),
-    LineMagic(StmtLineMagic<'a>),
+    IpyEscapeCommand(StmtIpyEscapeCommand<'a>),
     Expr(StmtExpr<'a>),
     Pass,
     Break,
@@ -1228,6 +1204,7 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
     fn from(stmt: &'a ast::Stmt) -> Self {
         match stmt {
             ast::Stmt::FunctionDef(ast::StmtFunctionDef {
+                is_async,
                 name,
                 parameters,
                 body,
@@ -1236,22 +1213,7 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                 type_params,
                 range: _,
             }) => Self::FunctionDef(StmtFunctionDef {
-                name: name.as_str(),
-                parameters: parameters.into(),
-                body: body.iter().map(Into::into).collect(),
-                decorator_list: decorator_list.iter().map(Into::into).collect(),
-                returns: returns.as_ref().map(Into::into),
-                type_params: type_params.as_ref().map(Into::into),
-            }),
-            ast::Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-                name,
-                parameters,
-                body,
-                decorator_list,
-                returns,
-                type_params,
-                range: _,
-            }) => Self::AsyncFunctionDef(StmtAsyncFunctionDef {
+                is_async: *is_async,
                 name: name.as_str(),
                 parameters: parameters.into(),
                 body: body.iter().map(Into::into).collect(),
@@ -1320,24 +1282,14 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                 simple: *simple,
             }),
             ast::Stmt::For(ast::StmtFor {
+                is_async,
                 target,
                 iter,
                 body,
                 orelse,
                 range: _,
             }) => Self::For(StmtFor {
-                target: target.into(),
-                iter: iter.into(),
-                body: body.iter().map(Into::into).collect(),
-                orelse: orelse.iter().map(Into::into).collect(),
-            }),
-            ast::Stmt::AsyncFor(ast::StmtAsyncFor {
-                target,
-                iter,
-                body,
-                orelse,
-                range: _,
-            }) => Self::AsyncFor(StmtAsyncFor {
+                is_async: *is_async,
                 target: target.into(),
                 iter: iter.into(),
                 body: body.iter().map(Into::into).collect(),
@@ -1364,18 +1316,12 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                 elif_else_clauses: elif_else_clauses.iter().map(Into::into).collect(),
             }),
             ast::Stmt::With(ast::StmtWith {
+                is_async,
                 items,
                 body,
                 range: _,
             }) => Self::With(StmtWith {
-                items: items.iter().map(Into::into).collect(),
-                body: body.iter().map(Into::into).collect(),
-            }),
-            ast::Stmt::AsyncWith(ast::StmtAsyncWith {
-                items,
-                body,
-                range: _,
-            }) => Self::AsyncWith(StmtAsyncWith {
+                is_async: *is_async,
                 items: items.iter().map(Into::into).collect(),
                 body: body.iter().map(Into::into).collect(),
             }),
@@ -1448,11 +1394,11 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                     names: names.iter().map(ast::Identifier::as_str).collect(),
                 })
             }
-            ast::Stmt::LineMagic(ast::StmtLineMagic {
+            ast::Stmt::IpyEscapeCommand(ast::StmtIpyEscapeCommand {
                 kind,
                 value,
                 range: _,
-            }) => Self::LineMagic(StmtLineMagic {
+            }) => Self::IpyEscapeCommand(StmtIpyEscapeCommand {
                 kind: *kind,
                 value: value.as_str(),
             }),

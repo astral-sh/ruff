@@ -43,7 +43,7 @@ impl AlwaysAutofixableViolation for StringOrBytesTooLong {
 /// PYI053
 pub(crate) fn string_or_bytes_too_long(checker: &mut Checker, expr: &Expr) {
     // Ignore docstrings.
-    if is_docstring_stmt(checker.semantic().stmt()) {
+    if is_docstring_stmt(checker.semantic().current_statement()) {
         return;
     }
 

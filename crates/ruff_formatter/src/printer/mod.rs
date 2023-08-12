@@ -1379,7 +1379,7 @@ enum MeasureMode {
     /// Returns
     FirstLine,
 
-    /// The content only fits if non of the lines exceed the print width. Lines are terminated by either
+    /// The content only fits if none of the lines exceed the print width. Lines are terminated by either
     /// a hard line break or a soft line break in [`PrintMode::Expanded`].
     AllLines,
 }

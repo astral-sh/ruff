@@ -226,7 +226,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
             }
         }
         // Ex) `f"foo{bar}".encode("utf-8")`
-        Expr::JoinedStr(_) => {
+        Expr::FString(_) => {
             if let Some(encoding_arg) = match_encoding_arg(&call.arguments) {
                 if let EncodingArg::Keyword(kwarg) = encoding_arg {
                     // Ex) Convert `f"unicode text©".encode(encoding="utf-8")` to

@@ -43,6 +43,11 @@ impl Violation for UnnecessaryTypeUnion {
 
 /// PYI055
 pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr) {
+    // The `|` operator isn't always safe to allow to runtime-evaluated annotations.
+    if checker.semantic().execution_context().is_runtime() {
+        return;
+    }
+
     let mut type_exprs = Vec::new();
 
     // Check if `union` is a PEP604 union (e.g. `float | int`) or a `typing.Union[float, int]`

@@ -54,7 +54,7 @@ pub(crate) fn useless_expression(checker: &mut Checker, value: &Expr) {
     // Ignore strings, to avoid false positives with docstrings.
     if matches!(
         value,
-        Expr::JoinedStr(_)
+        Expr::FString(_)
             | Expr::Constant(ast::ExprConstant {
                 value: Constant::Str(..) | Constant::Ellipsis,
                 ..

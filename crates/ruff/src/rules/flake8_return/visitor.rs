@@ -50,12 +50,6 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                 decorator_list,
                 returns,
                 ..
-            })
-            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-                parameters,
-                decorator_list,
-                returns,
-                ..
             }) => {
                 // Visit the decorators, etc.
                 self.sibling = Some(stmt);
@@ -101,8 +95,7 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                         //         x = f.read()
                         //     return x
                         // ```
-                        Stmt::With(ast::StmtWith { body, .. })
-                        | Stmt::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
+                        Stmt::With(ast::StmtWith { body, .. }) => {
                             if let Some(stmt_assign) = body.last().and_then(Stmt::as_assign_stmt) {
                                 self.stack
                                     .assignment_return

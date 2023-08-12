@@ -52,7 +52,7 @@ impl Violation for FStringInGetTextFuncCall {
 /// INT001
 pub(crate) fn f_string_in_gettext_func_call(checker: &mut Checker, args: &[Expr]) {
     if let Some(first) = args.first() {
-        if first.is_joined_str_expr() {
+        if first.is_f_string_expr() {
             checker
                 .diagnostics
                 .push(Diagnostic::new(FStringInGetTextFuncCall {}, first.range()));

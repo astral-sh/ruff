@@ -1,9 +1,7 @@
-use ruff_python_ast::Ranged;
-use ruff_text_size::{TextLen, TextRange};
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::{Definition, Member, MemberKind};
+use ruff_python_ast::Ranged;
+use ruff_text_size::{TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
@@ -57,13 +55,7 @@ impl AlwaysAutofixableViolation for FirstLineCapitalized {
 
 /// D403
 pub(crate) fn capitalized(checker: &mut Checker, docstring: &Docstring) {
-    if !matches!(
-        docstring.definition,
-        Definition::Member(Member {
-            kind: MemberKind::Function | MemberKind::NestedFunction | MemberKind::Method,
-            ..
-        })
-    ) {
+    if docstring.definition.as_function_def().is_none() {
         return;
     }
 

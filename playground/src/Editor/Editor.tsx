@@ -66,7 +66,7 @@ export default function Editor() {
 
   const initialized = ruffVersion != null;
 
-  // Ideally this would be retrieved right from the URl... but routing without a proper
+  // Ideally this would be retrieved right from the URL... but routing without a proper
   // router is hard (there's no location changed event) and pulling in a router
   // feels overkill.
   const handleSecondaryToolSelected = (tool: SecondaryTool | null) => {
@@ -88,8 +88,10 @@ export default function Editor() {
   };
 
   useEffect(() => {
-    init().then(() => {
-      const [settingsSource, pythonSource] = restore() ?? [
+    async function initAsync() {
+      await init();
+      const response = await restore();
+      const [settingsSource, pythonSource] = response ?? [
         stringify(Workspace.defaultSettings()),
         DEFAULT_PYTHON_SOURCE,
       ];
@@ -100,7 +102,8 @@ export default function Editor() {
         settingsSource,
       });
       setRuffVersion(Workspace.version());
-    });
+    }
+    initAsync().catch(console.error);
   }, []);
 
   const deferredSource = useDeferredValue(source);
@@ -182,7 +185,7 @@ export default function Editor() {
     }
 
     return () => {
-      persist(source.settingsSource, source.pythonSource);
+      return persist(source.settingsSource, source.pythonSource);
     };
   }, [source, initialized]);
 
@@ -201,8 +204,6 @@ export default function Editor() {
       revision: state.revision + 1,
     }));
   }, []);
-
-  // useMonacoTheme();
 
   return (
     <main className="flex flex-col h-full bg-ayu-background dark:bg-ayu-background-dark">

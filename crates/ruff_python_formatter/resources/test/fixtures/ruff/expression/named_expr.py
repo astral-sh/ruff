@@ -36,3 +36,18 @@ except (e := Exception):
 (x := 1)
 
 (x := 1) + (y := 2)
+
+with (x := 1):
+    pass
+
+
+def f():
+    yield (x := 1)
+
+
+def f():
+    yield from (x := 1)
+
+
+async def f():
+    await (x := 1)

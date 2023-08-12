@@ -45,15 +45,14 @@ pub struct Options {
         default = r#"[]"#,
         value_type = r#"list[str]"#,
         example = r#"
-            # Ban certain modules from being imported at module level,
-            # as opposed to importing them lazily (e.g., within a function
-            # definition).
+            # Ban certain modules from being imported at module level, instead requiring
+            # that they're imported lazily (e.g., within a function definition).
             banned-module-level-imports = ["torch", "tensorflow"]
         "#
     )]
     /// List of specific modules that may not be imported at module level, and should instead be
-    /// imported conditionally (e.g., within a function definition, or an `if TYPE_CHECKING:`
-    /// block).
+    /// imported lazily (e.g., within a function definition, or an `if TYPE_CHECKING:`
+    /// block, or some other nested context).
     pub banned_module_level_imports: Option<Vec<String>>,
 }
 

@@ -1,10 +1,9 @@
-use ruff_formatter::prelude::{format_with, text};
+use ruff_formatter::prelude::format_with;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{ExprList, Ranged};
 
-use crate::builders::empty_parenthesized_with_dangling_comments;
 use crate::expression::parentheses::{
-    parenthesized_with_dangling_comments, NeedsParentheses, OptionalParentheses,
+    empty_parenthesized, parenthesized, NeedsParentheses, OptionalParentheses,
 };
 use crate::prelude::*;
 use crate::FormatNodeRule;
@@ -24,8 +23,7 @@ impl FormatNodeRule<ExprList> for FormatExprList {
         let dangling = comments.dangling_comments(item);
 
         if elts.is_empty() {
-            return empty_parenthesized_with_dangling_comments(text("["), dangling, text("]"))
-                .fmt(f);
+            return empty_parenthesized("[", dangling, "]").fmt(f);
         }
 
         let items = format_with(|f| {
@@ -34,7 +32,9 @@ impl FormatNodeRule<ExprList> for FormatExprList {
                 .finish()
         });
 
-        parenthesized_with_dangling_comments("[", dangling, &items, "]").fmt(f)
+        parenthesized("[", &items, "]")
+            .with_dangling_comments(dangling)
+            .fmt(f)
     }
 
     fn fmt_dangling_comments(&self, _node: &ExprList, _f: &mut PyFormatter) -> FormatResult<()> {

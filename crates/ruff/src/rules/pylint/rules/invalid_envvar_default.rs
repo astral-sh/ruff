@@ -71,7 +71,7 @@ fn is_valid_default(expr: &Expr) -> bool {
         Expr::Constant(ast::ExprConstant {
             value: Constant::Str { .. } | Constant::None { .. },
             ..
-        }) | Expr::JoinedStr(_)
+        }) | Expr::FString(_)
     )
 }
 

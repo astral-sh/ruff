@@ -67,8 +67,8 @@ pub(crate) fn compare_to_empty_string(
     // DataFrame and np.ndarray indexing.
     if checker
         .semantic()
-        .expr_ancestors()
-        .any(|parent| parent.is_subscript_expr())
+        .current_expressions()
+        .any(Expr::is_subscript_expr)
     {
         return;
     }

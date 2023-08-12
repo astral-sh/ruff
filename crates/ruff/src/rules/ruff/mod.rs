@@ -60,10 +60,8 @@ mod tests {
         );
         let diagnostics = test_path(
             Path::new("ruff").join(path).as_path(),
-            &settings::Settings {
-                target_version: PythonVersion::Py39,
-                ..settings::Settings::for_rule(Rule::ImplicitOptional)
-            },
+            &settings::Settings::for_rule(Rule::ImplicitOptional)
+                .with_target_version(PythonVersion::Py39),
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -151,6 +149,16 @@ mod tests {
                 Rule::LineTooLong,
                 Rule::UndefinedName,
             ]),
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn ruf100_4() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF100_4.py"),
+            &settings::Settings::for_rules(vec![Rule::UnusedNOQA, Rule::UnusedImport]),
         )?;
         assert_messages!(diagnostics);
         Ok(())
