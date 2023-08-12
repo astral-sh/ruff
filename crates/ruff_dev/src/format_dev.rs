@@ -1,7 +1,11 @@
 use anyhow::{bail, format_err, Context, Error};
 use clap::{CommandFactory, FromArgMatches};
 use ignore::DirEntry;
+use imara_diff::intern::InternedInput;
+use imara_diff::sink::Counter;
+use imara_diff::{diff, Algorithm};
 use indicatif::ProgressStyle;
+#[cfg_attr(feature = "singlethreaded", allow(unused_imports))]
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use ruff::logging::LogLevel;
 use ruff::resolver::python_files_in_path;
@@ -22,7 +26,7 @@ use std::panic::catch_unwind;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::{Duration, Instant};
-use std::{fmt, fs, io};
+use std::{fmt, fs, io, iter};
 use tempfile::NamedTempFile;
 use tracing::{debug, error, info, info_span};
 use tracing_indicatif::span_ext::IndicatifSpanExt;
@@ -99,16 +103,18 @@ impl Statistics {
                 intersection,
             }
         } else {
-            let diff = TextDiff::from_lines(black, ruff);
-            let mut statistics = Self::default();
-            for change in diff.iter_all_changes() {
-                match change.tag() {
-                    ChangeTag::Delete => statistics.black_input += 1,
-                    ChangeTag::Insert => statistics.ruff_output += 1,
-                    ChangeTag::Equal => statistics.intersection += 1,
-                }
+            // `similar` was too slow (for some files >90% diffing instead of formatting)
+            let input = InternedInput::new(black, ruff);
+            let changes = diff(Algorithm::Histogram, &input, Counter::default());
+            assert_eq!(
+                input.before.len() - (changes.removals as usize),
+                input.after.len() - (changes.insertions as usize)
+            );
+            Self {
+                black_input: changes.removals,
+                ruff_output: changes.insertions,
+                intersection: u32::try_from(input.before.len()).unwrap() - changes.removals,
             }
-            statistics
         }
     }
 
@@ -187,6 +193,9 @@ pub(crate) struct Args {
     /// Write all log messages (same as cli) to this file
     #[arg(long)]
     pub(crate) log_file: Option<PathBuf>,
+    /// Write a markdown table with the similarity indices to this file
+    #[arg(long)]
+    pub(crate) stats_file: Option<PathBuf>,
     /// Assert that there are exactly this many input files with errors. This catches regressions
     /// (or improvements) in the parser.
     #[arg(long)]
@@ -250,7 +259,10 @@ fn setup_logging(log_level_args: &LogLevelArgs, log_file: Option<&Path>) -> io::
             .with_default_directive(log_level.into())
             .parse_lossy("")
     });
-    let indicatif_layer = IndicatifLayer::new();
+    let indicatif_layer = IndicatifLayer::new().with_progress_style(
+        // Default without the spinner
+        ProgressStyle::with_template("{span_child_prefix} {span_name}{{{span_fields}}}").unwrap(),
+    );
     let indicitif_compatible_writer_layer = tracing_subscriber::fmt::layer()
         .with_writer(indicatif_layer.get_stderr_writer())
         .with_target(false);
@@ -302,6 +314,8 @@ fn format_dev_multi_project(args: &Args) -> anyhow::Result<bool> {
         None => None,
     };
 
+    let mut results = Vec::new();
+
     for project_path in project_paths {
         debug!(parent: None, "Starting {}", project_path.display());
 
@@ -332,6 +346,7 @@ fn format_dev_multi_project(args: &Args) -> anyhow::Result<bool> {
                     write!(error_file, "{}", result.display(args.format)).unwrap();
                     error_file.flush().unwrap();
                 }
+                results.push(result);
 
                 pb_span.pb_inc(1);
             }
@@ -352,6 +367,35 @@ fn format_dev_multi_project(args: &Args) -> anyhow::Result<bool> {
         "Finished: {total_errors} stability errors, {total_files} files, tool {}s, {total_syntax_error_in_input} input files contained syntax errors ",
         duration.as_secs_f32(),
     );
+
+    if let Some(stats_file) = &args.stats_file {
+        results.sort_by(|result1, result2| result1.name.cmp(&result2.name));
+        let project_col_len = results
+            .iter()
+            .map(|result| result.name.len())
+            .chain(iter::once("project".len()))
+            .max()
+            .unwrap_or_default();
+        let mut stats_file = BufWriter::new(File::create(stats_file)?);
+        writeln!(
+            stats_file,
+            "| {:<project_col_len$} | similarity index |",
+            "project"
+        )?;
+        writeln!(
+            stats_file,
+            "|-{:-<project_col_len$}-|------------------|",
+            ""
+        )?;
+        for result in results {
+            writeln!(
+                stats_file,
+                "| {:<project_col_len$} | {:.5}          |",
+                result.name,
+                result.statistics.similarity_index()
+            )?;
+        }
+    }
 
     if let Some(files_with_errors) = args.files_with_errors {
         if total_syntax_error_in_input != files_with_errors {
@@ -395,14 +439,16 @@ fn format_dev_project(
         pb_span.pb_set_style(&ProgressStyle::default_bar());
         pb_span.pb_set_length(paths.len() as u64);
         let _pb_span_enter = pb_span.enter();
-        paths
-            .into_par_iter()
-            .map(|dir_entry| {
-                let result = format_dir_entry(dir_entry, stability_check, write, &black_options);
-                pb_span.pb_inc(1);
-                result
-            })
-            .collect::<anyhow::Result<Vec<_>>>()?
+        #[cfg(not(feature = "singlethreaded"))]
+        let iter = { paths.into_par_iter() };
+        #[cfg(feature = "singlethreaded")]
+        let iter = { paths.into_iter() };
+        iter.map(|dir_entry| {
+            let result = format_dir_entry(dir_entry, stability_check, write, &black_options);
+            pb_span.pb_inc(1);
+            result
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?
     };
 
     let mut statistics = Statistics::default();
@@ -433,7 +479,13 @@ fn format_dev_project(
 
     let duration = start.elapsed();
 
+    let name = files[0]
+        .file_name()
+        .unwrap_or(files[0].as_os_str())
+        .to_string_lossy()
+        .to_string();
     Ok(CheckRepoResult {
+        name,
         duration,
         file_count: formatted_counter,
         diagnostics,
@@ -511,6 +563,7 @@ fn diff_show_only_changes(
 }
 
 struct CheckRepoResult {
+    name: String,
     duration: Duration,
     file_count: usize,
     diagnostics: Vec<Diagnostic>,

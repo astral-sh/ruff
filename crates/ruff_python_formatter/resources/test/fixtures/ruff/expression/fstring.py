@@ -24,3 +24,12 @@ result_f = (
     r'  \[Previous line repeated (\d+) more times\]' '\n'
     'RecursionError: maximum recursion depth exceeded\n'
 )
+
+
+# Regression for fstring dropping comments that were accidentally attached to
+# an expression inside a formatted value
+(
+    f'{1}'
+    # comment
+    ''
+)

@@ -55,10 +55,11 @@ git -C "$dir/cpython" checkout 45de31db9cc9be945702f3a7ca35bbb9f98476af
 # Uncomment if you want to update the hashes
 # for i in "$dir"/*/; do git -C "$i" switch main && git -C "$i" pull && echo "# $(basename "$i") $(git -C "$i" rev-parse HEAD)"; done
 
-time cargo run --bin ruff_dev -- format-dev --stability-check --error-file "$target/progress_projects_errors.txt" \
-  --log-file "$target/progress_projects_log.txt" --files-with-errors 25 --multi-project "$dir" || (
+time cargo run --bin ruff_dev -- format-dev --stability-check \
+  --error-file "$target/progress_projects_errors.txt" --log-file "$target/progress_projects_log.txt" --stats-file "$target/progress_projects_stats.txt" \
+  --files-with-errors 25 --multi-project "$dir" || (
   echo "Ecosystem check failed"
   cat "$target/progress_projects_log.txt"
   exit 1
 )
-grep "similarity index" "$target/progress_projects_log.txt" | sort
+cat "$target/progress_projects_stats.txt"

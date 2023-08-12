@@ -1,7 +1,8 @@
-use ruff_formatter::{write, Buffer, FormatResult};
+use ruff_formatter::{format_args, write, Buffer, FormatResult};
 use ruff_python_ast::StmtMatch;
 
-use crate::comments::trailing_comments;
+use crate::comments::{leading_alternate_branch_comments, trailing_comments};
+use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
@@ -35,8 +36,29 @@ impl FormatNodeRule<StmtMatch> for FormatStmtMatch {
             ]
         )?;
 
-        for case in cases {
-            write!(f, [block_indent(&case.format())])?;
+        let mut cases_iter = cases.iter();
+        let Some(first) = cases_iter.next() else {
+            return Ok(());
+        };
+
+        // The new level is for the `case` nodes.
+        let mut f = WithNodeLevel::new(NodeLevel::CompoundStatement, f);
+
+        write!(f, [block_indent(&first.format())])?;
+        let mut last_case = first;
+
+        for case in cases_iter {
+            write!(
+                f,
+                [block_indent(&format_args!(
+                    &leading_alternate_branch_comments(
+                        comments.leading_comments(case),
+                        last_case.body.last(),
+                    ),
+                    &case.format()
+                ))]
+            )?;
+            last_case = case;
         }
 
         Ok(())

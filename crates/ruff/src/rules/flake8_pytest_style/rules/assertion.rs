@@ -145,6 +145,30 @@ impl Violation for PytestAssertAlwaysFalse {
     }
 }
 
+/// ## What it does
+/// Checks for uses of assertion methods from the `unittest` module.
+///
+/// ## Why is this bad?
+/// To make use of `pytest`'s assertion rewriting, a regular `assert` statement
+/// is preferred over `unittest`'s assertion methods.
+///
+/// ## Example
+/// ```python
+/// class TestFoo(unittest.TestCase):
+///     def test_foo(self):
+///         self.assertEqual(a, b)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class TestFoo(unittest.TestCase):
+///     def test_foo(self):
+///         assert a == b
+/// ```
+///
+/// ## References
+/// - [`pytest` documentation: Assertion introspection details](https://docs.pytest.org/en/7.1.x/how-to/assert.html#assertion-introspection-details)
+
 #[violation]
 pub struct PytestUnittestAssertion {
     assertion: String,

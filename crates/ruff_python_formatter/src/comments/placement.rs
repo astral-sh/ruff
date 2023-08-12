@@ -80,6 +80,7 @@ pub(super) fn place_comment<'a>(
                 CommentPlacement::Default(comment)
             }
         }
+        AnyNodeRef::ExprFString(fstring) => CommentPlacement::dangling(fstring, comment),
         AnyNodeRef::ExprList(_)
         | AnyNodeRef::ExprSet(_)
         | AnyNodeRef::ExprGeneratorExp(_)
@@ -212,6 +213,7 @@ fn is_first_statement_in_body(statement: AnyNodeRef, has_body: AnyNodeRef) -> bo
         | AnyNodeRef::ExceptHandlerExceptHandler(ast::ExceptHandlerExceptHandler {
             body, ..
         })
+        | AnyNodeRef::MatchCase(ast::MatchCase { body, .. })
         | AnyNodeRef::StmtFunctionDef(ast::StmtFunctionDef { body, .. })
         | AnyNodeRef::StmtClassDef(ast::StmtClassDef { body, .. }) => {
             are_same_optional(statement, body.first())
@@ -450,12 +452,11 @@ fn handle_own_line_comment_after_branch<'a>(
         return CommentPlacement::Default(comment);
     }
 
-    let mut parent_body = None;
-    let mut current_body = Some(preceding_node);
-    let mut last_child_in_current_body = last_child;
+    let mut parent = None;
+    let mut last_child_in_parent = last_child;
 
     loop {
-        let child_indentation = indentation(locator, &last_child_in_current_body)
+        let child_indentation = indentation(locator, &last_child_in_parent)
             .unwrap_or_default()
             .len();
 
@@ -464,15 +465,16 @@ fn handle_own_line_comment_after_branch<'a>(
         // if parent_body:
         //     if current_body:
         //         child_in_body()
-        //         last_child_in_current_body # may or may not have children on its own
+        //         last_child_in_current_body  # may or may not have children on its own
         // # less: Comment belongs to the parent block.
-        //   # less
+        //   # less: Comment belongs to the parent block.
         //     # equal: The comment belongs to this block.
-        //        # greater
-        //          # greater: The comment belongs to the inner block.
+        //       # greater (but less in the next iteration)
+        //         # greater: The comment belongs to the inner block.
+        // ```
         match comment_indentation.cmp(&child_indentation) {
             Ordering::Less => {
-                return if let Some(parent_block) = parent_body {
+                return if let Some(parent_block) = parent {
                     // Comment belongs to the parent block.
                     CommentPlacement::trailing(parent_block, comment)
                 } else {
@@ -487,14 +489,13 @@ fn handle_own_line_comment_after_branch<'a>(
             }
             Ordering::Equal => {
                 // The comment belongs to this block.
-                return CommentPlacement::trailing(last_child_in_current_body, comment);
+                return CommentPlacement::trailing(last_child_in_parent, comment);
             }
             Ordering::Greater => {
-                if let Some(nested_child) = last_child_in_body(last_child_in_current_body) {
+                if let Some(nested_child) = last_child_in_body(last_child_in_parent) {
                     // The comment belongs to the inner block.
-                    parent_body = current_body;
-                    current_body = Some(last_child_in_current_body);
-                    last_child_in_current_body = nested_child;
+                    parent = Some(last_child_in_parent);
+                    last_child_in_parent = nested_child;
                 } else {
                     // The comment is overindented, we assign it to the most indented child we have.
                     // ```python
@@ -502,7 +503,7 @@ fn handle_own_line_comment_after_branch<'a>(
                     //     pass
                     //       # comment
                     // ```
-                    return CommentPlacement::trailing(last_child_in_current_body, comment);
+                    return CommentPlacement::trailing(last_child_in_parent, comment);
                 }
             }
         }
@@ -1345,7 +1346,7 @@ where
     right.is_some_and(|right| left.ptr_eq(right.into()))
 }
 
-/// The last child of the last branch, if the node hs multiple branches.
+/// The last child of the last branch, if the node has multiple branches.
 fn last_child_in_body(node: AnyNodeRef) -> Option<AnyNodeRef> {
     let body = match node {
         AnyNodeRef::StmtFunctionDef(ast::StmtFunctionDef { body, .. })
@@ -1503,9 +1504,7 @@ mod tests {
         );
 
         assert_eq!(
-            max_empty_lines(
-                "# trailing comment\n\n# own line comment\n\n\n# an other own line comment\n# block"
-            ),
+            max_empty_lines("# trailing comment\n\n# own line comment\n\n\n# an other own line comment\n# block"),
             2
         );
 
