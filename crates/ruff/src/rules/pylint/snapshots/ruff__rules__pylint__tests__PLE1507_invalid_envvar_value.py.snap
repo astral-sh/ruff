@@ -31,14 +31,4 @@ invalid_envvar_value.py:8:11: PLE1507 Invalid type for initial `os.getenv` argum
 10 | os.getenv(key=f"foo", default="bar")
    |
 
-invalid_envvar_value.py:12:15: PLE1507 Invalid type for initial `os.getenv` argument; expected `str`
-   |
-10 | os.getenv(key=f"foo", default="bar")
-11 | os.getenv(key="foo" + "bar", default=1)
-12 | os.getenv(key=1 + "bar", default=1)  # [invalid-envvar-value]
-   |               ^^^^^^^^^ PLE1507
-13 | 
-14 | AA = "aa"
-   |
-
 

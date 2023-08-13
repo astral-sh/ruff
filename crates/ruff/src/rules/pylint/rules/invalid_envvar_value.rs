@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Constant, Expr, Operator, Ranged};
+use ruff_python_ast::{self as ast, Ranged};
+use ruff_python_semantic::analyze::type_inference::PythonType;
 
 use crate::checkers::ast::Checker;
 
@@ -32,46 +33,6 @@ impl Violation for InvalidEnvvarValue {
     }
 }
 
-fn is_valid_key(expr: &Expr) -> bool {
-    // We can't infer the types of these defaults, so assume they're valid.
-    if matches!(
-        expr,
-        Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) | Expr::Call(_)
-    ) {
-        return true;
-    }
-
-    // Allow string concatenation.
-    if let Expr::BinOp(ast::ExprBinOp {
-        left,
-        right,
-        op: Operator::Add,
-        range: _,
-    }) = expr
-    {
-        return is_valid_key(left) && is_valid_key(right);
-    }
-
-    // Allow string formatting.
-    if let Expr::BinOp(ast::ExprBinOp {
-        left,
-        op: Operator::Mod,
-        ..
-    }) = expr
-    {
-        return is_valid_key(left);
-    }
-
-    // Otherwise, the default must be a string.
-    matches!(
-        expr,
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Str { .. },
-            ..
-        }) | Expr::FString(_)
-    )
-}
-
 /// PLE1507
 pub(crate) fn invalid_envvar_value(checker: &mut Checker, call: &ast::ExprCall) {
     if checker
@@ -84,10 +45,15 @@ pub(crate) fn invalid_envvar_value(checker: &mut Checker, call: &ast::ExprCall) 
             return;
         };
 
-        if !is_valid_key(expr) {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(InvalidEnvvarValue, expr.range()));
+        if matches!(
+            PythonType::from(expr),
+            PythonType::String | PythonType::Unknown
+        ) {
+            return;
         }
+
+        checker
+            .diagnostics
+            .push(Diagnostic::new(InvalidEnvvarValue, expr.range()));
     }
 }
