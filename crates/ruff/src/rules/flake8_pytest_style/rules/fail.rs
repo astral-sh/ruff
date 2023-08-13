@@ -14,9 +14,6 @@ use super::helpers::{is_empty_or_null_string, is_pytest_fail};
 ///
 /// ## Example
 /// ```python
-/// import pytest
-///
-///
 /// def test_foo():
 ///     pytest.fail()
 ///
@@ -31,9 +28,6 @@ use super::helpers::{is_empty_or_null_string, is_pytest_fail};
 ///
 /// Use instead:
 /// ```python
-/// import pytest
-///
-///
 /// def test_foo():
 ///     pytest.fail("...")
 ///

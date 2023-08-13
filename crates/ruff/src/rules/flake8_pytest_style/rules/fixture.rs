@@ -192,9 +192,6 @@ impl Violation for PytestFixtureParamWithoutValue {
 ///
 /// ## Example
 /// ```python
-/// import pytest
-///
-///
 /// @pytest.yield_fixture()
 /// def my_fixture():
 ///     obj = SomeClass()
@@ -204,9 +201,6 @@ impl Violation for PytestFixtureParamWithoutValue {
 ///
 /// Use instead:
 /// ```python
-/// import pytest
-///
-///
 /// @pytest.fixture()
 /// def my_fixture():
 ///     obj = SomeClass()

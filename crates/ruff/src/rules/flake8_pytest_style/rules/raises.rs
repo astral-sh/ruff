@@ -110,9 +110,6 @@ impl Violation for PytestRaisesTooBroad {
 ///
 /// ## Example
 /// ```python
-/// import pytest
-///
-///
 /// def test_foo():
 ///     with pytest.raises():
 ///         do_something()
@@ -120,9 +117,6 @@ impl Violation for PytestRaisesTooBroad {
 ///
 /// Use instead:
 /// ```python
-/// import pytest
-///
-///
 /// def test_foo():
 ///     with pytest.raises(SomeException):
 ///         do_something()
