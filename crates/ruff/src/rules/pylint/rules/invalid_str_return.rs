@@ -3,7 +3,7 @@ use ruff_python_ast::{Ranged, Stmt};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{helpers::ReturnStatementVisitor, statement_visitor::StatementVisitor};
-use ruff_python_semantic::analyze::type_inference::PythonType;
+use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
 
 use crate::checkers::ast::Checker;
 
@@ -42,8 +42,8 @@ pub(crate) fn invalid_str_return(checker: &mut Checker, name: &str, body: &[Stmt
     for stmt in returns {
         if let Some(value) = stmt.value.as_deref() {
             if !matches!(
-                PythonType::from(value),
-                PythonType::String | PythonType::Unknown
+                ResolvedPythonType::from(value),
+                ResolvedPythonType::Unknown | ResolvedPythonType::Atom(PythonType::String)
             ) {
                 checker
                     .diagnostics
