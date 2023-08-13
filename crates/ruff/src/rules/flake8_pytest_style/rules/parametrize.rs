@@ -45,6 +45,7 @@ use super::helpers::{is_pytest_parametrize, split_names};
 /// ```
 ///
 /// Use instead:
+/// ```python
 /// @pytest.mark.parametrize("param", [1, 2, 3])
 /// def test_foo(param):
 ///     ...
@@ -59,7 +60,7 @@ use super::helpers::{is_pytest_parametrize, split_names};
 /// - `flake8-pytest-style.parametrize-names-type`
 ///
 /// ## References
-/// - [`pytest` documentation: `How to parametrize fixtures and test functions`](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
+/// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
 #[violation]
 pub struct PytestParametrizeNamesWrongType {
     pub expected: types::ParametrizeNameType,
@@ -123,6 +124,7 @@ impl Violation for PytestParametrizeNamesWrongType {
 /// ```
 ///
 /// Use instead:
+/// ```python
 /// @pytest.mark.parametrize("param", [1, 2, 3])
 /// def test_foo(param):
 ///     ...
@@ -137,7 +139,7 @@ impl Violation for PytestParametrizeNamesWrongType {
 /// - `flake8-pytest-style.parametrize-values-row-type`
 ///
 /// ## References
-/// - [`pytest` documentation: `How to parametrize fixtures and test functions`](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
+/// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
 #[violation]
 pub struct PytestParametrizeValuesWrongType {
     pub values: types::ParametrizeValuesType,
