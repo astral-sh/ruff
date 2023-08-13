@@ -67,13 +67,22 @@ pub(crate) fn try_except_in_loop(checker: &mut Checker, body: &[Stmt]) {
         return;
     }
 
-    let [Stmt::Try(ast::StmtTry { handlers, .. })] = body else {
+    let [Stmt::Try(ast::StmtTry { handlers, body: try_body, .. })] = body else {
         return;
     };
 
     let Some(handler) = handlers.first() else {
         return;
     };
+
+    // Parse all nodes underneath the `try` - if we see any loop control flow statements, we don't
+    // want to throw.
+    for stmt in try_body {
+        match stmt {
+            Stmt::Continue(_) | Stmt::Break(_) => return,
+            _ => (),
+        }
+    }
 
     checker
         .diagnostics

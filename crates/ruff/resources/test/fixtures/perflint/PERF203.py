@@ -21,3 +21,20 @@ while i < 10:
         print("error")
 
     i += 1
+
+# OK - no other way to write this
+for i in range(10):
+    try:
+        print(f"{i}")
+        break
+    except:
+        print("error")
+
+# OK - no other way to write this
+for i in range(10):
+    try:
+        print(f"{i}")
+        continue
+    except:
+        print("error")
+
