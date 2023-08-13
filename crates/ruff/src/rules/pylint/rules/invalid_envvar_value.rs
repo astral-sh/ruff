@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Ranged};
-use ruff_python_semantic::analyze::type_inference::PythonType;
+use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
 
 use crate::checkers::ast::Checker;
 
@@ -46,8 +46,8 @@ pub(crate) fn invalid_envvar_value(checker: &mut Checker, call: &ast::ExprCall) 
         };
 
         if matches!(
-            PythonType::from(expr),
-            PythonType::String | PythonType::Unknown
+            ResolvedPythonType::from(expr),
+            ResolvedPythonType::Unknown | ResolvedPythonType::Atom(PythonType::String)
         ) {
             return;
         }

@@ -9,7 +9,7 @@ use rustc_hash::FxHashMap;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
-use ruff_python_semantic::analyze::type_inference::PythonType;
+use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 
 use crate::checkers::ast::Checker;
 
@@ -59,14 +59,16 @@ impl FormatType {
             | PythonType::Set
             | PythonType::Tuple
             | PythonType::Generator
-            | PythonType::Complex
-            | PythonType::Bool
             | PythonType::Ellipsis
             | PythonType::None => matches!(
                 self,
                 FormatType::Unknown | FormatType::String | FormatType::Repr
             ),
-            PythonType::Integer => matches!(
+            PythonType::Number(NumberLike::Complex | NumberLike::Bool) => matches!(
+                self,
+                FormatType::Unknown | FormatType::String | FormatType::Repr
+            ),
+            PythonType::Number(NumberLike::Integer) => matches!(
                 self,
                 FormatType::Unknown
                     | FormatType::String
@@ -75,7 +77,7 @@ impl FormatType {
                     | FormatType::Float
                     | FormatType::Number
             ),
-            PythonType::Float => matches!(
+            PythonType::Number(NumberLike::Float) => matches!(
                 self,
                 FormatType::Unknown
                     | FormatType::String
@@ -83,7 +85,6 @@ impl FormatType {
                     | FormatType::Float
                     | FormatType::Number
             ),
-            PythonType::Unknown => true,
         }
     }
 }
@@ -118,16 +119,22 @@ fn collect_specs(formats: &[CFormatStrOrBytes<String>]) -> Vec<&CFormatSpec> {
 
 /// Return `true` if the format string is equivalent to the constant type
 fn equivalent(format: &CFormatSpec, value: &Expr) -> bool {
-    let format: FormatType = format.format_char.into();
-    let constant: PythonType = value.into();
-    format.is_compatible_with(constant)
+    let format = FormatType::from(format.format_char);
+    match ResolvedPythonType::from(value) {
+        ResolvedPythonType::Atom(atom) => format.is_compatible_with(atom),
+        ResolvedPythonType::Union(atoms) => {
+            atoms.iter().all(|atom| format.is_compatible_with(*atom))
+        }
+        ResolvedPythonType::Unknown => true,
+        ResolvedPythonType::TypeError => true,
+    }
 }
 
-/// Return `true` if the [`Constnat`] aligns with the format type.
+/// Return `true` if the [`Constant`] aligns with the format type.
 fn is_valid_constant(formats: &[CFormatStrOrBytes<String>], value: &Expr) -> bool {
     let formats = collect_specs(formats);
-    // If there is more than one format, this is not valid python and we should
-    // return true so that no error is reported
+    // If there is more than one format, this is not valid Python and we should
+    // return true so that no error is reported.
     let [format] = formats.as_slice() else {
         return true;
     };
@@ -242,8 +249,7 @@ pub(crate) fn bad_string_format_type(checker: &mut Checker, expr: &Expr, right: 
             values,
             range: _,
         }) => is_valid_dict(&format_strings, keys, values),
-        Expr::Constant(_) => is_valid_constant(&format_strings, right),
-        _ => true,
+        _ => is_valid_constant(&format_strings, right),
     };
     if !is_valid {
         checker
