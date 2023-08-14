@@ -697,6 +697,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8PytestStyle, "024") => (RuleGroup::Unspecified, rules::flake8_pytest_style::rules::PytestUnnecessaryAsyncioMarkOnFixture),
         (Flake8PytestStyle, "025") => (RuleGroup::Unspecified, rules::flake8_pytest_style::rules::PytestErroneousUseFixturesOnFixture),
         (Flake8PytestStyle, "026") => (RuleGroup::Unspecified, rules::flake8_pytest_style::rules::PytestUseFixturesWithoutParameters),
+        (Flake8PytestStyle, "027") => (RuleGroup::Unspecified, rules::flake8_pytest_style::rules::PytestUnittestRaisesAssertion),
 
         // flake8-pie
         (Flake8Pie, "790") => (RuleGroup::Unspecified, rules::flake8_pie::rules::UnnecessaryPass),

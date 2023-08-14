@@ -250,6 +250,18 @@ mod tests {
         Settings::default(),
         "PT026"
     )]
+    #[test_case(
+        Rule::PytestUnittestRaisesAssertion,
+        Path::new("PT027_0.py"),
+        Settings::default(),
+        "PT027_0"
+    )]
+    #[test_case(
+        Rule::PytestUnittestRaisesAssertion,
+        Path::new("PT027_1.py"),
+        Settings::default(),
+        "PT027_1"
+    )]
     fn test_pytest_style(
         rule_code: Rule,
         path: &Path,

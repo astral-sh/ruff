@@ -58,7 +58,8 @@ pub(crate) fn raise_vanilla_args(checker: &mut Checker, expr: &Expr) {
         func,
         arguments: Arguments { args, .. },
         ..
-    }) = expr else {
+    }) = expr
+    else {
         return;
     };
 
