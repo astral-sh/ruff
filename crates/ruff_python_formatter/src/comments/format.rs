@@ -1,7 +1,5 @@
 use std::borrow::Cow;
 
-use unicode_width::UnicodeWidthChar;
-
 use ruff_formatter::{format_args, write, FormatError, FormatOptions, SourceCode};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
 use ruff_python_trivia::{lines_after, lines_after_ignoring_trivia, lines_before};
@@ -377,16 +375,10 @@ impl Format<PyFormatContext<'_>> for FormatTrailingEndOfLineComment<'_> {
             0
         } else {
             // Start with 2 because of the two leading spaces.
-            let mut width = 2;
-
-            // SAFETY: The formatted file is <= 4GB, and each comment should as well.
-            #[allow(clippy::cast_possible_truncation)]
-            for c in normalized_comment.chars() {
-                width += match c {
-                    '\t' => f.options().tab_width().value(),
-                    c => c.width().unwrap_or(0) as u32,
-                }
-            }
+            let width = TextWidth::from_text(&normalized_comment, f.options().tab_width())
+                .width()
+                .expect("Expected comment not to contain any newlines")
+                + 2;
 
             width
         };
@@ -430,11 +422,9 @@ pub(crate) struct FormatNormalizedComment<'a> {
 impl Format<PyFormatContext<'_>> for FormatNormalizedComment<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext>) -> FormatResult<()> {
         match self.comment {
-            Cow::Borrowed(borrowed) => source_text_slice(
-                TextRange::at(self.range.start(), borrowed.text_len()),
-                ContainsNewlines::No,
-            )
-            .fmt(f),
+            Cow::Borrowed(borrowed) => {
+                source_text_slice(TextRange::at(self.range.start(), borrowed.text_len())).fmt(f)
+            }
 
             Cow::Owned(ref owned) => {
                 write!(

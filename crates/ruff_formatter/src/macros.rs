@@ -343,15 +343,15 @@ mod tests {
 
     struct TestFormat;
 
-    impl Format<()> for TestFormat {
-        fn fmt(&self, f: &mut Formatter<()>) -> FormatResult<()> {
+    impl Format<SimpleFormatContext> for TestFormat {
+        fn fmt(&self, f: &mut Formatter<SimpleFormatContext>) -> FormatResult<()> {
             write!(f, [token("test")])
         }
     }
 
     #[test]
     fn test_single_element() {
-        let mut state = FormatState::new(());
+        let mut state = FormatState::new(SimpleFormatContext::default());
         let mut buffer = VecBuffer::new(&mut state);
 
         write![&mut buffer, [TestFormat]].unwrap();
@@ -364,7 +364,7 @@ mod tests {
 
     #[test]
     fn test_multiple_elements() {
-        let mut state = FormatState::new(());
+        let mut state = FormatState::new(SimpleFormatContext::default());
         let mut buffer = VecBuffer::new(&mut state);
 
         write![
