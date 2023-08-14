@@ -355,13 +355,13 @@ fn to_pytest_raises_args(
             ([arg], []) => {
                 format!("({})", checker.locator().slice(arg.range()))
             }
-            ([], [arg])
-                if arg
+            ([], [kwarg])
+                if kwarg
                     .arg
                     .as_ref()
                     .map_or(false, |a| a.as_str() == "expected_exception") =>
             {
-                format!("({})", checker.locator().slice(arg.value.range()))
+                format!("({})", checker.locator().slice(kwarg.value.range()))
             }
             _ => bail!("Unable to fix"),
         },
