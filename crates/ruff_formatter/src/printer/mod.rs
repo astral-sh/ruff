@@ -695,8 +695,6 @@ impl<'a> Printer<'a> {
                 .buffer
                 .push_str(self.options.line_ending.as_str());
 
-            self.state.generated_line += 1;
-            self.state.generated_column = 0;
             self.state.line_width = 0;
 
             // Fit's only tests if groups up to the first line break fit.
@@ -704,12 +702,11 @@ impl<'a> Printer<'a> {
             self.state.measured_group_fits = false;
         } else {
             self.state.buffer.push(char);
-            self.state.generated_column += 1;
 
             let char_width = if char == '\t' {
-                self.options.tab_width as usize
+                self.options.tab_width as u32
             } else {
-                char.width().unwrap_or(0)
+                char.width().unwrap_or(0) as u32
             };
 
             self.state.line_width += char_width;
@@ -744,9 +741,7 @@ struct PrinterState<'a> {
     source_position: TextSize,
     pending_indent: Indention,
     measured_group_fits: bool,
-    generated_line: usize,
-    generated_column: usize,
-    line_width: usize,
+    line_width: u32,
     line_suffixes: LineSuffixes<'a>,
     verbatim_markers: Vec<TextRange>,
     group_modes: GroupModes,
@@ -1256,12 +1251,12 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
 
     fn fits_text(&mut self, text: &str, args: PrintElementArgs) -> Fits {
         let indent = std::mem::take(&mut self.state.pending_indent);
-        self.state.line_width += indent.level() as usize * self.options().indent_width() as usize
-            + indent.align() as usize;
+        self.state.line_width +=
+            indent.level() as u32 * self.options().indent_width() as u32 + indent.align() as u32;
 
         for c in text.chars() {
             let char_width = match c {
-                '\t' => self.options().tab_width as usize,
+                '\t' => self.options().tab_width as u32,
                 '\n' => {
                     if self.must_be_flat {
                         return Fits::No;
@@ -1275,7 +1270,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                         }
                     };
                 }
-                c => c.width().unwrap_or(0),
+                c => c.width().unwrap_or(0) as u32,
             };
             self.state.line_width += char_width;
         }
@@ -1369,7 +1364,7 @@ impl From<bool> for Fits {
 struct FitsState {
     pending_indent: Indention,
     has_line_suffix: bool,
-    line_width: usize,
+    line_width: u32,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
