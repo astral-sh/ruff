@@ -15,7 +15,7 @@ use crate::rules::flake8_boolean_trap::helpers::{add_if_boolean, is_allowed_func
 /// argument can be omitted, which makes the function call ambiguous.
 ///
 /// Instead, consider defining the relevant argument as a required keyword
-/// argument.
+/// argument to force callers to be explicit about their intent.
 ///
 /// ## Example
 /// ```python
