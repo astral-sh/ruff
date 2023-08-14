@@ -5,9 +5,14 @@ class Test(unittest.TestCase):
     def test_errors(self):
         with self.assertRaises(ValueError):
             raise ValueError
-
         with self.assertRaises(expected_exception=ValueError):
             raise ValueError
+
+        with self.failUnlessRaises(ValueError):
+            raise ValueError
+
+        with self.assertRaisesRegex(ValueError, "test"):
+            raise ValueError("test")
 
         with self.assertRaisesRegex(ValueError, expected_regex="test"):
             raise ValueError("test")
@@ -22,8 +27,8 @@ class Test(unittest.TestCase):
         ):
             raise ValueError("test")
 
-        with self.failUnlessRaises(ValueError):
-            raise ValueError
+        with self.assertRaisesRegexp(ValueError, "test"):
+            raise ValueError("test")
 
     def test_unfixable_error(self):
         with self.assertRaises(ValueError, msg="msg"):
@@ -38,8 +43,6 @@ class Test(unittest.TestCase):
         with (
             self
             # comment
-            .assertRaises
-            # comment
-            (ValueError)
+            .assertRaises(ValueError)
         ):
             raise ValueError
