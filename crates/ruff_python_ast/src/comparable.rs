@@ -328,10 +328,14 @@ impl<'a> From<&'a ast::Constant> for ComparableConstant<'a> {
             ast::Constant::Bool(value) => Self::Bool(value),
             ast::Constant::Str(ast::StringConstant {
                 value,
+                // Compare strings based on resolved value, not representation (i.e., ignore whether
+                // the string was implicitly concatenated).
                 implicit_concatenated: _,
             }) => Self::Str(value),
             ast::Constant::Bytes(ast::BytesConstant {
                 value,
+                // Compare bytes based on resolved value, not representation (i.e., ignore whether
+                // the bytes were implicitly concatenated).
                 implicit_concatenated: _,
             }) => Self::Bytes(value),
             ast::Constant::Int(value) => Self::Int(value),
