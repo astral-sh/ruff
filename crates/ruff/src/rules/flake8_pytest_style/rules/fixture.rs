@@ -78,8 +78,8 @@ impl AlwaysAutofixableViolation for PytestFixtureIncorrectParenthesesStyle {
 /// Checks for `pytest.fixture` calls with positional arguments.
 ///
 /// ## Why is this bad?
-/// To make the meaning of the arguments obvious and for consistency, keyword
-/// arguments are preferred over positional arguments.
+/// For clarity and consistency, prefer using keyword arguments to specify
+/// fixture configuration.
 ///
 /// ## Example
 /// ```python
@@ -151,14 +151,10 @@ impl AlwaysAutofixableViolation for PytestExtraneousScopeFunction {
 /// with a leading underscore.
 ///
 /// ## Why is this bad?
-/// To enforce a naming convention for fixtures: fixtures that don't return a
-/// value start with a leading underscore (e.g. `_patch_something`), fixtures
-/// that return a value don't start with a leading underscore
-/// (e.g. `some_object`). This rule does not fire on abstract fixtures
-/// (those decorated with `@abc.abstractmethod`), so that only the actual
-/// fixture implementations will be checked. This rule does not fire on fixtures
-/// containing `yield from` either, because there is no reasonable way to
-/// determine whether the generator yields a value.
+/// By convention, fixtures that don't return a value should be named with a
+/// leading underscore, while fixtures that do return a value should not.
+///
+/// This rule ignores abstract fixtures and generators.
 ///
 /// ## Example
 /// ```python
@@ -198,12 +194,10 @@ pub struct PytestMissingFixtureNameUnderscore {
 /// leading underscore.
 ///
 /// ## Why is this bad?
-/// To enforce a naming convention for fixtures: fixtures that don't return a
-/// value start with a leading underscore (e.g. `_patch_something`), fixtures
-/// that return a value don't start with a leading underscore
-/// (e.g. `some_object`). This rule does not fire on abstract fixtures
-/// (those decorated with `@abc.abstractmethod`), so that only the actual
-/// fixture implementations will be checked.
+/// By convention, fixtures that don't return a value should be named with a
+/// leading underscore, while fixtures that do return a value should not.
+///
+/// This rule ignores abstract fixtures.
 ///
 /// ## Example
 /// ```python
