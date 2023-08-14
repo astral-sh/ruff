@@ -48,10 +48,10 @@ where
     N: AstNode,
 {
     fn fmt(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
-        self.fmt_leading_comments(node, f)?;
+        leading_node_comments(node).fmt(f)?;
         self.fmt_node(node, f)?;
         self.fmt_dangling_comments(node, f)?;
-        self.fmt_trailing_comments(node, f)
+        trailing_node_comments(node).fmt(f)
     }
 
     /// Formats the node without comments. Ignores any suppression comments.
@@ -64,14 +64,6 @@ where
     /// Formats the node's fields.
     fn fmt_fields(&self, item: &N, f: &mut PyFormatter) -> FormatResult<()>;
 
-    /// Formats the [leading comments](comments#leading-comments) of the node.
-    ///
-    /// You may want to override this method if you want to manually handle the formatting of comments
-    /// inside of the `fmt_fields` method or customize the formatting of the leading comments.
-    fn fmt_leading_comments(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
-        leading_node_comments(node).fmt(f)
-    }
-
     /// Formats the [dangling comments](comments#dangling-comments) of the node.
     ///
     /// You should override this method if the node handled by this rule can have dangling comments because the
@@ -81,14 +73,6 @@ where
     /// A node can have dangling comments if all its children are tokens or if all node children are optional.
     fn fmt_dangling_comments(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
         dangling_node_comments(node).fmt(f)
-    }
-
-    /// Formats the [trailing comments](comments#trailing-comments) of the node.
-    ///
-    /// You may want to override this method if you want to manually handle the formatting of comments
-    /// inside of the `fmt_fields` method or customize the formatting of the trailing comments.
-    fn fmt_trailing_comments(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
-        trailing_node_comments(node).fmt(f)
     }
 }
 

@@ -39,6 +39,11 @@ pub(crate) fn write_suppressed_statements_starting_with_leading_comment<'a>(
     let (formatted_comments, format_off_comment) = before_format_off.unwrap_suppression_starts();
 
     // Format the leading comments before the fmt off
+    // ```python
+    // # leading comment that gets formatted
+    // # fmt: off
+    // statement
+    // ```
     write!(
         f,
         [
@@ -102,7 +107,15 @@ pub(crate) fn write_suppressed_statements_starting_with_trailing_comment<'a>(
 
     for range in trailing_comment_ranges {
         match range {
-            // A `fmt: off`..`fmt: on` sequence. Disable formatting for the in-between comments and
+            // A `fmt: off`..`fmt: on` sequence. Disable formatting for the in-between comments.
+            // ```python
+            // def test():
+            //      pass
+            //      # fmt: off
+            //          # haha
+            //      # fmt: on
+            //      # fmt: off (maybe)
+            // ```
             SuppressionComments::SuppressionEnds {
                 suppressed_comments: _,
                 format_on_comment,
@@ -128,6 +141,14 @@ pub(crate) fn write_suppressed_statements_starting_with_trailing_comment<'a>(
                 )?;
 
                 // `fmt: off`..`fmt:on`..`fmt:off` sequence
+                // ```python
+                // def test():
+                //      pass
+                //      # fmt: off
+                //          # haha
+                //      # fmt: on
+                //      # fmt: off
+                // ```
                 if let Some(new_format_off_comment) = new_format_off_comment {
                     new_format_off_comment.mark_unformatted();
 
@@ -148,6 +169,15 @@ pub(crate) fn write_suppressed_statements_starting_with_trailing_comment<'a>(
         }
     }
 
+    // The statement with the suppression comment isn't the last statement in the suite.
+    // Format the statements up to the first `fmt: on` comment (or end of the suite) as verbatim/suppressed.
+    // ```python
+    // a + b
+    // # fmt: off
+    //
+    // def a():
+    //  pass
+    // ```
     if let Some(first_suppressed) = statements.next() {
         write_suppressed_statements(
             format_off_comment,
@@ -156,10 +186,25 @@ pub(crate) fn write_suppressed_statements_starting_with_trailing_comment<'a>(
             statements,
             f,
         )
-    } else if let Some(last_comment) = trailing_node_comments.last() {
+    }
+    // The suppression comment is the block's last node. Format any trailing comments as suppressed
+    // ```python
+    // def test():
+    //      pass
+    //      # fmt: off
+    //      # a trailing comment
+    // ```
+    else if let Some(last_comment) = trailing_node_comments.last() {
         verbatim_text(TextRange::new(format_off_comment.end(), last_comment.end())).fmt(f)?;
         Ok(last_formatted.statement())
-    } else {
+    }
+    // The suppression comment is the very last code in the block. There's nothing more to format.
+    // ```python
+    // def test():
+    //      pass
+    //      # fmt: off
+    // ```
+    else {
         Ok(last_formatted.statement())
     }
 }
@@ -190,6 +235,10 @@ fn write_suppressed_statements<'a>(
         for range in CommentRangeIter::in_suppression(leading_node_comments, source) {
             match range {
                 // All leading comments are suppressed
+                // ```python
+                // # suppressed comment
+                // statement
+                // ```
                 SuppressionComments::Suppressed { comments } => {
                     for comment in comments {
                         comment.mark_formatted();
@@ -197,6 +246,13 @@ fn write_suppressed_statements<'a>(
                 }
 
                 // Node has a leading `fmt: on` comment and maybe another `fmt: off` comment
+                // ```python
+                // # suppressed comment (optional)
+                // # fmt: on
+                // # formatted comment (optional)
+                // # fmt: off (optional)
+                // statement
+                // ```
                 SuppressionComments::SuppressionEnds {
                     suppressed_comments,
                     format_on_comment,
@@ -255,12 +311,25 @@ fn write_suppressed_statements<'a>(
         for range in CommentRangeIter::in_suppression(comments.trailing_comments(statement), source)
         {
             match range {
+                // All leading comments are suppressed
+                // ```python
+                // statement
+                // # suppressed
+                // ```
                 SuppressionComments::Suppressed { comments } => {
                     for comment in comments {
                         comment.mark_formatted();
                     }
                 }
 
+                // Node has a trailing `fmt: on` comment and maybe another `fmt: off` comment
+                // ```python
+                // statement
+                // # suppressed comment (optional)
+                // # fmt: on
+                // # formatted comment (optional)
+                // # fmt: off (optional)
+                // ```
                 SuppressionComments::SuppressionEnds {
                     suppressed_comments,
                     format_on_comment,
@@ -361,14 +430,14 @@ enum SuppressionComments<'a> {
 
 impl<'a> SuppressionComments<'a> {
     fn unwrap_suppression_starts(&self) -> (&'a [SourceComment], &'a SourceComment) {
-        match self {
-            SuppressionComments::SuppressionStarts {
-                formatted_comments,
-                format_off_comment,
-            } => (formatted_comments, *format_off_comment),
-            _ => {
-                panic!("Expected SuppressionStarts")
-            }
+        if let SuppressionComments::SuppressionStarts {
+            formatted_comments,
+            format_off_comment,
+        } = self
+        {
+            (formatted_comments, *format_off_comment)
+        } else {
+            panic!("Expected SuppressionStarts")
         }
     }
 }
@@ -407,80 +476,80 @@ impl<'a> Iterator for CommentRangeIter<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.comments.is_empty() {
-            None
-        } else {
-            Some(match self.in_suppression {
-                // Inside of a suppressed range
-                InSuppression::Yes => {
-                    if let Some(format_on_position) = self
-                        .comments
-                        .iter()
-                        .position(|comment| comment.is_suppression_on_comment(self.source))
-                    {
-                        let (suppressed_comments, formatted) =
-                            self.comments.split_at(format_on_position);
-                        let (format_on_comment, rest) = formatted.split_first().unwrap();
-
-                        let (formatted_comments, format_off_comment) =
-                            if let Some(format_off_position) = rest
-                                .iter()
-                                .position(|comment| comment.is_suppression_off_comment(self.source))
-                            {
-                                let (formatted_comments, suppressed_comments) =
-                                    rest.split_at(format_off_position);
-                                let (format_off_comment, rest) =
-                                    suppressed_comments.split_first().unwrap();
-
-                                self.comments = rest;
-
-                                (formatted_comments, Some(format_off_comment))
-                            } else {
-                                self.in_suppression = InSuppression::No;
-
-                                self.comments = &[];
-                                (rest, None)
-                            };
-
-                        SuppressionComments::SuppressionEnds {
-                            suppressed_comments,
-                            format_on_comment,
-                            formatted_comments,
-                            format_off_comment,
-                        }
-                    } else {
-                        SuppressionComments::Suppressed {
-                            comments: std::mem::take(&mut self.comments),
-                        }
-                    }
-                }
-
-                // Outside of a suppression
-                InSuppression::No => {
-                    if let Some(format_off_position) = self
-                        .comments
-                        .iter()
-                        .position(|comment| comment.is_suppression_off_comment(self.source))
-                    {
-                        self.in_suppression = InSuppression::Yes;
-
-                        let (formatted_comments, suppressed) =
-                            self.comments.split_at(format_off_position);
-                        let format_off_comment = &suppressed[0];
-
-                        self.comments = &suppressed[1..];
-
-                        SuppressionComments::SuppressionStarts {
-                            formatted_comments,
-                            format_off_comment,
-                        }
-                    } else {
-                        SuppressionComments::Formatted {
-                            comments: std::mem::take(&mut self.comments),
-                        }
-                    }
-                }
-            })
+            return None;
         }
+
+        Some(match self.in_suppression {
+            // Inside of a suppressed range
+            InSuppression::Yes => {
+                if let Some(format_on_position) = self
+                    .comments
+                    .iter()
+                    .position(|comment| comment.is_suppression_on_comment(self.source))
+                {
+                    let (suppressed_comments, formatted) =
+                        self.comments.split_at(format_on_position);
+                    let (format_on_comment, rest) = formatted.split_first().unwrap();
+
+                    let (formatted_comments, format_off_comment) =
+                        if let Some(format_off_position) = rest
+                            .iter()
+                            .position(|comment| comment.is_suppression_off_comment(self.source))
+                        {
+                            let (formatted_comments, suppressed_comments) =
+                                rest.split_at(format_off_position);
+                            let (format_off_comment, rest) =
+                                suppressed_comments.split_first().unwrap();
+
+                            self.comments = rest;
+
+                            (formatted_comments, Some(format_off_comment))
+                        } else {
+                            self.in_suppression = InSuppression::No;
+
+                            self.comments = &[];
+                            (rest, None)
+                        };
+
+                    SuppressionComments::SuppressionEnds {
+                        suppressed_comments,
+                        format_on_comment,
+                        formatted_comments,
+                        format_off_comment,
+                    }
+                } else {
+                    SuppressionComments::Suppressed {
+                        comments: std::mem::take(&mut self.comments),
+                    }
+                }
+            }
+
+            // Outside of a suppression
+            InSuppression::No => {
+                if let Some(format_off_position) = self
+                    .comments
+                    .iter()
+                    .position(|comment| comment.is_suppression_off_comment(self.source))
+                {
+                    self.in_suppression = InSuppression::Yes;
+
+                    let (formatted_comments, suppressed) =
+                        self.comments.split_at(format_off_position);
+                    let format_off_comment = &suppressed[0];
+
+                    self.comments = &suppressed[1..];
+
+                    SuppressionComments::SuppressionStarts {
+                        formatted_comments,
+                        format_off_comment,
+                    }
+                } else {
+                    SuppressionComments::Formatted {
+                        comments: std::mem::take(&mut self.comments),
+                    }
+                }
+            }
+        })
     }
 }
 

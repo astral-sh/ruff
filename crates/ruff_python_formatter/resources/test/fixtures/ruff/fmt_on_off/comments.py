@@ -15,3 +15,9 @@ def test():
   # fmt: on
 
 a +   b
+
+def test():
+    pass
+    # fmt: off
+    # a trailing comment
+
