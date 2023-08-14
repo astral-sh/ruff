@@ -20,16 +20,24 @@ expression: parse_ast
                     ExprFString {
                         range: 7..11,
                         values: [
-                            Constant(
-                                ExprConstant {
+                            FormattedValue(
+                                ExprFormattedValue {
                                     range: 7..11,
-                                    value: Str(
-                                        StringConstant {
-                                            value: "spec",
-                                            implicit_concatenated: false,
+                                    value: Constant(
+                                        ExprConstant {
+                                            range: 8..10,
+                                            value: Str(
+                                                StringConstant {
+                                                    value: "",
+                                                    implicit_concatenated: false,
+                                                },
+                                            ),
+                                            kind: None,
                                         },
                                     ),
-                                    kind: None,
+                                    debug_text: None,
+                                    conversion: None,
+                                    format_spec: None,
                                 },
                             ),
                         ],

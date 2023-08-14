@@ -326,8 +326,18 @@ impl<'a> From<&'a ast::Constant> for ComparableConstant<'a> {
         match constant {
             ast::Constant::None => Self::None,
             ast::Constant::Bool(value) => Self::Bool(value),
-            ast::Constant::Str(value) => Self::Str(value),
-            ast::Constant::Bytes(value) => Self::Bytes(value),
+            ast::Constant::Str(ast::StringConstant {
+                value,
+                // Compare strings based on resolved value, not representation (i.e., ignore whether
+                // the string was implicitly concatenated).
+                implicit_concatenated: _,
+            }) => Self::Str(value),
+            ast::Constant::Bytes(ast::BytesConstant {
+                value,
+                // Compare bytes based on resolved value, not representation (i.e., ignore whether
+                // the bytes were implicitly concatenated).
+                implicit_concatenated: _,
+            }) => Self::Bytes(value),
             ast::Constant::Int(value) => Self::Int(value),
             ast::Constant::Float(value) => Self::Float(value.to_bits()),
             ast::Constant::Complex { real, imag } => Self::Complex {
@@ -865,11 +875,13 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 debug_text: debug_text.as_ref(),
                 format_spec: format_spec.as_ref().map(Into::into),
             }),
-            ast::Expr::FString(ast::ExprFString { values, range: _ }) => {
-                Self::FString(ExprFString {
-                    values: values.iter().map(Into::into).collect(),
-                })
-            }
+            ast::Expr::FString(ast::ExprFString {
+                values,
+                implicit_concatenated: _,
+                range: _,
+            }) => Self::FString(ExprFString {
+                values: values.iter().map(Into::into).collect(),
+            }),
             ast::Expr::Constant(ast::ExprConstant {
                 value,
                 kind,

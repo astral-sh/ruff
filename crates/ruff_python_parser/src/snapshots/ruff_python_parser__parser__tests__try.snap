@@ -87,7 +87,10 @@ expression: parse_ast
                                                                     ExprConstant {
                                                                         range: 64..71,
                                                                         value: Str(
-                                                                            "caught ",
+                                                                            StringConstant {
+                                                                                value: "caught ",
+                                                                                implicit_concatenated: false,
+                                                                            },
                                                                         ),
                                                                         kind: None,
                                                                     },
@@ -126,6 +129,7 @@ expression: parse_ast
                                                                     },
                                                                 ),
                                                             ],
+                                                            implicit_concatenated: false,
                                                         },
                                                     ),
                                                 ],
@@ -181,7 +185,10 @@ expression: parse_ast
                                                                     ExprConstant {
                                                                         range: 116..123,
                                                                         value: Str(
-                                                                            "caught ",
+                                                                            StringConstant {
+                                                                                value: "caught ",
+                                                                                implicit_concatenated: false,
+                                                                            },
                                                                         ),
                                                                         kind: None,
                                                                     },
@@ -220,6 +227,7 @@ expression: parse_ast
                                                                     },
                                                                 ),
                                                             ],
+                                                            implicit_concatenated: false,
                                                         },
                                                     ),
                                                 ],

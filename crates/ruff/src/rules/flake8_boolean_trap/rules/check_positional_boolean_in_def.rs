@@ -112,7 +112,7 @@ pub(crate) fn check_positional_boolean_in_def(
         let hint = match expr.as_ref() {
             Expr::Name(name) => &name.id == "bool",
             Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(value),
+                value: Constant::Str(ast::StringConstant { value, .. }),
                 ..
             }) => value == "bool",
             _ => false,

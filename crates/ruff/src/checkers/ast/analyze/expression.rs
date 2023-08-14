@@ -418,9 +418,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
 
                             if checker.enabled(Rule::BadStringFormatCharacter) {
                                 pylint::rules::bad_string_format_character::call(
-                                    checker,
-                                    val.as_str(),
-                                    location,
+                                    checker, val, location,
                                 );
                             }
                         }
@@ -918,7 +916,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 pylint::rules::await_outside_async(checker, expr);
             }
         }
-        Expr::FString(ast::ExprFString { values, range: _ }) => {
+        Expr::FString(ast::ExprFString { values, .. }) => {
             if checker.enabled(Rule::FStringMissingPlaceholders) {
                 pyflakes::rules::f_string_missing_placeholders(expr, values, checker);
             }
@@ -945,7 +943,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             range: _,
         }) => {
             if let Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(value),
+                value: Constant::Str(ast::StringConstant { value, .. }),
                 ..
             }) = left.as_ref()
             {

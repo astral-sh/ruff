@@ -88,7 +88,7 @@ pub(crate) fn setattr_with_constant(
     if !is_identifier(name) {
         return;
     }
-    if is_mangled_private(name.as_str()) {
+    if is_mangled_private(name) {
         return;
     }
     // We can only replace a `setattr` call (which is an `Expr`) with an assignment

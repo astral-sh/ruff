@@ -140,7 +140,7 @@ pub fn relocate_expr(expr: &mut Expr, location: TextRange) {
                 relocate_expr(expr, location);
             }
         }
-        Expr::FString(nodes::ExprFString { values, range }) => {
+        Expr::FString(nodes::ExprFString { values, range, .. }) => {
             *range = location;
             for expr in values {
                 relocate_expr(expr, location);

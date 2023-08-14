@@ -54,7 +54,7 @@ where
     F: (Fn(&str) -> bool) + Copy,
 {
     match expr {
-        Expr::FString(ast::ExprFString { values, range: _ }) => {
+        Expr::FString(ast::ExprFString { values, .. }) => {
             for value in values {
                 if any_string(value, predicate) {
                     return true;
@@ -62,10 +62,10 @@ where
             }
         }
         Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(val),
+            value: Constant::Str(value),
             ..
         }) => {
-            if predicate(val.as_str()) {
+            if predicate(value) {
                 return true;
             }
         }
