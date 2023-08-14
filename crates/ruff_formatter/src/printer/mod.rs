@@ -9,8 +9,8 @@ use ruff_text_size::{Ranged, TextLen, TextSize};
 use crate::format_element::document::Document;
 use crate::format_element::tag::{Condition, GroupMode};
 use crate::format_element::{BestFittingMode, BestFittingVariants, LineMode, PrintMode};
-use crate::prelude::tag;
 use crate::prelude::tag::{DedentMode, Tag, TagKind, VerbatimKind};
+use crate::prelude::{tag, TextWidth};
 use crate::printer::call_stack::{
     CallStack, FitsCallStack, PrintCallStack, PrintElementArgs, StackFrame,
 };
@@ -97,10 +97,22 @@ impl<'a> Printer<'a> {
         match element {
             FormatElement::Space => self.print_text(Text::Token(" "), None),
             FormatElement::Token { text } => self.print_text(Text::Token(text), None),
-            FormatElement::Text { text } => self.print_text(Text::Text(text), None),
-            FormatElement::SourceCodeSlice { slice, .. } => {
+            FormatElement::Text { text, text_width } => self.print_text(
+                Text::Text {
+                    text,
+                    width: *text_width,
+                },
+                None,
+            ),
+            FormatElement::SourceCodeSlice { slice, text_width } => {
                 let text = slice.text(self.source_code);
-                self.print_text(Text::Text(text), Some(slice.range()));
+                self.print_text(
+                    Text::Text {
+                        text,
+                        width: *text_width,
+                    },
+                    Some(slice.range()),
+                );
             }
             FormatElement::Line(line_mode) => {
                 if args.mode().is_flat()
@@ -396,9 +408,14 @@ impl<'a> Printer<'a> {
                 self.state.buffer.push_str(token);
                 self.state.line_width += token.len() as u32;
             }
-            Text::Text(text) => {
-                for char in text.chars() {
-                    self.print_char(char);
+            Text::Text { text, width } => {
+                if let Some(width) = width.width() {
+                    self.state.buffer.push_str(text);
+                    self.state.line_width += width;
+                } else {
+                    for char in text.chars() {
+                        self.print_char(char);
+                    }
                 }
             }
         }
@@ -1087,10 +1104,24 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
             }
 
             FormatElement::Token { text } => return Ok(self.fits_text(Text::Token(text), args)),
-            FormatElement::Text { text, .. } => return Ok(self.fits_text(Text::Text(text), args)),
-            FormatElement::SourceCodeSlice { slice, .. } => {
+            FormatElement::Text { text, text_width } => {
+                return Ok(self.fits_text(
+                    Text::Text {
+                        text,
+                        width: *text_width,
+                    },
+                    args,
+                ))
+            }
+            FormatElement::SourceCodeSlice { slice, text_width } => {
                 let text = slice.text(self.printer.source_code);
-                return Ok(self.fits_text(Text::Text(text), args));
+                return Ok(self.fits_text(
+                    Text::Text {
+                        text,
+                        width: *text_width,
+                    },
+                    args,
+                ));
             }
             FormatElement::LineSuffixBoundary => {
                 if self.state.has_line_suffix {
@@ -1308,27 +1339,31 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
             Text::Token(token) => {
                 self.state.line_width += token.len() as u32;
             }
-            Text::Text(text) => {
-                for c in text.chars() {
-                    let char_width = match c {
-                        '\t' => self.options().tab_width.value(),
-                        '\n' => {
-                            if self.must_be_flat {
-                                return Fits::No;
-                            }
-                            match args.measure_mode() {
-                                MeasureMode::FirstLine => return Fits::Yes,
-                                MeasureMode::AllLines => {
-                                    self.state.line_width = 0;
-                                    continue;
+            Text::Text { text, width } => {
+                if let Some(width) = width.width() {
+                    self.state.line_width += width;
+                } else {
+                    for c in text.chars() {
+                        let char_width = match c {
+                            '\t' => self.options().tab_width.value(),
+                            '\n' => {
+                                if self.must_be_flat {
+                                    return Fits::No;
+                                }
+                                match args.measure_mode() {
+                                    MeasureMode::FirstLine => return Fits::Yes,
+                                    MeasureMode::AllLines => {
+                                        self.state.line_width = 0;
+                                        continue;
+                                    }
                                 }
                             }
-                        }
-                        // SAFETY: A u32 is sufficient to format files <= 4GB
-                        #[allow(clippy::cast_possible_truncation)]
-                        c => c.width().unwrap_or(0) as u32,
-                    };
-                    self.state.line_width += char_width;
+                            // SAFETY: A u32 is sufficient to format files <= 4GB
+                            #[allow(clippy::cast_possible_truncation)]
+                            c => c.width().unwrap_or(0) as u32,
+                        };
+                        self.state.line_width += char_width;
+                    }
                 }
             }
         }
@@ -1452,7 +1487,7 @@ enum Text<'a> {
     /// ASCII only text that contains no line breaks or tab characters.
     Token(&'a str),
     /// Arbitrary text. May contain `\n` line breaks, tab characters, or unicode characters.
-    Text(&'a str),
+    Text { text: &'a str, width: TextWidth },
 }
 
 #[cfg(test)]
@@ -1670,7 +1705,7 @@ two lines`,
 
     #[test]
     fn test_fill_breaks() {
-        let mut state = FormatState::new(());
+        let mut state = FormatState::new(SimpleFormatContext::default());
         let mut buffer = VecBuffer::new(&mut state);
         let mut formatter = Formatter::new(&mut buffer);
 

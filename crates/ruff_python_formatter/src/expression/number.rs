@@ -24,7 +24,7 @@ impl Format<PyFormatContext<'_>> for FormatInt<'_> {
         let normalized = normalize_integer(content);
 
         match normalized {
-            Cow::Borrowed(_) => source_text_slice(range, ContainsNewlines::No).fmt(f),
+            Cow::Borrowed(_) => source_text_slice(range).fmt(f),
             Cow::Owned(normalized) => text(&normalized, Some(range.start())).fmt(f),
         }
     }
@@ -49,7 +49,7 @@ impl Format<PyFormatContext<'_>> for FormatFloat<'_> {
         let normalized = normalize_floating_number(content);
 
         match normalized {
-            Cow::Borrowed(_) => source_text_slice(range, ContainsNewlines::No).fmt(f),
+            Cow::Borrowed(_) => source_text_slice(range).fmt(f),
             Cow::Owned(normalized) => text(&normalized, Some(range.start())).fmt(f),
         }
     }
@@ -75,7 +75,7 @@ impl Format<PyFormatContext<'_>> for FormatComplex<'_> {
 
         match normalized {
             Cow::Borrowed(_) => {
-                source_text_slice(range.sub_end(TextSize::from(1)), ContainsNewlines::No).fmt(f)?;
+                source_text_slice(range.sub_end(TextSize::from(1))).fmt(f)?;
             }
             Cow::Owned(normalized) => {
                 text(&normalized, Some(range.start())).fmt(f)?;

@@ -104,10 +104,11 @@ impl Document {
                         expands = false;
                         continue;
                     }
-                    FormatElement::Text { text, .. } => text.contains('\n'),
-                    FormatElement::SourceCodeSlice {
-                        contains_newlines, ..
-                    } => *contains_newlines,
+                    FormatElement::Text {
+                        text: _,
+                        text_width,
+                    } => text_width.is_multiline(),
+                    FormatElement::SourceCodeSlice { text_width, .. } => text_width.is_multiline(),
                     FormatElement::ExpandParent
                     | FormatElement::Line(LineMode::Hard | LineMode::Empty) => true,
                     _ => false,
@@ -259,11 +260,16 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                 | FormatElement::Text { .. }
                 | FormatElement::SourceCodeSlice { .. }) => {
                     fn write_escaped(element: &FormatElement, f: &mut Formatter<IrFormatContext>) {
-                        let text = match element {
-                            FormatElement::Token { text } => text,
-                            FormatElement::Text { text } => text.as_ref(),
-                            FormatElement::SourceCodeSlice { slice, .. } => {
-                                slice.text(f.context().source_code())
+                        let (text, text_width) = match element {
+                            #[allow(clippy::cast_possible_truncation)]
+                            FormatElement::Token { text } => {
+                                (*text, TextWidth::new_width(text.len() as u32))
+                            }
+                            FormatElement::Text { text, text_width } => {
+                                (text.as_ref(), *text_width)
+                            }
+                            FormatElement::SourceCodeSlice { slice, text_width } => {
+                                (slice.text(f.context().source_code()), *text_width)
                             }
                             _ => unreachable!(),
                         };
@@ -271,6 +277,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                         if text.contains('"') {
                             f.write_element(FormatElement::Text {
                                 text: text.replace('"', r#"\""#).into(),
+                                text_width,
                             });
                         } else {
                             f.write_element(element.clone());
@@ -854,15 +861,9 @@ mod tests {
                     [group(&format_args![
                         token("("),
                         soft_block_indent(&format_args![
-                            source_text_slice(
-                                TextRange::at(TextSize::new(0), TextSize::new(19)),
-                                ContainsNewlines::No
-                            ),
+                            source_text_slice(TextRange::at(TextSize::new(0), TextSize::new(19)),),
                             space(),
-                            source_text_slice(
-                                TextRange::at(TextSize::new(20), TextSize::new(28)),
-                                ContainsNewlines::No
-                            ),
+                            source_text_slice(TextRange::at(TextSize::new(20), TextSize::new(28)),),
                         ])
                     ])]
                 )
