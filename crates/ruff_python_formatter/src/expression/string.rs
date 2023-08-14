@@ -690,7 +690,7 @@ fn count_indentation_like_black(line: &str) -> TextSize {
 /// Summary of changes we make:
 /// * Normalize the string like all other strings
 /// * Ignore docstring that have an escaped newline
-/// * Trim all trailing whitespace, except for a chaperone space to avoid quotes or backslashes
+/// * Trim all trailing whitespace, except for a chaperone space that avoids quotes or backslashes
 ///   in the last line.
 /// * Trim leading whitespace on the first line, again except for a chaperone space
 /// * If there is only content in the first line and after that only whitespace, collapse the
@@ -810,8 +810,8 @@ fn format_docstring(string_part: &FormatStringPart, f: &mut PyFormatter) -> Form
     let trim_end = first.trim_end();
     let trim_both = trim_end.trim_start();
 
-    // Edge case: The first line is `""" "content`, so we need to insert chaperone space to
-    // avoid `""""content`
+    // Edge case: The first line is `""" "content`, so we need to insert chaperone space that keep
+    // inner quotes and closing quotes from getting to close to avoid `""""content`
     if trim_both.starts_with(string_part.preferred_quotes.style.as_char()) {
         space().fmt(f)?;
     }
@@ -891,7 +891,7 @@ fn format_docstring(string_part: &FormatStringPart, f: &mut PyFormatter) -> Form
 }
 
 /// If the last line of the docstring is `content" """` or `content\ """`, we need a chaperone space
-/// to avoid `content""""` and `content\"""`. This does only applies to un-escaped backslashes,
+/// that avoids `content""""` and `content\"""`. This does only applies to un-escaped backslashes,
 /// so `content\\ """` doesn't need a space while `content\\\ """` does.
 fn needs_chaperone_space(string_part: &FormatStringPart, trim_end: &str) -> bool {
     trim_end.ends_with(string_part.preferred_quotes.style.as_char())
