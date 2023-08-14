@@ -38,3 +38,12 @@ for i in range(10):
     except:
         print("error")
 
+
+# OK - no other way to write this
+for i in range(10):
+    try:
+        print(f"{i}")
+        if i > 0:
+            break
+    except:
+        print("error")
