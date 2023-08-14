@@ -1133,14 +1133,7 @@ pub struct StmtTry<'a> {
     handlers: Vec<ComparableExceptHandler<'a>>,
     orelse: Vec<ComparableStmt<'a>>,
     finalbody: Vec<ComparableStmt<'a>>,
-}
-
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct StmtTryStar<'a> {
-    body: Vec<ComparableStmt<'a>>,
-    handlers: Vec<ComparableExceptHandler<'a>>,
-    orelse: Vec<ComparableStmt<'a>>,
-    finalbody: Vec<ComparableStmt<'a>>,
+    is_star: bool,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -1198,7 +1191,6 @@ pub enum ComparableStmt<'a> {
     Match(StmtMatch<'a>),
     Raise(StmtRaise<'a>),
     Try(StmtTry<'a>),
-    TryStar(StmtTryStar<'a>),
     TypeAlias(StmtTypeAlias<'a>),
     Assert(StmtAssert<'a>),
     Import(StmtImport<'a>),
@@ -1358,24 +1350,14 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                 handlers,
                 orelse,
                 finalbody,
+                is_star,
                 range: _,
             }) => Self::Try(StmtTry {
                 body: body.iter().map(Into::into).collect(),
                 handlers: handlers.iter().map(Into::into).collect(),
                 orelse: orelse.iter().map(Into::into).collect(),
                 finalbody: finalbody.iter().map(Into::into).collect(),
-            }),
-            ast::Stmt::TryStar(ast::StmtTryStar {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                range: _,
-            }) => Self::TryStar(StmtTryStar {
-                body: body.iter().map(Into::into).collect(),
-                handlers: handlers.iter().map(Into::into).collect(),
-                orelse: orelse.iter().map(Into::into).collect(),
-                finalbody: finalbody.iter().map(Into::into).collect(),
+                is_star: *is_star,
             }),
             ast::Stmt::Assert(ast::StmtAssert {
                 test,

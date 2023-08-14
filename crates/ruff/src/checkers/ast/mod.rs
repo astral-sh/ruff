@@ -599,14 +599,7 @@ where
                 handlers,
                 orelse,
                 finalbody,
-                range: _,
-            })
-            | Stmt::TryStar(ast::StmtTryStar {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                range: _,
+                ..
             }) => {
                 let mut handled_exceptions = Exceptions::empty();
                 for type_ in extract_handled_exceptions(handlers) {

@@ -3,8 +3,8 @@ source: crates/ruff_python_parser/src/parser.rs
 expression: parse_ast
 ---
 [
-    TryStar(
-        StmtTryStar {
+    Try(
+        StmtTry {
             range: 0..260,
             body: [
                 Raise(
@@ -436,6 +436,7 @@ expression: parse_ast
             ],
             orelse: [],
             finalbody: [],
+            is_star: true,
         },
     ),
 ]

@@ -196,12 +196,6 @@ fn is_first_statement_in_body(statement: AnyNodeRef, has_body: AnyNodeRef) -> bo
             orelse,
             finalbody,
             ..
-        })
-        | AnyNodeRef::StmtTryStar(ast::StmtTryStar {
-            body,
-            orelse,
-            finalbody,
-            ..
         }) => {
             are_same_optional(statement, body.first())
                 || are_same_optional(statement, orelse.first())
@@ -1418,13 +1412,6 @@ fn last_child_in_body(node: AnyNodeRef) -> Option<AnyNodeRef> {
             orelse,
             finalbody,
             ..
-        })
-        | AnyNodeRef::StmtTryStar(ast::StmtTryStar {
-            body,
-            handlers,
-            orelse,
-            finalbody,
-            ..
         }) => {
             if finalbody.is_empty() {
                 if orelse.is_empty() {
@@ -1457,12 +1444,6 @@ fn is_first_statement_in_alternate_body(statement: AnyNodeRef, has_body: AnyNode
         }
 
         AnyNodeRef::StmtTry(ast::StmtTry {
-            handlers,
-            orelse,
-            finalbody,
-            ..
-        })
-        | AnyNodeRef::StmtTryStar(ast::StmtTryStar {
             handlers,
             orelse,
             finalbody,

@@ -59,12 +59,6 @@ fn alternatives(stmt: &Stmt) -> Vec<Vec<&Stmt>> {
             handlers,
             orelse,
             ..
-        })
-        | Stmt::TryStar(ast::StmtTryStar {
-            body,
-            handlers,
-            orelse,
-            ..
         }) => vec![body.iter().chain(orelse.iter()).collect()]
             .into_iter()
             .chain(handlers.iter().map(|handler| {

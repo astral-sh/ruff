@@ -243,6 +243,7 @@ expression: parse_ast
             ],
             orelse: [],
             finalbody: [],
+            is_star: false,
         },
     ),
 ]

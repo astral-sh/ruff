@@ -1225,14 +1225,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             handlers,
             orelse,
             finalbody,
-            range: _,
-        })
-        | Stmt::TryStar(ast::StmtTryStar {
-            body,
-            handlers,
-            orelse,
-            finalbody,
-            range: _,
+            ..
         }) => {
             if checker.enabled(Rule::JumpStatementInFinally) {
                 flake8_bugbear::rules::jump_statement_in_finally(checker, finalbody);

@@ -513,6 +513,7 @@ impl<'a> Generator<'a> {
                 handlers,
                 orelse,
                 finalbody,
+                is_star,
                 range: _,
             }) => {
                 statement!({
@@ -522,38 +523,7 @@ impl<'a> Generator<'a> {
 
                 for handler in handlers {
                     statement!({
-                        self.unparse_except_handler(handler, false);
-                    });
-                }
-
-                if !orelse.is_empty() {
-                    statement!({
-                        self.p("else:");
-                    });
-                    self.body(orelse);
-                }
-                if !finalbody.is_empty() {
-                    statement!({
-                        self.p("finally:");
-                    });
-                    self.body(finalbody);
-                }
-            }
-            Stmt::TryStar(ast::StmtTryStar {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                range: _,
-            }) => {
-                statement!({
-                    self.p("try:");
-                });
-                self.body(body);
-
-                for handler in handlers {
-                    statement!({
-                        self.unparse_except_handler(handler, true);
+                        self.unparse_except_handler(handler, *is_star);
                     });
                 }
 
