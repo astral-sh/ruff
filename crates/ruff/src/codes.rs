@@ -568,9 +568,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bandit, "701") => (RuleGroup::Unspecified, rules::flake8_bandit::rules::Jinja2AutoescapeFalse),
 
         // flake8-boolean-trap
-        (Flake8BooleanTrap, "001") => (RuleGroup::Unspecified, rules::flake8_boolean_trap::rules::BooleanPositionalArgInFunctionDefinition),
-        (Flake8BooleanTrap, "002") => (RuleGroup::Unspecified, rules::flake8_boolean_trap::rules::BooleanDefaultValueInFunctionDefinition),
-        (Flake8BooleanTrap, "003") => (RuleGroup::Unspecified, rules::flake8_boolean_trap::rules::BooleanPositionalValueInFunctionCall),
+        (Flake8BooleanTrap, "001") => (RuleGroup::Unspecified, rules::flake8_boolean_trap::rules::BooleanTypeHintPositionalArgument),
+        (Flake8BooleanTrap, "002") => (RuleGroup::Unspecified, rules::flake8_boolean_trap::rules::BooleanDefaultValuePositionalArgument),
+        (Flake8BooleanTrap, "003") => (RuleGroup::Unspecified, rules::flake8_boolean_trap::rules::BooleanPositionalValueInCall),
 
         // flake8-unused-arguments
         (Flake8UnusedArguments, "001") => (RuleGroup::Unspecified, rules::flake8_unused_arguments::rules::UnusedFunctionArgument),

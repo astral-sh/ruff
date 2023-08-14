@@ -673,10 +673,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     checker, expr, func, args, keywords,
                 );
             }
-            if checker.enabled(Rule::BooleanPositionalValueInFunctionCall) {
-                flake8_boolean_trap::rules::check_boolean_positional_value_in_function_call(
-                    checker, args, func,
-                );
+            if checker.enabled(Rule::BooleanPositionalValueInCall) {
+                flake8_boolean_trap::rules::boolean_positional_value_in_call(checker, args, func);
             }
             if checker.enabled(Rule::Debugger) {
                 flake8_debugger::rules::debugger_call(checker, expr, func);

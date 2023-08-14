@@ -72,7 +72,7 @@ impl RuleSet {
     /// let set_1 = RuleSet::from_rules(&[Rule::AmbiguousFunctionName, Rule::AnyType]);
     /// let set_2 = RuleSet::from_rules(&[
     ///     Rule::BadQuotesInlineString,
-    ///     Rule::BooleanPositionalValueInFunctionCall,
+    ///     Rule::BooleanPositionalValueInCall,
     /// ]);
     ///
     /// let union = set_1.union(&set_2);
@@ -80,7 +80,7 @@ impl RuleSet {
     /// assert!(union.contains(Rule::AmbiguousFunctionName));
     /// assert!(union.contains(Rule::AnyType));
     /// assert!(union.contains(Rule::BadQuotesInlineString));
-    /// assert!(union.contains(Rule::BooleanPositionalValueInFunctionCall));
+    /// assert!(union.contains(Rule::BooleanPositionalValueInCall));
     /// ```
     #[must_use]
     pub const fn union(mut self, other: &Self) -> Self {
@@ -132,7 +132,7 @@ impl RuleSet {
     /// ])));
     ///
     /// assert!(!set_1.intersects(&RuleSet::from_rules(&[
-    ///     Rule::BooleanPositionalValueInFunctionCall,
+    ///     Rule::BooleanPositionalValueInCall,
     ///     Rule::BadQuotesInlineString
     /// ])));
     /// ```
