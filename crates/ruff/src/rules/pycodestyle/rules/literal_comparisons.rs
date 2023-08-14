@@ -279,8 +279,13 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
             .map(|(idx, op)| bad_ops.get(&idx).unwrap_or(op))
             .copied()
             .collect::<Vec<_>>();
-        let content =
-            generate_comparison(&compare.left, &ops, &compare.comparators, checker.locator());
+        let content = generate_comparison(
+            &compare.left,
+            &ops,
+            &compare.comparators,
+            compare.into(),
+            checker.locator(),
+        );
         for diagnostic in &mut diagnostics {
             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                 content.to_string(),
