@@ -1,0 +1,30 @@
+---
+source: crates/ruff/src/rules/pylint/mod.rs
+---
+no_self_use.py:2:28: PLR6301 Method `developer_greeting` could be a function or a static method (no-self-use)
+  |
+1 | class Person:
+2 |     def developer_greeting(self, name):  # [no-self-use]
+  |                            ^^^^ PLR6301
+3 |         print(f"Greetings {name}!")
+  |
+
+no_self_use.py:5:20: PLR6301 Method `greeting_1` could be a function or a static method (no-self-use)
+  |
+3 |         print(f"Greetings {name}!")
+4 | 
+5 |     def greeting_1(self):  # [no-self-use]
+  |                    ^^^^ PLR6301
+6 |         print("Hello!")
+  |
+
+no_self_use.py:8:20: PLR6301 Method `greeting_2` could be a function or a static method (no-self-use)
+  |
+6 |         print("Hello!")
+7 | 
+8 |     def greeting_2(self):  # [no-self-use]
+  |                    ^^^^ PLR6301
+9 |         print("Hi!")
+  |
+
+
