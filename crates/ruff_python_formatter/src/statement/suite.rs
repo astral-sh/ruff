@@ -1,14 +1,19 @@
+use crate::comments::{leading_comments, trailing_comments};
 use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
 use ruff_python_ast::helpers::is_compound_statement;
-use ruff_python_ast::{self as ast, Ranged, Stmt, Suite};
-use ruff_python_ast::{Constant, ExprConstant};
+use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::{self as ast, Expr, ExprConstant, Ranged, Stmt, Suite};
 use ruff_python_trivia::{lines_after_ignoring_trivia, lines_before};
+use ruff_text_size::TextRange;
 
-use crate::comments::{leading_comments, trailing_comments};
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::expr_constant::ExprConstantLayout;
 use crate::expression::string::StringLayout;
 use crate::prelude::*;
+use crate::verbatim::{
+    write_suppressed_statements_starting_with_leading_comment,
+    write_suppressed_statements_starting_with_trailing_comment,
+};
 
 /// Level at which the [`Suite`] appears in the source code.
 #[derive(Copy, Clone, Debug)]
@@ -51,196 +56,231 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
         let comments = f.context().comments().clone();
         let source = f.context().source();
 
-        let mut iter = statements.iter();
-        let Some(first) = iter.next() else {
-            return Ok(());
-        };
-
         let mut f = WithNodeLevel::new(node_level, f);
+        write!(
+            f,
+            [format_with(|f| {
+                let mut iter = statements.iter();
+                let Some(first) = iter.next() else {
+                    return Ok(());
+                };
 
-        // Format the first statement in the body, which often has special formatting rules.
-        let mut last = first;
-        match self.kind {
-            SuiteKind::Other => {
-                if is_class_or_function_definition(first) && !comments.has_leading_comments(first) {
-                    // Add an empty line for any nested functions or classes defined within
-                    // non-function or class compound statements, e.g., this is stable formatting:
-                    // ```python
-                    // if True:
-                    //
-                    //     def test():
-                    //         ...
-                    // ```
-                    write!(f, [empty_line()])?;
-                }
-                write!(f, [first.format()])?;
-            }
-            SuiteKind::Function => {
-                if let Some(constant) = get_docstring(first) {
-                    write!(
-                        f,
-                        [
-                            // We format the expression, but the statement carries the comments
-                            leading_comments(comments.leading_comments(first)),
-                            constant
-                                .format()
-                                .with_options(ExprConstantLayout::String(StringLayout::DocString)),
-                            trailing_comments(comments.trailing_comments(first)),
-                        ]
-                    )?;
+                // Format the first statement in the body, which often has special formatting rules.
+                let first = match self.kind {
+                    SuiteKind::Other => {
+                        if is_class_or_function_definition(first)
+                            && !comments.has_leading_comments(first)
+                        {
+                            // Add an empty line for any nested functions or classes defined within
+                            // non-function or class compound statements, e.g., this is stable formatting:
+                            // ```python
+                            // if True:
+                            //
+                            //     def test():
+                            //         ...
+                            // ```
+                            empty_line().fmt(f)?;
+                        }
+
+                        SuiteChildStatement::Other(first)
+                    }
+
+                    SuiteKind::Function => {
+                        if let Some(docstring) = DocstringStmt::try_from_statement(first) {
+                            SuiteChildStatement::Docstring(docstring)
+                        } else {
+                            SuiteChildStatement::Other(first)
+                        }
+                    }
+
+                    SuiteKind::Class => {
+                        if let Some(docstring) = DocstringStmt::try_from_statement(first) {
+                            if !comments.has_leading_comments(first)
+                                && lines_before(first.start(), source) > 1
+                            {
+                                // Allow up to one empty line before a class docstring, e.g., this is
+                                // stable formatting:
+                                // ```python
+                                // class Test:
+                                //
+                                //     """Docstring"""
+                                // ```
+                                empty_line().fmt(f)?;
+                            }
+
+                            SuiteChildStatement::Docstring(docstring)
+                        } else {
+                            SuiteChildStatement::Other(first)
+                        }
+                    }
+                    SuiteKind::TopLevel => SuiteChildStatement::Other(first),
+                };
+
+                let (mut preceding, mut after_class_docstring) = if comments
+                    .leading_comments(first)
+                    .iter()
+                    .any(|comment| comment.is_suppression_off_comment(source))
+                {
+                    (
+                        write_suppressed_statements_starting_with_leading_comment(
+                            first, &mut iter, f,
+                        )?,
+                        false,
+                    )
+                } else if comments
+                    .trailing_comments(first)
+                    .iter()
+                    .any(|comment| comment.is_suppression_off_comment(source))
+                {
+                    (
+                        write_suppressed_statements_starting_with_trailing_comment(
+                            first, &mut iter, f,
+                        )?,
+                        false,
+                    )
                 } else {
-                    write!(f, [first.format()])?;
-                }
-            }
-            SuiteKind::Class => {
-                if let Some(constant) = get_docstring(first) {
-                    if !comments.has_leading_comments(first)
-                        && lines_before(first.start(), source) > 1
+                    first.fmt(f)?;
+                    (
+                        first.statement(),
+                        matches!(first, SuiteChildStatement::Docstring(_))
+                            && matches!(self.kind, SuiteKind::Class),
+                    )
+                };
+
+                while let Some(following) = iter.next() {
+                    if is_class_or_function_definition(preceding)
+                        || is_class_or_function_definition(following)
                     {
-                        // Allow up to one empty line before a class docstring
+                        match self.kind {
+                            SuiteKind::TopLevel => {
+                                write!(f, [empty_line(), empty_line()])?;
+                            }
+                            SuiteKind::Function | SuiteKind::Class | SuiteKind::Other => {
+                                empty_line().fmt(f)?;
+                            }
+                        }
+                    } else if is_import_definition(preceding) && !is_import_definition(following) {
+                        empty_line().fmt(f)?;
+                    } else if is_compound_statement(preceding) {
+                        // Handles the case where a body has trailing comments. The issue is that RustPython does not include
+                        // the comments in the range of the suite. This means, the body ends right after the last statement in the body.
                         // ```python
+                        // def test():
+                        //      ...
+                        //      # The body of `test` ends right after `...` and before this comment
+                        //
+                        // # leading comment
+                        //
+                        //
+                        // a = 10
+                        // ```
+                        // Using `lines_after` for the node doesn't work because it would count the lines after the `...`
+                        // which is 0 instead of 1, the number of lines between the trailing comment and
+                        // the leading comment. This is why the suite handling counts the lines before the
+                        // start of the next statement or before the first leading comments for compound statements.
+                        let start = if let Some(first_leading) =
+                            comments.leading_comments(following).first()
+                        {
+                            first_leading.slice().start()
+                        } else {
+                            following.start()
+                        };
+
+                        match lines_before(start, source) {
+                            0 | 1 => hard_line_break().fmt(f)?,
+                            2 => empty_line().fmt(f)?,
+                            3.. => match self.kind {
+                                SuiteKind::TopLevel => write!(f, [empty_line(), empty_line()])?,
+                                SuiteKind::Function | SuiteKind::Class | SuiteKind::Other => {
+                                    empty_line().fmt(f)?;
+                                }
+                            },
+                        }
+                    } else if after_class_docstring {
+                        // Enforce an empty line after a class docstring, e.g., these are both stable
+                        // formatting:
+                        // ```python
+                        // class Test:
+                        //     """Docstring"""
+                        //
+                        //     ...
+                        //
+                        //
                         // class Test:
                         //
                         //     """Docstring"""
+                        //
+                        //     ...
                         // ```
-                        write!(f, [empty_line()])?;
-                    }
-                    write!(
-                        f,
-                        [
-                            // We format the expression, but the statement carries the comments
-                            leading_comments(comments.leading_comments(first)),
-                            constant
-                                .format()
-                                .with_options(ExprConstantLayout::String(StringLayout::DocString)),
-                            trailing_comments(comments.trailing_comments(first)),
-                        ]
-                    )?;
-
-                    // Enforce an empty line after a class docstring
-                    // ```python
-                    // class Test:
-                    //     """Docstring"""
-                    //
-                    //     ...
-                    //
-                    //
-                    // class Test:
-                    //
-                    //     """Docstring"""
-                    //
-                    //     ...
-                    // ```
-                    // Unlike black, we add the newline also after single quoted docstrings
-                    if let Some(second) = iter.next() {
-                        // Format the subsequent statement immediately. This rule takes precedence
-                        // over the rules in the loop below (and most of them won't apply anyway,
-                        // e.g., we know the first statement isn't an import).
-                        write!(f, [empty_line(), second.format()])?;
-                        last = second;
-                    }
-                } else {
-                    // No docstring, use normal formatting
-                    write!(f, [first.format()])?;
-                }
-            }
-            SuiteKind::TopLevel => {
-                write!(f, [first.format()])?;
-            }
-        }
-
-        for statement in iter {
-            if is_class_or_function_definition(last) || is_class_or_function_definition(statement) {
-                match self.kind {
-                    SuiteKind::TopLevel => {
-                        write!(f, [empty_line(), empty_line(), statement.format()])?;
-                    }
-                    SuiteKind::Function | SuiteKind::Class | SuiteKind::Other => {
-                        write!(f, [empty_line(), statement.format()])?;
-                    }
-                }
-            } else if is_import_definition(last) && !is_import_definition(statement) {
-                write!(f, [empty_line(), statement.format()])?;
-            } else if is_compound_statement(last) {
-                // Handles the case where a body has trailing comments. The issue is that RustPython does not include
-                // the comments in the range of the suite. This means, the body ends right after the last statement in the body.
-                // ```python
-                // def test():
-                //      ...
-                //      # The body of `test` ends right after `...` and before this comment
-                //
-                // # leading comment
-                //
-                //
-                // a = 10
-                // ```
-                // Using `lines_after` for the node doesn't work because it would count the lines after the `...`
-                // which is 0 instead of 1, the number of lines between the trailing comment and
-                // the leading comment. This is why the suite handling counts the lines before the
-                // start of the next statement or before the first leading comments for compound statements.
-                let start =
-                    if let Some(first_leading) = comments.leading_comments(statement).first() {
-                        first_leading.slice().start()
+                        empty_line().fmt(f)?;
+                        after_class_docstring = false;
                     } else {
-                        statement.start()
-                    };
+                        // Insert the appropriate number of empty lines based on the node level, e.g.:
+                        // * [`NodeLevel::Module`]: Up to two empty lines
+                        // * [`NodeLevel::CompoundStatement`]: Up to one empty line
+                        // * [`NodeLevel::Expression`]: No empty lines
 
-                match lines_before(start, source) {
-                    0 | 1 => write!(f, [hard_line_break()])?,
-                    2 => write!(f, [empty_line()])?,
-                    3.. => match self.kind {
-                        SuiteKind::TopLevel => write!(f, [empty_line(), empty_line()])?,
-                        SuiteKind::Function | SuiteKind::Class | SuiteKind::Other => {
-                            write!(f, [empty_line()])?;
+                        let count_lines = |offset| {
+                            // It's necessary to skip any trailing line comment because RustPython doesn't include trailing comments
+                            // in the node's range
+                            // ```python
+                            // a # The range of `a` ends right before this comment
+                            //
+                            // b
+                            // ```
+                            //
+                            // Simply using `lines_after` doesn't work if a statement has a trailing comment because
+                            // it then counts the lines between the statement and the trailing comment, which is
+                            // always 0. This is why it skips any trailing trivia (trivia that's on the same line)
+                            // and counts the lines after.
+                            lines_after_ignoring_trivia(offset, source)
+                        };
+
+                        match node_level {
+                            NodeLevel::TopLevel => match count_lines(preceding.end()) {
+                                0 | 1 => hard_line_break().fmt(f)?,
+                                2 => empty_line().fmt(f)?,
+                                _ => write!(f, [empty_line(), empty_line()])?,
+                            },
+                            NodeLevel::CompoundStatement => match count_lines(preceding.end()) {
+                                0 | 1 => hard_line_break().fmt(f)?,
+                                _ => empty_line().fmt(f)?,
+                            },
+                            NodeLevel::Expression(_) | NodeLevel::ParenthesizedExpression => {
+                                hard_line_break().fmt(f)?;
+                            }
                         }
-                    },
-                }
+                    }
 
-                write!(f, [statement.format()])?;
-            } else {
-                // Insert the appropriate number of empty lines based on the node level, e.g.:
-                // * [`NodeLevel::Module`]: Up to two empty lines
-                // * [`NodeLevel::CompoundStatement`]: Up to one empty line
-                // * [`NodeLevel::Expression`]: No empty lines
-
-                let count_lines = |offset| {
-                    // It's necessary to skip any trailing line comment because RustPython doesn't include trailing comments
-                    // in the node's range
-                    // ```python
-                    // a # The range of `a` ends right before this comment
-                    //
-                    // b
-                    // ```
-                    //
-                    // Simply using `lines_after` doesn't work if a statement has a trailing comment because
-                    // it then counts the lines between the statement and the trailing comment, which is
-                    // always 0. This is why it skips any trailing trivia (trivia that's on the same line)
-                    // and counts the lines after.
-                    lines_after_ignoring_trivia(offset, source)
-                };
-
-                match node_level {
-                    NodeLevel::TopLevel => match count_lines(last.end()) {
-                        0 | 1 => write!(f, [hard_line_break()])?,
-                        2 => write!(f, [empty_line()])?,
-                        _ => write!(f, [empty_line(), empty_line()])?,
-                    },
-                    NodeLevel::CompoundStatement => match count_lines(last.end()) {
-                        0 | 1 => write!(f, [hard_line_break()])?,
-                        _ => write!(f, [empty_line()])?,
-                    },
-                    NodeLevel::Expression(_) | NodeLevel::ParenthesizedExpression => {
-                        write!(f, [hard_line_break()])?;
+                    if comments
+                        .leading_comments(following)
+                        .iter()
+                        .any(|comment| comment.is_suppression_off_comment(source))
+                    {
+                        preceding = write_suppressed_statements_starting_with_leading_comment(
+                            SuiteChildStatement::Other(following),
+                            &mut iter,
+                            f,
+                        )?;
+                    } else if comments
+                        .trailing_comments(following)
+                        .iter()
+                        .any(|comment| comment.is_suppression_off_comment(source))
+                    {
+                        preceding = write_suppressed_statements_starting_with_trailing_comment(
+                            SuiteChildStatement::Other(following),
+                            &mut iter,
+                            f,
+                        )?;
+                    } else {
+                        following.format().fmt(f)?;
+                        preceding = following;
                     }
                 }
 
-                write!(f, [statement.format()])?;
-            }
-
-            last = statement;
-        }
-
-        Ok(())
+                Ok(())
+            })]
+        )
     }
 }
 
@@ -252,23 +292,6 @@ const fn is_class_or_function_definition(stmt: &Stmt) -> bool {
 /// Returns `true` if a [`Stmt`] is an import.
 const fn is_import_definition(stmt: &Stmt) -> bool {
     matches!(stmt, Stmt::Import(_) | Stmt::ImportFrom(_))
-}
-
-/// Checks if the statement is a simple string that can be formatted as a docstring
-fn get_docstring(stmt: &Stmt) -> Option<&ExprConstant> {
-    let stmt_expr = stmt.as_expr_stmt()?;
-    let expr_constant = stmt_expr.value.as_constant_expr()?;
-    if matches!(
-        expr_constant.value,
-        Constant::Str(ast::StringConstant {
-            implicit_concatenated: false,
-            ..
-        })
-    ) {
-        Some(expr_constant)
-    } else {
-        None
-    }
 }
 
 impl FormatRuleWithOptions<Suite, PyFormatContext<'_>> for FormatSuite {
@@ -293,6 +316,93 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Suite {
 
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, FormatSuite::default())
+    }
+}
+
+/// A statement representing a docstring.
+#[derive(Copy, Clone)]
+pub(crate) struct DocstringStmt<'a>(&'a Stmt);
+
+impl<'a> DocstringStmt<'a> {
+    /// Checks if the statement is a simple string that can be formatted as a docstring
+    fn try_from_statement(stmt: &'a Stmt) -> Option<DocstringStmt<'a>> {
+        let Stmt::Expr(ast::StmtExpr { value, .. }) = stmt else {
+            return None;
+        };
+
+        if let Expr::Constant(ExprConstant { value, .. }) = value.as_ref() {
+            if !value.is_implicit_concatenated() {
+                return Some(DocstringStmt(stmt));
+            }
+        }
+
+        None
+    }
+}
+
+impl Format<PyFormatContext<'_>> for DocstringStmt<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+        // SAFETY: Safe because `DocStringStmt` guarantees that it only ever wraps a `ExprStmt` containing a `ConstantExpr`.
+        let constant = self
+            .0
+            .as_expr_stmt()
+            .unwrap()
+            .value
+            .as_constant_expr()
+            .unwrap();
+        let comments = f.context().comments().clone();
+
+        // We format the expression, but the statement carries the comments
+        write!(
+            f,
+            [
+                leading_comments(comments.leading_comments(self.0)),
+                constant
+                    .format()
+                    .with_options(ExprConstantLayout::String(StringLayout::DocString)),
+                trailing_comments(comments.trailing_comments(self.0)),
+            ]
+        )
+    }
+}
+
+/// A Child of a suite.
+#[derive(Copy, Clone)]
+pub(crate) enum SuiteChildStatement<'a> {
+    /// A docstring documenting a class or function definition.
+    Docstring(DocstringStmt<'a>),
+
+    /// Any other statement.
+    Other(&'a Stmt),
+}
+
+impl<'a> SuiteChildStatement<'a> {
+    pub(crate) const fn statement(self) -> &'a Stmt {
+        match self {
+            SuiteChildStatement::Docstring(docstring) => docstring.0,
+            SuiteChildStatement::Other(statement) => statement,
+        }
+    }
+}
+
+impl Ranged for SuiteChildStatement<'_> {
+    fn range(&self) -> TextRange {
+        self.statement().range()
+    }
+}
+
+impl<'a> From<SuiteChildStatement<'a>> for AnyNodeRef<'a> {
+    fn from(value: SuiteChildStatement<'a>) -> Self {
+        value.statement().into()
+    }
+}
+
+impl Format<PyFormatContext<'_>> for SuiteChildStatement<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+        match self {
+            SuiteChildStatement::Docstring(docstring) => docstring.fmt(f),
+            SuiteChildStatement::Other(statement) => statement.format().fmt(f),
+        }
     }
 }
 
