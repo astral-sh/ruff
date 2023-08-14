@@ -1,86 +1,13 @@
-use crate::comments;
-use crate::comments::SourceComment;
-use crate::comments::{leading_alternate_branch_comments, trailing_comments};
-use crate::other::except_handler_except_handler::ExceptHandlerKind;
-use crate::prelude::*;
-use crate::statement::FormatRefWithRule;
-use crate::statement::Stmt;
-use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::FormatRuleWithOptions;
 use ruff_formatter::{write, Buffer, FormatResult};
-use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{ExceptHandler, Ranged, StmtTry, StmtTryStar, Suite};
-use ruff_text_size::TextRange;
+use ruff_python_ast::{ExceptHandler, Ranged, StmtTry, Suite};
 
-pub(super) enum AnyStatementTry<'a> {
-    Try(&'a StmtTry),
-    TryStar(&'a StmtTryStar),
-}
-impl<'a> AnyStatementTry<'a> {
-    const fn except_handler_kind(&self) -> ExceptHandlerKind {
-        match self {
-            AnyStatementTry::Try(_) => ExceptHandlerKind::Regular,
-            AnyStatementTry::TryStar(_) => ExceptHandlerKind::Starred,
-        }
-    }
-
-    fn body(&self) -> &Suite {
-        match self {
-            AnyStatementTry::Try(try_) => &try_.body,
-            AnyStatementTry::TryStar(try_) => &try_.body,
-        }
-    }
-
-    fn handlers(&self) -> &[ExceptHandler] {
-        match self {
-            AnyStatementTry::Try(try_) => try_.handlers.as_slice(),
-            AnyStatementTry::TryStar(try_) => try_.handlers.as_slice(),
-        }
-    }
-    fn orelse(&self) -> &Suite {
-        match self {
-            AnyStatementTry::Try(try_) => &try_.orelse,
-            AnyStatementTry::TryStar(try_) => &try_.orelse,
-        }
-    }
-
-    fn finalbody(&self) -> &Suite {
-        match self {
-            AnyStatementTry::Try(try_) => &try_.finalbody,
-            AnyStatementTry::TryStar(try_) => &try_.finalbody,
-        }
-    }
-}
-
-impl Ranged for AnyStatementTry<'_> {
-    fn range(&self) -> TextRange {
-        match self {
-            AnyStatementTry::Try(with) => with.range(),
-            AnyStatementTry::TryStar(with) => with.range(),
-        }
-    }
-}
-
-impl<'a> From<&'a StmtTry> for AnyStatementTry<'a> {
-    fn from(value: &'a StmtTry) -> Self {
-        AnyStatementTry::Try(value)
-    }
-}
-
-impl<'a> From<&'a StmtTryStar> for AnyStatementTry<'a> {
-    fn from(value: &'a StmtTryStar) -> Self {
-        AnyStatementTry::TryStar(value)
-    }
-}
-
-impl<'a> From<&AnyStatementTry<'a>> for AnyNodeRef<'a> {
-    fn from(value: &AnyStatementTry<'a>) -> Self {
-        match value {
-            AnyStatementTry::Try(with) => AnyNodeRef::StmtTry(with),
-            AnyStatementTry::TryStar(with) => AnyNodeRef::StmtTryStar(with),
-        }
-    }
-}
+use crate::comments;
+use crate::comments::{leading_alternate_branch_comments, trailing_comments, SourceComment};
+use crate::other::except_handler_except_handler::ExceptHandlerKind;
+use crate::prelude::*;
+use crate::statement::{FormatRefWithRule, Stmt};
+use crate::{FormatNodeRule, PyFormatter};
 
 #[derive(Default)]
 pub struct FormatStmtTry;
@@ -102,9 +29,10 @@ impl FormatRuleWithOptions<ExceptHandler, PyFormatContext<'_>> for FormatExceptH
 impl FormatRule<ExceptHandler, PyFormatContext<'_>> for FormatExceptHandler {
     fn fmt(&self, item: &ExceptHandler, f: &mut PyFormatter) -> FormatResult<()> {
         match item {
-            ExceptHandler::ExceptHandler(x) => {
-                x.format().with_options(self.except_handler_kind).fmt(f)
-            }
+            ExceptHandler::ExceptHandler(except_handler) => except_handler
+                .format()
+                .with_options(self.except_handler_kind)
+                .fmt(f),
         }
     }
 }
@@ -121,14 +49,20 @@ impl<'ast> AsFormat<PyFormatContext<'ast>> for ExceptHandler {
         FormatRefWithRule::new(self, FormatExceptHandler::default())
     }
 }
-impl Format<PyFormatContext<'_>> for AnyStatementTry<'_> {
-    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
+
+impl FormatNodeRule<StmtTry> for FormatStmtTry {
+    fn fmt_fields(&self, item: &StmtTry, f: &mut PyFormatter) -> FormatResult<()> {
+        let StmtTry {
+            body,
+            handlers,
+            orelse,
+            finalbody,
+            is_star,
+            range: _,
+        } = item;
+
         let comments_info = f.context().comments().clone();
-        let mut dangling_comments = comments_info.dangling_comments(self);
-        let body = self.body();
-        let handlers = self.handlers();
-        let orelse = self.orelse();
-        let finalbody = self.finalbody();
+        let mut dangling_comments = comments_info.dangling_comments(item);
 
         (_, dangling_comments) = format_case("try", body, None, dangling_comments, f)?;
         let mut previous_node = body.last();
@@ -139,7 +73,11 @@ impl Format<PyFormatContext<'_>> for AnyStatementTry<'_> {
                 f,
                 [
                     leading_alternate_branch_comments(handler_comments, previous_node),
-                    &handler.format().with_options(self.except_handler_kind()),
+                    &handler.format().with_options(if *is_star {
+                        ExceptHandlerKind::Starred
+                    } else {
+                        ExceptHandlerKind::Regular
+                    }),
                 ]
             )?;
             previous_node = match handler {
@@ -153,12 +91,6 @@ impl Format<PyFormatContext<'_>> for AnyStatementTry<'_> {
         format_case("finally", finalbody, previous_node, dangling_comments, f)?;
 
         write!(f, [comments::dangling_comments(dangling_comments)])
-    }
-}
-
-impl FormatNodeRule<StmtTry> for FormatStmtTry {
-    fn fmt_fields(&self, item: &StmtTry, f: &mut PyFormatter) -> FormatResult<()> {
-        AnyStatementTry::from(item).fmt(f)
     }
 
     fn fmt_dangling_comments(&self, _node: &StmtTry, _f: &mut PyFormatter) -> FormatResult<()> {

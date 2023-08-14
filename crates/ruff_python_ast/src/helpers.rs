@@ -25,7 +25,6 @@ pub const fn is_compound_statement(stmt: &Stmt) -> bool {
             | Stmt::With(_)
             | Stmt::If(_)
             | Stmt::Try(_)
-            | Stmt::TryStar(_)
     )
 }
 
@@ -478,13 +477,7 @@ where
             handlers,
             orelse,
             finalbody,
-            range: _,
-        })
-        | Stmt::TryStar(ast::StmtTryStar {
-            body,
-            handlers,
-            orelse,
-            finalbody,
+            is_star: _,
             range: _,
         }) => {
             any_over_body(body, func)
@@ -920,7 +913,7 @@ where
                 self.raises
                     .push((stmt.range(), exc.as_deref(), cause.as_deref()));
             }
-            Stmt::ClassDef(_) | Stmt::FunctionDef(_) | Stmt::Try(_) | Stmt::TryStar(_) => {}
+            Stmt::ClassDef(_) | Stmt::FunctionDef(_) | Stmt::Try(_) => {}
             Stmt::If(ast::StmtIf {
                 body,
                 elif_else_clauses,
@@ -981,7 +974,7 @@ pub fn in_nested_block<'a>(mut parents: impl Iterator<Item = &'a Stmt>) -> bool 
     parents.any(|parent| {
         matches!(
             parent,
-            Stmt::Try(_) | Stmt::TryStar(_) | Stmt::If(_) | Stmt::With(_) | Stmt::Match(_)
+            Stmt::Try(_) | Stmt::If(_) | Stmt::With(_) | Stmt::Match(_)
         )
     })
 }

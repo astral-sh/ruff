@@ -73,8 +73,6 @@ pub enum Stmt {
     Raise(StmtRaise),
     #[is(name = "try_stmt")]
     Try(StmtTry),
-    #[is(name = "try_star_stmt")]
-    TryStar(StmtTryStar),
     #[is(name = "assert_stmt")]
     Assert(StmtAssert),
     #[is(name = "import_stmt")]
@@ -362,7 +360,8 @@ impl From<StmtRaise> for Stmt {
     }
 }
 
-/// See also [Try](https://docs.python.org/3/library/ast.html#ast.Try)
+/// See also [Try](https://docs.python.org/3/library/ast.html#ast.Try) and
+/// [TryStar](https://docs.python.org/3/library/ast.html#ast.TryStar)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtTry {
     pub range: TextRange,
@@ -370,27 +369,12 @@ pub struct StmtTry {
     pub handlers: Vec<ExceptHandler>,
     pub orelse: Vec<Stmt>,
     pub finalbody: Vec<Stmt>,
+    pub is_star: bool,
 }
 
 impl From<StmtTry> for Stmt {
     fn from(payload: StmtTry) -> Self {
         Stmt::Try(payload)
-    }
-}
-
-/// See also [TryStar](https://docs.python.org/3/library/ast.html#ast.TryStar)
-#[derive(Clone, Debug, PartialEq)]
-pub struct StmtTryStar {
-    pub range: TextRange,
-    pub body: Vec<Stmt>,
-    pub handlers: Vec<ExceptHandler>,
-    pub orelse: Vec<Stmt>,
-    pub finalbody: Vec<Stmt>,
-}
-
-impl From<StmtTryStar> for Stmt {
-    fn from(payload: StmtTryStar) -> Self {
-        Stmt::TryStar(payload)
     }
 }
 
@@ -2666,11 +2650,6 @@ impl Ranged for crate::nodes::StmtTry {
         self.range
     }
 }
-impl Ranged for crate::nodes::StmtTryStar {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
 impl Ranged for crate::nodes::StmtAssert {
     fn range(&self) -> TextRange {
         self.range
@@ -2739,7 +2718,6 @@ impl Ranged for crate::Stmt {
             Self::Match(node) => node.range(),
             Self::Raise(node) => node.range(),
             Self::Try(node) => node.range(),
-            Self::TryStar(node) => node.range(),
             Self::Assert(node) => node.range(),
             Self::Import(node) => node.range(),
             Self::ImportFrom(node) => node.range(),
@@ -3086,7 +3064,7 @@ mod size_assertions {
     assert_eq_size!(Stmt, [u8; 144]);
     assert_eq_size!(StmtFunctionDef, [u8; 144]);
     assert_eq_size!(StmtClassDef, [u8; 104]);
-    assert_eq_size!(StmtTry, [u8; 104]);
+    assert_eq_size!(StmtTry, [u8; 112]);
     assert_eq_size!(Expr, [u8; 80]);
     assert_eq_size!(Constant, [u8; 40]);
     assert_eq_size!(Pattern, [u8; 96]);

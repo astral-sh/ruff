@@ -43,7 +43,6 @@ pub enum AnyNode {
     StmtMatch(ast::StmtMatch),
     StmtRaise(ast::StmtRaise),
     StmtTry(ast::StmtTry),
-    StmtTryStar(ast::StmtTryStar),
     StmtAssert(ast::StmtAssert),
     StmtImport(ast::StmtImport),
     StmtImportFrom(ast::StmtImportFrom),
@@ -126,7 +125,6 @@ impl AnyNode {
             AnyNode::StmtMatch(node) => Some(Stmt::Match(node)),
             AnyNode::StmtRaise(node) => Some(Stmt::Raise(node)),
             AnyNode::StmtTry(node) => Some(Stmt::Try(node)),
-            AnyNode::StmtTryStar(node) => Some(Stmt::TryStar(node)),
             AnyNode::StmtAssert(node) => Some(Stmt::Assert(node)),
             AnyNode::StmtImport(node) => Some(Stmt::Import(node)),
             AnyNode::StmtImportFrom(node) => Some(Stmt::ImportFrom(node)),
@@ -243,7 +241,6 @@ impl AnyNode {
             | AnyNode::StmtMatch(_)
             | AnyNode::StmtRaise(_)
             | AnyNode::StmtTry(_)
-            | AnyNode::StmtTryStar(_)
             | AnyNode::StmtAssert(_)
             | AnyNode::StmtImport(_)
             | AnyNode::StmtImportFrom(_)
@@ -301,7 +298,6 @@ impl AnyNode {
             | AnyNode::StmtMatch(_)
             | AnyNode::StmtRaise(_)
             | AnyNode::StmtTry(_)
-            | AnyNode::StmtTryStar(_)
             | AnyNode::StmtAssert(_)
             | AnyNode::StmtImport(_)
             | AnyNode::StmtImportFrom(_)
@@ -395,7 +391,6 @@ impl AnyNode {
             | AnyNode::StmtMatch(_)
             | AnyNode::StmtRaise(_)
             | AnyNode::StmtTry(_)
-            | AnyNode::StmtTryStar(_)
             | AnyNode::StmtAssert(_)
             | AnyNode::StmtImport(_)
             | AnyNode::StmtImportFrom(_)
@@ -474,7 +469,6 @@ impl AnyNode {
             | AnyNode::StmtMatch(_)
             | AnyNode::StmtRaise(_)
             | AnyNode::StmtTry(_)
-            | AnyNode::StmtTryStar(_)
             | AnyNode::StmtAssert(_)
             | AnyNode::StmtImport(_)
             | AnyNode::StmtImportFrom(_)
@@ -578,7 +572,6 @@ impl AnyNode {
             Self::StmtMatch(node) => AnyNodeRef::StmtMatch(node),
             Self::StmtRaise(node) => AnyNodeRef::StmtRaise(node),
             Self::StmtTry(node) => AnyNodeRef::StmtTry(node),
-            Self::StmtTryStar(node) => AnyNodeRef::StmtTryStar(node),
             Self::StmtAssert(node) => AnyNodeRef::StmtAssert(node),
             Self::StmtImport(node) => AnyNodeRef::StmtImport(node),
             Self::StmtImportFrom(node) => AnyNodeRef::StmtImportFrom(node),
@@ -1445,54 +1438,7 @@ impl AstNode for ast::StmtTry {
             handlers,
             orelse,
             finalbody,
-            range: _,
-        } = self;
-
-        visitor.visit_body(body);
-        for except_handler in handlers {
-            visitor.visit_except_handler(except_handler);
-        }
-        visitor.visit_body(orelse);
-        visitor.visit_body(finalbody);
-    }
-}
-impl AstNode for ast::StmtTryStar {
-    fn cast(kind: AnyNode) -> Option<Self>
-    where
-        Self: Sized,
-    {
-        if let AnyNode::StmtTryStar(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::StmtTryStar(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn as_any_node_ref(&self) -> AnyNodeRef {
-        AnyNodeRef::from(self)
-    }
-
-    fn into_any_node(self) -> AnyNode {
-        AnyNode::from(self)
-    }
-
-    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
-    where
-        V: PreorderVisitor<'a> + ?Sized,
-    {
-        let ast::StmtTryStar {
-            body,
-            handlers,
-            orelse,
-            finalbody,
+            is_star: _,
             range: _,
         } = self;
 
@@ -4056,7 +4002,6 @@ impl From<Stmt> for AnyNode {
             Stmt::Match(node) => AnyNode::StmtMatch(node),
             Stmt::Raise(node) => AnyNode::StmtRaise(node),
             Stmt::Try(node) => AnyNode::StmtTry(node),
-            Stmt::TryStar(node) => AnyNode::StmtTryStar(node),
             Stmt::Assert(node) => AnyNode::StmtAssert(node),
             Stmt::Import(node) => AnyNode::StmtImport(node),
             Stmt::ImportFrom(node) => AnyNode::StmtImportFrom(node),
@@ -4243,12 +4188,6 @@ impl From<ast::StmtRaise> for AnyNode {
 impl From<ast::StmtTry> for AnyNode {
     fn from(node: ast::StmtTry) -> Self {
         AnyNode::StmtTry(node)
-    }
-}
-
-impl From<ast::StmtTryStar> for AnyNode {
-    fn from(node: ast::StmtTryStar) -> Self {
-        AnyNode::StmtTryStar(node)
     }
 }
 
@@ -4627,7 +4566,6 @@ impl Ranged for AnyNode {
             AnyNode::StmtMatch(node) => node.range(),
             AnyNode::StmtRaise(node) => node.range(),
             AnyNode::StmtTry(node) => node.range(),
-            AnyNode::StmtTryStar(node) => node.range(),
             AnyNode::StmtAssert(node) => node.range(),
             AnyNode::StmtImport(node) => node.range(),
             AnyNode::StmtImportFrom(node) => node.range(),
@@ -4713,7 +4651,6 @@ pub enum AnyNodeRef<'a> {
     StmtMatch(&'a ast::StmtMatch),
     StmtRaise(&'a ast::StmtRaise),
     StmtTry(&'a ast::StmtTry),
-    StmtTryStar(&'a ast::StmtTryStar),
     StmtAssert(&'a ast::StmtAssert),
     StmtImport(&'a ast::StmtImport),
     StmtImportFrom(&'a ast::StmtImportFrom),
@@ -4798,7 +4735,6 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::StmtMatch(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtRaise(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtTry(node) => NonNull::from(*node).cast(),
-            AnyNodeRef::StmtTryStar(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtAssert(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtImport(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtImportFrom(node) => NonNull::from(*node).cast(),
@@ -4889,7 +4825,6 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::StmtMatch(_) => NodeKind::StmtMatch,
             AnyNodeRef::StmtRaise(_) => NodeKind::StmtRaise,
             AnyNodeRef::StmtTry(_) => NodeKind::StmtTry,
-            AnyNodeRef::StmtTryStar(_) => NodeKind::StmtTryStar,
             AnyNodeRef::StmtAssert(_) => NodeKind::StmtAssert,
             AnyNodeRef::StmtImport(_) => NodeKind::StmtImport,
             AnyNodeRef::StmtImportFrom(_) => NodeKind::StmtImportFrom,
@@ -4972,7 +4907,6 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtMatch(_)
             | AnyNodeRef::StmtRaise(_)
             | AnyNodeRef::StmtTry(_)
-            | AnyNodeRef::StmtTryStar(_)
             | AnyNodeRef::StmtAssert(_)
             | AnyNodeRef::StmtImport(_)
             | AnyNodeRef::StmtImportFrom(_)
@@ -5089,7 +5023,6 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtMatch(_)
             | AnyNodeRef::StmtRaise(_)
             | AnyNodeRef::StmtTry(_)
-            | AnyNodeRef::StmtTryStar(_)
             | AnyNodeRef::StmtAssert(_)
             | AnyNodeRef::StmtImport(_)
             | AnyNodeRef::StmtImportFrom(_)
@@ -5146,7 +5079,6 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtMatch(_)
             | AnyNodeRef::StmtRaise(_)
             | AnyNodeRef::StmtTry(_)
-            | AnyNodeRef::StmtTryStar(_)
             | AnyNodeRef::StmtAssert(_)
             | AnyNodeRef::StmtImport(_)
             | AnyNodeRef::StmtImportFrom(_)
@@ -5240,7 +5172,6 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtMatch(_)
             | AnyNodeRef::StmtRaise(_)
             | AnyNodeRef::StmtTry(_)
-            | AnyNodeRef::StmtTryStar(_)
             | AnyNodeRef::StmtAssert(_)
             | AnyNodeRef::StmtImport(_)
             | AnyNodeRef::StmtImportFrom(_)
@@ -5319,7 +5250,6 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtMatch(_)
             | AnyNodeRef::StmtRaise(_)
             | AnyNodeRef::StmtTry(_)
-            | AnyNodeRef::StmtTryStar(_)
             | AnyNodeRef::StmtAssert(_)
             | AnyNodeRef::StmtImport(_)
             | AnyNodeRef::StmtImportFrom(_)
@@ -5395,7 +5325,6 @@ impl AnyNodeRef<'_> {
                 | AnyNodeRef::StmtFunctionDef(_)
                 | AnyNodeRef::StmtClassDef(_)
                 | AnyNodeRef::StmtTry(_)
-                | AnyNodeRef::StmtTryStar(_)
                 | AnyNodeRef::ExceptHandlerExceptHandler(_)
                 | AnyNodeRef::ElifElseClause(_)
         )
@@ -5433,7 +5362,6 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::StmtMatch(node) => node.visit_preorder(visitor),
             AnyNodeRef::StmtRaise(node) => node.visit_preorder(visitor),
             AnyNodeRef::StmtTry(node) => node.visit_preorder(visitor),
-            AnyNodeRef::StmtTryStar(node) => node.visit_preorder(visitor),
             AnyNodeRef::StmtAssert(node) => node.visit_preorder(visitor),
             AnyNodeRef::StmtImport(node) => node.visit_preorder(visitor),
             AnyNodeRef::StmtImportFrom(node) => node.visit_preorder(visitor),
@@ -5605,12 +5533,6 @@ impl<'a> From<&'a ast::StmtRaise> for AnyNodeRef<'a> {
 impl<'a> From<&'a ast::StmtTry> for AnyNodeRef<'a> {
     fn from(node: &'a ast::StmtTry) -> Self {
         AnyNodeRef::StmtTry(node)
-    }
-}
-
-impl<'a> From<&'a ast::StmtTryStar> for AnyNodeRef<'a> {
-    fn from(node: &'a ast::StmtTryStar) -> Self {
-        AnyNodeRef::StmtTryStar(node)
     }
 }
 
@@ -5943,7 +5865,6 @@ impl<'a> From<&'a Stmt> for AnyNodeRef<'a> {
             Stmt::Match(node) => AnyNodeRef::StmtMatch(node),
             Stmt::Raise(node) => AnyNodeRef::StmtRaise(node),
             Stmt::Try(node) => AnyNodeRef::StmtTry(node),
-            Stmt::TryStar(node) => AnyNodeRef::StmtTryStar(node),
             Stmt::Assert(node) => AnyNodeRef::StmtAssert(node),
             Stmt::Import(node) => AnyNodeRef::StmtImport(node),
             Stmt::ImportFrom(node) => AnyNodeRef::StmtImportFrom(node),
@@ -6103,7 +6024,6 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::StmtMatch(node) => node.range(),
             AnyNodeRef::StmtRaise(node) => node.range(),
             AnyNodeRef::StmtTry(node) => node.range(),
-            AnyNodeRef::StmtTryStar(node) => node.range(),
             AnyNodeRef::StmtAssert(node) => node.range(),
             AnyNodeRef::StmtImport(node) => node.range(),
             AnyNodeRef::StmtImportFrom(node) => node.range(),
@@ -6191,7 +6111,6 @@ pub enum NodeKind {
     StmtMatch,
     StmtRaise,
     StmtTry,
-    StmtTryStar,
     StmtAssert,
     StmtImport,
     StmtImportFrom,

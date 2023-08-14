@@ -121,14 +121,7 @@ fn num_branches(stmts: &[Stmt]) -> usize {
                 handlers,
                 orelse,
                 finalbody,
-                range: _,
-            })
-            | Stmt::TryStar(ast::StmtTryStar {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                range: _,
+                ..
             }) => {
                 1 + num_branches(body)
                     + (if orelse.is_empty() {

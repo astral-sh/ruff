@@ -64,8 +64,7 @@ fn traverse_body(checker: &mut Checker, body: &[Stmt]) {
                     traverse_body(checker, &clause.body);
                 }
             }
-            Stmt::Try(ast::StmtTry { body, orelse, .. })
-            | Stmt::TryStar(ast::StmtTryStar { body, orelse, .. }) => {
+            Stmt::Try(ast::StmtTry { body, orelse, .. }) => {
                 traverse_body(checker, body);
                 traverse_body(checker, orelse);
             }
