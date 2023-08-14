@@ -209,14 +209,7 @@ fn is_lone_child(child: &Stmt, parent: &Stmt) -> bool {
             handlers,
             orelse,
             finalbody,
-            range: _,
-        })
-        | Stmt::TryStar(ast::StmtTryStar {
-            body,
-            handlers,
-            orelse,
-            finalbody,
-            range: _,
+            ..
         }) => {
             if is_only(body, child)
                 || is_only(orelse, child)

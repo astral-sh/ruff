@@ -1,7 +1,6 @@
-use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Ranged};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Ranged};
 
 use crate::checkers::ast::Checker;
 
@@ -16,6 +15,10 @@ use crate::checkers::ast::Checker;
 ///
 /// If the exception message is instead defined within the exception class, it
 /// will be consistent across all `raise` invocations.
+///
+/// This rule is not enforced for some built-in exceptions that are commonly
+/// raised with a message and would be unusual to subclass, such as
+/// `NotImplementedError`.
 ///
 /// ## Example
 /// ```python
@@ -49,23 +52,53 @@ impl Violation for RaiseVanillaArgs {
     }
 }
 
-fn any_string<F>(expr: &Expr, predicate: F) -> bool
-where
-    F: (Fn(&str) -> bool) + Copy,
-{
+/// TRY003
+pub(crate) fn raise_vanilla_args(checker: &mut Checker, expr: &Expr) {
+    let Expr::Call(ast::ExprCall {
+        func,
+        arguments: Arguments { args, .. },
+        ..
+    }) = expr else {
+        return;
+    };
+
+    let Some(arg) = args.first() else {
+        return;
+    };
+
+    // Ignore some built-in exceptions that don't make sense to subclass, like
+    // `NotImplementedError`.
+    if checker
+        .semantic()
+        .resolve_call_path(func)
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["", "NotImplementedError"]))
+    {
+        return;
+    }
+
+    if contains_message(arg) {
+        checker
+            .diagnostics
+            .push(Diagnostic::new(RaiseVanillaArgs, expr.range()));
+    }
+}
+
+/// Returns `true` if an expression appears to be an exception message (i.e., a string with
+/// some whitespace).
+fn contains_message(expr: &Expr) -> bool {
     match expr {
-        Expr::FString(ast::ExprFString { values, range: _ }) => {
+        Expr::FString(ast::ExprFString { values, .. }) => {
             for value in values {
-                if any_string(value, predicate) {
+                if contains_message(value) {
                     return true;
                 }
             }
         }
         Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(val),
+            value: Constant::Str(value),
             ..
         }) => {
-            if predicate(val.as_str()) {
+            if value.chars().any(char::is_whitespace) {
                 return true;
             }
         }
@@ -73,21 +106,4 @@ where
     }
 
     false
-}
-
-/// TRY003
-pub(crate) fn raise_vanilla_args(checker: &mut Checker, expr: &Expr) {
-    if let Expr::Call(ast::ExprCall {
-        arguments: Arguments { args, .. },
-        ..
-    }) = expr
-    {
-        if let Some(arg) = args.first() {
-            if any_string(arg, |part| part.chars().any(char::is_whitespace)) {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(RaiseVanillaArgs, expr.range()));
-            }
-        }
-    }
 }

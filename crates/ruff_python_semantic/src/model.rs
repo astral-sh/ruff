@@ -233,13 +233,6 @@ impl<'a> SemanticModel<'a> {
         })
     }
 
-    /// Return the current [`Binding`] for a given `name`.
-    pub fn find_binding(&self, member: &str) -> Option<&Binding> {
-        self.current_scopes()
-            .find_map(|scope| scope.get(member))
-            .map(|binding_id| &self.bindings[binding_id])
-    }
-
     /// Return the [`BindingId`] that the given [`BindingId`] shadows, if any.
     ///
     /// Note that this will only return bindings that are shadowed by a binding in a parent scope.
@@ -618,6 +611,11 @@ impl<'a> SemanticModel<'a> {
         Some(binding_id)
     }
 
+    /// Resolves the [`ast::ExprName`] to the [`BindingId`] of the symbol it refers to, if any.
+    pub fn resolve_name(&self, name: &ast::ExprName) -> Option<BindingId> {
+        self.resolved_names.get(&name.into()).copied()
+    }
+
     /// Resolves the [`Expr`] to a fully-qualified symbol-name, if `value` resolves to an imported
     /// or builtin symbol.
     ///
@@ -642,11 +640,10 @@ impl<'a> SemanticModel<'a> {
 
         // If the name was already resolved, look it up; otherwise, search for the symbol.
         let head = match_head(value)?;
-        let binding = if let Some(id) = self.resolved_names.get(&head.into()) {
-            self.binding(*id)
-        } else {
-            self.find_binding(&head.id)?
-        };
+        let binding = self
+            .resolve_name(head)
+            .or_else(|| self.lookup_symbol(&head.id))
+            .map(|id| self.binding(id))?;
 
         match &binding.kind {
             BindingKind::Import(Import { call_path }) => {
@@ -915,6 +912,11 @@ impl<'a> SemanticModel<'a> {
     /// Returns an iterator over all scopes, starting from the current [`Scope`].
     pub fn current_scopes(&self) -> impl Iterator<Item = &Scope> {
         self.scopes.ancestors(self.scope_id)
+    }
+
+    /// Returns an iterator over all scopes IDs, starting from the current [`Scope`].
+    pub fn current_scope_ids(&self) -> impl Iterator<Item = ScopeId> + '_ {
+        self.scopes.ancestor_ids(self.scope_id)
     }
 
     /// Returns the parent of the given [`Scope`], if any.

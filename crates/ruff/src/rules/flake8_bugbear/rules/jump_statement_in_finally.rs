@@ -74,7 +74,6 @@ fn walk_stmt(checker: &mut Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
             }
             Stmt::If(ast::StmtIf { body, .. })
             | Stmt::Try(ast::StmtTry { body, .. })
-            | Stmt::TryStar(ast::StmtTryStar { body, .. })
             | Stmt::With(ast::StmtWith { body, .. }) => {
                 walk_stmt(checker, body, f);
             }

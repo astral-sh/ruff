@@ -73,8 +73,6 @@ pub enum Stmt {
     Raise(StmtRaise),
     #[is(name = "try_stmt")]
     Try(StmtTry),
-    #[is(name = "try_star_stmt")]
-    TryStar(StmtTryStar),
     #[is(name = "assert_stmt")]
     Assert(StmtAssert),
     #[is(name = "import_stmt")]
@@ -362,7 +360,8 @@ impl From<StmtRaise> for Stmt {
     }
 }
 
-/// See also [Try](https://docs.python.org/3/library/ast.html#ast.Try)
+/// See also [Try](https://docs.python.org/3/library/ast.html#ast.Try) and
+/// [TryStar](https://docs.python.org/3/library/ast.html#ast.TryStar)
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtTry {
     pub range: TextRange,
@@ -370,27 +369,12 @@ pub struct StmtTry {
     pub handlers: Vec<ExceptHandler>,
     pub orelse: Vec<Stmt>,
     pub finalbody: Vec<Stmt>,
+    pub is_star: bool,
 }
 
 impl From<StmtTry> for Stmt {
     fn from(payload: StmtTry) -> Self {
         Stmt::Try(payload)
-    }
-}
-
-/// See also [TryStar](https://docs.python.org/3/library/ast.html#ast.TryStar)
-#[derive(Clone, Debug, PartialEq)]
-pub struct StmtTryStar {
-    pub range: TextRange,
-    pub body: Vec<Stmt>,
-    pub handlers: Vec<ExceptHandler>,
-    pub orelse: Vec<Stmt>,
-    pub finalbody: Vec<Stmt>,
-}
-
-impl From<StmtTryStar> for Stmt {
-    fn from(payload: StmtTryStar) -> Self {
-        Stmt::TryStar(payload)
     }
 }
 
@@ -881,6 +865,8 @@ pub struct DebugText {
 pub struct ExprFString {
     pub range: TextRange,
     pub values: Vec<Expr>,
+    /// Whether the f-string contains multiple string tokens that were implicitly concatenated.
+    pub implicit_concatenated: bool,
 }
 
 impl From<ExprFString> for Expr {
@@ -2463,8 +2449,8 @@ impl std::cmp::PartialEq<usize> for Int {
 pub enum Constant {
     None,
     Bool(bool),
-    Str(String),
-    Bytes(Vec<u8>),
+    Str(StringConstant),
+    Bytes(BytesConstant),
     Int(BigInt),
     Float(f64),
     Complex { real: f64, imag: f64 },
@@ -2472,38 +2458,68 @@ pub enum Constant {
 }
 
 impl Constant {
-    pub fn is_true(self) -> bool {
-        self.bool().is_some_and(|b| b)
-    }
-    pub fn is_false(self) -> bool {
-        self.bool().is_some_and(|b| !b)
-    }
-    pub fn complex(self) -> Option<(f64, f64)> {
+    /// Returns `true` if the constant is a string or bytes constant that contains multiple,
+    /// implicitly concatenated string tokens.
+    pub fn is_implicit_concatenated(&self) -> bool {
         match self {
-            Constant::Complex { real, imag } => Some((real, imag)),
-            _ => None,
+            Constant::Str(value) => value.implicit_concatenated,
+            Constant::Bytes(value) => value.implicit_concatenated,
+            _ => false,
         }
     }
 }
 
-impl From<String> for Constant {
-    fn from(s: String) -> Constant {
-        Self::Str(s)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct StringConstant {
+    /// The string value as resolved by the parser (i.e., without quotes, or escape sequences, or
+    /// implicit concatenations).
+    pub value: String,
+    /// Whether the string contains multiple string tokens that were implicitly concatenated.
+    pub implicit_concatenated: bool,
+}
+
+impl Deref for StringConstant {
+    type Target = str;
+    fn deref(&self) -> &Self::Target {
+        self.value.as_str()
     }
 }
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BytesConstant {
+    /// The bytes value as resolved by the parser (i.e., without quotes, or escape sequences, or
+    /// implicit concatenations).
+    pub value: Vec<u8>,
+    /// Whether the string contains multiple string tokens that were implicitly concatenated.
+    pub implicit_concatenated: bool,
+}
+
+impl Deref for BytesConstant {
+    type Target = [u8];
+    fn deref(&self) -> &Self::Target {
+        self.value.as_slice()
+    }
+}
+
 impl From<Vec<u8>> for Constant {
-    fn from(b: Vec<u8>) -> Constant {
-        Self::Bytes(b)
+    fn from(value: Vec<u8>) -> Constant {
+        Self::Bytes(BytesConstant {
+            value,
+            implicit_concatenated: false,
+        })
+    }
+}
+impl From<String> for Constant {
+    fn from(value: String) -> Constant {
+        Self::Str(StringConstant {
+            value,
+            implicit_concatenated: false,
+        })
     }
 }
 impl From<bool> for Constant {
-    fn from(b: bool) -> Constant {
-        Self::Bool(b)
-    }
-}
-impl From<BigInt> for Constant {
-    fn from(i: BigInt) -> Constant {
-        Self::Int(i)
+    fn from(value: bool) -> Constant {
+        Self::Bool(value)
     }
 }
 
@@ -2634,11 +2650,6 @@ impl Ranged for crate::nodes::StmtTry {
         self.range
     }
 }
-impl Ranged for crate::nodes::StmtTryStar {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
 impl Ranged for crate::nodes::StmtAssert {
     fn range(&self) -> TextRange {
         self.range
@@ -2707,7 +2718,6 @@ impl Ranged for crate::Stmt {
             Self::Match(node) => node.range(),
             Self::Raise(node) => node.range(),
             Self::Try(node) => node.range(),
-            Self::TryStar(node) => node.range(),
             Self::Assert(node) => node.range(),
             Self::Import(node) => node.range(),
             Self::ImportFrom(node) => node.range(),
@@ -3054,9 +3064,9 @@ mod size_assertions {
     assert_eq_size!(Stmt, [u8; 144]);
     assert_eq_size!(StmtFunctionDef, [u8; 144]);
     assert_eq_size!(StmtClassDef, [u8; 104]);
-    assert_eq_size!(StmtTry, [u8; 104]);
+    assert_eq_size!(StmtTry, [u8; 112]);
     assert_eq_size!(Expr, [u8; 80]);
-    assert_eq_size!(Constant, [u8; 32]);
+    assert_eq_size!(Constant, [u8; 40]);
     assert_eq_size!(Pattern, [u8; 96]);
     assert_eq_size!(Mod, [u8; 32]);
 }

@@ -22,6 +22,11 @@ impl FormatNodeRule<ExprName> for FormatExprName {
 
         write!(f, [source_text_slice(*range, ContainsNewlines::No)])
     }
+
+    fn fmt_dangling_comments(&self, _node: &ExprName, _f: &mut PyFormatter) -> FormatResult<()> {
+        // Node cannot have dangling comments
+        Ok(())
+    }
 }
 
 impl NeedsParentheses for ExprName {

@@ -457,7 +457,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                 implicit_return(checker, last_stmt);
             }
         }
-        Stmt::Return(_) | Stmt::Raise(_) | Stmt::Try(_) | Stmt::TryStar(_) => {}
+        Stmt::Return(_) | Stmt::Raise(_) | Stmt::Try(_) => {}
         Stmt::Expr(ast::StmtExpr { value, .. })
             if matches!(
                 value.as_ref(),

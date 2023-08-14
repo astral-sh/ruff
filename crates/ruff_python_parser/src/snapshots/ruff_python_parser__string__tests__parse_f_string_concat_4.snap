@@ -1,0 +1,63 @@
+---
+source: crates/ruff_python_parser/src/string.rs
+expression: parse_ast
+---
+[
+    Expr(
+        StmtExpr {
+            range: 0..31,
+            value: FString(
+                ExprFString {
+                    range: 0..31,
+                    values: [
+                        Constant(
+                            ExprConstant {
+                                range: 1..16,
+                                value: Str(
+                                    StringConstant {
+                                        value: "Hello world",
+                                        implicit_concatenated: true,
+                                    },
+                                ),
+                                kind: None,
+                            },
+                        ),
+                        FormattedValue(
+                            ExprFormattedValue {
+                                range: 16..21,
+                                value: Constant(
+                                    ExprConstant {
+                                        range: 17..20,
+                                        value: Str(
+                                            StringConstant {
+                                                value: "!",
+                                                implicit_concatenated: false,
+                                            },
+                                        ),
+                                        kind: None,
+                                    },
+                                ),
+                                debug_text: None,
+                                conversion: None,
+                                format_spec: None,
+                            },
+                        ),
+                        Constant(
+                            ExprConstant {
+                                range: 24..30,
+                                value: Str(
+                                    StringConstant {
+                                        value: "again!",
+                                        implicit_concatenated: true,
+                                    },
+                                ),
+                                kind: None,
+                            },
+                        ),
+                    ],
+                    implicit_concatenated: true,
+                },
+            ),
+        },
+    ),
+]

@@ -91,3 +91,5 @@ lambda *args, b, **kwds,: 0
 lambda *, b, **kwds,: 0
 lambda a, *args, b, **kwds,: 0
 lambda a, *, b, **kwds,: 0
+lambda a, /: a
+lambda a, /, c: a

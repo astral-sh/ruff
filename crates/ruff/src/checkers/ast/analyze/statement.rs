@@ -309,16 +309,16 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             ]) {
                 flake8_pytest_style::rules::marks(checker, decorator_list);
             }
-            if checker.enabled(Rule::BooleanPositionalArgInFunctionDefinition) {
-                flake8_boolean_trap::rules::check_positional_boolean_in_def(
+            if checker.enabled(Rule::BooleanTypeHintPositionalArgument) {
+                flake8_boolean_trap::rules::boolean_type_hint_positional_argument(
                     checker,
                     name,
                     decorator_list,
                     parameters,
                 );
             }
-            if checker.enabled(Rule::BooleanDefaultValueInFunctionDefinition) {
-                flake8_boolean_trap::rules::check_boolean_default_value_in_function_definition(
+            if checker.enabled(Rule::BooleanDefaultValuePositionalArgument) {
+                flake8_boolean_trap::rules::boolean_default_value_positional_argument(
                     checker,
                     name,
                     decorator_list,
@@ -1225,14 +1225,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             handlers,
             orelse,
             finalbody,
-            range: _,
-        })
-        | Stmt::TryStar(ast::StmtTryStar {
-            body,
-            handlers,
-            orelse,
-            finalbody,
-            range: _,
+            ..
         }) => {
             if checker.enabled(Rule::JumpStatementInFinally) {
                 flake8_bugbear::rules::jump_statement_in_finally(checker, finalbody);

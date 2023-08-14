@@ -23,6 +23,7 @@ pub struct Options {
     )]
     /// Enforce TC001, TC002, and TC003 rules even when valid runtime imports
     /// are present for the same module.
+    ///
     /// See flake8-type-checking's [strict](https://github.com/snok/flake8-type-checking#strict) option.
     pub strict: Option<bool>,
     #[option(
@@ -39,11 +40,19 @@ pub struct Options {
         default = "[]",
         value_type = "list[str]",
         example = r#"
-            runtime-evaluated-base-classes = ["pydantic.BaseModel"]
+            runtime-evaluated-base-classes = ["pydantic.BaseModel", "sqlalchemy.orm.DeclarativeBase"]
         "#
     )]
     /// Exempt classes that list any of the enumerated classes as a base class
     /// from needing to be moved into type-checking blocks.
+    ///
+    /// Common examples include Pydantic's `pydantic.BaseModel` and SQLAlchemy's
+    /// `sqlalchemy.orm.DeclarativeBase`, but can also support user-defined
+    /// classes that inherit from those base classes. For example, if you define
+    /// a common `DeclarativeBase` subclass that's used throughout your project
+    /// (e.g., `class Base(DeclarativeBase) ...` in `base.py`), you can add it to
+    /// this list (`runtime-evaluated-base-classes = ["base.Base"]`) to exempt
+    /// models from being moved into type-checking blocks.
     pub runtime_evaluated_base_classes: Option<Vec<String>>,
     #[option(
         default = "[]",

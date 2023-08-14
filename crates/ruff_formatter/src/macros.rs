@@ -1,9 +1,9 @@
 /// Constructs the parameters for other formatting macros.
 ///
-/// This macro functions by taking a list of objects implementing [crate::Format]. It canonicalize the
+/// This macro functions by taking a list of objects implementing [`crate::Format`]. It canonicalize the
 /// arguments into a single type.
 ///
-/// This macro produces a value of type [crate::Arguments]. This value can be passed to
+/// This macro produces a value of type [`crate::Arguments`]. This value can be passed to
 /// the macros within [crate]. All other formatting macros ([`format!`](crate::format!),
 /// [`write!`](crate::write!)) are proxied through this one. This macro avoids heap allocations.
 ///
@@ -41,7 +41,7 @@ macro_rules! format_args {
 ///
 /// This macro accepts a 'buffer' and a list of format arguments. Each argument will be formatted
 /// and the result will be passed to the buffer. The writer may be any value with a `write_fmt` method;
-/// generally this comes from an implementation of the [crate::Buffer] trait.
+/// generally this comes from an implementation of the [`crate::Buffer`] trait.
 ///
 /// # Examples
 ///
@@ -116,8 +116,8 @@ macro_rules! dbg_write {
 
 /// Creates the Format IR for a value.
 ///
-/// The first argument `format!` receives is the [crate::FormatContext] that specify how elements must be formatted.
-/// Additional parameters passed get formatted by using their [crate::Format] implementation.
+/// The first argument `format!` receives is the [`crate::FormatContext`] that specify how elements must be formatted.
+/// Additional parameters passed get formatted by using their [`crate::Format`] implementation.
 ///
 ///
 /// ## Examples
@@ -314,13 +314,13 @@ macro_rules! format {
 /// ## Behavior
 /// This IR is similar to Prettier's `conditionalGroup`. The printer measures each variant, except the [`MostExpanded`], in [`Flat`] mode
 /// to find the first variant that fits and prints this variant in [`Flat`] mode. If no variant fits, then
-/// the printer falls back to printing the [`MostExpanded`] variant in `[`Expanded`] mode.
+/// the printer falls back to printing the [`MostExpanded`] variant in [`Expanded`] mode.
 ///
 /// The definition of *fits* differs to groups in that the printer only tests if it is possible to print
 /// the content up to the first non-soft line break without exceeding the configured print width.
 /// This definition differs from groups as that non-soft line breaks make group expand.
 ///
-/// [crate::BestFitting] acts as a "break" boundary, meaning that it is considered to fit
+/// [`crate::BestFitting`] acts as a "break" boundary, meaning that it is considered to fit
 ///
 ///
 /// [`Flat`]: crate::format_element::PrintMode::Flat
@@ -329,6 +329,7 @@ macro_rules! format {
 #[macro_export]
 macro_rules! best_fitting {
     ($least_expanded:expr, $($tail:expr),+ $(,)?) => {{
+        #[allow(unsafe_code)]
         unsafe {
             $crate::BestFitting::from_arguments_unchecked($crate::format_args!($least_expanded, $($tail),+))
         }

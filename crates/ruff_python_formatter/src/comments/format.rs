@@ -281,11 +281,11 @@ impl Format<PyFormatContext<'_>> for FormatDanglingOpenParenthesisComments<'_> {
 ///
 /// * Adds a whitespace between `#` and the comment text except if the first character is a `#`, `:`, `'`, or `!`
 /// * Replaces non breaking whitespaces with regular whitespaces except if in front of a `types:` comment
-const fn format_comment(comment: &SourceComment) -> FormatComment {
+pub(crate) const fn format_comment(comment: &SourceComment) -> FormatComment {
     FormatComment { comment }
 }
 
-struct FormatComment<'a> {
+pub(crate) struct FormatComment<'a> {
     comment: &'a SourceComment,
 }
 
@@ -343,12 +343,12 @@ impl Format<PyFormatContext<'_>> for FormatComment<'_> {
 // Top level: Up to two empty lines
 // parenthesized: A single empty line
 // other: Up to a single empty line
-const fn empty_lines(lines: u32) -> FormatEmptyLines {
+pub(crate) const fn empty_lines(lines: u32) -> FormatEmptyLines {
     FormatEmptyLines { lines }
 }
 
 #[derive(Copy, Clone, Debug)]
-struct FormatEmptyLines {
+pub(crate) struct FormatEmptyLines {
     lines: u32,
 }
 

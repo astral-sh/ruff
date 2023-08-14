@@ -20,17 +20,25 @@ use crate::rules::isort::{categorize, ImportSection, ImportType};
 ///
 /// ## Why is this bad?
 /// Unused imports add a performance overhead at runtime, and risk creating
-/// import cycles.
+/// import cycles. If an import is _only_ used in typing-only contexts, it can
+/// instead be imported conditionally under an `if TYPE_CHECKING:` block to
+/// minimize runtime overhead.
+///
+/// If a class _requires_ that type annotations be available at runtime (as is
+/// the case for Pydantic, SQLAlchemy, and other libraries), consider using
+/// the [`flake8-type-checking.runtime-evaluated-base-classes`] and
+/// [`flake8-type-checking.runtime-evaluated-decorators`] settings to mark them
+/// as such.
 ///
 /// ## Example
 /// ```python
 /// from __future__ import annotations
 ///
-/// import A
+/// import local_module
 ///
 ///
-/// def foo(a: A) -> int:
-///     return len(a)
+/// def func(sized: local_module.Container) -> int:
+///     return len(sized)
 /// ```
 ///
 /// Use instead:
@@ -40,12 +48,16 @@ use crate::rules::isort::{categorize, ImportSection, ImportType};
 /// from typing import TYPE_CHECKING
 ///
 /// if TYPE_CHECKING:
-///     import A
+///     import local_module
 ///
 ///
-/// def foo(a: A) -> int:
-///     return len(a)
+/// def func(sized: local_module.Container) -> int:
+///     return len(sized)
 /// ```
+///
+/// ## Options
+/// - `flake8-type-checking.runtime-evaluated-base-classes`
+/// - `flake8-type-checking.runtime-evaluated-decorators`
 ///
 /// ## References
 /// - [PEP 536](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
@@ -76,7 +88,15 @@ impl Violation for TypingOnlyFirstPartyImport {
 ///
 /// ## Why is this bad?
 /// Unused imports add a performance overhead at runtime, and risk creating
-/// import cycles.
+/// import cycles. If an import is _only_ used in typing-only contexts, it can
+/// instead be imported conditionally under an `if TYPE_CHECKING:` block to
+/// minimize runtime overhead.
+///
+/// If a class _requires_ that type annotations be available at runtime (as is
+/// the case for Pydantic, SQLAlchemy, and other libraries), consider using
+/// the [`flake8-type-checking.runtime-evaluated-base-classes`] and
+/// [`flake8-type-checking.runtime-evaluated-decorators`] settings to mark them
+/// as such.
 ///
 /// ## Example
 /// ```python
@@ -85,7 +105,7 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// import pandas as pd
 ///
 ///
-/// def foo(df: pd.DataFrame) -> int:
+/// def func(df: pd.DataFrame) -> int:
 ///     return len(df)
 /// ```
 ///
@@ -99,9 +119,13 @@ impl Violation for TypingOnlyFirstPartyImport {
 ///     import pandas as pd
 ///
 ///
-/// def foo(df: pd.DataFrame) -> int:
+/// def func(df: pd.DataFrame) -> int:
 ///     return len(df)
 /// ```
+///
+/// ## Options
+/// - `flake8-type-checking.runtime-evaluated-base-classes`
+/// - `flake8-type-checking.runtime-evaluated-decorators`
 ///
 /// ## References
 /// - [PEP 536](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
@@ -132,7 +156,15 @@ impl Violation for TypingOnlyThirdPartyImport {
 ///
 /// ## Why is this bad?
 /// Unused imports add a performance overhead at runtime, and risk creating
-/// import cycles.
+/// import cycles. If an import is _only_ used in typing-only contexts, it can
+/// instead be imported conditionally under an `if TYPE_CHECKING:` block to
+/// minimize runtime overhead.
+///
+/// If a class _requires_ that type annotations be available at runtime (as is
+/// the case for Pydantic, SQLAlchemy, and other libraries), consider using
+/// the [`flake8-type-checking.runtime-evaluated-base-classes`] and
+/// [`flake8-type-checking.runtime-evaluated-decorators`] settings to mark them
+/// as such.
 ///
 /// ## Example
 /// ```python
@@ -141,7 +173,7 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// from pathlib import Path
 ///
 ///
-/// def foo(path: Path) -> str:
+/// def func(path: Path) -> str:
 ///     return str(path)
 /// ```
 ///
@@ -155,9 +187,13 @@ impl Violation for TypingOnlyThirdPartyImport {
 ///     from pathlib import Path
 ///
 ///
-/// def foo(path: Path) -> str:
+/// def func(path: Path) -> str:
 ///     return str(path)
 /// ```
+///
+/// ## Options
+/// - `flake8-type-checking.runtime-evaluated-base-classes`
+/// - `flake8-type-checking.runtime-evaluated-decorators`
 ///
 /// ## References
 /// - [PEP 536](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)

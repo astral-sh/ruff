@@ -187,7 +187,10 @@ fn is_valid_dict(
             return true;
         };
         if let Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(mapping_key),
+            value:
+                Constant::Str(ast::StringConstant {
+                    value: mapping_key, ..
+                }),
             ..
         }) = key
         {

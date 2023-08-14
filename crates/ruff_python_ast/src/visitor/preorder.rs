@@ -192,7 +192,6 @@ where
             Stmt::Match(stmt) => stmt.visit_preorder(visitor),
             Stmt::Raise(stmt) => stmt.visit_preorder(visitor),
             Stmt::Try(stmt) => stmt.visit_preorder(visitor),
-            Stmt::TryStar(stmt) => stmt.visit_preorder(visitor),
             Stmt::Assert(stmt) => stmt.visit_preorder(visitor),
             Stmt::Import(stmt) => stmt.visit_preorder(visitor),
             Stmt::ImportFrom(stmt) => stmt.visit_preorder(visitor),

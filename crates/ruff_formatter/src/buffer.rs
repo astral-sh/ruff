@@ -7,15 +7,15 @@ use std::any::{Any, TypeId};
 use std::fmt::Debug;
 use std::ops::{Deref, DerefMut};
 
-/// A trait for writing or formatting into [FormatElement]-accepting buffers or streams.
+/// A trait for writing or formatting into [`FormatElement`]-accepting buffers or streams.
 pub trait Buffer {
     /// The context used during formatting
     type Context;
 
-    /// Writes a [crate::FormatElement] into this buffer, returning whether the write succeeded.
+    /// Writes a [`crate::FormatElement`] into this buffer, returning whether the write succeeded.
     ///
     /// # Errors
-    /// This function will return an instance of [crate::FormatError] on error.
+    /// This function will return an instance of [`crate::FormatError`] on error.
     ///
     /// # Examples
     ///
@@ -122,7 +122,7 @@ impl BufferSnapshot {
                 Err(err) => {
                     panic!(
                         "Tried to unwrap snapshot of type {:?} as {:?}",
-                        err.type_id(),
+                        (*err).type_id(),
                         TypeId::of::<T>()
                     )
                 }
@@ -160,7 +160,7 @@ impl<W: Buffer<Context = Context> + ?Sized, Context> Buffer for &mut W {
     }
 
     fn restore_snapshot(&mut self, snapshot: BufferSnapshot) {
-        (**self).restore_snapshot(snapshot)
+        (**self).restore_snapshot(snapshot);
     }
 }
 
@@ -426,7 +426,7 @@ where
     }
 
     fn restore_snapshot(&mut self, snapshot: BufferSnapshot) {
-        self.inner.restore_snapshot(snapshot)
+        self.inner.restore_snapshot(snapshot);
     }
 }
 
@@ -508,59 +508,58 @@ fn clean_interned(
     interned: &Interned,
     interned_cache: &mut FxHashMap<Interned, Interned>,
 ) -> Interned {
-    match interned_cache.get(interned) {
-        Some(cleaned) => cleaned.clone(),
-        None => {
-            // Find the first soft line break element or interned element that must be changed
-            let result = interned
-                .iter()
-                .enumerate()
-                .find_map(|(index, element)| match element {
-                    FormatElement::Line(LineMode::Soft | LineMode::SoftOrSpace) => {
-                        let mut cleaned = Vec::new();
-                        cleaned.extend_from_slice(&interned[..index]);
-                        Some((cleaned, &interned[index..]))
-                    }
-                    FormatElement::Interned(inner) => {
-                        let cleaned_inner = clean_interned(inner, interned_cache);
-
-                        if &cleaned_inner != inner {
-                            let mut cleaned = Vec::with_capacity(interned.len());
-                            cleaned.extend_from_slice(&interned[..index]);
-                            cleaned.push(FormatElement::Interned(cleaned_inner));
-                            Some((cleaned, &interned[index + 1..]))
-                        } else {
-                            None
-                        }
-                    }
-
-                    _ => None,
-                });
-
-            let result = match result {
-                // Copy the whole interned buffer so that becomes possible to change the necessary elements.
-                Some((mut cleaned, rest)) => {
-                    for element in rest {
-                        let element = match element {
-                            FormatElement::Line(LineMode::Soft) => continue,
-                            FormatElement::Line(LineMode::SoftOrSpace) => FormatElement::Space,
-                            FormatElement::Interned(interned) => {
-                                FormatElement::Interned(clean_interned(interned, interned_cache))
-                            }
-                            element => element.clone(),
-                        };
-                        cleaned.push(element)
-                    }
-
-                    Interned::new(cleaned)
+    if let Some(cleaned) = interned_cache.get(interned) {
+        cleaned.clone()
+    } else {
+        // Find the first soft line break element or interned element that must be changed
+        let result = interned
+            .iter()
+            .enumerate()
+            .find_map(|(index, element)| match element {
+                FormatElement::Line(LineMode::Soft | LineMode::SoftOrSpace) => {
+                    let mut cleaned = Vec::new();
+                    cleaned.extend_from_slice(&interned[..index]);
+                    Some((cleaned, &interned[index..]))
                 }
-                // No change necessary, return existing interned element
-                None => interned.clone(),
-            };
+                FormatElement::Interned(inner) => {
+                    let cleaned_inner = clean_interned(inner, interned_cache);
 
-            interned_cache.insert(interned.clone(), result.clone());
-            result
-        }
+                    if &cleaned_inner == inner {
+                        None
+                    } else {
+                        let mut cleaned = Vec::with_capacity(interned.len());
+                        cleaned.extend_from_slice(&interned[..index]);
+                        cleaned.push(FormatElement::Interned(cleaned_inner));
+                        Some((cleaned, &interned[index + 1..]))
+                    }
+                }
+
+                _ => None,
+            });
+
+        let result = match result {
+            // Copy the whole interned buffer so that becomes possible to change the necessary elements.
+            Some((mut cleaned, rest)) => {
+                for element in rest {
+                    let element = match element {
+                        FormatElement::Line(LineMode::Soft) => continue,
+                        FormatElement::Line(LineMode::SoftOrSpace) => FormatElement::Space,
+                        FormatElement::Interned(interned) => {
+                            FormatElement::Interned(clean_interned(interned, interned_cache))
+                        }
+                        element => element.clone(),
+                    };
+                    cleaned.push(element);
+                }
+
+                Interned::new(cleaned)
+            }
+            // No change necessary, return existing interned element
+            None => interned.clone(),
+        };
+
+        interned_cache.insert(interned.clone(), result.clone());
+        result
     }
 }
 
@@ -597,7 +596,7 @@ impl<Context> Buffer for RemoveSoftLinesBuffer<'_, Context> {
     }
 
     fn restore_snapshot(&mut self, snapshot: BufferSnapshot) {
-        self.inner.restore_snapshot(snapshot)
+        self.inner.restore_snapshot(snapshot);
     }
 }
 
@@ -658,7 +657,7 @@ pub trait BufferExtensions: Buffer + Sized {
     where
         I: IntoIterator<Item = FormatElement>,
     {
-        for element in elements.into_iter() {
+        for element in elements {
             self.write_element(element)?;
         }
 
@@ -685,12 +684,12 @@ where
         }
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn write_fmt(&mut self, arguments: Arguments<B::Context>) -> FormatResult<()> {
         self.buffer.write_fmt(arguments)
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn write_element(&mut self, element: FormatElement) -> FormatResult<()> {
         self.buffer.write_element(element)
     }
