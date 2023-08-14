@@ -69,6 +69,11 @@ impl FormatNodeRule<ExprCompare> for FormatExprCompare {
 
         in_parentheses_only_group(&inner).fmt(f)
     }
+
+    fn fmt_dangling_comments(&self, _node: &ExprCompare, _f: &mut PyFormatter) -> FormatResult<()> {
+        // Node can not have dangling comments
+        Ok(())
+    }
 }
 
 impl NeedsParentheses for ExprCompare {
