@@ -352,9 +352,11 @@ fn to_pytest_raises_args(
 ) -> Result<String> {
     let args = match attr {
         "assertRaises" | "failUnlessRaises" => match (args, keywords) {
+            // assertRaises(Exception)
             ([arg], []) => {
                 format!("({})", checker.locator().slice(arg.range()))
             }
+            // assertRaises(expected_exception=Exception)
             ([], [kwarg])
                 if kwarg
                     .arg
@@ -366,6 +368,7 @@ fn to_pytest_raises_args(
             _ => bail!("Unable to fix"),
         },
         "assertRaisesRegex" | "assertRaisesRegexp" => match (args, keywords) {
+            // assertRaisesRegex(Exception, regex)
             ([arg1, arg2], []) => {
                 format!(
                     "({}, match={})",
@@ -373,6 +376,7 @@ fn to_pytest_raises_args(
                     checker.locator().slice(arg2.range())
                 )
             }
+            // assertRaisesRegex(Exception, expected_regex=regex)
             ([arg], [kwarg])
                 if kwarg
                     .arg
@@ -385,6 +389,7 @@ fn to_pytest_raises_args(
                     checker.locator().slice(kwarg.value.range())
                 )
             }
+            // assertRaisesRegex(expected_exception=Exception, expected_regex=regex)
             ([], [kwarg1, kwarg2])
                 if kwarg1
                     .arg
@@ -401,6 +406,7 @@ fn to_pytest_raises_args(
                     checker.locator().slice(kwarg2.value.range())
                 )
             }
+            // assertRaisesRegex(expected_regex=regex, expected_exception=Exception)
             ([], [kwarg1, kwarg2])
                 if kwarg1
                     .arg
