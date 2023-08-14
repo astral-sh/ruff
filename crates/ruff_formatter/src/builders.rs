@@ -8,6 +8,7 @@ use ruff_text_size::TextRange;
 use std::cell::Cell;
 use std::marker::PhantomData;
 use std::num::NonZeroU8;
+#[allow(clippy::enum_glob_use)]
 use Tag::*;
 
 /// A line break that only gets printed if the enclosing `Group` doesn't fit on a single line.
@@ -34,7 +35,7 @@ use Tag::*;
 /// # Ok(())
 /// # }
 /// ```
-/// See [soft_line_break_or_space] if you want to insert a space between the elements if the enclosing
+/// See [`soft_line_break_or_space`] if you want to insert a space between the elements if the enclosing
 /// `Group` fits on a single line.
 ///
 /// Soft line breaks are emitted if the enclosing `Group` doesn't fit on a single line
@@ -217,7 +218,7 @@ impl std::fmt::Debug for Line {
 ///
 /// # Line feeds
 /// Tokens may contain line breaks but they must use the line feeds (`\n`).
-/// The [crate::Printer] converts the line feed characters to the character specified in the [crate::PrinterOptions].
+/// The [`crate::Printer`] converts the line feed characters to the character specified in the [`crate::PrinterOptions`].
 ///
 /// # Examples
 ///
@@ -520,7 +521,7 @@ impl<Context> Format<Context> for LineSuffixBoundary {
 ///
 /// This does not directly influence how this content will be printed, but some
 /// parts of the formatter may inspect the [labelled element](Tag::StartLabelled)
-/// using [FormatElements::has_label].
+/// using [`FormatElements::has_label`].
 ///
 /// ## Examples
 ///
@@ -648,7 +649,7 @@ impl<Context> Format<Context> for Space {
 /// the line breaks have to be manually added.
 ///
 /// This helper should be used only in rare cases, instead you should rely more on
-/// [block_indent] and [soft_block_indent]
+/// [`block_indent`] and [`soft_block_indent`]
 ///
 /// # Examples
 ///
@@ -970,7 +971,7 @@ impl<Context> std::fmt::Debug for Align<'_, Context> {
 /// Block indents indent a block of code, such as in a function body, and therefore insert a line
 /// break before and after the content.
 ///
-/// Doesn't create an indention if the passed in content is [FormatElement.is_empty].
+/// Doesn't create an indention if the passed in content is [`FormatElement.is_empty`].
 ///
 /// # Examples
 ///
@@ -1176,7 +1177,7 @@ impl<Context> Format<Context> for BlockIndent<'_, Context> {
             IndentMode::Soft => write!(f, [soft_line_break()])?,
             IndentMode::Block => write!(f, [hard_line_break()])?,
             IndentMode::SoftLineOrSpace | IndentMode::SoftSpace => {
-                write!(f, [soft_line_break_or_space()])?
+                write!(f, [soft_line_break_or_space()])?;
             }
         }
 
@@ -1374,17 +1375,19 @@ pub struct Group<'a, Context> {
 }
 
 impl<Context> Group<'_, Context> {
+    #[must_use]
     pub fn with_group_id(mut self, group_id: Option<GroupId>) -> Self {
         self.group_id = group_id;
         self
     }
 
-    /// Changes the [PrintMode] of the group from [`Flat`](PrintMode::Flat) to [`Expanded`](PrintMode::Expanded).
+    /// Changes the [`PrintMode`] of the group from [`Flat`](PrintMode::Flat) to [`Expanded`](PrintMode::Expanded).
     /// The result is that any soft-line break gets printed as a regular line break.
     ///
-    /// This is useful for content rendered inside of a [FormatElement::BestFitting] that prints each variant
-    /// in [PrintMode::Flat] to change some content to be printed in [`Expanded`](PrintMode::Expanded) regardless.
+    /// This is useful for content rendered inside of a [`FormatElement::BestFitting`] that prints each variant
+    /// in [`PrintMode::Flat`] to change some content to be printed in [`Expanded`](PrintMode::Expanded) regardless.
     /// See the documentation of the [`best_fitting`] macro for an example.
+    #[must_use]
     pub fn should_expand(mut self, should_expand: bool) -> Self {
         self.should_expand = should_expand;
         self
@@ -1393,9 +1396,10 @@ impl<Context> Group<'_, Context> {
 
 impl<Context> Format<Context> for Group<'_, Context> {
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
-        let mode = match self.should_expand {
-            true => GroupMode::Expand,
-            false => GroupMode::Flat,
+        let mode = if self.should_expand {
+            GroupMode::Expand
+        } else {
+            GroupMode::Flat
         };
 
         f.write_element(FormatElement::Tag(StartGroup(
@@ -1602,7 +1606,7 @@ impl<Context> Format<Context> for ExpandParent {
 ///
 /// The element has no special meaning if used outside of a `Group`. In that case, the content is always emitted.
 ///
-/// If you're looking for a way to only print something if the `Group` fits on a single line see [self::if_group_fits_on_line].
+/// If you're looking for a way to only print something if the `Group` fits on a single line see [`self::if_group_fits_on_line`].
 ///
 /// # Examples
 ///
@@ -1684,7 +1688,7 @@ where
 /// Adds a conditional content specific for `Group`s that fit on a single line. The content isn't
 /// emitted for `Group`s spanning multiple lines.
 ///
-/// See [if_group_breaks] if you're looking for a way to print content only for groups spanning multiple lines.
+/// See [`if_group_breaks`] if you're looking for a way to print content only for groups spanning multiple lines.
 ///
 /// # Examples
 ///
@@ -1823,6 +1827,7 @@ impl<Context> IfGroupBreaks<'_, Context> {
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn with_group_id(mut self, group_id: Option<GroupId>) -> Self {
         self.group_id = group_id;
         self
@@ -1855,7 +1860,7 @@ impl<Context> std::fmt::Debug for IfGroupBreaks<'_, Context> {
 
 /// Increases the indent level by one if the group with the specified id breaks.
 ///
-/// This IR has the same semantics as using [if_group_breaks] and [if_group_fits_on_line] together.
+/// This IR has the same semantics as using [`if_group_breaks`] and [`if_group_fits_on_line`] together.
 ///
 /// ```
 /// # use ruff_formatter::prelude::*;
@@ -1874,7 +1879,7 @@ impl<Context> std::fmt::Debug for IfGroupBreaks<'_, Context> {
 ///
 /// If you want to indent some content if the enclosing group breaks, use [`indent`].
 ///
-/// Use [if_group_breaks] or [if_group_fits_on_line] if the fitting and breaking content differs more than just the
+/// Use [`if_group_breaks`] or [`if_group_fits_on_line`] if the fitting and breaking content differs more than just the
 /// indention level.
 ///
 /// # Examples
@@ -1972,7 +1977,7 @@ impl<Context> std::fmt::Debug for IndentIfGroupBreaks<'_, Context> {
 
 /// Changes the definition of *fits* for `content`. Instead of measuring it in *flat*, measure it with
 /// all line breaks expanded and test if no line exceeds the line width. The [`FitsExpanded`] acts
-/// as a expands boundary similar to best fitting, meaning that a [hard_line_break] will not cause the parent group to expand.
+/// as a expands boundary similar to best fitting, meaning that a [`hard_line_break`] will not cause the parent group to expand.
 ///
 /// Useful in conjunction with a group with a condition.
 ///
@@ -2034,6 +2039,7 @@ pub struct FitsExpanded<'a, Context> {
 impl<Context> FitsExpanded<'_, Context> {
     /// Sets a `condition` to when the content should fit in expanded mode. The content uses the regular fits
     /// definition if the `condition` is not met.
+    #[must_use]
     pub fn with_condition(mut self, condition: Option<Condition>) -> Self {
         self.condition = condition;
         self
@@ -2061,7 +2067,7 @@ impl<Context, T> Format<Context> for FormatWith<Context, T>
 where
     T: Fn(&mut Formatter<Context>) -> FormatResult<()>,
 {
-    #[inline(always)]
+    #[inline]
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         (self.formatter)(f)
     }
@@ -2207,7 +2213,7 @@ impl<T, Context> Format<Context> for FormatOnce<T, Context>
 where
     T: FnOnce(&mut Formatter<Context>) -> FormatResult<()>,
 {
-    #[inline(always)]
+    #[inline]
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         let formatter = self.formatter.take().expect("Tried to format a `format_once` at least twice. This is not allowed. You may want to use `format_with` or `format.memoized` instead.");
 
@@ -2222,7 +2228,7 @@ impl<T, Context> std::fmt::Debug for FormatOnce<T, Context> {
 }
 
 /// Builder to join together a sequence of content.
-/// See [Formatter::join]
+/// See [`Formatter::join`]
 #[must_use = "must eventually call `finish()` on Format builders"]
 pub struct JoinBuilder<'fmt, 'buf, Separator, Context> {
     result: FormatResult<()>,
@@ -2367,7 +2373,9 @@ impl<'a, Context> BestFitting<'a, Context> {
     /// You're looking for a way to create a `BestFitting` object, use the `best_fitting![least_expanded, most_expanded]` macro.
     ///
     /// ## Safety
+
     /// The slice must contain at least two variants.
+    #[allow(unsafe_code)]
     pub unsafe fn from_arguments_unchecked(variants: Arguments<'a, Context>) -> Self {
         assert!(
             variants.0.len() >= 2,
@@ -2395,6 +2403,7 @@ impl<Context> Format<Context> for BestFitting<'_, Context> {
 
         // SAFETY: The constructor guarantees that there are always at least two variants. It's, therefore,
         // safe to call into the unsafe `from_vec_unchecked` function
+        #[allow(unsafe_code)]
         let element = unsafe {
             FormatElement::BestFitting {
                 variants: format_element::BestFittingVariants::from_vec_unchecked(

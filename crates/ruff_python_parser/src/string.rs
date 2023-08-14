@@ -387,7 +387,7 @@ impl<'a> StringParser<'a> {
                 '{' => {
                     if !constant_piece.is_empty() {
                         spec_constructor.push(Expr::from(ast::ExprConstant {
-                            value: constant_piece.drain(..).collect::<String>().into(),
+                            value: std::mem::take(&mut constant_piece).into(),
                             kind: None,
                             range: self.range(start_location),
                         }));
@@ -408,7 +408,7 @@ impl<'a> StringParser<'a> {
         }
         if !constant_piece.is_empty() {
             spec_constructor.push(Expr::from(ast::ExprConstant {
-                value: constant_piece.drain(..).collect::<String>().into(),
+                value: std::mem::take(&mut constant_piece).into(),
                 kind: None,
                 range: self.range(start_location),
             }));
@@ -446,7 +446,7 @@ impl<'a> StringParser<'a> {
                     }
                     if !content.is_empty() {
                         values.push(Expr::from(ast::ExprConstant {
-                            value: content.drain(..).collect::<String>().into(),
+                            value: std::mem::take(&mut content).into(),
                             kind: None,
                             range: self.range(start_location),
                         }));
@@ -1003,7 +1003,7 @@ mod tests {
     #[test]
     fn test_escape_char_in_byte_literal() {
         // backslash does not escape
-        let source = r##"b"omkmok\Xaa""##; // spell-checker:ignore omkmok
+        let source = r#"b"omkmok\Xaa""#; // spell-checker:ignore omkmok
         let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
@@ -1024,7 +1024,7 @@ mod tests {
 
     #[test]
     fn test_escape_octet() {
-        let source = r##"b'\43a\4\1234'"##;
+        let source = r"b'\43a\4\1234'";
         let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }

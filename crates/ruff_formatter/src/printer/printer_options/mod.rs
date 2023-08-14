@@ -1,6 +1,6 @@
 use crate::{FormatOptions, IndentStyle, LineWidth};
 
-/// Options that affect how the [crate::Printer] prints the format tokens
+/// Options that affect how the [`crate::Printer`] prints the format tokens
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PrinterOptions {
     /// Width of a single tab character (does it equal 2, 4, ... spaces?)
@@ -33,7 +33,7 @@ impl Default for PrintWidth {
 
 impl From<LineWidth> for PrintWidth {
     fn from(width: LineWidth) -> Self {
-        Self(u16::from(width) as u32)
+        Self(u32::from(u16::from(width)))
     }
 }
 
@@ -61,11 +61,13 @@ where
 }
 
 impl PrinterOptions {
+    #[must_use]
     pub fn with_print_width(mut self, width: PrintWidth) -> Self {
         self.print_width = width;
         self
     }
 
+    #[must_use]
     pub fn with_indent(mut self, style: IndentStyle) -> Self {
         self.indent_style = style;
 
@@ -114,7 +116,7 @@ impl Default for PrinterOptions {
         PrinterOptions {
             tab_width: 2,
             print_width: PrintWidth::default(),
-            indent_style: Default::default(),
+            indent_style: IndentStyle::default(),
             line_ending: LineEnding::LineFeed,
         }
     }

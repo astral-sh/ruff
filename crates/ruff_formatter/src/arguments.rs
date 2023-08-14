@@ -3,8 +3,8 @@ use crate::FormatResult;
 use std::ffi::c_void;
 use std::marker::PhantomData;
 
-/// Mono-morphed type to format an object. Used by the [crate::format!], [crate::format_args!], and
-/// [crate::write!] macros.
+/// Mono-morphed type to format an object. Used by the [`crate::format`!], [`crate::format_args`!], and
+/// [`crate::write`!] macros.
 ///
 /// This struct is similar to a dynamic dispatch (using `dyn Format`) because it stores a pointer to the value.
 /// However, it doesn't store the pointer to `dyn Format`'s vtable, instead it statically resolves the function
@@ -33,23 +33,26 @@ impl<'fmt, Context> Argument<'fmt, Context> {
     #[doc(hidden)]
     #[inline]
     pub fn new<F: Format<Context>>(value: &'fmt F) -> Self {
+        #[allow(clippy::inline_always)]
         #[inline(always)]
         fn formatter<F: Format<Context>, Context>(
             ptr: *const c_void,
             fmt: &mut Formatter<Context>,
         ) -> FormatResult<()> {
             // SAFETY: Safe because the 'fmt lifetime is captured by the 'lifetime' field.
-            F::fmt(unsafe { &*(ptr as *const F) }, fmt)
+            #[allow(unsafe_code)]
+            F::fmt(unsafe { &*ptr.cast::<F>() }, fmt)
         }
 
         Self {
-            value: value as *const F as *const c_void,
+            value: (value as *const F).cast::<std::ffi::c_void>(),
             lifetime: PhantomData,
             formatter: formatter::<F, Context>,
         }
     }
 
     /// Formats the value stored by this argument using the given formatter.
+    #[allow(clippy::inline_always)]
     #[inline(always)]
     pub(super) fn format(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         (self.formatter)(self.value, f)
@@ -79,6 +82,7 @@ impl<'fmt, Context> Argument<'fmt, Context> {
 pub struct Arguments<'fmt, Context>(pub &'fmt [Argument<'fmt, Context>]);
 
 impl<'fmt, Context> Arguments<'fmt, Context> {
+    #[allow(clippy::inline_always)]
     #[doc(hidden)]
     #[inline(always)]
     pub fn new(arguments: &'fmt [Argument<'fmt, Context>]) -> Self {
@@ -87,6 +91,7 @@ impl<'fmt, Context> Arguments<'fmt, Context> {
 
     /// Returns the arguments
     #[inline]
+    #[allow(clippy::trivially_copy_pass_by_ref)] // Bug in Clippy? Sizeof Arguments is 16
     pub(super) fn items(&self) -> &'fmt [Argument<'fmt, Context>] {
         self.0
     }
@@ -101,6 +106,7 @@ impl<Context> Clone for Arguments<'_, Context> {
 }
 
 impl<Context> Format<Context> for Arguments<'_, Context> {
+    #[allow(clippy::inline_always)]
     #[inline(always)]
     fn fmt(&self, formatter: &mut Formatter<Context>) -> FormatResult<()> {
         formatter.write_fmt(*self)

@@ -20,10 +20,10 @@ pub(super) struct StackFrame {
 
 /// Stores arguments passed to `print_element` call, holding the state specific to printing an element.
 /// E.g. the `indent` depends on the token the Printer's currently processing. That's why
-/// it must be stored outside of the [PrinterState] that stores the state common to all elements.
+/// it must be stored outside of the [`PrinterState`] that stores the state common to all elements.
 ///
 /// The state is passed by value, which is why it's important that it isn't storing any heavy
-/// data structures. Such structures should be stored on the [PrinterState] instead.
+/// data structures. Such structures should be stored on the [`PrinterState`] instead.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub(super) struct PrintElementArgs {
     indent: Indention,
@@ -39,15 +39,15 @@ impl PrintElementArgs {
         }
     }
 
-    pub(super) fn mode(&self) -> PrintMode {
+    pub(super) fn mode(self) -> PrintMode {
         self.mode
     }
 
-    pub(super) fn measure_mode(&self) -> MeasureMode {
+    pub(super) fn measure_mode(self) -> MeasureMode {
         self.measure_mode
     }
 
-    pub(super) fn indention(&self) -> Indention {
+    pub(super) fn indention(self) -> Indention {
         self.indent
     }
 
@@ -92,9 +92,9 @@ impl Default for PrintElementArgs {
     }
 }
 
-/// Call stack that stores the [PrintElementCallArgs].
+/// Call stack that stores the [`PrintElementCallArgs`].
 ///
-/// New [PrintElementCallArgs] are pushed onto the stack for every [`start`](Tag::is_start) [`Tag`](FormatElement::Tag)
+/// New [`PrintElementCallArgs`] are pushed onto the stack for every [`start`](Tag::is_start) [`Tag`](FormatElement::Tag)
 /// and popped when reaching the corresponding [`end`](Tag::is_end) [`Tag`](FormatElement::Tag).
 pub(super) trait CallStack {
     type Stack: Stack<StackFrame> + Debug;
@@ -158,7 +158,7 @@ pub(super) trait CallStack {
         }
     }
 
-    /// Returns the [PrintElementArgs] for the current stack frame.
+    /// Returns the [`PrintElementArgs`] for the current stack frame.
     fn top(&self) -> PrintElementArgs {
         self.stack()
             .top()
@@ -166,7 +166,7 @@ pub(super) trait CallStack {
             .args
     }
 
-    /// Returns the [TagKind] of the current stack frame or [None] if this is the root stack frame.
+    /// Returns the [`TagKind`] of the current stack frame or [None] if this is the root stack frame.
     fn top_kind(&self) -> Option<TagKind> {
         match self
             .stack()
@@ -179,16 +179,16 @@ pub(super) trait CallStack {
         }
     }
 
-    /// Creates a new stack frame for a [FormatElement::Tag] of `kind` with `args` as the call arguments.
+    /// Creates a new stack frame for a [`FormatElement::Tag`] of `kind` with `args` as the call arguments.
     fn push(&mut self, kind: TagKind, args: PrintElementArgs) {
         self.stack_mut().push(StackFrame {
             kind: StackFrameKind::Tag(kind),
             args,
-        })
+        });
     }
 }
 
-/// Call stack used for printing the [FormatElement]s
+/// Call stack used for printing the [`FormatElement`]s
 #[derive(Debug, Clone)]
 pub(super) struct PrintCallStack(Vec<StackFrame>);
 
@@ -215,7 +215,7 @@ impl CallStack for PrintCallStack {
 
 /// Call stack used for measuring if some content fits on the line.
 ///
-/// The stack is a view on top of the [PrintCallStack] because the stack frames are still necessary for printing.
+/// The stack is a view on top of the [`PrintCallStack`] because the stack frames are still necessary for printing.
 #[must_use]
 pub(super) struct FitsCallStack<'print> {
     stack: StackedStack<'print, StackFrame>,

@@ -877,8 +877,8 @@ mod tests {
     #[test]
     fn single_quoted_multiline_string_containing_comment() {
         let test_case = tokenize(
-            r#"'This string contains a hash looking like a comment\
-# This is not a comment'"#,
+            r"'This string contains a hash looking like a comment\
+# This is not a comment'",
         );
 
         assert_debug_snapshot!(test_case.tokenize_reverse());
@@ -928,14 +928,14 @@ mod tests {
 
     #[test]
     fn string_with_escaped_quote() {
-        let test_case = tokenize(r#"'a string \' # containing a hash ' # finally a comment"#);
+        let test_case = tokenize(r"'a string \' # containing a hash ' # finally a comment");
 
         assert_debug_snapshot!(test_case.tokenize_reverse());
     }
 
     #[test]
     fn string_with_double_escaped_backslash() {
-        let test_case = tokenize(r#"'a string \\' # a comment '"#);
+        let test_case = tokenize(r"'a string \\' # a comment '");
 
         assert_debug_snapshot!(test_case.tokenize_reverse());
     }
