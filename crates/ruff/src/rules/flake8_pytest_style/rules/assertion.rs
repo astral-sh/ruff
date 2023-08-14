@@ -21,6 +21,7 @@ use crate::autofix::codemods::CodegenStylist;
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::match_indented_block;
 use crate::cst::matchers::match_module;
+use crate::importer::ImportRequest;
 use crate::registry::AsRule;
 
 use super::unittest_assert::UnittestAssert;
@@ -289,6 +290,181 @@ pub(crate) fn unittest_assertion(
         }
         _ => None,
     }
+}
+
+/// ## What it does
+/// Checks for uses of assertion methods for exceptions from the `unittest` module.
+///
+/// ## Why is this bad?
+/// To enforce the assertion style recommended by `pytest`, `pytest.raises` is
+/// preferred.
+///
+/// ## Example
+/// ```python
+/// import unittest
+///
+///
+/// class TestFoo(unittest.TestCase):
+///     def test_foo(self):
+///         with self.assertRaises(ValueError):
+///             raise ValueError("foo")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import unittest
+/// import pytest
+///
+///
+/// class TestFoo(unittest.TestCase):
+///     def test_foo(self):
+///         with pytest.raises(ValueError):
+///             raise ValueError("foo")
+/// ```
+///
+/// ## References
+/// - [`pytest` documentation: Assertions about expected exceptions](https://docs.pytest.org/en/latest/how-to/assert.html#assertions-about-expected-exceptions)
+#[violation]
+pub struct PytestUnittestRaisesAssertion {
+    assertion: String,
+}
+
+impl Violation for PytestUnittestRaisesAssertion {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let PytestUnittestRaisesAssertion { assertion } = self;
+        format!("Use `pytest.raises` instead of unittest-style `{assertion}`")
+    }
+
+    fn autofix_title(&self) -> Option<String> {
+        let PytestUnittestRaisesAssertion { assertion } = self;
+        Some(format!("Replace `{assertion}` with `pytest.raises`"))
+    }
+}
+
+fn to_pytest_raises_args(
+    checker: &Checker,
+    attr: &str,
+    args: &[Expr],
+    keywords: &[Keyword],
+) -> Result<String> {
+    let args = match attr {
+        "assertRaises" | "failUnlessRaises" => match (args, keywords) {
+            ([arg], []) => {
+                format!("({})", checker.locator().slice(arg.range()))
+            }
+            ([], [arg])
+                if arg
+                    .arg
+                    .as_ref()
+                    .map_or(false, |a| a.as_str() == "expected_exception") =>
+            {
+                format!("({})", checker.locator().slice(arg.value.range()))
+            }
+            _ => bail!("Unable to fix"),
+        },
+        "assertRaisesRegex" | "assertRaisesRegexp" => match (args, keywords) {
+            ([arg1, arg2], []) => {
+                format!(
+                    "({}, match={})",
+                    checker.locator().slice(arg1.range()),
+                    checker.locator().slice(arg2.range())
+                )
+            }
+            ([arg], [kwarg])
+                if kwarg
+                    .arg
+                    .as_ref()
+                    .map_or(false, |f| f.as_str() == "expected_regex") =>
+            {
+                format!(
+                    "({}, match={})",
+                    checker.locator().slice(arg.range()),
+                    checker.locator().slice(kwarg.value.range())
+                )
+            }
+            ([], [kwarg1, kwarg2])
+                if kwarg1
+                    .arg
+                    .as_ref()
+                    .map_or(false, |f| f.as_str() == "expected_exception")
+                    && kwarg2
+                        .arg
+                        .as_ref()
+                        .map_or(false, |f| f.as_str() == "expected_regex") =>
+            {
+                format!(
+                    "({}, match={})",
+                    checker.locator().slice(kwarg1.value.range()),
+                    checker.locator().slice(kwarg2.value.range())
+                )
+            }
+            ([], [kwarg1, kwarg2])
+                if kwarg1
+                    .arg
+                    .as_ref()
+                    .map_or(false, |f| f.as_str() == "expected_regex")
+                    && kwarg2
+                        .arg
+                        .as_ref()
+                        .map_or(false, |f| f.as_str() == "expected_exception") =>
+            {
+                format!(
+                    "({}, match={})",
+                    checker.locator().slice(kwarg2.value.range()),
+                    checker.locator().slice(kwarg1.value.range())
+                )
+            }
+            _ => bail!("Unable to fix"),
+        },
+        _ => bail!("Unable to fix"),
+    };
+    Ok(args)
+}
+
+/// PT027
+pub(crate) fn unittest_raises_assertion(
+    checker: &Checker,
+    expr: &Expr,
+    func: &Expr,
+    args: &[Expr],
+    keywords: &[Keyword],
+) -> Option<Diagnostic> {
+    let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func else {
+        return None
+    };
+
+    if !matches!(
+        attr.as_str(),
+        "assertRaises" | "failUnlessRaises" | "assertRaisesRegex" | "assertRaisesRegexp"
+    ) {
+        return None;
+    }
+
+    let mut diagnostic = Diagnostic::new(
+        PytestUnittestRaisesAssertion {
+            assertion: attr.to_string(),
+        },
+        func.range(),
+    );
+    if checker.patch(diagnostic.kind.rule())
+        && !checker.indexer().has_comments(expr, checker.locator())
+    {
+        diagnostic.try_set_fix(|| {
+            let (import_edit, biding) = checker.importer().get_or_import_symbol(
+                &ImportRequest::import("pytest", "raises"),
+                func.start(),
+                checker.semantic(),
+            )?;
+            let args = to_pytest_raises_args(checker, attr.as_str(), args, keywords)?;
+            let edit = Edit::range_replacement(format!("{biding}{args}"), expr.range());
+            Ok(Fix::suggested_edits(import_edit, [edit]))
+        });
+    }
+
+    Some(diagnostic)
 }
 
 /// PT015

@@ -760,6 +760,13 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     checker.diagnostics.push(diagnostic);
                 }
             }
+            if checker.enabled(Rule::PytestUnittestRaisesAssertion) {
+                if let Some(diagnostic) = flake8_pytest_style::rules::unittest_raises_assertion(
+                    checker, expr, func, args, keywords,
+                ) {
+                    checker.diagnostics.push(diagnostic);
+                }
+            }
             if checker.enabled(Rule::SubprocessPopenPreexecFn) {
                 pylint::rules::subprocess_popen_preexec_fn(checker, call);
             }
