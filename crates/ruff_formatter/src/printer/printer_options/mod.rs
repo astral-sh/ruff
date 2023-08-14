@@ -43,6 +43,12 @@ impl From<PrintWidth> for usize {
     }
 }
 
+impl From<PrintWidth> for u32 {
+    fn from(width: PrintWidth) -> Self {
+        width.0
+    }
+}
+
 impl<'a, O> From<&'a O> for PrinterOptions
 where
     O: FormatOptions,
