@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::iter::FusedIterator;
 
 use ruff_formatter::write;
@@ -10,7 +11,6 @@ use crate::comments::format::{empty_lines, format_comment};
 use crate::comments::{leading_comments, trailing_comments, SourceComment};
 use crate::prelude::*;
 use crate::statement::suite::SuiteChildStatement;
-use crate::verbatim_text;
 
 /// Disables formatting for all statements between the `first_suppressed` that has a leading `fmt: off` comment
 /// and the first trailing or leading `fmt: on` comment. The statements are formatted as they appear in the source code.
@@ -570,5 +570,41 @@ impl Format<PyFormatContext<'_>> for TrailingFormatOffComment<'_> {
         self.0.mark_formatted();
 
         Ok(())
+    }
+}
+
+struct VerbatimText(TextRange);
+
+fn verbatim_text<T>(item: T) -> VerbatimText
+where
+    T: Ranged,
+{
+    VerbatimText(item.range())
+}
+
+impl Format<PyFormatContext<'_>> for VerbatimText {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
+        f.write_element(FormatElement::Tag(Tag::StartVerbatim(
+            tag::VerbatimKind::Verbatim {
+                length: self.0.len(),
+            },
+        )))?;
+
+        match normalize_newlines(f.context().locator().slice(self.0), ['\r']) {
+            Cow::Borrowed(_) => {
+                write!(f, [source_text_slice(self.0, ContainsNewlines::Detect)])?;
+            }
+            Cow::Owned(cleaned) => {
+                write!(
+                    f,
+                    [
+                        dynamic_text(&cleaned, Some(self.0.start())),
+                        source_position(self.0.end())
+                    ]
+                )?;
+            }
+        }
+
+        f.write_element(FormatElement::Tag(Tag::EndVerbatim))
     }
 }

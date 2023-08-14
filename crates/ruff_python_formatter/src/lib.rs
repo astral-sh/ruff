@@ -1,26 +1,24 @@
+use thiserror::Error;
+
+use ruff_formatter::format_element::tag;
+use ruff_formatter::prelude::{source_position, text, Formatter, Tag};
+use ruff_formatter::{
+    format, write, Buffer, Format, FormatElement, FormatError, FormatResult, PrintError,
+};
+use ruff_formatter::{Formatted, Printed, SourceCode};
+use ruff_python_ast::node::{AnyNodeRef, AstNode};
+use ruff_python_ast::Mod;
+use ruff_python_index::{CommentRanges, CommentRangesBuilder};
+use ruff_python_parser::lexer::{lex, LexicalError};
+use ruff_python_parser::{parse_tokens, Mode, ParseError};
+use ruff_source_file::Locator;
+use ruff_text_size::TextLen;
+
 use crate::comments::{
     dangling_node_comments, leading_node_comments, trailing_node_comments, Comments,
 };
 use crate::context::PyFormatContext;
 pub use crate::options::{MagicTrailingComma, PyFormatOptions, QuoteStyle};
-use ruff_formatter::format_element::tag;
-use ruff_formatter::prelude::{
-    dynamic_text, source_position, source_text_slice, text, ContainsNewlines, Formatter, Tag,
-};
-use ruff_formatter::{
-    format, normalize_newlines, write, Buffer, Format, FormatElement, FormatError, FormatResult,
-    PrintError,
-};
-use ruff_formatter::{Formatted, Printed, SourceCode};
-use ruff_python_ast::node::{AnyNodeRef, AstNode};
-use ruff_python_ast::{Mod, Ranged};
-use ruff_python_index::{CommentRanges, CommentRangesBuilder};
-use ruff_python_parser::lexer::{lex, LexicalError};
-use ruff_python_parser::{parse_tokens, Mode, ParseError};
-use ruff_source_file::Locator;
-use ruff_text_size::{TextLen, TextRange};
-use std::borrow::Cow;
-use thiserror::Error;
 
 pub(crate) mod builders;
 pub mod cli;
@@ -219,53 +217,18 @@ impl Format<PyFormatContext<'_>> for NotYetImplementedCustomText<'_> {
     }
 }
 
-pub(crate) struct VerbatimText(TextRange);
-
-#[allow(unused)]
-pub(crate) fn verbatim_text<T>(item: T) -> VerbatimText
-where
-    T: Ranged,
-{
-    VerbatimText(item.range())
-}
-
-impl Format<PyFormatContext<'_>> for VerbatimText {
-    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        f.write_element(FormatElement::Tag(Tag::StartVerbatim(
-            tag::VerbatimKind::Verbatim {
-                length: self.0.len(),
-            },
-        )))?;
-
-        match normalize_newlines(f.context().locator().slice(self.0), ['\r']) {
-            Cow::Borrowed(_) => {
-                write!(f, [source_text_slice(self.0, ContainsNewlines::Detect)])?;
-            }
-            Cow::Owned(cleaned) => {
-                write!(
-                    f,
-                    [
-                        dynamic_text(&cleaned, Some(self.0.start())),
-                        source_position(self.0.end())
-                    ]
-                )?;
-            }
-        }
-
-        f.write_element(FormatElement::Tag(Tag::EndVerbatim))?;
-        Ok(())
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::{format_module, format_node, PyFormatOptions};
+    use std::path::Path;
+
     use anyhow::Result;
     use insta::assert_snapshot;
+
     use ruff_python_index::CommentRangesBuilder;
     use ruff_python_parser::lexer::lex;
     use ruff_python_parser::{parse_tokens, Mode};
-    use std::path::Path;
+
+    use crate::{format_module, format_node, PyFormatOptions};
 
     /// Very basic test intentionally kept very similar to the CLI
     #[test]
