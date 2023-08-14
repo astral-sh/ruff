@@ -17,10 +17,10 @@ dir="$target/progress_projects"
 mkdir -p "$dir"
 
 # small util library
-if [ ! -d "$dir/build/.git" ]; then
-  git clone --filter=tree:0 https://github.com/pypa/build "$dir/build"
+if [ ! -d "$dir/twine/.git" ]; then
+  git clone --filter=tree:0 https://github.com/pypa/twine "$dir/twine"
 fi
-git -C "$dir/build" checkout d90f9ac6503a40ddbfaef94b7a7040f87178a4b3
+git -C "$dir/twine" checkout 0bb428c410b8df64c04dc881ac1db37d932f3066
 # web framework that implements a lot of magic
 if [ ! -d "$dir/django/.git" ]; then
   git clone --filter=tree:0 https://github.com/django/django "$dir/django"
