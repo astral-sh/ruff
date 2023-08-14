@@ -780,7 +780,8 @@ where
     Context: FormatContext,
 {
     let mut state = FormatState::new(context);
-    let mut buffer = VecBuffer::with_capacity(arguments.items().len(), &mut state);
+    let mut buffer =
+        VecBuffer::with_capacity(state.context().source_code().as_str().len(), &mut state);
 
     buffer.write_fmt(arguments)?;
 
