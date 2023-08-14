@@ -89,13 +89,20 @@ mod tests {
         Rule::TypingOnlyStandardLibraryImport,
         Path::new("runtime_evaluated_base_classes_3.py")
     )]
+    #[test_case(
+        Rule::TypingOnlyStandardLibraryImport,
+        Path::new("runtime_evaluated_base_classes_4.py")
+    )]
     fn runtime_evaluated_base_classes(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::Settings {
                 flake8_type_checking: super::settings::Settings {
-                    runtime_evaluated_base_classes: vec!["pydantic.BaseModel".to_string()],
+                    runtime_evaluated_base_classes: vec![
+                        "pydantic.BaseModel".to_string(),
+                        "sqlalchemy.orm.DeclarativeBase".to_string(),
+                    ],
                     ..Default::default()
                 },
                 ..settings::Settings::for_rule(rule_code)
