@@ -68,11 +68,11 @@ pub(crate) fn unnecessary_map(
     func: &Expr,
     args: &[Expr],
 ) {
-    let Some(id) = helpers::expr_name(func) else {
+    let Some(func) = func.as_name_expr() else {
         return;
     };
 
-    let object_type = match id {
+    let object_type = match func.id.as_str() {
         "map" => ObjectType::Generator,
         "list" => ObjectType::List,
         "set" => ObjectType::Set,
@@ -80,20 +80,20 @@ pub(crate) fn unnecessary_map(
         _ => return,
     };
 
-    if !checker.semantic().is_builtin(id) {
+    if !checker.semantic().is_builtin(&func.id) {
         return;
     }
 
     match object_type {
         ObjectType::Generator => {
             // Exclude the parent if already matched by other arms.
-            if let Some(Expr::Call(ast::ExprCall { func, .. })) = parent {
-                if let Some(name) = helpers::expr_name(func) {
-                    if matches!(name, "list" | "set" | "dict") {
-                        return;
-                    }
-                }
-            };
+            if parent
+                .and_then(ruff_python_ast::Expr::as_call_expr)
+                .and_then(|call| call.func.as_name_expr())
+                .is_some_and(|name| matches!(name.id.as_str(), "list" | "set" | "dict"))
+            {
+                return;
+            }
 
             // Only flag, e.g., `map(lambda x: x + 1, iterable)`.
             let [Expr::Lambda(ast::ExprLambda {

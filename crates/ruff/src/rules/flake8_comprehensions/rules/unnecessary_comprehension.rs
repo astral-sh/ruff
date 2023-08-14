@@ -1,13 +1,10 @@
-use ruff_python_ast::{self as ast, Comprehension, Expr, Ranged};
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Comprehension, Expr, Ranged};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 use crate::rules::flake8_comprehensions::fixes;
-
-use super::helpers;
 
 /// ## What it does
 /// Checks for unnecessary `dict`, `list`, and `set` comprehension.
@@ -88,28 +85,28 @@ pub(crate) fn unnecessary_dict_comprehension(
     if !generator.ifs.is_empty() || generator.is_async {
         return;
     }
-    let Some(key_id) = helpers::expr_name(key) else {
+    let Some(key) = key.as_name_expr() else {
         return;
     };
-    let Some(value_id) = helpers::expr_name(value) else {
+    let Some(value) = value.as_name_expr() else {
         return;
     };
     let Expr::Tuple(ast::ExprTuple { elts, .. }) = &generator.target else {
         return;
     };
-    if elts.len() != 2 {
-        return;
-    }
-    let Some(target_key_id) = helpers::expr_name(&elts[0]) else {
+    let [target_key, target_value] = elts.as_slice() else {
         return;
     };
-    if target_key_id != key_id {
-        return;
-    }
-    let Some(target_value_id) = helpers::expr_name(&elts[1]) else {
+    let Some(target_key) = target_key.as_name_expr() else {
         return;
     };
-    if target_value_id != value_id {
+    let Some(target_value) = target_value.as_name_expr() else {
+        return;
+    };
+    if target_key.id != key.id {
+        return;
+    }
+    if target_value.id != value.id {
         return;
     }
     add_diagnostic(checker, expr);
@@ -128,13 +125,13 @@ pub(crate) fn unnecessary_list_set_comprehension(
     if !generator.ifs.is_empty() || generator.is_async {
         return;
     }
-    let Some(elt_id) = helpers::expr_name(elt) else {
+    let Some(elt) = elt.as_name_expr() else {
         return;
     };
-    let Some(target_id) = helpers::expr_name(&generator.target) else {
+    let Some(target) = generator.target.as_name_expr() else {
         return;
     };
-    if elt_id != target_id {
+    if elt.id != target.id {
         return;
     }
     add_diagnostic(checker, expr);

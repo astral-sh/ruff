@@ -1,14 +1,11 @@
-use ruff_python_ast::{Expr, Keyword, Ranged};
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{Expr, Keyword, Ranged};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 use crate::rules::flake8_comprehensions::fixes;
 use crate::rules::flake8_comprehensions::settings::Settings;
-
-use super::helpers;
 
 /// ## What it does
 /// Checks for unnecessary `dict`, `list` or `tuple` calls that can be
@@ -63,10 +60,10 @@ pub(crate) fn unnecessary_collection_call(
     if !args.is_empty() {
         return;
     }
-    let Some(id) = helpers::expr_name(func) else {
+    let Some(func) = func.as_name_expr() else {
         return;
     };
-    match id {
+    match func.id.as_str() {
         "dict"
             if keywords.is_empty()
                 || (!settings.allow_dict_calls_with_keyword_arguments
@@ -79,12 +76,12 @@ pub(crate) fn unnecessary_collection_call(
         }
         _ => return,
     };
-    if !checker.semantic().is_builtin(id) {
+    if !checker.semantic().is_builtin(func.id.as_str()) {
         return;
     }
     let mut diagnostic = Diagnostic::new(
         UnnecessaryCollectionCall {
-            obj_type: id.to_string(),
+            obj_type: func.id.to_string(),
         },
         expr.range(),
     );
