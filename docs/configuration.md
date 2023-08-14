@@ -77,7 +77,7 @@ unfixable = ["B"]
 [tool.ruff.per-file-ignores]
 "__init__.py" = ["E402"]
 "path/to/file.py" = ["E402"]
-"{tests,docs,tools}/*" = ["E402"]  # regular expression is supported
+"**/{tests,docs,tools}/*" = ["E402"]
 ```
 
 Plugin configurations should be expressed as subsections, e.g.:
