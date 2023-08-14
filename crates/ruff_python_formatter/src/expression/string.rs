@@ -4,7 +4,6 @@ use bitflags::bitflags;
 
 use ruff_formatter::{format_args, write, FormatError};
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::str::is_implicit_concatenation;
 use ruff_python_ast::{self as ast, ExprConstant, ExprFString, Ranged};
 use ruff_python_parser::lexer::{lex_starts_at, LexicalError, LexicalErrorType};
 use ruff_python_parser::{Mode, Tok};
@@ -47,6 +46,17 @@ impl<'a> AnyString<'a> {
                     Quoting::CanChange
                 }
             }
+        }
+    }
+
+    /// Returns `true` if the string is implicitly concatenated.
+    fn implicit_concatenated(&self) -> bool {
+        match self {
+            Self::Constant(ExprConstant { value, .. }) => value.is_implicit_concatenated(),
+            Self::FString(ExprFString {
+                implicit_concatenated,
+                ..
+            }) => *implicit_concatenated,
         }
     }
 }
@@ -103,14 +113,11 @@ impl<'a> Format<PyFormatContext<'_>> for FormatString<'a> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         match self.layout {
             StringLayout::Default => {
-                let string_range = self.string.range();
-                let string_content = f.context().locator().slice(string_range);
-
-                if is_implicit_concatenation(string_content) {
+                if self.string.implicit_concatenated() {
                     in_parentheses_only_group(&FormatStringContinuation::new(self.string)).fmt(f)
                 } else {
                     FormatStringPart::new(
-                        string_range,
+                        self.string.range(),
                         self.string.quoting(&f.context().locator()),
                         &f.context().locator(),
                         f.options().quote_style(),

@@ -2,11 +2,10 @@ use std::fmt;
 use std::str::FromStr;
 
 use num_bigint::BigInt;
-use ruff_python_ast::{self as ast, Constant, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::str::is_implicit_concatenation;
+use ruff_python_ast::{self as ast, Constant, Expr, Keyword, Ranged};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -182,6 +181,11 @@ pub(crate) fn native_literals(
                 return;
             };
 
+            // Skip implicit string concatenations.
+            if value.is_implicit_concatenated() {
+                return;
+            }
+
             let Ok(arg_literal_type) = LiteralType::try_from(value) else {
                 return;
             };
@@ -191,13 +195,6 @@ pub(crate) fn native_literals(
             }
 
             let arg_code = checker.locator().slice(arg.range());
-
-            // Skip implicit string concatenations.
-            if matches!(arg_literal_type, LiteralType::Str | LiteralType::Bytes)
-                && is_implicit_concatenation(arg_code)
-            {
-                return;
-            }
 
             let mut diagnostic = Diagnostic::new(NativeLiterals { literal_type }, expr.range());
             if checker.patch(diagnostic.kind.rule()) {
