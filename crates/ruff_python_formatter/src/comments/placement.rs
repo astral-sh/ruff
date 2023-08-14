@@ -1150,14 +1150,20 @@ fn handle_bracketed_end_of_line_comment<'a>(
             locator.contents(),
             TextRange::new(comment.enclosing_node().start(), comment.start()),
         )
-        .skip_trivia()
-        .skip_while(|t| {
-            matches!(
-                t.kind(),
-                SimpleTokenKind::LParen | SimpleTokenKind::LBrace | SimpleTokenKind::LBracket
-            )
-        });
+        .skip_trivia();
 
+        // Skip the opening parenthesis.
+        let Some(paren) = lexer.next() else {
+            return CommentPlacement::Default(comment);
+        };
+        debug_assert!(matches!(
+            paren.kind(),
+            SimpleTokenKind::LParen | SimpleTokenKind::LBrace | SimpleTokenKind::LBracket
+        ));
+
+        // If there are no additional tokens between the open parenthesis and the comment, then
+        // it should be attached as a dangling comment on the brackets, rather than a leading
+        // comment on the first argument.
         if lexer.next().is_none() {
             return CommentPlacement::dangling(comment.enclosing_node(), comment);
         }
