@@ -91,3 +91,12 @@ def docstring_that_ends_with_quote_and_a_line_break3():
     """he said "the news of my death have been greatly exaggerated"
 
     """
+
+
+class TabbedIndent:
+	def tabbed_indent(self):
+		"""check for correct tabbed formatting
+		                            ^^^^^^^^^^
+		Normal indented line
+		  	- autor
+		"""
