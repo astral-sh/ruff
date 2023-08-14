@@ -1,8 +1,12 @@
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use ruff_benchmark::{TestCase, TestCaseSpeed, TestFile, TestFileDownloadError};
-use ruff_python_formatter::{format_module, PyFormatOptions};
 use std::path::Path;
-use std::time::Duration;
+
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+
+use ruff_benchmark::{TestCase, TestFile, TestFileDownloadError};
+use ruff_python_formatter::{format_node, PyFormatOptions};
+use ruff_python_index::CommentRangesBuilder;
+use ruff_python_parser::lexer::lex;
+use ruff_python_parser::{parse_tokens, Mode};
 
 #[cfg(target_os = "windows")]
 #[global_allocator]
@@ -41,19 +45,33 @@ fn benchmark_formatter(criterion: &mut Criterion) {
 
     for case in test_cases {
         group.throughput(Throughput::Bytes(case.code().len() as u64));
-        group.measurement_time(match case.speed() {
-            TestCaseSpeed::Fast => Duration::from_secs(5),
-            TestCaseSpeed::Normal => Duration::from_secs(10),
-            TestCaseSpeed::Slow => Duration::from_secs(20),
-        });
 
         group.bench_with_input(
             BenchmarkId::from_parameter(case.name()),
             &case,
             |b, case| {
+                let mut tokens = Vec::new();
+                let mut comment_ranges = CommentRangesBuilder::default();
+
+                for result in lex(case.code(), Mode::Module) {
+                    let (token, range) = result.expect("Input to be a valid python program.");
+
+                    comment_ranges.visit_token(&token, range);
+                    tokens.push(Ok((token, range)));
+                }
+
+                let comment_ranges = comment_ranges.finish();
+
+                // Parse the AST.
+                let python_ast = parse_tokens(tokens, Mode::Module, "<filename>")
+                    .expect("Input to be a valid python program");
+
                 b.iter(|| {
                     let options = PyFormatOptions::from_extension(Path::new(case.name()));
-                    format_module(case.code(), options).expect("Formatting to succeed")
+                    let formatted = format_node(&python_ast, &comment_ranges, case.code(), options)
+                        .expect("Formatting to succeed");
+
+                    formatted.print().expect("Printing to succeed")
                 });
             },
         );
