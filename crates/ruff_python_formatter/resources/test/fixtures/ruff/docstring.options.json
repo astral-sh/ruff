@@ -1,0 +1,15 @@
+[
+  {
+    "indent_style": {
+      "Space": 4
+    }
+  },
+  {
+    "indent_style": {
+      "Space": 2
+    }
+  },
+  {
+    "indent_style": "Tab"
+  }
+]
