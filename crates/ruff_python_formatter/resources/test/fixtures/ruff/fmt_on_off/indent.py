@@ -38,3 +38,18 @@ disabled +  formatting;
 # fmt: on
 
 formatted;
+
+def test():
+  pass
+  # fmt: off
+  """A multiline strings
+      that should not get formatted"""
+
+  "A single quoted multiline \
+       string"
+
+  disabled +  formatting;
+
+# fmt: on
+
+formatted;

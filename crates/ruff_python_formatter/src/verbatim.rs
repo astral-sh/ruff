@@ -610,7 +610,7 @@ impl Indentation {
 
         let mut indentation = 0u32;
         for c in source[TextRange::new(line_start, stmt.start())].chars() {
-            if matches!(c, ' ' | '\t') {
+            if is_indent_whitespace(c) {
                 indentation += 1;
             } else {
                 break;
@@ -625,7 +625,7 @@ impl Indentation {
         let mut start_offset = TextSize::default();
 
         for c in source[range].chars().take(self.0 as usize) {
-            if matches!(c, ' ' | '\t') {
+            if is_indent_whitespace(c) {
                 start_offset += TextSize::new(1);
             } else {
                 break;
@@ -634,6 +634,14 @@ impl Indentation {
 
         TextRange::new(range.start() + start_offset, range.end())
     }
+}
+
+/// Returns `true` for a space or tab character.
+///
+/// This is different than [`is_python_whitespace`] in that it returns `false` for a form feed character.
+/// Form feed characters are excluded because they should be preserved in the suppressed output.
+const fn is_indent_whitespace(c: char) -> bool {
+    matches!(c, ' ' | '\t')
 }
 
 /// Formats a verbatim range where the top-level nodes are statements (or statement-level comments).
@@ -775,14 +783,14 @@ where
                     _ => {}
                 },
                 None => {
-                    // Is there any remaining content after the last token? If so, return it as the last
-                    // logical line.
+                    // Returns any content that comes after the last newline. This is mainly whitespace
+                    // or characters that the `Lexer` skips, like a form-feed character.
                     return if self.last_line_end < self.content_end {
                         let content_start = self.last_line_end;
                         self.last_line_end = self.content_end;
                         Some(Ok(LogicalLine {
                             content_range: TextRange::new(content_start, self.content_end),
-                            contains_newlines,
+                            contains_newlines: ContainsNewlines::No,
                             has_trailing_newline: false,
                         }))
                     } else {
