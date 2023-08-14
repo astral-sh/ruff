@@ -114,7 +114,7 @@ impl TryFrom<Options> for Settings {
                 .ignore_names
                 .unwrap_or_else(default_ignore_names)
                 .into_iter()
-                .chain(options.extend_ignore_names.unwrap_or_default().into_iter())
+                .chain(options.extend_ignore_names.unwrap_or_default())
                 .map(|name| IdentifierPattern::new(&name).map_err(SettingsError::InvalidIgnoreName))
                 .collect::<Result<Vec<_>, Self::Error>>()?,
             classmethod_decorators: options.classmethod_decorators.unwrap_or_default(),

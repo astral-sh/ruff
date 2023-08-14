@@ -3,7 +3,6 @@
 use crate::prelude::*;
 use std::cell::RefCell;
 use std::marker::PhantomData;
-use std::ops::Deref;
 
 use crate::Buffer;
 
@@ -149,7 +148,7 @@ where
             .get_or_insert_with(|| f.intern(&self.inner));
 
         match result.as_ref() {
-            Ok(Some(FormatElement::Interned(interned))) => Ok(interned.deref()),
+            Ok(Some(FormatElement::Interned(interned))) => Ok(&**interned),
             Ok(Some(other)) => Ok(std::slice::from_ref(other)),
             Ok(None) => Ok(&[]),
             Err(error) => Err(*error),
