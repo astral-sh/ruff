@@ -62,8 +62,6 @@ quick-junit = { version = "0.3.2" }
 regex = { workspace = true }
 result-like = { version = "0.4.6" }
 rustc-hash = { workspace = true }
-
-
 schemars = { workspace = true, optional = true }
 semver = { version = "1.0.16" }
 serde = { workspace = true }
