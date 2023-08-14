@@ -14,14 +14,15 @@ use crate::rules::flake8_boolean_trap::helpers::{add_if_boolean, is_allowed_func
 /// Calling a function with boolean default means that the keyword argument
 /// argument can be omitted, which makes the function call ambiguous.
 ///
-/// Instead, define the relevant argument as keyword-only.
+/// Instead, consider defining the relevant argument as a required keyword
+/// argument.
 ///
 /// ## Example
 /// ```python
 /// from math import ceil, floor
 ///
 ///
-/// def round_number(number: float, *, up: bool = True) -> int:
+/// def round_number(number: float, up: bool = True) -> int:
 ///     return ceil(number) if up else floor(number)
 ///
 ///
