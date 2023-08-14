@@ -1,5 +1,5 @@
-use ruff_formatter::{write, Buffer};
-use ruff_python_ast::{Ranged, StmtClassDef};
+use ruff_formatter::write;
+use ruff_python_ast::{Decorator, Ranged, StmtClassDef};
 use ruff_python_trivia::lines_after_ignoring_trivia;
 
 use crate::comments::{leading_comments, trailing_comments, SourceComment};
@@ -30,31 +30,11 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
         let (leading_definition_comments, trailing_definition_comments) =
             dangling_comments.split_at(trailing_definition_comments_start);
 
-        if let Some(last_decorator) = decorator_list.last() {
-            f.join_with(hard_line_break())
-                .entries(decorator_list.iter().formatted())
-                .finish()?;
-
-            if leading_definition_comments.is_empty() {
-                write!(f, [hard_line_break()])?;
-            } else {
-                // Write any leading definition comments (between last decorator and the header)
-                // while maintaining the right amount of empty lines between the comment
-                // and the last decorator.
-                let leading_line =
-                    if lines_after_ignoring_trivia(last_decorator.end(), f.context().source()) <= 1
-                    {
-                        hard_line_break()
-                    } else {
-                        empty_line()
-                    };
-
-                write!(
-                    f,
-                    [leading_line, leading_comments(leading_definition_comments)]
-                )?;
-            }
+        FormatDecorators {
+            decorators: decorator_list,
+            leading_definition_comments,
         }
+        .fmt(f)?;
 
         write!(f, [text("class"), space(), name.format()])?;
 
@@ -133,6 +113,46 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
         _f: &mut PyFormatter,
     ) -> FormatResult<()> {
         // handled in fmt_fields
+        Ok(())
+    }
+}
+
+pub(super) struct FormatDecorators<'a> {
+    pub(super) decorators: &'a [Decorator],
+    pub(super) leading_definition_comments: &'a [SourceComment],
+}
+
+impl Format<PyFormatContext<'_>> for FormatDecorators<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+        if let Some(last_decorator) = self.decorators.last() {
+            f.join_with(hard_line_break())
+                .entries(self.decorators.iter().formatted())
+                .finish()?;
+
+            if self.leading_definition_comments.is_empty() {
+                write!(f, [hard_line_break()])?;
+            } else {
+                // Write any leading definition comments (between last decorator and the header)
+                // while maintaining the right amount of empty lines between the comment
+                // and the last decorator.
+                let leading_line =
+                    if lines_after_ignoring_trivia(last_decorator.end(), f.context().source()) <= 1
+                    {
+                        hard_line_break()
+                    } else {
+                        empty_line()
+                    };
+
+                write!(
+                    f,
+                    [
+                        leading_line,
+                        leading_comments(self.leading_definition_comments)
+                    ]
+                )?;
+            }
+        }
+
         Ok(())
     }
 }

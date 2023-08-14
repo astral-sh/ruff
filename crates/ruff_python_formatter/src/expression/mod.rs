@@ -94,7 +94,7 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             Expr::List(expr) => expr.format().fmt(f),
             Expr::Tuple(expr) => expr.format().fmt(f),
             Expr::Slice(expr) => expr.format().fmt(f),
-            Expr::IpyEscapeCommand(_) => todo!(),
+            Expr::IpyEscapeCommand(expr) => expr.format().fmt(f),
         });
 
         let parenthesize = match parentheses {

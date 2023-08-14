@@ -1,9 +1,9 @@
-use ruff_formatter::FormatRuleWithOptions;
-use ruff_formatter::{write, Buffer, FormatResult};
+use ruff_formatter::{write, FormatRuleWithOptions};
 use ruff_python_ast::{ExceptHandler, Ranged, StmtTry, Suite};
 
 use crate::comments;
-use crate::comments::{leading_alternate_branch_comments, trailing_comments, SourceComment};
+use crate::comments::SourceComment;
+use crate::comments::{leading_alternate_branch_comments, trailing_comments};
 use crate::other::except_handler_except_handler::ExceptHandlerKind;
 use crate::prelude::*;
 use crate::statement::{FormatRefWithRule, Stmt};

@@ -238,7 +238,7 @@ d={'a':1,
      # fmt: on
  
  
-@@ -178,7 +180,7 @@
+@@ -178,14 +180,18 @@
          $
          """,
          # fmt: off
@@ -247,6 +247,18 @@ d={'a':1,
          # fmt: on
      )
  
+ 
+ def single_literal_yapf_disable():
+     """Black does not support this."""
+-    BAZ = {(1, 2, 3, 4), (5, 6, 7, 8), (9, 10, 11, 12)}  # yapf: disable
++    BAZ = {
++        (1, 2, 3, 4),
++        (5, 6, 7, 8),
++        (9, 10, 11, 12)
++    }  # yapf: disable
+ 
+ 
+ cfg.rule(
 ```
 
 ## Ruff Output
@@ -441,7 +453,11 @@ def long_lines():
 
 def single_literal_yapf_disable():
     """Black does not support this."""
-    BAZ = {(1, 2, 3, 4), (5, 6, 7, 8), (9, 10, 11, 12)}  # yapf: disable
+    BAZ = {
+        (1, 2, 3, 4),
+        (5, 6, 7, 8),
+        (9, 10, 11, 12)
+    }  # yapf: disable
 
 
 cfg.rule(

@@ -1,12 +1,12 @@
-use ruff_formatter::prelude::{dynamic_text, format_with, space, text};
-use ruff_formatter::{write, Buffer, Format, FormatResult};
+use ruff_formatter::write;
 use ruff_python_ast::node::AstNode;
 use ruff_python_ast::{Ranged, StmtImportFrom};
 
 use crate::builders::{parenthesize_if_expands, PyFormatterExtensions, TrailingComma};
-use crate::comments::SourceComment;
+use crate::comments::{SourceComment, SuppressionKind};
 use crate::expression::parentheses::parenthesized;
-use crate::{AsFormat, FormatNodeRule, PyFormatter};
+use crate::prelude::*;
+use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatStmtImportFrom;
@@ -77,5 +77,13 @@ impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
     ) -> FormatResult<()> {
         // Handled in `fmt_fields`
         Ok(())
+    }
+
+    fn is_suppressed(
+        &self,
+        trailing_comments: &[SourceComment],
+        context: &PyFormatContext,
+    ) -> bool {
+        SuppressionKind::has_skip_comment(trailing_comments, context.source())
     }
 }

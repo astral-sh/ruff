@@ -1,11 +1,12 @@
+use ruff_formatter::write;
+use ruff_python_ast::{Ranged, StmtDelete};
+
 use crate::builders::{parenthesize_if_expands, PyFormatterExtensions};
-use crate::comments::{dangling_node_comments, SourceComment};
+use crate::comments::{dangling_node_comments, SourceComment, SuppressionKind};
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
-use crate::{FormatNodeRule, PyFormatter};
-use ruff_formatter::prelude::{block_indent, format_with, space, text};
-use ruff_formatter::{write, Buffer, Format, FormatResult};
-use ruff_python_ast::{Ranged, StmtDelete};
+use crate::prelude::*;
+use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatStmtDelete;
@@ -60,5 +61,13 @@ impl FormatNodeRule<StmtDelete> for FormatStmtDelete {
     ) -> FormatResult<()> {
         // Handled in `fmt_fields`
         Ok(())
+    }
+
+    fn is_suppressed(
+        &self,
+        trailing_comments: &[SourceComment],
+        context: &PyFormatContext,
+    ) -> bool {
+        SuppressionKind::has_skip_comment(trailing_comments, context.source())
     }
 }

@@ -1,3 +1,4 @@
+use crate::comments::{SourceComment, SuppressionKind};
 use ruff_formatter::{format_args, write};
 use ruff_python_ast::node::AstNode;
 use ruff_python_ast::StmtNonlocal;
@@ -49,5 +50,13 @@ impl FormatNodeRule<StmtNonlocal> for FormatStmtNonlocal {
                 ]
             )
         }
+    }
+
+    fn is_suppressed(
+        &self,
+        trailing_comments: &[SourceComment],
+        context: &PyFormatContext,
+    ) -> bool {
+        SuppressionKind::has_skip_comment(trailing_comments, context.source())
     }
 }
