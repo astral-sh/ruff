@@ -40,7 +40,7 @@ impl<'a> Printer<'a> {
         Self {
             source_code,
             options,
-            state: PrinterState::default(),
+            state: PrinterState::with_capacity(source_code.as_str().len()),
         }
     }
 
@@ -755,6 +755,15 @@ struct PrinterState<'a> {
     // vec every time a group gets measured
     fits_stack: Vec<StackFrame>,
     fits_queue: Vec<&'a [FormatElement]>,
+}
+
+impl<'a> PrinterState<'a> {
+    fn with_capacity(capacity: usize) -> Self {
+        Self {
+            buffer: String::with_capacity(capacity),
+            ..Self::default()
+        }
+    }
 }
 
 /// Tracks the mode in which groups with ids are printed. Stores the groups at `group.id()` index.

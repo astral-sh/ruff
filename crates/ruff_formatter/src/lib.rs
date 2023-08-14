@@ -319,20 +319,20 @@ where
     Context: FormatContext,
 {
     pub fn print(&self) -> PrintResult<Printed> {
-        let source_code = self.context.source_code();
-        let print_options = self.context.options().as_print_options();
-        let printed = Printer::new(source_code, print_options).print(&self.document)?;
-
-        Ok(printed)
+        let printer = self.create_printer();
+        printer.print(&self.document)
     }
 
     pub fn print_with_indent(&self, indent: u16) -> PrintResult<Printed> {
+        let printer = self.create_printer();
+        printer.print_with_indent(&self.document, indent)
+    }
+
+    fn create_printer(&self) -> Printer {
         let source_code = self.context.source_code();
         let print_options = self.context.options().as_print_options();
-        let printed =
-            Printer::new(source_code, print_options).print_with_indent(&self.document, indent)?;
 
-        Ok(printed)
+        Printer::new(source_code, print_options)
     }
 }
 
