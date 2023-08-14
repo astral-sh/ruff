@@ -2,7 +2,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
 use ruff_python_ast::{self as ast, Expr, Ranged};
-use ruff_python_semantic::ScopeKind;
+use ruff_python_semantic::{BindingKind, ScopeKind};
 
 use crate::checkers::ast::Checker;
 
@@ -156,30 +156,26 @@ pub(crate) fn private_member_access(checker: &mut Checker, expr: &Expr) {
             if matches!(call_path.as_slice(), ["self" | "cls" | "mcs"]) {
                 return;
             }
+        }
 
+        if let Expr::Name(name) = value.as_ref() {
             // Ignore accesses on class members from _within_ the class.
             if checker
                 .semantic()
-                .scopes
-                .iter()
-                .rev()
-                .find_map(|scope| match &scope.kind {
-                    ScopeKind::Class(ast::StmtClassDef { name, .. }) => Some(name),
-                    _ => None,
-                })
-                .is_some_and(|name| {
-                    if call_path.as_slice() == [name.as_str()] {
-                        checker
-                            .semantic()
-                            .find_binding(name)
-                            .is_some_and(|binding| {
-                                // TODO(charlie): Could the name ever be bound to a
-                                // _different_ class here?
-                                binding.kind.is_class_definition()
-                            })
+                .resolve_name(name)
+                .and_then(|id| {
+                    if let BindingKind::ClassDefinition(scope) = checker.semantic().binding(id).kind
+                    {
+                        Some(scope)
                     } else {
-                        false
+                        None
                     }
+                })
+                .is_some_and(|scope| {
+                    checker
+                        .semantic()
+                        .current_scope_ids()
+                        .any(|parent| scope == parent)
                 })
             {
                 return;
