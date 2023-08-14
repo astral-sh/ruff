@@ -7,12 +7,14 @@ use libcst_native::{
     ParenthesizedNode, SimpleStatementLine, SimpleWhitespace, SmallStatement, Statement,
     TrailingWhitespace, UnaryOperation,
 };
-use ruff_python_ast::{self as ast, BoolOp, ExceptHandler, Expr, Keyword, Ranged, Stmt, UnaryOp};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{
+    self as ast, Arguments, BoolOp, ExceptHandler, Expr, Keyword, Ranged, Stmt, UnaryOp,
+};
 use ruff_python_ast::{visitor, whitespace};
 use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
@@ -293,11 +295,13 @@ pub(crate) fn unittest_assertion(
 }
 
 /// ## What it does
-/// Checks for uses of assertion methods for exceptions from the `unittest` module.
+/// Checks for uses of exception-related assertion methods from the `unittest`
+/// module.
 ///
 /// ## Why is this bad?
 /// To enforce the assertion style recommended by `pytest`, `pytest.raises` is
-/// preferred.
+/// preferred over the exception-related assertion methods in `unittest`, like
+/// `assertRaises`.
 ///
 /// ## Example
 /// ```python
@@ -344,102 +348,13 @@ impl Violation for PytestUnittestRaisesAssertion {
     }
 }
 
-fn to_pytest_raises_args(
-    checker: &Checker,
-    attr: &str,
-    args: &[Expr],
-    keywords: &[Keyword],
-) -> Result<String> {
-    let args = match attr {
-        "assertRaises" | "failUnlessRaises" => match (args, keywords) {
-            // assertRaises(Exception)
-            ([arg], []) => {
-                format!("({})", checker.locator().slice(arg.range()))
-            }
-            // assertRaises(expected_exception=Exception)
-            ([], [kwarg])
-                if kwarg
-                    .arg
-                    .as_ref()
-                    .map_or(false, |a| a.as_str() == "expected_exception") =>
-            {
-                format!("({})", checker.locator().slice(kwarg.value.range()))
-            }
-            _ => bail!("Unable to fix"),
-        },
-        "assertRaisesRegex" | "assertRaisesRegexp" => match (args, keywords) {
-            // assertRaisesRegex(Exception, regex)
-            ([arg1, arg2], []) => {
-                format!(
-                    "({}, match={})",
-                    checker.locator().slice(arg1.range()),
-                    checker.locator().slice(arg2.range())
-                )
-            }
-            // assertRaisesRegex(Exception, expected_regex=regex)
-            ([arg], [kwarg])
-                if kwarg
-                    .arg
-                    .as_ref()
-                    .map_or(false, |f| f.as_str() == "expected_regex") =>
-            {
-                format!(
-                    "({}, match={})",
-                    checker.locator().slice(arg.range()),
-                    checker.locator().slice(kwarg.value.range())
-                )
-            }
-            // assertRaisesRegex(expected_exception=Exception, expected_regex=regex)
-            ([], [kwarg1, kwarg2])
-                if kwarg1
-                    .arg
-                    .as_ref()
-                    .map_or(false, |f| f.as_str() == "expected_exception")
-                    && kwarg2
-                        .arg
-                        .as_ref()
-                        .map_or(false, |f| f.as_str() == "expected_regex") =>
-            {
-                format!(
-                    "({}, match={})",
-                    checker.locator().slice(kwarg1.value.range()),
-                    checker.locator().slice(kwarg2.value.range())
-                )
-            }
-            // assertRaisesRegex(expected_regex=regex, expected_exception=Exception)
-            ([], [kwarg1, kwarg2])
-                if kwarg1
-                    .arg
-                    .as_ref()
-                    .map_or(false, |f| f.as_str() == "expected_regex")
-                    && kwarg2
-                        .arg
-                        .as_ref()
-                        .map_or(false, |f| f.as_str() == "expected_exception") =>
-            {
-                format!(
-                    "({}, match={})",
-                    checker.locator().slice(kwarg2.value.range()),
-                    checker.locator().slice(kwarg1.value.range())
-                )
-            }
-            _ => bail!("Unable to fix"),
-        },
-        _ => bail!("Unable to fix"),
-    };
-    Ok(args)
-}
-
 /// PT027
 pub(crate) fn unittest_raises_assertion(
     checker: &Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
+    call: &ast::ExprCall,
 ) -> Option<Diagnostic> {
-    let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func else {
-        return None
+    let Expr::Attribute(ast::ExprAttribute { attr, .. }) = call.func.as_ref() else {
+        return None;
     };
 
     if !matches!(
@@ -453,24 +368,110 @@ pub(crate) fn unittest_raises_assertion(
         PytestUnittestRaisesAssertion {
             assertion: attr.to_string(),
         },
-        func.range(),
+        call.func.range(),
     );
     if checker.patch(diagnostic.kind.rule())
-        && !checker.indexer().has_comments(expr, checker.locator())
+        && !checker.indexer().has_comments(call, checker.locator())
     {
-        diagnostic.try_set_fix(|| {
-            let (import_edit, biding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import("pytest", "raises"),
-                func.start(),
-                checker.semantic(),
-            )?;
-            let args = to_pytest_raises_args(checker, attr.as_str(), args, keywords)?;
-            let edit = Edit::range_replacement(format!("{biding}{args}"), expr.range());
-            Ok(Fix::suggested_edits(import_edit, [edit]))
-        });
+        if let Some(args) = to_pytest_raises_args(checker, attr.as_str(), &call.arguments) {
+            diagnostic.try_set_fix(|| {
+                let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                    &ImportRequest::import("pytest", "raises"),
+                    call.func.start(),
+                    checker.semantic(),
+                )?;
+                let edit = Edit::range_replacement(format!("{binding}({args})"), call.range());
+                Ok(Fix::suggested_edits(import_edit, [edit]))
+            });
+        }
     }
 
     Some(diagnostic)
+}
+
+fn to_pytest_raises_args<'a>(
+    checker: &Checker<'a>,
+    attr: &str,
+    arguments: &Arguments,
+) -> Option<Cow<'a, str>> {
+    let args = match attr {
+        "assertRaises" | "failUnlessRaises" => {
+            match (arguments.args.as_slice(), arguments.keywords.as_slice()) {
+                // Ex) `assertRaises(Exception)`
+                ([arg], []) => Cow::Borrowed(checker.locator().slice(arg.range())),
+                // Ex) `assertRaises(expected_exception=Exception)`
+                ([], [kwarg])
+                    if kwarg
+                        .arg
+                        .as_ref()
+                        .is_some_and(|id| id.as_str() == "expected_exception") =>
+                {
+                    Cow::Borrowed(checker.locator().slice(kwarg.value.range()))
+                }
+                _ => return None,
+            }
+        }
+        "assertRaisesRegex" | "assertRaisesRegexp" => {
+            match (arguments.args.as_slice(), arguments.keywords.as_slice()) {
+                // Ex) `assertRaisesRegex(Exception, regex)`
+                ([arg1, arg2], []) => Cow::Owned(format!(
+                    "{}, match={}",
+                    checker.locator().slice(arg1.range()),
+                    checker.locator().slice(arg2.range())
+                )),
+                // Ex) `assertRaisesRegex(Exception, expected_regex=regex)`
+                ([arg], [kwarg])
+                    if kwarg
+                        .arg
+                        .as_ref()
+                        .is_some_and(|arg| arg.as_str() == "expected_regex") =>
+                {
+                    Cow::Owned(format!(
+                        "{}, match={}",
+                        checker.locator().slice(arg.range()),
+                        checker.locator().slice(kwarg.value.range())
+                    ))
+                }
+                // Ex) `assertRaisesRegex(expected_exception=Exception, expected_regex=regex)`
+                ([], [kwarg1, kwarg2])
+                    if kwarg1
+                        .arg
+                        .as_ref()
+                        .is_some_and(|id| id.as_str() == "expected_exception")
+                        && kwarg2
+                            .arg
+                            .as_ref()
+                            .is_some_and(|id| id.as_str() == "expected_regex") =>
+                {
+                    Cow::Owned(format!(
+                        "{}, match={}",
+                        checker.locator().slice(kwarg1.value.range()),
+                        checker.locator().slice(kwarg2.value.range())
+                    ))
+                }
+                // Ex) `assertRaisesRegex(expected_regex=regex, expected_exception=Exception)`
+                ([], [kwarg1, kwarg2])
+                    if kwarg1
+                        .arg
+                        .as_ref()
+                        .is_some_and(|id| id.as_str() == "expected_regex")
+                        && kwarg2
+                            .arg
+                            .as_ref()
+                            .is_some_and(|id| id.as_str() == "expected_exception") =>
+                {
+                    Cow::Owned(format!(
+                        "{}, match={}",
+                        checker.locator().slice(kwarg2.value.range()),
+                        checker.locator().slice(kwarg1.value.range())
+                    ))
+                }
+                _ => return None,
+            }
+        }
+        _ => return None,
+    };
+    Some(args)
 }
 
 /// PT015
