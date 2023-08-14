@@ -210,11 +210,11 @@ PT027_0.py:30:14: PT027 [*] Use `pytest.raises` instead of unittest-style `asser
    31 |+        with pytest.raises(ValueError, match="test"):
 31 32 |             raise ValueError("test")
 32 33 | 
-33 34 |     def test_unfixable_error(self):
+33 34 |     def test_unfixable_errors(self):
 
 PT027_0.py:34:14: PT027 Use `pytest.raises` instead of unittest-style `assertRaises`
    |
-33 |     def test_unfixable_error(self):
+33 |     def test_unfixable_errors(self):
 34 |         with self.assertRaises(ValueError, msg="msg"):
    |              ^^^^^^^^^^^^^^^^^ PT027
 35 |             raise ValueError

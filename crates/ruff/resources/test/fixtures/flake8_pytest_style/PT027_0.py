@@ -30,7 +30,7 @@ class Test(unittest.TestCase):
         with self.assertRaisesRegexp(ValueError, "test"):
             raise ValueError("test")
 
-    def test_unfixable_error(self):
+    def test_unfixable_errors(self):
         with self.assertRaises(ValueError, msg="msg"):
             raise ValueError
 
