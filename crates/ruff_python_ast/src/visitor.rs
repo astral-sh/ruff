@@ -266,20 +266,7 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             handlers,
             orelse,
             finalbody,
-            range: _,
-        }) => {
-            visitor.visit_body(body);
-            for except_handler in handlers {
-                visitor.visit_except_handler(except_handler);
-            }
-            visitor.visit_body(orelse);
-            visitor.visit_body(finalbody);
-        }
-        Stmt::TryStar(ast::StmtTryStar {
-            body,
-            handlers,
-            orelse,
-            finalbody,
+            is_star: _,
             range: _,
         }) => {
             visitor.visit_body(body);
@@ -476,7 +463,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
                 visitor.visit_format_spec(expr);
             }
         }
-        Expr::FString(ast::ExprFString { values, range: _ }) => {
+        Expr::FString(ast::ExprFString { values, .. }) => {
             for expr in values {
                 visitor.visit_expr(expr);
             }
@@ -715,23 +702,19 @@ pub fn walk_pattern<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, pattern: &'a P
 }
 
 #[allow(unused_variables)]
-pub fn walk_expr_context<'a, V: Visitor<'a> + ?Sized>(
-    visitor: &mut V,
-    expr_context: &'a ExprContext,
-) {
-}
+pub fn walk_expr_context<'a, V: Visitor<'a> + ?Sized>(visitor: &V, expr_context: &'a ExprContext) {}
 
 #[allow(unused_variables)]
-pub fn walk_bool_op<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, bool_op: &'a BoolOp) {}
+pub fn walk_bool_op<'a, V: Visitor<'a> + ?Sized>(visitor: &V, bool_op: &'a BoolOp) {}
 
 #[allow(unused_variables)]
-pub fn walk_operator<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, operator: &'a Operator) {}
+pub fn walk_operator<'a, V: Visitor<'a> + ?Sized>(visitor: &V, operator: &'a Operator) {}
 
 #[allow(unused_variables)]
-pub fn walk_unary_op<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, unary_op: &'a UnaryOp) {}
+pub fn walk_unary_op<'a, V: Visitor<'a> + ?Sized>(visitor: &V, unary_op: &'a UnaryOp) {}
 
 #[allow(unused_variables)]
-pub fn walk_cmp_op<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, cmp_op: &'a CmpOp) {}
+pub fn walk_cmp_op<'a, V: Visitor<'a> + ?Sized>(visitor: &V, cmp_op: &'a CmpOp) {}
 
 #[allow(unused_variables)]
-pub fn walk_alias<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, alias: &'a Alias) {}
+pub fn walk_alias<'a, V: Visitor<'a> + ?Sized>(visitor: &V, alias: &'a Alias) {}

@@ -1,12 +1,11 @@
-use crate::{verbatim_text, FormatNodeRule, PyFormatter};
-use ruff_formatter::{write, Buffer, FormatResult};
-use ruff_python_ast::StmtIpyEscapeCommand;
+use crate::prelude::*;
+use ruff_python_ast::{Ranged, StmtIpyEscapeCommand};
 
 #[derive(Default)]
 pub struct FormatStmtIpyEscapeCommand;
 
 impl FormatNodeRule<StmtIpyEscapeCommand> for FormatStmtIpyEscapeCommand {
     fn fmt_fields(&self, item: &StmtIpyEscapeCommand, f: &mut PyFormatter) -> FormatResult<()> {
-        write!(f, [verbatim_text(item)])
+        source_text_slice(item.range(), ContainsNewlines::No).fmt(f)
     }
 }

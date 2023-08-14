@@ -24,7 +24,6 @@ pub(crate) mod stmt_pass;
 pub(crate) mod stmt_raise;
 pub(crate) mod stmt_return;
 pub(crate) mod stmt_try;
-pub(crate) mod stmt_try_star;
 pub(crate) mod stmt_type_alias;
 pub(crate) mod stmt_while;
 pub(crate) mod stmt_with;
@@ -50,7 +49,6 @@ impl FormatRule<Stmt, PyFormatContext<'_>> for FormatStmt {
             Stmt::Match(x) => x.format().fmt(f),
             Stmt::Raise(x) => x.format().fmt(f),
             Stmt::Try(x) => x.format().fmt(f),
-            Stmt::TryStar(x) => x.format().fmt(f),
             Stmt::Assert(x) => x.format().fmt(f),
             Stmt::Import(x) => x.format().fmt(f),
             Stmt::ImportFrom(x) => x.format().fmt(f),

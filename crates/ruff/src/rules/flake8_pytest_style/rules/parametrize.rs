@@ -50,9 +50,9 @@ impl Violation for PytestParametrizeValuesWrongType {
 }
 
 fn elts_to_csv(elts: &[Expr], generator: Generator) -> Option<String> {
-    let all_literals = elts.iter().all(|e| {
+    let all_literals = elts.iter().all(|expr| {
         matches!(
-            e,
+            expr,
             Expr::Constant(ast::ExprConstant {
                 value: Constant::Str(_),
                 ..
@@ -65,19 +65,23 @@ fn elts_to_csv(elts: &[Expr], generator: Generator) -> Option<String> {
     }
 
     let node = Expr::Constant(ast::ExprConstant {
-        value: Constant::Str(elts.iter().fold(String::new(), |mut acc, elt| {
-            if let Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(ref s),
-                ..
-            }) = elt
-            {
-                if !acc.is_empty() {
-                    acc.push(',');
+        value: elts
+            .iter()
+            .fold(String::new(), |mut acc, elt| {
+                if let Expr::Constant(ast::ExprConstant {
+                    value: Constant::Str(ast::StringConstant { value, .. }),
+                    ..
+                }) = elt
+                {
+                    if !acc.is_empty() {
+                        acc.push(',');
+                    }
+                    acc.push_str(value.as_str());
                 }
-                acc.push_str(s);
-            }
-            acc
-        })),
+                acc
+            })
+            .into(),
+
         kind: None,
         range: TextRange::default(),
     });
@@ -166,7 +170,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                                     .iter()
                                     .map(|name| {
                                         Expr::Constant(ast::ExprConstant {
-                                            value: Constant::Str((*name).to_string()),
+                                            value: (*name).to_string().into(),
                                             kind: None,
                                             range: TextRange::default(),
                                         })
@@ -201,7 +205,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                                     .iter()
                                     .map(|name| {
                                         Expr::Constant(ast::ExprConstant {
-                                            value: Constant::Str((*name).to_string()),
+                                            value: (*name).to_string().into(),
                                             kind: None,
                                             range: TextRange::default(),
                                         })

@@ -311,6 +311,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         // flake8-tidy-imports
         (Flake8TidyImports, "251") => (RuleGroup::Unspecified, rules::flake8_tidy_imports::rules::BannedApi),
         (Flake8TidyImports, "252") => (RuleGroup::Unspecified, rules::flake8_tidy_imports::rules::RelativeImports),
+        (Flake8TidyImports, "253") => (RuleGroup::Unspecified, rules::flake8_tidy_imports::rules::BannedModuleLevelImports),
 
         // flake8-return
         (Flake8Return, "501") => (RuleGroup::Unspecified, rules::flake8_return::rules::UnnecessaryReturnNone),
@@ -567,9 +568,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bandit, "701") => (RuleGroup::Unspecified, rules::flake8_bandit::rules::Jinja2AutoescapeFalse),
 
         // flake8-boolean-trap
-        (Flake8BooleanTrap, "001") => (RuleGroup::Unspecified, rules::flake8_boolean_trap::rules::BooleanPositionalArgInFunctionDefinition),
-        (Flake8BooleanTrap, "002") => (RuleGroup::Unspecified, rules::flake8_boolean_trap::rules::BooleanDefaultValueInFunctionDefinition),
-        (Flake8BooleanTrap, "003") => (RuleGroup::Unspecified, rules::flake8_boolean_trap::rules::BooleanPositionalValueInFunctionCall),
+        (Flake8BooleanTrap, "001") => (RuleGroup::Unspecified, rules::flake8_boolean_trap::rules::BooleanTypeHintPositionalArgument),
+        (Flake8BooleanTrap, "002") => (RuleGroup::Unspecified, rules::flake8_boolean_trap::rules::BooleanDefaultValuePositionalArgument),
+        (Flake8BooleanTrap, "003") => (RuleGroup::Unspecified, rules::flake8_boolean_trap::rules::BooleanPositionalValueInCall),
 
         // flake8-unused-arguments
         (Flake8UnusedArguments, "001") => (RuleGroup::Unspecified, rules::flake8_unused_arguments::rules::UnusedFunctionArgument),
@@ -696,6 +697,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8PytestStyle, "024") => (RuleGroup::Unspecified, rules::flake8_pytest_style::rules::PytestUnnecessaryAsyncioMarkOnFixture),
         (Flake8PytestStyle, "025") => (RuleGroup::Unspecified, rules::flake8_pytest_style::rules::PytestErroneousUseFixturesOnFixture),
         (Flake8PytestStyle, "026") => (RuleGroup::Unspecified, rules::flake8_pytest_style::rules::PytestUseFixturesWithoutParameters),
+        (Flake8PytestStyle, "027") => (RuleGroup::Unspecified, rules::flake8_pytest_style::rules::PytestUnittestRaisesAssertion),
 
         // flake8-pie
         (Flake8Pie, "790") => (RuleGroup::Unspecified, rules::flake8_pie::rules::UnnecessaryPass),

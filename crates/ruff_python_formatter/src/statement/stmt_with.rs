@@ -1,11 +1,12 @@
 use ruff_formatter::{format_args, write, FormatError};
+use ruff_python_ast::node::AstNode;
 use ruff_python_ast::{Ranged, StmtWith};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::TextRange;
 
 use crate::comments::trailing_comments;
 use crate::expression::parentheses::{
-    in_parentheses_only_soft_line_break_or_space, optional_parentheses,
+    in_parentheses_only_soft_line_break_or_space, optional_parentheses, parenthesized,
 };
 use crate::prelude::*;
 use crate::FormatNodeRule;
@@ -15,9 +16,6 @@ pub struct FormatStmtWith;
 
 impl FormatNodeRule<StmtWith> for FormatStmtWith {
     fn fmt_fields(&self, item: &StmtWith, f: &mut PyFormatter) -> FormatResult<()> {
-        let comments = f.context().comments().clone();
-        let dangling_comments = comments.dangling_comments(item);
-
         write!(
             f,
             [
@@ -28,7 +26,39 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
             ]
         )?;
 
-        if are_with_items_parenthesized(item, f.context())? {
+        // The `with` statement can have one dangling comment on the open parenthesis, like:
+        // ```python
+        // with (  # comment
+        //     CtxManager() as example
+        // ):
+        //     ...
+        // ```
+        //
+        // Any other dangling comments are trailing comments on the colon, like:
+        // ```python
+        // with CtxManager() as example:  # comment
+        //     ...
+        // ```
+        let comments = f.context().comments().clone();
+        let dangling_comments = comments.dangling_comments(item.as_any_node_ref());
+        let partition_point = dangling_comments.partition_point(|comment| {
+            item.items
+                .first()
+                .is_some_and(|with_item| with_item.start() > comment.start())
+        });
+        let (parenthesized_comments, colon_comments) = dangling_comments.split_at(partition_point);
+
+        if !parenthesized_comments.is_empty() {
+            let joined = format_with(|f: &mut PyFormatter| {
+                f.join_comma_separated(item.body.first().unwrap().start())
+                    .nodes(&item.items)
+                    .finish()
+            });
+
+            parenthesized("(", &joined, ")")
+                .with_dangling_comments(parenthesized_comments)
+                .fmt(f)?;
+        } else if are_with_items_parenthesized(item, f.context())? {
             optional_parentheses(&format_with(|f| {
                 let mut joiner = f.join_comma_separated(item.body.first().unwrap().start());
 
@@ -52,7 +82,7 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
             f,
             [
                 text(":"),
-                trailing_comments(dangling_comments),
+                trailing_comments(colon_comments),
                 block_indent(&item.body.format())
             ]
         )

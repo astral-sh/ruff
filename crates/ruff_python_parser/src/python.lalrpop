@@ -952,6 +952,7 @@ TryStatement: ast::Stmt = {
                 handlers,
                 orelse,
                 finalbody,
+                is_star: false,
                 range: (location..end_location).into()
             },
         )
@@ -965,12 +966,13 @@ TryStatement: ast::Stmt = {
             .map(Ranged::end)
             .or_else(|| handlers.last().map(Ranged::end))
             .unwrap();
-        ast::Stmt::TryStar(
-            ast::StmtTryStar {
+        ast::Stmt::Try(
+            ast::StmtTry {
                 body,
                 handlers,
                 orelse,
                 finalbody,
+                is_star: true,
                 range: (location..end_location).into()
             },
         )
@@ -985,6 +987,7 @@ TryStatement: ast::Stmt = {
                 handlers,
                 orelse,
                 finalbody,
+                is_star: false,
                 range: (location..end_location).into()
             },
         )

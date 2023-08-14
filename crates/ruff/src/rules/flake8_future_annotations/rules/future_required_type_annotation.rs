@@ -20,6 +20,12 @@ use crate::checkers::ast::Checker;
 /// annotations at evaluation time, making the code compatible with both past
 /// and future Python versions.
 ///
+/// This rule respects the [`target-version`] setting. For example, if your
+/// project targets Python 3.10 and above, adding `from __future__ import annotations`
+/// does not impact your ability to leverage PEP 604-style unions (e.g., to
+/// convert `Optional[str]` to `str | None`). As such, this rule will only
+/// flag such usages if your project targets Python 3.9 or below.
+///
 /// ## Example
 /// ```python
 /// def func(obj: dict[str, int | None]) -> None:
@@ -34,6 +40,9 @@ use crate::checkers::ast::Checker;
 /// def func(obj: dict[str, int | None]) -> None:
 ///     ...
 /// ```
+///
+/// ## Options
+/// - `target-version`
 #[violation]
 pub struct FutureRequiredTypeAnnotation {
     reason: Reason,

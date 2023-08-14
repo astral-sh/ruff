@@ -73,6 +73,7 @@ pub(super) fn place_comment<'a>(
             handle_leading_class_with_decorators_comment(comment, class_def)
         }
         AnyNodeRef::StmtImportFrom(import_from) => handle_import_from_comment(comment, import_from),
+        AnyNodeRef::StmtWith(with_) => handle_with_comment(comment, with_),
         AnyNodeRef::ExprConstant(_) => {
             if let Some(AnyNodeRef::ExprFString(fstring)) = comment.enclosing_parent() {
                 CommentPlacement::dangling(fstring, comment)
@@ -191,12 +192,6 @@ fn is_first_statement_in_body(statement: AnyNodeRef, has_body: AnyNodeRef) -> bo
         }
 
         AnyNodeRef::StmtTry(ast::StmtTry {
-            body,
-            orelse,
-            finalbody,
-            ..
-        })
-        | AnyNodeRef::StmtTryStar(ast::StmtTryStar {
             body,
             orelse,
             finalbody,
@@ -1150,14 +1145,20 @@ fn handle_bracketed_end_of_line_comment<'a>(
             locator.contents(),
             TextRange::new(comment.enclosing_node().start(), comment.start()),
         )
-        .skip_trivia()
-        .skip_while(|t| {
-            matches!(
-                t.kind(),
-                SimpleTokenKind::LParen | SimpleTokenKind::LBrace | SimpleTokenKind::LBracket
-            )
-        });
+        .skip_trivia();
 
+        // Skip the opening parenthesis.
+        let Some(paren) = lexer.next() else {
+            return CommentPlacement::Default(comment);
+        };
+        debug_assert!(matches!(
+            paren.kind(),
+            SimpleTokenKind::LParen | SimpleTokenKind::LBrace | SimpleTokenKind::LBracket
+        ));
+
+        // If there are no additional tokens between the open parenthesis and the comment, then
+        // it should be attached as a dangling comment on the brackets, rather than a leading
+        // comment on the first argument.
         if lexer.next().is_none() {
             return CommentPlacement::dangling(comment.enclosing_node(), comment);
         }
@@ -1166,7 +1167,7 @@ fn handle_bracketed_end_of_line_comment<'a>(
     CommentPlacement::Default(comment)
 }
 
-/// Attach an enclosed end-of-line comment to a [`StmtImportFrom`].
+/// Attach an enclosed end-of-line comment to a [`ast::StmtImportFrom`].
 ///
 /// For example, given:
 /// ```python
@@ -1175,8 +1176,8 @@ fn handle_bracketed_end_of_line_comment<'a>(
 /// )
 /// ```
 ///
-/// The comment will be attached to the `StmtImportFrom` node as a dangling comment, to ensure
-/// that it remains on the same line as the `StmtImportFrom` itself.
+/// The comment will be attached to the [`ast::StmtImportFrom`] node as a dangling comment, to
+/// ensure that it remains on the same line as the [`ast::StmtImportFrom`] itself.
 fn handle_import_from_comment<'a>(
     comment: DecoratedComment<'a>,
     import_from: &'a ast::StmtImportFrom,
@@ -1203,6 +1204,35 @@ fn handle_import_from_comment<'a>(
     if comment.line_position().is_end_of_line()
         && import_from.names.first().is_some_and(|first_name| {
             import_from.start() < comment.start() && comment.start() < first_name.start()
+        })
+    {
+        CommentPlacement::dangling(comment.enclosing_node(), comment)
+    } else {
+        CommentPlacement::Default(comment)
+    }
+}
+
+/// Attach an enclosed end-of-line comment to a [`ast::StmtWith`].
+///
+/// For example, given:
+/// ```python
+/// with ( # foo
+///     CtxManager1() as example1,
+///     CtxManager2() as example2,
+///     CtxManager3() as example3,
+/// ):
+///     ...
+/// ```
+///
+/// The comment will be attached to the [`ast::StmtWith`] node as a dangling comment, to ensure
+/// that it remains on the same line as the [`ast::StmtWith`] itself.
+fn handle_with_comment<'a>(
+    comment: DecoratedComment<'a>,
+    with_statement: &'a ast::StmtWith,
+) -> CommentPlacement<'a> {
+    if comment.line_position().is_end_of_line()
+        && with_statement.items.first().is_some_and(|with_item| {
+            with_statement.start() < comment.start() && comment.start() < with_item.start()
         })
     {
         CommentPlacement::dangling(comment.enclosing_node(), comment)
@@ -1382,13 +1412,6 @@ fn last_child_in_body(node: AnyNodeRef) -> Option<AnyNodeRef> {
             orelse,
             finalbody,
             ..
-        })
-        | AnyNodeRef::StmtTryStar(ast::StmtTryStar {
-            body,
-            handlers,
-            orelse,
-            finalbody,
-            ..
         }) => {
             if finalbody.is_empty() {
                 if orelse.is_empty() {
@@ -1421,12 +1444,6 @@ fn is_first_statement_in_alternate_body(statement: AnyNodeRef, has_body: AnyNode
         }
 
         AnyNodeRef::StmtTry(ast::StmtTry {
-            handlers,
-            orelse,
-            finalbody,
-            ..
-        })
-        | AnyNodeRef::StmtTryStar(ast::StmtTryStar {
             handlers,
             orelse,
             finalbody,

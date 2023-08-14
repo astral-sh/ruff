@@ -88,7 +88,9 @@ from a import (  # comment
     bar,
 )
 
-from a import bar  # comment
+from a import (  # comment
+    bar
+)
 
 from a import (
     bar,

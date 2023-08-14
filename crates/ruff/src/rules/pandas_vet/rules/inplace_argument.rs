@@ -2,8 +2,6 @@ use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_true;
 use ruff_python_ast::{self as ast, Keyword, PySourceType, Ranged};
-use ruff_python_semantic::BindingKind;
-use ruff_python_semantic::Imported;
 use ruff_source_file::Locator;
 
 use crate::autofix::edits::{remove_argument, Parentheses};
@@ -53,20 +51,12 @@ impl Violation for PandasUseOfInplaceArgument {
 /// PD002
 pub(crate) fn inplace_argument(checker: &mut Checker, call: &ast::ExprCall) {
     // If the function was imported from another module, and it's _not_ Pandas, abort.
-    if let Some(call_path) = checker.semantic().resolve_call_path(&call.func) {
-        if !call_path
-            .first()
-            .and_then(|module| checker.semantic().find_binding(module))
-            .is_some_and(|binding| {
-                if let BindingKind::Import(import) = &binding.kind {
-                    matches!(import.call_path(), ["pandas"])
-                } else {
-                    false
-                }
-            })
-        {
-            return;
-        }
+    if checker
+        .semantic()
+        .resolve_call_path(&call.func)
+        .is_some_and(|call_path| !matches!(call_path.as_slice(), ["pandas", ..]))
+    {
+        return;
     }
 
     let mut seen_star = false;

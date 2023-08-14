@@ -132,7 +132,7 @@ static FORMAT_SPECIFIER: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"\{(?P<int>\d+)(?P<fmt>.*?)}").unwrap());
 
 /// Remove the explicit positional indices from a format string.
-fn remove_specifiers<'a>(value: &mut Expression<'a>, arena: &'a mut typed_arena::Arena<String>) {
+fn remove_specifiers<'a>(value: &mut Expression<'a>, arena: &'a typed_arena::Arena<String>) {
     match value {
         Expression::SimpleString(expr) => {
             expr.value = arena.alloc(
@@ -217,8 +217,8 @@ fn generate_call(
 
     // Fix the string itself.
     let item = match_attribute(&mut call.func)?;
-    let mut arena = typed_arena::Arena::new();
-    remove_specifiers(&mut item.value, &mut arena);
+    let arena = typed_arena::Arena::new();
+    remove_specifiers(&mut item.value, &arena);
 
     // Remove the parentheses (first and last characters).
     let mut output = expression.codegen_stylist(stylist);

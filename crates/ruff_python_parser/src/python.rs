@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: eea7f30d1f9d5648f73bb9aeb9c0d61be448c1d648b743eb3155da459e4e6038
+// sha3: d7e633596695f78340d0d083cd0561185ac7f8efadb0297003c81a41031f6e24
 use num_bigint::BigInt;
 use ruff_text_size::TextSize;
 use ruff_python_ast::{self as ast, Ranged, IpyEscapeKind};
@@ -35125,6 +35125,7 @@ fn __action150<
                 handlers,
                 orelse,
                 finalbody,
+                is_star: false,
                 range: (location..end_location).into()
             },
         )
@@ -35155,12 +35156,13 @@ fn __action151<
             .map(Ranged::end)
             .or_else(|| handlers.last().map(Ranged::end))
             .unwrap();
-        ast::Stmt::TryStar(
-            ast::StmtTryStar {
+        ast::Stmt::Try(
+            ast::StmtTry {
                 body,
                 handlers,
                 orelse,
                 finalbody,
+                is_star: true,
                 range: (location..end_location).into()
             },
         )
@@ -35189,6 +35191,7 @@ fn __action152<
                 handlers,
                 orelse,
                 finalbody,
+                is_star: false,
                 range: (location..end_location).into()
             },
         )

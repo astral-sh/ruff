@@ -170,8 +170,7 @@ async def h():
     )
 
 
-with (
-    # d 1
+with (  # d 1
     x
 ):
     pass
