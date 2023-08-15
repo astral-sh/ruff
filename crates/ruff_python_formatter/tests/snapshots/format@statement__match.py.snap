@@ -120,7 +120,7 @@ match long_lines:
 ```py
 # leading match comment
 match foo:  # dangling match comment
-    case NOT_YET_IMPLEMENTED_Pattern:
+    case "NOT_YET_IMPLEMENTED_PatternMatchValue":
         pass
 
 
@@ -131,7 +131,7 @@ match (
     foo  # trailing expr comment
     # another trailing expr comment
 ):  # dangling match comment
-    case NOT_YET_IMPLEMENTED_Pattern:
+    case "NOT_YET_IMPLEMENTED_PatternMatchValue":
         pass
 
 
@@ -139,7 +139,7 @@ match (
 match (  # hello
     foo,  # trailing expr comment  # another
 ):  # dangling match comment
-    case NOT_YET_IMPLEMENTED_Pattern:
+    case "NOT_YET_IMPLEMENTED_PatternMatchValue":
         pass
 
 
@@ -148,14 +148,14 @@ match [  # comment
     second,
     third,
 ]:  # another comment
-    case NOT_YET_IMPLEMENTED_Pattern:
+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
         pass
 
 match (
     # comment
     "a b c"
 ).split():  # another comment
-    case NOT_YET_IMPLEMENTED_Pattern:
+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
         pass
 
 
@@ -164,62 +164,62 @@ match (
     # let's go
     yield foo
 ):  # another comment
-    case NOT_YET_IMPLEMENTED_Pattern:
+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
         pass
 
 
 match aaaaaaaaahhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh:  # comment
-    case NOT_YET_IMPLEMENTED_Pattern:
+    case "NOT_YET_IMPLEMENTED_PatternMatchValue":
         pass
 
 
 def foo():
     match inside_func:  # comment
-        case NOT_YET_IMPLEMENTED_Pattern:
+        case "NOT_YET_IMPLEMENTED_PatternMatchValue":
             pass
 
 
 match newlines:
     # case 1 leading comment
 
-    case NOT_YET_IMPLEMENTED_Pattern:  # case dangling comment
+    case "NOT_YET_IMPLEMENTED_PatternMatchValue":  # case dangling comment
         # pass leading comment
         pass
         # pass trailing comment
 
     # case 2 leading comment
 
-    case NOT_YET_IMPLEMENTED_Pattern if foo == 2:  # second
+    case "NOT_YET_IMPLEMENTED_PatternMatchValue" if foo == 2:  # second
         pass
 
-    case NOT_YET_IMPLEMENTED_Pattern if (foo := 1):  # third
+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2] if (foo := 1):  # third
         pass
 
-    case NOT_YET_IMPLEMENTED_Pattern:
+    case "NOT_YET_IMPLEMENTED_PatternMatchValue":
         pass
 
-    case NOT_YET_IMPLEMENTED_Pattern:
+    case "NOT_YET_IMPLEMENTED_PatternMatchValue":
         pass
-    case NOT_YET_IMPLEMENTED_Pattern:
+    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
         pass
 
 
 match long_lines:
-    case NOT_YET_IMPLEMENTED_Pattern if aaaaaaaaahhhhhhhh == 1 and bbbbbbaaaaaaaaaaa == 2:  # comment
+    case "NOT_YET_IMPLEMENTED_PatternMatchValue" if aaaaaaaaahhhhhhhh == 1 and bbbbbbaaaaaaaaaaa == 2:  # comment
         pass
 
-    case NOT_YET_IMPLEMENTED_Pattern if (
+    case "NOT_YET_IMPLEMENTED_PatternMatchValue" if (
         aaaaaaaaahhhhhhhh == 1 and bbbbbbaaaaaaaaaaa == 2
     ):  # comment
         pass
 
-    case NOT_YET_IMPLEMENTED_Pattern if foo := 1:
+    case "NOT_YET_IMPLEMENTED_PatternMatchValue" if foo := 1:
         pass
 
-    case NOT_YET_IMPLEMENTED_Pattern if (foo := 1):
+    case "NOT_YET_IMPLEMENTED_PatternMatchValue" if (foo := 1):
         pass
 
-    case NOT_YET_IMPLEMENTED_Pattern if (
+    case "NOT_YET_IMPLEMENTED_PatternMatchValue" if (
         aaaaaaahhhhhhhhhhh == 1 and bbbbbbbbaaaaaahhhh == 2
     ):  # another comment
         pass
