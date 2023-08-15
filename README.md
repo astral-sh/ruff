@@ -233,7 +233,7 @@ linting command.
 
 <!-- Begin section: Rules -->
 
-**Ruff supports over 500 lint rules**, many of which are inspired by popular tools like Flake8,
+**Ruff supports over 600 lint rules**, many of which are inspired by popular tools like Flake8,
 isort, pyupgrade, and others. Regardless of the rule's origin, Ruff re-implements every rule in
 Rust as a first-party feature.
 
