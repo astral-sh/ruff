@@ -204,7 +204,7 @@ impl NeedsParentheses for ExprTuple {
 }
 
 /// Check if a tuple has already had parentheses in the input
-fn is_tuple_parenthesized(tuple: &ExprTuple, source: &str) -> bool {
+pub(crate) fn is_tuple_parenthesized(tuple: &ExprTuple, source: &str) -> bool {
     let Some(elt) = tuple.elts.first() else {
         return false;
     };

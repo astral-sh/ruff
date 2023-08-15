@@ -9,6 +9,7 @@ use ruff_text_size::{TextLen, TextRange};
 
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
 use crate::expression::expr_slice::{assign_comment_in_slice, ExprSliceCommentSection};
+use crate::expression::expr_tuple::is_tuple_parenthesized;
 use crate::other::parameters::{
     assign_argument_separator_comment_placement, find_parameter_separators,
 };
@@ -185,7 +186,7 @@ fn handle_enclosed_comment<'a>(
         AnyNodeRef::ExprIfExp(expr_if) => handle_expr_if_comment(comment, expr_if, locator),
         AnyNodeRef::ExprSlice(expr_slice) => handle_slice_comments(comment, expr_slice, locator),
         AnyNodeRef::ExprStarred(starred) => {
-            handle_trailing_expression_starred_star_end_of_line_comment(comment, starred)
+            handle_trailing_expression_starred_star_end_of_line_comment(comment, starred, locator)
         }
         AnyNodeRef::ExprSubscript(expr_subscript) => {
             if let Expr::Slice(expr_slice) = expr_subscript.slice.as_ref() {
@@ -217,8 +218,10 @@ fn handle_enclosed_comment<'a>(
         | AnyNodeRef::ExprGeneratorExp(_)
         | AnyNodeRef::ExprListComp(_)
         | AnyNodeRef::ExprSetComp(_)
-        | AnyNodeRef::ExprDictComp(_)
-        | AnyNodeRef::ExprTuple(_) => handle_bracketed_end_of_line_comment(comment, locator),
+        | AnyNodeRef::ExprDictComp(_) => handle_bracketed_end_of_line_comment(comment, locator),
+        AnyNodeRef::ExprTuple(tuple) if is_tuple_parenthesized(tuple, locator.contents()) => {
+            handle_bracketed_end_of_line_comment(comment, locator)
+        }
         _ => CommentPlacement::Default(comment),
     }
 }
@@ -1060,27 +1063,37 @@ fn handle_expr_if_comment<'a>(
     CommentPlacement::Default(comment)
 }
 
-/// Moving
+/// Handles trailing comments on between the `*` of a starred expression and the
+/// expression itself. For example, attaches the first two comments here as leading
+/// comments on the enclosing node, and the third to the `True` node.
 /// ``` python
 /// call(
-///     # Leading starred comment
-///     * # Trailing star comment
-///     []
-/// )
-/// ```
-/// to
-/// ``` python
-/// call(
-///     # Leading starred comment
-///     # Trailing star comment
-///     * []
+///     *  # dangling end-of-line comment
+///     # dangling own line comment
+///     (  # leading comment on the expression
+///        True
+///     )
 /// )
 /// ```
 fn handle_trailing_expression_starred_star_end_of_line_comment<'a>(
     comment: DecoratedComment<'a>,
     starred: &'a ast::ExprStarred,
+    locator: &Locator,
 ) -> CommentPlacement<'a> {
-    CommentPlacement::leading(starred, comment)
+    if comment.following_node().is_some() {
+        let tokenizer = SimpleTokenizer::new(
+            locator.contents(),
+            TextRange::new(starred.start(), comment.start()),
+        );
+        if !tokenizer
+            .skip_trivia()
+            .any(|token| token.kind() == SimpleTokenKind::LParen)
+        {
+            return CommentPlacement::leading(starred, comment);
+        }
+    }
+
+    CommentPlacement::Default(comment)
 }
 
 /// Handles trailing own line comments before the `as` keyword of a with item and

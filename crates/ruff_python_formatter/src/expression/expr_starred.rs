@@ -1,6 +1,6 @@
 use ruff_python_ast::ExprStarred;
 
-use crate::comments::SourceComment;
+use crate::comments::{dangling_comments, SourceComment};
 use ruff_formatter::write;
 use ruff_python_ast::node::AnyNodeRef;
 
@@ -20,7 +20,10 @@ impl FormatNodeRule<ExprStarred> for FormatExprStarred {
             ctx: _,
         } = item;
 
-        write!(f, [text("*"), value.format()])
+        let comments = f.context().comments().clone();
+        let dangling = comments.dangling_comments(item);
+
+        write!(f, [text("*"), dangling_comments(dangling), value.format()])
     }
 
     fn fmt_dangling_comments(
