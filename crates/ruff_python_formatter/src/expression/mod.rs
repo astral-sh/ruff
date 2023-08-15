@@ -107,7 +107,15 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
         };
 
         if parenthesize {
-            parenthesized("(", &format_expr, ")").fmt(f)
+            let comments = f.context().comments().clone();
+            let open_parenthesis_comment = comments.open_parenthesis_comment(expression);
+            parenthesized("(", &format_expr, ")")
+                .with_dangling_comments(
+                    open_parenthesis_comment
+                        .map(std::slice::from_ref)
+                        .unwrap_or_default(),
+                )
+                .fmt(f)
         } else {
             let level = match f.context().node_level() {
                 NodeLevel::TopLevel | NodeLevel::CompoundStatement => NodeLevel::Expression(None),
@@ -162,6 +170,9 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
         let has_comments = comments.has_leading_comments(*expression)
             || comments.has_trailing_own_line_comments(*expression);
 
+        // If the expression has comments, we always want to preserve the parentheses. This also
+        // ensures that we correctly handle parenthesized comments, and don't need to worry about
+        // them in the implementation below.
         if preserve_parentheses || has_comments {
             return expression.format().with_options(Parentheses::Always).fmt(f);
         }

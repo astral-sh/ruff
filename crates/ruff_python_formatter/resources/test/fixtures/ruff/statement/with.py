@@ -108,7 +108,6 @@ with (
 ):
     ...
 
-
 with [
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "bbbbbbbbbb",
@@ -125,7 +124,6 @@ with (  # comment
 ):
     ...
 
-
 with (  # outer comment
     (  # inner comment
         CtxManager1()
@@ -133,4 +131,30 @@ with (  # outer comment
     CtxManager2() as example2,
     CtxManager3() as example3,
 ):
+    ...
+
+with (  # outer comment
+    CtxManager()
+) as example:
+    ...
+
+with (  # outer comment
+    CtxManager()
+) as example, (  # inner comment
+    CtxManager2()
+) as example2:
+    ...
+
+with (  # outer comment
+    CtxManager1(),
+    CtxManager2(),
+) as example:
+    ...
+
+with (  # outer comment
+    (  # inner comment
+        CtxManager1()
+    ),
+    CtxManager2(),
+) as example:
     ...

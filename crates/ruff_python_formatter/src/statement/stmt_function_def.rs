@@ -66,10 +66,12 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
                 write!(f, [space(), text("->"), space()])?;
 
                 if return_annotation.is_tuple_expr() {
-                    write!(
-                        f,
-                        [return_annotation.format().with_options(Parentheses::Never)]
-                    )?;
+                    let parentheses = if comments.has_leading_comments(return_annotation.as_ref()) {
+                        Parentheses::Always
+                    } else {
+                        Parentheses::Never
+                    };
+                    write!(f, [return_annotation.format().with_options(parentheses)])?;
                 } else if comments.has_trailing_comments(return_annotation.as_ref()) {
                     // Intentionally parenthesize any return annotations with trailing comments.
                     // This avoids an instability in cases like:

@@ -125,8 +125,7 @@ match foo:  # dangling match comment
 
 
 # leading match comment
-match (
-    # leading expr comment
+match (  # leading expr comment
     # another leading expr comment
     foo  # trailing expr comment
     # another trailing expr comment
@@ -151,16 +150,14 @@ match [  # comment
     case NOT_YET_IMPLEMENTED_Pattern:
         pass
 
-match (
-    # comment
+match (  # comment
     "a b c"
 ).split():  # another comment
     case NOT_YET_IMPLEMENTED_Pattern:
         pass
 
 
-match (
-    # comment
+match (  # comment
     # let's go
     yield foo
 ):  # another comment
