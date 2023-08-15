@@ -45,7 +45,7 @@ for item in container:
         process(item)
         break
 # leading comment
-else:  # fmt: skip
+else   :  # fmt: skip
     # Didn't find anything..
     not_found_in_container()
 

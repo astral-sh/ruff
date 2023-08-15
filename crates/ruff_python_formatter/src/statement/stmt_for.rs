@@ -1,14 +1,12 @@
 use ruff_formatter::{format_args, write};
 use ruff_python_ast::{Expr, Ranged, Stmt, StmtFor};
 
-use crate::comments::{
-    leading_alternate_branch_comments, trailing_comments, SourceComment, SuppressionKind,
-};
+use crate::comments::SourceComment;
 use crate::expression::expr_tuple::TupleParentheses;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
-use crate::verbatim::{OrElseParent, SuppressedClauseHeader};
+use crate::statement::clause::{clause_header, ClauseHeader, ElseClause};
 use crate::FormatNodeRule;
 
 #[derive(Debug)]
@@ -49,29 +47,23 @@ impl FormatNodeRule<StmtFor> for FormatStmtFor {
         let (trailing_condition_comments, or_else_comments) =
             dangling_comments.split_at(or_else_comments_start);
 
-        if SuppressionKind::has_skip_comment(trailing_condition_comments, f.context().source()) {
-            SuppressedClauseHeader::For(item).fmt(f)?;
-        } else {
-            write!(
-                f,
-                [
-                    is_async.then_some(format_args![text("async"), space()]),
-                    text("for"),
-                    space(),
-                    ExprTupleWithoutParentheses(target),
-                    space(),
-                    text("in"),
-                    space(),
-                    maybe_parenthesize_expression(iter, item, Parenthesize::IfBreaks),
-                    text(":"),
-                ]
-            )?;
-        }
-
         write!(
             f,
             [
-                trailing_comments(trailing_condition_comments),
+                clause_header(
+                    ClauseHeader::For(item),
+                    trailing_condition_comments,
+                    &format_args![
+                        is_async.then_some(format_args![text("async"), space()]),
+                        text("for"),
+                        space(),
+                        ExprTupleWithoutParentheses(target),
+                        space(),
+                        text("in"),
+                        space(),
+                        maybe_parenthesize_expression(iter, item, Parenthesize::IfBreaks),
+                    ],
+                ),
                 block_indent(&body.format())
             ]
         )?;
@@ -85,18 +77,17 @@ impl FormatNodeRule<StmtFor> for FormatStmtFor {
                 or_else_comments.partition_point(|comment| comment.line_position().is_own_line());
             let (leading, trailing) = or_else_comments.split_at(trailing_start);
 
-            leading_alternate_branch_comments(leading, body.last()).fmt(f)?;
-
-            if SuppressionKind::has_skip_comment(trailing_condition_comments, f.context().source())
-            {
-                SuppressedClauseHeader::OrElse(OrElseParent::For(item)).fmt(f)?;
-            } else {
-                text("else:").fmt(f)?;
-            }
-
             write!(
                 f,
-                [trailing_comments(trailing), block_indent(&orelse.format())]
+                [
+                    clause_header(
+                        ClauseHeader::OrElse(ElseClause::For(item)),
+                        trailing,
+                        &text("else"),
+                    )
+                    .with_leading_comments(leading, body.last()),
+                    block_indent(&orelse.format())
+                ]
             )?;
         }
 

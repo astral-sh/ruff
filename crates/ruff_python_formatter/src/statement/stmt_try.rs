@@ -2,12 +2,12 @@ use ruff_formatter::{write, FormatRuleWithOptions};
 use ruff_python_ast::{ExceptHandler, Ranged, StmtTry};
 
 use crate::comments;
-use crate::comments::{leading_alternate_branch_comments, trailing_comments};
-use crate::comments::{SourceComment, SuppressionKind};
+use crate::comments::leading_alternate_branch_comments;
+use crate::comments::SourceComment;
 use crate::other::except_handler_except_handler::ExceptHandlerKind;
 use crate::prelude::*;
+use crate::statement::clause::{clause_header, ClauseHeader, ElseClause};
 use crate::statement::{FormatRefWithRule, Stmt};
-use crate::verbatim::{OrElseParent, SuppressedClauseHeader};
 use crate::{FormatNodeRule, PyFormatter};
 
 #[derive(Default)]
@@ -127,23 +127,17 @@ fn format_case<'a>(
         let (leading_case_comments, trailing_case_comments) =
             case_comments.split_at(partition_point);
 
-        leading_alternate_branch_comments(leading_case_comments, previous_node).fmt(f)?;
+        let header = match kind {
+            CaseKind::Try => ClauseHeader::Try(try_statement),
+            CaseKind::Else => ClauseHeader::OrElse(ElseClause::Try(try_statement)),
+            CaseKind::Finally => ClauseHeader::TryFinally(try_statement),
+        };
 
-        if SuppressionKind::has_skip_comment(trailing_case_comments, f.context().source()) {
-            let header = match kind {
-                CaseKind::Try => SuppressedClauseHeader::Try(try_statement),
-                CaseKind::Else => SuppressedClauseHeader::OrElse(OrElseParent::Try(try_statement)),
-                CaseKind::Finally => SuppressedClauseHeader::TryFinally(try_statement),
-            };
-
-            header.fmt(f)?;
-        } else {
-            write!(f, [text(kind.keyword()), text(":")])?;
-        }
         write!(
             f,
             [
-                trailing_comments(trailing_case_comments),
+                clause_header(header, trailing_case_comments, &text(kind.keyword()))
+                    .with_leading_comments(leading_case_comments, previous_node),
                 block_indent(&body.format())
             ]
         )?;
@@ -153,6 +147,7 @@ fn format_case<'a>(
     })
 }
 
+#[derive(Copy, Clone)]
 enum CaseKind {
     Try,
     Else,

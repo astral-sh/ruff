@@ -1,14 +1,13 @@
-use crate::comments::{
-    leading_alternate_branch_comments, trailing_comments, SourceComment, SuppressionKind,
-};
+use ruff_formatter::{format_args, write};
+use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::{ElifElseClause, StmtIf};
+
+use crate::comments::SourceComment;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
-use crate::verbatim::SuppressedClauseHeader;
+use crate::statement::clause::{clause_header, ClauseHeader};
 use crate::FormatNodeRule;
-use ruff_formatter::write;
-use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{ElifElseClause, StmtIf};
 
 #[derive(Default)]
 pub struct FormatStmtIf;
@@ -25,24 +24,18 @@ impl FormatNodeRule<StmtIf> for FormatStmtIf {
         let comments = f.context().comments().clone();
         let trailing_colon_comment = comments.dangling_comments(item);
 
-        if SuppressionKind::has_skip_comment(trailing_colon_comment, f.context().source()) {
-            SuppressedClauseHeader::If(item).fmt(f)?;
-        } else {
-            write!(
-                f,
-                [
-                    text("if"),
-                    space(),
-                    maybe_parenthesize_expression(test, item, Parenthesize::IfBreaks),
-                    text(":"),
-                ]
-            )?;
-        }
-
         write!(
             f,
             [
-                trailing_comments(trailing_colon_comment),
+                clause_header(
+                    ClauseHeader::If(item),
+                    trailing_colon_comment,
+                    &format_args![
+                        text("if"),
+                        space(),
+                        maybe_parenthesize_expression(test, item, Parenthesize::IfBreaks),
+                    ],
+                ),
                 block_indent(&body.format())
             ]
         )?;
@@ -83,31 +76,28 @@ pub(crate) fn format_elif_else_clause(
     let trailing_colon_comment = comments.dangling_comments(item);
     let leading_comments = comments.leading_comments(item);
 
-    leading_alternate_branch_comments(leading_comments, last_node).fmt(f)?;
-
-    if SuppressionKind::has_skip_comment(trailing_colon_comment, f.context().source()) {
-        SuppressedClauseHeader::ElifElse(item).fmt(f)?;
-    } else {
-        if let Some(test) = test {
-            write!(
-                f,
-                [
-                    text("elif"),
-                    space(),
-                    maybe_parenthesize_expression(test, item, Parenthesize::IfBreaks),
-                ]
-            )?;
-        } else {
-            text("else").fmt(f)?;
-        }
-
-        text(":").fmt(f)?;
-    }
-
     write!(
         f,
         [
-            trailing_comments(trailing_colon_comment),
+            clause_header(
+                ClauseHeader::ElifElse(item),
+                trailing_colon_comment,
+                &format_with(|f| {
+                    if let Some(test) = test {
+                        write!(
+                            f,
+                            [
+                                text("elif"),
+                                space(),
+                                maybe_parenthesize_expression(test, item, Parenthesize::IfBreaks),
+                            ]
+                        )
+                    } else {
+                        text("else").fmt(f)
+                    }
+                }),
+            )
+            .with_leading_comments(leading_comments, last_node),
             block_indent(&body.format())
         ]
     )

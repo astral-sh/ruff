@@ -3,6 +3,7 @@ use ruff_python_ast::Stmt;
 
 use crate::prelude::*;
 
+pub(super) mod clause;
 pub(crate) mod stmt_ann_assign;
 pub(crate) mod stmt_assert;
 pub(crate) mod stmt_assign;

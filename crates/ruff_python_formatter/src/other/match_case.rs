@@ -3,10 +3,10 @@ use ruff_python_ast::{MatchCase, Pattern, Ranged};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::TextRange;
 
-use crate::comments::{leading_comments, trailing_comments, SourceComment, SuppressionKind};
+use crate::comments::{leading_comments, SourceComment};
 use crate::expression::parentheses::parenthesized;
 use crate::prelude::*;
-use crate::verbatim::SuppressedClauseHeader;
+use crate::statement::clause::{clause_header, ClauseHeader};
 use crate::{FormatError, FormatNodeRule, PyFormatter};
 
 #[derive(Default)]
@@ -24,36 +24,39 @@ impl FormatNodeRule<MatchCase> for FormatMatchCase {
         let comments = f.context().comments().clone();
         let dangling_item_comments = comments.dangling_comments(item);
 
-        if SuppressionKind::has_skip_comment(dangling_item_comments, f.context().source()) {
-            SuppressedClauseHeader::MatchCase(item).fmt(f)?;
-        } else {
-            write!(f, [text("case"), space()])?;
-
-            let leading_pattern_comments = comments.leading_comments(pattern);
-            if !leading_pattern_comments.is_empty() {
-                parenthesized(
-                    "(",
-                    &format_args![leading_comments(leading_pattern_comments), pattern.format()],
-                    ")",
-                )
-                .fmt(f)?;
-            } else if is_match_case_pattern_parenthesized(item, pattern, f.context())? {
-                parenthesized("(", &pattern.format(), ")").fmt(f)?;
-            } else {
-                pattern.format().fmt(f)?;
-            }
-
-            if let Some(guard) = guard {
-                write!(f, [space(), text("if"), space(), guard.format()])?;
-            }
-
-            text(":").fmt(f)?;
-        }
-
         write!(
             f,
             [
-                trailing_comments(dangling_item_comments),
+                clause_header(
+                    ClauseHeader::MatchCase(item),
+                    dangling_item_comments,
+                    &format_with(|f| {
+                        write!(f, [text("case"), space()])?;
+
+                        let leading_pattern_comments = comments.leading_comments(pattern);
+                        if !leading_pattern_comments.is_empty() {
+                            parenthesized(
+                                "(",
+                                &format_args![
+                                    leading_comments(leading_pattern_comments),
+                                    pattern.format()
+                                ],
+                                ")",
+                            )
+                            .fmt(f)?;
+                        } else if is_match_case_pattern_parenthesized(item, pattern, f.context())? {
+                            parenthesized("(", &pattern.format(), ")").fmt(f)?;
+                        } else {
+                            pattern.format().fmt(f)?;
+                        }
+
+                        if let Some(guard) = guard {
+                            write!(f, [space(), text("if"), space(), guard.format()])?;
+                        }
+
+                        Ok(())
+                    }),
+                ),
                 block_indent(&body.format())
             ]
         )

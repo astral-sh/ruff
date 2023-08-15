@@ -1,12 +1,13 @@
-use crate::comments::{trailing_comments, SourceComment, SuppressionKind};
-use crate::expression::maybe_parenthesize_expression;
-use crate::expression::parentheses::Parenthesize;
-use crate::prelude::*;
-use crate::verbatim::SuppressedClauseHeader;
-use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::FormatRuleWithOptions;
 use ruff_formatter::{write, Buffer, FormatResult};
 use ruff_python_ast::ExceptHandlerExceptHandler;
+
+use crate::comments::SourceComment;
+use crate::expression::maybe_parenthesize_expression;
+use crate::expression::parentheses::Parenthesize;
+use crate::prelude::*;
+use crate::statement::clause::{clause_header, ClauseHeader};
+use crate::{FormatNodeRule, PyFormatter};
 
 #[derive(Copy, Clone, Default)]
 pub enum ExceptHandlerKind {
@@ -47,41 +48,45 @@ impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHan
         let comments_info = f.context().comments().clone();
         let dangling_comments = comments_info.dangling_comments(item);
 
-        if SuppressionKind::has_skip_comment(dangling_comments, f.context().source()) {
-            SuppressedClauseHeader::ExceptHandler(item).fmt(f)?;
-        } else {
-            write!(
-                f,
-                [
-                    text("except"),
-                    match self.except_handler_kind {
-                        ExceptHandlerKind::Regular => None,
-                        ExceptHandlerKind::Starred => Some(text("*")),
-                    }
-                ]
-            )?;
-
-            if let Some(type_) = type_ {
-                write!(
-                    f,
-                    [
-                        space(),
-                        maybe_parenthesize_expression(type_, item, Parenthesize::IfBreaks)
-                    ]
-                )?;
-                if let Some(name) = name {
-                    write!(f, [space(), text("as"), space(), name.format()])?;
-                }
-            }
-
-            text(":").fmt(f)?;
-        }
-
         write!(
             f,
             [
-                trailing_comments(dangling_comments),
-                block_indent(&body.format()),
+                clause_header(
+                    ClauseHeader::ExceptHandler(item),
+                    dangling_comments,
+                    &format_with(|f| {
+                        write!(
+                            f,
+                            [
+                                text("except"),
+                                match self.except_handler_kind {
+                                    ExceptHandlerKind::Regular => None,
+                                    ExceptHandlerKind::Starred => Some(text("*")),
+                                }
+                            ]
+                        )?;
+
+                        if let Some(type_) = type_ {
+                            write!(
+                                f,
+                                [
+                                    space(),
+                                    maybe_parenthesize_expression(
+                                        type_,
+                                        item,
+                                        Parenthesize::IfBreaks
+                                    )
+                                ]
+                            )?;
+                            if let Some(name) = name {
+                                write!(f, [space(), text("as"), space(), name.format()])?;
+                            }
+                        }
+
+                        Ok(())
+                    }),
+                ),
+                block_indent(&body.format())
             ]
         )
     }

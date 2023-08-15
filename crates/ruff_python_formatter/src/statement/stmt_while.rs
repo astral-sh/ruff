@@ -1,14 +1,12 @@
-use ruff_formatter::write;
+use ruff_formatter::{format_args, write};
 use ruff_python_ast::node::AstNode;
 use ruff_python_ast::{Ranged, Stmt, StmtWhile};
 
-use crate::comments::{
-    leading_alternate_branch_comments, trailing_comments, SourceComment, SuppressionKind,
-};
+use crate::comments::SourceComment;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
-use crate::verbatim::{OrElseParent, SuppressedClauseHeader};
+use crate::statement::clause::{clause_header, ClauseHeader, ElseClause};
 use crate::FormatNodeRule;
 
 #[derive(Default)]
@@ -33,24 +31,18 @@ impl FormatNodeRule<StmtWhile> for FormatStmtWhile {
         let (trailing_condition_comments, or_else_comments) =
             dangling_comments.split_at(or_else_comments_start);
 
-        if SuppressionKind::has_skip_comment(trailing_condition_comments, f.context().source()) {
-            SuppressedClauseHeader::While(item).fmt(f)?;
-        } else {
-            write!(
-                f,
-                [
-                    text("while"),
-                    space(),
-                    maybe_parenthesize_expression(test, item, Parenthesize::IfBreaks),
-                    text(":"),
-                ]
-            )?;
-        }
-
         write!(
             f,
             [
-                trailing_comments(trailing_condition_comments),
+                clause_header(
+                    ClauseHeader::While(item),
+                    trailing_condition_comments,
+                    &format_args![
+                        text("while"),
+                        space(),
+                        maybe_parenthesize_expression(test, item, Parenthesize::IfBreaks),
+                    ]
+                ),
                 block_indent(&body.format())
             ]
         )?;
@@ -62,17 +54,17 @@ impl FormatNodeRule<StmtWhile> for FormatStmtWhile {
                 or_else_comments.partition_point(|comment| comment.line_position().is_own_line());
             let (leading, trailing) = or_else_comments.split_at(trailing_start);
 
-            leading_alternate_branch_comments(leading, body.last()).fmt(f)?;
-
-            if SuppressionKind::has_skip_comment(trailing, f.context().source()) {
-                SuppressedClauseHeader::OrElse(OrElseParent::While(item)).fmt(f)?;
-            } else {
-                text("else:").fmt(f)?;
-            }
-
             write!(
                 f,
-                [trailing_comments(trailing), block_indent(&orelse.format())]
+                [
+                    clause_header(
+                        ClauseHeader::OrElse(ElseClause::While(item)),
+                        trailing,
+                        &text("else")
+                    )
+                    .with_leading_comments(leading, body.last()),
+                    block_indent(&orelse.format())
+                ]
             )?;
         }
 

@@ -85,11 +85,11 @@ def http_error(status):
     match status   :  # fmt: skip
         case 400   :  # fmt: skip
             return "Bad request"
-        case NOT_YET_IMPLEMENTED_Pattern:
+        case "NOT_YET_IMPLEMENTED_PatternMatchValue":
             return "Not found"
-        case NOT_YET_IMPLEMENTED_Pattern:
+        case "NOT_YET_IMPLEMENTED_PatternMatchValue":
             return "I'm a teapot"
-        case NOT_YET_IMPLEMENTED_Pattern:
+        case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
             return "Something's wrong with the internet"
 
 
@@ -97,13 +97,13 @@ def http_error(status):
 match point:
     case (0,   0):  # fmt: skip
         print("Origin")
-    case NOT_YET_IMPLEMENTED_Pattern:
+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
         print(f"Y={y}")
-    case NOT_YET_IMPLEMENTED_Pattern:
+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
         print(f"X={x}")
-    case NOT_YET_IMPLEMENTED_Pattern:
+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
         print(f"X={x}, Y={y}")
-    case NOT_YET_IMPLEMENTED_Pattern:
+    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
         raise ValueError("Not a point")
 
 
@@ -116,28 +116,28 @@ def location(point):
     match point:
         case Point(x=0, y =0  ) :  # fmt: skip
             print("Origin is the point's location.")
-        case NOT_YET_IMPLEMENTED_Pattern:
+        case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
             print(f"Y={y} and the point is on the y-axis.")
-        case NOT_YET_IMPLEMENTED_Pattern:
+        case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
             print(f"X={x} and the point is on the x-axis.")
-        case NOT_YET_IMPLEMENTED_Pattern:
+        case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
             print("The point is located somewhere else on the plane.")
-        case NOT_YET_IMPLEMENTED_Pattern:
+        case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
             print("Not a point")
 
 
 match points:
-    case NOT_YET_IMPLEMENTED_Pattern:
+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
         print("No points in the list.")
     case [
         Point(0, 0)
     ]:  # fmt: skip
         print("The origin is the only point in the list.")
-    case NOT_YET_IMPLEMENTED_Pattern:
+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
         print(f"A single point {x}, {y} is in the list.")
-    case NOT_YET_IMPLEMENTED_Pattern:
+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
         print(f"Two points on the Y axis at {y1}, {y2} are in the list.")
-    case NOT_YET_IMPLEMENTED_Pattern:
+    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
         print("Something else is found in the list.")
 
 
@@ -148,14 +148,14 @@ match test_variable:
             40
     ):  # fmt: skip
         print("A warning has been received.")
-    case NOT_YET_IMPLEMENTED_Pattern:
+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
         print(f"An error {code} occurred.")
 
 
 match point:
     case Point(x, y) if x   == y:  # fmt: skip
         print(f"The point is located on the diagonal Y=X at {x}.")
-    case NOT_YET_IMPLEMENTED_Pattern:
+    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
         print(f"Point is not on the diagonal.")
 ```
 
