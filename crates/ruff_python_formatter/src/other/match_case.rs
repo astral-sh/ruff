@@ -1,7 +1,7 @@
 use ruff_formatter::{write, Buffer, FormatResult};
 use ruff_python_ast::MatchCase;
 
-use crate::comments::trailing_comments;
+use crate::comments::{trailing_comments, SourceComment};
 use crate::not_yet_implemented_custom_text;
 use crate::prelude::*;
 use crate::{FormatNodeRule, PyFormatter};
@@ -54,7 +54,11 @@ impl FormatNodeRule<MatchCase> for FormatMatchCase {
         )
     }
 
-    fn fmt_dangling_comments(&self, _node: &MatchCase, _f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         // Handled as part of `fmt_fields`
         Ok(())
     }

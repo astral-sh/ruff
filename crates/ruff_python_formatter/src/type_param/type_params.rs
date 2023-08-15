@@ -1,5 +1,5 @@
 use crate::builders::PyFormatterExtensions;
-use crate::comments::trailing_comments;
+use crate::comments::{trailing_comments, SourceComment};
 use crate::expression::parentheses::parenthesized;
 use crate::prelude::*;
 use ruff_formatter::write;
@@ -34,7 +34,11 @@ impl FormatNodeRule<TypeParams> for FormatTypeParams {
         parenthesized("[", &items, "]").fmt(f)
     }
 
-    fn fmt_dangling_comments(&self, _node: &TypeParams, _f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         // Handled in `fmt_fields`
         Ok(())
     }

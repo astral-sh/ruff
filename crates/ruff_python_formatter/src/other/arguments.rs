@@ -1,3 +1,4 @@
+use crate::comments::SourceComment;
 use ruff_formatter::write;
 use ruff_python_ast::node::AstNode;
 use ruff_python_ast::{Arguments, Expr, Ranged};
@@ -99,7 +100,11 @@ impl FormatNodeRule<Arguments> for FormatArguments {
         )
     }
 
-    fn fmt_dangling_comments(&self, _node: &Arguments, _f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         // Handled in `fmt_fields`
         Ok(())
     }

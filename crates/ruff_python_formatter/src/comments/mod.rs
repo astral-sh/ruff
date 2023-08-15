@@ -106,7 +106,7 @@ use ruff_python_index::CommentRanges;
 use ruff_python_trivia::PythonWhitespace;
 
 use crate::comments::debug::{DebugComment, DebugComments};
-use crate::comments::map::MultiMap;
+use crate::comments::map::{LeadingDanglingTrailing, MultiMap};
 use crate::comments::node_key::NodeRefEqualityKey;
 use crate::comments::visitor::CommentsVisitor;
 
@@ -405,13 +405,13 @@ impl<'a> Comments<'a> {
     pub(crate) fn leading_dangling_trailing_comments<T>(
         &self,
         node: T,
-    ) -> impl Iterator<Item = &SourceComment>
+    ) -> LeadingDanglingTrailingComments
     where
         T: Into<AnyNodeRef<'a>>,
     {
         self.data
             .comments
-            .parts(&NodeRefEqualityKey::from_ref(node.into()))
+            .leading_dangling_trailing(&NodeRefEqualityKey::from_ref(node.into()))
     }
 
     #[inline(always)]
@@ -463,6 +463,8 @@ impl<'a> Comments<'a> {
         DebugComments::new(&self.data.comments, source_code)
     }
 }
+
+pub(crate) type LeadingDanglingTrailingComments<'a> = LeadingDanglingTrailing<'a, SourceComment>;
 
 #[derive(Debug, Default)]
 struct CommentsData<'a> {

@@ -1,4 +1,4 @@
-use crate::comments::{leading_alternate_branch_comments, trailing_comments};
+use crate::comments::{leading_alternate_branch_comments, trailing_comments, SourceComment};
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
@@ -43,7 +43,11 @@ impl FormatNodeRule<StmtIf> for FormatStmtIf {
         Ok(())
     }
 
-    fn fmt_dangling_comments(&self, _node: &StmtIf, _f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         // Handled by `fmt_fields`
         Ok(())
     }

@@ -1,5 +1,6 @@
 use ruff_python_ast::ExprStarred;
 
+use crate::comments::SourceComment;
 use ruff_formatter::write;
 use ruff_python_ast::node::AnyNodeRef;
 
@@ -22,9 +23,11 @@ impl FormatNodeRule<ExprStarred> for FormatExprStarred {
         write!(f, [text("*"), value.format()])
     }
 
-    fn fmt_dangling_comments(&self, node: &ExprStarred, f: &mut PyFormatter) -> FormatResult<()> {
-        debug_assert_eq!(f.context().comments().dangling_comments(node), []);
-
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         Ok(())
     }
 }

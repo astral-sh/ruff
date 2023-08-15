@@ -2,7 +2,7 @@ use ruff_formatter::{write, Buffer};
 use ruff_python_ast::{Ranged, StmtClassDef};
 use ruff_python_trivia::lines_after_ignoring_trivia;
 
-use crate::comments::{leading_comments, trailing_comments};
+use crate::comments::{leading_comments, trailing_comments, SourceComment};
 use crate::prelude::*;
 use crate::statement::suite::SuiteKind;
 use crate::FormatNodeRule;
@@ -129,7 +129,7 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
 
     fn fmt_dangling_comments(
         &self,
-        _node: &StmtClassDef,
+        _dangling_comments: &[SourceComment],
         _f: &mut PyFormatter,
     ) -> FormatResult<()> {
         // handled in fmt_fields

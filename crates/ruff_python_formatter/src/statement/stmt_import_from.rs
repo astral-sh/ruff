@@ -4,6 +4,7 @@ use ruff_python_ast::node::AstNode;
 use ruff_python_ast::{Ranged, StmtImportFrom};
 
 use crate::builders::{parenthesize_if_expands, PyFormatterExtensions, TrailingComma};
+use crate::comments::SourceComment;
 use crate::expression::parentheses::parenthesized;
 use crate::{AsFormat, FormatNodeRule, PyFormatter};
 
@@ -71,7 +72,7 @@ impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
 
     fn fmt_dangling_comments(
         &self,
-        _node: &StmtImportFrom,
+        _dangling_comments: &[SourceComment],
         _f: &mut PyFormatter,
     ) -> FormatResult<()> {
         // Handled in `fmt_fields`

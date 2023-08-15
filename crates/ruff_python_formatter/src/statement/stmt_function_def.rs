@@ -2,7 +2,7 @@ use ruff_formatter::write;
 use ruff_python_ast::{Parameters, Ranged, StmtFunctionDef};
 use ruff_python_trivia::{lines_after_ignoring_trivia, SimpleTokenKind, SimpleTokenizer};
 
-use crate::comments::{leading_comments, trailing_comments};
+use crate::comments::{leading_comments, trailing_comments, SourceComment};
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{Parentheses, Parenthesize};
 use crate::prelude::*;
@@ -147,7 +147,7 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
 
     fn fmt_dangling_comments(
         &self,
-        _node: &StmtFunctionDef,
+        _dangling_comments: &[SourceComment],
         _f: &mut PyFormatter,
     ) -> FormatResult<()> {
         // Handled in `fmt_fields`

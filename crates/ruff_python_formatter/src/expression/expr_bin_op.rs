@@ -9,7 +9,7 @@ use smallvec::SmallVec;
 use ruff_formatter::{format_args, write, FormatOwnedWithRule, FormatRefWithRule};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
 
-use crate::comments::{trailing_comments, trailing_node_comments};
+use crate::comments::{trailing_comments, trailing_node_comments, SourceComment};
 use crate::expression::expr_constant::ExprConstantLayout;
 use crate::expression::parentheses::{
     in_parentheses_only_group, in_parentheses_only_soft_line_break,
@@ -147,7 +147,11 @@ impl FormatNodeRule<ExprBinOp> for FormatExprBinOp {
         }
     }
 
-    fn fmt_dangling_comments(&self, _node: &ExprBinOp, _f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         // Handled inside of `fmt_fields`
         Ok(())
     }

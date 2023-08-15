@@ -1,3 +1,4 @@
+use crate::comments::SourceComment;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 use crate::FormatNodeRule;
@@ -23,7 +24,11 @@ impl FormatNodeRule<ExprName> for FormatExprName {
         write!(f, [source_text_slice(*range, ContainsNewlines::No)])
     }
 
-    fn fmt_dangling_comments(&self, _node: &ExprName, _f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         // Node cannot have dangling comments
         Ok(())
     }
