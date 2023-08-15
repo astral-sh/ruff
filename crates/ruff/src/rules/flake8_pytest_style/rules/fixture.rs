@@ -213,6 +213,14 @@ pub struct PytestMissingFixtureNameUnderscore {
     function: String,
 }
 
+impl Violation for PytestMissingFixtureNameUnderscore {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let PytestMissingFixtureNameUnderscore { function } = self;
+        format!("Fixture `{function}` does not return anything, add leading underscore")
+    }
+}
+
 /// ## What it does
 /// Checks for `pytest` fixtures that return a value, but are named with a
 /// leading underscore.
@@ -259,14 +267,6 @@ pub struct PytestMissingFixtureNameUnderscore {
 ///
 /// ## References
 /// - [`pytest` documentation: `@pytest.fixture` functions](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fixture)
-impl Violation for PytestMissingFixtureNameUnderscore {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let PytestMissingFixtureNameUnderscore { function } = self;
-        format!("Fixture `{function}` does not return anything, add leading underscore")
-    }
-}
-
 #[violation]
 pub struct PytestIncorrectFixtureNameUnderscore {
     function: String,
