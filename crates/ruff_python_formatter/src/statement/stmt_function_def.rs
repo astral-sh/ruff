@@ -140,7 +140,15 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
         // def f(): ...
         // ```
         if f.options().source_type().is_stub() && contains_only_an_ellipsis(&item.body) {
-            write!(f, [text(":"), space(), text("..."), hard_line_break()])
+            write!(
+                f,
+                [
+                    text(":"),
+                    space(),
+                    &item.body.format().with_options(SuiteKind::Function),
+                    hard_line_break()
+                ]
+            )
         } else {
             write!(
                 f,

@@ -76,3 +76,9 @@ class Test2(A):
 def b(): ...
 # comment
 def c(): ...
+
+class EllipsisWithComment:
+    ...  # comment
+
+def function_with_comment():
+    ...  # comment

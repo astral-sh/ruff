@@ -122,7 +122,15 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
         // class A: ...
         // ```
         if f.options().source_type().is_stub() && contains_only_an_ellipsis(body) {
-            write!(f, [text(":"), space(), text("..."), hard_line_break()])
+            write!(
+                f,
+                [
+                    text(":"),
+                    space(),
+                    &body.format().with_options(SuiteKind::Class),
+                    hard_line_break()
+                ]
+            )
         } else {
             write!(
                 f,
