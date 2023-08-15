@@ -209,14 +209,14 @@ impl Violation for PytestParametrizeValuesWrongType {
 /// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
 #[violation]
 pub struct PytestDuplicateParametrizeTestCases {
-    pub indexes: Vec<usize>,
+    pub indices: Vec<usize>,
 }
 
 impl Violation for PytestDuplicateParametrizeTestCases {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PytestDuplicateParametrizeTestCases { indexes } = self;
-        format!("Found duplicate test cases {indexes:?} in `@pytest.mark.parametrize`")
+        let PytestDuplicateParametrizeTestCases { indices } = self;
+        format!("Found duplicate test cases at indices {indices:?} in `@pytest.mark.parametrize`")
     }
 }
 
@@ -527,16 +527,6 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
                 ));
             }
 
-            let duplicates = find_duplicates(elts);
-            if !duplicates.is_empty() {
-                checker.diagnostics.push(Diagnostic::new(
-                    PytestDuplicateParametrizeTestCases {
-                        indexes: duplicates,
-                    },
-                    values.range(),
-                ));
-            }
-
             if is_multi_named {
                 handle_value_rows(checker, elts, values_type, values_row_type);
             }
@@ -575,10 +565,10 @@ fn find_duplicates(elts: &Vec<Expr>) -> Vec<usize> {
 fn check_duplicates(checker: &mut Checker, values: &Expr) {
     match values {
         Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-            let indexes = find_duplicates(elts);
-            if !indexes.is_empty() {
+            let indices = find_duplicates(elts);
+            if !indices.is_empty() {
                 checker.diagnostics.push(Diagnostic::new(
-                    PytestDuplicateParametrizeTestCases { indexes },
+                    PytestDuplicateParametrizeTestCases { indices },
                     values.range(),
                 ));
             }
