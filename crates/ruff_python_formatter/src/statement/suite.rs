@@ -2,7 +2,7 @@ use crate::comments::{leading_comments, trailing_comments};
 use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
 use ruff_python_ast::helpers::is_compound_statement;
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{self as ast, Expr, ExprConstant, Ranged, Stmt, Suite};
+use ruff_python_ast::{self as ast, Constant, Expr, ExprConstant, Ranged, Stmt, Suite};
 use ruff_python_trivia::{lines_after_ignoring_trivia, lines_before};
 use ruff_text_size::TextRange;
 
@@ -55,6 +55,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
 
         let comments = f.context().comments().clone();
         let source = f.context().source();
+        let source_type = f.options().source_type();
 
         let mut f = WithNodeLevel::new(node_level, f);
         write!(
@@ -152,6 +153,44 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                         || is_class_or_function_definition(following)
                     {
                         match self.kind {
+                            SuiteKind::TopLevel if source_type.is_stub() => {
+                                // Preserve the empty line if the definitions are separated by a comment
+                                if comments.has_trailing_comments(preceding)
+                                    || comments.has_leading_comments(following)
+                                {
+                                    empty_line().fmt(f)?;
+                                } else {
+                                    // Two subsequent classes that both have an ellipsis only body
+                                    // ```python
+                                    // class A: ...
+                                    // class B: ...
+                                    // ```
+                                    let class_sequences_with_ellipsis_only =
+                                        preceding.as_class_def_stmt().is_some_and(|class| {
+                                            contains_only_an_ellipsis(&class.body)
+                                        }) && following.as_class_def_stmt().is_some_and(|class| {
+                                            contains_only_an_ellipsis(&class.body)
+                                        });
+
+                                    // Two subsequent functions where the preceding has an ellipsis only body
+                                    // ```python
+                                    // def test(): ...
+                                    // def b(): a
+                                    // ```
+                                    let function_with_ellipsis =
+                                        preceding.as_function_def_stmt().is_some_and(|function| {
+                                            contains_only_an_ellipsis(&function.body)
+                                        }) && following.is_function_def_stmt();
+
+                                    // Don't add an empty line between two classes that have an `...` body only or after
+                                    // a function with an `...` body. Otherwise add an empty line.
+                                    if !class_sequences_with_ellipsis_only
+                                        && !function_with_ellipsis
+                                    {
+                                        empty_line().fmt(f)?;
+                                    }
+                                }
+                            }
                             SuiteKind::TopLevel => {
                                 write!(f, [empty_line(), empty_line()])?;
                             }
@@ -281,6 +320,20 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 Ok(())
             })]
         )
+    }
+}
+
+/// Returns `true` if a function or class body contains only an ellipsis.
+fn contains_only_an_ellipsis(body: &[Stmt]) -> bool {
+    match body {
+        [Stmt::Expr(ast::StmtExpr { value, .. })] => matches!(
+            value.as_ref(),
+            Expr::Constant(ast::ExprConstant {
+                value: Constant::Ellipsis,
+                ..
+            })
+        ),
+        _ => false,
     }
 }
 
