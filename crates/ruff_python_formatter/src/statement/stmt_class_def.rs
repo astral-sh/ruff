@@ -4,7 +4,7 @@ use ruff_python_trivia::lines_after_ignoring_trivia;
 
 use crate::comments::{leading_comments, trailing_comments};
 use crate::prelude::*;
-use crate::statement::suite::SuiteKind;
+use crate::statement::suite::{contains_only_an_ellipsis, SuiteKind};
 use crate::FormatNodeRule;
 
 #[derive(Default)]
@@ -117,14 +117,18 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
             }
         }
 
-        write!(
-            f,
-            [
-                text(":"),
-                trailing_comments(trailing_definition_comments),
-                block_indent(&body.format().with_options(SuiteKind::Class))
-            ]
-        )
+        if f.options().source_type().is_stub() && contains_only_an_ellipsis(body) {
+            write!(f, [text(":"), space(), text("..."), hard_line_break()])
+        } else {
+            write!(
+                f,
+                [
+                    text(":"),
+                    trailing_comments(trailing_definition_comments),
+                    block_indent(&body.format().with_options(SuiteKind::Class))
+                ]
+            )
+        }
     }
 
     fn fmt_dangling_comments(

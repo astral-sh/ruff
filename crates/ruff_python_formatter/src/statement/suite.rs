@@ -324,7 +324,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
 }
 
 /// Returns `true` if a function or class body contains only an ellipsis.
-fn contains_only_an_ellipsis(body: &[Stmt]) -> bool {
+pub(crate) fn contains_only_an_ellipsis(body: &[Stmt]) -> bool {
     match body {
         [Stmt::Expr(ast::StmtExpr { value, .. })] => matches!(
             value.as_ref(),
