@@ -35,6 +35,9 @@ use super::helpers::{
 ///
 /// ## Example
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.fixture
 /// def my_fixture():
 ///     ...
@@ -42,6 +45,9 @@ use super::helpers::{
 ///
 /// Use instead:
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.fixture()
 /// def my_fixture():
 ///     ...
@@ -83,6 +89,9 @@ impl AlwaysAutofixableViolation for PytestFixtureIncorrectParenthesesStyle {
 ///
 /// ## Example
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.fixture("module")
 /// def my_fixture():
 ///     ...
@@ -90,6 +99,9 @@ impl AlwaysAutofixableViolation for PytestFixtureIncorrectParenthesesStyle {
 ///
 /// Use instead:
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.fixture(scope="module")
 /// def my_fixture():
 ///     ...
@@ -118,6 +130,9 @@ impl Violation for PytestFixturePositionalArgs {
 ///
 /// ## Example
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.fixture(scope="function")
 /// def my_fixture():
 ///     ...
@@ -125,6 +140,9 @@ impl Violation for PytestFixturePositionalArgs {
 ///
 /// Use instead:
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.fixture()
 /// def my_fixture():
 ///     ...
@@ -158,6 +176,9 @@ impl AlwaysAutofixableViolation for PytestExtraneousScopeFunction {
 ///
 /// ## Example
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.fixture()
 /// def patch_something(mocker):
 ///     mocker.patch("module.object")
@@ -171,6 +192,9 @@ impl AlwaysAutofixableViolation for PytestExtraneousScopeFunction {
 ///
 /// Use instead:
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.fixture()
 /// def _patch_something(mocker):
 ///     mocker.patch("module.object")
@@ -201,6 +225,9 @@ pub struct PytestMissingFixtureNameUnderscore {
 ///
 /// ## Example
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.fixture()
 /// def _some_object():
 ///     return SomeClass()
@@ -215,6 +242,9 @@ pub struct PytestMissingFixtureNameUnderscore {
 ///
 /// Use instead:
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.fixture()
 /// def some_object():
 ///     return SomeClass()
@@ -268,6 +298,9 @@ impl Violation for PytestIncorrectFixtureNameUnderscore {
 ///
 /// ## Example
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.fixture
 /// def _patch_something():
 ///     ...
@@ -279,6 +312,9 @@ impl Violation for PytestIncorrectFixtureNameUnderscore {
 ///
 /// Use instead:
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.fixture
 /// def _patch_something():
 ///     ...
@@ -362,6 +398,9 @@ impl Violation for PytestDeprecatedYieldFixture {
 ///
 /// ## Example
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.fixture()
 /// def my_fixture(request):
 ///     resource = acquire_resource()
@@ -371,6 +410,9 @@ impl Violation for PytestDeprecatedYieldFixture {
 ///
 /// Use instead:
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.fixture()
 /// def my_fixture():
 ///     resource = acquire_resource()
@@ -411,6 +453,9 @@ impl Violation for PytestFixtureFinalizerCallback {
 ///
 /// ## Example
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.fixture()
 /// def my_fixture():
 ///     resource = acquire_resource()
@@ -419,6 +464,9 @@ impl Violation for PytestFixtureFinalizerCallback {
 ///
 /// Use instead:
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.fixture()
 /// def my_fixture_with_teardown():
 ///     resource = acquire_resource()
@@ -460,6 +508,9 @@ impl AlwaysAutofixableViolation for PytestUselessYieldFixture {
 ///
 /// ## Example
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.fixture()
 /// def a():
 ///     pass
@@ -473,6 +524,9 @@ impl AlwaysAutofixableViolation for PytestUselessYieldFixture {
 ///
 /// Use instead:
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.fixture()
 /// def a():
 ///     pass
@@ -507,6 +561,9 @@ impl AlwaysAutofixableViolation for PytestErroneousUseFixturesOnFixture {
 ///
 /// ## Example
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.mark.asyncio()
 /// @pytest.fixture()
 /// async def my_fixture():
@@ -515,6 +572,9 @@ impl AlwaysAutofixableViolation for PytestErroneousUseFixturesOnFixture {
 ///
 /// Use instead:
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.fixture()
 /// async def my_fixture():
 ///     return 0

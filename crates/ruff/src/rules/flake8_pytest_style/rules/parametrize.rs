@@ -26,6 +26,9 @@ use super::helpers::{is_pytest_parametrize, split_names};
 ///
 /// ## Example
 /// ```python
+/// import pytest
+///
+///
 /// # single parameter, always expecting string
 /// @pytest.mark.parametrize(("param",), [1, 2, 3])
 /// def test_foo(param):
@@ -46,6 +49,9 @@ use super::helpers::{is_pytest_parametrize, split_names};
 ///
 /// Use instead:
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.mark.parametrize("param", [1, 2, 3])
 /// def test_foo(param):
 ///     ...
@@ -93,6 +99,9 @@ impl Violation for PytestParametrizeNamesWrongType {
 ///
 /// ## Example
 /// ```python
+/// import pytest
+///
+///
 /// # expected list, got tuple
 /// @pytest.mark.parametrize("param", (1, 2))
 /// def test_foo(param):
@@ -125,6 +134,9 @@ impl Violation for PytestParametrizeNamesWrongType {
 ///
 /// Use instead:
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.mark.parametrize("param", [1, 2, 3])
 /// def test_foo(param):
 ///     ...

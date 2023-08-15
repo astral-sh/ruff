@@ -23,6 +23,9 @@ use super::helpers::get_mark_decorators;
 ///
 /// ## Example
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.mark.foo
 /// def test_something():
 ///     ...
@@ -30,6 +33,9 @@ use super::helpers::get_mark_decorators;
 ///
 /// Use instead:
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.mark.foo()
 /// def test_something():
 ///     ...
@@ -76,6 +82,9 @@ impl AlwaysAutofixableViolation for PytestIncorrectMarkParenthesesStyle {
 ///
 /// ## Example
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.mark.usefixtures()
 /// def test_something():
 ///     ...
