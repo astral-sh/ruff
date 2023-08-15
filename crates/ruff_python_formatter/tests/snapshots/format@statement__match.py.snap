@@ -114,6 +114,32 @@ match long_lines:
         bbbbbbbbaaaaaahhhh == 2
     ):  # another comment
         pass
+
+
+match pattern_comments:
+    case (
+    only_trailing  # trailing 1
+    # trailing 2
+# trailing 3
+    ):
+        pass
+
+
+match pattern_comments:
+    case (
+    # leading
+    leading_and_trailing  # trailing 1
+    # trailing 2
+# trailing 3
+    ):
+        pass
+
+
+match pattern_comments:
+    case (
+    no_comments
+    ):
+        pass
 ```
 
 ## Output
@@ -222,6 +248,30 @@ match long_lines:
     case "NOT_YET_IMPLEMENTED_PatternMatchValue" if (
         aaaaaaahhhhhhhhhhh == 1 and bbbbbbbbaaaaaahhhh == 2
     ):  # another comment
+        pass
+
+
+match pattern_comments:
+    case (
+        x as NOT_YET_IMPLEMENTED_PatternMatchAs  # trailing 1
+        # trailing 2
+        # trailing 3
+    ):
+        pass
+
+
+match pattern_comments:
+    case (
+        # leading
+        x as NOT_YET_IMPLEMENTED_PatternMatchAs  # trailing 1
+        # trailing 2
+        # trailing 3
+    ):
+        pass
+
+
+match pattern_comments:
+    case (x as NOT_YET_IMPLEMENTED_PatternMatchAs):
         pass
 ```
 

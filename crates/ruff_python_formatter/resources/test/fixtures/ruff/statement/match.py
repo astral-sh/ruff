@@ -108,3 +108,29 @@ match long_lines:
         bbbbbbbbaaaaaahhhh == 2
     ):  # another comment
         pass
+
+
+match pattern_comments:
+    case (
+    only_trailing  # trailing 1
+    # trailing 2
+# trailing 3
+    ):
+        pass
+
+
+match pattern_comments:
+    case (
+    # leading
+    leading_and_trailing  # trailing 1
+    # trailing 2
+# trailing 3
+    ):
+        pass
+
+
+match pattern_comments:
+    case (
+    no_comments
+    ):
+        pass
