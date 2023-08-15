@@ -92,6 +92,9 @@ impl Violation for PytestCompositeAssertion {
 ///
 /// Use instead:
 /// ```python
+/// import pytest
+///
+///
 /// def test_foo():
 ///     with pytest.raises(ZeroDivisionError) as exc_info:
 ///         1 / 0
@@ -130,6 +133,9 @@ impl Violation for PytestAssertInExcept {
 ///
 /// Use instead:
 /// ```python
+/// import pytest
+///
+///
 /// def test_foo():
 ///     if some_condition:
 ///         pytest.fail("some_condition was True")
@@ -157,6 +163,9 @@ impl Violation for PytestAssertAlwaysFalse {
 ///
 /// ## Example
 /// ```python
+/// import unittest
+///
+///
 /// class TestFoo(unittest.TestCase):
 ///     def test_foo(self):
 ///         self.assertEqual(a, b)
@@ -164,6 +173,9 @@ impl Violation for PytestAssertAlwaysFalse {
 ///
 /// Use instead:
 /// ```python
+/// import unittest
+///
+///
 /// class TestFoo(unittest.TestCase):
 ///     def test_foo(self):
 ///         assert a == b
