@@ -7,8 +7,7 @@ use crate::{
 
 /// Visitor that traverses all nodes recursively in pre-order.
 pub trait PreorderVisitor<'a> {
-    #[allow(clippy::inline_always)]
-    #[inline(always)]
+    #[inline]
     fn enter_node(&mut self, _node: AnyNodeRef<'a>) -> TraversalSignal {
         TraversalSignal::Traverse
     }

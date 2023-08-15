@@ -442,7 +442,7 @@ impl<'a> Comments<'a> {
 
     #[inline(always)]
     #[cfg(not(debug_assertions))]
-    pub(crate) fn mark_verbatim_node_comments_formatted(&self, node: AnyNodeRef) {}
+    pub(crate) fn mark_verbatim_node_comments_formatted(&self, _node: AnyNodeRef) {}
 
     /// Marks the comments of a node printed in verbatim (suppressed) as formatted.
     ///
