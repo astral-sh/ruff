@@ -1,7 +1,8 @@
-use ruff_formatter::{write, Buffer, FormatResult};
+use ruff_formatter::{format_args, write, Buffer, FormatResult};
 use ruff_python_ast::MatchCase;
 
-use crate::comments::trailing_comments;
+use crate::comments::{leading_comments, trailing_comments};
+use crate::expression::parentheses::parenthesized;
 use crate::prelude::*;
 use crate::{FormatNodeRule, PyFormatter};
 
@@ -20,7 +21,18 @@ impl FormatNodeRule<MatchCase> for FormatMatchCase {
         let comments = f.context().comments().clone();
         let dangling_item_comments = comments.dangling_comments(item);
 
-        write!(f, [text("case"), space(), pattern.format()])?;
+        write!(f, [text("case"), space()])?;
+        let leading_pattern_comments = comments.leading_comments(pattern);
+        if leading_pattern_comments.is_empty() {
+            pattern.format().fmt(f)?;
+        } else {
+            parenthesized(
+                "(",
+                &format_args![leading_comments(leading_pattern_comments), pattern.format()],
+                ")",
+            )
+            .fmt(f)?;
+        }
 
         if let Some(guard) = guard {
             write!(f, [space(), text("if"), space(), guard.format()])?;
