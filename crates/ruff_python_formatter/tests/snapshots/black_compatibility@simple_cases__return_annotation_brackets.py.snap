@@ -113,17 +113,6 @@ def foo() -> tuple[int, int, int,]:
      return 2 * a
  
  
-@@ -54,7 +58,9 @@
-     a: int,
-     b: int,
-     c: int,
--) -> intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds:
-+) -> (
-+    intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
-+):
-     return 2
- 
- 
 ```
 
 ## Ruff Output
@@ -189,9 +178,7 @@ def foo(
     a: int,
     b: int,
     c: int,
-) -> (
-    intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
-):
+) -> intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds:
     return 2
 
 

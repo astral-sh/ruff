@@ -8,7 +8,7 @@ use ruff_python_ast::identifier::Identifier;
 /// Checks for functions or methods with too many statements.
 ///
 /// By default, this rule allows up to 50 statements, as configured by the
-/// `pylint.max-statements` option.
+/// [`pylint.max-statements`] option.
 ///
 /// ## Why is this bad?
 /// Functions or methods with many statements are harder to understand
@@ -98,14 +98,7 @@ fn num_statements(stmts: &[Stmt]) -> usize {
                 handlers,
                 orelse,
                 finalbody,
-                range: _,
-            })
-            | Stmt::TryStar(ast::StmtTryStar {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                range: _,
+                ..
             }) => {
                 count += 1;
                 count += num_statements(body);

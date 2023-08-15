@@ -22,7 +22,10 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
 
         write!(f, [text("lambda")])?;
 
-        if !parameters.args.is_empty() || parameters.vararg.is_some() || parameters.kwarg.is_some()
+        if !parameters.args.is_empty()
+            || !parameters.posonlyargs.is_empty()
+            || parameters.vararg.is_some()
+            || parameters.kwarg.is_some()
         {
             write!(
                 f,

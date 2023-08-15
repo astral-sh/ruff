@@ -7,7 +7,7 @@ use std::fmt::Debug;
 use std::iter::FusedIterator;
 use std::marker::PhantomData;
 
-/// Queue of [FormatElement]s.
+/// Queue of [`FormatElement`]s.
 pub(super) trait Queue<'a> {
     type Stack: Stack<&'a [FormatElement]>;
 
@@ -40,19 +40,19 @@ pub(super) trait Queue<'a> {
         }
     }
 
-    /// Returns the next element, not traversing into [FormatElement::Interned].
+    /// Returns the next element, not traversing into [`FormatElement::Interned`].
     fn top_with_interned(&self) -> Option<&'a FormatElement> {
         self.stack()
             .top()
             .map(|top_slice| &top_slice[self.next_index()])
     }
 
-    /// Returns the next element, recursively resolving the first element of [FormatElement::Interned].
+    /// Returns the next element, recursively resolving the first element of [`FormatElement::Interned`].
     fn top(&self) -> Option<&'a FormatElement> {
         let mut top = self.top_with_interned();
 
         while let Some(FormatElement::Interned(interned)) = top {
-            top = interned.first()
+            top = interned.first();
         }
 
         top
@@ -60,7 +60,7 @@ pub(super) trait Queue<'a> {
 
     /// Queues a single element to process before the other elements in this queue.
     fn push(&mut self, element: &'a FormatElement) {
-        self.extend_back(std::slice::from_ref(element))
+        self.extend_back(std::slice::from_ref(element));
     }
 
     /// Queues a slice of elements to process before the other elements in this queue.
@@ -73,7 +73,7 @@ pub(super) trait Queue<'a> {
                 let next_index = self.next_index();
                 let stack = self.stack_mut();
                 if let Some(top) = stack.pop() {
-                    stack.push(&top[next_index..])
+                    stack.push(&top[next_index..]);
                 }
 
                 stack.push(slice);
@@ -150,14 +150,14 @@ impl<'a> Queue<'a> for PrintQueue<'a> {
     }
 
     fn set_next_index(&mut self, index: usize) {
-        self.next_index = index
+        self.next_index = index;
     }
 }
 
 /// Queue for measuring if an element fits on the line.
 ///
-/// The queue is a view on top of the [PrintQueue] because no elements should be removed
-/// from the [PrintQueue] while measuring.
+/// The queue is a view on top of the [`PrintQueue`] because no elements should be removed
+/// from the [`PrintQueue`] while measuring.
 #[must_use]
 #[derive(Debug)]
 pub(super) struct FitsQueue<'a, 'print> {
@@ -203,9 +203,9 @@ impl<'a, 'print> Queue<'a> for FitsQueue<'a, 'print> {
     }
 }
 
-/// Iterator that calls [Queue::pop] until it reaches the end of the document.
+/// Iterator that calls [`Queue::pop`] until it reaches the end of the document.
 ///
-/// The iterator traverses into the content of any [FormatElement::Interned].
+/// The iterator traverses into the content of any [`FormatElement::Interned`].
 pub(super) struct QueueIterator<'a, 'q, Q: Queue<'a>> {
     queue: &'q mut Q,
     lifetime: PhantomData<&'a ()>,
@@ -252,32 +252,31 @@ where
     type Item = &'a FormatElement;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.depth {
-            0 => None,
-            _ => {
-                let mut top = self.queue.pop();
+        if self.depth == 0 {
+            None
+        } else {
+            let mut top = self.queue.pop();
 
-                while let Some(FormatElement::Interned(interned)) = top {
-                    self.queue.extend_back(interned);
-                    top = self.queue.pop();
-                }
+            while let Some(FormatElement::Interned(interned)) = top {
+                self.queue.extend_back(interned);
+                top = self.queue.pop();
+            }
 
-                match top.expect("Missing end signal.") {
-                    element @ FormatElement::Tag(tag) if tag.kind() == self.kind => {
-                        if tag.is_start() {
-                            self.depth += 1;
-                        } else {
-                            self.depth -= 1;
+            match top.expect("Missing end signal.") {
+                element @ FormatElement::Tag(tag) if tag.kind() == self.kind => {
+                    if tag.is_start() {
+                        self.depth += 1;
+                    } else {
+                        self.depth -= 1;
 
-                            if self.depth == 0 {
-                                return None;
-                            }
+                        if self.depth == 0 {
+                            return None;
                         }
-
-                        Some(element)
                     }
-                    element => Some(element),
+
+                    Some(element)
                 }
+                element => Some(element),
             }
         }
     }
@@ -287,7 +286,7 @@ impl<'a, Q> FusedIterator for QueueContentIterator<'a, '_, Q> where Q: Queue<'a>
 
 /// A predicate determining when to end measuring if some content fits on the line.
 ///
-/// Called for every [`element`](FormatElement) in the [FitsQueue] when measuring if a content
+/// Called for every [`element`](FormatElement) in the [`FitsQueue`] when measuring if a content
 /// fits on the line. The measuring of the content ends after the first element [`element`](FormatElement) for which this
 /// predicate returns `true` (similar to a take while iterator except that it takes while the predicate returns `false`).
 pub(super) trait FitsEndPredicate {
@@ -303,7 +302,7 @@ impl FitsEndPredicate for AllPredicate {
     }
 }
 
-/// Filter that takes all elements between two matching [Tag::StartEntry] and [Tag::EndEntry] tags.
+/// Filter that takes all elements between two matching [`Tag::StartEntry`] and [`Tag::EndEntry`] tags.
 #[derive(Debug)]
 pub(super) enum SingleEntryPredicate {
     Entry { depth: usize },

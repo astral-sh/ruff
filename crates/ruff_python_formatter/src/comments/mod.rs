@@ -103,6 +103,7 @@ use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::visitor::preorder::{PreorderVisitor, TraversalSignal};
 use ruff_python_index::CommentRanges;
+use ruff_python_trivia::PythonWhitespace;
 
 use crate::comments::debug::{DebugComment, DebugComments};
 use crate::comments::map::MultiMap;
@@ -110,7 +111,7 @@ use crate::comments::node_key::NodeRefEqualityKey;
 use crate::comments::visitor::CommentsVisitor;
 
 mod debug;
-mod format;
+pub(crate) mod format;
 mod map;
 mod node_key;
 mod placement;
@@ -150,6 +151,11 @@ impl SourceComment {
         self.formatted.set(true);
     }
 
+    /// Marks the comment as not-formatted
+    pub(crate) fn mark_unformatted(&self) {
+        self.formatted.set(false);
+    }
+
     /// If the comment has already been formatted
     pub(crate) fn is_formatted(&self) -> bool {
         self.formatted.get()
@@ -163,6 +169,50 @@ impl SourceComment {
     pub(crate) fn debug<'a>(&'a self, source_code: SourceCode<'a>) -> DebugComment<'a> {
         DebugComment::new(self, source_code)
     }
+
+    pub(crate) fn suppression_kind(&self, source: &str) -> Option<SuppressionKind> {
+        let text = self.slice.text(SourceCode::new(source));
+        let trimmed = text.strip_prefix('#').unwrap_or(text).trim_whitespace();
+
+        if let Some(command) = trimmed.strip_prefix("fmt:") {
+            match command.trim_whitespace_start() {
+                "off" => Some(SuppressionKind::Off),
+                "on" => Some(SuppressionKind::On),
+                "skip" => Some(SuppressionKind::Skip),
+                _ => None,
+            }
+        } else if let Some(command) = trimmed.strip_prefix("yapf:") {
+            match command.trim_whitespace_start() {
+                "disable" => Some(SuppressionKind::Off),
+                "enable" => Some(SuppressionKind::On),
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }
+
+    /// Returns true if this comment is a `fmt: off` or `yapf: disable` own line suppression comment.
+    pub(crate) fn is_suppression_off_comment(&self, source: &str) -> bool {
+        self.line_position.is_own_line()
+            && matches!(self.suppression_kind(source), Some(SuppressionKind::Off))
+    }
+
+    /// Returns true if this comment is a `fmt: on` or `yapf: enable` own line suppression comment.
+    pub(crate) fn is_suppression_on_comment(&self, source: &str) -> bool {
+        self.line_position.is_own_line()
+            && matches!(self.suppression_kind(source), Some(SuppressionKind::On))
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub(crate) enum SuppressionKind {
+    /// A `fmt: off` or `yapf: disable` comment
+    Off,
+    /// A `fmt: on` or `yapf: enable` comment
+    On,
+    /// A `fmt: skip` comment
+    Skip,
 }
 
 impl Ranged for SourceComment {
@@ -246,8 +296,6 @@ pub(crate) struct Comments<'a> {
     data: Rc<CommentsData<'a>>,
 }
 
-#[allow(unused)]
-// TODO(micha): Remove after using the new comments infrastructure in the formatter.
 impl<'a> Comments<'a> {
     fn new(comments: CommentsMap<'a>) -> Self {
         Self {
@@ -268,16 +316,6 @@ impl<'a> Comments<'a> {
         };
 
         Self::new(map)
-    }
-
-    #[inline]
-    pub(crate) fn has_comments<T>(&self, node: T) -> bool
-    where
-        T: Into<AnyNodeRef<'a>>,
-    {
-        self.data
-            .comments
-            .has(&NodeRefEqualityKey::from_ref(node.into()))
     }
 
     /// Returns `true` if the given `node` has any [leading comments](self#leading-comments).

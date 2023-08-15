@@ -2141,6 +2141,7 @@ dependencies = [
  "ruff",
  "ruff_python_ast",
  "ruff_python_formatter",
+ "ruff_python_index",
  "ruff_python_parser",
  "serde",
  "serde_json",
@@ -2353,6 +2354,7 @@ dependencies = [
  "similar",
  "smallvec",
  "thiserror",
+ "unicode-width",
 ]
 
 [[package]]
@@ -2423,6 +2425,7 @@ dependencies = [
  "num-traits",
  "ruff_index",
  "ruff_python_ast",
+ "ruff_python_parser",
  "ruff_python_stdlib",
  "ruff_source_file",
  "ruff_text_size",

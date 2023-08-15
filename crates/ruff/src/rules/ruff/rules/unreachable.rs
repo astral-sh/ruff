@@ -3,7 +3,7 @@ use std::{fmt, iter, usize};
 use log::error;
 use ruff_python_ast::{
     Expr, Identifier, MatchCase, Pattern, PatternMatchAs, Ranged, Stmt, StmtFor, StmtMatch,
-    StmtReturn, StmtTry, StmtTryStar, StmtWhile, StmtWith,
+    StmtReturn, StmtTry, StmtWhile, StmtWith,
 };
 use ruff_text_size::{TextRange, TextSize};
 
@@ -541,13 +541,6 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                     orelse,
                     finalbody,
                     ..
-                })
-                | Stmt::TryStar(StmtTryStar {
-                    body,
-                    handlers,
-                    orelse,
-                    finalbody,
-                    ..
                 }) => {
                     // TODO: handle `try` statements. The `try` control flow is very
                     // complex, what blocks are and aren't taken and from which
@@ -900,7 +893,6 @@ fn needs_next_block(stmts: &[Stmt]) -> bool {
         | Stmt::With(_)
         | Stmt::Match(_)
         | Stmt::Try(_)
-        | Stmt::TryStar(_)
         | Stmt::Assert(_) => true,
         Stmt::TypeAlias(_) => todo!(),
         Stmt::IpyEscapeCommand(_) => todo!(),
@@ -931,7 +923,6 @@ fn is_control_flow_stmt(stmt: &Stmt) -> bool {
         | Stmt::Match(_)
         | Stmt::Raise(_)
         | Stmt::Try(_)
-        | Stmt::TryStar(_)
         | Stmt::Assert(_)
         | Stmt::Break(_)
         | Stmt::Continue(_) => true,

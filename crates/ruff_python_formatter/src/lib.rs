@@ -1,26 +1,24 @@
+use thiserror::Error;
+
+use ruff_formatter::format_element::tag;
+use ruff_formatter::prelude::{source_position, text, Formatter, Tag};
+use ruff_formatter::{
+    format, write, Buffer, Format, FormatElement, FormatError, FormatResult, PrintError,
+};
+use ruff_formatter::{Formatted, Printed, SourceCode};
+use ruff_python_ast::node::{AnyNodeRef, AstNode};
+use ruff_python_ast::Mod;
+use ruff_python_index::{CommentRanges, CommentRangesBuilder};
+use ruff_python_parser::lexer::{lex, LexicalError};
+use ruff_python_parser::{parse_tokens, Mode, ParseError};
+use ruff_source_file::Locator;
+use ruff_text_size::TextLen;
+
 use crate::comments::{
     dangling_node_comments, leading_node_comments, trailing_node_comments, Comments,
 };
 use crate::context::PyFormatContext;
 pub use crate::options::{MagicTrailingComma, PyFormatOptions, QuoteStyle};
-use ruff_formatter::format_element::tag;
-use ruff_formatter::prelude::{
-    dynamic_text, source_position, source_text_slice, text, ContainsNewlines, Formatter, Tag,
-};
-use ruff_formatter::{
-    format, normalize_newlines, write, Buffer, Format, FormatElement, FormatError, FormatResult,
-    PrintError,
-};
-use ruff_formatter::{Formatted, Printed, SourceCode};
-use ruff_python_ast::node::{AnyNodeRef, AstNode};
-use ruff_python_ast::{Mod, Ranged};
-use ruff_python_index::{CommentRanges, CommentRangesBuilder};
-use ruff_python_parser::lexer::{lex, LexicalError};
-use ruff_python_parser::{parse_tokens, Mode, ParseError};
-use ruff_source_file::Locator;
-use ruff_text_size::{TextLen, TextRange};
-use std::borrow::Cow;
-use thiserror::Error;
 
 pub(crate) mod builders;
 pub mod cli;
@@ -35,6 +33,7 @@ pub(crate) mod pattern;
 mod prelude;
 pub(crate) mod statement;
 pub(crate) mod type_param;
+mod verbatim;
 
 include!("../../ruff_formatter/shared_traits.rs");
 
@@ -47,10 +46,10 @@ where
     N: AstNode,
 {
     fn fmt(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
-        self.fmt_leading_comments(node, f)?;
+        leading_node_comments(node).fmt(f)?;
         self.fmt_node(node, f)?;
         self.fmt_dangling_comments(node, f)?;
-        self.fmt_trailing_comments(node, f)
+        trailing_node_comments(node).fmt(f)
     }
 
     /// Formats the node without comments. Ignores any suppression comments.
@@ -63,14 +62,6 @@ where
     /// Formats the node's fields.
     fn fmt_fields(&self, item: &N, f: &mut PyFormatter) -> FormatResult<()>;
 
-    /// Formats the [leading comments](comments#leading-comments) of the node.
-    ///
-    /// You may want to override this method if you want to manually handle the formatting of comments
-    /// inside of the `fmt_fields` method or customize the formatting of the leading comments.
-    fn fmt_leading_comments(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
-        leading_node_comments(node).fmt(f)
-    }
-
     /// Formats the [dangling comments](comments#dangling-comments) of the node.
     ///
     /// You should override this method if the node handled by this rule can have dangling comments because the
@@ -80,14 +71,6 @@ where
     /// A node can have dangling comments if all its children are tokens or if all node children are optional.
     fn fmt_dangling_comments(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
         dangling_node_comments(node).fmt(f)
-    }
-
-    /// Formats the [trailing comments](comments#trailing-comments) of the node.
-    ///
-    /// You may want to override this method if you want to manually handle the formatting of comments
-    /// inside of the `fmt_fields` method or customize the formatting of the trailing comments.
-    fn fmt_trailing_comments(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
-        trailing_node_comments(node).fmt(f)
     }
 }
 
@@ -234,53 +217,18 @@ impl Format<PyFormatContext<'_>> for NotYetImplementedCustomText<'_> {
     }
 }
 
-pub(crate) struct VerbatimText(TextRange);
-
-#[allow(unused)]
-pub(crate) fn verbatim_text<T>(item: &T) -> VerbatimText
-where
-    T: Ranged,
-{
-    VerbatimText(item.range())
-}
-
-impl Format<PyFormatContext<'_>> for VerbatimText {
-    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        f.write_element(FormatElement::Tag(Tag::StartVerbatim(
-            tag::VerbatimKind::Verbatim {
-                length: self.0.len(),
-            },
-        )))?;
-
-        match normalize_newlines(f.context().locator().slice(self.0), ['\r']) {
-            Cow::Borrowed(_) => {
-                write!(f, [source_text_slice(self.0, ContainsNewlines::Detect)])?;
-            }
-            Cow::Owned(cleaned) => {
-                write!(
-                    f,
-                    [
-                        dynamic_text(&cleaned, Some(self.0.start())),
-                        source_position(self.0.end())
-                    ]
-                )?;
-            }
-        }
-
-        f.write_element(FormatElement::Tag(Tag::EndVerbatim))?;
-        Ok(())
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::{format_module, format_node, PyFormatOptions};
+    use std::path::Path;
+
     use anyhow::Result;
     use insta::assert_snapshot;
+
     use ruff_python_index::CommentRangesBuilder;
     use ruff_python_parser::lexer::lex;
     use ruff_python_parser::{parse_tokens, Mode};
-    use std::path::Path;
+
+    use crate::{format_module, format_node, PyFormatOptions};
 
     /// Very basic test intentionally kept very similar to the CLI
     #[test]
@@ -307,31 +255,16 @@ if True:
     #[ignore]
     #[test]
     fn quick_test() {
-        let src = r#"
-with (
-    [
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        "bbbbbbbbbb",
-        "cccccccccccccccccccccccccccccccccccccccccc",
-        dddddddddddddddddddddddddddddddd,
-    ] as example1,
-    aaaaaaaaaaaaaaaaaaaaaaaaaa
-    + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-    + cccccccccccccccccccccccccccc
-    + ddddddddddddddddd as example2,
-    CtxManager2() as example2,
-    CtxManager2() as example2,
-    CtxManager2() as example2,
-):
-    ...
+        let src = r#"def test():
+    # fmt: off
 
-with [
-    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "bbbbbbbbbb",
-    "cccccccccccccccccccccccccccccccccccccccccc",
-    dddddddddddddddddddddddddddddddd,
-] as example1, aaaaaaaaaaaaaaaaaaaaaaaaaa * bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb * cccccccccccccccccccccccccccc + ddddddddddddddddd as example2, CtxManager222222222222222() as example2:
-    ...
+    a  + b
+
+
+
+        # suppressed comments
+
+a   + b # formatted
 
 "#;
         // Tokenize once
@@ -356,9 +289,9 @@ with [
         // Use `dbg_write!(f, []) instead of `write!(f, [])` in your formatting code to print some IR
         // inside of a `Format` implementation
         // use ruff_formatter::FormatContext;
-        // dbg!(formatted
+        // formatted
         //     .document()
-        //     .display(formatted.context().source_code()));
+        //     .display(formatted.context().source_code());
         //
         // dbg!(formatted
         //     .context()

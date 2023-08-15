@@ -69,6 +69,16 @@ bad_string_format_type.py:10:1: PLE1307 Format type does not match argument type
 12 | "%d" % ([],)
    |
 
+bad_string_format_type.py:11:1: PLE1307 Format type does not match argument type
+   |
+ 9 | "%x" % 1.1
+10 | "%(key)x" % {"key": 1.1}
+11 | "%d" % []
+   | ^^^^^^^^^ PLE1307
+12 | "%d" % ([],)
+13 | "%(key)d" % {"key": []}
+   |
+
 bad_string_format_type.py:12:1: PLE1307 Format type does not match argument type
    |
 10 | "%(key)x" % {"key": 1.1}
@@ -96,6 +106,7 @@ bad_string_format_type.py:14:7: PLE1307 Format type does not match argument type
 14 | print("%d" % ("%s" % ("nested",),))
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLE1307
 15 | "%d" % ((1, 2, 3),)
+16 | "%d" % (1 if x > 0 else [])
    |
 
 bad_string_format_type.py:15:1: PLE1307 Format type does not match argument type
@@ -104,8 +115,17 @@ bad_string_format_type.py:15:1: PLE1307 Format type does not match argument type
 14 | print("%d" % ("%s" % ("nested",),))
 15 | "%d" % ((1, 2, 3),)
    | ^^^^^^^^^^^^^^^^^^^ PLE1307
-16 | 
-17 | # False negatives
+16 | "%d" % (1 if x > 0 else [])
+   |
+
+bad_string_format_type.py:16:1: PLE1307 Format type does not match argument type
+   |
+14 | print("%d" % ("%s" % ("nested",),))
+15 | "%d" % ((1, 2, 3),)
+16 | "%d" % (1 if x > 0 else [])
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLE1307
+17 | 
+18 | # False negatives
    |
 
 

@@ -513,6 +513,7 @@ impl<'a> Generator<'a> {
                 handlers,
                 orelse,
                 finalbody,
+                is_star,
                 range: _,
             }) => {
                 statement!({
@@ -522,38 +523,7 @@ impl<'a> Generator<'a> {
 
                 for handler in handlers {
                     statement!({
-                        self.unparse_except_handler(handler, false);
-                    });
-                }
-
-                if !orelse.is_empty() {
-                    statement!({
-                        self.p("else:");
-                    });
-                    self.body(orelse);
-                }
-                if !finalbody.is_empty() {
-                    statement!({
-                        self.p("finally:");
-                    });
-                    self.body(finalbody);
-                }
-            }
-            Stmt::TryStar(ast::StmtTryStar {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                range: _,
-            }) => {
-                statement!({
-                    self.p("try:");
-                });
-                self.body(body);
-
-                for handler in handlers {
-                    statement!({
-                        self.unparse_except_handler(handler, true);
+                        self.unparse_except_handler(handler, *is_star);
                     });
                 }
 
@@ -1104,7 +1074,7 @@ impl<'a> Generator<'a> {
                 *conversion,
                 format_spec.as_deref(),
             ),
-            Expr::FString(ast::ExprFString { values, range: _ }) => {
+            Expr::FString(ast::ExprFString { values, .. }) => {
                 self.unparse_f_string(values, false);
             }
             Expr::Constant(ast::ExprConstant {
@@ -1197,8 +1167,8 @@ impl<'a> Generator<'a> {
             Constant::Bytes(b) => {
                 self.p_bytes_repr(b);
             }
-            Constant::Str(s) => {
-                self.p_str_repr(s);
+            Constant::Str(ast::StringConstant { value, .. }) => {
+                self.p_str_repr(value);
             }
             Constant::None => self.p("None"),
             Constant::Bool(b) => self.p(if *b { "True" } else { "False" }),
@@ -1339,13 +1309,13 @@ impl<'a> Generator<'a> {
     fn unparse_f_string_elem(&mut self, expr: &Expr, is_spec: bool) {
         match expr {
             Expr::Constant(ast::ExprConstant { value, .. }) => {
-                if let Constant::Str(s) = value {
-                    self.unparse_f_string_literal(s);
+                if let Constant::Str(ast::StringConstant { value, .. }) = value {
+                    self.unparse_f_string_literal(value);
                 } else {
                     unreachable!()
                 }
             }
-            Expr::FString(ast::ExprFString { values, range: _ }) => {
+            Expr::FString(ast::ExprFString { values, .. }) => {
                 self.unparse_f_string(values, is_spec);
             }
             Expr::FormattedValue(ast::ExprFormattedValue {

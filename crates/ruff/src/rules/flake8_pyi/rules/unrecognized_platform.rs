@@ -123,7 +123,7 @@ pub(crate) fn unrecognized_platform(checker: &mut Checker, test: &Expr) {
     }
 
     if let Expr::Constant(ast::ExprConstant {
-        value: Constant::Str(value),
+        value: Constant::Str(ast::StringConstant { value, .. }),
         ..
     }) = right
     {

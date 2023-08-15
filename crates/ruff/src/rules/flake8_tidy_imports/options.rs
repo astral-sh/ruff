@@ -41,6 +41,19 @@ pub struct Options {
     /// Note that this rule is only meant to flag accidental uses,
     /// and can be circumvented via `eval` or `importlib`.
     pub banned_api: Option<FxHashMap<String, ApiBan>>,
+    #[option(
+        default = r#"[]"#,
+        value_type = r#"list[str]"#,
+        example = r#"
+            # Ban certain modules from being imported at module level, instead requiring
+            # that they're imported lazily (e.g., within a function definition).
+            banned-module-level-imports = ["torch", "tensorflow"]
+        "#
+    )]
+    /// List of specific modules that may not be imported at module level, and should instead be
+    /// imported lazily (e.g., within a function definition, or an `if TYPE_CHECKING:`
+    /// block, or some other nested context).
+    pub banned_module_level_imports: Option<Vec<String>>,
 }
 
 impl From<Options> for Settings {
@@ -48,6 +61,7 @@ impl From<Options> for Settings {
         Self {
             ban_relative_imports: options.ban_relative_imports.unwrap_or(Strictness::Parents),
             banned_api: options.banned_api.unwrap_or_default(),
+            banned_module_level_imports: options.banned_module_level_imports.unwrap_or_default(),
         }
     }
 }
@@ -57,6 +71,7 @@ impl From<Settings> for Options {
         Self {
             ban_relative_imports: Some(settings.ban_relative_imports),
             banned_api: Some(settings.banned_api),
+            banned_module_level_imports: Some(settings.banned_module_level_imports),
         }
     }
 }

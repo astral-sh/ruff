@@ -775,7 +775,7 @@ type X[T] \
 
     #[test]
     fn test_type_as_identifier() {
-        let source = r#"\
+        let source = r"\
 type *a + b, c   # ((type * a) + b), c
 type *(a + b), c   # (type * (a + b)), c
 type (*a + b, c)   # type ((*(a + b)), c)
@@ -806,7 +806,7 @@ type (
 type = 1
 type = x = 1
 x = type = 1
-"#;
+";
         insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
     }
 
@@ -863,7 +863,7 @@ y = 100(no)
 
     #[test]
     fn test_match_as_identifier() {
-        let source = r#"\
+        let source = r"\
 match *a + b, c   # ((match * a) + b), c
 match *(a + b), c   # (match * (a + b)), c
 match (*a + b, c)   # match ((*(a + b)), c)
@@ -885,7 +885,7 @@ match match:
         pass
 match = lambda query: query == event
 print(match(12))
-"#;
+";
         insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
     }
 
@@ -1124,7 +1124,7 @@ class Abcd:
     #[test]
     fn test_ipython_escape_commands() {
         let parse_ast = parse(
-            r#"
+            r"
 # Normal Python code
 (
     a
@@ -1189,7 +1189,7 @@ foo[0]??
 foo[0][1]?
 foo.bar[0].baz[1]??
 foo.bar[0].baz[2].egg??
-"#
+"
             .trim(),
             Mode::Jupyter,
             "<test>",

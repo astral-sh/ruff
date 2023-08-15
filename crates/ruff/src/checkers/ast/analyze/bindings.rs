@@ -16,7 +16,7 @@ pub(crate) fn bindings(checker: &mut Checker) {
         return;
     }
 
-    for binding in checker.semantic.bindings.iter() {
+    for binding in &*checker.semantic.bindings {
         if checker.enabled(Rule::UnusedVariable) {
             if binding.kind.is_bound_exception()
                 && !binding.is_used()

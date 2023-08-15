@@ -16,7 +16,7 @@ fn to_formatted_value_expr(inner: &Expr) -> Expr {
 /// Convert a string to a constant string expression.
 pub(super) fn to_constant_string(s: &str) -> Expr {
     let node = ast::ExprConstant {
-        value: Constant::Str(s.to_owned()),
+        value: s.to_owned().into(),
         kind: None,
         range: TextRange::default(),
     };

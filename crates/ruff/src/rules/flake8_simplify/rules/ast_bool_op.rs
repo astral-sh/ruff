@@ -152,7 +152,7 @@ impl AlwaysAutofixableViolation for ExprAndNotExpr {
 ///
 /// ## Example
 /// ```python
-/// x and not x
+/// x or not x
 /// ```
 ///
 /// ## References

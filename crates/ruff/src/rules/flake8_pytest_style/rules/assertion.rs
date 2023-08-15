@@ -7,12 +7,14 @@ use libcst_native::{
     ParenthesizedNode, SimpleStatementLine, SimpleWhitespace, SmallStatement, Statement,
     TrailingWhitespace, UnaryOperation,
 };
-use ruff_python_ast::{self as ast, BoolOp, ExceptHandler, Expr, Keyword, Ranged, Stmt, UnaryOp};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{
+    self as ast, Arguments, BoolOp, ExceptHandler, Expr, Keyword, Ranged, Stmt, UnaryOp,
+};
 use ruff_python_ast::{visitor, whitespace};
 use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
@@ -21,6 +23,7 @@ use crate::autofix::codemods::CodegenStylist;
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::match_indented_block;
 use crate::cst::matchers::match_module;
+use crate::importer::ImportRequest;
 use crate::registry::AsRule;
 
 use super::unittest_assert::UnittestAssert;
@@ -89,6 +92,9 @@ impl Violation for PytestCompositeAssertion {
 ///
 /// Use instead:
 /// ```python
+/// import pytest
+///
+///
 /// def test_foo():
 ///     with pytest.raises(ZeroDivisionError) as exc_info:
 ///         1 / 0
@@ -127,6 +133,9 @@ impl Violation for PytestAssertInExcept {
 ///
 /// Use instead:
 /// ```python
+/// import pytest
+///
+///
 /// def test_foo():
 ///     if some_condition:
 ///         pytest.fail("some_condition was True")
@@ -144,6 +153,36 @@ impl Violation for PytestAssertAlwaysFalse {
         format!("Assertion always fails, replace with `pytest.fail()`")
     }
 }
+
+/// ## What it does
+/// Checks for uses of assertion methods from the `unittest` module.
+///
+/// ## Why is this bad?
+/// To make use of `pytest`'s assertion rewriting, a regular `assert` statement
+/// is preferred over `unittest`'s assertion methods.
+///
+/// ## Example
+/// ```python
+/// import unittest
+///
+///
+/// class TestFoo(unittest.TestCase):
+///     def test_foo(self):
+///         self.assertEqual(a, b)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import unittest
+///
+///
+/// class TestFoo(unittest.TestCase):
+///     def test_foo(self):
+///         assert a == b
+/// ```
+///
+/// ## References
+/// - [`pytest` documentation: Assertion introspection details](https://docs.pytest.org/en/7.1.x/how-to/assert.html#assertion-introspection-details)
 
 #[violation]
 pub struct PytestUnittestAssertion {
@@ -265,6 +304,186 @@ pub(crate) fn unittest_assertion(
         }
         _ => None,
     }
+}
+
+/// ## What it does
+/// Checks for uses of exception-related assertion methods from the `unittest`
+/// module.
+///
+/// ## Why is this bad?
+/// To enforce the assertion style recommended by `pytest`, `pytest.raises` is
+/// preferred over the exception-related assertion methods in `unittest`, like
+/// `assertRaises`.
+///
+/// ## Example
+/// ```python
+/// import unittest
+///
+///
+/// class TestFoo(unittest.TestCase):
+///     def test_foo(self):
+///         with self.assertRaises(ValueError):
+///             raise ValueError("foo")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import unittest
+/// import pytest
+///
+///
+/// class TestFoo(unittest.TestCase):
+///     def test_foo(self):
+///         with pytest.raises(ValueError):
+///             raise ValueError("foo")
+/// ```
+///
+/// ## References
+/// - [`pytest` documentation: Assertions about expected exceptions](https://docs.pytest.org/en/latest/how-to/assert.html#assertions-about-expected-exceptions)
+#[violation]
+pub struct PytestUnittestRaisesAssertion {
+    assertion: String,
+}
+
+impl Violation for PytestUnittestRaisesAssertion {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let PytestUnittestRaisesAssertion { assertion } = self;
+        format!("Use `pytest.raises` instead of unittest-style `{assertion}`")
+    }
+
+    fn autofix_title(&self) -> Option<String> {
+        let PytestUnittestRaisesAssertion { assertion } = self;
+        Some(format!("Replace `{assertion}` with `pytest.raises`"))
+    }
+}
+
+/// PT027
+pub(crate) fn unittest_raises_assertion(
+    checker: &Checker,
+    call: &ast::ExprCall,
+) -> Option<Diagnostic> {
+    let Expr::Attribute(ast::ExprAttribute { attr, .. }) = call.func.as_ref() else {
+        return None;
+    };
+
+    if !matches!(
+        attr.as_str(),
+        "assertRaises" | "failUnlessRaises" | "assertRaisesRegex" | "assertRaisesRegexp"
+    ) {
+        return None;
+    }
+
+    let mut diagnostic = Diagnostic::new(
+        PytestUnittestRaisesAssertion {
+            assertion: attr.to_string(),
+        },
+        call.func.range(),
+    );
+    if checker.patch(diagnostic.kind.rule())
+        && !checker.indexer().has_comments(call, checker.locator())
+    {
+        if let Some(args) = to_pytest_raises_args(checker, attr.as_str(), &call.arguments) {
+            diagnostic.try_set_fix(|| {
+                let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                    &ImportRequest::import("pytest", "raises"),
+                    call.func.start(),
+                    checker.semantic(),
+                )?;
+                let edit = Edit::range_replacement(format!("{binding}({args})"), call.range());
+                Ok(Fix::suggested_edits(import_edit, [edit]))
+            });
+        }
+    }
+
+    Some(diagnostic)
+}
+
+fn to_pytest_raises_args<'a>(
+    checker: &Checker<'a>,
+    attr: &str,
+    arguments: &Arguments,
+) -> Option<Cow<'a, str>> {
+    let args = match attr {
+        "assertRaises" | "failUnlessRaises" => {
+            match (arguments.args.as_slice(), arguments.keywords.as_slice()) {
+                // Ex) `assertRaises(Exception)`
+                ([arg], []) => Cow::Borrowed(checker.locator().slice(arg.range())),
+                // Ex) `assertRaises(expected_exception=Exception)`
+                ([], [kwarg])
+                    if kwarg
+                        .arg
+                        .as_ref()
+                        .is_some_and(|id| id.as_str() == "expected_exception") =>
+                {
+                    Cow::Borrowed(checker.locator().slice(kwarg.value.range()))
+                }
+                _ => return None,
+            }
+        }
+        "assertRaisesRegex" | "assertRaisesRegexp" => {
+            match (arguments.args.as_slice(), arguments.keywords.as_slice()) {
+                // Ex) `assertRaisesRegex(Exception, regex)`
+                ([arg1, arg2], []) => Cow::Owned(format!(
+                    "{}, match={}",
+                    checker.locator().slice(arg1.range()),
+                    checker.locator().slice(arg2.range())
+                )),
+                // Ex) `assertRaisesRegex(Exception, expected_regex=regex)`
+                ([arg], [kwarg])
+                    if kwarg
+                        .arg
+                        .as_ref()
+                        .is_some_and(|arg| arg.as_str() == "expected_regex") =>
+                {
+                    Cow::Owned(format!(
+                        "{}, match={}",
+                        checker.locator().slice(arg.range()),
+                        checker.locator().slice(kwarg.value.range())
+                    ))
+                }
+                // Ex) `assertRaisesRegex(expected_exception=Exception, expected_regex=regex)`
+                ([], [kwarg1, kwarg2])
+                    if kwarg1
+                        .arg
+                        .as_ref()
+                        .is_some_and(|id| id.as_str() == "expected_exception")
+                        && kwarg2
+                            .arg
+                            .as_ref()
+                            .is_some_and(|id| id.as_str() == "expected_regex") =>
+                {
+                    Cow::Owned(format!(
+                        "{}, match={}",
+                        checker.locator().slice(kwarg1.value.range()),
+                        checker.locator().slice(kwarg2.value.range())
+                    ))
+                }
+                // Ex) `assertRaisesRegex(expected_regex=regex, expected_exception=Exception)`
+                ([], [kwarg1, kwarg2])
+                    if kwarg1
+                        .arg
+                        .as_ref()
+                        .is_some_and(|id| id.as_str() == "expected_regex")
+                        && kwarg2
+                            .arg
+                            .as_ref()
+                            .is_some_and(|id| id.as_str() == "expected_exception") =>
+                {
+                    Cow::Owned(format!(
+                        "{}, match={}",
+                        checker.locator().slice(kwarg2.value.range()),
+                        checker.locator().slice(kwarg1.value.range())
+                    ))
+                }
+                _ => return None,
+            }
+        }
+        _ => return None,
+    };
+    Some(args)
 }
 
 /// PT015

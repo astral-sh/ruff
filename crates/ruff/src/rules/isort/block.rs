@@ -254,14 +254,7 @@ where
                 handlers,
                 orelse,
                 finalbody,
-                range: _,
-            })
-            | Stmt::TryStar(ast::StmtTryStar {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                range: _,
+                ..
             }) => {
                 for except_handler in handlers {
                     self.visit_except_handler(except_handler);

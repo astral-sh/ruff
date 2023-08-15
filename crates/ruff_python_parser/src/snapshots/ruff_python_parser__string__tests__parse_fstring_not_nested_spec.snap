@@ -24,12 +24,16 @@ expression: parse_ast
                                 ExprConstant {
                                     range: 7..11,
                                     value: Str(
-                                        "spec",
+                                        StringConstant {
+                                            value: "spec",
+                                            implicit_concatenated: false,
+                                        },
                                     ),
                                     kind: None,
                                 },
                             ),
                         ],
+                        implicit_concatenated: false,
                     },
                 ),
             ),

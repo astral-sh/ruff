@@ -183,24 +183,44 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                     needs_parentheses
                 }
             }
-            Parenthesize::Optional | Parenthesize::IfBreaks => needs_parentheses,
+            Parenthesize::Optional
+            | Parenthesize::IfBreaks
+            | Parenthesize::IfBreaksOrIfRequired => needs_parentheses,
         };
 
         match needs_parentheses {
-            OptionalParentheses::Multiline if *parenthesize != Parenthesize::IfRequired => {
-                if can_omit_optional_parentheses(expression, f.context()) {
-                    optional_parentheses(&expression.format().with_options(Parentheses::Never))
-                        .fmt(f)
-                } else {
+            OptionalParentheses::Multiline => match parenthesize {
+                Parenthesize::IfBreaksOrIfRequired => {
                     parenthesize_if_expands(&expression.format().with_options(Parentheses::Never))
                         .fmt(f)
                 }
-            }
+                Parenthesize::IfRequired => {
+                    expression.format().with_options(Parentheses::Never).fmt(f)
+                }
+                Parenthesize::Optional | Parenthesize::IfBreaks => {
+                    if can_omit_optional_parentheses(expression, f.context()) {
+                        optional_parentheses(&expression.format().with_options(Parentheses::Never))
+                            .fmt(f)
+                    } else {
+                        parenthesize_if_expands(
+                            &expression.format().with_options(Parentheses::Never),
+                        )
+                        .fmt(f)
+                    }
+                }
+            },
+            OptionalParentheses::Never => match parenthesize {
+                Parenthesize::IfBreaksOrIfRequired => {
+                    parenthesize_if_expands(&expression.format().with_options(Parentheses::Never))
+                        .fmt(f)
+                }
+
+                Parenthesize::Optional | Parenthesize::IfBreaks | Parenthesize::IfRequired => {
+                    expression.format().with_options(Parentheses::Never).fmt(f)
+                }
+            },
             OptionalParentheses::Always => {
                 expression.format().with_options(Parentheses::Always).fmt(f)
-            }
-            OptionalParentheses::Never | OptionalParentheses::Multiline => {
-                expression.format().with_options(Parentheses::Never).fmt(f)
             }
         }
     }

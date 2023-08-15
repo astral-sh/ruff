@@ -37,7 +37,10 @@ expression: parse_ast
         ExprConstant {
             range: 10..17,
             value: Str(
-                "{foo}",
+                StringConstant {
+                    value: "{foo}",
+                    implicit_concatenated: false,
+                },
             ),
             kind: None,
         },

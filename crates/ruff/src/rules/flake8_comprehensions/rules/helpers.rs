@@ -1,12 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, Keyword};
-
-pub(super) fn expr_name(func: &Expr) -> Option<&str> {
-    if let Expr::Name(ast::ExprName { id, .. }) = func {
-        Some(id)
-    } else {
-        None
-    }
-}
+use ruff_python_ast::{Expr, Keyword};
 
 pub(super) fn exactly_one_argument_with_matching_function<'a>(
     name: &str,
@@ -20,7 +12,8 @@ pub(super) fn exactly_one_argument_with_matching_function<'a>(
     if !keywords.is_empty() {
         return None;
     }
-    if expr_name(func)? != name {
+    let func = func.as_name_expr()?;
+    if func.id != name {
         return None;
     }
     Some(arg)
@@ -31,8 +24,8 @@ pub(super) fn first_argument_with_matching_function<'a>(
     func: &Expr,
     args: &'a [Expr],
 ) -> Option<&'a Expr> {
-    if expr_name(func)? == name {
-        Some(args.first()?)
+    if func.as_name_expr().is_some_and(|func| func.id == name) {
+        args.first()
     } else {
         None
     }

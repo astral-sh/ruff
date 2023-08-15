@@ -22,6 +22,9 @@ use super::helpers::is_empty_or_null_string;
 ///
 /// ## Example
 /// ```python
+/// import pytest
+///
+///
 /// def test_foo():
 ///     with pytest.raises(MyError):
 ///         setup()  # may raise `MyError`
@@ -31,6 +34,9 @@ use super::helpers::is_empty_or_null_string;
 ///
 /// Use instead:
 /// ```python
+/// import pytest
+///
+///
 /// def test_foo():
 ///     setup()
 ///     with pytest.raises(MyException):
@@ -63,6 +69,9 @@ impl Violation for PytestRaisesWithMultipleStatements {
 ///
 /// ## Example
 /// ```python
+/// import pytest
+///
+///
 /// def test_foo():
 ///     with pytest.raises(ValueError):
 ///         ...
@@ -74,6 +83,9 @@ impl Violation for PytestRaisesWithMultipleStatements {
 ///
 /// Use instead:
 /// ```python
+/// import pytest
+///
+///
 /// def test_foo():
 ///     with pytest.raises(ValueError, match="expected message"):
 ///         ...

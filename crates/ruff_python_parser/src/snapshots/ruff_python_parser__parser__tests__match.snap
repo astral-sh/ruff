@@ -15,7 +15,10 @@ expression: parse_ast
                                 ExprConstant {
                                     range: 8..14,
                                     value: Str(
-                                        "test",
+                                        StringConstant {
+                                            value: "test",
+                                            implicit_concatenated: false,
+                                        },
                                     ),
                                     kind: None,
                                 },
@@ -100,7 +103,10 @@ expression: parse_ast
                                 ExprConstant {
                                     range: 81..88,
                                     value: Str(
-                                        "label",
+                                        StringConstant {
+                                            value: "label",
+                                            implicit_concatenated: false,
+                                        },
                                     ),
                                     kind: None,
                                 },
@@ -112,7 +118,10 @@ expression: parse_ast
                             ExprConstant {
                                 range: 90..96,
                                 value: Str(
-                                    "test",
+                                    StringConstant {
+                                        value: "test",
+                                        implicit_concatenated: false,
+                                    },
                                 ),
                                 kind: None,
                             },
@@ -131,7 +140,10 @@ expression: parse_ast
                                     ExprConstant {
                                         range: 118..125,
                                         value: Str(
-                                            "label",
+                                            StringConstant {
+                                                value: "label",
+                                                implicit_concatenated: false,
+                                            },
                                         ),
                                         kind: None,
                                     },

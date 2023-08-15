@@ -51,6 +51,11 @@ pub(crate) enum Parenthesize {
     /// * The expression is not enclosed by another parenthesized expression and it expands over multiple lines
     /// * The expression has leading or trailing comments. Adding parentheses is desired to prevent the comments from wandering.
     IfRequired,
+
+    /// Parenthesizes the expression if the group doesn't fit on a line (e.g., even name expressions are parenthesized), or if
+    /// the expression doesn't break, but _does_ reports that it always requires parentheses in this position (e.g., walrus
+    /// operators in function return annotations).
+    IfBreaksOrIfRequired,
 }
 
 impl Parenthesize {
@@ -193,8 +198,8 @@ pub(crate) struct FormatOptionalParentheses<'content, 'ast> {
 
 impl<'ast> Format<PyFormatContext<'ast>> for FormatOptionalParentheses<'_, 'ast> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
-        // The group id is used as a condition in [`in_parentheses_only`] to create a conditional group
-        // that is only active if the optional parentheses group expands.
+        // The group id is used as a condition in [`in_parentheses_only_group`] to create a
+        // conditional group that is only active if the optional parentheses group expands.
         let parens_id = f.group_id("optional_parentheses");
 
         let mut f = WithNodeLevel::new(NodeLevel::Expression(Some(parens_id)), f);

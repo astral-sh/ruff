@@ -5,6 +5,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::from_qualified_name;
 
 use crate::checkers::ast::Checker;
+use crate::rules::flake8_tidy_imports::matchers::NameMatchPolicy;
 
 /// ## What it does
 /// Checks for banned imports.
@@ -38,45 +39,17 @@ impl Violation for BannedApi {
 }
 
 /// TID251
-pub(crate) fn name_is_banned<T>(checker: &mut Checker, name: String, located: &T)
-where
-    T: Ranged,
-{
+pub(crate) fn banned_api<T: Ranged>(checker: &mut Checker, policy: &NameMatchPolicy, node: &T) {
     let banned_api = &checker.settings.flake8_tidy_imports.banned_api;
-    if let Some(ban) = banned_api.get(&name) {
-        checker.diagnostics.push(Diagnostic::new(
-            BannedApi {
-                name,
-                message: ban.msg.to_string(),
-            },
-            located.range(),
-        ));
-    }
-}
-
-/// TID251
-pub(crate) fn name_or_parent_is_banned<T>(checker: &mut Checker, name: &str, located: &T)
-where
-    T: Ranged,
-{
-    let banned_api = &checker.settings.flake8_tidy_imports.banned_api;
-    let mut name = name;
-    loop {
-        if let Some(ban) = banned_api.get(name) {
+    if let Some(banned_module) = policy.find(banned_api.keys().map(AsRef::as_ref)) {
+        if let Some(reason) = banned_api.get(&banned_module) {
             checker.diagnostics.push(Diagnostic::new(
                 BannedApi {
-                    name: name.to_string(),
-                    message: ban.msg.to_string(),
+                    name: banned_module,
+                    message: reason.msg.to_string(),
                 },
-                located.range(),
+                node.range(),
             ));
-            return;
-        }
-        match name.rfind('.') {
-            Some(idx) => {
-                name = &name[..idx];
-            }
-            None => return,
         }
     }
 }

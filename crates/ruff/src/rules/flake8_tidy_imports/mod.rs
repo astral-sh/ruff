@@ -1,4 +1,5 @@
 //! Rules from [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/).
+pub(crate) mod matchers;
 pub mod options;
 pub(crate) mod rules;
 pub mod settings;
@@ -119,6 +120,25 @@ mod tests {
                 },
                 namespace_packages: vec![Path::new("my_package").to_path_buf()],
                 ..Settings::for_rules(vec![Rule::RelativeImports])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn banned_module_level_imports() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_tidy_imports/TID253.py"),
+            &Settings {
+                flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
+                    banned_module_level_imports: vec![
+                        "torch".to_string(),
+                        "tensorflow".to_string(),
+                    ],
+                    ..Default::default()
+                },
+                ..Settings::for_rules(vec![Rule::BannedModuleLevelImports])
             },
         )?;
         assert_messages!(diagnostics);

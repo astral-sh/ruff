@@ -10,7 +10,10 @@ expression: parse_ast
                 ExprConstant {
                     range: 0..9,
                     value: Str(
-                        "\u{88}",
+                        StringConstant {
+                            value: "\u{88}",
+                            implicit_concatenated: false,
+                        },
                     ),
                     kind: None,
                 },
