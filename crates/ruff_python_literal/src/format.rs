@@ -203,6 +203,8 @@ pub struct FormatSpec {
     precision: Option<usize>,
     // Ex) `f` in `'{:+f}'`
     format_type: Option<FormatType>,
+    // Ex) `f` in `'{1:{f}}'`
+    format_part: Option<FormatPart>,
 }
 
 fn get_num_digits(text: &str) -> usize {
@@ -279,6 +281,41 @@ fn parse_precision(text: &str) -> Result<(Option<usize>, &str), FormatSpecError>
     })
 }
 
+/// Parses a format part within a format spec
+fn parse_nested_format_part(text: &str) -> Result<(Option<FormatPart>, &str), FormatSpecError> {
+    let mut end_bracket_pos = None;
+    let mut left = String::new();
+
+    if text.is_empty() {
+        return Ok((None, text));
+    }
+
+    for (idx, c) in text.char_indices() {
+        if idx == 0 {
+            if c != '{' {
+                return Ok((None, text));
+            }
+        } else if c == '{' {
+            return Err(FormatSpecError::ReplacementNotAllowed);
+        } else if c == '}' {
+            end_bracket_pos = Some(idx);
+            break;
+        } else {
+            left.push(c);
+        }
+    }
+    if let Some(pos) = end_bracket_pos {
+        let (_, right) = text.split_at(pos);
+        let format_part = FormatString::parse_part_in_brackets(&left)
+            .map_err(|err| FormatSpecError::InvalidReplacement(err))?;
+        Ok((Some(format_part), &right[1..]))
+    } else {
+        Err(FormatSpecError::InvalidReplacement(
+            FormatParseError::MissingRightBracket,
+        ))
+    }
+}
+
 impl FormatSpec {
     pub fn parse(text: &str) -> Result<Self, FormatSpecError> {
         // get_integer in CPython
@@ -290,6 +327,7 @@ impl FormatSpec {
         let (width, text) = parse_number(text)?;
         let (grouping_option, text) = FormatGrouping::parse(text);
         let (precision, text) = parse_precision(text)?;
+        let (format_part, text) = parse_nested_format_part(text)?;
         let (format_type, _text) = if text.is_empty() {
             (None, text)
         } else {
@@ -320,6 +358,7 @@ impl FormatSpec {
             grouping_option,
             precision,
             format_type,
+            format_part,
         })
     }
 }
@@ -330,6 +369,8 @@ pub enum FormatSpecError {
     PrecisionTooBig,
     InvalidFormatSpecifier,
     InvalidFormatType,
+    InvalidReplacement(FormatParseError),
+    ReplacementNotAllowed,
     UnspecifiedFormat(char, char),
     UnknownFormatCode(char, &'static str),
     PrecisionNotAllowed,
@@ -671,6 +712,7 @@ mod tests {
             grouping_option: None,
             precision: None,
             format_type: None,
+            format_part: None,
         });
         assert_eq!(FormatSpec::parse("33"), expected);
     }
@@ -687,8 +729,30 @@ mod tests {
             grouping_option: None,
             precision: None,
             format_type: None,
+            format_part: None,
         });
         assert_eq!(FormatSpec::parse("<>33"), expected);
+    }
+
+    #[test]
+    fn test_nested() {
+        let expected = Ok(FormatSpec {
+            conversion: None,
+            fill: None,
+            align: None,
+            sign: None,
+            alternate_form: false,
+            width: None,
+            grouping_option: None,
+            precision: None,
+            format_type: None,
+            format_part: Some(FormatPart::Field {
+                field_name: "x".to_string(),
+                conversion_spec: None,
+                format_spec: "".to_string(),
+            }),
+        });
+        assert_eq!(FormatSpec::parse("{x}"), expected);
     }
 
     #[test]
@@ -703,6 +767,7 @@ mod tests {
             grouping_option: Some(FormatGrouping::Comma),
             precision: Some(11),
             format_type: Some(FormatType::Binary),
+            format_part: None,
         });
         assert_eq!(FormatSpec::parse("<>-#23,.11b"), expected);
     }
@@ -727,6 +792,22 @@ mod tests {
         });
 
         assert_eq!(FormatString::from_str("abcd{1}:{key}"), expected);
+    }
+
+    #[test]
+    fn test_format_parse_nested_specifier() {
+        let expected = Ok(FormatString {
+            format_parts: vec![
+                FormatPart::Literal("abcd".to_owned()),
+                FormatPart::Field {
+                    field_name: "1".to_owned(),
+                    conversion_spec: None,
+                    format_spec: "{a}".to_owned(),
+                },
+            ],
+        });
+
+        assert_eq!(FormatString::from_str("abcd{1:{a}}"), expected);
     }
 
     #[test]
@@ -784,6 +865,26 @@ mod tests {
         assert_eq!(
             FormatSpec::parse("o!"),
             Err(FormatSpecError::InvalidFormatSpecifier)
+        );
+        assert_eq!(
+            FormatSpec::parse("{"),
+            Err(FormatSpecError::InvalidReplacement(
+                FormatParseError::MissingRightBracket
+            ))
+        );
+        assert_eq!(
+            FormatSpec::parse("{x"),
+            Err(FormatSpecError::InvalidReplacement(
+                FormatParseError::MissingRightBracket
+            ))
+        );
+        assert_eq!(
+            FormatSpec::parse("}"),
+            Err(FormatSpecError::InvalidFormatType)
+        );
+        assert_eq!(
+            FormatSpec::parse("{{x}}"),
+            Err(FormatSpecError::ReplacementNotAllowed)
         );
         assert_eq!(
             FormatSpec::parse("d "),
