@@ -154,22 +154,41 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                     {
                         match self.kind {
                             SuiteKind::TopLevel if source_type.is_stub() => {
-                                let class_sequences_with_ellipsis_only = preceding
-                                    .as_class_def_stmt()
-                                    .is_some_and(|class| contains_only_an_ellipsis(&class.body))
-                                    && following.as_class_def_stmt().is_some_and(|class| {
-                                        contains_only_an_ellipsis(&class.body)
-                                    });
-
-                                let function_with_ellipsis =
-                                    preceding.as_function_def_stmt().is_some_and(|function| {
-                                        contains_only_an_ellipsis(&function.body)
-                                    });
-
-                                // Don't add an empty line between two classes that have an `...` body only or after
-                                // a function with an `...` body. Otherwise add an empty line.
-                                if !class_sequences_with_ellipsis_only && !function_with_ellipsis {
+                                // Preserve the empty line if the definitions are separated by a comment
+                                if comments.has_trailing_comments(preceding)
+                                    || comments.has_leading_comments(following)
+                                {
                                     empty_line().fmt(f)?;
+                                } else {
+                                    // Two subsequent classes that both have an ellipsis only body
+                                    // ```python
+                                    // class A: ...
+                                    // class B: ...
+                                    // ```
+                                    let class_sequences_with_ellipsis_only =
+                                        preceding.as_class_def_stmt().is_some_and(|class| {
+                                            contains_only_an_ellipsis(&class.body)
+                                        }) && following.as_class_def_stmt().is_some_and(|class| {
+                                            contains_only_an_ellipsis(&class.body)
+                                        });
+
+                                    // Two subsequent functions where the preceding has an ellipsis only body
+                                    // ```python
+                                    // def test(): ...
+                                    // def b(): a
+                                    // ```
+                                    let function_with_ellipsis =
+                                        preceding.as_function_def_stmt().is_some_and(|function| {
+                                            contains_only_an_ellipsis(&function.body)
+                                        }) && following.is_function_def_stmt();
+
+                                    // Don't add an empty line between two classes that have an `...` body only or after
+                                    // a function with an `...` body. Otherwise add an empty line.
+                                    if !class_sequences_with_ellipsis_only
+                                        && !function_with_ellipsis
+                                    {
+                                        empty_line().fmt(f)?;
+                                    }
                                 }
                             }
                             SuiteKind::TopLevel => {

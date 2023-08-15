@@ -69,6 +69,19 @@ def quux():
 
 def quuz():
     """Some docstring."""
+
+def a():
+  ...
+
+class Test:
+  ...
+
+class Test2(A):
+  ...
+
+def b(): ...
+# comment
+def c(): ...
 ```
 
 ## Output
@@ -88,6 +101,7 @@ class Del(expr_context):
     ...
 class Load(expr_context):
     ...
+
 # Some comment.
 class Other(expr_context):
     ...
@@ -118,6 +132,21 @@ def quux():
 
 def quuz():
     """Some docstring."""
+
+def a():
+    ...
+
+class Test:
+    ...
+class Test2(A):
+    ...
+
+def b():
+    ...
+
+# comment
+def c():
+    ...
 ```
 
 

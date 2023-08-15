@@ -63,3 +63,16 @@ def quux():
 
 def quuz():
     """Some docstring."""
+
+def a():
+  ...
+
+class Test:
+  ...
+
+class Test2(A):
+  ...
+
+def b(): ...
+# comment
+def c(): ...
