@@ -1,3 +1,4 @@
+use crate::comments::SourceComment;
 use ruff_formatter::prelude::format_with;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{ExprList, Ranged};
@@ -37,7 +38,11 @@ impl FormatNodeRule<ExprList> for FormatExprList {
             .fmt(f)
     }
 
-    fn fmt_dangling_comments(&self, _node: &ExprList, _f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         // Handled as part of `fmt_fields`
         Ok(())
     }

@@ -92,11 +92,23 @@ impl Entries {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
+pub(crate) enum TrailingComma {
+    /// Add a trailing comma if the group breaks and there's more than one element (or if the last
+    /// element has a trailing comma and the magical trailing comma option is enabled).
+    #[default]
+    MoreThanOne,
+    /// Add a trailing comma if the group breaks (or if the last element has a trailing comma and
+    /// the magical trailing comma option is enabled).
+    OneOrMore,
+}
+
 pub(crate) struct JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
     result: FormatResult<()>,
     fmt: &'fmt mut PyFormatter<'ast, 'buf>,
     entries: Entries,
     sequence_end: TextSize,
+    trailing_comma: TrailingComma,
 }
 
 impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
@@ -106,7 +118,17 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
             result: Ok(()),
             entries: Entries::None,
             sequence_end,
+            trailing_comma: TrailingComma::default(),
         }
+    }
+
+    /// Set the trailing comma behavior for the builder. Trailing commas will only be inserted if
+    /// the group breaks, and will _always_ be inserted if the last element has a trailing comma
+    /// (and the magical trailing comma option is enabled). However, this setting dictates whether
+    /// trailing commas are inserted for single element groups.
+    pub(crate) fn with_trailing_comma(mut self, trailing_comma: TrailingComma) -> Self {
+        self.trailing_comma = trailing_comma;
+        self
     }
 
     pub(crate) fn entry<T>(
@@ -194,8 +216,11 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
                 };
 
                 // If there is a single entry, only keep the magic trailing comma, don't add it if
-                // it wasn't there. If there is more than one entry, always add it.
-                if magic_trailing_comma || self.entries.is_more_than_one() {
+                // it wasn't there -- unless the trailing comma behavior is set to one-or-more.
+                if magic_trailing_comma
+                    || self.trailing_comma == TrailingComma::OneOrMore
+                    || self.entries.is_more_than_one()
+                {
                     if_group_breaks(&text(",")).fmt(self.fmt)?;
                 }
 

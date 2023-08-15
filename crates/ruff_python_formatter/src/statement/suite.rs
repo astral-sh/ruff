@@ -117,8 +117,10 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                     SuiteKind::TopLevel => SuiteChildStatement::Other(first),
                 };
 
-                let (mut preceding, mut after_class_docstring) = if comments
-                    .leading_comments(first)
+                let first_comments = comments.leading_dangling_trailing_comments(first);
+
+                let (mut preceding, mut after_class_docstring) = if first_comments
+                    .leading
                     .iter()
                     .any(|comment| comment.is_suppression_off_comment(source))
                 {
@@ -128,8 +130,8 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                         )?,
                         false,
                     )
-                } else if comments
-                    .trailing_comments(first)
+                } else if first_comments
+                    .trailing
                     .iter()
                     .any(|comment| comment.is_suppression_off_comment(source))
                 {
@@ -291,8 +293,10 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                         }
                     }
 
-                    if comments
-                        .leading_comments(following)
+                    let following_comments = comments.leading_dangling_trailing_comments(following);
+
+                    if following_comments
+                        .leading
                         .iter()
                         .any(|comment| comment.is_suppression_off_comment(source))
                     {
@@ -301,8 +305,8 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                             &mut iter,
                             f,
                         )?;
-                    } else if comments
-                        .trailing_comments(following)
+                    } else if following_comments
+                        .trailing
                         .iter()
                         .any(|comment| comment.is_suppression_off_comment(source))
                     {

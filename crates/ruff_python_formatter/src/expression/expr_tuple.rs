@@ -5,6 +5,7 @@ use ruff_python_ast::{Expr, Ranged};
 use ruff_text_size::TextRange;
 
 use crate::builders::parenthesize_if_expands;
+use crate::comments::SourceComment;
 use crate::expression::parentheses::{
     empty_parenthesized, parenthesized, NeedsParentheses, OptionalParentheses,
 };
@@ -162,7 +163,11 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
         }
     }
 
-    fn fmt_dangling_comments(&self, _node: &ExprTuple, _f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         // Handled in `fmt_fields`
         Ok(())
     }

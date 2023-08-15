@@ -2,7 +2,7 @@ use ruff_formatter::{format_args, write, Buffer, FormatResult, FormatRuleWithOpt
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::ExprGeneratorExp;
 
-use crate::comments::leading_comments;
+use crate::comments::{leading_comments, SourceComment};
 use crate::context::PyFormatContext;
 use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
@@ -81,7 +81,7 @@ impl FormatNodeRule<ExprGeneratorExp> for FormatExprGeneratorExp {
 
     fn fmt_dangling_comments(
         &self,
-        _node: &ExprGeneratorExp,
+        _dangling_comments: &[SourceComment],
         _f: &mut PyFormatter,
     ) -> FormatResult<()> {
         // Handled as part of `fmt_fields`

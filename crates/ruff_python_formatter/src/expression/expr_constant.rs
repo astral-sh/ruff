@@ -1,3 +1,4 @@
+use crate::comments::SourceComment;
 use ruff_formatter::FormatRuleWithOptions;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{Constant, ExprConstant, Ranged};
@@ -65,7 +66,7 @@ impl FormatNodeRule<ExprConstant> for FormatExprConstant {
 
     fn fmt_dangling_comments(
         &self,
-        _node: &ExprConstant,
+        _dangling_comments: &[SourceComment],
         _f: &mut PyFormatter,
     ) -> FormatResult<()> {
         Ok(())

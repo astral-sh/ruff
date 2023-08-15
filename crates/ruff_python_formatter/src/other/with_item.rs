@@ -2,7 +2,7 @@ use ruff_python_ast::WithItem;
 
 use ruff_formatter::{write, Buffer, FormatResult};
 
-use crate::comments::{leading_comments, trailing_comments};
+use crate::comments::{leading_comments, trailing_comments, SourceComment};
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
@@ -47,7 +47,11 @@ impl FormatNodeRule<WithItem> for FormatWithItem {
         Ok(())
     }
 
-    fn fmt_dangling_comments(&self, _node: &WithItem, _f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         Ok(())
     }
 }
