@@ -25,7 +25,15 @@ def test():
     and_this +  gets + formatted + too
 ```
 
-## Output
+## Outputs
+### Output 1
+```
+indent-style            = Spaces, size: 4
+line-width              = 88
+quote-style             = Double
+magic-trailing-comma    = Respect
+```
+
 ```py
 def test():
     # fmt: off
@@ -46,6 +54,37 @@ def test():
     """This docstring gets formatted"""  # trailing comment
 
     and_this + gets + formatted + too
+```
+
+
+### Output 2
+```
+indent-style            = Spaces, size: 2
+line-width              = 88
+quote-style             = Double
+magic-trailing-comma    = Respect
+```
+
+```py
+def test():
+  # fmt: off
+  """ This docstring does not
+        get formatted
+    """
+
+  # fmt: on
+
+  but + this + does
+
+
+def test():
+  # fmt: off
+      # just for fun
+  # fmt: on
+  # leading comment
+  """This docstring gets formatted"""  # trailing comment
+
+  and_this + gets + formatted + too
 ```
 
 

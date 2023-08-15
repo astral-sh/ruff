@@ -75,7 +75,7 @@ strum_macros = { workspace = true }
 thiserror = { version = "1.0.43" }
 toml = { workspace = true }
 typed-arena = { version = "2.0.2" }
-unicode-width = { version = "0.1.10" }
+unicode-width = { workspace = true }
 unicode_names2 = { version = "0.6.0", git = "https://github.com/youknowone/unicode_names2.git", rev = "4ce16aa85cbcdd9cc830410f1a72ef9a235f2fde" }
 wsl = { version = "0.1.0" }
 

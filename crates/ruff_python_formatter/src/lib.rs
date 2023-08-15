@@ -255,31 +255,16 @@ if True:
     #[ignore]
     #[test]
     fn quick_test() {
-        let src = r#"
-with (
-    [
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        "bbbbbbbbbb",
-        "cccccccccccccccccccccccccccccccccccccccccc",
-        dddddddddddddddddddddddddddddddd,
-    ] as example1,
-    aaaaaaaaaaaaaaaaaaaaaaaaaa
-    + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-    + cccccccccccccccccccccccccccc
-    + ddddddddddddddddd as example2,
-    CtxManager2() as example2,
-    CtxManager2() as example2,
-    CtxManager2() as example2,
-):
-    ...
+        let src = r#"def test():
+    # fmt: off
 
-with [
-    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "bbbbbbbbbb",
-    "cccccccccccccccccccccccccccccccccccccccccc",
-    dddddddddddddddddddddddddddddddd,
-] as example1, aaaaaaaaaaaaaaaaaaaaaaaaaa * bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb * cccccccccccccccccccccccccccc + ddddddddddddddddd as example2, CtxManager222222222222222() as example2:
-    ...
+    a  + b
+
+
+
+        # suppressed comments
+
+a   + b # formatted
 
 "#;
         // Tokenize once
@@ -304,9 +289,9 @@ with [
         // Use `dbg_write!(f, []) instead of `write!(f, [])` in your formatting code to print some IR
         // inside of a `Format` implementation
         // use ruff_formatter::FormatContext;
-        // dbg!(formatted
+        // formatted
         //     .document()
-        //     .display(formatted.context().source_code()));
+        //     .display(formatted.context().source_code());
         //
         // dbg!(formatted
         //     .context()
