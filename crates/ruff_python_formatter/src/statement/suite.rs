@@ -154,28 +154,22 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                     {
                         match self.kind {
                             SuiteKind::TopLevel if source_type.is_stub() => {
-                                match (preceding, following) {
-                                    // Check if the statements are class containing only an
-                                    // ellipsis.
-                                    (
-                                        Stmt::ClassDef(ast::StmtClassDef {
-                                            body: last_body, ..
-                                        }),
-                                        Stmt::ClassDef(ast::StmtClassDef { body, .. }),
-                                    ) if contains_only_an_ellipsis(last_body)
-                                        && contains_only_an_ellipsis(body) => {}
-                                    // Check if the statements are functions with the last
-                                    // function body containing only an ellipsis.
-                                    (
-                                        Stmt::FunctionDef(ast::StmtFunctionDef {
-                                            body: last_body,
-                                            ..
-                                        }),
-                                        Stmt::FunctionDef(ast::StmtFunctionDef { .. }),
-                                    ) if contains_only_an_ellipsis(last_body) => {}
-                                    // Otherwise, top-level stub items should be separated
-                                    // one empty line.
-                                    _ => write!(f, [empty_line()])?,
+                                let class_sequences_with_ellipsis_only = preceding
+                                    .as_class_def_stmt()
+                                    .is_some_and(|class| contains_only_an_ellipsis(&class.body))
+                                    && following.as_class_def_stmt().is_some_and(|class| {
+                                        contains_only_an_ellipsis(&class.body)
+                                    });
+
+                                let function_with_ellipsis =
+                                    preceding.as_function_def_stmt().is_some_and(|function| {
+                                        contains_only_an_ellipsis(&function.body)
+                                    });
+
+                                // Don't add an empty line between two classes that have an `...` body only or after
+                                // a function with an `...` body. Otherwise add an empty line.
+                                if !class_sequences_with_ellipsis_only && !function_with_ellipsis {
+                                    empty_line().fmt(f)?;
                                 }
                             }
                             SuiteKind::TopLevel => {
