@@ -16,8 +16,6 @@ use crate::expression::parentheses::{
 };
 use crate::prelude::*;
 
-use self::expr_bool_op::BoolOpLayout;
-
 pub(crate) mod expr_attribute;
 pub(crate) mod expr_await;
 pub(crate) mod expr_bin_op;
@@ -69,13 +67,7 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
         let parentheses = self.parentheses;
 
         let format_expr = format_with(|f| match expression {
-            Expr::BoolOp(expr) => expr
-                .format()
-                .with_options(BoolOpLayout {
-                    parentheses: Some(parentheses),
-                    chained: false,
-                })
-                .fmt(f),
+            Expr::BoolOp(expr) => expr.format().fmt(f),
             Expr::NamedExpr(expr) => expr.format().fmt(f),
             Expr::BinOp(expr) => expr.format().fmt(f),
             Expr::UnaryOp(expr) => expr.format().fmt(f),
@@ -90,7 +82,7 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             Expr::Await(expr) => expr.format().fmt(f),
             Expr::Yield(expr) => expr.format().fmt(f),
             Expr::YieldFrom(expr) => expr.format().fmt(f),
-            Expr::Compare(expr) => expr.format().with_options(Some(parentheses)).fmt(f),
+            Expr::Compare(expr) => expr.format().fmt(f),
             Expr::Call(expr) => expr.format().fmt(f),
             Expr::FormattedValue(expr) => expr.format().fmt(f),
             Expr::FString(expr) => expr.format().fmt(f),

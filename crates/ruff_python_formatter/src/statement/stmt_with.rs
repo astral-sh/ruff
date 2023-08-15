@@ -4,7 +4,7 @@ use ruff_python_ast::{Ranged, StmtWith};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::TextRange;
 
-use crate::comments::trailing_comments;
+use crate::comments::{trailing_comments, SourceComment};
 use crate::expression::parentheses::{
     in_parentheses_only_soft_line_break_or_space, optional_parentheses, parenthesized,
 };
@@ -88,7 +88,11 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
         )
     }
 
-    fn fmt_dangling_comments(&self, _node: &StmtWith, _f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         // Handled in `fmt_fields`
         Ok(())
     }

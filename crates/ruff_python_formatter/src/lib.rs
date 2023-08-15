@@ -15,7 +15,7 @@ use ruff_source_file::Locator;
 use ruff_text_size::TextLen;
 
 use crate::comments::{
-    dangling_node_comments, leading_node_comments, trailing_node_comments, Comments,
+    dangling_comments, leading_comments, trailing_comments, Comments, SourceComment,
 };
 use crate::context::PyFormatContext;
 pub use crate::options::{MagicTrailingComma, PyFormatOptions, QuoteStyle};
@@ -46,10 +46,14 @@ where
     N: AstNode,
 {
     fn fmt(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
-        leading_node_comments(node).fmt(f)?;
+        let comments = f.context().comments().clone();
+
+        let node_comments = comments.leading_dangling_trailing_comments(node.as_any_node_ref());
+
+        leading_comments(node_comments.leading).fmt(f)?;
         self.fmt_node(node, f)?;
-        self.fmt_dangling_comments(node, f)?;
-        trailing_node_comments(node).fmt(f)
+        self.fmt_dangling_comments(node_comments.dangling, f)?;
+        trailing_comments(node_comments.trailing).fmt(f)
     }
 
     /// Formats the node without comments. Ignores any suppression comments.
@@ -69,8 +73,12 @@ where
     /// no comments are dropped.
     ///
     /// A node can have dangling comments if all its children are tokens or if all node children are optional.
-    fn fmt_dangling_comments(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
-        dangling_node_comments(node).fmt(f)
+    fn fmt_dangling_comments(
+        &self,
+        dangling_node_comments: &[SourceComment],
+        f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        dangling_comments(dangling_node_comments).fmt(f)
     }
 }
 

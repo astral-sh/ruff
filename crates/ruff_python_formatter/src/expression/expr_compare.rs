@@ -1,27 +1,16 @@
-use crate::comments::leading_comments;
+use crate::comments::{leading_comments, SourceComment};
 use crate::expression::parentheses::{
     in_parentheses_only_group, in_parentheses_only_soft_line_break_or_space, NeedsParentheses,
-    OptionalParentheses, Parentheses,
+    OptionalParentheses,
 };
 use crate::prelude::*;
 use crate::FormatNodeRule;
-use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
+use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{CmpOp, ExprCompare};
 
 #[derive(Default)]
-pub struct FormatExprCompare {
-    parentheses: Option<Parentheses>,
-}
-
-impl FormatRuleWithOptions<ExprCompare, PyFormatContext<'_>> for FormatExprCompare {
-    type Options = Option<Parentheses>;
-
-    fn with_options(mut self, options: Self::Options) -> Self {
-        self.parentheses = options;
-        self
-    }
-}
+pub struct FormatExprCompare;
 
 impl FormatNodeRule<ExprCompare> for FormatExprCompare {
     fn fmt_fields(&self, item: &ExprCompare, f: &mut PyFormatter) -> FormatResult<()> {
@@ -70,7 +59,11 @@ impl FormatNodeRule<ExprCompare> for FormatExprCompare {
         in_parentheses_only_group(&inner).fmt(f)
     }
 
-    fn fmt_dangling_comments(&self, _node: &ExprCompare, _f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         // Node can not have dangling comments
         Ok(())
     }

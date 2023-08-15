@@ -1,4 +1,4 @@
-use crate::comments::{leading_comments, trailing_comments};
+use crate::comments::{leading_comments, trailing_comments, SourceComment};
 use crate::expression::expr_tuple::TupleParentheses;
 use crate::prelude::*;
 use crate::AsFormat;
@@ -98,7 +98,7 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
 
     fn fmt_dangling_comments(
         &self,
-        _node: &Comprehension,
+        _dangling_comments: &[SourceComment],
         _f: &mut PyFormatter,
     ) -> FormatResult<()> {
         // dangling comments are formatted as part of fmt_fields

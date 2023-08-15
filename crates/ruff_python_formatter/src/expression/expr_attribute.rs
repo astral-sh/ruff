@@ -2,7 +2,7 @@ use ruff_formatter::{write, FormatRuleWithOptions};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{Constant, Expr, ExprAttribute, ExprConstant};
 
-use crate::comments::{leading_comments, trailing_comments};
+use crate::comments::{leading_comments, trailing_comments, SourceComment};
 use crate::expression::parentheses::{
     is_expression_parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
 };
@@ -150,7 +150,7 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
 
     fn fmt_dangling_comments(
         &self,
-        _node: &ExprAttribute,
+        _dangling_comments: &[SourceComment],
         _f: &mut PyFormatter,
     ) -> FormatResult<()> {
         // handle in `fmt_fields`

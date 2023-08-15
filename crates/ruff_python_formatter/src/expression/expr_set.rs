@@ -1,3 +1,4 @@
+use crate::comments::SourceComment;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{ExprSet, Ranged};
 
@@ -28,7 +29,11 @@ impl FormatNodeRule<ExprSet> for FormatExprSet {
             .fmt(f)
     }
 
-    fn fmt_dangling_comments(&self, _node: &ExprSet, _f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         // Handled as part of `fmt_fields`
         Ok(())
     }
