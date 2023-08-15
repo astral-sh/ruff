@@ -117,6 +117,10 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
             }
         }
 
+        // If the body contains only an ellipsis, format as:
+        // ```python
+        // class A: ...
+        // ```
         if f.options().source_type().is_stub() && contains_only_an_ellipsis(body) {
             write!(f, [text(":"), space(), text("..."), hard_line_break()])
         } else {

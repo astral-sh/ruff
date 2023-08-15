@@ -135,6 +135,10 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
 
         write!(f, [group(&format_inner)])?;
 
+        // If the body contains only an ellipsis, format as:
+        // ```python
+        // def f(): ...
+        // ```
         if f.options().source_type().is_stub() && contains_only_an_ellipsis(&item.body) {
             write!(f, [text(":"), space(), text("..."), hard_line_break()])
         } else {
