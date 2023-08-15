@@ -168,7 +168,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                             continue;
                         }
 
-                        let Some(statement_id) = shadowed.source else {
+                        let Some(node_id) = shadowed.source else {
                             continue;
                         };
 
@@ -176,7 +176,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                         if shadowed.kind.is_function_definition() {
                             if checker
                                 .semantic
-                                .statement(statement_id)
+                                .statement(node_id)
                                 .as_function_def_stmt()
                                 .is_some_and(|function| {
                                     visibility::is_overload(
