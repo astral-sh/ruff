@@ -551,7 +551,7 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
 }
 
 fn find_duplicates(elts: &Vec<Expr>) -> Vec<(usize, usize)> {
-    let mut duplicates: Vec<(usize, usize)> = Vec::with_capacity(elts.len());
+    let mut duplicates: Vec<(usize, usize)> = Vec::new();
     for ((idx1, elt1), (idx2, elt2)) in elts.iter().enumerate().tuple_combinations() {
         if ComparableExpr::from(elt1) == ComparableExpr::from(elt2) {
             duplicates.push((idx1 + 1, idx2 + 1));
