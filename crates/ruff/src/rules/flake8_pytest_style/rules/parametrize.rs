@@ -184,7 +184,7 @@ impl Violation for PytestParametrizeValuesWrongType {
 ///     [
 ///         (1, 2),
 ///         (1, 2),
-///     ]
+///     ],
 /// )
 /// def test_foo(param1, param2):
 ///     ...
@@ -199,7 +199,7 @@ impl Violation for PytestParametrizeValuesWrongType {
 ///     ("param1", "param2"),
 ///     [
 ///         (1, 2),
-///     ]
+///     ],
 /// )
 /// def test_foo(param1, param2):
 ///     ...
