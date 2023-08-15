@@ -2,6 +2,7 @@ use ruff_formatter::{format_args, write, FormatRuleWithOptions};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::ExprTuple;
 use ruff_python_ast::{Expr, Ranged};
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::TextRange;
 
 use crate::builders::parenthesize_if_expands;
@@ -11,7 +12,7 @@ use crate::expression::parentheses::{
 };
 use crate::prelude::*;
 
-#[derive(Eq, PartialEq, Debug, Default)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Default)]
 pub enum TupleParentheses {
     /// By default tuples with a single element will include parentheses. Tuples with multiple elements
     /// will parenthesize if the expression expands. This means that tuples will often *preserve*
@@ -204,20 +205,26 @@ impl NeedsParentheses for ExprTuple {
 
 /// Check if a tuple has already had parentheses in the input
 fn is_parenthesized(tuple_range: TextRange, elts: &[Expr], source: &str) -> bool {
-    let parentheses = '(';
-    let first_char = &source[usize::from(tuple_range.start())..].chars().next();
-    let Some(first_char) = first_char else {
+    let Some(elt) = elts.first() else {
         return false;
     };
-    if *first_char != parentheses {
-        return false;
-    }
 
-    // Consider `a = (1, 2), 3`: The first char of the current expr starts is a parentheses, but
-    // it's not its own but that of its first tuple child. We know that it belongs to the child
-    // because if it wouldn't, the child would start (at least) a char later
-    let Some(first_child) = elts.first() else {
-        return false;
-    };
-    first_child.range().start() != tuple_range.start()
+    // Count the number of open parentheses between the start of the tuple and the first element.
+    let open_parentheses_count =
+        SimpleTokenizer::new(source, TextRange::new(tuple_range.start(), elt.start()))
+            .skip_trivia()
+            .filter(|token| token.kind() == SimpleTokenKind::LParen)
+            .count();
+
+    // Count the number of parentheses between the end of the first element and its trailing comma.
+    let close_parentheses_count =
+        SimpleTokenizer::new(source, TextRange::new(elt.end(), tuple_range.end()))
+            .skip_trivia()
+            .take_while(|token| token.kind() != SimpleTokenKind::Comma)
+            .filter(|token| token.kind() == SimpleTokenKind::RParen)
+            .count();
+
+    // If the number of open parentheses is greater than the number of close parentheses, the tuple
+    // is parenthesized.
+    open_parentheses_count > close_parentheses_count
 }

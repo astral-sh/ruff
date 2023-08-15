@@ -8,21 +8,6 @@ use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
 use crate::{FormatNodeRule, PyFormatter};
 
-#[derive(Debug)]
-struct ExprTupleWithoutParentheses<'a>(&'a Expr);
-
-impl Format<PyFormatContext<'_>> for ExprTupleWithoutParentheses<'_> {
-    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        match self.0 {
-            Expr::Tuple(expr_tuple) => expr_tuple
-                .format()
-                .with_options(TupleParentheses::NeverPreserve)
-                .fmt(f),
-            other => maybe_parenthesize_expression(other, self.0, Parenthesize::IfBreaks).fmt(f),
-        }
-    }
-}
-
 #[derive(Default)]
 pub struct FormatStmtFor;
 
@@ -52,11 +37,19 @@ impl FormatNodeRule<StmtFor> for FormatStmtFor {
                 is_async.then_some(format_args![text("async"), space()]),
                 text("for"),
                 space(),
-                ExprTupleWithoutParentheses(target),
+                ExprWithTupleParentheses {
+                    expr: target,
+                    parent: item,
+                    parentheses: TupleParentheses::NeverPreserve
+                },
                 space(),
                 text("in"),
                 space(),
-                maybe_parenthesize_expression(iter, item, Parenthesize::IfBreaks),
+                ExprWithTupleParentheses {
+                    expr: iter,
+                    parent: item,
+                    parentheses: TupleParentheses::Preserve
+                },
                 text(":"),
                 trailing_comments(trailing_condition_comments),
                 block_indent(&body.format())
@@ -93,5 +86,23 @@ impl FormatNodeRule<StmtFor> for FormatStmtFor {
     ) -> FormatResult<()> {
         // Handled in `fmt_fields`
         Ok(())
+    }
+}
+
+#[derive(Debug)]
+struct ExprWithTupleParentheses<'a> {
+    expr: &'a Expr,
+    parent: &'a StmtFor,
+    parentheses: TupleParentheses,
+}
+
+impl Format<PyFormatContext<'_>> for ExprWithTupleParentheses<'_> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
+        match &self.expr {
+            Expr::Tuple(expr_tuple) => expr_tuple.format().with_options(self.parentheses).fmt(f),
+            other => {
+                maybe_parenthesize_expression(other, self.parent, Parenthesize::IfBreaks).fmt(f)
+            }
+        }
     }
 }
