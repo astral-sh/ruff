@@ -1,9 +1,10 @@
+use itertools::Itertools;
+
 use ruff_python_ast::{
     self as ast, Arguments, Constant, Decorator, Expr, ExprContext, PySourceType, Ranged,
 };
 use ruff_python_parser::{lexer, AsMode, Tok};
 use ruff_text_size::TextRange;
-use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -209,7 +210,7 @@ impl Violation for PytestParametrizeValuesWrongType {
 /// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
 #[violation]
 pub struct PytestDuplicateParametrizeTestCases {
-    pub indices: Vec<usize>,
+    pub indices: (usize, usize),
 }
 
 impl Violation for PytestDuplicateParametrizeTestCases {
@@ -549,13 +550,11 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
     }
 }
 
-fn find_duplicates(elts: &Vec<Expr>) -> Vec<usize> {
-    let mut duplicates: Vec<usize> = Vec::with_capacity(elts.len());
-    let mut seen_values: FxHashSet<ComparableExpr> = FxHashSet::default();
-    for (idx, elt) in elts.iter().enumerate() {
-        let comparable_value: ComparableExpr = elt.into();
-        if !seen_values.insert(comparable_value) {
-            duplicates.push(idx);
+fn find_duplicates(elts: &Vec<Expr>) -> Vec<(usize, usize)> {
+    let mut duplicates: Vec<(usize, usize)> = Vec::with_capacity(elts.len());
+    for ((idx1, elt1), (idx2, elt2)) in elts.iter().enumerate().tuple_combinations() {
+        if ComparableExpr::from(elt1) == ComparableExpr::from(elt2) {
+            duplicates.push((idx1 + 1, idx2 + 1));
         }
     }
     duplicates
@@ -565,8 +564,7 @@ fn find_duplicates(elts: &Vec<Expr>) -> Vec<usize> {
 fn check_duplicates(checker: &mut Checker, values: &Expr) {
     match values {
         Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-            let indices = find_duplicates(elts);
-            if !indices.is_empty() {
+            for indices in find_duplicates(elts) {
                 checker.diagnostics.push(Diagnostic::new(
                     PytestDuplicateParametrizeTestCases { indices },
                     values.range(),
