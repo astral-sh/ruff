@@ -51,11 +51,11 @@ impl FormatNodeRule<StmtMatch> for FormatStmtMatch {
             write!(
                 f,
                 [block_indent(&format_args!(
-                    &leading_alternate_branch_comments(
+                    leading_alternate_branch_comments(
                         comments.leading_comments(case),
                         last_case.body.last(),
                     ),
-                    &case.format()
+                    case.format()
                 ))]
             )?;
             last_case = case;

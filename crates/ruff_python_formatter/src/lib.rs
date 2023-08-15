@@ -144,40 +144,6 @@ pub fn format_node<'a>(
     Ok(formatted)
 }
 
-pub(crate) struct NotYetImplemented<'a>(AnyNodeRef<'a>);
-
-/// Formats a placeholder for nodes that have not yet been implemented
-pub(crate) fn not_yet_implemented<'a, T>(node: T) -> NotYetImplemented<'a>
-where
-    T: Into<AnyNodeRef<'a>>,
-{
-    NotYetImplemented(node.into())
-}
-
-impl Format<PyFormatContext<'_>> for NotYetImplemented<'_> {
-    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let text = std::format!("NOT_YET_IMPLEMENTED_{:?}", self.0.kind());
-
-        f.write_element(FormatElement::Tag(Tag::StartVerbatim(
-            tag::VerbatimKind::Verbatim {
-                length: text.text_len(),
-            },
-        )))?;
-
-        f.write_element(FormatElement::DynamicText {
-            text: Box::from(text),
-        })?;
-
-        f.write_element(FormatElement::Tag(Tag::EndVerbatim))?;
-
-        f.context()
-            .comments()
-            .mark_verbatim_node_comments_formatted(self.0);
-
-        Ok(())
-    }
-}
-
 pub(crate) struct NotYetImplementedCustomText<'a> {
     text: &'static str,
     node: AnyNodeRef<'a>,
