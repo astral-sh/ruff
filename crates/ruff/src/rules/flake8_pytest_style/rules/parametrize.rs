@@ -216,7 +216,7 @@ impl Violation for PytestDuplicateParametrizeTestCases {
     #[derive_message_formats]
     fn message(&self) -> String {
         let PytestDuplicateParametrizeTestCases { indices } = self;
-        format!("Found duplicate test cases at indices {indices:?} in `@pytest.mark.parametrize`")
+        format!("Found duplicate test cases {indices:?} in `@pytest.mark.parametrize`")
     }
 }
 
