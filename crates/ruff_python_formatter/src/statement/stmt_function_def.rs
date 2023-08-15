@@ -2,12 +2,13 @@ use ruff_formatter::write;
 use ruff_python_ast::{Parameters, Ranged, StmtFunctionDef};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 
-use crate::comments::{trailing_comments, SourceComment};
+use crate::comments::{trailing_comments, SourceComment, SuppressionKind};
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{Parentheses, Parenthesize};
 use crate::prelude::*;
 use crate::statement::stmt_class_def::FormatDecorators;
 use crate::statement::suite::SuiteKind;
+use crate::verbatim::SuppressedClauseHeader;
 use crate::FormatNodeRule;
 
 #[derive(Default)]
@@ -41,98 +42,102 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
         }
         .fmt(f)?;
 
-        if *is_async {
-            write!(f, [text("async"), space()])?;
-        }
-
-        write!(f, [text("def"), space(), name.format()])?;
-
-        if let Some(type_params) = type_params.as_ref() {
-            write!(f, [type_params.format()])?;
-        }
-
-        let format_inner = format_with(|f: &mut PyFormatter| {
-            write!(f, [parameters.format()])?;
-
-            if let Some(return_annotation) = returns.as_ref() {
-                write!(f, [space(), text("->"), space()])?;
-
-                if return_annotation.is_tuple_expr() {
-                    let parentheses = if comments.has_leading_comments(return_annotation.as_ref()) {
-                        Parentheses::Always
-                    } else {
-                        Parentheses::Never
-                    };
-                    write!(f, [return_annotation.format().with_options(parentheses)])?;
-                } else if comments.has_trailing_comments(return_annotation.as_ref()) {
-                    // Intentionally parenthesize any return annotations with trailing comments.
-                    // This avoids an instability in cases like:
-                    // ```python
-                    // def double(
-                    //     a: int
-                    // ) -> (
-                    //     int  # Hello
-                    // ):
-                    //     pass
-                    // ```
-                    // If we allow this to break, it will be formatted as follows:
-                    // ```python
-                    // def double(
-                    //     a: int
-                    // ) -> int:  # Hello
-                    //     pass
-                    // ```
-                    // On subsequent formats, the `# Hello` will be interpreted as a dangling
-                    // comment on a function, yielding:
-                    // ```python
-                    // def double(a: int) -> int:  # Hello
-                    //     pass
-                    // ```
-                    // Ideally, we'd reach that final formatting in a single pass, but doing so
-                    // requires that the parent be aware of how the child is formatted, which
-                    // is challenging. As a compromise, we break those expressions to avoid an
-                    // instability.
-                    write!(
-                        f,
-                        [return_annotation.format().with_options(Parentheses::Always)]
-                    )?;
-                } else {
-                    write!(
-                        f,
-                        [maybe_parenthesize_expression(
-                            return_annotation,
-                            item,
-                            if empty_parameters(parameters, f.context().source()) {
-                                // If the parameters are empty, add parentheses if the return annotation
-                                // breaks at all.
-                                Parenthesize::IfBreaksOrIfRequired
-                            } else {
-                                // Otherwise, use our normal rules for parentheses, which allows us to break
-                                // like:
-                                // ```python
-                                // def f(
-                                //     x,
-                                // ) -> Tuple[
-                                //     int,
-                                //     int,
-                                // ]:
-                                //     ...
-                                // ```
-                                Parenthesize::IfBreaks
-                            },
-                        )]
-                    )?;
-                }
+        if SuppressionKind::has_skip_comment(trailing_definition_comments, f.context().source()) {
+            SuppressedClauseHeader::Function(item).fmt(f)?;
+        } else {
+            if *is_async {
+                write!(f, [text("async"), space()])?;
             }
-            Ok(())
-        });
 
-        write!(f, [group(&format_inner)])?;
+            write!(f, [text("def"), space(), name.format()])?;
+
+            if let Some(type_params) = type_params.as_ref() {
+                write!(f, [type_params.format()])?;
+            }
+
+            let format_inner = format_with(|f: &mut PyFormatter| {
+                write!(f, [parameters.format()])?;
+
+                if let Some(return_annotation) = returns.as_ref() {
+                    write!(f, [space(), text("->"), space()])?;
+
+                    if return_annotation.is_tuple_expr() {
+                        let parentheses =
+                            if comments.has_leading_comments(return_annotation.as_ref()) {
+                                Parentheses::Always
+                            } else {
+                                Parentheses::Never
+                            };
+                        write!(f, [return_annotation.format().with_options(parentheses)])?;
+                    } else if comments.has_trailing_comments(return_annotation.as_ref()) {
+                        // Intentionally parenthesize any return annotations with trailing comments.
+                        // This avoids an instability in cases like:
+                        // ```python
+                        // def double(
+                        //     a: int
+                        // ) -> (
+                        //     int  # Hello
+                        // ):
+                        //     pass
+                        // ```
+                        // If we allow this to break, it will be formatted as follows:
+                        // ```python
+                        // def double(
+                        //     a: int
+                        // ) -> int:  # Hello
+                        //     pass
+                        // ```
+                        // On subsequent formats, the `# Hello` will be interpreted as a dangling
+                        // comment on a function, yielding:
+                        // ```python
+                        // def double(a: int) -> int:  # Hello
+                        //     pass
+                        // ```
+                        // Ideally, we'd reach that final formatting in a single pass, but doing so
+                        // requires that the parent be aware of how the child is formatted, which
+                        // is challenging. As a compromise, we break those expressions to avoid an
+                        // instability.
+                        write!(
+                            f,
+                            [return_annotation.format().with_options(Parentheses::Always)]
+                        )?;
+                    } else {
+                        write!(
+                            f,
+                            [maybe_parenthesize_expression(
+                                return_annotation,
+                                item,
+                                if empty_parameters(parameters, f.context().source()) {
+                                    // If the parameters are empty, add parentheses if the return annotation
+                                    // breaks at all.
+                                    Parenthesize::IfBreaksOrIfRequired
+                                } else {
+                                    // Otherwise, use our normal rules for parentheses, which allows us to break
+                                    // like:
+                                    // ```python
+                                    // def f(
+                                    //     x,
+                                    // ) -> Tuple[
+                                    //     int,
+                                    //     int,
+                                    // ]:
+                                    //     ...
+                                    // ```
+                                    Parenthesize::IfBreaks
+                                },
+                            )]
+                        )?;
+                    }
+                }
+                Ok(())
+            });
+
+            write!(f, [group(&format_inner), text(":"),])?;
+        }
 
         write!(
             f,
             [
-                text(":"),
                 trailing_comments(trailing_definition_comments),
                 block_indent(&body.format().with_options(SuiteKind::Function))
             ]

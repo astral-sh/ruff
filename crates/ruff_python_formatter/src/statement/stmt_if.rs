@@ -1,7 +1,10 @@
-use crate::comments::{leading_alternate_branch_comments, trailing_comments, SourceComment};
+use crate::comments::{
+    leading_alternate_branch_comments, trailing_comments, SourceComment, SuppressionKind,
+};
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
+use crate::verbatim::SuppressedClauseHeader;
 use crate::FormatNodeRule;
 use ruff_formatter::write;
 use ruff_python_ast::node::AnyNodeRef;
@@ -22,13 +25,23 @@ impl FormatNodeRule<StmtIf> for FormatStmtIf {
         let comments = f.context().comments().clone();
         let trailing_colon_comment = comments.dangling_comments(item);
 
+        if SuppressionKind::has_skip_comment(trailing_colon_comment, f.context().source()) {
+            SuppressedClauseHeader::If(item).fmt(f)?;
+        } else {
+            write!(
+                f,
+                [
+                    text("if"),
+                    space(),
+                    maybe_parenthesize_expression(test, item, Parenthesize::IfBreaks),
+                    text(":"),
+                ]
+            )?;
+        }
+
         write!(
             f,
             [
-                text("if"),
-                space(),
-                maybe_parenthesize_expression(test, item, Parenthesize::IfBreaks),
-                text(":"),
                 trailing_comments(trailing_colon_comment),
                 block_indent(&body.format())
             ]
@@ -72,23 +85,28 @@ pub(crate) fn format_elif_else_clause(
 
     leading_alternate_branch_comments(leading_comments, last_node).fmt(f)?;
 
-    if let Some(test) = test {
-        write!(
-            f,
-            [
-                text("elif"),
-                space(),
-                maybe_parenthesize_expression(test, item, Parenthesize::IfBreaks),
-            ]
-        )?;
+    if SuppressionKind::has_skip_comment(trailing_colon_comment, f.context().source()) {
+        SuppressedClauseHeader::ElifElse(item).fmt(f)?;
     } else {
-        text("else").fmt(f)?;
+        if let Some(test) = test {
+            write!(
+                f,
+                [
+                    text("elif"),
+                    space(),
+                    maybe_parenthesize_expression(test, item, Parenthesize::IfBreaks),
+                ]
+            )?;
+        } else {
+            text("else").fmt(f)?;
+        }
+
+        text(":").fmt(f)?;
     }
 
     write!(
         f,
         [
-            text(":"),
             trailing_comments(trailing_colon_comment),
             block_indent(&body.format())
         ]

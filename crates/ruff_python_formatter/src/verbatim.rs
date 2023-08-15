@@ -5,10 +5,13 @@ use unicode_width::UnicodeWidthStr;
 
 use ruff_formatter::{write, FormatError};
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{Ranged, Stmt};
+use ruff_python_ast::{
+    ElifElseClause, ExceptHandlerExceptHandler, MatchCase, Ranged, Stmt, StmtClassDef, StmtFor,
+    StmtFunctionDef, StmtIf, StmtMatch, StmtTry, StmtWhile, StmtWith,
+};
 use ruff_python_parser::lexer::{lex_starts_at, LexResult};
 use ruff_python_parser::{Mode, Tok};
-use ruff_python_trivia::lines_before;
+use ruff_python_trivia::{lines_before, SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::Locator;
 use ruff_text_size::{TextRange, TextSize};
 
@@ -928,5 +931,296 @@ impl Format<PyFormatContext<'_>> for FormatSuppressedNode<'_> {
                 trailing_comments(node_comments.trailing)
             ]
         )
+    }
+}
+
+#[derive(Copy, Clone)]
+pub(crate) enum SuppressedClauseHeader<'a> {
+    Class(&'a StmtClassDef),
+    Function(&'a StmtFunctionDef),
+    If(&'a StmtIf),
+    ElifElse(&'a ElifElseClause),
+    Try(&'a StmtTry),
+    ExceptHandler(&'a ExceptHandlerExceptHandler),
+    TryFinally(&'a StmtTry),
+    Match(&'a StmtMatch),
+    MatchCase(&'a MatchCase),
+    For(&'a StmtFor),
+    While(&'a StmtWhile),
+    With(&'a StmtWith),
+    OrElse(OrElseParent<'a>),
+}
+
+impl<'a> SuppressedClauseHeader<'a> {
+    fn range(self, source: &str) -> FormatResult<TextRange> {
+        let keyword_range = self.keyword_range(source)?;
+
+        let mut last_child_end = None;
+
+        self.visit_children(&mut |child| last_child_end = Some(child.end()));
+
+        let end = match self {
+            SuppressedClauseHeader::Class(class) => {
+                Some(last_child_end.unwrap_or(class.name.end()))
+            }
+            SuppressedClauseHeader::Function(function) => {
+                Some(last_child_end.unwrap_or(function.name.end()))
+            }
+            SuppressedClauseHeader::ElifElse(_)
+            | SuppressedClauseHeader::Try(_)
+            | SuppressedClauseHeader::If(_)
+            | SuppressedClauseHeader::TryFinally(_)
+            | SuppressedClauseHeader::Match(_)
+            | SuppressedClauseHeader::MatchCase(_)
+            | SuppressedClauseHeader::For(_)
+            | SuppressedClauseHeader::While(_)
+            | SuppressedClauseHeader::With(_)
+            | SuppressedClauseHeader::OrElse(_) => last_child_end,
+
+            SuppressedClauseHeader::ExceptHandler(handler) => handler
+                .name
+                .as_ref()
+                .map(ruff_python_ast::Ranged::end)
+                .or(last_child_end),
+        };
+
+        let colon = colon_range(end.unwrap_or(keyword_range.end()), source)?;
+
+        Ok(TextRange::new(keyword_range.start(), colon.end()))
+    }
+
+    // Needs to know child nodes.
+    // Could use normal lexer to get header end since we know that it is rare
+    fn visit_children<F>(self, visitor: &mut F)
+    where
+        F: FnMut(AnyNodeRef),
+    {
+        fn visit<'a, N, F>(node: N, visitor: &mut F)
+        where
+            N: Into<AnyNodeRef<'a>>,
+            F: FnMut(AnyNodeRef<'a>),
+        {
+            visitor(node.into());
+        }
+
+        match self {
+            SuppressedClauseHeader::Class(class) => {
+                if let Some(type_params) = &class.type_params {
+                    visit(type_params.as_ref(), visitor);
+                }
+
+                if let Some(arguments) = &class.arguments {
+                    visit(arguments.as_ref(), visitor);
+                }
+            }
+            SuppressedClauseHeader::Function(function) => {
+                visit(function.parameters.as_ref(), visitor);
+                if let Some(type_params) = function.type_params.as_ref() {
+                    visit(type_params, visitor);
+                }
+            }
+            SuppressedClauseHeader::If(if_stmt) => {
+                visit(if_stmt.test.as_ref(), visitor);
+            }
+            SuppressedClauseHeader::ElifElse(clause) => {
+                if let Some(test) = clause.test.as_ref() {
+                    visit(test, visitor);
+                }
+            }
+
+            SuppressedClauseHeader::ExceptHandler(handler) => {
+                if let Some(ty) = handler.type_.as_deref() {
+                    visit(ty, visitor);
+                }
+            }
+            SuppressedClauseHeader::Match(match_stmt) => {
+                visit(match_stmt.subject.as_ref(), visitor);
+            }
+            SuppressedClauseHeader::MatchCase(match_case) => {
+                visit(&match_case.pattern, visitor);
+
+                if let Some(guard) = match_case.guard.as_deref() {
+                    visit(guard, visitor);
+                }
+            }
+            SuppressedClauseHeader::For(for_stmt) => {
+                visit(for_stmt.target.as_ref(), visitor);
+                visit(for_stmt.iter.as_ref(), visitor);
+            }
+            SuppressedClauseHeader::While(while_stmt) => {
+                visit(while_stmt.test.as_ref(), visitor);
+            }
+            SuppressedClauseHeader::With(with_stmt) => {
+                for item in &with_stmt.items {
+                    visit(item, visitor);
+                }
+            }
+            SuppressedClauseHeader::Try(_)
+            | SuppressedClauseHeader::TryFinally(_)
+            | SuppressedClauseHeader::OrElse(_) => {}
+        }
+    }
+
+    fn keyword_range(self, source: &str) -> FormatResult<TextRange> {
+        match self {
+            SuppressedClauseHeader::Class(header) => {
+                find_keyword(header.start(), SimpleTokenKind::Class, source)
+            }
+            SuppressedClauseHeader::Function(header) => {
+                let keyword = if header.is_async {
+                    SimpleTokenKind::Async
+                } else {
+                    SimpleTokenKind::Def
+                };
+                find_keyword(header.start(), keyword, source)
+            }
+            SuppressedClauseHeader::If(header) => {
+                find_keyword(header.start(), SimpleTokenKind::If, source)
+            }
+            SuppressedClauseHeader::ElifElse(ElifElseClause {
+                test: None, range, ..
+            }) => find_keyword(range.start(), SimpleTokenKind::Else, source),
+            SuppressedClauseHeader::ElifElse(ElifElseClause {
+                test: Some(_),
+                range,
+                ..
+            }) => find_keyword(range.start(), SimpleTokenKind::Elif, source),
+            SuppressedClauseHeader::Try(header) => {
+                find_keyword(header.start(), SimpleTokenKind::Try, source)
+            }
+            SuppressedClauseHeader::ExceptHandler(header) => {
+                find_keyword(header.start(), SimpleTokenKind::Except, source)
+            }
+            SuppressedClauseHeader::TryFinally(header) => {
+                let last_statement = header
+                    .orelse
+                    .last()
+                    .map(AnyNodeRef::from)
+                    .or_else(|| header.handlers.last().map(AnyNodeRef::from))
+                    .or_else(|| header.body.last().map(AnyNodeRef::from))
+                    .unwrap();
+
+                find_keyword(last_statement.end(), SimpleTokenKind::Finally, source)
+            }
+            SuppressedClauseHeader::Match(header) => {
+                find_keyword(header.start(), SimpleTokenKind::Match, source)
+            }
+            SuppressedClauseHeader::MatchCase(header) => {
+                find_keyword(header.start(), SimpleTokenKind::Case, source)
+            }
+            SuppressedClauseHeader::For(header) => {
+                let keyword = if header.is_async {
+                    SimpleTokenKind::Async
+                } else {
+                    SimpleTokenKind::For
+                };
+                find_keyword(header.start(), keyword, source)
+            }
+            SuppressedClauseHeader::While(header) => {
+                find_keyword(header.start(), SimpleTokenKind::While, source)
+            }
+            SuppressedClauseHeader::With(header) => {
+                let keyword = if header.is_async {
+                    SimpleTokenKind::Async
+                } else {
+                    SimpleTokenKind::With
+                };
+
+                find_keyword(header.start(), keyword, source)
+            }
+            SuppressedClauseHeader::OrElse(header) => match header {
+                OrElseParent::Try(try_stmt) => {
+                    let last_statement = try_stmt
+                        .handlers
+                        .last()
+                        .map(AnyNodeRef::from)
+                        .or_else(|| try_stmt.body.last().map(AnyNodeRef::from))
+                        .unwrap();
+
+                    find_keyword(last_statement.end(), SimpleTokenKind::Else, source)
+                }
+                OrElseParent::For(StmtFor { body, .. })
+                | OrElseParent::While(StmtWhile { body, .. }) => {
+                    find_keyword(body.last().unwrap().end(), SimpleTokenKind::Else, source)
+                }
+            },
+        }
+    }
+}
+
+fn find_keyword(
+    start_position: TextSize,
+    keyword: SimpleTokenKind,
+    source: &str,
+) -> FormatResult<TextRange> {
+    let mut tokenizer = SimpleTokenizer::starts_at(start_position, source).skip_trivia();
+
+    match tokenizer.next() {
+        Some(token) if token.kind() == keyword => Ok(token.range()),
+        Some(other) => {
+            debug_assert!(
+                false,
+                "Expected the keyword token {keyword:?} but found the token {other:?} instead."
+            );
+            Err(FormatError::syntax_error(
+                "Expected the keyword token but found another token instead.",
+            ))
+        }
+        None => {
+            debug_assert!(
+                false,
+                "Expected the keyword token {keyword:?} but reached the end of the source instead."
+            );
+            Err(FormatError::syntax_error(
+                "Expected the case header keyword token but reached the end of the source instead.",
+            ))
+        }
+    }
+}
+
+fn colon_range(after_keyword_or_condition: TextSize, source: &str) -> FormatResult<TextRange> {
+    let mut tokenizer = SimpleTokenizer::starts_at(after_keyword_or_condition, source)
+        .skip_trivia()
+        .skip_while(|token| token.kind() == SimpleTokenKind::RParen);
+
+    match tokenizer.next() {
+        Some(SimpleToken {
+            kind: SimpleTokenKind::Colon,
+            range,
+        }) => Ok(range),
+        Some(token) => {
+            debug_assert!(false, "Expected the colon marking the end of the case header but found {token:?} instead.");
+            Err(FormatError::syntax_error("Expected colon marking the end of the case header but found another token instead."))
+        }
+        None => {
+            debug_assert!(false, "Expected the colon marking the end of the case header but found the end of the range.");
+            Err(FormatError::syntax_error("Expected the colon marking the end of the case header but found the end of the range."))
+        }
+    }
+}
+
+#[derive(Copy, Clone)]
+pub(crate) enum OrElseParent<'a> {
+    Try(&'a StmtTry),
+    For(&'a StmtFor),
+    While(&'a StmtWhile),
+}
+
+impl Format<PyFormatContext<'_>> for SuppressedClauseHeader<'_> {
+    #[cold]
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+        // Write the outer comments and format the node as verbatim
+        write!(
+            f,
+            [verbatim_text(
+                self.range(f.context().source())?,
+                ContainsNewlines::Detect
+            ),]
+        )?;
+
+        let comments = f.context().comments();
+        self.visit_children(&mut |child| comments.mark_verbatim_node_comments_formatted(child));
+
+        Ok(())
     }
 }

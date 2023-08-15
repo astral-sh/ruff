@@ -1,7 +1,8 @@
-use crate::comments::{trailing_comments, SourceComment};
+use crate::comments::{trailing_comments, SourceComment, SuppressionKind};
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
+use crate::verbatim::SuppressedClauseHeader;
 use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::FormatRuleWithOptions;
 use ruff_formatter::{write, Buffer, FormatResult};
@@ -46,33 +47,39 @@ impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHan
         let comments_info = f.context().comments().clone();
         let dangling_comments = comments_info.dangling_comments(item);
 
-        write!(
-            f,
-            [
-                text("except"),
-                match self.except_handler_kind {
-                    ExceptHandlerKind::Regular => None,
-                    ExceptHandlerKind::Starred => Some(text("*")),
-                }
-            ]
-        )?;
-
-        if let Some(type_) = type_ {
+        if SuppressionKind::has_skip_comment(dangling_comments, f.context().source()) {
+            SuppressedClauseHeader::ExceptHandler(item).fmt(f)?;
+        } else {
             write!(
                 f,
                 [
-                    space(),
-                    maybe_parenthesize_expression(type_, item, Parenthesize::IfBreaks)
+                    text("except"),
+                    match self.except_handler_kind {
+                        ExceptHandlerKind::Regular => None,
+                        ExceptHandlerKind::Starred => Some(text("*")),
+                    }
                 ]
             )?;
-            if let Some(name) = name {
-                write!(f, [space(), text("as"), space(), name.format()])?;
+
+            if let Some(type_) = type_ {
+                write!(
+                    f,
+                    [
+                        space(),
+                        maybe_parenthesize_expression(type_, item, Parenthesize::IfBreaks)
+                    ]
+                )?;
+                if let Some(name) = name {
+                    write!(f, [space(), text("as"), space(), name.format()])?;
+                }
             }
+
+            text(":").fmt(f)?;
         }
+
         write!(
             f,
             [
-                text(":"),
                 trailing_comments(dangling_comments),
                 block_indent(&body.format()),
             ]
