@@ -105,7 +105,7 @@ src = ["src"]
 
 ### Rule Selection
 
-Ruff supports [over 500 lint rules](rules.md) split across over 40 built-in plugins, but
+Ruff supports [over 600 lint rules](rules.md) split across over 40 built-in plugins, but
 determining the right set of rules will depend on your project's needs: some rules may be too
 strict, some are framework-specific, and so on.
 
