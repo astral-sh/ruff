@@ -22,8 +22,7 @@ impl FormatNodeRule<MatchCase> for FormatMatchCase {
         let dangling_item_comments = comments.dangling_comments(item);
 
         write!(f, [text("case"), space()])?;
-        let leading_pattern_comments = comments.leading_comments(pattern);
-        if leading_pattern_comments.is_empty() {
+        if comments.has_leading_comments(pattern) {
             pattern.format().fmt(f)?;
         } else {
             parenthesized(
