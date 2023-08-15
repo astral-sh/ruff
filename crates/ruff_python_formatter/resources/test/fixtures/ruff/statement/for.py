@@ -32,3 +32,13 @@ for (x, y) in (z, w):
 # type comment
 for x in (): # type: int
     ...
+
+# Tuple parentheses for iterable.
+for x in 1, 2, 3:
+    pass
+
+for x in (1, 2, 3):
+    pass
+
+for x in 1, 2, 3,:
+    pass
