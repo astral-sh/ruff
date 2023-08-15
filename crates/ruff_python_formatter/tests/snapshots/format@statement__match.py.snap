@@ -126,6 +126,13 @@ match pattern_comments:
 
 
 match pattern_comments:
+    case (  # leading
+    only_leading
+    ):
+        pass
+
+
+match pattern_comments:
     case (
     # leading
     leading_and_trailing  # trailing 1
@@ -256,6 +263,14 @@ match pattern_comments:
         x as NOT_YET_IMPLEMENTED_PatternMatchAs  # trailing 1
         # trailing 2
         # trailing 3
+    ):
+        pass
+
+
+match pattern_comments:
+    case (
+        # leading
+        x as NOT_YET_IMPLEMENTED_PatternMatchAs
     ):
         pass
 

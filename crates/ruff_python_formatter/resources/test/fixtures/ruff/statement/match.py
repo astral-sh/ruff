@@ -120,6 +120,13 @@ match pattern_comments:
 
 
 match pattern_comments:
+    case (  # leading
+    only_leading
+    ):
+        pass
+
+
+match pattern_comments:
     case (
     # leading
     leading_and_trailing  # trailing 1
