@@ -85,7 +85,11 @@ pub fn lines_after_ignoring_trivia(offset: TextSize, code: &str) -> u32 {
 }
 
 fn is_identifier_start(c: char) -> bool {
-    c.is_ascii_alphabetic() || c == '_' || is_non_ascii_identifier_start(c)
+    if c.is_ascii() {
+        c.is_ascii_alphabetic() || c == '_'
+    } else {
+        is_xid_start(c)
+    }
 }
 
 // Checks if the character c is a valid continuation character as described
@@ -96,10 +100,6 @@ fn is_identifier_continuation(c: char) -> bool {
     } else {
         is_xid_continue(c)
     }
-}
-
-fn is_non_ascii_identifier_start(c: char) -> bool {
-    is_xid_start(c)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]

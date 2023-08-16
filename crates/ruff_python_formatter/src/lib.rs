@@ -50,17 +50,24 @@ where
 
         let node_comments = comments.leading_dangling_trailing_comments(node.as_any_node_ref());
 
-        leading_comments(node_comments.leading).fmt(f)?;
-        self.fmt_node(node, f)?;
-        self.fmt_dangling_comments(node_comments.dangling, f)?;
-        trailing_comments(node_comments.trailing).fmt(f)
-    }
+        write!(
+            f,
+            [
+                leading_comments(node_comments.leading),
+                source_position(node.start())
+            ]
+        )?;
 
-    /// Formats the node without comments. Ignores any suppression comments.
-    fn fmt_node(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
-        write!(f, [source_position(node.start())])?;
         self.fmt_fields(node, f)?;
-        write!(f, [source_position(node.end())])
+        self.fmt_dangling_comments(node_comments.dangling, f)?;
+
+        write!(
+            f,
+            [
+                source_position(node.end()),
+                trailing_comments(node_comments.trailing)
+            ]
+        )
     }
 
     /// Formats the node's fields.
