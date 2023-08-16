@@ -659,9 +659,9 @@ impl FormatString {
                     left.push(c);
                     continue;
                 }
-                let (_, right) = text.split_at(idx);
+                let (_, right) = text.split_at(idx + 1);
                 let format_part = FormatString::parse_part_in_brackets(&left)?;
-                return Ok((format_part, &right[1..]));
+                return Ok((format_part, &right));
             } else {
                 left.push(c);
             }
@@ -959,6 +959,10 @@ mod tests {
         );
         assert_eq!(
             FormatSpec::parse("}"),
+            Err(FormatSpecError::InvalidFormatType)
+        );
+        assert_eq!(
+            FormatSpec::parse("{}}"),
             Err(FormatSpecError::InvalidFormatType)
         );
         assert_eq!(
