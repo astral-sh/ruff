@@ -233,7 +233,7 @@ pub struct FormatSpec {
     // Ex) `f` in `'{:+f}'`
     format_type: Option<FormatType>,
     // Ex) `x` and `y` in `'{:*{x},{y}b}'`
-    replacements: Vec<FormatPart>,
+    pub replacements: Vec<FormatPart>,
 }
 
 fn get_num_digits(text: &str) -> usize {

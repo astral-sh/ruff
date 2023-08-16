@@ -49,16 +49,39 @@ pub(crate) fn call(checker: &mut Checker, string: &str, range: TextRange) {
                 continue;
             };
 
-            if let Err(FormatSpecError::InvalidFormatType) = FormatSpec::parse(format_spec) {
-                checker.diagnostics.push(Diagnostic::new(
-                    BadStringFormatCharacter {
-                        // The format type character is always the last one.
-                        // More info in the official spec:
-                        // https://docs.python.org/3/library/string.html#format-specification-mini-language
-                        format_char: format_spec.chars().last().unwrap(),
-                    },
-                    range,
-                ));
+            match FormatSpec::parse(format_spec) {
+                Err(FormatSpecError::InvalidFormatType) => {
+                    checker.diagnostics.push(Diagnostic::new(
+                        BadStringFormatCharacter {
+                            // The format type character is always the last one.
+                            // More info in the official spec:
+                            // https://docs.python.org/3/library/string.html#format-specification-mini-language
+                            format_char: format_spec.chars().last().unwrap(),
+                        },
+                        range,
+                    ));
+                }
+                Err(_) => {}
+                Ok(format_spec) => {
+                    for replacement in format_spec.replacements {
+                        let FormatPart::Field { format_spec, .. } = replacement else {
+                            continue;
+                        };
+                        if let Err(FormatSpecError::InvalidFormatType) =
+                            FormatSpec::parse(&format_spec)
+                        {
+                            checker.diagnostics.push(Diagnostic::new(
+                                BadStringFormatCharacter {
+                                    // The format type character is always the last one.
+                                    // More info in the official spec:
+                                    // https://docs.python.org/3/library/string.html#format-specification-mini-language
+                                    format_char: format_spec.chars().last().unwrap(),
+                                },
+                                range,
+                            ));
+                        }
+                    }
+                }
             }
         }
     }
