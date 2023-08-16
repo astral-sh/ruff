@@ -72,6 +72,20 @@ with (
     # trailing comment
 ): ...
 
+with (
+    a as (
+        # leading comment
+        b
+    )
+): ...
+
+with (
+    a as (
+        b
+        # trailing comment
+    )
+): ...
+
 with (a # trailing same line comment
     # trailing own line comment
     ) as b: ...
@@ -236,4 +250,7 @@ with (
 
 with (
     (aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb) as b, c as d):
+    pass
+
+with (foo() as bar, baz() as bop):
     pass
