@@ -183,14 +183,31 @@ impl FormatParse for FormatType {
     }
 }
 
+/// The format specification component of a format field
+///
+/// For example the content would be parsed from `<20` in:
+/// ```python
+/// "hello {name:<20}".format(name="test")
+/// ```
+///
+/// Format specifications allow nested replacements for dynamic formatting.
+/// For example, the following statements are equivalent:
+/// ```python
+/// "hello {name:{fmt}}".format(name="test", fmt="<20")
+/// "hello {name:{align}{width}}".format(name="test", align="<", width="20")
+/// "hello {name:<20{empty}>}".format(name="test", empty="")
+/// ```
+///
+/// Nested replacements can include additional format specifiers.
+/// ```python
+/// "hello {name:{fmt:*>}}".format(name="test", fmt="<20")
+/// ```
+///
+/// When replacements are present in a format specification, we will parse them and
+/// store them in [`FormatSpec`] but will otherwise ignore them if they would introduce
+/// an invalid format specification at runtime.
 #[derive(Debug, PartialEq)]
-pub enum FormatSpec {
-    Static(StaticFormatSpec),
-    Dynamic(DynamicFormatSpec),
-}
-
-#[derive(Debug, PartialEq)]
-pub struct StaticFormatSpec {
+pub struct FormatSpec {
     // Ex) `!s` in `'{!s}'`
     conversion: Option<FormatConversion>,
     // Ex) `*` in `'{:*^30}'`
@@ -209,18 +226,8 @@ pub struct StaticFormatSpec {
     precision: Option<usize>,
     // Ex) `f` in `'{:+f}'`
     format_type: Option<FormatType>,
-}
-
-/// A format specification with a dynamic replacement
-/// We cannot analyze the components of dynamic format specifications and thus require a separate structure
-#[derive(Debug, PartialEq)]
-pub struct DynamicFormatSpec {
-    // Ex) `*<` in `'{:*<{f}}'`
-    left: String,
-    // Ex) `f` in `'{:{f}}'`
-    replacement: Option<FormatPart>,
-    // Ex) `.2b` in `'{:{f}.2b}'`
-    right: String,
+    // Ex) `x` and `y` in `'{:*{x},{y}b}'`
+    replacements: Vec<FormatPart>,
 }
 
 fn get_num_digits(text: &str) -> usize {
@@ -298,18 +305,22 @@ fn parse_precision(text: &str) -> Result<(Option<usize>, &str), FormatSpecError>
 }
 
 /// Parses a format part within a format spec
-fn parse_nested_format_part(text: &str) -> Result<(Option<FormatPart>, &str), FormatSpecError> {
+fn parse_nested_format_part<'a>(
+    parts: &'a RefCell<Vec<FormatPart>>,
+    text: &'a str,
+) -> Result<&'a str, FormatSpecError> {
+    let mut parts = parts.borrow_mut();
     let mut end_bracket_pos = None;
     let mut left = String::new();
 
     if text.is_empty() {
-        return Ok((None, text));
+        return Ok(text);
     }
 
     for (idx, c) in text.char_indices() {
         if idx == 0 {
             if c != '{' {
-                return Ok((None, text));
+                return Ok(text);
             }
         } else if c == '{' {
             return Err(FormatSpecError::ReplacementNotAllowed);
@@ -324,7 +335,8 @@ fn parse_nested_format_part(text: &str) -> Result<(Option<FormatPart>, &str), Fo
         let (_, right) = text.split_at(pos);
         let format_part = FormatString::parse_part_in_brackets(&left)
             .map_err(|err| FormatSpecError::InvalidReplacement(err))?;
-        Ok((Some(format_part), &right[1..]))
+        parts.push(format_part);
+        Ok(&right[1..])
     } else {
         Err(FormatSpecError::InvalidReplacement(
             FormatParseError::MissingRightBracket,
@@ -334,16 +346,26 @@ fn parse_nested_format_part(text: &str) -> Result<(Option<FormatPart>, &str), Fo
 
 impl FormatSpec {
     pub fn parse(text: &str) -> Result<Self, FormatSpecError> {
+        let replacements = RefCell::new(vec![]);
         // get_integer in CPython
+        let text = parse_nested_format_part(&replacements, text)?;
         let (conversion, text) = FormatConversion::parse(text);
+        let text = parse_nested_format_part(&replacements, text)?;
         let (mut fill, mut align, text) = parse_fill_and_align(text);
+        let text = parse_nested_format_part(&replacements, text)?;
         let (sign, text) = FormatSign::parse(text);
+        let text = parse_nested_format_part(&replacements, text)?;
         let (alternate_form, text) = parse_alternate_form(text);
+        let text = parse_nested_format_part(&replacements, text)?;
         let (zero, text) = parse_zero(text);
+        let text = parse_nested_format_part(&replacements, text)?;
         let (width, text) = parse_number(text)?;
+        let text = parse_nested_format_part(&replacements, text)?;
         let (grouping_option, text) = FormatGrouping::parse(text);
+        let text = parse_nested_format_part(&replacements, text)?;
         let (precision, text) = parse_precision(text)?;
-        let (format_part, text) = parse_nested_format_part(text)?;
+        let text = parse_nested_format_part(&replacements, text)?;
+
         let (format_type, _text) = if text.is_empty() {
             (None, text)
         } else {
@@ -364,7 +386,7 @@ impl FormatSpec {
             align = align.or(Some(FormatAlign::AfterSign));
         }
 
-        Ok(FormatSpec::Static(StaticFormatSpec {
+        Ok(FormatSpec {
             conversion,
             fill,
             align,
@@ -374,7 +396,8 @@ impl FormatSpec {
             grouping_option,
             precision,
             format_type,
-        }))
+            replacements: replacements.take(),
+        })
     }
 }
 
@@ -727,7 +750,7 @@ mod tests {
             grouping_option: None,
             precision: None,
             format_type: None,
-            format_part: None,
+            replacements: vec![],
         });
         assert_eq!(FormatSpec::parse("33"), expected);
     }
@@ -744,7 +767,7 @@ mod tests {
             grouping_option: None,
             precision: None,
             format_type: None,
-            format_part: None,
+            replacements: vec![],
         });
         assert_eq!(FormatSpec::parse("<>33"), expected);
     }
@@ -761,13 +784,46 @@ mod tests {
             grouping_option: None,
             precision: None,
             format_type: None,
-            format_part: Some(FormatPart::Field {
+            replacements: vec![FormatPart::Field {
                 field_name: "x".to_string(),
                 conversion_spec: None,
                 format_spec: "".to_string(),
-            }),
+            }],
         });
         assert_eq!(FormatSpec::parse("{x}"), expected);
+    }
+
+    #[test]
+    fn test_format_parts() {
+        let expected = Ok(FormatSpec {
+            conversion: None,
+            fill: None,
+            align: None,
+            sign: None,
+            alternate_form: false,
+            width: None,
+            grouping_option: None,
+            precision: None,
+            format_type: None,
+            replacements: vec![
+                FormatPart::Field {
+                    field_name: "x".to_string(),
+                    conversion_spec: None,
+                    format_spec: "".to_string(),
+                },
+                FormatPart::Field {
+                    field_name: "y".to_string(),
+                    conversion_spec: None,
+                    format_spec: "<2".to_string(),
+                },
+                FormatPart::Field {
+                    field_name: "z".to_string(),
+                    conversion_spec: None,
+                    format_spec: "".to_string(),
+                },
+            ],
+        });
+        assert_eq!(FormatSpec::parse("{x}{y:<2}{z}"), expected);
     }
 
     #[test]
@@ -778,18 +834,19 @@ mod tests {
             align: Some(FormatAlign::Left),
             sign: None,
             alternate_form: false,
-            width: None,
+            width: Some(20),
             grouping_option: None,
             precision: None,
             format_type: Some(FormatType::Binary),
-            format_part: Some(FormatPart::Field {
+            replacements: vec![FormatPart::Field {
                 field_name: "x".to_string(),
                 conversion_spec: None,
                 format_spec: "".to_string(),
-            }),
+            }],
         });
-        assert_eq!(FormatSpec::parse("<{x}b"), expected);
+        assert_eq!(FormatSpec::parse("<{x}20b"), expected);
     }
+
     #[test]
     fn test_all() {
         let expected = Ok(FormatSpec {
@@ -802,7 +859,7 @@ mod tests {
             grouping_option: Some(FormatGrouping::Comma),
             precision: Some(11),
             format_type: Some(FormatType::Binary),
-            format_part: None,
+            replacements: vec![],
         });
         assert_eq!(FormatSpec::parse("<>-#23,.11b"), expected);
     }
