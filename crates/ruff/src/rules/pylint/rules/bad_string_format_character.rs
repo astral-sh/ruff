@@ -68,7 +68,7 @@ pub(crate) fn call(checker: &mut Checker, string: &str, range: TextRange) {
                             continue;
                         };
                         if let Err(FormatSpecError::InvalidFormatType) =
-                            FormatSpec::parse(&format_spec)
+                            FormatSpec::parse(format_spec)
                         {
                             checker.diagnostics.push(Diagnostic::new(
                                 BadStringFormatCharacter {

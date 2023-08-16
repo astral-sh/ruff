@@ -236,11 +236,12 @@ pub struct FormatSpec {
     replacements: Vec<FormatPart>,
 }
 
-#[derive(Debug, PartialEq, Default)]
+#[derive(Copy, Clone, Debug, PartialEq, Default)]
 pub enum AllowPlaceholderNesting {
     #[default]
     Yes,
     No,
+    AllowPlaceholderNesting,
 }
 
 fn get_num_digits(text: &str) -> usize {
@@ -387,6 +388,10 @@ impl FormatSpec {
             format_type,
             replacements,
         })
+    }
+
+    pub fn replacements(&self) -> &[FormatPart] {
+        return self.replacements.as_slice();
     }
 }
 
@@ -644,7 +649,6 @@ impl FormatString {
         let mut left = String::new();
 
         for (idx, c) in text.char_indices() {
-            println!("Parsing {:?} {:?}", c, nested);
             if c == '{' {
                 // There may be one layer nesting brackets in spec
                 if nested || allow_nesting == AllowPlaceholderNesting::No {
@@ -661,10 +665,9 @@ impl FormatString {
                 }
                 let (_, right) = text.split_at(idx + 1);
                 let format_part = FormatString::parse_part_in_brackets(&left)?;
-                return Ok((format_part, &right));
-            } else {
-                left.push(c);
+                return Ok((format_part, right));
             }
+            left.push(c);
         }
         Err(FormatParseError::UnmatchedBracket)
     }
