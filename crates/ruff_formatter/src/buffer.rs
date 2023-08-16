@@ -1,7 +1,7 @@
 use super::{write, Arguments, FormatElement};
 use crate::format_element::Interned;
 use crate::prelude::LineMode;
-use crate::{Format, FormatResult, FormatState};
+use crate::{FormatResult, FormatState};
 use rustc_hash::FxHashMap;
 use std::any::{Any, TypeId};
 use std::fmt::Debug;
@@ -25,11 +25,11 @@ pub trait Buffer {
     /// let mut state = FormatState::new(SimpleFormatContext::default());
     /// let mut buffer = VecBuffer::new(&mut state);
     ///
-    /// buffer.write_element(FormatElement::StaticText { text: "test"}).unwrap();
+    /// buffer.write_element(FormatElement::StaticText { text: "test"});
     ///
     /// assert_eq!(buffer.into_vec(), vec![FormatElement::StaticText { text: "test" }]);
     /// ```
-    fn write_element(&mut self, element: FormatElement) -> FormatResult<()>;
+    fn write_element(&mut self, element: FormatElement);
 
     /// Returns a slice containing all elements written into this buffer.
     ///
@@ -135,8 +135,8 @@ impl BufferSnapshot {
 impl<W: Buffer<Context = Context> + ?Sized, Context> Buffer for &mut W {
     type Context = Context;
 
-    fn write_element(&mut self, element: FormatElement) -> FormatResult<()> {
-        (**self).write_element(element)
+    fn write_element(&mut self, element: FormatElement) {
+        (**self).write_element(element);
     }
 
     fn elements(&self) -> &[FormatElement] {
@@ -218,10 +218,8 @@ impl<Context> DerefMut for VecBuffer<'_, Context> {
 impl<Context> Buffer for VecBuffer<'_, Context> {
     type Context = Context;
 
-    fn write_element(&mut self, element: FormatElement) -> FormatResult<()> {
+    fn write_element(&mut self, element: FormatElement) {
         self.elements.push(element);
-
-        Ok(())
     }
 
     fn elements(&self) -> &[FormatElement] {
@@ -252,140 +250,6 @@ Make sure that you take and restore the snapshot in order and that this snapshot
     }
 }
 
-/// This struct wraps an existing buffer and emits a preamble text when the first text is written.
-///
-/// This can be useful if you, for example, want to write some content if what gets written next isn't empty.
-///
-/// # Examples
-///
-/// ```
-/// use ruff_formatter::{FormatState, Formatted, PreambleBuffer, SimpleFormatContext, VecBuffer, write};
-/// use ruff_formatter::prelude::*;
-///
-/// struct Preamble;
-///
-/// impl Format<SimpleFormatContext> for Preamble {
-///     fn fmt(&self, f: &mut Formatter<SimpleFormatContext>) -> FormatResult<()> {
-///         write!(f, [text("# heading"), hard_line_break()])
-///     }
-/// }
-///
-/// # fn main() -> FormatResult<()> {
-/// let mut state = FormatState::new(SimpleFormatContext::default());
-/// let mut buffer = VecBuffer::new(&mut state);
-///
-/// {
-///     let mut with_preamble = PreambleBuffer::new(&mut buffer, Preamble);
-///
-///     write!(&mut with_preamble, [text("this text will be on a new line")])?;
-/// }
-///
-/// let formatted = Formatted::new(Document::from(buffer.into_vec()), SimpleFormatContext::default());
-/// assert_eq!("# heading\nthis text will be on a new line", formatted.print()?.as_code());
-///
-/// # Ok(())
-/// # }
-/// ```
-///
-/// The pre-amble does not get written if no content is written to the buffer.
-///
-/// ```
-/// use ruff_formatter::{FormatState, Formatted, PreambleBuffer, SimpleFormatContext, VecBuffer, write};
-/// use ruff_formatter::prelude::*;
-///
-/// struct Preamble;
-///
-/// impl Format<SimpleFormatContext> for Preamble {
-///     fn fmt(&self, f: &mut Formatter<SimpleFormatContext>) -> FormatResult<()> {
-///         write!(f, [text("# heading"), hard_line_break()])
-///     }
-/// }
-///
-/// # fn main() -> FormatResult<()> {
-/// let mut state = FormatState::new(SimpleFormatContext::default());
-/// let mut buffer = VecBuffer::new(&mut state);
-/// {
-///     let mut with_preamble = PreambleBuffer::new(&mut buffer, Preamble);
-/// }
-///
-/// let formatted = Formatted::new(Document::from(buffer.into_vec()), SimpleFormatContext::default());
-/// assert_eq!("", formatted.print()?.as_code());
-/// # Ok(())
-/// # }
-/// ```
-pub struct PreambleBuffer<'buf, Preamble, Context> {
-    /// The wrapped buffer
-    inner: &'buf mut dyn Buffer<Context = Context>,
-
-    /// The pre-amble to write once the first content gets written to this buffer.
-    preamble: Preamble,
-
-    /// Whether some content (including the pre-amble) has been written at this point.
-    empty: bool,
-}
-
-impl<'buf, Preamble, Context> PreambleBuffer<'buf, Preamble, Context> {
-    pub fn new(inner: &'buf mut dyn Buffer<Context = Context>, preamble: Preamble) -> Self {
-        Self {
-            inner,
-            preamble,
-            empty: true,
-        }
-    }
-
-    /// Returns `true` if the preamble has been written, `false` otherwise.
-    pub fn did_write_preamble(&self) -> bool {
-        !self.empty
-    }
-}
-
-impl<Preamble, Context> Buffer for PreambleBuffer<'_, Preamble, Context>
-where
-    Preamble: Format<Context>,
-{
-    type Context = Context;
-
-    fn write_element(&mut self, element: FormatElement) -> FormatResult<()> {
-        if self.empty {
-            write!(self.inner, [&self.preamble])?;
-            self.empty = false;
-        }
-
-        self.inner.write_element(element)
-    }
-
-    fn elements(&self) -> &[FormatElement] {
-        self.inner.elements()
-    }
-
-    fn state(&self) -> &FormatState<Self::Context> {
-        self.inner.state()
-    }
-
-    fn state_mut(&mut self) -> &mut FormatState<Self::Context> {
-        self.inner.state_mut()
-    }
-
-    fn snapshot(&self) -> BufferSnapshot {
-        BufferSnapshot::Any(Box::new(PreambleBufferSnapshot {
-            inner: self.inner.snapshot(),
-            empty: self.empty,
-        }))
-    }
-
-    fn restore_snapshot(&mut self, snapshot: BufferSnapshot) {
-        let snapshot = snapshot.unwrap_any::<PreambleBufferSnapshot>();
-
-        self.empty = snapshot.empty;
-        self.inner.restore_snapshot(snapshot.inner);
-    }
-}
-
-struct PreambleBufferSnapshot {
-    inner: BufferSnapshot,
-    empty: bool,
-}
-
 /// Buffer that allows you inspecting elements as they get written to the formatter.
 pub struct Inspect<'inner, Context, Inspector> {
     inner: &'inner mut dyn Buffer<Context = Context>,
@@ -404,9 +268,9 @@ where
 {
     type Context = Context;
 
-    fn write_element(&mut self, element: FormatElement) -> FormatResult<()> {
+    fn write_element(&mut self, element: FormatElement) {
         (self.inspector)(&element);
-        self.inner.write_element(element)
+        self.inner.write_element(element);
     }
 
     fn elements(&self) -> &[FormatElement] {
@@ -566,9 +430,9 @@ fn clean_interned(
 impl<Context> Buffer for RemoveSoftLinesBuffer<'_, Context> {
     type Context = Context;
 
-    fn write_element(&mut self, element: FormatElement) -> FormatResult<()> {
+    fn write_element(&mut self, element: FormatElement) {
         let element = match element {
-            FormatElement::Line(LineMode::Soft) => return Ok(()),
+            FormatElement::Line(LineMode::Soft) => return,
             FormatElement::Line(LineMode::SoftOrSpace) => FormatElement::Space,
             FormatElement::Interned(interned) => {
                 FormatElement::Interned(self.clean_interned(&interned))
@@ -576,7 +440,7 @@ impl<Context> Buffer for RemoveSoftLinesBuffer<'_, Context> {
             element => element,
         };
 
-        self.inner.write_element(element)
+        self.inner.write_element(element);
     }
 
     fn elements(&self) -> &[FormatElement] {
@@ -653,15 +517,13 @@ pub trait BufferExtensions: Buffer + Sized {
     }
 
     /// Writes a sequence of elements into this buffer.
-    fn write_elements<I>(&mut self, elements: I) -> FormatResult<()>
+    fn write_elements<I>(&mut self, elements: I)
     where
         I: IntoIterator<Item = FormatElement>,
     {
         for element in elements {
-            self.write_element(element)?;
+            self.write_element(element);
         }
-
-        Ok(())
     }
 }
 
@@ -690,8 +552,8 @@ where
     }
 
     #[inline]
-    pub fn write_element(&mut self, element: FormatElement) -> FormatResult<()> {
-        self.buffer.write_element(element)
+    pub fn write_element(&mut self, element: FormatElement) {
+        self.buffer.write_element(element);
     }
 
     pub fn stop(self) -> Recorded<'buf> {

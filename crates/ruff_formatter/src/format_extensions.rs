@@ -166,7 +166,7 @@ where
 
         match result {
             Ok(Some(elements)) => {
-                f.write_element(elements.clone())?;
+                f.write_element(elements.clone());
 
                 Ok(())
             }

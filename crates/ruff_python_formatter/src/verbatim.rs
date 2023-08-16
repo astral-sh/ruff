@@ -855,7 +855,7 @@ impl Format<PyFormatContext<'_>> for VerbatimText {
             tag::VerbatimKind::Verbatim {
                 length: self.verbatim_range.len(),
             },
-        )))?;
+        )));
 
         match normalize_newlines(f.context().locator().slice(self.verbatim_range), ['\r']) {
             Cow::Borrowed(_) => {
@@ -878,6 +878,7 @@ impl Format<PyFormatContext<'_>> for VerbatimText {
             }
         }
 
-        f.write_element(FormatElement::Tag(Tag::EndVerbatim))
+        f.write_element(FormatElement::Tag(Tag::EndVerbatim));
+        Ok(())
     }
 }

@@ -184,11 +184,11 @@ impl Format<PyFormatContext<'_>> for NotYetImplementedCustomText<'_> {
             tag::VerbatimKind::Verbatim {
                 length: self.text.text_len(),
             },
-        )))?;
+        )));
 
         text(self.text).fmt(f)?;
 
-        f.write_element(FormatElement::Tag(Tag::EndVerbatim))?;
+        f.write_element(FormatElement::Tag(Tag::EndVerbatim));
 
         f.context()
             .comments()

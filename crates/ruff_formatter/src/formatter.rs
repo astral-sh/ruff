@@ -206,8 +206,8 @@ impl<Context> Buffer for Formatter<'_, Context> {
     type Context = Context;
 
     #[inline]
-    fn write_element(&mut self, element: FormatElement) -> FormatResult<()> {
-        self.buffer.write_element(element)
+    fn write_element(&mut self, element: FormatElement) {
+        self.buffer.write_element(element);
     }
 
     fn elements(&self) -> &[FormatElement] {

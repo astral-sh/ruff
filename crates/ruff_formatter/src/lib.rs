@@ -42,8 +42,7 @@ use crate::format_element::document::Document;
 use crate::printer::{Printer, PrinterOptions};
 pub use arguments::{Argument, Arguments};
 pub use buffer::{
-    Buffer, BufferExtensions, BufferSnapshot, Inspect, PreambleBuffer, RemoveSoftLinesBuffer,
-    VecBuffer,
+    Buffer, BufferExtensions, BufferSnapshot, Inspect, RemoveSoftLinesBuffer, VecBuffer,
 };
 pub use builders::BestFitting;
 pub use source_code::{SourceCode, SourceCodeSlice};
