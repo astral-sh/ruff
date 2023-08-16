@@ -63,7 +63,7 @@ pub(crate) fn call(checker: &mut Checker, string: &str, range: TextRange) {
                 }
                 Err(_) => {}
                 Ok(format_spec) => {
-                    for replacement in format_spec.replacements {
+                    for replacement in format_spec.replacements() {
                         let FormatPart::Field { format_spec, .. } = replacement else {
                             continue;
                         };
