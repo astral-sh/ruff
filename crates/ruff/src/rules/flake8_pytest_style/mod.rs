@@ -11,6 +11,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
+    use crate::settings::types::IdentifierPattern;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
@@ -143,7 +144,7 @@ mod tests {
         Rule::PytestRaisesTooBroad,
         Path::new("PT011.py"),
         Settings {
-            raises_extend_require_match_for: vec!["ZeroDivisionError".to_string()],
+            raises_extend_require_match_for: vec![IdentifierPattern::new("ZeroDivisionError").unwrap()],
             ..Settings::default()
         },
         "PT011_extend_broad_exceptions"
@@ -152,10 +153,28 @@ mod tests {
         Rule::PytestRaisesTooBroad,
         Path::new("PT011.py"),
         Settings {
-            raises_require_match_for: vec!["ZeroDivisionError".to_string()],
+            raises_require_match_for: vec![IdentifierPattern::new("ZeroDivisionError").unwrap()],
             ..Settings::default()
         },
         "PT011_replace_broad_exceptions"
+    )]
+    #[test_case(
+        Rule::PytestRaisesTooBroad,
+        Path::new("PT011.py"),
+        Settings {
+            raises_require_match_for: vec![IdentifierPattern::new("*").unwrap()],
+            ..Settings::default()
+        },
+        "PT011_glob_all"
+    )]
+    #[test_case(
+        Rule::PytestRaisesTooBroad,
+        Path::new("PT011.py"),
+        Settings {
+            raises_require_match_for: vec![IdentifierPattern::new("pickle.*").unwrap()],
+            ..Settings::default()
+        },
+        "PT011_glob_submodule"
     )]
     #[test_case(
         Rule::PytestRaisesWithMultipleStatements,

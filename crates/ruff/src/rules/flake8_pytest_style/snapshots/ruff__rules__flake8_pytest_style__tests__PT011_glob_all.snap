@@ -26,6 +26,24 @@ PT011.py:21:24: PT011 `pytest.raises(socket.error)` is too broad, set the `match
 22 |         raise ValueError("Can't divide 1 by 0")
    |
 
+PT011.py:24:24: PT011 `pytest.raises(pickle.PicklingError)` is too broad, set the `match` parameter or use a more specific exception
+   |
+22 |         raise ValueError("Can't divide 1 by 0")
+23 | 
+24 |     with pytest.raises(PicklingError):
+   |                        ^^^^^^^^^^^^^ PT011
+25 |         raise PicklingError("Can't pickle")
+   |
+
+PT011.py:27:24: PT011 `pytest.raises(pickle.UnpicklingError)` is too broad, set the `match` parameter or use a more specific exception
+   |
+25 |         raise PicklingError("Can't pickle")
+26 | 
+27 |     with pytest.raises(UnpicklingError):
+   |                        ^^^^^^^^^^^^^^^ PT011
+28 |         raise UnpicklingError("Can't unpickle")
+   |
+
 PT011.py:32:24: PT011 `pytest.raises(ValueError)` is too broad, set the `match` parameter or use a more specific exception
    |
 31 | def test_error_match_is_empty():
