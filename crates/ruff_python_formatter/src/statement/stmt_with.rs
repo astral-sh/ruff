@@ -1,9 +1,10 @@
 use ruff_formatter::{format_args, write, FormatError};
 use ruff_python_ast::node::AstNode;
 use ruff_python_ast::{Ranged, StmtWith};
-use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
+use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::TextRange;
 
+use crate::builders::parenthesize_if_expands;
 use crate::comments::SourceComment;
 use crate::expression::parentheses::{
     in_parentheses_only_soft_line_break_or_space, optional_parentheses, parenthesized,
@@ -66,8 +67,8 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
                             parenthesized("(", &joined, ")")
                                 .with_dangling_comments(parenthesized_comments)
                                 .fmt(f)?;
-                        } else if are_with_items_parenthesized(item, f.context())? {
-                            optional_parentheses(&format_with(|f| {
+                        } else if should_parenthesize(item, f.context())? {
+                            parenthesize_if_expands(&format_with(|f| {
                                 let mut joiner =
                                     f.join_comma_separated(item.body.first().unwrap().start());
 
@@ -81,6 +82,16 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
                                 joiner.finish()
                             }))
                             .fmt(f)?;
+                        } else if let [item] = item.items.as_slice() {
+                            // This is similar to `maybe_parenthesize_expression`, but we're not dealing with an
+                            // expression here, it's a `WithItem`.
+                            if comments.has_leading_comments(item)
+                                || comments.has_trailing_own_line_comments(item)
+                            {
+                                optional_parentheses(&item.format()).fmt(f)?;
+                            } else {
+                                item.format().fmt(f)?;
+                            }
                         } else {
                             f.join_with(format_args![text(","), space()])
                                 .entries(item.items.iter().formatted())
@@ -105,8 +116,46 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
     }
 }
 
+/// Returns `true` if the `with` items should be parenthesized, if at least one item expands.
+///
+/// Black parenthesizes `with` items if there's more than one item and they're already
+/// parenthesized, _or_ there's a single item with a trailing comma.
+fn should_parenthesize(with: &StmtWith, context: &PyFormatContext) -> FormatResult<bool> {
+    if has_magic_trailing_comma(with, context) {
+        return Ok(true);
+    }
+
+    if with.items.len() > 1 && are_with_items_parenthesized(with, context)? {
+        return Ok(true);
+    }
+
+    Ok(false)
+}
+
+fn has_magic_trailing_comma(with: &StmtWith, context: &PyFormatContext) -> bool {
+    let Some(last_item) = with.items.last() else {
+        return false;
+    };
+
+    let first_token = SimpleTokenizer::new(
+        context.source(),
+        TextRange::new(last_item.end(), with.end()),
+    )
+    .skip_trivia()
+    // Skip over any closing parentheses belonging to the expression
+    .find(|token| token.kind() != SimpleTokenKind::RParen);
+
+    matches!(
+        first_token,
+        Some(SimpleToken {
+            kind: SimpleTokenKind::Comma,
+            ..
+        })
+    )
+}
+
 fn are_with_items_parenthesized(with: &StmtWith, context: &PyFormatContext) -> FormatResult<bool> {
-    let [first_item, ..] = with.items.as_slice() else {
+    let [first_item, _, ..] = with.items.as_slice() else {
         return Ok(false);
     };
 

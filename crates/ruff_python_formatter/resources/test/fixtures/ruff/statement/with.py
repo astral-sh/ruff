@@ -67,6 +67,10 @@ with (
     a as b
 ): ...
 
+with (
+    a as b
+    # trailing comment
+): ...
 
 with (a # trailing same line comment
     # trailing own line comment
@@ -77,7 +81,6 @@ with (
     # trailing own line comment
     as b
 ): ...
-
 
 with (a # trailing same line comment
     # trailing own line comment
@@ -159,7 +162,7 @@ with (  # outer comment
 ) as example:
     ...
 
-# Breaking of items.
+# Breaking of with items.
 with (test  # bar
       as  # foo
       (

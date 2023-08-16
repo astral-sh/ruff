@@ -1130,9 +1130,8 @@ fn handle_with_item_comment<'a>(
     if comment.end() < as_token.start() {
         // If before the `as` keyword, then it must be a trailing comment of the context expression.
         CommentPlacement::trailing(context_expr, comment)
-    }
-    // Trailing end of line comment coming after the `as` keyword`.
-    else if comment.line_position().is_end_of_line() {
+    } else if comment.line_position().is_end_of_line() {
+        // Trailing end of line comment coming after the `as` keyword`.
         CommentPlacement::dangling(comment.enclosing_node(), comment)
     } else {
         CommentPlacement::leading(optional_vars, comment)

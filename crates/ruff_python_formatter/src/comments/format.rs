@@ -247,12 +247,11 @@ pub(crate) struct FormatDanglingOpenParenthesisComments<'a> {
 
 impl Format<PyFormatContext<'_>> for FormatDanglingOpenParenthesisComments<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext>) -> FormatResult<()> {
-        let mut comments = self
+        for comment in self
             .comments
             .iter()
-            .filter(|comment| comment.is_unformatted());
-
-        if let Some(comment) = comments.next() {
+            .filter(|comment| comment.is_unformatted())
+        {
             debug_assert!(
                 comment.line_position().is_end_of_line(),
                 "Expected dangling comment to be at the end of the line"
@@ -261,16 +260,11 @@ impl Format<PyFormatContext<'_>> for FormatDanglingOpenParenthesisComments<'_> {
             write!(
                 f,
                 [
-                    line_suffix(&format_args![space(), space(), format_comment(comment)]),
+                    line_suffix(&format_args!(space(), space(), format_comment(comment))),
                     expand_parent()
                 ]
             )?;
             comment.mark_formatted();
-
-            debug_assert!(
-                comments.next().is_none(),
-                "Expected at most one dangling comment"
-            );
         }
 
         Ok(())
