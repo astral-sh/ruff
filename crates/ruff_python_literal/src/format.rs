@@ -793,7 +793,7 @@ mod tests {
             replacements: vec![FormatPart::Field {
                 field_name: "x".to_string(),
                 conversion_spec: None,
-                format_spec: "".to_string(),
+                format_spec: String::new(),
             }],
         });
         assert_eq!(FormatSpec::parse("{x}"), expected);
@@ -815,7 +815,7 @@ mod tests {
                 FormatPart::Field {
                     field_name: "x".to_string(),
                     conversion_spec: None,
-                    format_spec: "".to_string(),
+                    format_spec: String::new(),
                 },
                 FormatPart::Field {
                     field_name: "y".to_string(),
@@ -825,7 +825,7 @@ mod tests {
                 FormatPart::Field {
                     field_name: "z".to_string(),
                     conversion_spec: None,
-                    format_spec: "".to_string(),
+                    format_spec: String::new(),
                 },
             ],
         });
@@ -847,7 +847,7 @@ mod tests {
             replacements: vec![FormatPart::Field {
                 field_name: "x".to_string(),
                 conversion_spec: None,
-                format_spec: "".to_string(),
+                format_spec: String::new(),
             }],
         });
         assert_eq!(FormatSpec::parse("<{x}20b"), expected);
