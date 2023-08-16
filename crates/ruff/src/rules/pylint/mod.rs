@@ -131,6 +131,7 @@ mod tests {
         Path::new("subprocess_run_without_check.py")
     )]
     #[test_case(Rule::BadDunderMethodName, Path::new("bad_dunder_method_name.py"))]
+    #[test_case(Rule::NonAsciiName, Path::new("non_ascii_name.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

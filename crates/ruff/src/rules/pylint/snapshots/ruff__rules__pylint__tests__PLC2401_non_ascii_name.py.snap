@@ -1,0 +1,141 @@
+---
+source: crates/ruff/src/rules/pylint/mod.rs
+---
+non_ascii_name.py:1:1: PLC2401 Variable name `ápple_count` contains non-ASCII character, consider renaming it. (non-ascii-name)
+  |
+1 | ápple_count = 4444  # [non-ascii-name]
+  | ^^^^^^^^^^^ PLC2401
+2 | í: int = 42  # [non-ascii-name]
+3 | vár, vér = 1, 2  # [non-ascii-name]
+  |
+
+non_ascii_name.py:2:1: PLC2401 Variable name `í` contains non-ASCII character, consider renaming it. (non-ascii-name)
+  |
+1 | ápple_count = 4444  # [non-ascii-name]
+2 | í: int = 42  # [non-ascii-name]
+  | ^ PLC2401
+3 | vár, vér = 1, 2  # [non-ascii-name]
+4 | á += 1  # [non-ascii-name]
+  |
+
+non_ascii_name.py:3:1: PLC2401 Variable name `vár` contains non-ASCII character, consider renaming it. (non-ascii-name)
+  |
+1 | ápple_count = 4444  # [non-ascii-name]
+2 | í: int = 42  # [non-ascii-name]
+3 | vár, vér = 1, 2  # [non-ascii-name]
+  | ^^^ PLC2401
+4 | á += 1  # [non-ascii-name]
+  |
+
+non_ascii_name.py:3:6: PLC2401 Variable name `vér` contains non-ASCII character, consider renaming it. (non-ascii-name)
+  |
+1 | ápple_count = 4444  # [non-ascii-name]
+2 | í: int = 42  # [non-ascii-name]
+3 | vár, vér = 1, 2  # [non-ascii-name]
+  |      ^^^ PLC2401
+4 | á += 1  # [non-ascii-name]
+  |
+
+non_ascii_name.py:4:1: PLC2401 Variable name `á` contains non-ASCII character, consider renaming it. (non-ascii-name)
+  |
+2 | í: int = 42  # [non-ascii-name]
+3 | vár, vér = 1, 2  # [non-ascii-name]
+4 | á += 1  # [non-ascii-name]
+  | ^ PLC2401
+  |
+
+non_ascii_name.py:7:5: PLC2401 Function name `fúnc` contains non-ASCII character, consider renaming it. (non-ascii-name)
+  |
+7 | def fúnc(вeta, βeta):  # [non-ascii-name]
+  |     ^^^^ PLC2401
+8 |     global あ  # [non-ascii-name]
+  |
+
+non_ascii_name.py:7:10: PLC2401 Argument name `вeta` contains non-ASCII character, consider renaming it. (non-ascii-name)
+  |
+7 | def fúnc(вeta, βeta):  # [non-ascii-name]
+  |          ^^^^ PLC2401
+8 |     global あ  # [non-ascii-name]
+  |
+
+non_ascii_name.py:7:16: PLC2401 Argument name `βeta` contains non-ASCII character, consider renaming it. (non-ascii-name)
+  |
+7 | def fúnc(вeta, βeta):  # [non-ascii-name]
+  |                ^^^^ PLC2401
+8 |     global あ  # [non-ascii-name]
+  |
+
+non_ascii_name.py:8:12: PLC2401 Constant name `あ` contains non-ASCII character, consider renaming it. (non-ascii-name)
+  |
+7 | def fúnc(вeta, βeta):  # [non-ascii-name]
+8 |     global あ  # [non-ascii-name]
+  |            ^^ PLC2401
+  |
+
+non_ascii_name.py:11:11: PLC2401 Argument name `pós_árg1` contains non-ASCII character, consider renaming it. (non-ascii-name)
+   |
+11 | def func1(pós_árg1, pós_arg2, /, *, kwárg1, kwárg2):  # [non-ascii-name]
+   |           ^^^^^^^^ PLC2401
+12 |     ...
+   |
+
+non_ascii_name.py:11:21: PLC2401 Argument name `pós_arg2` contains non-ASCII character, consider renaming it. (non-ascii-name)
+   |
+11 | def func1(pós_árg1, pós_arg2, /, *, kwárg1, kwárg2):  # [non-ascii-name]
+   |                     ^^^^^^^^ PLC2401
+12 |     ...
+   |
+
+non_ascii_name.py:11:37: PLC2401 Argument name `kwárg1` contains non-ASCII character, consider renaming it. (non-ascii-name)
+   |
+11 | def func1(pós_árg1, pós_arg2, /, *, kwárg1, kwárg2):  # [non-ascii-name]
+   |                                     ^^^^^^ PLC2401
+12 |     ...
+   |
+
+non_ascii_name.py:11:45: PLC2401 Argument name `kwárg2` contains non-ASCII character, consider renaming it. (non-ascii-name)
+   |
+11 | def func1(pós_árg1, pós_arg2, /, *, kwárg1, kwárg2):  # [non-ascii-name]
+   |                                             ^^^^^^ PLC2401
+12 |     ...
+   |
+
+non_ascii_name.py:15:12: PLC2401 Argument name `várgs` contains non-ASCII character, consider renaming it. (non-ascii-name)
+   |
+15 | def func2(*várgs, **kwárgs):  # [non-ascii-name]
+   |            ^^^^^ PLC2401
+16 |     ...
+   |
+
+non_ascii_name.py:15:21: PLC2401 Argument name `kwárgs` contains non-ASCII character, consider renaming it. (non-ascii-name)
+   |
+15 | def func2(*várgs, **kwárgs):  # [non-ascii-name]
+   |                     ^^^^^^ PLC2401
+16 |     ...
+   |
+
+non_ascii_name.py:19:7: PLC2401 Class name `Tést` contains non-ASCII character, consider renaming it. (non-ascii-name)
+   |
+19 | class Tést:  # [non-ascii-name]
+   |       ^^^^ PLC2401
+20 |     def methоd(self):  # contains Cyrillic `о` [non-ascii-name]
+21 |         self.áé = "hello"  # [non-ascii-name]
+   |
+
+non_ascii_name.py:20:9: PLC2401 Function name `methоd` contains non-ASCII character, consider renaming it. (non-ascii-name)
+   |
+19 | class Tést:  # [non-ascii-name]
+20 |     def methоd(self):  # contains Cyrillic `о` [non-ascii-name]
+   |         ^^^^^^ PLC2401
+21 |         self.áé = "hello"  # [non-ascii-name]
+   |
+
+non_ascii_name.py:21:14: PLC2401 Attribute name `áé` contains non-ASCII character, consider renaming it. (non-ascii-name)
+   |
+19 | class Tést:  # [non-ascii-name]
+20 |     def methоd(self):  # contains Cyrillic `о` [non-ascii-name]
+21 |         self.áé = "hello"  # [non-ascii-name]
+   |              ^^ PLC2401
+   |
+
+

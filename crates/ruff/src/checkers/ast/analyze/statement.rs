@@ -27,6 +27,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     pycodestyle::rules::ambiguous_variable_name(name, name.range())
                 }));
             }
+            if checker.enabled(Rule::NonAsciiName) {
+                pylint::rules::non_ascii_name(checker, stmt);
+            }
         }
         Stmt::Nonlocal(ast::StmtNonlocal { names, range: _ }) => {
             if checker.enabled(Rule::AmbiguousVariableName) {
@@ -355,6 +358,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     flake8_builtins::rules::builtin_variable_shadowing(checker, name, name.range());
                 }
             }
+            if checker.enabled(Rule::NonAsciiName) {
+                pylint::rules::non_ascii_name(checker, stmt);
+            }
             #[cfg(feature = "unreachable-code")]
             if checker.enabled(Rule::UnreachableCode) {
                 checker
@@ -513,6 +519,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::BadDunderMethodName) {
                 pylint::rules::bad_dunder_method_name(checker, body);
+            }
+            if checker.enabled(Rule::NonAsciiName) {
+                pylint::rules::non_ascii_name(checker, stmt);
             }
         }
         Stmt::Import(ast::StmtImport { names, range: _ }) => {
@@ -1006,6 +1015,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     pylint::rules::global_statement(checker, id);
                 }
             }
+            if checker.enabled(Rule::NonAsciiName) {
+                pylint::rules::non_ascii_name(checker, stmt);
+            }
         }
         Stmt::If(
             if_ @ ast::StmtIf {
@@ -1355,6 +1367,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.settings.rules.enabled(Rule::TypeBivariance) {
                 pylint::rules::type_bivariance(checker, value);
             }
+            if checker.enabled(Rule::NonAsciiName) {
+                pylint::rules::non_ascii_name(checker, stmt);
+            }
             if checker.source_type.is_stub() {
                 if checker.any_enabled(&[
                     Rule::UnprefixedTypeParam,
@@ -1454,6 +1469,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if checker.enabled(Rule::TSuffixedTypeAlias) {
                     flake8_pyi::rules::t_suffixed_type_alias(checker, target);
                 }
+            }
+            if checker.enabled(Rule::NonAsciiName) {
+                pylint::rules::non_ascii_name(checker, stmt);
             }
         }
         Stmt::Delete(ast::StmtDelete { targets, range: _ }) => {
