@@ -312,10 +312,9 @@ fn parse_precision(text: &str) -> Result<(Option<usize>, &str), FormatSpecError>
 
 /// Parses a format part within a format spec
 fn parse_nested_format_part<'a>(
-    parts: &'a RefCell<Vec<FormatPart>>,
+    parts: &mut Vec<FormatPart>,
     text: &'a str,
 ) -> Result<&'a str, FormatSpecError> {
-    let mut parts = parts.borrow_mut();
     let mut end_bracket_pos = None;
     let mut left = String::new();
 
@@ -352,25 +351,25 @@ fn parse_nested_format_part<'a>(
 
 impl FormatSpec {
     pub fn parse(text: &str) -> Result<Self, FormatSpecError> {
-        let replacements = RefCell::new(vec![]);
+        let mut replacements = vec![];
         // get_integer in CPython
-        let text = parse_nested_format_part(&replacements, text)?;
+        let text = parse_nested_format_part(&mut replacements, text)?;
         let (conversion, text) = FormatConversion::parse(text);
-        let text = parse_nested_format_part(&replacements, text)?;
+        let text = parse_nested_format_part(&mut replacements, text)?;
         let (mut fill, mut align, text) = parse_fill_and_align(text);
-        let text = parse_nested_format_part(&replacements, text)?;
+        let text = parse_nested_format_part(&mut replacements, text)?;
         let (sign, text) = FormatSign::parse(text);
-        let text = parse_nested_format_part(&replacements, text)?;
+        let text = parse_nested_format_part(&mut replacements, text)?;
         let (alternate_form, text) = parse_alternate_form(text);
-        let text = parse_nested_format_part(&replacements, text)?;
+        let text = parse_nested_format_part(&mut replacements, text)?;
         let (zero, text) = parse_zero(text);
-        let text = parse_nested_format_part(&replacements, text)?;
+        let text = parse_nested_format_part(&mut replacements, text)?;
         let (width, text) = parse_number(text)?;
-        let text = parse_nested_format_part(&replacements, text)?;
+        let text = parse_nested_format_part(&mut replacements, text)?;
         let (grouping_option, text) = FormatGrouping::parse(text);
-        let text = parse_nested_format_part(&replacements, text)?;
+        let text = parse_nested_format_part(&mut replacements, text)?;
         let (precision, text) = parse_precision(text)?;
-        let text = parse_nested_format_part(&replacements, text)?;
+        let text = parse_nested_format_part(&mut replacements, text)?;
 
         let (format_type, _text) = if text.is_empty() {
             (None, text)
@@ -402,7 +401,7 @@ impl FormatSpec {
             grouping_option,
             precision,
             format_type,
-            replacements: replacements.take(),
+            replacements,
         })
     }
 }
