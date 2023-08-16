@@ -951,39 +951,11 @@ fn handle_dict_unpacking_comment<'a>(
 
     // if the remaining tokens from the previous node are exactly `**`,
     // re-assign the comment to the one that follows the stars
-    let mut count = 0u32;
-
-    // we start from the preceding node but we skip its token
-    if let Some(token) = tokens.next() {
-        // The Keyword case
-        if token.kind == SimpleTokenKind::Star {
-            count += 1;
-        } else {
-            // The dict case
-            debug_assert!(
-                matches!(
-                    token,
-                    SimpleToken {
-                        kind: SimpleTokenKind::LBrace
-                            | SimpleTokenKind::Comma
-                            | SimpleTokenKind::Colon,
-                        ..
-                    }
-                ),
-                "{token:?}",
-            );
-        }
+    if tokens.any(|token| token.kind == SimpleTokenKind::DoubleStar) {
+        CommentPlacement::trailing(following, comment)
+    } else {
+        CommentPlacement::Default(comment)
     }
-
-    for token in tokens {
-        debug_assert!(token.kind == SimpleTokenKind::Star, "Expected star token");
-        count += 1;
-    }
-    if count == 2 {
-        return CommentPlacement::trailing(following, comment);
-    }
-
-    CommentPlacement::Default(comment)
 }
 
 /// Own line comments coming after the node are always dangling comments

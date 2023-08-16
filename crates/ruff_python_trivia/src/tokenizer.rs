@@ -1,6 +1,7 @@
 use memchr::{memchr2, memchr3, memrchr3_iter};
-use ruff_text_size::{TextLen, TextRange, TextSize};
 use unic_ucd_ident::{is_xid_continue, is_xid_start};
+
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::{is_python_whitespace, Cursor};
 
@@ -213,6 +214,78 @@ pub enum SimpleTokenKind {
     /// `~`
     Tilde,
 
+    /// `==`
+    EqEqual,
+
+    /// `!=`
+    NotEqual,
+
+    /// `<=`
+    LessEqual,
+
+    /// `>=`
+    GreaterEqual,
+
+    /// `<<`
+    LeftShift,
+
+    /// `>>`
+    RightShift,
+
+    /// `**`
+    DoubleStar,
+
+    /// `**=`
+    DoubleStarEqual,
+
+    /// `+=`
+    PlusEqual,
+
+    /// `-=`
+    MinusEqual,
+
+    /// `*=`
+    StarEqual,
+
+    /// `/=`
+    SlashEqual,
+
+    /// `%=`
+    PercentEqual,
+
+    /// `&=`
+    AmperEqual,
+
+    /// `|=`
+    VbarEqual,
+
+    /// `^=`
+    CircumflexEqual,
+
+    /// `<<=`
+    LeftShiftEqual,
+
+    /// `>>=`
+    RightShiftEqual,
+
+    /// `//`
+    DoubleSlash,
+
+    /// `//=`
+    DoubleSlashEqual,
+
+    /// `:=`
+    ColonEqual,
+
+    /// `...`
+    Ellipsis,
+
+    /// `@=`
+    AtEqual,
+
+    /// `->`
+    RArrow,
+
     /// `and`
     And,
 
@@ -326,35 +399,6 @@ pub enum SimpleTokenKind {
 }
 
 impl SimpleTokenKind {
-    const fn from_non_trivia_char(c: char) -> SimpleTokenKind {
-        match c {
-            '(' => SimpleTokenKind::LParen,
-            ')' => SimpleTokenKind::RParen,
-            '[' => SimpleTokenKind::LBracket,
-            ']' => SimpleTokenKind::RBracket,
-            '{' => SimpleTokenKind::LBrace,
-            '}' => SimpleTokenKind::RBrace,
-            ',' => SimpleTokenKind::Comma,
-            ':' => SimpleTokenKind::Colon,
-            ';' => SimpleTokenKind::Semi,
-            '/' => SimpleTokenKind::Slash,
-            '*' => SimpleTokenKind::Star,
-            '.' => SimpleTokenKind::Dot,
-            '+' => SimpleTokenKind::Plus,
-            '-' => SimpleTokenKind::Minus,
-            '=' => SimpleTokenKind::Equals,
-            '>' => SimpleTokenKind::Greater,
-            '<' => SimpleTokenKind::Less,
-            '%' => SimpleTokenKind::Percent,
-            '&' => SimpleTokenKind::Ampersand,
-            '^' => SimpleTokenKind::Circumflex,
-            '|' => SimpleTokenKind::Vbar,
-            '@' => SimpleTokenKind::At,
-            '~' => SimpleTokenKind::Tilde,
-            _ => SimpleTokenKind::Other,
-        }
-    }
-
     const fn is_trivia(self) -> bool {
         matches!(
             self,
@@ -478,6 +522,20 @@ impl<'a> SimpleTokenizer<'a> {
         }
 
         let kind = match first {
+            // Keywords and identifiers
+            c if is_identifier_start(c) => {
+                self.cursor.eat_while(is_identifier_continuation);
+                let token_len = self.cursor.token_len();
+
+                let range = TextRange::at(self.offset, token_len);
+                let kind = self.to_keyword_or_other(range);
+
+                if kind == SimpleTokenKind::Other {
+                    self.bogus = true;
+                }
+                kind
+            }
+
             ' ' | '\t' => {
                 self.cursor.eat_while(|c| matches!(c, ' ' | '\t'));
                 SimpleTokenKind::Whitespace
@@ -497,21 +555,156 @@ impl<'a> SimpleTokenizer<'a> {
 
             '\\' => SimpleTokenKind::Continuation,
 
-            c => {
-                let kind = if is_identifier_start(c) {
-                    self.cursor.eat_while(is_identifier_continuation);
-                    let token_len = self.cursor.token_len();
-
-                    let range = TextRange::at(self.offset, token_len);
-                    self.to_keyword_or_other(range)
+            // Non-trivia, non-keyword tokens
+            '=' => {
+                if self.cursor.eat_char('=') {
+                    SimpleTokenKind::EqEqual
                 } else {
-                    SimpleTokenKind::from_non_trivia_char(c)
-                };
-
-                if kind == SimpleTokenKind::Other {
-                    self.bogus = true;
+                    SimpleTokenKind::Equals
                 }
-                kind
+            }
+            '+' => {
+                if self.cursor.eat_char('=') {
+                    SimpleTokenKind::PlusEqual
+                } else {
+                    SimpleTokenKind::Plus
+                }
+            }
+            '*' => {
+                if self.cursor.eat_char('=') {
+                    SimpleTokenKind::StarEqual
+                } else if self.cursor.eat_char('*') {
+                    if self.cursor.eat_char('=') {
+                        SimpleTokenKind::DoubleStarEqual
+                    } else {
+                        SimpleTokenKind::DoubleStar
+                    }
+                } else {
+                    SimpleTokenKind::Star
+                }
+            }
+            '/' => {
+                if self.cursor.eat_char('=') {
+                    SimpleTokenKind::SlashEqual
+                } else if self.cursor.eat_char('/') {
+                    if self.cursor.eat_char('=') {
+                        SimpleTokenKind::DoubleSlashEqual
+                    } else {
+                        SimpleTokenKind::DoubleSlash
+                    }
+                } else {
+                    SimpleTokenKind::Slash
+                }
+            }
+            '%' => {
+                if self.cursor.eat_char('=') {
+                    SimpleTokenKind::PercentEqual
+                } else {
+                    SimpleTokenKind::Percent
+                }
+            }
+            '|' => {
+                if self.cursor.eat_char('=') {
+                    SimpleTokenKind::VbarEqual
+                } else {
+                    SimpleTokenKind::Vbar
+                }
+            }
+            '^' => {
+                if self.cursor.eat_char('=') {
+                    SimpleTokenKind::CircumflexEqual
+                } else {
+                    SimpleTokenKind::Circumflex
+                }
+            }
+            '&' => {
+                if self.cursor.eat_char('=') {
+                    SimpleTokenKind::AmperEqual
+                } else {
+                    SimpleTokenKind::Ampersand
+                }
+            }
+            '-' => {
+                if self.cursor.eat_char('=') {
+                    SimpleTokenKind::MinusEqual
+                } else if self.cursor.eat_char('>') {
+                    SimpleTokenKind::RArrow
+                } else {
+                    SimpleTokenKind::Minus
+                }
+            }
+            '@' => {
+                if self.cursor.eat_char('=') {
+                    SimpleTokenKind::AtEqual
+                } else {
+                    SimpleTokenKind::At
+                }
+            }
+            '!' => {
+                if self.cursor.eat_char('=') {
+                    SimpleTokenKind::NotEqual
+                } else {
+                    self.bogus = true;
+                    SimpleTokenKind::Other
+                }
+            }
+            '~' => SimpleTokenKind::Tilde,
+            ':' => {
+                if self.cursor.eat_char('=') {
+                    SimpleTokenKind::ColonEqual
+                } else {
+                    SimpleTokenKind::Colon
+                }
+            }
+            ';' => SimpleTokenKind::Semi,
+            '<' => {
+                if self.cursor.eat_char('<') {
+                    if self.cursor.eat_char('=') {
+                        SimpleTokenKind::LeftShiftEqual
+                    } else {
+                        SimpleTokenKind::LeftShift
+                    }
+                } else if self.cursor.eat_char('=') {
+                    SimpleTokenKind::LessEqual
+                } else {
+                    SimpleTokenKind::Less
+                }
+            }
+            '>' => {
+                if self.cursor.eat_char('>') {
+                    if self.cursor.eat_char('=') {
+                        SimpleTokenKind::RightShiftEqual
+                    } else {
+                        SimpleTokenKind::RightShift
+                    }
+                } else if self.cursor.eat_char('=') {
+                    SimpleTokenKind::GreaterEqual
+                } else {
+                    SimpleTokenKind::Greater
+                }
+            }
+            ',' => SimpleTokenKind::Comma,
+            '.' => {
+                if self.cursor.first() == '.' && self.cursor.second() == '.' {
+                    self.cursor.bump();
+                    self.cursor.bump();
+                    SimpleTokenKind::Ellipsis
+                } else {
+                    SimpleTokenKind::Dot
+                }
+            }
+
+            // Bracket tokens
+            '(' => SimpleTokenKind::LParen,
+            ')' => SimpleTokenKind::RParen,
+            '[' => SimpleTokenKind::LBracket,
+            ']' => SimpleTokenKind::RBracket,
+            '{' => SimpleTokenKind::LBrace,
+            '}' => SimpleTokenKind::RBrace,
+
+            _ => {
+                self.bogus = true;
+                SimpleTokenKind::Other
             }
         };
 
@@ -612,38 +805,108 @@ impl<'a> SimpleTokenizer<'a> {
                     }
 
                     SimpleTokenKind::Comment
-                } else if c == '\\' {
-                    SimpleTokenKind::Continuation
                 } else {
-                    let kind = if is_identifier_continuation(c) {
-                        // if we only have identifier continuations but no start (e.g. 555) we
-                        // don't want to consume the chars, so in that case, we want to rewind the
-                        // cursor to here
-                        let savepoint = self.cursor.clone();
-                        self.cursor.eat_back_while(is_identifier_continuation);
+                    match c {
+                        // Keywords and identifiers
+                        c if is_identifier_continuation(c) => {
+                            // if we only have identifier continuations but no start (e.g. 555) we
+                            // don't want to consume the chars, so in that case, we want to rewind the
+                            // cursor to here
+                            let savepoint = self.cursor.clone();
+                            self.cursor.eat_back_while(is_identifier_continuation);
 
-                        let token_len = self.cursor.token_len();
-                        let range = TextRange::at(self.back_offset - token_len, token_len);
+                            let token_len = self.cursor.token_len();
+                            let range = TextRange::at(self.back_offset - token_len, token_len);
 
-                        if self.source[range]
-                            .chars()
-                            .next()
-                            .is_some_and(is_identifier_start)
-                        {
-                            self.to_keyword_or_other(range)
-                        } else {
-                            self.cursor = savepoint;
+                            if self.source[range]
+                                .chars()
+                                .next()
+                                .is_some_and(is_identifier_start)
+                            {
+                                self.to_keyword_or_other(range)
+                            } else {
+                                self.cursor = savepoint;
+                                self.bogus = true;
+                                SimpleTokenKind::Other
+                            }
+                        }
+
+                        // Non-trivia tokens that are unambiguous when lexing backwards.
+                        // In other words: these are characters that _don't_ appear at the
+                        // end of a multi-character token (like `!=`).
+                        '\\' => SimpleTokenKind::Continuation,
+                        ':' => SimpleTokenKind::Colon,
+                        '~' => SimpleTokenKind::Tilde,
+                        '%' => SimpleTokenKind::Percent,
+                        '|' => SimpleTokenKind::Vbar,
+                        ',' => SimpleTokenKind::Comma,
+                        ';' => SimpleTokenKind::Semi,
+                        '(' => SimpleTokenKind::LParen,
+                        ')' => SimpleTokenKind::RParen,
+                        '[' => SimpleTokenKind::LBracket,
+                        ']' => SimpleTokenKind::RBracket,
+                        '{' => SimpleTokenKind::LBrace,
+                        '}' => SimpleTokenKind::RBrace,
+                        '&' => SimpleTokenKind::Ampersand,
+                        '^' => SimpleTokenKind::Circumflex,
+                        '+' => SimpleTokenKind::Plus,
+                        '-' => SimpleTokenKind::Minus,
+
+                        // Non-trivia tokens that _are_ ambiguous when lexing backwards.
+                        // In other words: these are characters that _might_ mark the end
+                        // of a multi-character token (like `!=` or `->` or `//` or `**`).
+                        '=' | '*' | '/' | '@' | '!' | '<' | '>' | '.' => {
+                            // This could be a single-token token, like `+` in `x + y`, or a
+                            // multi-character token, like `+=` in `x += y`. It could also be a sequence
+                            // of multi-character tokens, like `x ==== y`, which is invalid, _but_ it's
+                            // important that we produce the same token stream when lexing backwards as
+                            // we do when lexing forwards. So, identify the range of the sequence, lex
+                            // forwards, and return the last token.
+                            let mut cursor = self.cursor.clone();
+                            cursor.eat_back_while(|c| {
+                                matches!(
+                                    c,
+                                    ':' | '~'
+                                        | '%'
+                                        | '|'
+                                        | '&'
+                                        | '^'
+                                        | '+'
+                                        | '-'
+                                        | '='
+                                        | '*'
+                                        | '/'
+                                        | '@'
+                                        | '!'
+                                        | '<'
+                                        | '>'
+                                        | '.'
+                                )
+                            });
+
+                            let token_len = cursor.token_len();
+                            let range = TextRange::at(self.back_offset - token_len, token_len);
+
+                            let forward_lexer = Self::new(self.source, range);
+                            if let Some(token) = forward_lexer.last() {
+                                // If the token spans multiple characters, bump the cursor. Note,
+                                // though, that we already bumped the cursor to past the last character
+                                // in the token at the very start of `next_token_back`.
+                                for _ in self.source[token.range].chars().rev().skip(1) {
+                                    self.cursor.bump_back().unwrap();
+                                }
+                                token.kind()
+                            } else {
+                                self.bogus = true;
+                                SimpleTokenKind::Other
+                            }
+                        }
+
+                        _ => {
+                            self.bogus = true;
                             SimpleTokenKind::Other
                         }
-                    } else {
-                        SimpleTokenKind::from_non_trivia_char(c)
-                    };
-
-                    if kind == SimpleTokenKind::Other {
-                        self.bogus = true;
                     }
-
-                    kind
                 }
             }
         };
@@ -871,6 +1134,7 @@ impl QuoteKind {
 #[cfg(test)]
 mod tests {
     use insta::assert_debug_snapshot;
+
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
     use crate::tokenizer::{lines_after, lines_before, SimpleToken, SimpleTokenizer};
@@ -947,6 +1211,30 @@ mod tests {
     }
 
     #[test]
+    fn tokenize_eq() {
+        // Should tokenize as `==`, then `=`, regardless of whether we're lexing forwards or
+        // backwards.
+        let source = "===";
+
+        let test_case = tokenize(source);
+
+        assert_debug_snapshot!(test_case.tokens());
+        test_case.assert_reverse_tokenization();
+    }
+
+    #[test]
+    fn tokenize_not_eq() {
+        // Should tokenize as `!=`, then `=`, regardless of whether we're lexing forwards or
+        // backwards.
+        let source = "!==";
+
+        let test_case = tokenize(source);
+
+        assert_debug_snapshot!(test_case.tokens());
+        test_case.assert_reverse_tokenization();
+    }
+
+    #[test]
     fn tokenize_continuation() {
         let source = "( \\\n )";
 
@@ -957,13 +1245,24 @@ mod tests {
     }
 
     #[test]
-    fn tokenize_characters() {
-        let source = "-> *= (~=)";
+    fn tokenize_operators() {
+        let source = "-> *= ( -= ) ~ // ** **= ^ ^= | |=";
 
         let test_case = tokenize(source);
 
         assert_debug_snapshot!(test_case.tokens());
         test_case.assert_reverse_tokenization();
+    }
+
+    #[test]
+    fn tokenize_invalid_operators() {
+        let source = "-> $=";
+
+        let test_case = tokenize(source);
+
+        assert_debug_snapshot!(test_case.tokens());
+
+        // note: not reversible: [other, bogus, bogus] vs [bogus, bogus, other]
     }
 
     #[test]
