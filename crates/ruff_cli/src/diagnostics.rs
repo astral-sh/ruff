@@ -96,12 +96,14 @@ impl AddAssign for Diagnostics {
     }
 }
 
-/// Returns either an indexed python jupyter notebook or a diagnostic (which is empty if we skip)
-fn load_jupyter_notebook(path: &Path) -> Result<Notebook, Box<Diagnostics>> {
-    let notebook = match Notebook::read(path) {
+/// Read a Jupyter Notebook from disk.
+///
+/// Returns either an indexed Python Jupyter Notebook or a diagnostic (which is empty if we skip).
+fn notebook_from_path(path: &Path) -> Result<Notebook, Box<Diagnostics>> {
+    let notebook = match Notebook::from_path(path) {
         Ok(notebook) => {
             if !notebook.is_python_notebook() {
-                // Not a python notebook, this could e.g. be an R notebook which we want to just skip
+                // Not a python notebook, this could e.g. be an R notebook which we want to just skip.
                 debug!(
                     "Skipping {} because it's not a Python notebook",
                     path.display()
@@ -116,6 +118,44 @@ fn load_jupyter_notebook(path: &Path) -> Result<Notebook, Box<Diagnostics>> {
                 messages: vec![Message::from_diagnostic(
                     *diagnostic,
                     SourceFileBuilder::new(path.to_string_lossy().as_ref(), "").finish(),
+                    TextSize::default(),
+                )],
+                ..Diagnostics::default()
+            }));
+        }
+    };
+
+    Ok(notebook)
+}
+
+/// Parse a Jupyter Notebook from a JSON string.
+///
+/// Returns either an indexed Python Jupyter Notebook or a diagnostic (which is empty if we skip).
+fn notebook_from_contents(
+    contents: &str,
+    path: Option<&Path>,
+) -> Result<Notebook, Box<Diagnostics>> {
+    let notebook = match Notebook::from_contents(contents) {
+        Ok(notebook) => {
+            if !notebook.is_python_notebook() {
+                // Not a python notebook, this could e.g. be an R notebook which we want to just skip.
+                if let Some(path) = path {
+                    debug!(
+                        "Skipping {} because it's not a Python notebook",
+                        path.display()
+                    );
+                }
+                return Err(Box::default());
+            }
+            notebook
+        }
+        Err(diagnostic) => {
+            // Failed to read the jupyter notebook
+            return Err(Box::new(Diagnostics {
+                messages: vec![Message::from_diagnostic(
+                    *diagnostic,
+                    SourceFileBuilder::new(path.map(Path::to_string_lossy).unwrap_or_default(), "")
+                        .finish(),
                     TextSize::default(),
                 )],
                 ..Diagnostics::default()
@@ -216,7 +256,7 @@ pub(crate) fn lint_path(
 
     // Read the file from disk
     let mut source_kind = if source_type.is_jupyter() {
-        match load_jupyter_notebook(path) {
+        match notebook_from_path(path) {
             Ok(notebook) => SourceKind::Jupyter(notebook),
             Err(diagnostic) => return Ok(*diagnostic),
         }
@@ -278,7 +318,7 @@ pub(crate) fn lint_path(
                             SourceKind::Jupyter(dest_notebook) => {
                                 // We need to load the notebook again, since we might've
                                 // mutated it.
-                                let src_notebook = match load_jupyter_notebook(path) {
+                                let src_notebook = match notebook_from_path(path) {
                                     Ok(notebook) => notebook,
                                     Err(diagnostic) => return Ok(*diagnostic),
                                 };
@@ -401,8 +441,19 @@ pub(crate) fn lint_stdin(
     noqa: flags::Noqa,
     autofix: flags::FixMode,
 ) -> Result<Diagnostics> {
-    let mut source_kind = SourceKind::Python(contents.to_string());
-    let source_type = PySourceType::default();
+    let source_type = path.map(PySourceType::from).unwrap_or_default();
+
+    let mut source_kind = if source_type.is_jupyter() {
+        // SAFETY: Jupyter isn't the default type, so we must have a path.
+        match notebook_from_contents(contents, path) {
+            Ok(notebook) => SourceKind::Jupyter(notebook),
+            Err(diagnostic) => return Ok(*diagnostic),
+        }
+    } else {
+        SourceKind::Python(contents.to_string())
+    };
+
+    let contents = source_kind.content().to_string();
 
     // Lint the inputs.
     let (
@@ -417,7 +468,7 @@ pub(crate) fn lint_stdin(
             transformed,
             fixed,
         }) = lint_fix(
-            contents,
+            &contents,
             path.unwrap_or_else(|| Path::new("-")),
             package,
             noqa,
@@ -433,7 +484,7 @@ pub(crate) fn lint_stdin(
                 flags::FixMode::Diff => {
                     // But only write a diff if it's non-empty.
                     if !fixed.is_empty() {
-                        let text_diff = TextDiff::from_lines(contents, &transformed);
+                        let text_diff = TextDiff::from_lines(contents.as_str(), &transformed);
                         let mut unified_diff = text_diff.unified_diff();
                         if let Some(path) = path {
                             unified_diff
@@ -453,7 +504,7 @@ pub(crate) fn lint_stdin(
         } else {
             // If we fail to autofix, lint the original source code.
             let result = lint_only(
-                contents,
+                &contents,
                 path.unwrap_or_else(|| Path::new("-")),
                 package,
                 settings,
@@ -472,7 +523,7 @@ pub(crate) fn lint_stdin(
         }
     } else {
         let result = lint_only(
-            contents,
+            &contents,
             path.unwrap_or_else(|| Path::new("-")),
             package,
             settings,
@@ -508,14 +559,21 @@ pub(crate) fn lint_stdin(
 mod tests {
     use std::path::Path;
 
-    use crate::diagnostics::{load_jupyter_notebook, Diagnostics};
+    use crate::diagnostics::{notebook_from_contents, notebook_from_path, Diagnostics};
 
     #[test]
     fn test_r() {
         let path = Path::new("../ruff/resources/test/fixtures/jupyter/R.ipynb");
-        // No diagnostics is used as skip signal
+        // No diagnostics is used as skip signal.
         assert_eq!(
-            load_jupyter_notebook(path).unwrap_err(),
+            notebook_from_path(path).unwrap_err(),
+            Box::<Diagnostics>::default()
+        );
+
+        let contents = std::fs::read_to_string(path).unwrap();
+        // No diagnostics is used as skip signal.
+        assert_eq!(
+            notebook_from_contents(&contents, Some(path)).unwrap_err(),
             Box::<Diagnostics>::default()
         );
     }
