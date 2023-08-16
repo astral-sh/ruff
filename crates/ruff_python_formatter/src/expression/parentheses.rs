@@ -268,7 +268,8 @@ impl<'ast> Format<PyFormatContext<'ast>> for InParenthesesOnlyLineBreak {
                 f.write_element(FormatElement::Line(match self {
                     InParenthesesOnlyLineBreak::SoftLineBreak => LineMode::Soft,
                     InParenthesesOnlyLineBreak::SoftLineBreakOrSpace => LineMode::SoftOrSpace,
-                }))
+                }));
+                Ok(())
             }
         }
     }
