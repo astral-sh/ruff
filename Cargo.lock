@@ -2378,7 +2378,6 @@ dependencies = [
  "is-macro",
  "itertools",
  "lexical-parse-float",
- "num-bigint",
  "num-traits",
  "rand",
  "unic-ucd-category",
