@@ -9,4 +9,4 @@ def long_function_name(
     argument_six,
     *rest,
 ):
-    ...
+    pass
