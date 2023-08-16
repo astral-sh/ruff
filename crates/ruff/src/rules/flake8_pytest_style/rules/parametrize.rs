@@ -1,4 +1,4 @@
-use itertools::Itertools;
+use rustc_hash::FxHashMap;
 
 use ruff_python_ast::{
     self as ast, Arguments, Constant, Decorator, Expr, ExprContext, PySourceType, Ranged,
@@ -210,14 +210,14 @@ impl Violation for PytestParametrizeValuesWrongType {
 /// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
 #[violation]
 pub struct PytestDuplicateParametrizeTestCases {
-    pub indices: (usize, usize),
+    pub index: usize,
 }
 
 impl Violation for PytestDuplicateParametrizeTestCases {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PytestDuplicateParametrizeTestCases { indices } = self;
-        format!("Found duplicate test cases {indices:?} in `@pytest.mark.parametrize`")
+        let PytestDuplicateParametrizeTestCases { index } = self;
+        format!("Duplicate of test case at {index} in `@pytest_mark.parametrize`")
     }
 }
 
@@ -550,25 +550,21 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
     }
 }
 
-fn find_duplicates(elts: &[Expr]) -> Vec<(usize, usize)> {
-    let mut duplicates: Vec<(usize, usize)> = Vec::new();
-    for ((idx1, elt1), (idx2, elt2)) in elts.iter().enumerate().tuple_combinations() {
-        if ComparableExpr::from(elt1) == ComparableExpr::from(elt2) {
-            duplicates.push((idx1 + 1, idx2 + 1));
-        }
-    }
-    duplicates
-}
-
 /// PT014
 fn check_duplicates(checker: &mut Checker, values: &Expr) {
     match values {
         Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-            for indices in find_duplicates(elts) {
-                checker.diagnostics.push(Diagnostic::new(
-                    PytestDuplicateParametrizeTestCases { indices },
-                    values.range(),
-                ));
+            let mut seen: FxHashMap<ComparableExpr, usize> = FxHashMap::default();
+            for (idx, elt) in elts.iter().enumerate() {
+                let expr = ComparableExpr::from(elt);
+                if let Some(index) = seen.get(&expr) {
+                    checker.diagnostics.push(Diagnostic::new(
+                        PytestDuplicateParametrizeTestCases { index: *index },
+                        elt.range(),
+                    ));
+                } else {
+                    seen.insert(expr, idx);
+                }
             }
         }
         _ => {}

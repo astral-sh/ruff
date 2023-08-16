@@ -11,7 +11,7 @@ b = 2
 c = 3
 
 
-@pytest.mark.parametrize("x", [a, a, b, b, c])
+@pytest.mark.parametrize("x", [a, a, b, b, b, c])
 def test_error_expr_simple(x):
     ...
 
