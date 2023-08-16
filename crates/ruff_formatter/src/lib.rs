@@ -778,9 +778,13 @@ pub fn format<Context>(
 where
     Context: FormatContext,
 {
+    let source_length = context.source_code().as_str().len();
+    // Use a simple heuristic to guess the number of expected format elements.
+    // See [#6612](https://github.com/astral-sh/ruff/pull/6612) for more details on how the formula was determined. Changes to our formatter, or supporting
+    // more languages may require fine tuning the formula.
+    let estimated_buffer_size = source_length / 2;
     let mut state = FormatState::new(context);
-    let mut buffer =
-        VecBuffer::with_capacity(state.context().source_code().as_str().len(), &mut state);
+    let mut buffer = VecBuffer::with_capacity(estimated_buffer_size, &mut state);
 
     buffer.write_fmt(arguments)?;
 
