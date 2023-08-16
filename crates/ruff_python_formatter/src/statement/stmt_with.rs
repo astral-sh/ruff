@@ -106,13 +106,13 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
 }
 
 fn are_with_items_parenthesized(with: &StmtWith, context: &PyFormatContext) -> FormatResult<bool> {
-    let first_with_item = with
-        .items
-        .first()
-        .ok_or(FormatError::syntax_error("Expected at least one with item"))?;
-    let before_first_with_item = TextRange::new(with.start(), first_with_item.start());
+    let [first_item, ..] = with.items.as_slice() else {
+        return Ok(false);
+    };
 
-    let mut tokenizer = SimpleTokenizer::new(context.source(), before_first_with_item)
+    let before_first_item = TextRange::new(with.start(), first_item.start());
+
+    let mut tokenizer = SimpleTokenizer::new(context.source(), before_first_item)
         .skip_trivia()
         .skip_while(|t| t.kind() == SimpleTokenKind::Async);
 
