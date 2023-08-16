@@ -388,6 +388,7 @@ impl<'a> Comments<'a> {
     }
 
     /// Returns an iterator over the [leading](self#leading-comments) and [trailing comments](self#trailing-comments) of `node`.
+    #[allow(unused)]
     pub(crate) fn leading_trailing_comments<T>(
         &self,
         node: T,
