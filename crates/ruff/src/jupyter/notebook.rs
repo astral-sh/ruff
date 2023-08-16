@@ -33,7 +33,7 @@ pub fn round_trip(path: &Path) -> anyhow::Result<String> {
             err
         )
     })?;
-    let code = notebook.content().to_string();
+    let code = notebook.source_code().to_string();
     notebook.update_cell_content(&code);
     let mut writer = Vec::new();
     notebook.write_inner(&mut writer)?;
@@ -103,7 +103,7 @@ pub struct Notebook {
     /// separated by a newline and a trailing newline. The trailing newline
     /// is added to make sure that each cell ends with a newline which will
     /// be removed when updating the cell content.
-    content: String,
+    source_code: String,
     /// The index of the notebook. This is used to map between the concatenated
     /// source code and the original notebook.
     index: OnceCell<JupyterIndex>,
@@ -132,8 +132,8 @@ impl Notebook {
     }
 
     /// Read the Jupyter Notebook from its JSON string.
-    pub fn from_contents(contents: &str) -> Result<Self, Box<Diagnostic>> {
-        Self::from_reader(Cursor::new(contents))
+    pub fn from_source_code(source_code: &str) -> Result<Self, Box<Diagnostic>> {
+        Self::from_reader(Cursor::new(source_code))
     }
 
     /// Read a Jupyter Notebook from a [`Read`] implementor.
@@ -268,7 +268,7 @@ impl Notebook {
             // The additional newline at the end is to maintain consistency for
             // all cells. These newlines will be removed before updating the
             // source code with the transformed content. Refer `update_cell_content`.
-            content: contents.join("\n") + "\n",
+            source_code: contents.join("\n") + "\n",
             cell_offsets,
             valid_code_cells,
             trailing_newline,
@@ -404,8 +404,8 @@ impl Notebook {
     /// Return the notebook content.
     ///
     /// This is the concatenation of all Python code cells.
-    pub(crate) fn content(&self) -> &str {
-        &self.content
+    pub fn source_code(&self) -> &str {
+        &self.source_code
     }
 
     /// Return the Jupyter notebook index.
@@ -429,7 +429,7 @@ impl Notebook {
         // it depends on the offsets to extract the cell content.
         self.update_cell_offsets(source_map);
         self.update_cell_content(transformed);
-        self.content = transformed.to_string();
+        self.source_code = transformed.to_string();
     }
 
     /// Return a slice of [`Cell`] in the Jupyter notebook.
@@ -482,8 +482,8 @@ mod tests {
     /// Read a Jupyter cell from the `resources/test/fixtures/jupyter/cell` directory.
     fn read_jupyter_cell(path: impl AsRef<Path>) -> Result<Cell> {
         let path = test_resource_path("fixtures/jupyter/cell").join(path);
-        let contents = std::fs::read_to_string(path)?;
-        Ok(serde_json::from_str(&contents)?)
+        let source_code = std::fs::read_to_string(path)?;
+        Ok(serde_json::from_str(&source_code)?)
     }
 
     #[test]
@@ -536,7 +536,7 @@ mod tests {
     fn test_concat_notebook() -> Result<()> {
         let notebook = read_jupyter_notebook(Path::new("valid.ipynb"))?;
         assert_eq!(
-            notebook.content,
+            notebook.source_code,
             r#"def unused_variable():
     x = 1
     y = 2
