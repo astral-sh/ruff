@@ -33,7 +33,8 @@ impl FormatNodeRule<WithItem> for FormatWithItem {
             write!(f, [space(), text("as"), space()])?;
 
             if trailing_as_comments.is_empty() {
-                write!(f, [optional_vars.format()])?;
+                maybe_parenthesize_expression(optional_vars, item, Parenthesize::IfRequired)
+                    .fmt(f)?;
             } else {
                 write!(
                     f,

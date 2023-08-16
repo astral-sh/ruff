@@ -235,7 +235,7 @@ fn handle_enclosed_comment<'a>(
             handle_leading_class_with_decorators_comment(comment, class_def)
         }
         AnyNodeRef::StmtImportFrom(import_from) => handle_import_from_comment(comment, import_from),
-        AnyNodeRef::StmtWith(with_) => handle_with_comment(comment, with_),
+        AnyNodeRef::StmtWith(_) => handle_with_comment(comment, locator),
         AnyNodeRef::ExprCall(_) => handle_call_comment(comment),
         AnyNodeRef::ExprConstant(_) => {
             if let Some(AnyNodeRef::ExprFString(fstring)) = comment.enclosing_parent() {
@@ -1565,7 +1565,7 @@ fn handle_import_from_comment<'a>(
 ///
 /// For example, given:
 /// ```python
-/// with ( # foo
+/// with (  # comment
 ///     CtxManager1() as example1,
 ///     CtxManager2() as example2,
 ///     CtxManager3() as example3,
@@ -1577,17 +1577,59 @@ fn handle_import_from_comment<'a>(
 /// that it remains on the same line as the [`ast::StmtWith`] itself.
 fn handle_with_comment<'a>(
     comment: DecoratedComment<'a>,
-    with_statement: &'a ast::StmtWith,
+    locator: &Locator,
 ) -> CommentPlacement<'a> {
-    if comment.line_position().is_end_of_line()
-        && with_statement.items.first().is_some_and(|with_item| {
-            with_statement.start() < comment.start() && comment.start() < with_item.start()
-        })
-    {
-        CommentPlacement::dangling(comment.enclosing_node(), comment)
-    } else {
-        CommentPlacement::Default(comment)
+    if comment.line_position().is_own_line() {
+        return CommentPlacement::Default(comment);
     }
+
+    if let Some(preceding) = comment.preceding_node() {
+        // If a comment trails a `WithItem` with an `as`, consider attaching it to the optional
+        // variable, rather than to the `WithItem` itself.
+        //
+        // For example, given:
+        // ```python
+        // with (
+        //     a
+        //     as
+        //     b  # comment
+        //     , c as d
+        // ): ...
+        // ```
+        //
+        // The `# comment` should be attached to the optional variable `b`, rather than to the
+        // `WithItem` itself.
+        if let AnyNodeRef::WithItem(ast::WithItem {
+            context_expr: _,
+            optional_vars: Some(optional_vars),
+            range: _,
+        }) = preceding
+        {
+            let tokenizer = SimpleTokenizer::new(
+                locator.contents(),
+                TextRange::new(optional_vars.end(), comment.start()),
+            );
+            if !tokenizer
+                .skip_trivia()
+                .any(|token| token.kind() == SimpleTokenKind::Comma)
+            {
+                return CommentPlacement::trailing(optional_vars.as_ref(), comment);
+            }
+        }
+    } else if let Some(following) = comment.following_node() {
+        // If a comment precedes the first `WithItem`, attach it as dangling:
+        // ```python
+        // with (  # comment
+        //     a as b,
+        //     c as d,
+        // ): ...
+        // ```
+        if comment.start() < following.start() {
+            return CommentPlacement::dangling(comment.enclosing_node(), comment);
+        }
+    }
+
+    CommentPlacement::Default(comment)
 }
 
 /// Handle comments inside comprehensions, e.g.

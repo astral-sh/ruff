@@ -260,6 +260,38 @@ with (
 
 with (foo() as bar, baz() as bop):
     pass
+
+# Trailing comments on items, broken by commas and parentheses.
+with (
+    a
+    as
+    # comment
+    b  # leading comment
+): ...
+
+
+with (
+    a
+    as
+    b,  # leading comment
+    c as d
+): ...
+
+
+with (
+    a
+    as
+    b  # leading comment
+    ,c as d
+): ...
+
+
+with (
+    a as (
+    b  # leading comment
+    )
+    ,c as d
+): ...
 ```
 
 ## Output
@@ -290,8 +322,8 @@ with (
 with (
     a as (  # a  # as
         # own line
-        b
-    ),  # b  # comma
+        b  # b
+    ),  # comma
     c,  # c
 ):  # colon
     ...  # body
@@ -299,8 +331,8 @@ with (
 
 with a as (  # a  # as
     # own line
-    bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-):  # b
+    bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb  # b
+):
     pass
 
 
@@ -375,8 +407,8 @@ with (
     a
     # trailing own line comment
 ) as (  # trailing as same line comment
-    b
-):  # trailing b same line comment
+    b  # trailing b same line comment
+):
     ...
 
 with (
@@ -533,6 +565,34 @@ with (
 
 with foo() as bar, baz() as bop:
     pass
+
+# Trailing comments on items, broken by commas and parentheses.
+with a as (
+    # comment
+    b  # leading comment
+):
+    ...
+
+
+with (
+    a as b,  # leading comment
+    c as d,
+):
+    ...
+
+
+with (
+    a as b,  # leading comment
+    c as d,
+):
+    ...
+
+
+with (
+    a as b,  # leading comment
+    c as d,
+):
+    ...
 ```
 
 

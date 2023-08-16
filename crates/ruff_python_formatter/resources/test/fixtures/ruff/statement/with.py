@@ -254,3 +254,35 @@ with (
 
 with (foo() as bar, baz() as bop):
     pass
+
+# Trailing comments on items, broken by commas and parentheses.
+with (
+    a
+    as
+    # comment
+    b  # leading comment
+): ...
+
+
+with (
+    a
+    as
+    b,  # leading comment
+    c as d
+): ...
+
+
+with (
+    a
+    as
+    b  # leading comment
+    ,c as d
+): ...
+
+
+with (
+    a as (
+    b  # leading comment
+    )
+    ,c as d
+): ...
