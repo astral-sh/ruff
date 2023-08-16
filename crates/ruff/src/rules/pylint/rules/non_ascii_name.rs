@@ -169,7 +169,7 @@ fn get_stmt_names(stmt: &Stmt) -> Vec<Name> {
                 name: name.as_str(),
                 range: name.range(),
                 node_type: NodeType::Constant,
-            }))
+            }));
         }
         _ => return Vec::new(),
     }
