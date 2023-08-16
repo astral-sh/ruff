@@ -261,7 +261,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 pylint::rules::load_before_global_declaration(checker, id, expr);
             }
         }
-        Expr::Attribute(ast::ExprAttribute { attr, value, .. }) => {
+        Expr::Attribute(attribute) => {
             // Ex) typing.List[...]
             if checker.any_enabled(&[
                 Rule::FutureRewritableTypeAnnotation,
@@ -323,7 +323,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::CollectionsNamedTuple) {
                 flake8_pyi::rules::collections_named_tuple(checker, expr);
             }
-            pandas_vet::rules::attr(checker, attr, value, expr);
+            pandas_vet::rules::attr(checker, attribute);
         }
         Expr::Call(
             call @ ast::ExprCall {
