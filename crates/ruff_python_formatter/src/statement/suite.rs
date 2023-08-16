@@ -1,4 +1,4 @@
-use crate::comments::{leading_comments, trailing_comments};
+use crate::comments::{leading_comments, trailing_comments, Comments, SourceComment};
 use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
 use ruff_python_ast::helpers::is_compound_statement;
 use ruff_python_ast::node::AnyNodeRef;
@@ -16,7 +16,7 @@ use crate::verbatim::{
 };
 
 /// Level at which the [`Suite`] appears in the source code.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Default)]
 pub enum SuiteKind {
     /// Statements at the module level / top level
     TopLevel,
@@ -28,6 +28,7 @@ pub enum SuiteKind {
     Class,
 
     /// Statements in any other body (e.g., `if` or `while`).
+    #[default]
     Other,
 }
 
@@ -167,9 +168,15 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                                     // ```
                                     let class_sequences_with_ellipsis_only =
                                         preceding.as_class_def_stmt().is_some_and(|class| {
-                                            contains_only_an_ellipsis(&class.body)
+                                            contains_only_an_ellipsis(
+                                                &class.body,
+                                                f.context().comments(),
+                                            )
                                         }) && following.as_class_def_stmt().is_some_and(|class| {
-                                            contains_only_an_ellipsis(&class.body)
+                                            contains_only_an_ellipsis(
+                                                &class.body,
+                                                f.context().comments(),
+                                            )
                                         });
 
                                     // Two subsequent functions where the preceding has an ellipsis only body
@@ -179,7 +186,10 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                                     // ```
                                     let function_with_ellipsis =
                                         preceding.as_function_def_stmt().is_some_and(|function| {
-                                            contains_only_an_ellipsis(&function.body)
+                                            contains_only_an_ellipsis(
+                                                &function.body,
+                                                f.context().comments(),
+                                            )
                                         }) && following.is_function_def_stmt();
 
                                     // Don't add an empty line between two classes that have an `...` body only or after
@@ -324,7 +334,8 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
 }
 
 /// Returns `true` if a function or class body contains only an ellipsis.
-pub(crate) fn contains_only_an_ellipsis(body: &[Stmt]) -> bool {
+pub(crate) fn contains_only_an_ellipsis(body: &[Stmt], _comments: &Comments) -> bool {
+    // TODO(tjkuson): false if there are comments.
     match body {
         [Stmt::Expr(ast::StmtExpr { value, .. })] => matches!(
             value.as_ref(),
@@ -455,6 +466,51 @@ impl Format<PyFormatContext<'_>> for SuiteChildStatement<'_> {
         match self {
             SuiteChildStatement::Docstring(docstring) => docstring.fmt(f),
             SuiteChildStatement::Other(statement) => statement.format().fmt(f),
+        }
+    }
+}
+
+pub(crate) struct FormatClauseBody<'a> {
+    body: &'a Suite,
+    kind: SuiteKind,
+    trailing_comments: &'a [SourceComment],
+}
+
+impl<'a> FormatClauseBody<'a> {}
+
+pub(crate) fn clause_body<'a>(
+    body: &'a Suite,
+    trailing_comments: &'a [SourceComment],
+) -> FormatClauseBody<'a> {
+    FormatClauseBody {
+        body,
+        kind: SuiteKind::default(),
+        trailing_comments,
+    }
+}
+
+impl Format<PyFormatContext<'_>> for FormatClauseBody<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+        if f.options().source_type().is_stub()
+            && contains_only_an_ellipsis(self.body, f.context().comments())
+            && self.trailing_comments.is_empty()
+        {
+            write!(
+                f,
+                [
+                    space(),
+                    self.body.format().with_options(self.kind),
+                    hard_line_break()
+                ]
+            )
+        } else {
+            write!(
+                f,
+                [
+                    trailing_comments(self.trailing_comments),
+                    block_indent(&self.body.format().with_options(self.kind))
+                ]
+            )
         }
     }
 }

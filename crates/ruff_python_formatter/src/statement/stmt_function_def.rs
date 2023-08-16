@@ -6,7 +6,7 @@ use crate::comments::{leading_comments, trailing_comments};
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{Parentheses, Parenthesize};
 use crate::prelude::*;
-use crate::statement::suite::{contains_only_an_ellipsis, SuiteKind};
+use crate::statement::suite::{clause_body, contains_only_an_ellipsis, SuiteKind};
 use crate::FormatNodeRule;
 
 #[derive(Default)]
@@ -135,18 +135,13 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
 
         write!(f, [group(&format_inner)])?;
 
-        // If the body contains only an ellipsis, format as:
-        // ```python
-        // def f(): ...
-        // ```
-        if f.options().source_type().is_stub() && contains_only_an_ellipsis(&item.body) {
+        // TODO(tjkuson): determine why this is necessary.
+        if contains_only_an_ellipsis(&item.body, f.context().comments()) {
             write!(
                 f,
                 [
                     text(":"),
-                    space(),
-                    &item.body.format().with_options(SuiteKind::Function),
-                    hard_line_break()
+                    clause_body(&item.body, trailing_definition_comments)
                 ]
             )
         } else {
