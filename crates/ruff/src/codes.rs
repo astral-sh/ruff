@@ -685,6 +685,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8PytestStyle, "011") => (RuleGroup::Unspecified, rules::flake8_pytest_style::rules::PytestRaisesTooBroad),
         (Flake8PytestStyle, "012") => (RuleGroup::Unspecified, rules::flake8_pytest_style::rules::PytestRaisesWithMultipleStatements),
         (Flake8PytestStyle, "013") => (RuleGroup::Unspecified, rules::flake8_pytest_style::rules::PytestIncorrectPytestImport),
+        (Flake8PytestStyle, "014") => (RuleGroup::Unspecified, rules::flake8_pytest_style::rules::PytestDuplicateParametrizeTestCases),
         (Flake8PytestStyle, "015") => (RuleGroup::Unspecified, rules::flake8_pytest_style::rules::PytestAssertAlwaysFalse),
         (Flake8PytestStyle, "016") => (RuleGroup::Unspecified, rules::flake8_pytest_style::rules::PytestFailWithoutMessage),
         (Flake8PytestStyle, "017") => (RuleGroup::Unspecified, rules::flake8_pytest_style::rules::PytestAssertInExcept),

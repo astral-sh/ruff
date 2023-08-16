@@ -170,6 +170,12 @@ mod tests {
         "PT013"
     )]
     #[test_case(
+        Rule::PytestDuplicateParametrizeTestCases,
+        Path::new("PT014.py"),
+        Settings::default(),
+        "PT014"
+    )]
+    #[test_case(
         Rule::PytestAssertAlwaysFalse,
         Path::new("PT015.py"),
         Settings::default(),

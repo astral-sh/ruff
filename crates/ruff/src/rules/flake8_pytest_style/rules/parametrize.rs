@@ -1,3 +1,6 @@
+use rustc_hash::FxHashMap;
+use std::hash::BuildHasherDefault;
+
 use ruff_python_ast::{
     self as ast, Arguments, Constant, Decorator, Expr, ExprContext, PySourceType, Ranged,
 };
@@ -6,6 +9,7 @@ use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_codegen::Generator;
 use ruff_source_file::Locator;
 
@@ -163,6 +167,58 @@ impl Violation for PytestParametrizeValuesWrongType {
     fn message(&self) -> String {
         let PytestParametrizeValuesWrongType { values, row } = self;
         format!("Wrong values type in `@pytest.mark.parametrize` expected `{values}` of `{row}`")
+    }
+}
+
+/// ## What it does
+/// Checks for duplicate test cases in `pytest.mark.parametrize`.
+///
+/// ## Why is this bad?
+/// Duplicate test cases are redundant and should be removed.
+///
+/// ## Example
+/// ```python
+/// import pytest
+///
+///
+/// @pytest.mark.parametrize(
+///     ("param1", "param2"),
+///     [
+///         (1, 2),
+///         (1, 2),
+///     ],
+/// )
+/// def test_foo(param1, param2):
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import pytest
+///
+///
+/// @pytest.mark.parametrize(
+///     ("param1", "param2"),
+///     [
+///         (1, 2),
+///     ],
+/// )
+/// def test_foo(param1, param2):
+///     ...
+/// ```
+///
+/// ## References
+/// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
+#[violation]
+pub struct PytestDuplicateParametrizeTestCases {
+    index: usize,
+}
+
+impl Violation for PytestDuplicateParametrizeTestCases {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let PytestDuplicateParametrizeTestCases { index } = self;
+        format!("Duplicate of test case at index {index} in `@pytest_mark.parametrize`")
     }
 }
 
@@ -472,6 +528,7 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
                     values.range(),
                 ));
             }
+
             if is_multi_named {
                 handle_value_rows(checker, elts, values_type, values_row_type);
             }
@@ -491,6 +548,29 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
             }
         }
         _ => {}
+    }
+}
+
+/// PT014
+fn check_duplicates(checker: &mut Checker, values: &Expr) {
+    let (Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. })) =
+        values
+    else {
+        return;
+    };
+
+    let mut seen: FxHashMap<ComparableExpr, usize> =
+        FxHashMap::with_capacity_and_hasher(elts.len(), BuildHasherDefault::default());
+    for (index, elt) in elts.iter().enumerate() {
+        let expr = ComparableExpr::from(elt);
+        seen.entry(expr)
+            .and_modify(|index| {
+                checker.diagnostics.push(Diagnostic::new(
+                    PytestDuplicateParametrizeTestCases { index: *index },
+                    elt.range(),
+                ));
+            })
+            .or_insert(index);
     }
 }
 
@@ -565,6 +645,11 @@ pub(crate) fn parametrize(checker: &mut Checker, decorators: &[Decorator]) {
                         if let Some(values) = args.get(1) {
                             check_values(checker, names, values);
                         }
+                    }
+                }
+                if checker.enabled(Rule::PytestDuplicateParametrizeTestCases) {
+                    if let [_, values, ..] = &args[..] {
+                        check_duplicates(checker, values);
                     }
                 }
             }
