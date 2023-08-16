@@ -340,7 +340,7 @@ fn parse_nested_format_part<'a>(
     if let Some(pos) = end_bracket_pos {
         let (_, right) = text.split_at(pos);
         let format_part = FormatString::parse_part_in_brackets(&left)
-            .map_err(|err| FormatSpecError::InvalidReplacement(err))?;
+            .map_err(FormatSpecError::InvalidReplacement)?;
         parts.push(format_part);
         Ok(&right[1..])
     } else {
