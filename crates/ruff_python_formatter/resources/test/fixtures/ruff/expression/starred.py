@@ -23,3 +23,11 @@ call(
         [What, i, this, s, very, long, aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa]
     ] # trailing value comment
 )
+
+call(
+    x,
+    * # Trailing star comment
+    (  # Leading value comment
+        y
+    )
+)
