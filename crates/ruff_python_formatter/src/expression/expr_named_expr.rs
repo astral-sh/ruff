@@ -1,7 +1,10 @@
+use crate::comments::{dangling_comments, SourceComment};
 use crate::context::PyFormatContext;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::{AsFormat, FormatNodeRule, PyFormatter};
-use ruff_formatter::prelude::{space, text};
+use ruff_formatter::prelude::{
+    format_args, group, hard_line_break, soft_line_break_or_space, space, text,
+};
 use ruff_formatter::{write, Buffer, FormatResult};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::ExprNamedExpr;
@@ -16,16 +19,35 @@ impl FormatNodeRule<ExprNamedExpr> for FormatExprNamedExpr {
             value,
             range: _,
         } = item;
+
+        // This context, a dangling comment is an end-of-line comment on the same line as the `:=`.
+        let comments = f.context().comments().clone();
+        let dangling = comments.dangling_comments(item);
+
         write!(
             f,
             [
-                target.format(),
-                space(),
-                text(":="),
-                space(),
-                value.format(),
+                group(&format_args!(target.format(), soft_line_break_or_space())),
+                text(":=")
             ]
-        )
+        )?;
+
+        if dangling.is_empty() {
+            write!(f, [space()])?;
+        } else {
+            write!(f, [dangling_comments(dangling), hard_line_break()])?;
+        }
+
+        write!(f, [value.format()])
+    }
+
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        // Handled by `fmt_fields`
+        Ok(())
     }
 }
 

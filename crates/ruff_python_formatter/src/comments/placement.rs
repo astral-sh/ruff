@@ -181,6 +181,7 @@ fn handle_enclosed_comment<'a>(
             )
         }
         AnyNodeRef::Keyword(_) => handle_dict_unpacking_comment(comment, locator),
+        AnyNodeRef::ExprNamedExpr(_) => handle_named_expr_comment(comment, locator),
         AnyNodeRef::ExprDict(_) => handle_dict_unpacking_comment(comment, locator)
             .or_else(|comment| handle_bracketed_end_of_line_comment(comment, locator)),
         AnyNodeRef::ExprIfExp(expr_if) => handle_expr_if_comment(comment, expr_if, locator),
@@ -1105,7 +1106,7 @@ fn handle_trailing_expression_starred_star_end_of_line_comment<'a>(
 ///     # trailing a own line comment
 ///     as # trailing as same line comment
 ///     b
-// ): ...
+/// ): ...
 /// ```
 fn handle_with_item_comment<'a>(
     comment: DecoratedComment<'a>,
@@ -1135,6 +1136,49 @@ fn handle_with_item_comment<'a>(
         CommentPlacement::dangling(comment.enclosing_node(), comment)
     } else {
         CommentPlacement::leading(optional_vars, comment)
+    }
+}
+
+/// Handles comments around the `:=` token in a named expression (walrus operator).
+///
+/// For example, here, `# 1` and `# 2` will be marked as dangling comments on the named expression,
+/// while `# 3` and `4` will be attached `y` (via our general parenthesized comment handling), and
+/// `# 5` will be a trailing comment on the named expression.
+///
+/// ```python
+/// if (
+///     x
+///     :=  # 1
+///     # 2
+///     (  # 3
+///         y  # 4
+///     ) # 5
+/// ):
+///     pass
+/// ```
+fn handle_named_expr_comment<'a>(
+    comment: DecoratedComment<'a>,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    debug_assert!(comment.enclosing_node().is_expr_named_expr());
+
+    let (Some(target), Some(value)) = (comment.preceding_node(), comment.following_node()) else {
+        return CommentPlacement::Default(comment);
+    };
+
+    let colon_equal = find_only_token_in_range(
+        TextRange::new(target.end(), value.start()),
+        SimpleTokenKind::ColonEqual,
+        locator,
+    );
+
+    if comment.end() < colon_equal.start() {
+        // If the comment is before the `:=` token, then it must be a trailing comment of the
+        // target.
+        CommentPlacement::trailing(target, comment)
+    } else {
+        // Otherwise, treat it as dangling. We effectively treat it as a comment on the `:=` itself.
+        CommentPlacement::dangling(comment.enclosing_node(), comment)
     }
 }
 
