@@ -203,6 +203,12 @@ impl FormatParse for FormatType {
 /// "hello {name:{fmt:*>}}".format(name="test", fmt="<20")
 /// ```
 ///
+/// However, replacements can only be singly nested (preserving our sanity).
+/// A [`FormatSpecError::ReplacementNotAllowed`] will be raised while parsing in this case.
+/// ```python
+/// "hello {name:{fmt:{not_allowed}}}".format(name="test", fmt="<20")  # Syntax error
+/// ```
+///
 /// When replacements are present in a format specification, we will parse them and
 /// store them in [`FormatSpec`] but will otherwise ignore them if they would introduce
 /// an invalid format specification at runtime.
