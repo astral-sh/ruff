@@ -333,17 +333,18 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
     }
 }
 
-/// Returns `true` if a function or class body contains only an ellipsis.
-pub(crate) fn contains_only_an_ellipsis(body: &[Stmt], _comments: &Comments) -> bool {
-    // TODO(tjkuson): false if there are comments.
+/// Returns `true` if a function or class body contains only an ellipsis with no comments.
+pub(crate) fn contains_only_an_ellipsis(body: &[Stmt], comments: &Comments) -> bool {
     match body {
-        [Stmt::Expr(ast::StmtExpr { value, .. })] => matches!(
-            value.as_ref(),
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::Ellipsis,
-                ..
-            })
-        ),
+        [Stmt::Expr(ast::StmtExpr { value, .. })] if !comments.has_comments(value.as_ref()) => {
+            matches!(
+                value.as_ref(),
+                Expr::Constant(ast::ExprConstant {
+                    value: Constant::Ellipsis,
+                    ..
+                })
+            )
+        }
         _ => false,
     }
 }
