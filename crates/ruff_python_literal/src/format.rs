@@ -795,7 +795,7 @@ mod tests {
     }
 
     #[test]
-    fn test_format_parse_nested_specifier() {
+    fn test_format_parse_nested_replacement() {
         let expected = Ok(FormatString {
             format_parts: vec![
                 FormatPart::Literal("abcd".to_owned()),
