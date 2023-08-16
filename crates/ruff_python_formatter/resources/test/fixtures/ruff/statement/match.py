@@ -141,3 +141,14 @@ match pattern_comments:
     no_comments
     ):
         pass
+
+match pattern_comments:
+    case value:
+        pass
+    # leading comment
+    case value1:
+        pass
+    case value2: # trailing
+        pass
+    case value3:
+        pass
