@@ -184,7 +184,13 @@ impl FormatParse for FormatType {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct FormatSpec {
+pub enum FormatSpec {
+    Static(StaticFormatSpec),
+    Dynamic(DynamicFormatSpec),
+}
+
+#[derive(Debug, PartialEq)]
+pub struct StaticFormatSpec {
     // Ex) `!s` in `'{!s}'`
     conversion: Option<FormatConversion>,
     // Ex) `*` in `'{:*^30}'`
@@ -203,8 +209,18 @@ pub struct FormatSpec {
     precision: Option<usize>,
     // Ex) `f` in `'{:+f}'`
     format_type: Option<FormatType>,
-    // Ex) `f` in `'{1:{f}}'`
-    format_part: Option<FormatPart>,
+}
+
+/// A format specification with a dynamic replacement
+/// We cannot analyze the components of dynamic format specifications and thus require a separate structure
+#[derive(Debug, PartialEq)]
+pub struct DynamicFormatSpec {
+    // Ex) `*<` in `'{:*<{f}}'`
+    left: String,
+    // Ex) `f` in `'{:{f}}'`
+    replacement: Option<FormatPart>,
+    // Ex) `.2b` in `'{:{f}.2b}'`
+    right: String,
 }
 
 fn get_num_digits(text: &str) -> usize {
@@ -348,7 +364,7 @@ impl FormatSpec {
             align = align.or(Some(FormatAlign::AfterSign));
         }
 
-        Ok(FormatSpec {
+        Ok(FormatSpec::Static(StaticFormatSpec {
             conversion,
             fill,
             align,
@@ -358,8 +374,7 @@ impl FormatSpec {
             grouping_option,
             precision,
             format_type,
-            format_part,
-        })
+        }))
     }
 }
 
@@ -735,7 +750,7 @@ mod tests {
     }
 
     #[test]
-    fn test_nested() {
+    fn test_format_part() {
         let expected = Ok(FormatSpec {
             conversion: None,
             fill: None,
@@ -755,6 +770,26 @@ mod tests {
         assert_eq!(FormatSpec::parse("{x}"), expected);
     }
 
+    #[test]
+    fn test_format_part_with_others() {
+        let expected = Ok(FormatSpec {
+            conversion: None,
+            fill: None,
+            align: Some(FormatAlign::Left),
+            sign: None,
+            alternate_form: false,
+            width: None,
+            grouping_option: None,
+            precision: None,
+            format_type: Some(FormatType::Binary),
+            format_part: Some(FormatPart::Field {
+                field_name: "x".to_string(),
+                conversion_spec: None,
+                format_spec: "".to_string(),
+            }),
+        });
+        assert_eq!(FormatSpec::parse("<{x}b"), expected);
+    }
     #[test]
     fn test_all() {
         let expected = Ok(FormatSpec {
