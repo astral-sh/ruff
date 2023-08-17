@@ -68,6 +68,20 @@ def this_is_also_wrong(value={}):
     ...
 
 
+class Foo:
+    @staticmethod
+    def this_is_also_wrong_and_more_indented(value={}):
+        pass
+
+
+def multiline_arg_wrong(value={
+
+}):
+    ...
+
+def single_line_func_wrong(value = {}): ...
+
+
 def and_this(value=set()):
     ...
 
@@ -261,3 +275,32 @@ def mutable_annotations(
     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
 ):
     pass
+
+
+def single_line_func_wrong(value: dict[str, str] = {}):
+    """Docstring"""
+
+
+def single_line_func_wrong(value: dict[str, str] = {}):
+    """Docstring"""
+    ...
+
+
+def single_line_func_wrong(value: dict[str, str] = {}):
+    """Docstring"""; ...
+
+
+def single_line_func_wrong(value: dict[str, str] = {}):
+    """Docstring"""; \
+        ...
+
+
+def single_line_func_wrong(value: dict[str, str] = {
+    # This is a comment
+}):
+    """Docstring"""
+
+
+def single_line_func_wrong(value: dict[str, str] = {}) \
+    : \
+    """Docstring"""

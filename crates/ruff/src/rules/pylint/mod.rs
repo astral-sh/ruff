@@ -126,11 +126,16 @@ mod tests {
         Rule::SubprocessPopenPreexecFn,
         Path::new("subprocess_popen_preexec_fn.py")
     )]
+    #[test_case(
+        Rule::SubprocessRunWithoutCheck,
+        Path::new("subprocess_run_without_check.py")
+    )]
+    #[test_case(Rule::BadDunderMethodName, Path::new("bad_dunder_method_name.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pylint").join(path).as_path(),
-            &Settings::for_rules(vec![rule_code]),
+            &Settings::for_rule(rule_code),
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -140,10 +145,8 @@ mod tests {
     fn repeated_isinstance_calls() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pylint/repeated_isinstance_calls.py"),
-            &Settings {
-                target_version: PythonVersion::Py39,
-                ..Settings::for_rules(vec![Rule::RepeatedIsinstanceCalls])
-            },
+            &Settings::for_rule(Rule::RepeatedIsinstanceCalls)
+                .with_target_version(PythonVersion::Py39),
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -153,10 +156,7 @@ mod tests {
     fn continue_in_finally() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pylint/continue_in_finally.py"),
-            &Settings {
-                target_version: PythonVersion::Py37,
-                ..Settings::for_rules(vec![Rule::ContinueInFinally])
-            },
+            &Settings::for_rule(Rule::ContinueInFinally).with_target_version(PythonVersion::Py37),
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -171,7 +171,7 @@ mod tests {
                     allow_magic_value_types: vec![pylint::settings::ConstantType::Int],
                     ..pylint::settings::Settings::default()
                 },
-                ..Settings::for_rules(vec![Rule::MagicValueComparison])
+                ..Settings::for_rule(Rule::MagicValueComparison)
             },
         )?;
         assert_messages!(diagnostics);
@@ -187,7 +187,7 @@ mod tests {
                     max_args: 4,
                     ..pylint::settings::Settings::default()
                 },
-                ..Settings::for_rules(vec![Rule::TooManyArguments])
+                ..Settings::for_rule(Rule::TooManyArguments)
             },
         )?;
         assert_messages!(diagnostics);
@@ -200,7 +200,7 @@ mod tests {
             Path::new("pylint/too_many_arguments_params.py"),
             &Settings {
                 dummy_variable_rgx: Regex::new(r"skip_.*").unwrap(),
-                ..Settings::for_rules(vec![Rule::TooManyArguments])
+                ..Settings::for_rule(Rule::TooManyArguments)
             },
         )?;
         assert_messages!(diagnostics);
@@ -216,7 +216,7 @@ mod tests {
                     max_branches: 1,
                     ..pylint::settings::Settings::default()
                 },
-                ..Settings::for_rules(vec![Rule::TooManyBranches])
+                ..Settings::for_rule(Rule::TooManyBranches)
             },
         )?;
         assert_messages!(diagnostics);
@@ -232,7 +232,7 @@ mod tests {
                     max_statements: 1,
                     ..pylint::settings::Settings::default()
                 },
-                ..Settings::for_rules(vec![Rule::TooManyStatements])
+                ..Settings::for_rule(Rule::TooManyStatements)
             },
         )?;
         assert_messages!(diagnostics);
@@ -248,7 +248,7 @@ mod tests {
                     max_returns: 1,
                     ..pylint::settings::Settings::default()
                 },
-                ..Settings::for_rules(vec![Rule::TooManyReturnStatements])
+                ..Settings::for_rule(Rule::TooManyReturnStatements)
             },
         )?;
         assert_messages!(diagnostics);

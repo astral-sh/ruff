@@ -295,3 +295,84 @@ def f(*args, b, **kwds, ): pass
 def f(*, b, **kwds, ): pass
 def f(a, *args, b, **kwds, ): pass
 def f(a, *, b, **kwds, ): pass
+
+# Handle comments on open parenthesis.
+def f(
+    # first
+    # second
+):
+    ...
+
+
+def f(  # first
+    # second
+):  # third
+    ...
+
+
+def f(  # first
+):  # second
+    ...
+
+
+def f(
+    a,
+    /,
+    # first
+    b
+    # second
+):
+    ...
+
+
+def f(  # first
+    *,
+    # second
+    b
+    # third
+):
+    ...
+
+
+def f(  # first
+    # second
+    *,
+    # third
+    b
+    # fourth
+):
+    ...
+
+
+def f(  # first
+    a,
+    # second
+):  # third
+    ...
+
+
+def f(  # first
+    a
+):  # second
+    ...
+
+
+def f(  # first
+    a
+    # second
+):  # third
+    ...
+
+
+def f(  # first
+    a,
+    / # second
+    ,
+    # third
+):
+    ...
+
+# Walrus operator in return type.
+def this_is_unusual() -> (please := no): ...
+
+def this_is_unusual(x) -> (please := no): ...

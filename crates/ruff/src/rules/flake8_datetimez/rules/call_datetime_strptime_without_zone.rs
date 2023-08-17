@@ -43,8 +43,8 @@ pub(crate) fn call_datetime_strptime_without_zone(checker: &mut Checker, call: &
     };
 
     let (Some(grandparent), Some(parent)) = (
-        checker.semantic().expr_grandparent(),
-        checker.semantic().expr_parent(),
+        checker.semantic().current_expression_grandparent(),
+        checker.semantic().current_expression_parent(),
     ) else {
         checker.diagnostics.push(Diagnostic::new(
             CallDatetimeStrptimeWithoutZone,

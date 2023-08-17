@@ -11,7 +11,10 @@ Dict(
                     ExprConstant {
                         range: 1..4,
                         value: Str(
-                            "a",
+                            StringConstant {
+                                value: "a",
+                                implicit_concatenated: false,
+                            },
                         ),
                         kind: None,
                     },
@@ -23,7 +26,10 @@ Dict(
                     ExprConstant {
                         range: 16..19,
                         value: Str(
-                            "d",
+                            StringConstant {
+                                value: "d",
+                                implicit_concatenated: false,
+                            },
                         ),
                         kind: None,
                     },
@@ -35,7 +41,10 @@ Dict(
                 ExprConstant {
                     range: 6..9,
                     value: Str(
-                        "b",
+                        StringConstant {
+                            value: "b",
+                            implicit_concatenated: false,
+                        },
                     ),
                     kind: None,
                 },
@@ -51,7 +60,10 @@ Dict(
                 ExprConstant {
                     range: 21..24,
                     value: Str(
-                        "e",
+                        StringConstant {
+                            value: "e",
+                            implicit_concatenated: false,
+                        },
                     ),
                     kind: None,
                 },

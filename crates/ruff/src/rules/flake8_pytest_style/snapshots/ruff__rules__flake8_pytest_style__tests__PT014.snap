@@ -1,0 +1,44 @@
+---
+source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
+---
+PT014.py:4:35: PT014 Duplicate of test case at index 0 in `@pytest_mark.parametrize`
+  |
+4 | @pytest.mark.parametrize("x", [1, 1, 2])
+  |                                   ^ PT014
+5 | def test_error_literal(x):
+6 |     ...
+  |
+
+PT014.py:14:35: PT014 Duplicate of test case at index 0 in `@pytest_mark.parametrize`
+   |
+14 | @pytest.mark.parametrize("x", [a, a, b, b, b, c])
+   |                                   ^ PT014
+15 | def test_error_expr_simple(x):
+16 |     ...
+   |
+
+PT014.py:14:41: PT014 Duplicate of test case at index 2 in `@pytest_mark.parametrize`
+   |
+14 | @pytest.mark.parametrize("x", [a, a, b, b, b, c])
+   |                                         ^ PT014
+15 | def test_error_expr_simple(x):
+16 |     ...
+   |
+
+PT014.py:14:44: PT014 Duplicate of test case at index 2 in `@pytest_mark.parametrize`
+   |
+14 | @pytest.mark.parametrize("x", [a, a, b, b, b, c])
+   |                                            ^ PT014
+15 | def test_error_expr_simple(x):
+16 |     ...
+   |
+
+PT014.py:19:40: PT014 Duplicate of test case at index 0 in `@pytest_mark.parametrize`
+   |
+19 | @pytest.mark.parametrize("x", [(a, b), (a, b), (b, c)])
+   |                                        ^^^^^^ PT014
+20 | def test_error_expr_complex(x):
+21 |     ...
+   |
+
+

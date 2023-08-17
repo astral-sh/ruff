@@ -128,26 +128,6 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             }
             visitor.visit_body(body);
         }
-        Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-            parameters,
-            body,
-            decorator_list,
-            returns,
-            type_params,
-            ..
-        }) => {
-            for decorator in decorator_list {
-                visitor.visit_decorator(decorator);
-            }
-            if let Some(type_params) = type_params {
-                visitor.visit_type_params(type_params);
-            }
-            visitor.visit_parameters(parameters);
-            for expr in returns {
-                visitor.visit_annotation(expr);
-            }
-            visitor.visit_body(body);
-        }
         Stmt::ClassDef(ast::StmtClassDef {
             arguments,
             body,
@@ -228,18 +208,6 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             visitor.visit_body(body);
             visitor.visit_body(orelse);
         }
-        Stmt::AsyncFor(ast::StmtAsyncFor {
-            target,
-            iter,
-            body,
-            orelse,
-            ..
-        }) => {
-            visitor.visit_expr(iter);
-            visitor.visit_expr(target);
-            visitor.visit_body(body);
-            visitor.visit_body(orelse);
-        }
         Stmt::While(ast::StmtWhile {
             test,
             body,
@@ -266,12 +234,6 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             }
         }
         Stmt::With(ast::StmtWith { items, body, .. }) => {
-            for with_item in items {
-                visitor.visit_with_item(with_item);
-            }
-            visitor.visit_body(body);
-        }
-        Stmt::AsyncWith(ast::StmtAsyncWith { items, body, .. }) => {
             for with_item in items {
                 visitor.visit_with_item(with_item);
             }
@@ -304,20 +266,7 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             handlers,
             orelse,
             finalbody,
-            range: _,
-        }) => {
-            visitor.visit_body(body);
-            for except_handler in handlers {
-                visitor.visit_except_handler(except_handler);
-            }
-            visitor.visit_body(orelse);
-            visitor.visit_body(finalbody);
-        }
-        Stmt::TryStar(ast::StmtTryStar {
-            body,
-            handlers,
-            orelse,
-            finalbody,
+            is_star: _,
             range: _,
         }) => {
             visitor.visit_body(body);
@@ -350,7 +299,7 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
         Stmt::Global(_) => {}
         Stmt::Nonlocal(_) => {}
         Stmt::Expr(ast::StmtExpr { value, range: _ }) => visitor.visit_expr(value),
-        Stmt::Pass(_) | Stmt::Break(_) | Stmt::Continue(_) | Stmt::LineMagic(_) => {}
+        Stmt::Pass(_) | Stmt::Break(_) | Stmt::Continue(_) | Stmt::IpyEscapeCommand(_) => {}
     }
 }
 
@@ -514,7 +463,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
                 visitor.visit_format_spec(expr);
             }
         }
-        Expr::JoinedStr(ast::ExprJoinedStr { values, range: _ }) => {
+        Expr::FString(ast::ExprFString { values, .. }) => {
             for expr in values {
                 visitor.visit_expr(expr);
             }
@@ -581,7 +530,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
                 visitor.visit_expr(expr);
             }
         }
-        Expr::LineMagic(_) => {}
+        Expr::IpyEscapeCommand(_) => {}
     }
 }
 
@@ -753,23 +702,19 @@ pub fn walk_pattern<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, pattern: &'a P
 }
 
 #[allow(unused_variables)]
-pub fn walk_expr_context<'a, V: Visitor<'a> + ?Sized>(
-    visitor: &mut V,
-    expr_context: &'a ExprContext,
-) {
-}
+pub fn walk_expr_context<'a, V: Visitor<'a> + ?Sized>(visitor: &V, expr_context: &'a ExprContext) {}
 
 #[allow(unused_variables)]
-pub fn walk_bool_op<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, bool_op: &'a BoolOp) {}
+pub fn walk_bool_op<'a, V: Visitor<'a> + ?Sized>(visitor: &V, bool_op: &'a BoolOp) {}
 
 #[allow(unused_variables)]
-pub fn walk_operator<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, operator: &'a Operator) {}
+pub fn walk_operator<'a, V: Visitor<'a> + ?Sized>(visitor: &V, operator: &'a Operator) {}
 
 #[allow(unused_variables)]
-pub fn walk_unary_op<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, unary_op: &'a UnaryOp) {}
+pub fn walk_unary_op<'a, V: Visitor<'a> + ?Sized>(visitor: &V, unary_op: &'a UnaryOp) {}
 
 #[allow(unused_variables)]
-pub fn walk_cmp_op<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, cmp_op: &'a CmpOp) {}
+pub fn walk_cmp_op<'a, V: Visitor<'a> + ?Sized>(visitor: &V, cmp_op: &'a CmpOp) {}
 
 #[allow(unused_variables)]
-pub fn walk_alias<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, alias: &'a Alias) {}
+pub fn walk_alias<'a, V: Visitor<'a> + ?Sized>(visitor: &V, alias: &'a Alias) {}

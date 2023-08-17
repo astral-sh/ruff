@@ -1,12 +1,12 @@
-use ruff_python_ast::{self as ast, Expr, ExprContext, Ranged, Stmt};
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::statement_visitor::StatementVisitor;
-use ruff_python_ast::types::RefEquality;
 use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{self as ast, Expr, ExprContext, Ranged, Stmt};
 use ruff_python_ast::{statement_visitor, visitor};
+use ruff_python_semantic::StatementKey;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -120,7 +120,7 @@ impl<'a> StatementVisitor<'a> for YieldFromVisitor<'a> {
                     }
                 }
             }
-            Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) | Stmt::ClassDef(_) => {
+            Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {
                 // Don't recurse into anything that defines a new scope.
             }
             _ => statement_visitor::walk_stmt(self, stmt),
@@ -131,7 +131,7 @@ impl<'a> StatementVisitor<'a> for YieldFromVisitor<'a> {
 #[derive(Default)]
 struct ReferenceVisitor<'a> {
     parent: Option<&'a Stmt>,
-    references: FxHashMap<RefEquality<'a, Stmt>, Vec<&'a str>>,
+    references: FxHashMap<StatementKey, Vec<&'a str>>,
 }
 
 impl<'a> Visitor<'a> for ReferenceVisitor<'a> {
@@ -148,7 +148,7 @@ impl<'a> Visitor<'a> for ReferenceVisitor<'a> {
                 if matches!(ctx, ExprContext::Load | ExprContext::Del) {
                     if let Some(parent) = self.parent {
                         self.references
-                            .entry(RefEquality(parent))
+                            .entry(StatementKey::from(parent))
                             .or_default()
                             .push(id);
                     }
@@ -162,39 +162,46 @@ impl<'a> Visitor<'a> for ReferenceVisitor<'a> {
 /// UP028
 pub(crate) fn yield_in_for_loop(checker: &mut Checker, stmt: &Stmt) {
     // Intentionally omit async functions.
-    if let Stmt::FunctionDef(ast::StmtFunctionDef { body, .. }) = stmt {
-        let yields = {
-            let mut visitor = YieldFromVisitor::default();
-            visitor.visit_body(body);
-            visitor.yields
-        };
+    let Stmt::FunctionDef(ast::StmtFunctionDef {
+        is_async: false,
+        body,
+        ..
+    }) = stmt
+    else {
+        return;
+    };
 
-        let references = {
-            let mut visitor = ReferenceVisitor::default();
-            visitor.visit_body(body);
-            visitor.references
-        };
+    let yields = {
+        let mut visitor = YieldFromVisitor::default();
+        visitor.visit_body(body);
+        visitor.yields
+    };
 
-        for item in yields {
-            // If any of the bound names are used outside of the loop, don't rewrite.
-            if references.iter().any(|(stmt, names)| {
-                stmt != &RefEquality(item.stmt)
-                    && stmt != &RefEquality(item.body)
-                    && item.names.iter().any(|name| names.contains(name))
-            }) {
-                continue;
-            }
+    let references = {
+        let mut visitor = ReferenceVisitor::default();
+        visitor.visit_body(body);
+        visitor.references
+    };
 
-            let mut diagnostic = Diagnostic::new(YieldInForLoop, item.stmt.range());
-            if checker.patch(diagnostic.kind.rule()) {
-                let contents = checker.locator().slice(item.iter.range());
-                let contents = format!("yield from {contents}");
-                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                    contents,
-                    item.stmt.range(),
-                )));
-            }
-            checker.diagnostics.push(diagnostic);
+    for item in yields {
+        // If any of the bound names are used outside of the loop, don't rewrite.
+        if references.iter().any(|(statement, names)| {
+            *statement != StatementKey::from(item.stmt)
+                && *statement != StatementKey::from(item.body)
+                && item.names.iter().any(|name| names.contains(name))
+        }) {
+            continue;
         }
+
+        let mut diagnostic = Diagnostic::new(YieldInForLoop, item.stmt.range());
+        if checker.patch(diagnostic.kind.rule()) {
+            let contents = checker.locator().slice(item.iter.range());
+            let contents = format!("yield from {contents}");
+            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                contents,
+                item.stmt.range(),
+            )));
+        }
+        checker.diagnostics.push(diagnostic);
     }
 }

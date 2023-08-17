@@ -91,7 +91,7 @@ pub(crate) fn custom_type_var_return_type(
         return;
     };
 
-    if !checker.semantic().scope().kind.is_class() {
+    if !checker.semantic().current_scope().kind.is_class() {
         return;
     };
 

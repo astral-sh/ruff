@@ -14,7 +14,7 @@ export default function Header({
   onChangeTheme,
   onShare,
 }: {
-  edit: number;
+  edit: number | null;
   theme: Theme;
   version: string | null;
   onChangeTheme: (theme: Theme) => void;

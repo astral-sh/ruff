@@ -2,6 +2,7 @@ use ruff_formatter::printer::{LineEnding, PrinterOptions};
 use ruff_formatter::{FormatOptions, IndentStyle, LineWidth};
 use ruff_python_ast::PySourceType;
 use std::path::Path;
+use std::str::FromStr;
 
 #[derive(Clone, Debug)]
 #[cfg_attr(
@@ -16,6 +17,7 @@ pub struct PyFormatOptions {
     /// Specifies the indent style:
     /// * Either a tab
     /// * or a specific amount of spaces
+    #[cfg_attr(feature = "serde", serde(default = "default_indent_style"))]
     indent_style: IndentStyle,
 
     /// The preferred line width at which the formatter should wrap lines.
@@ -33,12 +35,16 @@ fn default_line_width() -> LineWidth {
     LineWidth::try_from(88).unwrap()
 }
 
+fn default_indent_style() -> IndentStyle {
+    IndentStyle::Space(4)
+}
+
 impl Default for PyFormatOptions {
     fn default() -> Self {
         Self {
             source_type: PySourceType::default(),
-            indent_style: IndentStyle::Space(4),
-            line_width: LineWidth::try_from(88).unwrap(),
+            indent_style: default_indent_style(),
+            line_width: default_line_width(),
             quote_style: QuoteStyle::default(),
             magic_trailing_comma: MagicTrailingComma::default(),
         }
@@ -66,7 +72,12 @@ impl PyFormatOptions {
         self.quote_style
     }
 
-    pub fn with_quote_style(&mut self, style: QuoteStyle) -> &mut Self {
+    pub fn source_type(&self) -> PySourceType {
+        self.source_type
+    }
+
+    #[must_use]
+    pub fn with_quote_style(mut self, style: QuoteStyle) -> Self {
         self.quote_style = style;
         self
     }
@@ -150,6 +161,19 @@ impl TryFrom<char> for QuoteStyle {
     }
 }
 
+impl FromStr for QuoteStyle {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "\"" | "double" | "Double" => Ok(Self::Double),
+            "'" | "single" | "Single" => Ok(Self::Single),
+            // TODO: replace this error with a diagnostic
+            _ => Err("Value not supported for QuoteStyle"),
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug, Default)]
 #[cfg_attr(
     feature = "serde",
@@ -165,5 +189,18 @@ pub enum MagicTrailingComma {
 impl MagicTrailingComma {
     pub const fn is_respect(self) -> bool {
         matches!(self, Self::Respect)
+    }
+}
+
+impl FromStr for MagicTrailingComma {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "respect" | "Respect" => Ok(Self::Respect),
+            "ignore" | "Ignore" => Ok(Self::Ignore),
+            // TODO: replace this error with a diagnostic
+            _ => Err("Value not supported for MagicTrailingComma"),
+        }
     }
 }

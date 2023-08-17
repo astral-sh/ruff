@@ -95,20 +95,23 @@ use std::rc::Rc;
 use ruff_python_ast::{Mod, Ranged};
 
 pub(crate) use format::{
-    dangling_comments, dangling_node_comments, leading_alternate_branch_comments, leading_comments,
-    leading_node_comments, trailing_comments, trailing_node_comments,
+    dangling_comments, dangling_node_comments, dangling_open_parenthesis_comments,
+    leading_alternate_branch_comments, leading_comments, leading_node_comments, trailing_comments,
+    trailing_node_comments,
 };
 use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::visitor::preorder::{PreorderVisitor, TraversalSignal};
 use ruff_python_index::CommentRanges;
+use ruff_python_trivia::PythonWhitespace;
 
 use crate::comments::debug::{DebugComment, DebugComments};
-use crate::comments::map::MultiMap;
+use crate::comments::map::{LeadingDanglingTrailing, MultiMap};
 use crate::comments::node_key::NodeRefEqualityKey;
 use crate::comments::visitor::CommentsVisitor;
 
 mod debug;
-mod format;
+pub(crate) mod format;
 mod map;
 mod node_key;
 mod placement;
@@ -148,6 +151,11 @@ impl SourceComment {
         self.formatted.set(true);
     }
 
+    /// Marks the comment as not-formatted
+    pub(crate) fn mark_unformatted(&self) {
+        self.formatted.set(false);
+    }
+
     /// If the comment has already been formatted
     pub(crate) fn is_formatted(&self) -> bool {
         self.formatted.get()
@@ -161,6 +169,50 @@ impl SourceComment {
     pub(crate) fn debug<'a>(&'a self, source_code: SourceCode<'a>) -> DebugComment<'a> {
         DebugComment::new(self, source_code)
     }
+
+    pub(crate) fn suppression_kind(&self, source: &str) -> Option<SuppressionKind> {
+        let text = self.slice.text(SourceCode::new(source));
+        let trimmed = text.strip_prefix('#').unwrap_or(text).trim_whitespace();
+
+        if let Some(command) = trimmed.strip_prefix("fmt:") {
+            match command.trim_whitespace_start() {
+                "off" => Some(SuppressionKind::Off),
+                "on" => Some(SuppressionKind::On),
+                "skip" => Some(SuppressionKind::Skip),
+                _ => None,
+            }
+        } else if let Some(command) = trimmed.strip_prefix("yapf:") {
+            match command.trim_whitespace_start() {
+                "disable" => Some(SuppressionKind::Off),
+                "enable" => Some(SuppressionKind::On),
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }
+
+    /// Returns true if this comment is a `fmt: off` or `yapf: disable` own line suppression comment.
+    pub(crate) fn is_suppression_off_comment(&self, source: &str) -> bool {
+        self.line_position.is_own_line()
+            && matches!(self.suppression_kind(source), Some(SuppressionKind::Off))
+    }
+
+    /// Returns true if this comment is a `fmt: on` or `yapf: enable` own line suppression comment.
+    pub(crate) fn is_suppression_on_comment(&self, source: &str) -> bool {
+        self.line_position.is_own_line()
+            && matches!(self.suppression_kind(source), Some(SuppressionKind::On))
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub(crate) enum SuppressionKind {
+    /// A `fmt: off` or `yapf: disable` comment
+    Off,
+    /// A `fmt: on` or `yapf: enable` comment
+    On,
+    /// A `fmt: skip` comment
+    Skip,
 }
 
 impl Ranged for SourceComment {
@@ -244,8 +296,6 @@ pub(crate) struct Comments<'a> {
     data: Rc<CommentsData<'a>>,
 }
 
-#[allow(unused)]
-// TODO(micha): Remove after using the new comments infrastructure in the formatter.
 impl<'a> Comments<'a> {
     fn new(comments: CommentsMap<'a>) -> Self {
         Self {
@@ -266,16 +316,6 @@ impl<'a> Comments<'a> {
         };
 
         Self::new(map)
-    }
-
-    #[inline]
-    pub(crate) fn has_comments<T>(&self, node: T) -> bool
-    where
-        T: Into<AnyNodeRef<'a>>,
-    {
-        self.data
-            .comments
-            .has(&NodeRefEqualityKey::from_ref(node.into()))
     }
 
     /// Returns `true` if the given `node` has any [leading comments](self#leading-comments).
@@ -348,6 +388,7 @@ impl<'a> Comments<'a> {
     }
 
     /// Returns an iterator over the [leading](self#leading-comments) and [trailing comments](self#trailing-comments) of `node`.
+    #[allow(unused)]
     pub(crate) fn leading_trailing_comments<T>(
         &self,
         node: T,
@@ -365,13 +406,31 @@ impl<'a> Comments<'a> {
     pub(crate) fn leading_dangling_trailing_comments<T>(
         &self,
         node: T,
-    ) -> impl Iterator<Item = &SourceComment>
+    ) -> LeadingDanglingTrailingComments
     where
         T: Into<AnyNodeRef<'a>>,
     {
         self.data
             .comments
-            .parts(&NodeRefEqualityKey::from_ref(node.into()))
+            .leading_dangling_trailing(&NodeRefEqualityKey::from_ref(node.into()))
+    }
+
+    /// Returns any comments on the open parenthesis of a `node`.
+    ///
+    /// For example, `# comment` in:
+    /// ```python
+    /// (  # comment
+    ///    foo.bar
+    /// )
+    /// ```
+    #[inline]
+    pub(crate) fn open_parenthesis_comment<T>(&self, node: T) -> Option<&SourceComment>
+    where
+        T: Into<AnyNodeRef<'a>>,
+    {
+        self.leading_comments(node)
+            .first()
+            .filter(|comment| comment.line_position.is_end_of_line())
     }
 
     #[inline(always)]
@@ -400,15 +459,47 @@ impl<'a> Comments<'a> {
         );
     }
 
+    #[inline(always)]
+    #[cfg(not(debug_assertions))]
+    pub(crate) fn mark_verbatim_node_comments_formatted(&self, _node: AnyNodeRef) {}
+
+    /// Marks the comments of a node printed in verbatim (suppressed) as formatted.
+    ///
+    /// Marks the dangling comments and the comments of all descendants as formatted.
+    /// The leading and trailing comments are not marked as formatted because they are formatted
+    /// normally if `node` is the first or last node of a suppression range.
+    #[cfg(debug_assertions)]
+    pub(crate) fn mark_verbatim_node_comments_formatted(&self, node: AnyNodeRef) {
+        for dangling in self.dangling_comments(node) {
+            dangling.mark_formatted();
+        }
+
+        node.visit_preorder(&mut MarkVerbatimCommentsAsFormattedVisitor(self));
+    }
+
     /// Returns an object that implements [Debug] for nicely printing the [`Comments`].
     pub(crate) fn debug(&'a self, source_code: SourceCode<'a>) -> DebugComments<'a> {
         DebugComments::new(&self.data.comments, source_code)
     }
 }
 
+pub(crate) type LeadingDanglingTrailingComments<'a> = LeadingDanglingTrailing<'a, SourceComment>;
+
 #[derive(Debug, Default)]
 struct CommentsData<'a> {
     comments: CommentsMap<'a>,
+}
+
+struct MarkVerbatimCommentsAsFormattedVisitor<'a>(&'a Comments<'a>);
+
+impl<'a> PreorderVisitor<'a> for MarkVerbatimCommentsAsFormattedVisitor<'a> {
+    fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
+        for comment in self.0.leading_dangling_trailing_comments(node) {
+            comment.mark_formatted();
+        }
+
+        TraversalSignal::Traverse
+    }
 }
 
 #[cfg(test)]
@@ -568,8 +659,13 @@ def test(x, y):
 def other(y, z):
     if y == z:
         pass
-            # Trailing `if` comment
-      # Trailing `other` function comment
+            # Trailing `pass` comment
+      # Trailing `if` statement comment
+
+class Test:
+    def func():
+        pass
+       # Trailing `func` function comment
 
 test(10, 20)
 "#;

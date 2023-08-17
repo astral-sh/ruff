@@ -40,7 +40,7 @@ impl<'a> Printer<'a> {
         Self {
             source_code,
             options,
-            state: PrinterState::default(),
+            state: PrinterState::with_capacity(source_code.as_str().len()),
         }
     }
 
@@ -84,6 +84,7 @@ impl<'a> Printer<'a> {
         queue: &mut PrintQueue<'a>,
         element: &'a FormatElement,
     ) -> PrintResult<()> {
+        #[allow(clippy::enum_glob_use)]
         use Tag::*;
 
         let args = stack.top();
@@ -94,7 +95,7 @@ impl<'a> Printer<'a> {
             FormatElement::DynamicText { text } => self.print_text(text, None),
             FormatElement::SourceCodeSlice { slice, .. } => {
                 let text = slice.text(self.source_code);
-                self.print_text(text, Some(slice.range()))
+                self.print_text(text, Some(slice.range()));
             }
             FormatElement::Line(line_mode) => {
                 if args.mode().is_flat()
@@ -221,6 +222,8 @@ impl<'a> Printer<'a> {
 
             FormatElement::Tag(StartVerbatim(kind)) => {
                 if let VerbatimKind::Verbatim { length } = kind {
+                    // SAFETY: Ruff only supports formatting files <= 4GB
+                    #[allow(clippy::cast_possible_truncation)]
                     self.state.verbatim_markers.push(TextRange::at(
                         TextSize::from(self.state.buffer.len() as u32),
                         *length,
@@ -291,7 +294,7 @@ impl<'a> Printer<'a> {
         kind: TagKind,
         mode: GroupMode,
         args: PrintElementArgs,
-        queue: &mut PrintQueue<'a>,
+        queue: &PrintQueue<'a>,
         stack: &mut PrintCallStack,
     ) -> PrintResult<PrintMode> {
         let group_mode = match mode {
@@ -384,7 +387,7 @@ impl<'a> Printer<'a> {
 
         if let Some(last) = self.state.source_markers.last() {
             if last != &marker {
-                self.state.source_markers.push(marker)
+                self.state.source_markers.push(marker);
             }
         } else {
             self.state.source_markers.push(marker);
@@ -411,9 +414,10 @@ impl<'a> Printer<'a> {
                         queue.push(suffix);
                     }
                     LineSuffixEntry::Args(args) => {
-                        stack.push(TagKind::LineSuffix, args);
                         const LINE_SUFFIX_END: &FormatElement =
                             &FormatElement::Tag(Tag::EndLineSuffix);
+
+                        stack.push(TagKind::LineSuffix, args);
 
                         queue.push(LINE_SUFFIX_END);
                     }
@@ -437,7 +441,7 @@ impl<'a> Printer<'a> {
             self.state.measured_group_fits = true;
             let normal_variants = &variants[..variants.len() - 1];
 
-            for variant in normal_variants.iter() {
+            for variant in normal_variants {
                 // Test if this variant fits and if so, use it. Otherwise try the next
                 // variant.
 
@@ -614,7 +618,7 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Semantic alias for [Self::print_entry] for fill items.
+    /// Semantic alias for [`Self::print_entry`] for fill items.
     fn print_fill_item(
         &mut self,
         queue: &mut PrintQueue<'a>,
@@ -624,7 +628,7 @@ impl<'a> Printer<'a> {
         self.print_entry(queue, stack, args)
     }
 
-    /// Semantic alias for [Self::print_entry] for fill separators.
+    /// Semantic alias for [`Self::print_entry`] for fill separators.
     fn print_fill_separator(
         &mut self,
         queue: &mut PrintQueue<'a>,
@@ -636,7 +640,7 @@ impl<'a> Printer<'a> {
 
     /// Fully print an element (print the element itself and all its descendants)
     ///
-    /// Unlike [print_element], this function ensures the entire element has
+    /// Unlike [`print_element`], this function ensures the entire element has
     /// been printed when it returns and the queue is back to its original state
     fn print_entry(
         &mut self,
@@ -695,8 +699,6 @@ impl<'a> Printer<'a> {
                 .buffer
                 .push_str(self.options.line_ending.as_str());
 
-            self.state.generated_line += 1;
-            self.state.generated_column = 0;
             self.state.line_width = 0;
 
             // Fit's only tests if groups up to the first line break fit.
@@ -704,12 +706,13 @@ impl<'a> Printer<'a> {
             self.state.measured_group_fits = false;
         } else {
             self.state.buffer.push(char);
-            self.state.generated_column += 1;
 
+            #[allow(clippy::cast_possible_truncation)]
             let char_width = if char == '\t' {
-                self.options.tab_width as usize
+                u32::from(self.options.tab_width)
             } else {
-                char.width().unwrap_or(0)
+                // SAFETY: A u32 is sufficient to represent the width of a file <= 4GB
+                char.width().unwrap_or(0) as u32
             };
 
             self.state.line_width += char_width;
@@ -744,9 +747,7 @@ struct PrinterState<'a> {
     source_position: TextSize,
     pending_indent: Indention,
     measured_group_fits: bool,
-    generated_line: usize,
-    generated_column: usize,
-    line_width: usize,
+    line_width: u32,
     line_suffixes: LineSuffixes<'a>,
     verbatim_markers: Vec<TextRange>,
     group_modes: GroupModes,
@@ -754,6 +755,15 @@ struct PrinterState<'a> {
     // vec every time a group gets measured
     fits_stack: Vec<StackFrame>,
     fits_queue: Vec<&'a [FormatElement]>,
+}
+
+impl<'a> PrinterState<'a> {
+    fn with_capacity(capacity: usize) -> Self {
+        Self {
+            buffer: String::with_capacity(capacity),
+            ..Self::default()
+        }
+    }
 }
 
 /// Tracks the mode in which groups with ids are printed. Stores the groups at `group.id()` index.
@@ -796,7 +806,7 @@ enum Indention {
 }
 
 impl Indention {
-    const fn is_empty(&self) -> bool {
+    const fn is_empty(self) -> bool {
         matches!(self, Indention::Level(0))
     }
 
@@ -806,27 +816,27 @@ impl Indention {
     }
 
     /// Returns the indention level
-    fn level(&self) -> u16 {
+    fn level(self) -> u16 {
         match self {
-            Indention::Level(count) => *count,
-            Indention::Align { level: indent, .. } => *indent,
+            Indention::Level(count) => count,
+            Indention::Align { level: indent, .. } => indent,
         }
     }
 
     /// Returns the number of trailing align spaces or 0 if none
-    fn align(&self) -> u8 {
+    fn align(self) -> u8 {
         match self {
             Indention::Level(_) => 0,
-            Indention::Align { align, .. } => (*align).into(),
+            Indention::Align { align, .. } => align.into(),
         }
     }
 
     /// Increments the level by one.
     ///
-    /// The behaviour depends on the [`indent_style`][IndentStyle] if this is an [Indent::Align]:
+    /// The behaviour depends on the [`indent_style`][IndentStyle] if this is an [`Indent::Align`]:
     /// - **Tabs**: `align` is converted into an indent. This results in `level` increasing by two: once for the align, once for the level increment
     /// - **Spaces**: Increments the `level` by one and keeps the `align` unchanged.
-    /// Keeps any  the current value is [Indent::Align] and increments the level by one.
+    /// Keeps any  the current value is [`Indent::Align`] and increments the level by one.
     fn increment_level(self, indent_style: IndentStyle) -> Self {
         match self {
             Indention::Level(count) => Indention::Level(count + 1),
@@ -843,8 +853,8 @@ impl Indention {
     }
 
     /// Decrements the indent by one by:
-    /// - Reducing the level by one if this is [Indent::Level]
-    /// - Removing the `align` if this is [Indent::Align]
+    /// - Reducing the level by one if this is [`Indent::Level`]
+    /// - Removing the `align` if this is [`Indent::Align`]
     ///
     /// No-op if the level is already zero.
     fn decrement(self) -> Self {
@@ -856,7 +866,7 @@ impl Indention {
 
     /// Adds an `align` of `count` spaces to the current indention.
     ///
-    /// It increments the `level` value if the current value is [Indent::IndentAlign].
+    /// It increments the `level` value if the current value is [`Indent::IndentAlign`].
     fn set_align(self, count: NonZeroU8) -> Self {
         match self {
             Indention::Level(indent_count) => Indention::Align {
@@ -960,9 +970,9 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
         Ok(true)
     }
 
-    /// Tests if the content of a `Fill` item fits in [PrintMode::Flat].
+    /// Tests if the content of a `Fill` item fits in [`PrintMode::Flat`].
     ///
-    /// Returns `Err` if the top element of the queue is not a [Tag::StartEntry]
+    /// Returns `Err` if the top element of the queue is not a [`Tag::StartEntry`]
     /// or if the document has any mismatching start/end tags.
     fn fill_item_fits(&mut self) -> PrintResult<bool> {
         self.fill_entry_fits(PrintMode::Flat)
@@ -970,17 +980,17 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
 
     /// Tests if the content of a `Fill` separator fits with `mode`.
     ///
-    /// Returns `Err` if the top element of the queue is not a [Tag::StartEntry]
+    /// Returns `Err` if the top element of the queue is not a [`Tag::StartEntry`]
     /// or if the document has any mismatching start/end tags.
     fn fill_separator_fits(&mut self, mode: PrintMode) -> PrintResult<bool> {
         self.fill_entry_fits(mode)
     }
 
-    /// Tests if the elements between the [Tag::StartEntry] and [Tag::EndEntry]
+    /// Tests if the elements between the [`Tag::StartEntry`] and [`Tag::EndEntry`]
     /// of a fill item or separator fits with `mode`.
     ///
-    /// Returns `Err` if the queue isn't positioned at a [Tag::StartEntry] or if
-    /// the matching [Tag::EndEntry] is missing.
+    /// Returns `Err` if the queue isn't positioned at a [`Tag::StartEntry`] or if
+    /// the matching [`Tag::EndEntry`] is missing.
     fn fill_entry_fits(&mut self, mode: PrintMode) -> PrintResult<bool> {
         let start_entry = self.queue.top();
 
@@ -1002,6 +1012,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
 
     /// Tests if the passed element fits on the current line or not.
     fn fits_element(&mut self, element: &'a FormatElement) -> PrintResult<Fits> {
+        #[allow(clippy::enum_glob_use)]
         use Tag::*;
 
         let args = self.stack.top();
@@ -1098,7 +1109,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
             }
 
             FormatElement::Tag(StartGroup(group)) => {
-                return self.fits_group(TagKind::Group, group.mode(), group.id(), args);
+                return Ok(self.fits_group(TagKind::Group, group.mode(), group.id(), args));
             }
 
             FormatElement::Tag(StartConditionalGroup(group)) => {
@@ -1113,10 +1124,14 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                 };
 
                 if condition.mode == print_mode {
-                    return self.fits_group(TagKind::ConditionalGroup, group.mode(), None, args);
-                } else {
-                    self.stack.push(TagKind::ConditionalGroup, args);
+                    return Ok(self.fits_group(
+                        TagKind::ConditionalGroup,
+                        group.mode(),
+                        None,
+                        args,
+                    ));
                 }
+                self.stack.push(TagKind::ConditionalGroup, args);
             }
 
             FormatElement::Tag(StartConditionalContent(condition)) => {
@@ -1188,14 +1203,14 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                         TagKind::FitsExpanded,
                         args.with_print_mode(PrintMode::Expanded)
                             .with_measure_mode(MeasureMode::AllLines),
-                    )
+                    );
                 } else {
                     if propagate_expand.get() && args.mode().is_flat() {
                         return Ok(Fits::No);
                     }
 
                     // As usual
-                    self.stack.push(TagKind::FitsExpanded, args)
+                    self.stack.push(TagKind::FitsExpanded, args);
                 }
             }
 
@@ -1232,17 +1247,17 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
         mode: GroupMode,
         id: Option<GroupId>,
         args: PrintElementArgs,
-    ) -> PrintResult<Fits> {
+    ) -> Fits {
         if self.must_be_flat && !mode.is_flat() {
-            return Ok(Fits::No);
+            return Fits::No;
         }
 
         // Continue printing groups in expanded mode if measuring a `best_fitting` element where
         // a group expands.
-        let print_mode = if !mode.is_flat() {
-            PrintMode::Expanded
-        } else {
+        let print_mode = if mode.is_flat() {
             args.mode()
+        } else {
+            PrintMode::Expanded
         };
 
         self.stack.push(kind, args.with_print_mode(print_mode));
@@ -1251,31 +1266,33 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
             self.group_modes_mut().insert_print_mode(id, print_mode);
         }
 
-        Ok(Fits::Maybe)
+        Fits::Maybe
     }
 
     fn fits_text(&mut self, text: &str, args: PrintElementArgs) -> Fits {
         let indent = std::mem::take(&mut self.state.pending_indent);
-        self.state.line_width += indent.level() as usize * self.options().indent_width() as usize
-            + indent.align() as usize;
+        self.state.line_width += u32::from(indent.level())
+            * u32::from(self.options().indent_width())
+            + u32::from(indent.align());
 
         for c in text.chars() {
             let char_width = match c {
-                '\t' => self.options().tab_width as usize,
+                '\t' => u32::from(self.options().tab_width),
                 '\n' => {
                     if self.must_be_flat {
                         return Fits::No;
-                    } else {
-                        match args.measure_mode() {
-                            MeasureMode::FirstLine => return Fits::Yes,
-                            MeasureMode::AllLines => {
-                                self.state.line_width = 0;
-                                continue;
-                            }
+                    }
+                    match args.measure_mode() {
+                        MeasureMode::FirstLine => return Fits::Yes,
+                        MeasureMode::AllLines => {
+                            self.state.line_width = 0;
+                            continue;
                         }
-                    };
+                    }
                 }
-                c => c.width().unwrap_or(0),
+                // SAFETY: A u32 is sufficient to format files <= 4GB
+                #[allow(clippy::cast_possible_truncation)]
+                c => c.width().unwrap_or(0) as u32,
             };
             self.state.line_width += char_width;
         }
@@ -1357,9 +1374,10 @@ enum Fits {
 
 impl From<bool> for Fits {
     fn from(value: bool) -> Self {
-        match value {
-            true => Fits::Yes,
-            false => Fits::No,
+        if value {
+            Fits::Yes
+        } else {
+            Fits::No
         }
     }
 }
@@ -1369,7 +1387,7 @@ impl From<bool> for Fits {
 struct FitsState {
     pending_indent: Indention,
     has_line_suffix: bool,
-    line_width: usize,
+    line_width: u32,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -1379,7 +1397,7 @@ enum MeasureMode {
     /// Returns
     FirstLine,
 
-    /// The content only fits if non of the lines exceed the print width. Lines are terminated by either
+    /// The content only fits if none of the lines exceed the print width. Lines are terminated by either
     /// a hard line break or a soft line break in [`PrintMode::Expanded`].
     AllLines,
 }
@@ -1423,7 +1441,7 @@ mod tests {
             ],
         });
 
-        assert_eq!(r#"["a", "b", "c", "d"]"#, result.as_code())
+        assert_eq!(r#"["a", "b", "c", "d"]"#, result.as_code());
     }
 
     #[test]
@@ -1452,7 +1470,7 @@ mod tests {
   b
 a"#,
             formatted.as_code()
-        )
+        );
     }
 
     #[test]
@@ -1494,13 +1512,13 @@ two lines`,
   "b",
 ]"#,
             result.as_code()
-        )
+        );
     }
     #[test]
     fn it_breaks_a_group_if_it_contains_a_hard_line_break() {
         let result = format(&group(&format_args![text("a"), block_indent(&text("b"))]));
 
-        assert_eq!("a\n  b\n", result.as_code())
+        assert_eq!("a\n  b\n", result.as_code());
     }
 
     #[test]
@@ -1564,7 +1582,7 @@ two lines`,
             text("b"),
         ]);
 
-        assert_eq!("a\nb", result.as_code())
+        assert_eq!("a\nb", result.as_code());
     }
 
     #[test]
@@ -1577,7 +1595,7 @@ two lines`,
             text("b"),
         ]);
 
-        assert_eq!("a\n\n\n\nb", result.as_code())
+        assert_eq!("a\n\n\n\nb", result.as_code());
     }
 
     #[test]
@@ -1591,7 +1609,7 @@ two lines`,
             text("b"),
         ]);
 
-        assert_eq!("a\n\n\nb", result.as_code())
+        assert_eq!("a\n\n\nb", result.as_code());
     }
 
     #[test]
@@ -1653,7 +1671,7 @@ two lines`,
         assert_eq!(
             printed.as_code(),
             "1, 2, 3,\n723493294,\n[5],\n[\n\t123456789\n]"
-        )
+        );
     }
 
     #[test]
@@ -1683,7 +1701,7 @@ two lines`,
             &line_suffix(&format_args![space(), text("// trailing")])
         ]);
 
-        assert_eq!(printed.as_code(), "[1, 2, 3]; // trailing")
+        assert_eq!(printed.as_code(), "[1, 2, 3]; // trailing");
     }
 
     #[test]

@@ -1,4 +1,11 @@
-use ruff_python_ast::{Expr, ExprName, Ranged, Stmt, StmtAnnAssign, StmtTypeAlias};
+use ast::{Constant, ExprCall, ExprConstant};
+use ruff_python_ast::{
+    self as ast,
+    visitor::{self, Visitor},
+    Expr, ExprName, ExprSubscript, Identifier, Ranged, Stmt, StmtAnnAssign, StmtAssign,
+    StmtTypeAlias, TypeParam, TypeParamTypeVar,
+};
+use ruff_python_semantic::SemanticModel;
 
 use crate::{registry::AsRule, settings::types::PythonVersion};
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -75,15 +82,101 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
     //              as type params instead
     let mut diagnostic = Diagnostic::new(NonPEP695TypeAlias { name: name.clone() }, stmt.range());
     if checker.patch(diagnostic.kind.rule()) {
+        let mut visitor = TypeVarReferenceVisitor {
+            names: vec![],
+            semantic: checker.semantic(),
+        };
+        visitor.visit_expr(value);
+
+        let type_params = if visitor.names.is_empty() {
+            None
+        } else {
+            Some(ast::TypeParams {
+                range: TextRange::default(),
+                type_params: visitor
+                    .names
+                    .iter()
+                    .map(|name| {
+                        TypeParam::TypeVar(TypeParamTypeVar {
+                            range: TextRange::default(),
+                            name: Identifier::new(name.id.clone(), TextRange::default()),
+                            bound: None,
+                        })
+                    })
+                    .collect(),
+            })
+        };
+
         diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
             checker.generator().stmt(&Stmt::from(StmtTypeAlias {
                 range: TextRange::default(),
                 name: target.clone(),
-                type_params: None,
+                type_params,
                 value: value.clone(),
             })),
             stmt.range(),
         )));
     }
     checker.diagnostics.push(diagnostic);
+}
+
+struct TypeVarReferenceVisitor<'a> {
+    names: Vec<&'a ExprName>,
+    semantic: &'a SemanticModel<'a>,
+}
+
+/// Recursively collects the names of type variable references present in an expression.
+impl<'a> Visitor<'a> for TypeVarReferenceVisitor<'a> {
+    fn visit_expr(&mut self, expr: &'a Expr) {
+        match expr {
+            Expr::Name(name) if name.ctx.is_load() => {
+                let Some(Stmt::Assign(StmtAssign { value, .. })) = self
+                    .semantic
+                    .lookup_symbol(name.id.as_str())
+                    .and_then(|binding_id| {
+                        self.semantic
+                            .binding(binding_id)
+                            .source
+                            .map(|node_id| self.semantic.statement(node_id))
+                    })
+                else {
+                    return;
+                };
+
+                match value.as_ref() {
+                    Expr::Subscript(ExprSubscript {
+                        value: ref subscript_value,
+                        ..
+                    }) => {
+                        if self.semantic.match_typing_expr(subscript_value, "TypeVar") {
+                            self.names.push(name);
+                        }
+                    }
+                    Expr::Call(ExprCall {
+                        func, arguments, ..
+                    }) => {
+                        // TODO(zanieb): Add support for bounds and variance declarations
+                        //               for now this only supports `TypeVar("...")`
+                        if self.semantic.match_typing_expr(func, "TypeVar")
+                            && arguments.args.len() == 1
+                            && arguments.args.first().is_some_and(|arg| {
+                                matches!(
+                                    arg,
+                                    Expr::Constant(ExprConstant {
+                                        value: Constant::Str(_),
+                                        ..
+                                    })
+                                )
+                            })
+                            && arguments.keywords.is_empty()
+                        {
+                            self.names.push(name);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            _ => visitor::walk_expr(self, expr),
+        }
+    }
 }

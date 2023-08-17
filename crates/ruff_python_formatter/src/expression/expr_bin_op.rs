@@ -1,15 +1,15 @@
 use std::iter;
 
 use ruff_python_ast::{
-    Constant, Expr, ExprAttribute, ExprBinOp, ExprConstant, ExprUnaryOp, Operator, UnaryOp,
+    Constant, Expr, ExprAttribute, ExprBinOp, ExprConstant, ExprUnaryOp, Operator, StringConstant,
+    UnaryOp,
 };
 use smallvec::SmallVec;
 
 use ruff_formatter::{format_args, write, FormatOwnedWithRule, FormatRefWithRule};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
-use ruff_python_ast::str::is_implicit_concatenation;
 
-use crate::comments::{trailing_comments, trailing_node_comments};
+use crate::comments::{trailing_comments, trailing_node_comments, SourceComment};
 use crate::expression::expr_constant::ExprConstantLayout;
 use crate::expression::parentheses::{
     in_parentheses_only_group, in_parentheses_only_soft_line_break,
@@ -147,7 +147,11 @@ impl FormatNodeRule<ExprBinOp> for FormatExprBinOp {
         }
     }
 
-    fn fmt_dangling_comments(&self, _node: &ExprBinOp, _f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         // Handled inside of `fmt_fields`
         Ok(())
     }
@@ -157,8 +161,11 @@ impl FormatExprBinOp {
     fn layout<'a>(bin_op: &'a ExprBinOp, context: &PyFormatContext) -> BinOpLayout<'a> {
         if let Some(
             constant @ ExprConstant {
-                value: Constant::Str(_),
-                range,
+                value:
+                    Constant::Str(StringConstant {
+                        implicit_concatenated: true,
+                        ..
+                    }),
                 ..
             },
         ) = bin_op.left.as_constant_expr()
@@ -169,7 +176,6 @@ impl FormatExprBinOp {
                 && context.node_level().is_parenthesized()
                 && !comments.has_dangling_comments(constant)
                 && !comments.has_dangling_comments(bin_op)
-                && is_implicit_concatenation(&context.source()[*range])
             {
                 BinOpLayout::LeftString(constant)
             } else {

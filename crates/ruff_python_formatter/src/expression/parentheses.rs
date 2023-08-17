@@ -4,7 +4,9 @@ use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::Ranged;
 use ruff_python_trivia::{first_non_trivia_token, SimpleToken, SimpleTokenKind, SimpleTokenizer};
 
-use crate::comments::{dangling_comments, SourceComment};
+use crate::comments::{
+    dangling_comments, dangling_open_parenthesis_comments, trailing_comments, SourceComment,
+};
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::prelude::*;
 
@@ -49,6 +51,11 @@ pub(crate) enum Parenthesize {
     /// * The expression is not enclosed by another parenthesized expression and it expands over multiple lines
     /// * The expression has leading or trailing comments. Adding parentheses is desired to prevent the comments from wandering.
     IfRequired,
+
+    /// Parenthesizes the expression if the group doesn't fit on a line (e.g., even name expressions are parenthesized), or if
+    /// the expression doesn't break, but _does_ reports that it always requires parentheses in this position (e.g., walrus
+    /// operators in function return annotations).
+    IfBreaksOrIfRequired,
 }
 
 impl Parenthesize {
@@ -116,25 +123,6 @@ where
     }
 }
 
-/// Formats `content` enclosed by the `left` and `right` parentheses, along with any dangling
-/// comments that on the parentheses themselves.
-pub(crate) fn parenthesized_with_dangling_comments<'content, 'ast, Content>(
-    left: &'static str,
-    comments: &'content [SourceComment],
-    content: &'content Content,
-    right: &'static str,
-) -> FormatParenthesized<'content, 'ast>
-where
-    Content: Format<PyFormatContext<'ast>>,
-{
-    FormatParenthesized {
-        left,
-        comments,
-        content: Argument::new(content),
-        right,
-    }
-}
-
 pub(crate) struct FormatParenthesized<'content, 'ast> {
     left: &'static str,
     comments: &'content [SourceComment],
@@ -142,25 +130,34 @@ pub(crate) struct FormatParenthesized<'content, 'ast> {
     right: &'static str,
 }
 
+impl<'content, 'ast> FormatParenthesized<'content, 'ast> {
+    /// Inserts any dangling comments that should be placed immediately after the open parenthesis.
+    /// For example:
+    /// ```python
+    /// [  # comment
+    ///     1,
+    ///     2,
+    ///     3,
+    /// ]
+    /// ```
+    pub(crate) fn with_dangling_comments(
+        self,
+        comments: &'content [SourceComment],
+    ) -> FormatParenthesized<'content, 'ast> {
+        FormatParenthesized { comments, ..self }
+    }
+}
+
 impl<'ast> Format<PyFormatContext<'ast>> for FormatParenthesized<'_, 'ast> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
         let inner = format_with(|f| {
-            if self.comments.is_empty() {
-                group(&format_args![
-                    text(self.left),
-                    &soft_block_indent(&Arguments::from(&self.content)),
-                    text(self.right)
-                ])
-                .fmt(f)
-            } else {
-                group(&format_args![
-                    text(self.left),
-                    &line_suffix(&dangling_comments(self.comments)),
-                    &group(&soft_block_indent(&Arguments::from(&self.content))),
-                    text(self.right)
-                ])
-                .fmt(f)
-            }
+            group(&format_args![
+                text(self.left),
+                &dangling_open_parenthesis_comments(self.comments),
+                &soft_block_indent(&Arguments::from(&self.content)),
+                text(self.right)
+            ])
+            .fmt(f)
         });
 
         let current_level = f.context().node_level();
@@ -201,8 +198,8 @@ pub(crate) struct FormatOptionalParentheses<'content, 'ast> {
 
 impl<'ast> Format<PyFormatContext<'ast>> for FormatOptionalParentheses<'_, 'ast> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
-        // The group id is used as a condition in [`in_parentheses_only`] to create a conditional group
-        // that is only active if the optional parentheses group expands.
+        // The group id is used as a condition in [`in_parentheses_only_group`] to create a
+        // conditional group that is only active if the optional parentheses group expands.
         let parens_id = f.group_id("optional_parentheses");
 
         let mut f = WithNodeLevel::new(NodeLevel::Expression(Some(parens_id)), f);
@@ -271,7 +268,8 @@ impl<'ast> Format<PyFormatContext<'ast>> for InParenthesesOnlyLineBreak {
                 f.write_element(FormatElement::Line(match self {
                     InParenthesesOnlyLineBreak::SoftLineBreak => LineMode::Soft,
                     InParenthesesOnlyLineBreak::SoftLineBreakOrSpace => LineMode::SoftOrSpace,
-                }))
+                }));
+                Ok(())
             }
         }
     }
@@ -317,11 +315,73 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatInParenthesesOnlyGroup<'_, 'a
     }
 }
 
+/// Format comments inside empty parentheses, brackets or curly braces.
+///
+/// Empty `()`, `[]` and `{}` are special because there can be dangling comments, and they can be in
+/// two positions:
+/// ```python
+/// x = [  # end-of-line
+///     # own line
+/// ]
+/// ```
+/// These comments are dangling because they can't be assigned to any element inside as they would
+/// in all other cases.
+pub(crate) fn empty_parenthesized<'content>(
+    left: &'static str,
+    comments: &'content [SourceComment],
+    right: &'static str,
+) -> FormatEmptyParenthesized<'content> {
+    FormatEmptyParenthesized {
+        left,
+        comments,
+        right,
+    }
+}
+
+pub(crate) struct FormatEmptyParenthesized<'content> {
+    left: &'static str,
+    comments: &'content [SourceComment],
+    right: &'static str,
+}
+
+impl Format<PyFormatContext<'_>> for FormatEmptyParenthesized<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext>) -> FormatResult<()> {
+        let end_of_line_split = self
+            .comments
+            .partition_point(|comment| comment.line_position().is_end_of_line());
+        debug_assert!(self.comments[end_of_line_split..]
+            .iter()
+            .all(|comment| comment.line_position().is_own_line()));
+        write!(
+            f,
+            [group(&format_args![
+                text(self.left),
+                // end-of-line comments
+                trailing_comments(&self.comments[..end_of_line_split]),
+                // Avoid unstable formatting with
+                // ```python
+                // x = () - (#
+                // )
+                // ```
+                // Without this the comment would go after the empty tuple first, but still expand
+                // the bin op. In the second formatting pass they are trailing bin op comments
+                // so the bin op collapse. Suboptimally we keep parentheses around the bin op in
+                // either case.
+                (!self.comments[..end_of_line_split].is_empty()).then_some(hard_line_break()),
+                // own line comments, which need to be indented
+                soft_block_indent(&dangling_comments(&self.comments[end_of_line_split..])),
+                text(self.right)
+            ])]
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::expression::parentheses::is_expression_parenthesized;
     use ruff_python_ast::node::AnyNodeRef;
     use ruff_python_parser::parse_expression;
+
+    use crate::expression::parentheses::is_expression_parenthesized;
 
     #[test]
     fn test_has_parentheses() {

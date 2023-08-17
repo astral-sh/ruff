@@ -13,6 +13,44 @@ aa = [
     bakjdshflkjahdslkfjlasfdahjlfds
 ] = dddd = ddd = fkjaödkjaföjfahlfdalfhaöfaöfhaöfha = g = [3]
 
+aa = [
+
+] = dddd = ddd = fkjaödkjaföjfahlfdalfhaöfaöfhaöfha = g = [3]
+
+aa = [
+    # foo
+] = dddd = ddd = fkjaödkjaföjfahlfdalfhaöfaöfhaöfha = g = [3]
+
+aa = ([
+]) = dddd = ddd = fkjaödkjaföjfahlfdalfhaöfaöfhaöfha = g = [3]
+
 aaaa = ( # trailing
     # comment
     bbbbb) = cccccccccccccccc = 3
+
+x = (  # comment
+    [  # comment
+        a,
+        b,
+        c,
+    ]
+) = 1
+
+
+x = (
+    # comment
+    [
+        a,
+        b,
+        c,
+    ]
+) = 1
+
+
+x = (
+    [  # comment
+        a,
+        b,
+        c,
+    ]
+) = 1

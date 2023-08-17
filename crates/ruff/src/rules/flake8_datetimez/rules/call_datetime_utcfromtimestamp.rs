@@ -8,6 +8,43 @@ use crate::checkers::ast::Checker;
 
 use super::helpers;
 
+/// ## What it does
+/// Checks for usage of `datetime.datetime.utcfromtimestamp()`.
+///
+/// ## Why is this bad?
+/// Python datetime objects can be naive or timezone-aware. While an aware
+/// object represents a specific moment in time, a naive object does not
+/// contain enough information to unambiguously locate itself relative to other
+/// datetime objects. Since this can lead to errors, it is recommended to
+/// always use timezone-aware objects.
+///
+/// `datetime.datetime.utcfromtimestamp()` returns a naive datetime object;
+/// instead, use `datetime.datetime.fromtimestamp(ts, tz=)` to return a
+/// timezone-aware object.
+///
+/// ## Example
+/// ```python
+/// import datetime
+///
+/// datetime.datetime.utcfromtimestamp()
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import datetime
+///
+/// datetime.datetime.fromtimestamp(946684800, tz=datetime.timezone.utc)
+/// ```
+///
+/// Or, for Python 3.11 and later:
+/// ```python
+/// import datetime
+///
+/// datetime.datetime.fromtimestamp(946684800, tz=datetime.UTC)
+/// ```
+///
+/// ## References
+/// - [Python documentation: Aware and Naive Objects](https://docs.python.org/3/library/datetime.html#aware-and-naive-objects)
 #[violation]
 pub struct CallDatetimeUtcfromtimestamp;
 
@@ -21,15 +58,6 @@ impl Violation for CallDatetimeUtcfromtimestamp {
     }
 }
 
-/// Checks for `datetime.datetime.utcfromtimestamp()`. (DTZ004)
-///
-/// ## Why is this bad?
-///
-/// Because naive `datetime` objects are treated by many `datetime` methods as
-/// local times, it is preferred to use aware datetimes to represent times in
-/// UTC. As such, the recommended way to create an object representing a
-/// specific timestamp in UTC is by calling `datetime.fromtimestamp(timestamp,
-/// tz=timezone.utc)`.
 pub(crate) fn call_datetime_utcfromtimestamp(
     checker: &mut Checker,
     func: &Expr,

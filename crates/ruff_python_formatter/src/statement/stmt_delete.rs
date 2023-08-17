@@ -1,5 +1,5 @@
 use crate::builders::{parenthesize_if_expands, PyFormatterExtensions};
-use crate::comments::dangling_node_comments;
+use crate::comments::{dangling_node_comments, SourceComment};
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::{FormatNodeRule, PyFormatter};
@@ -53,7 +53,11 @@ impl FormatNodeRule<StmtDelete> for FormatStmtDelete {
         }
     }
 
-    fn fmt_dangling_comments(&self, _node: &StmtDelete, _f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         // Handled in `fmt_fields`
         Ok(())
     }

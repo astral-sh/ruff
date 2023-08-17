@@ -16,7 +16,7 @@ fn to_formatted_value_expr(inner: &Expr) -> Expr {
 /// Convert a string to a constant string expression.
 pub(super) fn to_constant_string(s: &str) -> Expr {
     let node = ast::ExprConstant {
-        value: Constant::Str(s.to_owned()),
+        value: s.to_owned().into(),
         kind: None,
         range: TextRange::default(),
     };
@@ -52,14 +52,14 @@ fn is_simple_callee(func: &Expr) -> bool {
 }
 
 /// Convert an expression to a f-string element (if it looks like a good idea).
-pub(super) fn to_fstring_elem(expr: &Expr) -> Option<Expr> {
+pub(super) fn to_f_string_element(expr: &Expr) -> Option<Expr> {
     match expr {
-        // These are directly handled by `unparse_fstring_elem`:
+        // These are directly handled by `unparse_f_string_element`:
         Expr::Constant(ast::ExprConstant {
             value: Constant::Str(_),
             ..
         })
-        | Expr::JoinedStr(_)
+        | Expr::FString(_)
         | Expr::FormattedValue(_) => Some(expr.clone()),
         // These should be pretty safe to wrap in a formatted value.
         Expr::Constant(ast::ExprConstant {

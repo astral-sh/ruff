@@ -6,6 +6,7 @@ expression: parse_ast
     FunctionDef(
         StmtFunctionDef {
             range: 0..34,
+            is_async: false,
             decorator_list: [
                 Decorator {
                     range: 0..13,

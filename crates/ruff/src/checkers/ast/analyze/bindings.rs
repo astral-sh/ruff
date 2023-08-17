@@ -16,9 +16,15 @@ pub(crate) fn bindings(checker: &mut Checker) {
         return;
     }
 
-    for binding in checker.semantic.bindings.iter() {
+    for binding in &*checker.semantic.bindings {
         if checker.enabled(Rule::UnusedVariable) {
-            if binding.kind.is_bound_exception() && !binding.is_used() {
+            if binding.kind.is_bound_exception()
+                && !binding.is_used()
+                && !checker
+                    .settings
+                    .dummy_variable_rgx
+                    .is_match(binding.name(checker.locator))
+            {
                 let mut diagnostic = Diagnostic::new(
                     pyflakes::rules::UnusedVariable {
                         name: binding.name(checker.locator).to_string(),

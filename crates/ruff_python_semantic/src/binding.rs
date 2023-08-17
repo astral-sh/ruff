@@ -11,8 +11,8 @@ use ruff_text_size::TextRange;
 
 use crate::context::ExecutionContext;
 use crate::model::SemanticModel;
-use crate::node::NodeId;
 use crate::reference::ResolvedReferenceId;
+use crate::statements::StatementId;
 use crate::ScopeId;
 
 #[derive(Debug, Clone)]
@@ -24,7 +24,7 @@ pub struct Binding<'a> {
     /// The context in which the [`Binding`] was created.
     pub context: ExecutionContext,
     /// The statement in which the [`Binding`] was defined.
-    pub source: Option<NodeId>,
+    pub source: Option<StatementId>,
     /// The references to the [`Binding`].
     pub references: Vec<ResolvedReferenceId>,
     /// The exceptions that were handled when the [`Binding`] was defined.
@@ -185,7 +185,7 @@ impl<'a> Binding<'a> {
     /// Returns the range of the binding's parent.
     pub fn parent_range(&self, semantic: &SemanticModel) -> Option<TextRange> {
         self.source
-            .map(|node_id| semantic.stmts[node_id])
+            .map(|statement_id| semantic.statement(statement_id))
             .and_then(|parent| {
                 if parent.is_import_from_stmt() {
                     Some(parent.range())
@@ -585,7 +585,7 @@ impl<'a> Imported<'a> for FromImport<'a> {
 }
 
 /// A wrapper around an import [`BindingKind`] that can be any of the three types of imports.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, is_macro::Is)]
 pub enum AnyImport<'a> {
     Import(&'a Import<'a>),
     SubmoduleImport(&'a SubmoduleImport<'a>),

@@ -1,13 +1,12 @@
+use crate::comments::SourceComment;
 use ruff_formatter::write;
 use ruff_python_ast::node::AstNode;
 use ruff_python_ast::{Arguments, Expr, Ranged};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{TextRange, TextSize};
 
-use crate::builders::empty_parenthesized_with_dangling_comments;
-use crate::comments::trailing_comments;
 use crate::expression::expr_generator_exp::GeneratorExpParentheses;
-use crate::expression::parentheses::{parenthesized, Parentheses};
+use crate::expression::parentheses::{empty_parenthesized, parenthesized, Parentheses};
 use crate::prelude::*;
 use crate::FormatNodeRule;
 
@@ -25,27 +24,9 @@ impl FormatNodeRule<Arguments> for FormatArguments {
         // ```
         if item.args.is_empty() && item.keywords.is_empty() {
             let comments = f.context().comments().clone();
-            return write!(
-                f,
-                [empty_parenthesized_with_dangling_comments(
-                    text("("),
-                    comments.dangling_comments(item),
-                    text(")"),
-                )]
-            );
+            let dangling = comments.dangling_comments(item);
+            return write!(f, [empty_parenthesized("(", dangling, ")")]);
         }
-
-        // If the arguments are non-empty, then a dangling comment indicates a comment on the
-        // same line as the opening parenthesis, e.g.:
-        // ```python
-        // f(  # This call has a dangling comment.
-        //     a,
-        //     b,
-        //     c,
-        // )
-        let comments = f.context().comments().clone();
-        let dangling_comments = comments.dangling_comments(item.as_any_node_ref());
-        write!(f, [trailing_comments(dangling_comments)])?;
 
         let all_arguments = format_with(|f: &mut PyFormatter| {
             let source = f.context().source();
@@ -64,6 +45,9 @@ impl FormatNodeRule<Arguments> for FormatArguments {
                                 if is_single_argument_parenthesized(arg, item.end(), source) {
                                     Parentheses::Always
                                 } else {
+                                    // Note: no need to handle opening-parenthesis comments, since
+                                    // an opening-parenthesis comment implies that the argument is
+                                    // parenthesized.
                                     Parentheses::Never
                                 };
                             joiner.entry(other, &other.format().with_options(parentheses))
@@ -84,10 +68,21 @@ impl FormatNodeRule<Arguments> for FormatArguments {
             joiner.finish()
         });
 
+        // If the arguments are non-empty, then a dangling comment indicates a comment on the
+        // same line as the opening parenthesis, e.g.:
+        // ```python
+        // f(  # This call has a dangling comment.
+        //     a,
+        //     b,
+        //     c,
+        // )
+        let comments = f.context().comments().clone();
+        let dangling_comments = comments.dangling_comments(item.as_any_node_ref());
+
         write!(
             f,
             [
-                // The outer group is for things like
+                // The outer group is for things like:
                 // ```python
                 // get_collection(
                 //     hey_this_is_a_very_long_call,
@@ -102,13 +97,17 @@ impl FormatNodeRule<Arguments> for FormatArguments {
                 //     hey_this_is_a_very_long_call, it_has_funny_attributes_asdf_asdf, really=True
                 // )
                 // ```
-                // TODO(konstin): Doesn't work see wrongly formatted test
                 parenthesized("(", &group(&all_arguments), ")")
+                    .with_dangling_comments(dangling_comments)
             ]
         )
     }
 
-    fn fmt_dangling_comments(&self, _node: &Arguments, _f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         // Handled in `fmt_fields`
         Ok(())
     }

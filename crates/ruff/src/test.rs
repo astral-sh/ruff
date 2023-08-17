@@ -33,7 +33,7 @@ use crate::source_kind::SourceKind;
 #[cfg(not(fuzzing))]
 pub(crate) fn read_jupyter_notebook(path: &Path) -> Result<Notebook> {
     let path = test_resource_path("fixtures/jupyter").join(path);
-    Notebook::read(&path).map_err(|err| {
+    Notebook::from_path(&path).map_err(|err| {
         anyhow::anyhow!(
             "Failed to read notebook file `{}`: {:?}",
             path.display(),

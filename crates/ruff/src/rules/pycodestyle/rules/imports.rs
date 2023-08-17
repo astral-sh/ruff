@@ -1,8 +1,6 @@
-use ruff_python_ast::{Alias, Ranged, Stmt};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_source_file::Locator;
+use ruff_python_ast::{Alias, Ranged, Stmt};
 
 use crate::checkers::ast::Checker;
 
@@ -81,12 +79,8 @@ pub(crate) fn multiple_imports_on_one_line(checker: &mut Checker, stmt: &Stmt, n
 }
 
 /// E402
-pub(crate) fn module_import_not_at_top_of_file(
-    checker: &mut Checker,
-    stmt: &Stmt,
-    locator: &Locator,
-) {
-    if checker.semantic().seen_import_boundary() && locator.is_at_start_of_line(stmt.start()) {
+pub(crate) fn module_import_not_at_top_of_file(checker: &mut Checker, stmt: &Stmt) {
+    if checker.semantic().seen_import_boundary() && checker.semantic().at_top_level() {
         checker
             .diagnostics
             .push(Diagnostic::new(ModuleImportNotAtTopOfFile, stmt.range()));

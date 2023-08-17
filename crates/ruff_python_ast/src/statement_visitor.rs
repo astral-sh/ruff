@@ -32,19 +32,12 @@ pub fn walk_stmt<'a, V: StatementVisitor<'a> + ?Sized>(visitor: &mut V, stmt: &'
         Stmt::FunctionDef(ast::StmtFunctionDef { body, .. }) => {
             visitor.visit_body(body);
         }
-        Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. }) => {
-            visitor.visit_body(body);
-        }
         Stmt::For(ast::StmtFor { body, orelse, .. }) => {
             visitor.visit_body(body);
             visitor.visit_body(orelse);
         }
         Stmt::ClassDef(ast::StmtClassDef { body, .. }) => {
             visitor.visit_body(body);
-        }
-        Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. }) => {
-            visitor.visit_body(body);
-            visitor.visit_body(orelse);
         }
         Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
             visitor.visit_body(body);
@@ -63,9 +56,6 @@ pub fn walk_stmt<'a, V: StatementVisitor<'a> + ?Sized>(visitor: &mut V, stmt: &'
         Stmt::With(ast::StmtWith { body, .. }) => {
             visitor.visit_body(body);
         }
-        Stmt::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
-            visitor.visit_body(body);
-        }
         Stmt::Match(ast::StmtMatch { cases, .. }) => {
             for match_case in cases {
                 visitor.visit_match_case(match_case);
@@ -76,21 +66,7 @@ pub fn walk_stmt<'a, V: StatementVisitor<'a> + ?Sized>(visitor: &mut V, stmt: &'
             handlers,
             orelse,
             finalbody,
-            range: _,
-        }) => {
-            visitor.visit_body(body);
-            for except_handler in handlers {
-                visitor.visit_except_handler(except_handler);
-            }
-            visitor.visit_body(orelse);
-            visitor.visit_body(finalbody);
-        }
-        Stmt::TryStar(ast::StmtTryStar {
-            body,
-            handlers,
-            orelse,
-            finalbody,
-            range: _,
+            ..
         }) => {
             visitor.visit_body(body);
             for except_handler in handlers {

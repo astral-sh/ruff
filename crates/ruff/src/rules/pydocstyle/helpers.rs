@@ -1,10 +1,9 @@
 use std::collections::BTreeSet;
 
 use ruff_python_ast::call_path::from_qualified_name;
-use ruff_python_ast::cast;
 use ruff_python_ast::helpers::map_callable;
-use ruff_python_ast::str::is_implicit_concatenation;
-use ruff_python_semantic::{Definition, Member, MemberKind, SemanticModel};
+use ruff_python_ast::Expr;
+use ruff_python_semantic::{Definition, SemanticModel};
 use ruff_source_file::UniversalNewlines;
 
 /// Return the index of the first logical line in a string.
@@ -48,31 +47,27 @@ pub(crate) fn should_ignore_definition(
         return false;
     }
 
-    if let Definition::Member(Member {
-        kind: MemberKind::Function | MemberKind::NestedFunction | MemberKind::Method,
-        stmt,
-        ..
-    }) = definition
-    {
-        for decorator in cast::decorator_list(stmt) {
-            if let Some(call_path) = semantic.resolve_call_path(map_callable(&decorator.expression))
-            {
-                if ignore_decorators
+    let Some(function) = definition.as_function_def() else {
+        return false;
+    };
+
+    function.decorator_list.iter().any(|decorator| {
+        semantic
+            .resolve_call_path(map_callable(&decorator.expression))
+            .is_some_and(|call_path| {
+                ignore_decorators
                     .iter()
                     .any(|decorator| from_qualified_name(decorator) == call_path)
-                {
-                    return true;
-                }
-            }
-        }
-    }
-    false
+            })
+    })
 }
 
 /// Check if a docstring should be ignored.
-pub(crate) fn should_ignore_docstring(contents: &str) -> bool {
+pub(crate) fn should_ignore_docstring(docstring: &Expr) -> bool {
     // Avoid analyzing docstrings that contain implicit string concatenations.
     // Python does consider these docstrings, but they're almost certainly a
     // user error, and supporting them "properly" is extremely difficult.
-    is_implicit_concatenation(contents)
+    docstring
+        .as_constant_expr()
+        .is_some_and(|constant| constant.value.is_implicit_concatenated())
 }

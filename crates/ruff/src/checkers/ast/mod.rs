@@ -176,13 +176,12 @@ impl<'a> Checker<'a> {
     ///
     /// If the current expression in the context is not an f-string, returns ``None``.
     pub(crate) fn f_string_quote_style(&self) -> Option<Quote> {
-        let model = &self.semantic;
-        if !model.in_f_string() {
+        if !self.semantic.in_f_string() {
             return None;
         }
 
         // Find the quote character used to start the containing f-string.
-        let expr = model.expr()?;
+        let expr = self.semantic.current_expression()?;
         let string_range = self.indexer.f_string_range(expr.start())?;
         let trailing_quote = trailing_quote(self.locator.slice(string_range))?;
 
@@ -202,7 +201,7 @@ impl<'a> Checker<'a> {
     /// thus be applied whenever we delete a statement, but can otherwise be omitted.
     pub(crate) fn isolation(&self, parent: Option<&Stmt>) -> IsolationLevel {
         parent
-            .and_then(|stmt| self.semantic.stmts.node_id(stmt))
+            .and_then(|stmt| self.semantic.statement_id(stmt))
             .map_or(IsolationLevel::default(), |node_id| {
                 IsolationLevel::Group(node_id.into())
             })
@@ -264,7 +263,7 @@ where
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         // Step 0: Pre-processing
-        self.semantic.push_stmt(stmt);
+        self.semantic.push_statement(stmt);
 
         // Track whether we've seen docstrings, non-imports, etc.
         match stmt {
@@ -288,7 +287,7 @@ where
                 self.semantic.flags |= SemanticModelFlags::FUTURES_BOUNDARY;
                 if !self.semantic.seen_import_boundary()
                     && !helpers::is_assignment_to_a_dunder(stmt)
-                    && !helpers::in_nested_block(self.semantic.parents())
+                    && !helpers::in_nested_block(self.semantic.current_statements())
                 {
                     self.semantic.flags |= SemanticModelFlags::IMPORT_BOUNDARY;
                 }
@@ -372,7 +371,7 @@ where
                         );
                     } else if &alias.name == "*" {
                         self.semantic
-                            .scope_mut()
+                            .current_scope_mut()
                             .add_star_import(StarImport { level, module });
                     } else {
                         let mut flags = BindingFlags::EXTERNAL;
@@ -421,7 +420,7 @@ where
                             BindingKind::Global,
                             BindingFlags::GLOBAL,
                         );
-                        let scope = self.semantic.scope_mut();
+                        let scope = self.semantic.current_scope_mut();
                         scope.add(name, binding_id);
                     }
                 }
@@ -444,7 +443,7 @@ where
                                 BindingKind::Nonlocal(scope_id),
                                 BindingFlags::NONLOCAL,
                             );
-                            let scope = self.semantic.scope_mut();
+                            let scope = self.semantic.current_scope_mut();
                             scope.add(name, binding_id);
                         }
                     }
@@ -455,22 +454,16 @@ where
 
         // Step 2: Traversal
         match stmt {
-            Stmt::FunctionDef(ast::StmtFunctionDef {
-                body,
-                parameters,
-                decorator_list,
-                returns,
-                type_params,
-                ..
-            })
-            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-                body,
-                parameters,
-                decorator_list,
-                type_params,
-                returns,
-                ..
-            }) => {
+            Stmt::FunctionDef(
+                function_def @ ast::StmtFunctionDef {
+                    body,
+                    parameters,
+                    decorator_list,
+                    returns,
+                    type_params,
+                    ..
+                },
+            ) => {
                 // Visit the decorators and arguments, but avoid the body, which will be
                 // deferred.
                 for decorator in decorator_list {
@@ -531,8 +524,7 @@ where
                 }
 
                 let definition = docstrings::extraction::extract_definition(
-                    ExtractionTarget::Function,
-                    stmt,
+                    ExtractionTarget::Function(function_def),
                     self.semantic.definition_id,
                     &self.semantic.definitions,
                 );
@@ -540,8 +532,7 @@ where
 
                 self.semantic.push_scope(match &stmt {
                     Stmt::FunctionDef(stmt) => ScopeKind::Function(stmt),
-                    Stmt::AsyncFunctionDef(stmt) => ScopeKind::AsyncFunction(stmt),
-                    _ => unreachable!("Expected Stmt::FunctionDef | Stmt::AsyncFunctionDef"),
+                    _ => unreachable!("Expected Stmt::FunctionDef"),
                 });
 
                 self.deferred.functions.push(self.semantic.snapshot());
@@ -575,8 +566,7 @@ where
                 }
 
                 let definition = docstrings::extraction::extract_definition(
-                    ExtractionTarget::Class,
-                    stmt,
+                    ExtractionTarget::Class(class_def),
                     self.semantic.definition_id,
                     &self.semantic.definitions,
                 );
@@ -609,14 +599,7 @@ where
                 handlers,
                 orelse,
                 finalbody,
-                range: _,
-            })
-            | Stmt::TryStar(ast::StmtTryStar {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                range: _,
+                ..
             }) => {
                 let mut handled_exceptions = Exceptions::empty();
                 for type_ in extract_handled_exceptions(handlers) {
@@ -657,7 +640,7 @@ where
                 // available at runtime.
                 // See: https://docs.python.org/3/reference/simple_stmts.html#annotated-assignment-statements
                 let runtime_annotation = if self.semantic.future_annotations() {
-                    if self.semantic.scope().kind.is_class() {
+                    if self.semantic.current_scope().kind.is_class() {
                         let baseclasses = &self
                             .settings
                             .flake8_type_checking
@@ -676,7 +659,7 @@ where
                     }
                 } else {
                     matches!(
-                        self.semantic.scope().kind,
+                        self.semantic.current_scope().kind,
                         ScopeKind::Class(_) | ScopeKind::Module
                     )
                 };
@@ -743,8 +726,7 @@ where
 
         // Step 3: Clean-up
         match stmt {
-            Stmt::FunctionDef(ast::StmtFunctionDef { name, .. })
-            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { name, .. }) => {
+            Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) => {
                 let scope_id = self.semantic.scope_id;
                 self.deferred.scopes.push(scope_id);
                 self.semantic.pop_scope(); // Function scope
@@ -777,7 +759,7 @@ where
         analyze::statement(stmt, self);
 
         self.semantic.flags = flags_snapshot;
-        self.semantic.pop_stmt();
+        self.semantic.pop_statement();
     }
 
     fn visit_annotation(&mut self, expr: &'b Expr) {
@@ -813,7 +795,7 @@ where
             return;
         }
 
-        self.semantic.push_expr(expr);
+        self.semantic.push_expression(expr);
 
         // Store the flags prior to any further descent, so that we can restore them after visiting
         // the node.
@@ -841,7 +823,7 @@ where
             }) => {
                 if let Expr::Name(ast::ExprName { id, ctx, range: _ }) = func.as_ref() {
                     if id == "locals" && ctx.is_load() {
-                        let scope = self.semantic.scope_mut();
+                        let scope = self.semantic.current_scope_mut();
                         scope.set_uses_locals();
                     }
                 }
@@ -1207,7 +1189,7 @@ where
                     ));
                 }
             }
-            Expr::JoinedStr(_) => {
+            Expr::FString(_) => {
                 self.semantic.flags |= SemanticModelFlags::F_STRING;
                 visitor::walk_expr(self, expr);
             }
@@ -1231,7 +1213,7 @@ where
         analyze::expression(expr, self);
 
         self.semantic.flags = flags_snapshot;
-        self.semantic.pop_expr();
+        self.semantic.pop_expression();
     }
 
     fn visit_except_handler(&mut self, except_handler: &'b ExceptHandler) {
@@ -1286,7 +1268,7 @@ where
 
     fn visit_format_spec(&mut self, format_spec: &'b Expr) {
         match format_spec {
-            Expr::JoinedStr(ast::ExprJoinedStr { values, range: _ }) => {
+            Expr::FString(ast::ExprFString { values, .. }) => {
                 for value in values {
                     self.visit_expr(value);
                 }
@@ -1611,7 +1593,7 @@ impl<'a> Checker<'a> {
     }
 
     fn handle_node_store(&mut self, id: &'a str, expr: &Expr) {
-        let parent = self.semantic.stmt();
+        let parent = self.semantic.current_statement();
 
         if matches!(
             parent,
@@ -1626,7 +1608,7 @@ impl<'a> Checker<'a> {
             return;
         }
 
-        if matches!(parent, Stmt::For(_) | Stmt::AsyncFor(_)) {
+        if parent.is_for_stmt() {
             self.add_binding(
                 id,
                 expr.range(),
@@ -1646,7 +1628,7 @@ impl<'a> Checker<'a> {
             return;
         }
 
-        let scope = self.semantic.scope();
+        let scope = self.semantic.current_scope();
 
         if scope.kind.is_module()
             && match parent {
@@ -1698,8 +1680,8 @@ impl<'a> Checker<'a> {
 
         if self
             .semantic
-            .expr_ancestors()
-            .any(|expr| expr.is_named_expr_expr())
+            .current_expressions()
+            .any(Expr::is_named_expr_expr)
         {
             self.add_binding(
                 id,
@@ -1725,7 +1707,7 @@ impl<'a> Checker<'a> {
 
         self.semantic.resolve_del(id, expr.range());
 
-        if helpers::on_conditional_branch(&mut self.semantic.parents()) {
+        if helpers::on_conditional_branch(&mut self.semantic.current_statements()) {
             return;
         }
 
@@ -1733,7 +1715,7 @@ impl<'a> Checker<'a> {
         let binding_id =
             self.semantic
                 .push_binding(expr.range(), BindingKind::Deletion, BindingFlags::empty());
-        let scope = self.semantic.scope_mut();
+        let scope = self.semantic.current_scope_mut();
         scope.add(id, binding_id);
     }
 
@@ -1825,19 +1807,14 @@ impl<'a> Checker<'a> {
             for snapshot in deferred_functions {
                 self.semantic.restore(snapshot);
 
-                match &self.semantic.stmt() {
-                    Stmt::FunctionDef(ast::StmtFunctionDef {
-                        body, parameters, ..
-                    })
-                    | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-                        body, parameters, ..
-                    }) => {
-                        self.visit_parameters(parameters);
-                        self.visit_body(body);
-                    }
-                    _ => {
-                        unreachable!("Expected Stmt::FunctionDef | Stmt::AsyncFunctionDef")
-                    }
+                if let Stmt::FunctionDef(ast::StmtFunctionDef {
+                    body, parameters, ..
+                }) = self.semantic.current_statement()
+                {
+                    self.visit_parameters(parameters);
+                    self.visit_body(body);
+                } else {
+                    unreachable!("Expected Stmt::FunctionDef")
                 }
             }
         }

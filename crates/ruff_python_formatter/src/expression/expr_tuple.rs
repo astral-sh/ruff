@@ -1,17 +1,18 @@
-use ruff_python_ast::ExprTuple;
-use ruff_python_ast::{Expr, Ranged};
-use ruff_text_size::TextRange;
-
 use ruff_formatter::{format_args, write, FormatRuleWithOptions};
 use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::ExprTuple;
+use ruff_python_ast::Ranged;
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
+use ruff_text_size::TextRange;
 
-use crate::builders::{empty_parenthesized_with_dangling_comments, parenthesize_if_expands};
+use crate::builders::parenthesize_if_expands;
+use crate::comments::SourceComment;
 use crate::expression::parentheses::{
-    parenthesized_with_dangling_comments, NeedsParentheses, OptionalParentheses,
+    empty_parenthesized, parenthesized, NeedsParentheses, OptionalParentheses,
 };
 use crate::prelude::*;
 
-#[derive(Eq, PartialEq, Debug, Default)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Default)]
 pub enum TupleParentheses {
     /// By default tuples with a single element will include parentheses. Tuples with multiple elements
     /// will parenthesize if the expression expands. This means that tuples will often *preserve*
@@ -100,9 +101,9 @@ impl FormatRuleWithOptions<ExprTuple, PyFormatContext<'_>> for FormatExprTuple {
 impl FormatNodeRule<ExprTuple> for FormatExprTuple {
     fn fmt_fields(&self, item: &ExprTuple, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprTuple {
-            range,
             elts,
             ctx: _,
+            range: _,
         } = item;
 
         let comments = f.context().comments().clone();
@@ -120,25 +121,20 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
         // In all other cases comments get assigned to a list element
         match elts.as_slice() {
             [] => {
-                return empty_parenthesized_with_dangling_comments(text("("), dangling, text(")"))
-                    .fmt(f);
+                return empty_parenthesized("(", dangling, ")").fmt(f);
             }
             [single] => match self.parentheses {
                 TupleParentheses::Preserve
-                    if !is_parenthesized(*range, elts, f.context().source()) =>
+                    if !is_tuple_parenthesized(item, f.context().source()) =>
                 {
                     write!(f, [single.format(), text(",")])
                 }
                 _ =>
                 // A single element tuple always needs parentheses and a trailing comma, except when inside of a subscript
                 {
-                    parenthesized_with_dangling_comments(
-                        "(",
-                        dangling,
-                        &format_args![single.format(), text(",")],
-                        ")",
-                    )
-                    .fmt(f)
+                    parenthesized("(", &format_args![single.format(), text(",")], ")")
+                        .with_dangling_comments(dangling)
+                        .fmt(f)
                 }
             },
             // If the tuple has parentheses, we generally want to keep them. The exception are for
@@ -146,11 +142,12 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
             //
             // Unlike other expression parentheses, tuple parentheses are part of the range of the
             // tuple itself.
-            _ if is_parenthesized(*range, elts, f.context().source())
+            _ if is_tuple_parenthesized(item, f.context().source())
                 && !(self.parentheses == TupleParentheses::NeverPreserve
                     && dangling.is_empty()) =>
             {
-                parenthesized_with_dangling_comments("(", dangling, &ExprSequence::new(item), ")")
+                parenthesized("(", &ExprSequence::new(item), ")")
+                    .with_dangling_comments(dangling)
                     .fmt(f)
             }
             _ => match self.parentheses {
@@ -167,7 +164,11 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
         }
     }
 
-    fn fmt_dangling_comments(&self, _node: &ExprTuple, _f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         // Handled in `fmt_fields`
         Ok(())
     }
@@ -203,21 +204,30 @@ impl NeedsParentheses for ExprTuple {
 }
 
 /// Check if a tuple has already had parentheses in the input
-fn is_parenthesized(tuple_range: TextRange, elts: &[Expr], source: &str) -> bool {
-    let parentheses = '(';
-    let first_char = &source[usize::from(tuple_range.start())..].chars().next();
-    let Some(first_char) = first_char else {
+pub(crate) fn is_tuple_parenthesized(tuple: &ExprTuple, source: &str) -> bool {
+    let Some(elt) = tuple.elts.first() else {
         return false;
     };
-    if *first_char != parentheses {
+
+    // Count the number of open parentheses between the start of the tuple and the first element.
+    let open_parentheses_count =
+        SimpleTokenizer::new(source, TextRange::new(tuple.start(), elt.start()))
+            .skip_trivia()
+            .filter(|token| token.kind() == SimpleTokenKind::LParen)
+            .count();
+    if open_parentheses_count == 0 {
         return false;
     }
 
-    // Consider `a = (1, 2), 3`: The first char of the current expr starts is a parentheses, but
-    // it's not its own but that of its first tuple child. We know that it belongs to the child
-    // because if it wouldn't, the child would start (at least) a char later
-    let Some(first_child) = elts.first() else {
-        return false;
-    };
-    first_child.range().start() != tuple_range.start()
+    // Count the number of parentheses between the end of the first element and its trailing comma.
+    let close_parentheses_count =
+        SimpleTokenizer::new(source, TextRange::new(elt.end(), tuple.end()))
+            .skip_trivia()
+            .take_while(|token| token.kind() != SimpleTokenKind::Comma)
+            .filter(|token| token.kind() == SimpleTokenKind::RParen)
+            .count();
+
+    // If the number of open parentheses is greater than the number of close parentheses, the tuple
+    // is parenthesized.
+    open_parentheses_count > close_parentheses_count
 }

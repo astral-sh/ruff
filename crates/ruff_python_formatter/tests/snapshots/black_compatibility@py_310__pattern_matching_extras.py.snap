@@ -131,139 +131,155 @@ match bar1:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,119 +1,43 @@
+@@ -1,13 +1,13 @@
  import match
  
--match something:
+ match something:
 -    case [a as b]:
--        print(b)
++    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+         print(b)
 -    case [a as b, c, d, e as f]:
--        print(f)
++    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+         print(f)
 -    case Point(a as b):
--        print(b)
++    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+         print(b)
 -    case Point(int() as x, int() as y):
--        print(x, y)
-+NOT_YET_IMPLEMENTED_StmtMatch
++    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+         print(x, y)
  
  
- match = 1
+@@ -15,40 +15,43 @@
  case: int = re.match(something)
  
--match re.match(case):
+ match re.match(case):
 -    case type("match", match):
--        pass
++    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+         pass
 -    case match:
--        pass
-+NOT_YET_IMPLEMENTED_StmtMatch
++    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+         pass
  
  
  def func(match: case, case: match) -> case:
--    match Something():
+     match Something():
 -        case func(match, case):
--            ...
++        case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+             ...
 -        case another:
--            ...
-+    NOT_YET_IMPLEMENTED_StmtMatch
++        case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+             ...
  
  
--match maybe, multiple:
+ match maybe, multiple:
 -    case perhaps, 5:
--        pass
++    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+         pass
 -    case perhaps, 6,:
--        pass
-+NOT_YET_IMPLEMENTED_StmtMatch
++    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+         pass
  
  
 -match more := (than, one), indeed,:
 -    case _, (5, 6):
--        pass
++match (
++    more := (than, one),
++    indeed,
++):
++    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+         pass
 -    case [[5], (6)], [7],:
--        pass
++    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+         pass
 -    case _:
--        pass
-+NOT_YET_IMPLEMENTED_StmtMatch
++    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+         pass
  
  
--match a, *b, c:
+ match a, *b, c:
 -    case [*_]:
--        assert "seq" == _
++    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+         assert "seq" == _
 -    case {}:
--        assert "map" == b
-+NOT_YET_IMPLEMENTED_StmtMatch
++    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
+         assert "map" == b
  
  
--match match(
--    case,
--    match(
--        match, case, match, looooooooooooooooooooooooooooooooooooong, match, case, match
--    ),
--    case,
--):
+@@ -59,61 +62,51 @@
+     ),
+     case,
+ ):
 -    case case(
 -        match=case,
 -        case=re.match(
 -            loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong
 -        ),
 -    ):
--        pass
-+NOT_YET_IMPLEMENTED_StmtMatch
++    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+         pass
  
 -    case [a as match]:
--        pass
++    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+         pass
  
 -    case case:
--        pass
--
--
--match match:
--    case case:
--        pass
--
-+NOT_YET_IMPLEMENTED_StmtMatch
++    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+         pass
  
--match a, *b(), c:
+ 
+ match match:
+-    case case:
++    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+         pass
+ 
+ 
+ match a, *b(), c:
 -    case d, *f, g:
--        pass
++    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+         pass
  
--
--match something:
+ 
+ match something:
 -    case {
 -        "key": key as key_1,
 -        "password": PASS.ONE | PASS.TWO | PASS.THREE as password,
 -    }:
--        pass
++    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
+         pass
 -    case {"maybe": something(complicated as this) as that}:
--        pass
-+NOT_YET_IMPLEMENTED_StmtMatch
++    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
+         pass
  
  
--match something:
+ match something:
 -    case 1 as a:
--        pass
-+NOT_YET_IMPLEMENTED_StmtMatch
++    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+         pass
  
 -    case 2 as b, 3 as c:
--        pass
++    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+         pass
  
 -    case 4 as d, (5 as e), (6 | 7 as g), *h:
--        pass
-+NOT_YET_IMPLEMENTED_StmtMatch
++    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+         pass
  
  
--match bar1:
+ match bar1:
 -    case Foo(aa=Callable() as aa, bb=int()):
--        print(bar1.aa, bar1.bb)
++    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+         print(bar1.aa, bar1.bb)
 -    case _:
--        print("no match", "\n")
-+NOT_YET_IMPLEMENTED_StmtMatch
++    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+         print("no match", "\n")
  
  
--match bar1:
+ match bar1:
 -    case Foo(
 -        normal=x, perhaps=[list, {"x": d, "y": 1.0}] as y, otherwise=something, q=t as u
 -    ):
--        pass
-+NOT_YET_IMPLEMENTED_StmtMatch
++    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+         pass
 ```
 
 ## Ruff Output
@@ -271,47 +287,116 @@ match bar1:
 ```py
 import match
 
-NOT_YET_IMPLEMENTED_StmtMatch
+match something:
+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+        print(b)
+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+        print(f)
+    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+        print(b)
+    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+        print(x, y)
 
 
 match = 1
 case: int = re.match(something)
 
-NOT_YET_IMPLEMENTED_StmtMatch
+match re.match(case):
+    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+        pass
+    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+        pass
 
 
 def func(match: case, case: match) -> case:
-    NOT_YET_IMPLEMENTED_StmtMatch
+    match Something():
+        case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+            ...
+        case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+            ...
 
 
-NOT_YET_IMPLEMENTED_StmtMatch
+match maybe, multiple:
+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+        pass
+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+        pass
 
 
-NOT_YET_IMPLEMENTED_StmtMatch
+match (
+    more := (than, one),
+    indeed,
+):
+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+        pass
+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+        pass
+    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+        pass
 
 
-NOT_YET_IMPLEMENTED_StmtMatch
+match a, *b, c:
+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+        assert "seq" == _
+    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
+        assert "map" == b
 
 
-NOT_YET_IMPLEMENTED_StmtMatch
+match match(
+    case,
+    match(
+        match, case, match, looooooooooooooooooooooooooooooooooooong, match, case, match
+    ),
+    case,
+):
+    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+        pass
+
+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+        pass
+
+    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+        pass
 
 
-NOT_YET_IMPLEMENTED_StmtMatch
+match match:
+    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+        pass
 
 
-NOT_YET_IMPLEMENTED_StmtMatch
+match a, *b(), c:
+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+        pass
 
 
-NOT_YET_IMPLEMENTED_StmtMatch
+match something:
+    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
+        pass
+    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
+        pass
 
 
-NOT_YET_IMPLEMENTED_StmtMatch
+match something:
+    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+        pass
+
+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+        pass
+
+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+        pass
 
 
-NOT_YET_IMPLEMENTED_StmtMatch
+match bar1:
+    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+        print(bar1.aa, bar1.bb)
+    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+        print("no match", "\n")
 
 
-NOT_YET_IMPLEMENTED_StmtMatch
+match bar1:
+    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+        pass
 ```
 
 ## Black Output

@@ -1,10 +1,6 @@
 use std::iter::Peekable;
 
-use ruff_python_ast::{
-    Alias, Arguments, Comprehension, Decorator, ElifElseClause, ExceptHandler, Expr, Keyword,
-    MatchCase, Mod, Parameter, ParameterWithDefault, Parameters, Pattern, Ranged, Stmt, TypeParam,
-    TypeParams, WithItem,
-};
+use ruff_python_ast::{Mod, Ranged, Stmt};
 use ruff_text_size::{TextRange, TextSize};
 
 use ruff_formatter::{SourceCode, SourceCodeSlice};
@@ -48,14 +44,22 @@ impl<'a> CommentsVisitor<'a> {
         self.finish()
     }
 
-    fn start_node<N>(&mut self, node: N) -> TraversalSignal
-    where
-        N: Into<AnyNodeRef<'a>>,
-    {
-        self.start_node_impl(node.into())
+    // Try to skip the subtree if
+    // * there are no comments
+    // * if the next comment comes after this node (meaning, this nodes subtree contains no comments)
+    fn can_skip(&mut self, node_end: TextSize) -> bool {
+        self.comment_ranges
+            .peek()
+            .map_or(true, |next_comment| next_comment.start() >= node_end)
     }
 
-    fn start_node_impl(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
+    fn finish(self) -> CommentsMap<'a> {
+        self.builder.finish()
+    }
+}
+
+impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast> {
+    fn enter_node(&mut self, node: AnyNodeRef<'ast>) -> TraversalSignal {
         let node_range = node.range();
 
         let enclosing_node = self.parents.last().copied().unwrap_or(node);
@@ -96,23 +100,7 @@ impl<'a> CommentsVisitor<'a> {
         }
     }
 
-    // Try to skip the subtree if
-    // * there are no comments
-    // * if the next comment comes after this node (meaning, this nodes subtree contains no comments)
-    fn can_skip(&mut self, node_end: TextSize) -> bool {
-        self.comment_ranges
-            .peek()
-            .map_or(true, |next_comment| next_comment.start() >= node_end)
-    }
-
-    fn finish_node<N>(&mut self, node: N)
-    where
-        N: Into<AnyNodeRef<'a>>,
-    {
-        self.finish_node_impl(node.into());
-    }
-
-    fn finish_node_impl(&mut self, node: AnyNodeRef<'a>) {
+    fn leave_node(&mut self, node: AnyNodeRef<'ast>) {
         // We are leaving this node, pop it from the parent stack.
         self.parents.pop();
 
@@ -130,8 +118,8 @@ impl<'a> CommentsVisitor<'a> {
 
             let comment = DecoratedComment {
                 enclosing: node,
-                preceding: self.preceding_node,
                 parent: self.parents.last().copied(),
+                preceding: self.preceding_node,
                 following: None,
                 line_position: text_position(*comment_range, self.source_code),
                 slice: self.source_code.slice(*comment_range),
@@ -146,19 +134,6 @@ impl<'a> CommentsVisitor<'a> {
         }
 
         self.preceding_node = Some(node);
-    }
-
-    fn finish(self) -> CommentsMap<'a> {
-        self.builder.finish()
-    }
-}
-
-impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast> {
-    fn visit_mod(&mut self, module: &'ast Mod) {
-        if self.start_node(module).is_traverse() {
-            walk_module(self, module);
-        }
-        self.finish_node(module);
     }
 
     fn visit_body(&mut self, body: &'ast [Stmt]) {
@@ -179,140 +154,6 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast> {
                 }
             }
         }
-    }
-
-    fn visit_stmt(&mut self, stmt: &'ast Stmt) {
-        if self.start_node(stmt).is_traverse() {
-            walk_stmt(self, stmt);
-        }
-        self.finish_node(stmt);
-    }
-
-    fn visit_annotation(&mut self, expr: &'ast Expr) {
-        if self.start_node(expr).is_traverse() {
-            walk_expr(self, expr);
-        }
-        self.finish_node(expr);
-    }
-
-    fn visit_decorator(&mut self, decorator: &'ast Decorator) {
-        if self.start_node(decorator).is_traverse() {
-            walk_decorator(self, decorator);
-        }
-        self.finish_node(decorator);
-    }
-
-    fn visit_expr(&mut self, expr: &'ast Expr) {
-        if self.start_node(expr).is_traverse() {
-            walk_expr(self, expr);
-        }
-        self.finish_node(expr);
-    }
-
-    fn visit_comprehension(&mut self, comprehension: &'ast Comprehension) {
-        if self.start_node(comprehension).is_traverse() {
-            walk_comprehension(self, comprehension);
-        }
-        self.finish_node(comprehension);
-    }
-
-    fn visit_except_handler(&mut self, except_handler: &'ast ExceptHandler) {
-        if self.start_node(except_handler).is_traverse() {
-            walk_except_handler(self, except_handler);
-        }
-        self.finish_node(except_handler);
-    }
-
-    fn visit_format_spec(&mut self, format_spec: &'ast Expr) {
-        if self.start_node(format_spec).is_traverse() {
-            walk_expr(self, format_spec);
-        }
-        self.finish_node(format_spec);
-    }
-
-    fn visit_arguments(&mut self, arguments: &'ast Arguments) {
-        if self.start_node(arguments).is_traverse() {
-            walk_arguments(self, arguments);
-        }
-        self.finish_node(arguments);
-    }
-
-    fn visit_parameters(&mut self, parameters: &'ast Parameters) {
-        if self.start_node(parameters).is_traverse() {
-            walk_parameters(self, parameters);
-        }
-        self.finish_node(parameters);
-    }
-
-    fn visit_parameter(&mut self, arg: &'ast Parameter) {
-        if self.start_node(arg).is_traverse() {
-            walk_parameter(self, arg);
-        }
-        self.finish_node(arg);
-    }
-
-    fn visit_parameter_with_default(&mut self, parameter_with_default: &'ast ParameterWithDefault) {
-        if self.start_node(parameter_with_default).is_traverse() {
-            walk_parameter_with_default(self, parameter_with_default);
-        }
-        self.finish_node(parameter_with_default);
-    }
-
-    fn visit_keyword(&mut self, keyword: &'ast Keyword) {
-        if self.start_node(keyword).is_traverse() {
-            walk_keyword(self, keyword);
-        }
-        self.finish_node(keyword);
-    }
-
-    fn visit_alias(&mut self, alias: &'ast Alias) {
-        if self.start_node(alias).is_traverse() {
-            walk_alias(self, alias);
-        }
-        self.finish_node(alias);
-    }
-
-    fn visit_with_item(&mut self, with_item: &'ast WithItem) {
-        if self.start_node(with_item).is_traverse() {
-            walk_with_item(self, with_item);
-        }
-
-        self.finish_node(with_item);
-    }
-
-    fn visit_match_case(&mut self, match_case: &'ast MatchCase) {
-        if self.start_node(match_case).is_traverse() {
-            walk_match_case(self, match_case);
-        }
-        self.finish_node(match_case);
-    }
-
-    fn visit_pattern(&mut self, pattern: &'ast Pattern) {
-        if self.start_node(pattern).is_traverse() {
-            walk_pattern(self, pattern);
-        }
-        self.finish_node(pattern);
-    }
-
-    fn visit_elif_else_clause(&mut self, elif_else_clause: &'ast ElifElseClause) {
-        if self.start_node(elif_else_clause).is_traverse() {
-            walk_elif_else_clause(self, elif_else_clause);
-        }
-        self.finish_node(elif_else_clause);
-    }
-
-    fn visit_type_params(&mut self, type_params: &'ast TypeParams) {
-        if self.start_node(type_params).is_traverse() {
-            walk_type_params(self, type_params);
-        }
-        self.finish_node(type_params);
-    }
-
-    fn visit_type_param(&mut self, type_param: &'ast TypeParam) {
-        if self.start_node(type_param).is_traverse() {
-            walk_type_param(self, type_param);
-        }
-        self.finish_node(type_param);
     }
 }
 
@@ -668,18 +509,6 @@ impl<'a> CommentPlacement<'a> {
             Self::Default(comment) => f(comment),
             _ => self,
         }
-    }
-}
-
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
-enum TraversalSignal {
-    Traverse,
-    Skip,
-}
-
-impl TraversalSignal {
-    const fn is_traverse(self) -> bool {
-        matches!(self, TraversalSignal::Traverse)
     }
 }
 

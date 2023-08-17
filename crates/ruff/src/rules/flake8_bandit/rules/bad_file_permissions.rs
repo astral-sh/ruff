@@ -112,21 +112,21 @@ fn py_stat(call_path: &CallPath) -> Option<u16> {
     }
 }
 
-fn int_value(expr: &Expr, model: &SemanticModel) -> Option<u16> {
+fn int_value(expr: &Expr, semantic: &SemanticModel) -> Option<u16> {
     match expr {
         Expr::Constant(ast::ExprConstant {
             value: Constant::Int(value),
             ..
         }) => value.to_u16(),
-        Expr::Attribute(_) => model.resolve_call_path(expr).as_ref().and_then(py_stat),
+        Expr::Attribute(_) => semantic.resolve_call_path(expr).as_ref().and_then(py_stat),
         Expr::BinOp(ast::ExprBinOp {
             left,
             op,
             right,
             range: _,
         }) => {
-            let left_value = int_value(left, model)?;
-            let right_value = int_value(right, model)?;
+            let left_value = int_value(left, semantic)?;
+            let right_value = int_value(right, semantic)?;
             match op {
                 Operator::BitAnd => Some(left_value & right_value),
                 Operator::BitOr => Some(left_value | right_value),

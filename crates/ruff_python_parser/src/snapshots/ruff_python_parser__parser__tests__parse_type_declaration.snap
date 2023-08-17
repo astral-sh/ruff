@@ -82,7 +82,10 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                         ExprConstant {
                             range: 48..61,
                             value: Str(
-                                "ForwardRefY",
+                                StringConstant {
+                                    value: "ForwardRefY",
+                                    implicit_concatenated: false,
+                                },
                             ),
                             kind: None,
                         },

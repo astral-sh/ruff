@@ -44,3 +44,9 @@ c1 = [ # trailing open bracket
 [  # end-of-line comment
     1
 ]
+
+[  # inner comment
+    first,
+    second,
+    third
+]  # outer comment

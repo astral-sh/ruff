@@ -6,15 +6,18 @@ expression: parse_ast
     Expr(
         StmtExpr {
             range: 0..22,
-            value: JoinedStr(
-                ExprJoinedStr {
+            value: FString(
+                ExprFString {
                     range: 0..22,
                     values: [
                         Constant(
                             ExprConstant {
                                 range: 1..16,
                                 value: Str(
-                                    "Hello world",
+                                    StringConstant {
+                                        value: "Hello world",
+                                        implicit_concatenated: true,
+                                    },
                                 ),
                                 kind: None,
                             },
@@ -26,7 +29,10 @@ expression: parse_ast
                                     ExprConstant {
                                         range: 17..20,
                                         value: Str(
-                                            "!",
+                                            StringConstant {
+                                                value: "!",
+                                                implicit_concatenated: false,
+                                            },
                                         ),
                                         kind: None,
                                     },
@@ -37,6 +43,7 @@ expression: parse_ast
                             },
                         ),
                     ],
+                    implicit_concatenated: true,
                 },
             ),
         },

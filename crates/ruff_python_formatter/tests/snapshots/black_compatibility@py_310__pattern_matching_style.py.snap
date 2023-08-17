@@ -65,22 +65,25 @@ match match(
 ```diff
 --- Black
 +++ Ruff
-@@ -1,35 +1,24 @@
--match something:
+@@ -1,35 +1,34 @@
+ match something:
 -    case b():
--        print(1 + 1)
++    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+         print(1 + 1)
 -    case c(
 -        very_complex=True, perhaps_even_loooooooooooooooooooooooooooooooooooooong=-1
 -    ):
--        print(1)
++    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+         print(1)
 -    case c(
 -        very_complex=True,
 -        perhaps_even_loooooooooooooooooooooooooooooooooooooong=-1,
 -    ):
--        print(2)
++    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+         print(2)
 -    case a:
--        pass
-+NOT_YET_IMPLEMENTED_StmtMatch
++    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+         pass
  
 -match(arg)  # comment
 +match(
@@ -106,18 +109,26 @@ match match(
 +    something  # fast
 +)
  re.match()
--match match():
+ match match():
 -    case case(
 -        arg,  # comment
 -    ):
--        pass
-+NOT_YET_IMPLEMENTED_StmtMatch
++    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+         pass
 ```
 
 ## Ruff Output
 
 ```py
-NOT_YET_IMPLEMENTED_StmtMatch
+match something:
+    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+        print(1 + 1)
+    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+        print(1)
+    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+        print(2)
+    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+        pass
 
 match(
     arg  # comment
@@ -140,7 +151,9 @@ re.match(
     something  # fast
 )
 re.match()
-NOT_YET_IMPLEMENTED_StmtMatch
+match match():
+    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+        pass
 ```
 
 ## Black Output

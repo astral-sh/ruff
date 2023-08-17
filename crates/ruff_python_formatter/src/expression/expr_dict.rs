@@ -4,10 +4,9 @@ use ruff_python_ast::Ranged;
 use ruff_python_ast::{Expr, ExprDict};
 use ruff_text_size::TextRange;
 
-use crate::builders::empty_parenthesized_with_dangling_comments;
-use crate::comments::leading_comments;
+use crate::comments::{leading_comments, SourceComment};
 use crate::expression::parentheses::{
-    parenthesized_with_dangling_comments, NeedsParentheses, OptionalParentheses,
+    empty_parenthesized, parenthesized, NeedsParentheses, OptionalParentheses,
 };
 use crate::prelude::*;
 use crate::FormatNodeRule;
@@ -71,8 +70,7 @@ impl FormatNodeRule<ExprDict> for FormatExprDict {
         let dangling = comments.dangling_comments(item);
 
         if values.is_empty() {
-            return empty_parenthesized_with_dangling_comments(text("{"), dangling, text("}"))
-                .fmt(f);
+            return empty_parenthesized("{", dangling, "}").fmt(f);
         }
 
         let format_pairs = format_with(|f| {
@@ -86,10 +84,16 @@ impl FormatNodeRule<ExprDict> for FormatExprDict {
             joiner.finish()
         });
 
-        parenthesized_with_dangling_comments("{", dangling, &format_pairs, "}").fmt(f)
+        parenthesized("{", &format_pairs, "}")
+            .with_dangling_comments(dangling)
+            .fmt(f)
     }
 
-    fn fmt_dangling_comments(&self, _node: &ExprDict, _f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         // Handled by `fmt_fields`
         Ok(())
     }

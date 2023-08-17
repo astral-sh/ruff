@@ -6,9 +6,7 @@ use once_cell::sync::Lazy;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::{from_qualified_name, CallPath};
-use ruff_python_ast::cast;
 use ruff_python_semantic::analyze::visibility::{is_property, is_test};
-use ruff_python_semantic::{Definition, Member, MemberKind};
 use ruff_source_file::UniversalNewlines;
 
 use crate::checkers::ast::Checker;
@@ -69,25 +67,18 @@ pub(crate) fn non_imperative_mood(
     docstring: &Docstring,
     property_decorators: &BTreeSet<String>,
 ) {
-    let Definition::Member(Member { kind, stmt, .. }) = &docstring.definition else {
+    let Some(function) = docstring.definition.as_function_def() else {
         return;
     };
-
-    if !matches!(
-        kind,
-        MemberKind::Function | MemberKind::NestedFunction | MemberKind::Method,
-    ) {
-        return;
-    }
 
     let property_decorators = property_decorators
         .iter()
         .map(|decorator| from_qualified_name(decorator))
         .collect::<Vec<CallPath>>();
 
-    if is_test(cast::name(stmt))
+    if is_test(&function.name)
         || is_property(
-            cast::decorator_list(stmt),
+            &function.decorator_list,
             &property_decorators,
             checker.semantic(),
         )

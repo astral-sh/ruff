@@ -131,7 +131,6 @@ At time of writing, the repository includes the following crates:
 - `crates/ruff_macros`: proc macro crate containing macros used by Ruff.
 - `crates/ruff_python_ast`: library crate containing Python-specific AST types and utilities.
 - `crates/ruff_python_codegen`: library crate containing utilities for generating Python source code.
-- `crates/ruff_python_codegen`: library crate containing utilities for generating Python source code.
 - `crates/ruff_python_formatter`: library crate implementing the Python formatter. Emits an
     intermediate representation for each node, which `ruff_formatter` prints based on the configured
     line length.
@@ -572,7 +571,7 @@ An alternative is to convert the perf data to `flamegraph.svg` using
 [flamegraph](https://github.com/flamegraph-rs/flamegraph) (`cargo install flamegraph`):
 
 ```shell
-flamegraph --perfdata perf.data
+flamegraph --perfdata perf.data --no-inline
 ```
 
 #### Mac

@@ -1,9 +1,9 @@
-use ruff_python_ast as ast;
-use ruff_python_ast::{Ranged, Stmt};
+use ruff_python_ast::Ranged;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::Expr;
+use ruff_python_ast::helpers::map_subscript;
+
 use ruff_python_semantic::{Definition, Member, MemberKind};
 
 use crate::checkers::ast::Checker;
@@ -49,14 +49,14 @@ use crate::checkers::ast::Checker;
 /// ```
 #[violation]
 pub struct IterMethodReturnIterable {
-    async_: bool,
+    is_async: bool,
 }
 
 impl Violation for IterMethodReturnIterable {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let IterMethodReturnIterable { async_ } = self;
-        if *async_ {
+        let IterMethodReturnIterable { is_async } = self;
+        if *is_async {
             format!("`__aiter__` methods should return an `AsyncIterator`, not an `AsyncIterable`")
         } else {
             format!("`__iter__` methods should return an `Iterator`, not an `Iterable`")
@@ -67,41 +67,31 @@ impl Violation for IterMethodReturnIterable {
 /// PYI045
 pub(crate) fn iter_method_return_iterable(checker: &mut Checker, definition: &Definition) {
     let Definition::Member(Member {
-        kind: MemberKind::Method,
-        stmt,
+        kind: MemberKind::Method(function),
         ..
     }) = definition
     else {
         return;
     };
 
-    let Stmt::FunctionDef(ast::StmtFunctionDef { name, returns, .. }) = stmt else {
+    let Some(returns) = function.returns.as_ref() else {
         return;
     };
 
-    let Some(returns) = returns else {
-        return;
-    };
-
-    let annotation = if let Expr::Subscript(ast::ExprSubscript { value, .. }) = returns.as_ref() {
-        // Ex) `Iterable[T]`
-        value
-    } else {
-        // Ex) `Iterable`, `typing.Iterable`
-        returns
-    };
-
-    let async_ = match name.as_str() {
+    let is_async = match function.name.as_str() {
         "__iter__" => false,
         "__aiter__" => true,
         _ => return,
     };
 
+    // Support both `Iterable` and `Iterable[T]`.
+    let annotation = map_subscript(returns);
+
     if checker
         .semantic()
-        .resolve_call_path(annotation)
+        .resolve_call_path(map_subscript(annotation))
         .is_some_and(|call_path| {
-            if async_ {
+            if is_async {
                 matches!(
                     call_path.as_slice(),
                     ["typing", "AsyncIterable"] | ["collections", "abc", "AsyncIterable"]
@@ -115,7 +105,7 @@ pub(crate) fn iter_method_return_iterable(checker: &mut Checker, definition: &De
         })
     {
         checker.diagnostics.push(Diagnostic::new(
-            IterMethodReturnIterable { async_ },
+            IterMethodReturnIterable { is_async },
             returns.range(),
         ));
     }

@@ -204,8 +204,7 @@ x6 = (
 )
 
 # regression: https://github.com/astral-sh/ruff/issues/6181
-(
-    #
+(  #
     ()
 ).a
 ```

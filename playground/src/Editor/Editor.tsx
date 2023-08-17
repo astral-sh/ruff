@@ -5,22 +5,22 @@ import {
   useMemo,
   useState,
 } from "react";
+import { Panel, PanelGroup } from "react-resizable-panels";
 import { DEFAULT_PYTHON_SOURCE } from "../constants";
 import init, { Diagnostic, Workspace } from "../pkg";
 import { ErrorMessage } from "./ErrorMessage";
 import Header from "./Header";
-import { useTheme } from "./theme";
-import { persist, persistLocal, restore, stringify } from "./settings";
-import SettingsEditor from "./SettingsEditor";
-import SourceEditor from "./SourceEditor";
-import { Panel, PanelGroup } from "react-resizable-panels";
 import PrimarySideBar from "./PrimarySideBar";
-import SecondarySideBar from "./SecondarySideBar";
 import { HorizontalResizeHandle } from "./ResizeHandle";
 import SecondaryPanel, {
   SecondaryPanelResult,
   SecondaryTool,
 } from "./SecondaryPanel";
+import SecondarySideBar from "./SecondarySideBar";
+import { persist, persistLocal, restore, stringify } from "./settings";
+import SettingsEditor from "./SettingsEditor";
+import SourceEditor from "./SourceEditor";
+import { useTheme } from "./theme";
 
 type Tab = "Source" | "Settings";
 
@@ -43,11 +43,7 @@ export default function Editor() {
     error: null,
     secondary: null,
   });
-  const [source, setSource] = useState<Source>({
-    pythonSource: "",
-    settingsSource: "",
-    revision: 0,
-  });
+  const [source, setSource] = useState<Source | null>(null);
 
   const [tab, setTab] = useState<Tab>("Source");
   const [secondaryTool, setSecondaryTool] = useState<SecondaryTool | null>(
@@ -64,9 +60,7 @@ export default function Editor() {
   );
   const [theme, setTheme] = useTheme();
 
-  const initialized = ruffVersion != null;
-
-  // Ideally this would be retrieved right from the URl... but routing without a proper
+  // Ideally this would be retrieved right from the URL... but routing without a proper
   // router is hard (there's no location changed event) and pulling in a router
   // feels overkill.
   const handleSecondaryToolSelected = (tool: SecondaryTool | null) => {
@@ -88,29 +82,32 @@ export default function Editor() {
   };
 
   useEffect(() => {
-    init().then(() => {
-      const [settingsSource, pythonSource] = restore() ?? [
+    async function initAsync() {
+      await init();
+      const response = await restore();
+      const [settingsSource, pythonSource] = response ?? [
         stringify(Workspace.defaultSettings()),
         DEFAULT_PYTHON_SOURCE,
       ];
 
       setSource({
-        pythonSource,
         revision: 0,
+        pythonSource,
         settingsSource,
       });
       setRuffVersion(Workspace.version());
-    });
+    }
+    initAsync().catch(console.error);
   }, []);
 
   const deferredSource = useDeferredValue(source);
 
   useEffect(() => {
-    if (!initialized) {
+    if (deferredSource == null) {
       return;
     }
 
-    const { settingsSource, pythonSource } = deferredSource;
+    const { pythonSource, settingsSource } = deferredSource;
 
     try {
       const config = JSON.parse(settingsSource);
@@ -168,46 +165,52 @@ export default function Editor() {
         secondary: null,
       });
     }
-  }, [initialized, deferredSource, secondaryTool]);
+  }, [deferredSource, secondaryTool]);
 
   useEffect(() => {
-    if (initialized) {
+    if (source != null) {
       persistLocal(source);
     }
-  }, [initialized, source]);
+  }, [source]);
 
   const handleShare = useMemo(() => {
-    if (!initialized) {
+    if (source == null) {
       return undefined;
     }
 
     return () => {
-      persist(source.settingsSource, source.pythonSource);
+      return persist(source.settingsSource, source.pythonSource);
     };
-  }, [source, initialized]);
+  }, [source]);
 
   const handlePythonSourceChange = useCallback((pythonSource: string) => {
-    setSource((state) => ({
-      ...state,
-      pythonSource,
-      revision: state.revision + 1,
-    }));
+    setSource((state) =>
+      state
+        ? {
+            ...state,
+            pythonSource,
+            revision: state.revision + 1,
+          }
+        : null,
+    );
   }, []);
 
   const handleSettingsSourceChange = useCallback((settingsSource: string) => {
-    setSource((state) => ({
-      ...state,
-      settingsSource,
-      revision: state.revision + 1,
-    }));
+    setSource((state) =>
+      state
+        ? {
+            ...state,
+            settingsSource,
+            revision: state.revision + 1,
+          }
+        : null,
+    );
   }, []);
-
-  // useMonacoTheme();
 
   return (
     <main className="flex flex-col h-full bg-ayu-background dark:bg-ayu-background-dark">
       <Header
-        edit={source.revision}
+        edit={source ? source.revision : null}
         theme={theme}
         version={ruffVersion}
         onChangeTheme={setTheme}
@@ -215,7 +218,7 @@ export default function Editor() {
       />
 
       <div className="flex flex-grow">
-        {initialized ? (
+        {source ? (
           <PanelGroup direction="horizontal" autoSaveId="main">
             <PrimarySideBar
               onSelectTool={(tool) => setTab(tool)}

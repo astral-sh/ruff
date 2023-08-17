@@ -2,7 +2,7 @@ use ruff_formatter::{format_args, write, FormatRuleWithOptions};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
 use ruff_python_ast::{Expr, ExprSubscript};
 
-use crate::comments::trailing_comments;
+use crate::comments::{trailing_comments, SourceComment};
 use crate::context::PyFormatContext;
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::expr_tuple::TupleParentheses;
@@ -81,7 +81,7 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
 
     fn fmt_dangling_comments(
         &self,
-        _node: &ExprSubscript,
+        _dangling_comments: &[SourceComment],
         _f: &mut PyFormatter,
     ) -> FormatResult<()> {
         // Handled inside of `fmt_fields`

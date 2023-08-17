@@ -376,7 +376,7 @@
       ]
     },
     "line-length": {
-      "description": "The line length to use when enforcing long-lines violations (like `E501`).",
+      "description": "The line length to use when enforcing long-lines violations (like `E501`). Must be greater than `0`.",
       "anyOf": [
         {
           "$ref": "#/definitions/LineLength"
@@ -560,7 +560,7 @@
       ]
     },
     "target-version": {
-      "description": "The minimum Python version to target, e.g., when considering automatic code upgrades, like rewriting type annotations.\n\nIf omitted, and Ruff is configured via a `pyproject.toml` file, the target version will be inferred from its `project.requires-python` field (e.g., `requires-python = \">=3.8\"`). If Ruff is configured via `ruff.toml` or `.ruff.toml`, no such inference will be performed.",
+      "description": "The minimum Python version to target, e.g., when considering automatic code upgrades, like rewriting type annotations. Ruff will not propose changes using features that are not available in the given version.\n\nFor example, to represent supporting Python >=3.10 or ==3.10 specify `target-version = \"py310\"`.\n\nIf omitted, and Ruff is configured via a `pyproject.toml` file, the target version will be inferred from its `project.requires-python` field (e.g., `requires-python = \">=3.8\"`). If Ruff is configured via `ruff.toml` or `.ruff.toml`, no such inference will be performed.",
       "anyOf": [
         {
           "$ref": "#/definitions/PythonVersion"
@@ -1062,6 +1062,16 @@
           "additionalProperties": {
             "$ref": "#/definitions/ApiBan"
           }
+        },
+        "banned-module-level-imports": {
+          "description": "List of specific modules that may not be imported at module level, and should instead be imported lazily (e.g., within a function definition, or an `if TYPE_CHECKING:` block, or some other nested context).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false
@@ -1080,7 +1090,7 @@
           }
         },
         "runtime-evaluated-base-classes": {
-          "description": "Exempt classes that list any of the enumerated classes as a base class from needing to be moved into type-checking blocks.",
+          "description": "Exempt classes that list any of the enumerated classes as a base class from needing to be moved into type-checking blocks.\n\nCommon examples include Pydantic's `pydantic.BaseModel` and SQLAlchemy's `sqlalchemy.orm.DeclarativeBase`, but can also support user-defined classes that inherit from those base classes. For example, if you define a common `DeclarativeBase` subclass that's used throughout your project (e.g., `class Base(DeclarativeBase) ...` in `base.py`), you can add it to this list (`runtime-evaluated-base-classes = [\"base.Base\"]`) to exempt models from being moved into type-checking blocks.",
           "type": [
             "array",
             "null"
@@ -1100,7 +1110,7 @@
           }
         },
         "strict": {
-          "description": "Enforce TC001, TC002, and TC003 rules even when valid runtime imports are present for the same module. See flake8-type-checking's [strict](https://github.com/snok/flake8-type-checking#strict) option.",
+          "description": "Enforce TC001, TC002, and TC003 rules even when valid runtime imports are present for the same module.\n\nSee flake8-type-checking's [strict](https://github.com/snok/flake8-type-checking#strict) option.",
           "type": [
             "boolean",
             "null"
@@ -1481,7 +1491,7 @@
           ]
         },
         "max-doc-length": {
-          "description": "The maximum line length to allow for line-length violations within documentation (`W505`), including standalone comments.",
+          "description": "The maximum line length to allow for line-length violations within documentation (`W505`), including standalone comments. By default, this is set to null which disables reporting violations.\n\nSee the [`doc-line-too-long`](https://beta.ruff.rs/docs/rules/doc-line-too-long/) rule for more information.",
           "anyOf": [
             {
               "$ref": "#/definitions/LineLength"
@@ -2283,12 +2293,15 @@
         "PLW150",
         "PLW1508",
         "PLW1509",
+        "PLW151",
+        "PLW1510",
         "PLW1641",
         "PLW2",
         "PLW29",
         "PLW290",
         "PLW2901",
         "PLW3",
+        "PLW3201",
         "PLW33",
         "PLW330",
         "PLW3301",
@@ -2309,6 +2322,7 @@
         "PT011",
         "PT012",
         "PT013",
+        "PT014",
         "PT015",
         "PT016",
         "PT017",
@@ -2322,6 +2336,7 @@
         "PT024",
         "PT025",
         "PT026",
+        "PT027",
         "PTH",
         "PTH1",
         "PTH10",
@@ -2608,6 +2623,7 @@
         "TID25",
         "TID251",
         "TID252",
+        "TID253",
         "TRY",
         "TRY0",
         "TRY00",
@@ -2742,7 +2758,7 @@
       "description": "The size of a tab.",
       "type": "integer",
       "format": "uint8",
-      "minimum": 0.0
+      "minimum": 1.0
     },
     "Version": {
       "type": "string"

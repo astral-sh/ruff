@@ -6,8 +6,8 @@ expression: parse_ast
     Expr(
         StmtExpr {
             range: 0..7,
-            value: JoinedStr(
-                ExprJoinedStr {
+            value: FString(
+                ExprFString {
                     range: 0..7,
                     values: [
                         FormattedValue(
@@ -26,6 +26,7 @@ expression: parse_ast
                             },
                         ),
                     ],
+                    implicit_concatenated: false,
                 },
             ),
         },

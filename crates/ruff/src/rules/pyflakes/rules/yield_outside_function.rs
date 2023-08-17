@@ -1,10 +1,8 @@
 use std::fmt;
 
-use ruff_python_ast::{Expr, Ranged};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::ScopeKind;
+use ruff_python_ast::{Expr, Ranged};
 
 use crate::checkers::ast::Checker;
 
@@ -26,11 +24,14 @@ impl fmt::Display for DeferralKeyword {
 }
 
 /// ## What it does
-/// Checks for `yield` and `yield from` statements outside of functions.
+/// Checks for `yield`, `yield from`, and `await` usages outside of functions.
 ///
 /// ## Why is this bad?
-/// The use of a `yield` or `yield from` statement outside of a function will
+/// The use of `yield`, `yield from`, or `await` outside of a function will
 /// raise a `SyntaxError`.
+///
+/// As an exception, `await` is allowed at the top level of a Jupyter notebook
+/// (see: [autoawait]).
 ///
 /// ## Example
 /// ```python
@@ -40,6 +41,8 @@ impl fmt::Display for DeferralKeyword {
 ///
 /// ## References
 /// - [Python documentation: `yield`](https://docs.python.org/3/reference/simple_stmts.html#the-yield-statement)
+///
+/// [autoawait]: https://ipython.readthedocs.io/en/stable/interactive/autoawait.html
 #[violation]
 pub struct YieldOutsideFunction {
     keyword: DeferralKeyword,
@@ -53,17 +56,26 @@ impl Violation for YieldOutsideFunction {
     }
 }
 
+/// F704
 pub(crate) fn yield_outside_function(checker: &mut Checker, expr: &Expr) {
-    if matches!(
-        checker.semantic().scope().kind,
-        ScopeKind::Class(_) | ScopeKind::Module
-    ) {
+    let scope = checker.semantic().current_scope();
+    if scope.kind.is_module() || scope.kind.is_class() {
         let keyword = match expr {
             Expr::Yield(_) => DeferralKeyword::Yield,
             Expr::YieldFrom(_) => DeferralKeyword::YieldFrom,
             Expr::Await(_) => DeferralKeyword::Await,
-            _ => panic!("Expected Expr::Yield | Expr::YieldFrom | Expr::Await"),
+            _ => return,
         };
+
+        // `await` is allowed at the top level of a Jupyter notebook.
+        // See: https://ipython.readthedocs.io/en/stable/interactive/autoawait.html.
+        if scope.kind.is_module()
+            && checker.source_type.is_jupyter()
+            && keyword == DeferralKeyword::Await
+        {
+            return;
+        }
+
         checker.diagnostics.push(Diagnostic::new(
             YieldOutsideFunction { keyword },
             expr.range(),

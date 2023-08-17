@@ -5,25 +5,29 @@ use ruff_python_ast::{self as ast, Constant, Expr, Operator, Ranged};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for `env.getenv` calls with invalid default values.
+/// Checks for `os.getenv` calls with invalid default values.
 ///
 /// ## Why is this bad?
-/// If an environment variable is set, `env.getenv` will return its value as
-/// a string. If the environment variable is _not_ set, `env.getenv` will
+/// If an environment variable is set, `os.getenv` will return its value as
+/// a string. If the environment variable is _not_ set, `os.getenv` will
 /// return `None`, or the default value if one is provided.
 ///
 /// If the default value is not a string or `None`, then it will be
-/// inconsistent with the return type of `env.getenv`, which can lead to
+/// inconsistent with the return type of `os.getenv`, which can lead to
 /// confusing behavior.
 ///
 /// ## Example
 /// ```python
-/// int(env.getenv("FOO", 1))
+/// import os
+///
+/// int(os.getenv("FOO", 1))
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// int(env.getenv("FOO", "1"))
+/// import os
+///
+/// int(os.getenv("FOO", "1"))
 /// ```
 #[violation]
 pub struct InvalidEnvvarDefault;
@@ -71,7 +75,7 @@ fn is_valid_default(expr: &Expr) -> bool {
         Expr::Constant(ast::ExprConstant {
             value: Constant::Str { .. } | Constant::None { .. },
             ..
-        }) | Expr::JoinedStr(_)
+        }) | Expr::FString(_)
     )
 }
 

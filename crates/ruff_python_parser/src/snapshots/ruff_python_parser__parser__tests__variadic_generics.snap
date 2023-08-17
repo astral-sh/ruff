@@ -6,6 +6,7 @@ expression: parse_ast
     FunctionDef(
         StmtFunctionDef {
             range: 1..49,
+            is_async: false,
             decorator_list: [],
             name: Identifier {
                 id: "args_to_tuple",

@@ -117,7 +117,7 @@ pub fn parse_expression_starts_at(
 ///
 /// This function is the most general function to parse Python code. Based on the [`Mode`] supplied,
 /// it can be used to parse a single expression, a full Python program, an interactive expression
-/// or a Python program containing Jupyter magics.
+/// or a Python program containing IPython escape commands.
 ///
 /// # Example
 ///
@@ -146,7 +146,7 @@ pub fn parse_expression_starts_at(
 /// assert!(program.is_ok());
 /// ```
 ///
-/// Additionally, we can parse a Python program containing Jupyter magics:
+/// Additionally, we can parse a Python program containing IPython escapes:
 ///
 /// ```
 /// use ruff_python_parser::{Mode, parse};
@@ -775,7 +775,7 @@ type X[T] \
 
     #[test]
     fn test_type_as_identifier() {
-        let source = r#"\
+        let source = r"\
 type *a + b, c   # ((type * a) + b), c
 type *(a + b), c   # (type * (a + b)), c
 type (*a + b, c)   # type ((*(a + b)), c)
@@ -806,7 +806,7 @@ type (
 type = 1
 type = x = 1
 x = type = 1
-"#;
+";
         insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
     }
 
@@ -863,7 +863,7 @@ y = 100(no)
 
     #[test]
     fn test_match_as_identifier() {
-        let source = r#"\
+        let source = r"\
 match *a + b, c   # ((match * a) + b), c
 match *(a + b), c   # (match * (a + b)), c
 match (*a + b, c)   # match ((*(a + b)), c)
@@ -885,7 +885,7 @@ match match:
         pass
 match = lambda query: query == event
 print(match(12))
-"#;
+";
         insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
     }
 
@@ -1122,9 +1122,9 @@ class Abcd:
     }
 
     #[test]
-    fn test_jupyter_magic() {
+    fn test_ipython_escape_commands() {
         let parse_ast = parse(
-            r#"
+            r"
 # Normal Python code
 (
     a
@@ -1169,7 +1169,7 @@ def foo():
 ;foo 1 2
 ,foo 1 2
 
-# Indented magic
+# Indented escape commands
 for a in range(5):
     !ls
 
@@ -1180,7 +1180,16 @@ foo = %foo \
 
 % foo
 foo = %foo  # comment
-"#
+
+# Help end line magics
+foo?
+foo.bar??
+foo.bar.baz?
+foo[0]??
+foo[0][1]?
+foo.bar[0].baz[1]??
+foo.bar[0].baz[2].egg??
+"
             .trim(),
             Mode::Jupyter,
             "<test>",
@@ -1190,7 +1199,7 @@ foo = %foo  # comment
     }
 
     #[test]
-    fn test_jupyter_magic_parse_error() {
+    fn test_ipython_escape_command_parse_error() {
         let source = r#"
 a = 1
 %timeit a == 1
@@ -1200,7 +1209,7 @@ a = 1
         let parse_err = parse_tokens(lxr, Mode::Module, "<test>").unwrap_err();
         assert_eq!(
             parse_err.to_string(),
-            "line magics are only allowed in Jupyter mode at byte offset 6".to_string()
+            "IPython escape commands are only allowed in Jupyter mode at byte offset 6".to_string()
         );
     }
 }

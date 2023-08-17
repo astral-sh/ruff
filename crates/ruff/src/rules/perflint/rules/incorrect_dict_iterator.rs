@@ -148,9 +148,11 @@ impl fmt::Display for DictSubset {
 }
 
 /// Returns `true` if the given expression is either an unused value or a tuple of unused values.
-fn is_unused(expr: &Expr, model: &SemanticModel) -> bool {
+fn is_unused(expr: &Expr, semantic: &SemanticModel) -> bool {
     match expr {
-        Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().all(|expr| is_unused(expr, model)),
+        Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            elts.iter().all(|expr| is_unused(expr, semantic))
+        }
         Expr::Name(ast::ExprName { id, .. }) => {
             // Treat a variable as used if it has any usages, _or_ it's shadowed by another variable
             // with usages.
@@ -167,10 +169,10 @@ fn is_unused(expr: &Expr, model: &SemanticModel) -> bool {
             //
             // print(bar)
             // ```
-            let scope = model.scope();
+            let scope = semantic.current_scope();
             scope
                 .get_all(id)
-                .map(|binding_id| model.binding(binding_id))
+                .map(|binding_id| semantic.binding(binding_id))
                 .filter(|binding| binding.range.start() >= expr.range().start())
                 .all(|binding| !binding.is_used())
         }

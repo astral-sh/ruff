@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use libcst_native::{Arg, Expression};
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff_python_ast::{Expr, Ranged};
+use ruff_python_ast::{self as ast, Expr, Ranged};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -55,13 +55,84 @@ impl Violation for FormatLiterals {
     }
 }
 
+/// UP030
+pub(crate) fn format_literals(
+    checker: &mut Checker,
+    summary: &FormatSummary,
+    call: &ast::ExprCall,
+) {
+    // The format we expect is, e.g.: `"{0} {1}".format(...)`
+    if summary.has_nested_parts {
+        return;
+    }
+    if !summary.keywords.is_empty() {
+        return;
+    }
+    if !summary.autos.is_empty() {
+        return;
+    }
+    if summary.indices.is_empty() {
+        return;
+    }
+    if (0..summary.indices.len()).any(|index| !summary.indices.contains(&index)) {
+        return;
+    }
+
+    // If the positional indices aren't sequential (e.g., `"{1} {0}".format(1, 2)`), then we
+    // need to reorder the function arguments; so we need to ensure that the function
+    // arguments aren't splatted (e.g., `"{1} {0}".format(*foo)`), that there are a sufficient
+    // number of them, etc.
+    let arguments = if is_sequential(&summary.indices) {
+        Arguments::Preserve
+    } else {
+        // Ex) `"{1} {0}".format(foo=1, bar=2)`
+        if !call.arguments.keywords.is_empty() {
+            return;
+        }
+
+        // Ex) `"{1} {0}".format(foo)`
+        if call.arguments.args.len() < summary.indices.len() {
+            return;
+        }
+
+        // Ex) `"{1} {0}".format(*foo)`
+        if call
+            .arguments
+            .args
+            .iter()
+            .take(summary.indices.len())
+            .any(Expr::is_starred_expr)
+        {
+            return;
+        }
+
+        Arguments::Reorder(&summary.indices)
+    };
+
+    let mut diagnostic = Diagnostic::new(FormatLiterals, call.range());
+    if checker.patch(diagnostic.kind.rule()) {
+        diagnostic.try_set_fix(|| {
+            Ok(Fix::suggested(Edit::range_replacement(
+                generate_call(call, arguments, checker.locator(), checker.stylist())?,
+                call.range(),
+            )))
+        });
+    }
+    checker.diagnostics.push(diagnostic);
+}
+
+/// Returns true if the indices are sequential.
+fn is_sequential(indices: &[usize]) -> bool {
+    indices.iter().enumerate().all(|(idx, value)| idx == *value)
+}
+
 // An opening curly brace, followed by any integer, followed by any text,
 // followed by a closing brace.
 static FORMAT_SPECIFIER: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"\{(?P<int>\d+)(?P<fmt>.*?)}").unwrap());
 
 /// Remove the explicit positional indices from a format string.
-fn remove_specifiers<'a>(value: &mut Expression<'a>, arena: &'a mut typed_arena::Arena<String>) {
+fn remove_specifiers<'a>(value: &mut Expression<'a>, arena: &'a typed_arena::Arena<String>) {
     match value {
         Expression::SimpleString(expr) => {
             expr.value = arena.alloc(
@@ -118,32 +189,36 @@ fn generate_arguments<'a>(arguments: &[Arg<'a>], order: &'a [usize]) -> Result<V
     Ok(new_arguments)
 }
 
-/// Returns true if the indices are sequential.
-fn is_sequential(indices: &[usize]) -> bool {
-    indices.iter().enumerate().all(|(idx, value)| idx == *value)
+#[derive(Debug, Copy, Clone)]
+enum Arguments<'a> {
+    /// Preserve the arguments to the `.format(...)` call.
+    Preserve,
+    /// Reorder the arguments to the `.format(...)` call, based on the given
+    /// indices.
+    Reorder(&'a [usize]),
 }
 
 /// Returns the corrected function call.
 fn generate_call(
-    expr: &Expr,
-    correct_order: &[usize],
+    call: &ast::ExprCall,
+    arguments: Arguments,
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<String> {
-    let content = locator.slice(expr.range());
+    let content = locator.slice(call.range());
     let parenthesized_content = format!("({content})");
     let mut expression = match_expression(&parenthesized_content)?;
 
     // Fix the call arguments.
     let call = match_call_mut(&mut expression)?;
-    if !is_sequential(correct_order) {
-        call.args = generate_arguments(&call.args, correct_order)?;
+    if let Arguments::Reorder(order) = arguments {
+        call.args = generate_arguments(&call.args, order)?;
     }
 
     // Fix the string itself.
     let item = match_attribute(&mut call.func)?;
-    let mut arena = typed_arena::Arena::new();
-    remove_specifiers(&mut item.value, &mut arena);
+    let arena = typed_arena::Arena::new();
+    remove_specifiers(&mut item.value, &arena);
 
     // Remove the parentheses (first and last characters).
     let mut output = expression.codegen_stylist(stylist);
@@ -156,35 +231,4 @@ fn generate_call(
     }
 
     Ok(output)
-}
-
-/// UP030
-pub(crate) fn format_literals(checker: &mut Checker, summary: &FormatSummary, expr: &Expr) {
-    // The format we expect is, e.g.: `"{0} {1}".format(...)`
-    if summary.has_nested_parts {
-        return;
-    }
-    if !summary.keywords.is_empty() {
-        return;
-    }
-    if !summary.autos.is_empty() {
-        return;
-    }
-    if summary.indices.is_empty() {
-        return;
-    }
-    if (0..summary.indices.len()).any(|index| !summary.indices.contains(&index)) {
-        return;
-    }
-
-    let mut diagnostic = Diagnostic::new(FormatLiterals, expr.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
-            Ok(Fix::suggested(Edit::range_replacement(
-                generate_call(expr, &summary.indices, checker.locator(), checker.stylist())?,
-                expr.range(),
-            )))
-        });
-    }
-    checker.diagnostics.push(diagnostic);
 }

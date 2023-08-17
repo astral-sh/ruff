@@ -1,5 +1,4 @@
 use ruff_diagnostics::Diagnostic;
-use ruff_python_ast::cast;
 use ruff_python_semantic::analyze::{branch_detection, visibility};
 use ruff_python_semantic::{Binding, BindingKind, ScopeKind};
 
@@ -112,7 +111,11 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                     // If the bindings are in different forks, abort.
                     if shadowed.source.map_or(true, |left| {
                         binding.source.map_or(true, |right| {
-                            branch_detection::different_forks(left, right, &checker.semantic.stmts)
+                            branch_detection::different_forks(
+                                left,
+                                right,
+                                checker.semantic.statements(),
+                            )
                         })
                     }) {
                         continue;
@@ -168,16 +171,25 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                             continue;
                         }
 
-                        // If this is an overloaded function, abort.
-                        if shadowed.kind.is_function_definition()
-                            && visibility::is_overload(
-                                cast::decorator_list(
-                                    checker.semantic.stmts[shadowed.source.unwrap()],
-                                ),
-                                &checker.semantic,
-                            )
-                        {
+                        let Some(statement_id) = shadowed.source else {
                             continue;
+                        };
+
+                        // If this is an overloaded function, abort.
+                        if shadowed.kind.is_function_definition() {
+                            if checker
+                                .semantic
+                                .statement(statement_id)
+                                .as_function_def_stmt()
+                                .is_some_and(|function| {
+                                    visibility::is_overload(
+                                        &function.decorator_list,
+                                        &checker.semantic,
+                                    )
+                                })
+                            {
+                                continue;
+                            }
                         }
                     } else {
                         // Only enforce cross-scope shadowing for imports.
@@ -195,7 +207,11 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                     // If the bindings are in different forks, abort.
                     if shadowed.source.map_or(true, |left| {
                         binding.source.map_or(true, |right| {
-                            branch_detection::different_forks(left, right, &checker.semantic.stmts)
+                            branch_detection::different_forks(
+                                left,
+                                right,
+                                checker.semantic.statements(),
+                            )
                         })
                     }) {
                         continue;
@@ -231,10 +247,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
             flake8_pyi::rules::unused_private_typed_dict(checker, scope, &mut diagnostics);
         }
 
-        if matches!(
-            scope.kind,
-            ScopeKind::Function(_) | ScopeKind::AsyncFunction(_) | ScopeKind::Lambda(_)
-        ) {
+        if matches!(scope.kind, ScopeKind::Function(_) | ScopeKind::Lambda(_)) {
             if checker.enabled(Rule::UnusedVariable) {
                 pyflakes::rules::unused_variable(checker, scope, &mut diagnostics);
             }
@@ -260,10 +273,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
             }
         }
 
-        if matches!(
-            scope.kind,
-            ScopeKind::Function(_) | ScopeKind::AsyncFunction(_) | ScopeKind::Module
-        ) {
+        if matches!(scope.kind, ScopeKind::Function(_) | ScopeKind::Module) {
             if enforce_typing_imports {
                 let runtime_imports: Vec<&Binding> = checker
                     .semantic

@@ -67,9 +67,13 @@ impl<'a> Insertion<'a> {
             TextSize::default()
         };
 
-        // Skip over commented lines.
+        // Skip over commented lines, with whitespace separation.
         for line in UniversalNewlineIterator::with_offset(locator.after(location), location) {
-            if line.trim_whitespace_start().starts_with('#') {
+            let trimmed_line = line.trim_whitespace_start();
+            if trimmed_line.is_empty() {
+                continue;
+            }
+            if trimmed_line.starts_with('#') {
                 location = line.full_end();
             } else {
                 break;

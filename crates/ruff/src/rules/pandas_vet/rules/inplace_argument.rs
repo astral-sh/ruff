@@ -2,8 +2,6 @@ use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_true;
 use ruff_python_ast::{self as ast, Keyword, PySourceType, Ranged};
-use ruff_python_semantic::BindingKind;
-use ruff_python_semantic::Imported;
 use ruff_source_file::Locator;
 
 use crate::autofix::edits::{remove_argument, Parentheses};
@@ -53,20 +51,12 @@ impl Violation for PandasUseOfInplaceArgument {
 /// PD002
 pub(crate) fn inplace_argument(checker: &mut Checker, call: &ast::ExprCall) {
     // If the function was imported from another module, and it's _not_ Pandas, abort.
-    if let Some(call_path) = checker.semantic().resolve_call_path(&call.func) {
-        if !call_path
-            .first()
-            .and_then(|module| checker.semantic().find_binding(module))
-            .is_some_and(|binding| {
-                if let BindingKind::Import(import) = &binding.kind {
-                    matches!(import.call_path(), ["pandas"])
-                } else {
-                    false
-                }
-            })
-        {
-            return;
-        }
+    if checker
+        .semantic()
+        .resolve_call_path(&call.func)
+        .is_some_and(|call_path| !matches!(call_path.as_slice(), ["pandas", ..]))
+    {
+        return;
     }
 
     let mut seen_star = false;
@@ -84,14 +74,9 @@ pub(crate) fn inplace_argument(checker: &mut Checker, call: &ast::ExprCall) {
                     //    the star argument _doesn't_ contain an override).
                     // 2. The call is part of a larger expression (we're converting an expression to a
                     //    statement, and expressions can't contain statements).
-                    // 3. The call is in a lambda (we can't assign to a variable in a lambda). This
-                    //    should be unnecessary, as lambdas are expressions, and so (2) should apply,
-                    //    but we don't currently restore expression stacks when parsing deferred nodes,
-                    //    and so the parent is lost.
                     if !seen_star
-                        && checker.semantic().stmt().is_expr_stmt()
-                        && checker.semantic().expr_parent().is_none()
-                        && !checker.semantic().scope().kind.is_lambda()
+                        && checker.semantic().current_statement().is_expr_stmt()
+                        && checker.semantic().current_expression_parent().is_none()
                     {
                         if let Some(fix) = convert_inplace_argument_to_assignment(
                             call,

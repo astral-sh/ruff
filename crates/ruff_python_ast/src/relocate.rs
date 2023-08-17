@@ -140,7 +140,7 @@ pub fn relocate_expr(expr: &mut Expr, location: TextRange) {
                 relocate_expr(expr, location);
             }
         }
-        Expr::JoinedStr(nodes::ExprJoinedStr { values, range }) => {
+        Expr::FString(nodes::ExprFString { values, range, .. }) => {
             *range = location;
             for expr in values {
                 relocate_expr(expr, location);
@@ -199,7 +199,7 @@ pub fn relocate_expr(expr: &mut Expr, location: TextRange) {
                 relocate_expr(expr, location);
             }
         }
-        Expr::LineMagic(nodes::ExprLineMagic { range, .. }) => {
+        Expr::IpyEscapeCommand(nodes::ExprIpyEscapeCommand { range, .. }) => {
             *range = location;
         }
     }

@@ -1,4 +1,4 @@
-use crate::comments::trailing_comments;
+use crate::comments::{trailing_comments, SourceComment};
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
@@ -81,7 +81,7 @@ impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHan
 
     fn fmt_dangling_comments(
         &self,
-        _node: &ExceptHandlerExceptHandler,
+        _dangling_comments: &[SourceComment],
         _f: &mut PyFormatter,
     ) -> FormatResult<()> {
         // dangling comments are formatted as part of fmt_fields

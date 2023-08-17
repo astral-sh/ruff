@@ -1,6 +1,6 @@
 [package]
 name = "ruff_cli"
-version = "0.0.282"
+version = "0.0.284"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -10,8 +10,6 @@ documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 readme = "../../README.md"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [[bin]]
 name = "ruff"

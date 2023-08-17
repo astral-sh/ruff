@@ -30,7 +30,7 @@ An extremely fast Python linter, written in Rust.
 - 🤝 Python 3.11 compatibility
 - 📦 Built-in caching, to avoid re-analyzing unchanged files
 - 🔧 Autofix support, for automatic error correction (e.g., automatically remove unused imports)
-- 📏 Over [500 built-in rules](https://beta.ruff.rs/docs/rules/)
+- 📏 Over [600 built-in rules](https://beta.ruff.rs/docs/rules/)
 - ⚖️ [Near-parity](https://beta.ruff.rs/docs/faq/#how-does-ruff-compare-to-flake8) with the
     built-in Flake8 rule set
 - 🔌 Native re-implementations of dozens of Flake8 plugins, like flake8-bugbear
@@ -140,7 +140,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com) hook:
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.0.282
+  rev: v0.0.284
   hooks:
     - id: ruff
 ```
@@ -211,8 +211,8 @@ line-length = 88
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
-# Assume Python 3.10.
-target-version = "py310"
+# Assume Python 3.8
+target-version = "py38"
 
 [tool.ruff.mccabe]
 # Unlike Flake8, default to a complexity level of 10.
@@ -233,7 +233,7 @@ linting command.
 
 <!-- Begin section: Rules -->
 
-**Ruff supports over 500 lint rules**, many of which are inspired by popular tools like Flake8,
+**Ruff supports over 600 lint rules**, many of which are inspired by popular tools like Flake8,
 isort, pyupgrade, and others. Regardless of the rule's origin, Ruff re-implements every rule in
 Rust as a first-party feature.
 

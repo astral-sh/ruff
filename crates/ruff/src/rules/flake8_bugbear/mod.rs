@@ -49,12 +49,22 @@ mod tests {
     #[test_case(Rule::UselessComparison, Path::new("B015.py"))]
     #[test_case(Rule::UselessContextlibSuppress, Path::new("B022.py"))]
     #[test_case(Rule::UselessExpression, Path::new("B018.py"))]
-    #[test_case(Rule::ZipWithoutExplicitStrict, Path::new("B905.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_bugbear").join(path).as_path(),
             &Settings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn zip_without_explicit_strict() -> Result<()> {
+        let snapshot = "B905.py";
+        let diagnostics = test_path(
+            Path::new("flake8_bugbear").join(snapshot).as_path(),
+            &Settings::for_rule(Rule::ZipWithoutExplicitStrict),
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -72,7 +82,7 @@ mod tests {
                         "fastapi.Query".to_string(),
                     ],
                 },
-                ..Settings::for_rules(vec![Rule::FunctionCallInDefaultArgument])
+                ..Settings::for_rule(Rule::FunctionCallInDefaultArgument)
             },
         )?;
         assert_messages!(snapshot, diagnostics);

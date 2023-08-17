@@ -548,6 +548,8 @@ PT009.py:82:9: PT009 [*] Use a regular `assert` instead of unittest-style `asser
 81 |     def test_assert_not_regexp_matches(self):
 82 |         self.assertNotRegex("abc", r"abc")  # Error
    |         ^^^^^^^^^^^^^^^^^^^ PT009
+83 | 
+84 |     def test_fail_if(self):
    |
    = help: Replace `assertNotRegex(...)` with `assert ...`
 
@@ -557,5 +559,83 @@ PT009.py:82:9: PT009 [*] Use a regular `assert` instead of unittest-style `asser
 81 81 |     def test_assert_not_regexp_matches(self):
 82    |-        self.assertNotRegex("abc", r"abc")  # Error
    82 |+        assert not re.search("abc", "abc")  # Error
+83 83 | 
+84 84 |     def test_fail_if(self):
+85 85 |         self.failIf("abc")  # Error
+
+PT009.py:85:9: PT009 [*] Use a regular `assert` instead of unittest-style `failIf`
+   |
+84 |     def test_fail_if(self):
+85 |         self.failIf("abc")  # Error
+   |         ^^^^^^^^^^^ PT009
+86 | 
+87 |     def test_fail_unless(self):
+   |
+   = help: Replace `failIf(...)` with `assert ...`
+
+ℹ Suggested fix
+82 82 |         self.assertNotRegex("abc", r"abc")  # Error
+83 83 | 
+84 84 |     def test_fail_if(self):
+85    |-        self.failIf("abc")  # Error
+   85 |+        assert not "abc"  # Error
+86 86 | 
+87 87 |     def test_fail_unless(self):
+88 88 |         self.failUnless("abc")  # Error
+
+PT009.py:88:9: PT009 [*] Use a regular `assert` instead of unittest-style `failUnless`
+   |
+87 |     def test_fail_unless(self):
+88 |         self.failUnless("abc")  # Error
+   |         ^^^^^^^^^^^^^^^ PT009
+89 | 
+90 |     def test_fail_unless_equal(self):
+   |
+   = help: Replace `failUnless(...)` with `assert ...`
+
+ℹ Suggested fix
+85 85 |         self.failIf("abc")  # Error
+86 86 | 
+87 87 |     def test_fail_unless(self):
+88    |-        self.failUnless("abc")  # Error
+   88 |+        assert "abc"  # Error
+89 89 | 
+90 90 |     def test_fail_unless_equal(self):
+91 91 |         self.failUnlessEqual(1, 2)  # Error
+
+PT009.py:91:9: PT009 [*] Use a regular `assert` instead of unittest-style `failUnlessEqual`
+   |
+90 |     def test_fail_unless_equal(self):
+91 |         self.failUnlessEqual(1, 2)  # Error
+   |         ^^^^^^^^^^^^^^^^^^^^ PT009
+92 | 
+93 |     def test_fail_if_equal(self):
+   |
+   = help: Replace `failUnlessEqual(...)` with `assert ...`
+
+ℹ Suggested fix
+88 88 |         self.failUnless("abc")  # Error
+89 89 | 
+90 90 |     def test_fail_unless_equal(self):
+91    |-        self.failUnlessEqual(1, 2)  # Error
+   91 |+        assert 1 == 2  # Error
+92 92 | 
+93 93 |     def test_fail_if_equal(self):
+94 94 |         self.failIfEqual(1, 2)  # Error
+
+PT009.py:94:9: PT009 [*] Use a regular `assert` instead of unittest-style `failIfEqual`
+   |
+93 |     def test_fail_if_equal(self):
+94 |         self.failIfEqual(1, 2)  # Error
+   |         ^^^^^^^^^^^^^^^^ PT009
+   |
+   = help: Replace `failIfEqual(...)` with `assert ...`
+
+ℹ Suggested fix
+91 91 |         self.failUnlessEqual(1, 2)  # Error
+92 92 | 
+93 93 |     def test_fail_if_equal(self):
+94    |-        self.failIfEqual(1, 2)  # Error
+   94 |+        assert 1 != 2  # Error
 
 

@@ -88,7 +88,7 @@ pub(crate) fn setattr_with_constant(
     if !is_identifier(name) {
         return;
     }
-    if is_mangled_private(name.as_str()) {
+    if is_mangled_private(name) {
         return;
     }
     // We can only replace a `setattr` call (which is an `Expr`) with an assignment
@@ -97,7 +97,7 @@ pub(crate) fn setattr_with_constant(
     if let Stmt::Expr(ast::StmtExpr {
         value: child,
         range: _,
-    }) = checker.semantic().stmt()
+    }) = checker.semantic().current_statement()
     {
         if expr == child.as_ref() {
             let mut diagnostic = Diagnostic::new(SetAttrWithConstant, expr.range());

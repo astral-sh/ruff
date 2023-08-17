@@ -2,10 +2,9 @@ use ruff_formatter::{format_args, write, FormatResult};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::ExprListComp;
 
+use crate::comments::SourceComment;
 use crate::context::PyFormatContext;
-use crate::expression::parentheses::{
-    parenthesized_with_dangling_comments, NeedsParentheses, OptionalParentheses,
-};
+use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 use crate::AsFormat;
 use crate::{FormatNodeRule, PyFormatter};
@@ -32,22 +31,22 @@ impl FormatNodeRule<ExprListComp> for FormatExprListComp {
 
         write!(
             f,
-            [parenthesized_with_dangling_comments(
+            [parenthesized(
                 "[",
-                dangling,
                 &group(&format_args![
                     group(&elt.format()),
                     soft_line_break_or_space(),
                     &joined
                 ]),
                 "]"
-            )]
+            )
+            .with_dangling_comments(dangling)]
         )
     }
 
     fn fmt_dangling_comments(
         &self,
-        _node: &ExprListComp,
+        _dangling_comments: &[SourceComment],
         _f: &mut PyFormatter,
     ) -> FormatResult<()> {
         // Handled as part of `fmt_fields`

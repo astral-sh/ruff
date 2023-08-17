@@ -1,15 +1,15 @@
 //! Infrastructure for code formatting
 //!
-//! This module defines [FormatElement], an IR to format code documents and provides a mean to print
+//! This module defines [`FormatElement`], an IR to format code documents and provides a mean to print
 //! such a document to a string. Objects that know how to format themselves implement the [Format] trait.
 //!
 //! ## Formatting Traits
 //!
 //! * [Format]: Implemented by objects that can be formatted.
-//! * [FormatRule]: Rule that knows how to format an object of another type. Necessary in the situation where
+//! * [`FormatRule`]: Rule that knows how to format an object of another type. Necessary in the situation where
 //!  it's necessary to implement [Format] on an object from another crate. This module defines the
-//!  [FormatRefWithRule] and [FormatOwnedWithRule] structs to pass an item with its corresponding rule.
-//! * [FormatWithRule] implemented by objects that know how to format another type. Useful for implementing
+//!  [`FormatRefWithRule`] and [`FormatOwnedWithRule`] structs to pass an item with its corresponding rule.
+//! * [`FormatWithRule`] implemented by objects that know how to format another type. Useful for implementing
 //!  some reusable formatting logic inside of this module if the type itself doesn't implement [Format]
 //!
 //! ## Formatting Macros
@@ -18,9 +18,6 @@
 //! * [`format!`]: Formats a formatable object
 //! * [`format_args!`]: Concatenates a sequence of Format objects.
 //! * [`write!`]: Writes a sequence of formatable objects into an output buffer.
-
-#![allow(clippy::pedantic, unsafe_code)]
-#![deny(rustdoc::broken_intra_doc_links)]
 
 mod arguments;
 mod buffer;
@@ -45,8 +42,7 @@ use crate::format_element::document::Document;
 use crate::printer::{Printer, PrinterOptions};
 pub use arguments::{Argument, Arguments};
 pub use buffer::{
-    Buffer, BufferExtensions, BufferSnapshot, Inspect, PreambleBuffer, RemoveSoftLinesBuffer,
-    VecBuffer,
+    Buffer, BufferExtensions, BufferSnapshot, Inspect, RemoveSoftLinesBuffer, VecBuffer,
 };
 pub use builders::BestFitting;
 pub use source_code::{SourceCode, SourceCodeSlice};
@@ -73,12 +69,12 @@ pub enum IndentStyle {
 impl IndentStyle {
     pub const DEFAULT_SPACES: u8 = 2;
 
-    /// Returns `true` if this is an [IndentStyle::Tab].
+    /// Returns `true` if this is an [`IndentStyle::Tab`].
     pub const fn is_tab(&self) -> bool {
         matches!(self, IndentStyle::Tab)
     }
 
-    /// Returns `true` if this is an [IndentStyle::Space].
+    /// Returns `true` if this is an [`IndentStyle::Space`].
     pub const fn is_space(&self) -> bool {
         matches!(self, IndentStyle::Space(_))
     }
@@ -92,7 +88,13 @@ impl FromStr for IndentStyle {
             "tab" | "Tabs" => Ok(Self::Tab),
             "space" | "Spaces" => Ok(Self::Space(IndentStyle::DEFAULT_SPACES)),
             // TODO: replace this error with a diagnostic
-            _ => Err("Value not supported for IndentStyle"),
+            v => {
+                let v = v.strip_prefix("Spaces, size: ").unwrap_or(v);
+
+                u8::from_str(v)
+                    .map(Self::Space)
+                    .map_err(|_| "Value not supported for IndentStyle")
+            }
         }
     }
 }
@@ -115,10 +117,10 @@ impl std::fmt::Display for IndentStyle {
 pub struct LineWidth(u16);
 
 impl LineWidth {
-    /// Maximum allowed value for a valid [LineWidth]
+    /// Maximum allowed value for a valid [`LineWidth`]
     pub const MAX: u16 = 320;
 
-    /// Return the numeric value for this [LineWidth]
+    /// Return the numeric value for this [`LineWidth`]
     pub fn value(&self) -> u16 {
         self.0
     }
@@ -130,7 +132,7 @@ impl Default for LineWidth {
     }
 }
 
-/// Error type returned when parsing a [LineWidth] from a string fails
+/// Error type returned when parsing a [`LineWidth`] from a string fails
 pub enum ParseLineWidthError {
     /// The string could not be parsed as a valid [u16]
     ParseError(ParseIntError),
@@ -163,7 +165,7 @@ impl FromStr for LineWidth {
     }
 }
 
-/// Error type returned when converting a u16 to a [LineWidth] fails
+/// Error type returned when converting a u16 to a [`LineWidth`] fails
 #[derive(Clone, Copy, Debug)]
 pub struct LineWidthFromIntError(pub u16);
 
@@ -232,6 +234,7 @@ impl SimpleFormatContext {
         }
     }
 
+    #[must_use]
     pub fn with_source_code(mut self, code: &str) -> Self {
         self.source_code = String::from(code);
         self
@@ -315,20 +318,20 @@ where
     Context: FormatContext,
 {
     pub fn print(&self) -> PrintResult<Printed> {
-        let source_code = self.context.source_code();
-        let print_options = self.context.options().as_print_options();
-        let printed = Printer::new(source_code, print_options).print(&self.document)?;
-
-        Ok(printed)
+        let printer = self.create_printer();
+        printer.print(&self.document)
     }
 
     pub fn print_with_indent(&self, indent: u16) -> PrintResult<Printed> {
+        let printer = self.create_printer();
+        printer.print_with_indent(&self.document, indent)
+    }
+
+    fn create_printer(&self) -> Printer {
         let source_code = self.context.source_code();
         let print_options = self.context.options().as_print_options();
-        let printed =
-            Printer::new(source_code, print_options).print_with_indent(&self.document, indent)?;
 
-        Ok(printed)
+        Printer::new(source_code, print_options)
     }
 }
 
@@ -384,20 +387,20 @@ impl Printed {
         self.range
     }
 
-    /// Returns a list of [SourceMarker] mapping byte positions
+    /// Returns a list of [`SourceMarker`] mapping byte positions
     /// in the output string to the input source code.
     /// It's not guaranteed that the markers are sorted by source position.
     pub fn sourcemap(&self) -> &[SourceMarker] {
         &self.sourcemap
     }
 
-    /// Returns a list of [SourceMarker] mapping byte positions
+    /// Returns a list of [`SourceMarker`] mapping byte positions
     /// in the output string to the input source code, consuming the result
     pub fn into_sourcemap(self) -> Vec<SourceMarker> {
         self.sourcemap
     }
 
-    /// Takes the list of [SourceMarker] mapping byte positions in the output string
+    /// Takes the list of [`SourceMarker`] mapping byte positions in the output string
     /// to the input source code.
     pub fn take_sourcemap(&mut self) -> Vec<SourceMarker> {
         std::mem::take(&mut self.sourcemap)
@@ -435,7 +438,7 @@ impl Printed {
 pub type FormatResult<F> = Result<F, FormatError>;
 
 /// Formatting trait for types that can create a formatted representation. The `ruff_formatter` equivalent
-/// to [std::fmt::Display].
+/// to [`std::fmt::Display`].
 ///
 /// ## Example
 /// Implementing `Format` for a custom struct
@@ -474,7 +477,7 @@ impl<T, Context> Format<Context> for &T
 where
     T: ?Sized + Format<Context>,
 {
-    #[inline(always)]
+    #[inline]
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         Format::fmt(&**self, f)
     }
@@ -484,7 +487,7 @@ impl<T, Context> Format<Context> for &mut T
 where
     T: ?Sized + Format<Context>,
 {
-    #[inline(always)]
+    #[inline]
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         Format::fmt(&**self, f)
     }
@@ -512,7 +515,7 @@ impl<Context> Format<Context> for () {
 
 /// Rule that knows how to format an object of type `T`.
 ///
-/// Implementing [Format] on the object itself is preferred over implementing [FormatRule] but
+/// Implementing [Format] on the object itself is preferred over implementing [`FormatRule`] but
 /// this isn't possible inside of a dependent crate for external type.
 ///
 /// For example, the `ruff_js_formatter` crate isn't able to implement [Format] on `JsIfStatement`
@@ -529,6 +532,7 @@ pub trait FormatRuleWithOptions<T, C>: FormatRule<T, C> {
     type Options;
 
     /// Returns a new rule that uses the given options to format an object.
+    #[must_use]
     fn with_options(self, options: Self::Options) -> Self;
 }
 
@@ -541,9 +545,9 @@ pub trait FormatRuleWithOptions<T, C>: FormatRule<T, C> {
 ///
 /// ## Examples
 ///
-/// This can be useful if you want to format a `SyntaxNode` inside ruff_formatter.. `SyntaxNode` doesn't implement [Format]
+/// This can be useful if you want to format a `SyntaxNode` inside `ruff_formatter`.. `SyntaxNode` doesn't implement [Format]
 /// itself but the language specific crate implements `AsFormat` and `IntoFormat` for it and the returned [Format]
-/// implement [FormatWithRule].
+/// implement [`FormatWithRule`].
 ///
 /// ```ignore
 /// use ruff_formatter::prelude::*;
@@ -591,6 +595,7 @@ impl<T, R, O, C> FormatRefWithRule<'_, T, R, C>
 where
     R: FormatRuleWithOptions<T, C, Options = O>,
 {
+    #[must_use]
     pub fn with_options(mut self, options: O) -> Self {
         self.rule = self.rule.with_options(options);
         self
@@ -612,7 +617,7 @@ impl<T, R, C> Format<C> for FormatRefWithRule<'_, T, R, C>
 where
     R: FormatRule<T, C>,
 {
-    #[inline(always)]
+    #[inline]
     fn fmt(&self, f: &mut Formatter<C>) -> FormatResult<()> {
         self.rule.fmt(self.item, f)
     }
@@ -641,6 +646,7 @@ where
         }
     }
 
+    #[must_use]
     pub fn with_item(mut self, item: T) -> Self {
         self.item = item;
         self
@@ -655,7 +661,7 @@ impl<T, R, C> Format<C> for FormatOwnedWithRule<T, R, C>
 where
     R: FormatRule<T, C>,
 {
-    #[inline(always)]
+    #[inline]
     fn fmt(&self, f: &mut Formatter<C>) -> FormatResult<()> {
         self.rule.fmt(&self.item, f)
     }
@@ -665,6 +671,7 @@ impl<T, R, O, C> FormatOwnedWithRule<T, R, C>
 where
     R: FormatRuleWithOptions<T, C, Options = O>,
 {
+    #[must_use]
     pub fn with_options(mut self, options: O) -> Self {
         self.rule = self.rule.with_options(options);
         self
@@ -723,7 +730,7 @@ where
 /// # Ok(())
 /// # }
 /// ```
-#[inline(always)]
+#[inline]
 pub fn write<Context>(
     output: &mut dyn Buffer<Context = Context>,
     args: Arguments<Context>,
@@ -771,8 +778,13 @@ pub fn format<Context>(
 where
     Context: FormatContext,
 {
+    let source_length = context.source_code().as_str().len();
+    // Use a simple heuristic to guess the number of expected format elements.
+    // See [#6612](https://github.com/astral-sh/ruff/pull/6612) for more details on how the formula was determined. Changes to our formatter, or supporting
+    // more languages may require fine tuning the formula.
+    let estimated_buffer_size = source_length / 2;
     let mut state = FormatState::new(context);
-    let mut buffer = VecBuffer::with_capacity(arguments.items().len(), &mut state);
+    let mut buffer = VecBuffer::with_capacity(estimated_buffer_size, &mut state);
 
     buffer.write_fmt(arguments)?;
 
@@ -784,9 +796,9 @@ where
 
 /// This structure stores the state that is relevant for the formatting of the whole document.
 ///
-/// This structure is different from [crate::Formatter] in that the formatting infrastructure
-/// creates a new [crate::Formatter] for every [crate::write!] call, whereas this structure stays alive
-/// for the whole process of formatting a root with [crate::format!].
+/// This structure is different from [`crate::Formatter`] in that the formatting infrastructure
+/// creates a new [`crate::Formatter`] for every [`crate::write`!] call, whereas this structure stays alive
+/// for the whole process of formatting a root with [`crate::format`!].
 pub struct FormatState<Context> {
     context: Context,
 
@@ -809,7 +821,7 @@ impl<Context> FormatState<Context> {
     pub fn new(context: Context) -> Self {
         Self {
             context,
-            group_id_builder: Default::default(),
+            group_id_builder: UniqueGroupIdBuilder::default(),
         }
     }
 
@@ -828,7 +840,7 @@ impl<Context> FormatState<Context> {
     }
 
     /// Creates a new group id that is unique to this document. The passed debug name is used in the
-    /// [std::fmt::Debug] of the document if this is a debug build.
+    /// [`std::fmt::Debug`] of the document if this is a debug build.
     /// The name is unused for production builds and has no meaning on the equality of two group ids.
     pub fn group_id(&self, debug_name: &'static str) -> GroupId {
         self.group_id_builder.group_id(debug_name)

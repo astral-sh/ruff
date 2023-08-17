@@ -3,7 +3,6 @@ use ruff_python_ast::Ranged;
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{TextRange, TextSize};
 
-use crate::comments::{dangling_comments, trailing_comments, SourceComment};
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::prelude::*;
 use crate::MagicTrailingComma;
@@ -93,11 +92,23 @@ impl Entries {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
+pub(crate) enum TrailingComma {
+    /// Add a trailing comma if the group breaks and there's more than one element (or if the last
+    /// element has a trailing comma and the magical trailing comma option is enabled).
+    #[default]
+    MoreThanOne,
+    /// Add a trailing comma if the group breaks (or if the last element has a trailing comma and
+    /// the magical trailing comma option is enabled).
+    OneOrMore,
+}
+
 pub(crate) struct JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
     result: FormatResult<()>,
     fmt: &'fmt mut PyFormatter<'ast, 'buf>,
     entries: Entries,
     sequence_end: TextSize,
+    trailing_comma: TrailingComma,
 }
 
 impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
@@ -107,7 +118,17 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
             result: Ok(()),
             entries: Entries::None,
             sequence_end,
+            trailing_comma: TrailingComma::default(),
         }
+    }
+
+    /// Set the trailing comma behavior for the builder. Trailing commas will only be inserted if
+    /// the group breaks, and will _always_ be inserted if the last element has a trailing comma
+    /// (and the magical trailing comma option is enabled). However, this setting dictates whether
+    /// trailing commas are inserted for single element groups.
+    pub(crate) fn with_trailing_comma(mut self, trailing_comma: TrailingComma) -> Self {
+        self.trailing_comma = trailing_comma;
+        self
     }
 
     pub(crate) fn entry<T>(
@@ -195,8 +216,11 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
                 };
 
                 // If there is a single entry, only keep the magic trailing comma, don't add it if
-                // it wasn't there. If there is more than one entry, always add it.
-                if magic_trailing_comma || self.entries.is_more_than_one() {
+                // it wasn't there -- unless the trailing comma behavior is set to one-or-more.
+                if magic_trailing_comma
+                    || self.trailing_comma == TrailingComma::OneOrMore
+                    || self.entries.is_more_than_one()
+                {
                     if_group_breaks(&text(",")).fmt(self.fmt)?;
                 }
 
@@ -207,56 +231,5 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
 
             Ok(())
         })
-    }
-}
-
-/// Format comments inside empty parentheses, brackets or curly braces.
-///
-/// Empty `()`, `[]` and `{}` are special because there can be dangling comments, and they can be in
-/// two positions:
-/// ```python
-/// x = [  # end-of-line
-///     # own line
-/// ]
-/// ```
-/// These comments are dangling because they can't be assigned to any element inside as they would
-/// in all other cases.
-pub(crate) fn empty_parenthesized_with_dangling_comments(
-    opening: StaticText,
-    comments: &[SourceComment],
-    closing: StaticText,
-) -> EmptyWithDanglingComments {
-    EmptyWithDanglingComments {
-        opening,
-        comments,
-        closing,
-    }
-}
-
-pub(crate) struct EmptyWithDanglingComments<'a> {
-    opening: StaticText,
-    comments: &'a [SourceComment],
-    closing: StaticText,
-}
-
-impl<'ast> Format<PyFormatContext<'ast>> for EmptyWithDanglingComments<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext>) -> FormatResult<()> {
-        let end_of_line_split = self
-            .comments
-            .partition_point(|comment| comment.line_position().is_end_of_line());
-        debug_assert!(self.comments[end_of_line_split..]
-            .iter()
-            .all(|comment| comment.line_position().is_own_line()));
-        write!(
-            f,
-            [group(&format_args![
-                self.opening,
-                // end-of-line comments
-                trailing_comments(&self.comments[..end_of_line_split]),
-                // own line comments, which need to be indented
-                soft_block_indent(&dangling_comments(&self.comments[end_of_line_split..])),
-                self.closing
-            ])]
-        )
     }
 }

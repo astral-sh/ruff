@@ -53,8 +53,8 @@ line-length = 88
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
-# Assume Python 3.10.
-target-version = "py310"
+# Assume Python 3.8
+target-version = "py38"
 ```
 
 As an example, the following would configure Ruff to: (1) enforce flake8-bugbear rules, in addition
@@ -77,6 +77,7 @@ unfixable = ["B"]
 [tool.ruff.per-file-ignores]
 "__init__.py" = ["E402"]
 "path/to/file.py" = ["E402"]
+"**/{tests,docs,tools}/*" = ["E402"]
 ```
 
 Plugin configurations should be expressed as subsections, e.g.:

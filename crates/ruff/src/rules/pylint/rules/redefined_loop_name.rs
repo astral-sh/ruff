@@ -147,9 +147,7 @@ impl<'a, 'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'a, 'b> {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         // Collect target expressions.
         match stmt {
-            // For and async for.
-            Stmt::For(ast::StmtFor { target, .. })
-            | Stmt::AsyncFor(ast::StmtAsyncFor { target, .. }) => {
+            Stmt::For(ast::StmtFor { target, .. }) => {
                 self.assignment_targets.extend(
                     assignment_targets_from_expr(target, self.dummy_variable_rgx).map(|expr| {
                         ExprWithInnerBindingKind {
@@ -159,7 +157,6 @@ impl<'a, 'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'a, 'b> {
                     }),
                 );
             }
-            // With.
             Stmt::With(ast::StmtWith { items, .. }) => {
                 self.assignment_targets.extend(
                     assignment_targets_from_with_items(items, self.dummy_variable_rgx).map(
@@ -170,7 +167,6 @@ impl<'a, 'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'a, 'b> {
                     ),
                 );
             }
-            // Assignment, augmented assignment, and annotated assignment.
             Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
                 // Check for single-target assignments which are of the
                 // form `x = cast(..., x)`.
@@ -217,8 +213,7 @@ impl<'a, 'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'a, 'b> {
         // Decide whether to recurse.
         match stmt {
             // Don't recurse into blocks that create a new scope.
-            Stmt::ClassDef(_) => {}
-            Stmt::FunctionDef(_) => {}
+            Stmt::ClassDef(_) | Stmt::FunctionDef(_) => {}
             // Otherwise, do recurse.
             _ => {
                 walk_stmt(self, stmt);
@@ -339,8 +334,7 @@ fn assignment_targets_from_assign_targets<'a>(
 /// PLW2901
 pub(crate) fn redefined_loop_name(checker: &mut Checker, stmt: &Stmt) {
     let (outer_assignment_targets, inner_assignment_targets) = match stmt {
-        Stmt::With(ast::StmtWith { items, body, .. })
-        | Stmt::AsyncWith(ast::StmtAsyncWith { items, body, .. }) => {
+        Stmt::With(ast::StmtWith { items, body, .. }) => {
             let outer_assignment_targets: Vec<ExprWithOuterBindingKind> =
                 assignment_targets_from_with_items(items, &checker.settings.dummy_variable_rgx)
                     .map(|expr| ExprWithOuterBindingKind {
@@ -358,8 +352,7 @@ pub(crate) fn redefined_loop_name(checker: &mut Checker, stmt: &Stmt) {
             }
             (outer_assignment_targets, visitor.assignment_targets)
         }
-        Stmt::For(ast::StmtFor { target, body, .. })
-        | Stmt::AsyncFor(ast::StmtAsyncFor { target, body, .. }) => {
+        Stmt::For(ast::StmtFor { target, body, .. }) => {
             let outer_assignment_targets: Vec<ExprWithOuterBindingKind> =
                 assignment_targets_from_expr(target, &checker.settings.dummy_variable_rgx)
                     .map(|expr| ExprWithOuterBindingKind {
@@ -377,9 +370,7 @@ pub(crate) fn redefined_loop_name(checker: &mut Checker, stmt: &Stmt) {
             }
             (outer_assignment_targets, visitor.assignment_targets)
         }
-        _ => panic!(
-            "redefined_loop_name called on Statement that is not a With, For, AsyncWith, or AsyncFor"
-        )
+        _ => panic!("redefined_loop_name called on Statement that is not a `With` or `For`"),
     };
 
     let mut diagnostics = Vec::new();

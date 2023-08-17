@@ -61,22 +61,21 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
         )
     }) {
         let node = ast::ExprConstant {
-            value: Constant::Str(
-                joinees
-                    .iter()
-                    .filter_map(|expr| {
-                        if let Expr::Constant(ast::ExprConstant {
-                            value: Constant::Str(string),
-                            ..
-                        }) = expr
-                        {
-                            Some(string.as_str())
-                        } else {
-                            None
-                        }
-                    })
-                    .join(joiner),
-            ),
+            value: joinees
+                .iter()
+                .filter_map(|expr| {
+                    if let Expr::Constant(ast::ExprConstant {
+                        value: Constant::Str(ast::StringConstant { value, .. }),
+                        ..
+                    }) = expr
+                    {
+                        Some(value.as_str())
+                    } else {
+                        None
+                    }
+                })
+                .join(joiner)
+                .into(),
             range: TextRange::default(),
             kind: None,
         };
@@ -87,7 +86,7 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
     let mut first = true;
 
     for expr in joinees {
-        if expr.is_joined_str_expr() {
+        if expr.is_f_string_expr() {
             // Oops, already an f-string. We don't know how to handle those
             // gracefully right now.
             return None;
@@ -95,11 +94,12 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
         if !std::mem::take(&mut first) {
             fstring_elems.push(helpers::to_constant_string(joiner));
         }
-        fstring_elems.push(helpers::to_fstring_elem(expr)?);
+        fstring_elems.push(helpers::to_f_string_element(expr)?);
     }
 
-    let node = ast::ExprJoinedStr {
+    let node = ast::ExprFString {
         values: fstring_elems,
+        implicit_concatenated: false,
         range: TextRange::default(),
     };
     Some(node.into())

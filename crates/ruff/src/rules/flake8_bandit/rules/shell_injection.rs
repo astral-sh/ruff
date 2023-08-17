@@ -10,6 +10,31 @@ use crate::{
     checkers::ast::Checker, registry::Rule, rules::flake8_bandit::helpers::string_literal,
 };
 
+/// ## What it does
+/// Check for method calls that initiate a subprocess with a shell.
+///
+/// ## Why is this bad?
+/// Starting a subprocess with a shell can allow attackers to execute arbitrary
+/// shell commands. Consider starting the process without a shell call and
+/// sanitize the input to mitigate the risk of shell injection.
+///
+/// ## Example
+/// ```python
+/// import subprocess
+///
+/// subprocess.run("ls -l", shell=True)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import subprocess
+///
+/// subprocess.run(["ls", "-l"])
+/// ```
+///
+/// ## References
+/// - [Python documentation: `subprocess` — Subprocess management](https://docs.python.org/3/library/subprocess.html)
+/// - [Common Weakness Enumeration: CWE-78](https://cwe.mitre.org/data/definitions/78.html)
 #[violation]
 pub struct SubprocessPopenWithShellEqualsTrue {
     seems_safe: bool,
@@ -28,6 +53,30 @@ impl Violation for SubprocessPopenWithShellEqualsTrue {
     }
 }
 
+/// ## What it does
+/// Check for method calls that initiate a subprocess without a shell.
+///
+/// ## Why is this bad?
+/// Starting a subprocess without a shell can prevent attackers from executing
+/// arbitrary shell commands; however, it is still error-prone. Consider
+/// validating the input.
+///
+/// ## Known problems
+/// Prone to false positives as it is difficult to determine whether the
+/// passed arguments have been validated ([#4045]).
+///
+/// ## Example
+/// ```python
+/// import subprocess
+///
+/// cmd = input("Enter a command: ").split()
+/// subprocess.run(cmd)
+/// ```
+///
+/// ## References
+/// - [Python documentation: `subprocess` — Subprocess management](https://docs.python.org/3/library/subprocess.html)
+///
+/// [#4045]: https://github.com/astral-sh/ruff/issues/4045
 #[violation]
 pub struct SubprocessWithoutShellEqualsTrue;
 

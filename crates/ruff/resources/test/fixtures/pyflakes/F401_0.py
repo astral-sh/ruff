@@ -92,3 +92,10 @@ match *0, 1, *2:
     case 0,:
         import x
         import y
+
+
+# Test: access a sub-importation via an alias.
+import foo.bar as bop
+import foo.bar.baz
+
+print(bop.baz.read_csv("test.csv"))

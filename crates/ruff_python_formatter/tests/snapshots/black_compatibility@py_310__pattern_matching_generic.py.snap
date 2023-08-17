@@ -119,49 +119,44 @@ with match() as match:
 ```diff
 --- Black
 +++ Ruff
-@@ -23,11 +23,7 @@
-             pygram.python_grammar,
+@@ -24,9 +24,9 @@
          ]
  
--    match match:
+     match match:
 -        case case:
--            match match:
++        case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+             match match:
 -                case case:
--                    pass
-+    NOT_YET_IMPLEMENTED_StmtMatch
++                case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+                     pass
  
      if all(version.is_python2() for version in target_versions):
-         # Python 2-only code, so try Python 2 grammars.
-@@ -45,9 +41,7 @@
- 
+@@ -46,7 +46,7 @@
      def test_patma_139(self):
          x = False
--        match x:
+         match x:
 -            case bool(z):
--                y = 0
-+        NOT_YET_IMPLEMENTED_StmtMatch
++            case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+                 y = 0
          self.assertIs(x, False)
          self.assertEqual(y, 0)
-         self.assertIs(z, x)
-@@ -72,16 +66,12 @@
-     def test_patma_155(self):
+@@ -73,14 +73,14 @@
          x = 0
          y = None
--        match x:
+         match x:
 -            case 1e1000:
--                y = 0
-+        NOT_YET_IMPLEMENTED_StmtMatch
++            case "NOT_YET_IMPLEMENTED_PatternMatchValue":
+                 y = 0
          self.assertEqual(x, 0)
          self.assertIs(y, None)
  
          x = range(3)
--        match x:
+         match x:
 -            case [y, case as x, z]:
--                w = 0
-+        NOT_YET_IMPLEMENTED_StmtMatch
++            case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+                 w = 0
  
      # At least one of the above branches must have been taken, because every Python
-     # version has exactly one of the two 'ASYNC_*' flags
 ```
 
 ## Ruff Output
@@ -192,7 +187,11 @@ def get_grammars(target_versions: Set[TargetVersion]) -> List[Grammar]:
             pygram.python_grammar,
         ]
 
-    NOT_YET_IMPLEMENTED_StmtMatch
+    match match:
+        case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+            match match:
+                case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+                    pass
 
     if all(version.is_python2() for version in target_versions):
         # Python 2-only code, so try Python 2 grammars.
@@ -210,7 +209,9 @@ def get_grammars(target_versions: Set[TargetVersion]) -> List[Grammar]:
 
     def test_patma_139(self):
         x = False
-        NOT_YET_IMPLEMENTED_StmtMatch
+        match x:
+            case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+                y = 0
         self.assertIs(x, False)
         self.assertEqual(y, 0)
         self.assertIs(z, x)
@@ -235,12 +236,16 @@ def get_grammars(target_versions: Set[TargetVersion]) -> List[Grammar]:
     def test_patma_155(self):
         x = 0
         y = None
-        NOT_YET_IMPLEMENTED_StmtMatch
+        match x:
+            case "NOT_YET_IMPLEMENTED_PatternMatchValue":
+                y = 0
         self.assertEqual(x, 0)
         self.assertIs(y, None)
 
         x = range(3)
-        NOT_YET_IMPLEMENTED_StmtMatch
+        match x:
+            case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+                w = 0
 
     # At least one of the above branches must have been taken, because every Python
     # version has exactly one of the two 'ASYNC_*' flags

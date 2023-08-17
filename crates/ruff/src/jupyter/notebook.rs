@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 use std::fmt::Display;
 use std::fs::File;
-use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
+use std::io::{BufReader, BufWriter, Cursor, Read, Seek, SeekFrom, Write};
 use std::iter;
 use std::path::Path;
 
@@ -26,7 +26,7 @@ pub const JUPYTER_NOTEBOOK_EXT: &str = "ipynb";
 
 /// Run round-trip source code generation on a given Jupyter notebook file path.
 pub fn round_trip(path: &Path) -> anyhow::Result<String> {
-    let mut notebook = Notebook::read(path).map_err(|err| {
+    let mut notebook = Notebook::from_path(path).map_err(|err| {
         anyhow::anyhow!(
             "Failed to read notebook file `{}`: {:?}",
             path.display(),
@@ -120,18 +120,30 @@ pub struct Notebook {
 
 impl Notebook {
     /// Read the Jupyter Notebook from the given [`Path`].
-    ///
-    /// See also the black implementation
-    /// <https://github.com/psf/black/blob/69ca0a4c7a365c5f5eea519a90980bab72cab764/src/black/__init__.py#L1017-L1046>
-    pub fn read(path: &Path) -> Result<Self, Box<Diagnostic>> {
-        let mut reader = BufReader::new(File::open(path).map_err(|err| {
+    pub fn from_path(path: &Path) -> Result<Self, Box<Diagnostic>> {
+        Self::from_reader(BufReader::new(File::open(path).map_err(|err| {
             Diagnostic::new(
                 IOError {
                     message: format!("{err}"),
                 },
                 TextRange::default(),
             )
-        })?);
+        })?))
+    }
+
+    /// Read the Jupyter Notebook from its JSON string.
+    pub fn from_contents(contents: &str) -> Result<Self, Box<Diagnostic>> {
+        Self::from_reader(Cursor::new(contents))
+    }
+
+    /// Read a Jupyter Notebook from a [`Read`] implementor.
+    ///
+    /// See also the black implementation
+    /// <https://github.com/psf/black/blob/69ca0a4c7a365c5f5eea519a90980bab72cab764/src/black/__init__.py#L1017-L1046>
+    fn from_reader<R>(mut reader: R) -> Result<Self, Box<Diagnostic>>
+    where
+        R: Read + Seek,
+    {
         let trailing_newline = reader.seek(SeekFrom::End(-1)).is_ok_and(|_| {
             let mut buf = [0; 1];
             reader.read_exact(&mut buf).is_ok_and(|_| buf[0] == b'\n')
@@ -144,7 +156,7 @@ impl Notebook {
                 TextRange::default(),
             )
         })?;
-        let raw_notebook: RawNotebook = match serde_json::from_reader(reader) {
+        let raw_notebook: RawNotebook = match serde_json::from_reader(reader.by_ref()) {
             Ok(notebook) => notebook,
             Err(err) => {
                 // Translate the error into a diagnostic
@@ -159,14 +171,19 @@ impl Notebook {
                         Category::Syntax | Category::Eof => {
                             // Maybe someone saved the python sources (those with the `# %%` separator)
                             // as jupyter notebook instead. Let's help them.
-                            let contents = std::fs::read_to_string(path).map_err(|err| {
-                                Diagnostic::new(
-                                    IOError {
-                                        message: format!("{err}"),
-                                    },
-                                    TextRange::default(),
-                                )
-                            })?;
+                            let mut contents = String::new();
+                            reader
+                                .rewind()
+                                .and_then(|_| reader.read_to_string(&mut contents))
+                                .map_err(|err| {
+                                    Diagnostic::new(
+                                        IOError {
+                                            message: format!("{err}"),
+                                        },
+                                        TextRange::default(),
+                                    )
+                                })?;
+
                             // Check if tokenizing was successful and the file is non-empty
                             if lex(&contents, Mode::Module).any(|result| result.is_err()) {
                                 Diagnostic::new(
@@ -182,7 +199,7 @@ impl Notebook {
                                 Diagnostic::new(
                                     SyntaxError {
                                         message: format!(
-                                            "Expected a Jupyter Notebook (.{JUPYTER_NOTEBOOK_EXT} extension), \
+                                            "Expected a Jupyter Notebook (.{JUPYTER_NOTEBOOK_EXT}), \
                                     which must be internally stored as JSON, \
                                     but found a Python source file: {err}"
                                         ),
@@ -484,22 +501,22 @@ mod tests {
     fn test_invalid() {
         let path = Path::new("resources/test/fixtures/jupyter/invalid_extension.ipynb");
         assert_eq!(
-            Notebook::read(path).unwrap_err().kind.body,
-            "SyntaxError: Expected a Jupyter Notebook (.ipynb extension), \
+            Notebook::from_path(path).unwrap_err().kind.body,
+            "SyntaxError: Expected a Jupyter Notebook (.ipynb), \
             which must be internally stored as JSON, \
             but found a Python source file: \
             expected value at line 1 column 1"
         );
         let path = Path::new("resources/test/fixtures/jupyter/not_json.ipynb");
         assert_eq!(
-            Notebook::read(path).unwrap_err().kind.body,
+            Notebook::from_path(path).unwrap_err().kind.body,
             "SyntaxError: A Jupyter Notebook (.ipynb) must internally be JSON, \
             but this file isn't valid JSON: \
             expected value at line 1 column 1"
         );
         let path = Path::new("resources/test/fixtures/jupyter/wrong_schema.ipynb");
         assert_eq!(
-            Notebook::read(path).unwrap_err().kind.body,
+            Notebook::from_path(path).unwrap_err().kind.body,
             "SyntaxError: This file does not match the schema expected of Jupyter Notebooks: \
             missing field `cells` at line 1 column 2"
         );
@@ -571,11 +588,11 @@ print("after empty cells")
     }
 
     #[test]
-    fn test_line_magics() -> Result<()> {
-        let path = "line_magics.ipynb".to_string();
+    fn test_ipy_escape_command() -> Result<()> {
+        let path = "ipy_escape_command.ipynb".to_string();
         let (diagnostics, source_kind, _) = test_notebook_path(
             &path,
-            Path::new("line_magics_expected.ipynb"),
+            Path::new("ipy_escape_command_expected.ipynb"),
             &settings::Settings::for_rule(Rule::UnusedImport),
         )?;
         assert_messages!(diagnostics, path, source_kind);

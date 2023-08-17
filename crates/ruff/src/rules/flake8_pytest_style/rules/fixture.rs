@@ -35,6 +35,9 @@ use super::helpers::{
 ///
 /// ## Example
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.fixture
 /// def my_fixture():
 ///     ...
@@ -42,6 +45,9 @@ use super::helpers::{
 ///
 /// Use instead:
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.fixture()
 /// def my_fixture():
 ///     ...
@@ -74,6 +80,35 @@ impl AlwaysAutofixableViolation for PytestFixtureIncorrectParenthesesStyle {
     }
 }
 
+/// ## What it does
+/// Checks for `pytest.fixture` calls with positional arguments.
+///
+/// ## Why is this bad?
+/// For clarity and consistency, prefer using keyword arguments to specify
+/// fixture configuration.
+///
+/// ## Example
+/// ```python
+/// import pytest
+///
+///
+/// @pytest.fixture("module")
+/// def my_fixture():
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import pytest
+///
+///
+/// @pytest.fixture(scope="module")
+/// def my_fixture():
+///     ...
+/// ```
+///
+/// ## References
+/// - [`pytest` documentation: `@pytest.fixture` functions](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fixture)
 #[violation]
 pub struct PytestFixturePositionalArgs {
     function: String,
@@ -87,6 +122,34 @@ impl Violation for PytestFixturePositionalArgs {
     }
 }
 
+/// ## What it does
+/// Checks for `pytest.fixture` calls with `scope="function"`.
+///
+/// ## Why is this bad?
+/// `scope="function"` can be omitted, as it is the default.
+///
+/// ## Example
+/// ```python
+/// import pytest
+///
+///
+/// @pytest.fixture(scope="function")
+/// def my_fixture():
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import pytest
+///
+///
+/// @pytest.fixture()
+/// def my_fixture():
+///     ...
+/// ```
+///
+/// ## References
+/// - [`pytest` documentation: `@pytest.fixture` functions](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fixture)
 #[violation]
 pub struct PytestExtraneousScopeFunction;
 
@@ -101,6 +164,50 @@ impl AlwaysAutofixableViolation for PytestExtraneousScopeFunction {
     }
 }
 
+/// ## What it does
+/// Checks for `pytest` fixtures that do not return a value, but are not named
+/// with a leading underscore.
+///
+/// ## Why is this bad?
+/// By convention, fixtures that don't return a value should be named with a
+/// leading underscore, while fixtures that do return a value should not.
+///
+/// This rule ignores abstract fixtures and generators.
+///
+/// ## Example
+/// ```python
+/// import pytest
+///
+///
+/// @pytest.fixture()
+/// def patch_something(mocker):
+///     mocker.patch("module.object")
+///
+///
+/// @pytest.fixture()
+/// def use_context():
+///     with create_context():
+///         yield
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import pytest
+///
+///
+/// @pytest.fixture()
+/// def _patch_something(mocker):
+///     mocker.patch("module.object")
+///
+///
+/// @pytest.fixture()
+/// def _use_context():
+///     with create_context():
+///         yield
+/// ```
+///
+/// ## References
+/// - [`pytest` documentation: `@pytest.fixture` functions](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fixture)
 #[violation]
 pub struct PytestMissingFixtureNameUnderscore {
     function: String,
@@ -114,6 +221,52 @@ impl Violation for PytestMissingFixtureNameUnderscore {
     }
 }
 
+/// ## What it does
+/// Checks for `pytest` fixtures that return a value, but are named with a
+/// leading underscore.
+///
+/// ## Why is this bad?
+/// By convention, fixtures that don't return a value should be named with a
+/// leading underscore, while fixtures that do return a value should not.
+///
+/// This rule ignores abstract fixtures.
+///
+/// ## Example
+/// ```python
+/// import pytest
+///
+///
+/// @pytest.fixture()
+/// def _some_object():
+///     return SomeClass()
+///
+///
+/// @pytest.fixture()
+/// def _some_object_with_cleanup():
+///     obj = SomeClass()
+///     yield obj
+///     obj.cleanup()
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import pytest
+///
+///
+/// @pytest.fixture()
+/// def some_object():
+///     return SomeClass()
+///
+///
+/// @pytest.fixture()
+/// def some_object_with_cleanup():
+///     obj = SomeClass()
+///     yield obj
+///     obj.cleanup()
+/// ```
+///
+/// ## References
+/// - [`pytest` documentation: `@pytest.fixture` functions](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fixture)
 #[violation]
 pub struct PytestIncorrectFixtureNameUnderscore {
     function: String,
@@ -145,6 +298,9 @@ impl Violation for PytestIncorrectFixtureNameUnderscore {
 ///
 /// ## Example
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.fixture
 /// def _patch_something():
 ///     ...
@@ -156,6 +312,9 @@ impl Violation for PytestIncorrectFixtureNameUnderscore {
 ///
 /// Use instead:
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.fixture
 /// def _patch_something():
 ///     ...
@@ -239,6 +398,9 @@ impl Violation for PytestDeprecatedYieldFixture {
 ///
 /// ## Example
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.fixture()
 /// def my_fixture(request):
 ///     resource = acquire_resource()
@@ -248,6 +410,9 @@ impl Violation for PytestDeprecatedYieldFixture {
 ///
 /// Use instead:
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.fixture()
 /// def my_fixture():
 ///     resource = acquire_resource()
@@ -288,6 +453,9 @@ impl Violation for PytestFixtureFinalizerCallback {
 ///
 /// ## Example
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.fixture()
 /// def my_fixture():
 ///     resource = acquire_resource()
@@ -296,6 +464,9 @@ impl Violation for PytestFixtureFinalizerCallback {
 ///
 /// Use instead:
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.fixture()
 /// def my_fixture_with_teardown():
 ///     resource = acquire_resource()
@@ -337,6 +508,9 @@ impl AlwaysAutofixableViolation for PytestUselessYieldFixture {
 ///
 /// ## Example
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.fixture()
 /// def a():
 ///     pass
@@ -350,6 +524,9 @@ impl AlwaysAutofixableViolation for PytestUselessYieldFixture {
 ///
 /// Use instead:
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.fixture()
 /// def a():
 ///     pass
@@ -384,6 +561,9 @@ impl AlwaysAutofixableViolation for PytestErroneousUseFixturesOnFixture {
 ///
 /// ## Example
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.mark.asyncio()
 /// @pytest.fixture()
 /// async def my_fixture():
@@ -392,6 +572,9 @@ impl AlwaysAutofixableViolation for PytestErroneousUseFixturesOnFixture {
 ///
 /// Use instead:
 /// ```python
+/// import pytest
+///
+///
 /// @pytest.fixture()
 /// async def my_fixture():
 ///     return 0
@@ -448,7 +631,7 @@ where
                     self.has_return_with_value = true;
                 }
             }
-            Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) => {}
+            Stmt::FunctionDef(_) => {}
             _ => visitor::walk_stmt(self, stmt),
         }
     }

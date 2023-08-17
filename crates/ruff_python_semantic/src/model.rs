@@ -6,7 +6,7 @@ use smallvec::smallvec;
 
 use ruff_python_ast::call_path::{collect_call_path, from_unqualified_name, CallPath};
 use ruff_python_ast::helpers::from_relative_import;
-use ruff_python_ast::{self as ast, Expr, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Expr, Operator, Ranged, Stmt};
 use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_python_stdlib::typing::is_typing_extension;
 use ruff_text_size::{TextRange, TextSize};
@@ -17,13 +17,15 @@ use crate::binding::{
 };
 use crate::context::ExecutionContext;
 use crate::definition::{Definition, DefinitionId, Definitions, Member, Module};
+use crate::expressions::{ExpressionId, Expressions};
 use crate::globals::{Globals, GlobalsArena};
-use crate::node::{NodeId, Nodes};
 use crate::reference::{
-    ResolvedReference, ResolvedReferenceId, ResolvedReferences, UnresolvedReferences,
+    ResolvedReference, ResolvedReferenceId, ResolvedReferences, UnresolvedReference,
+    UnresolvedReferenceFlags, UnresolvedReferences,
 };
 use crate::scope::{Scope, ScopeId, ScopeKind, Scopes};
-use crate::{Imported, UnresolvedReference, UnresolvedReferenceFlags};
+use crate::statements::{StatementId, Statements};
+use crate::Imported;
 
 /// A semantic model for a Python module, to enable querying the module's semantic information.
 pub struct SemanticModel<'a> {
@@ -31,13 +33,16 @@ pub struct SemanticModel<'a> {
     module_path: Option<&'a [String]>,
 
     /// Stack of all visited statements.
-    pub stmts: Nodes<'a, Stmt>,
+    statements: Statements<'a>,
 
     /// The identifier of the current statement.
-    stmt_id: Option<NodeId>,
+    statement_id: Option<StatementId>,
 
-    /// Stack of current expressions.
-    exprs: Vec<&'a Expr>,
+    /// Stack of all visited expressions.
+    expressions: Expressions<'a>,
+
+    /// The identifier of the current expression.
+    expression_id: Option<ExpressionId>,
 
     /// Stack of all scopes, along with the identifier of the current scope.
     pub scopes: Scopes<'a>,
@@ -129,9 +134,10 @@ impl<'a> SemanticModel<'a> {
         Self {
             typing_modules,
             module_path: module.path(),
-            stmts: Nodes::<Stmt>::default(),
-            stmt_id: None,
-            exprs: Vec::default(),
+            statements: Statements::default(),
+            statement_id: None,
+            expressions: Expressions::default(),
+            expression_id: None,
             scopes: Scopes::default(),
             scope_id: ScopeId::global(),
             definitions: Definitions::for_module(module),
@@ -221,17 +227,10 @@ impl<'a> SemanticModel<'a> {
             flags,
             references: Vec::new(),
             scope: self.scope_id,
-            source: self.stmt_id,
+            source: self.statement_id,
             context: self.execution_context(),
             exceptions: self.exceptions(),
         })
-    }
-
-    /// Return the current [`Binding`] for a given `name`.
-    pub fn find_binding(&self, member: &str) -> Option<&Binding> {
-        self.scopes()
-            .find_map(|scope| scope.get(member))
-            .map(|binding_id| &self.bindings[binding_id])
     }
 
     /// Return the [`BindingId`] that the given [`BindingId`] shadows, if any.
@@ -243,14 +242,16 @@ impl<'a> SemanticModel<'a> {
 
     /// Return `true` if `member` is bound as a builtin.
     pub fn is_builtin(&self, member: &str) -> bool {
-        self.find_binding(member)
+        self.lookup_symbol(member)
+            .map(|binding_id| &self.bindings[binding_id])
             .is_some_and(|binding| binding.kind.is_builtin())
     }
 
     /// Return `true` if `member` is an "available" symbol, i.e., a symbol that has not been bound
     /// in the current scope, or in any containing scope.
     pub fn is_available(&self, member: &str) -> bool {
-        self.find_binding(member)
+        self.lookup_symbol(member)
+            .map(|binding_id| &self.bindings[binding_id])
             .map_or(true, |binding| binding.kind.is_builtin())
     }
 
@@ -472,7 +473,7 @@ impl<'a> SemanticModel<'a> {
                 }
             }
 
-            seen_function |= scope.kind.is_any_function();
+            seen_function |= scope.kind.is_function();
             import_starred = import_starred || scope.uses_star_imports();
         }
 
@@ -534,7 +535,7 @@ impl<'a> SemanticModel<'a> {
                 }
             }
 
-            seen_function |= scope.kind.is_any_function();
+            seen_function |= scope.kind.is_function();
         }
 
         None
@@ -584,18 +585,35 @@ impl<'a> SemanticModel<'a> {
         // print(pa.csv.read_csv("test.csv"))
         // ```
         let import = self.bindings[binding_id].as_any_import()?;
+        if !import.is_import() {
+            return None;
+        }
+
+        // Grab, e.g., `pyarrow` from `import pyarrow as pa`.
         let call_path = import.call_path();
         let segment = call_path.last()?;
         if *segment == symbol {
             return None;
         }
 
+        // Locate the submodule import (e.g., `pyarrow.csv`) that `pa` aliases.
         let binding_id = self.scopes[scope_id].get(segment)?;
-        if !self.bindings[binding_id].kind.is_submodule_import() {
+        let submodule = &self.bindings[binding_id].as_any_import()?;
+        if !submodule.is_submodule_import() {
+            return None;
+        }
+
+        // Ensure that the submodule import and the aliased import are from the same module.
+        if import.module_name() != submodule.module_name() {
             return None;
         }
 
         Some(binding_id)
+    }
+
+    /// Resolves the [`ast::ExprName`] to the [`BindingId`] of the symbol it refers to, if any.
+    pub fn resolve_name(&self, name: &ast::ExprName) -> Option<BindingId> {
+        self.resolved_names.get(&name.into()).copied()
     }
 
     /// Resolves the [`Expr`] to a fully-qualified symbol-name, if `value` resolves to an imported
@@ -622,11 +640,10 @@ impl<'a> SemanticModel<'a> {
 
         // If the name was already resolved, look it up; otherwise, search for the symbol.
         let head = match_head(value)?;
-        let binding = if let Some(id) = self.resolved_names.get(&head.into()) {
-            self.binding(*id)
-        } else {
-            self.find_binding(&head.id)?
-        };
+        let binding = self
+            .resolve_name(head)
+            .or_else(|| self.lookup_symbol(&head.id))
+            .map(|id| self.binding(id))?;
 
         match &binding.kind {
             BindingKind::Import(Import { call_path }) => {
@@ -682,103 +699,110 @@ impl<'a> SemanticModel<'a> {
     ) -> Option<ImportedName> {
         // TODO(charlie): Pass in a slice.
         let module_path: Vec<&str> = module.split('.').collect();
-        self.scopes().enumerate().find_map(|(scope_index, scope)| {
-            scope.bindings().find_map(|(name, binding_id)| {
-                let binding = &self.bindings[binding_id];
-                match &binding.kind {
-                    // Ex) Given `module="sys"` and `object="exit"`:
-                    // `import sys`         -> `sys.exit`
-                    // `import sys as sys2` -> `sys2.exit`
-                    BindingKind::Import(Import { call_path }) => {
-                        if call_path.as_ref() == module_path.as_slice() {
-                            if let Some(source) = binding.source {
-                                // Verify that `sys` isn't bound in an inner scope.
-                                if self
-                                    .scopes()
-                                    .take(scope_index)
-                                    .all(|scope| !scope.has(name))
-                                {
-                                    return Some(ImportedName {
-                                        name: format!("{name}.{member}"),
-                                        range: self.stmts[source].range(),
-                                        context: binding.context,
-                                    });
-                                }
-                            }
-                        }
-                    }
-                    // Ex) Given `module="os.path"` and `object="join"`:
-                    // `from os.path import join`          -> `join`
-                    // `from os.path import join as join2` -> `join2`
-                    BindingKind::FromImport(FromImport { call_path }) => {
-                        if let Some((target_member, target_module)) = call_path.split_last() {
-                            if target_module == module_path.as_slice() && target_member == &member {
+        self.current_scopes()
+            .enumerate()
+            .find_map(|(scope_index, scope)| {
+                scope.bindings().find_map(|(name, binding_id)| {
+                    let binding = &self.bindings[binding_id];
+                    match &binding.kind {
+                        // Ex) Given `module="sys"` and `object="exit"`:
+                        // `import sys`         -> `sys.exit`
+                        // `import sys as sys2` -> `sys2.exit`
+                        BindingKind::Import(Import { call_path }) => {
+                            if call_path.as_ref() == module_path.as_slice() {
                                 if let Some(source) = binding.source {
-                                    // Verify that `join` isn't bound in an inner scope.
+                                    // Verify that `sys` isn't bound in an inner scope.
                                     if self
-                                        .scopes()
+                                        .current_scopes()
                                         .take(scope_index)
                                         .all(|scope| !scope.has(name))
                                     {
                                         return Some(ImportedName {
-                                            name: (*name).to_string(),
-                                            range: self.stmts[source].range(),
+                                            name: format!("{name}.{member}"),
+                                            range: self.statements[source].range(),
                                             context: binding.context,
                                         });
                                     }
                                 }
                             }
                         }
-                    }
-                    // Ex) Given `module="os"` and `object="name"`:
-                    // `import os.path ` -> `os.name`
-                    BindingKind::SubmoduleImport(SubmoduleImport { .. }) => {
-                        if name == module {
-                            if let Some(source) = binding.source {
-                                // Verify that `os` isn't bound in an inner scope.
-                                if self
-                                    .scopes()
-                                    .take(scope_index)
-                                    .all(|scope| !scope.has(name))
+                        // Ex) Given `module="os.path"` and `object="join"`:
+                        // `from os.path import join`          -> `join`
+                        // `from os.path import join as join2` -> `join2`
+                        BindingKind::FromImport(FromImport { call_path }) => {
+                            if let Some((target_member, target_module)) = call_path.split_last() {
+                                if target_module == module_path.as_slice()
+                                    && target_member == &member
                                 {
-                                    return Some(ImportedName {
-                                        name: format!("{name}.{member}"),
-                                        range: self.stmts[source].range(),
-                                        context: binding.context,
-                                    });
+                                    if let Some(source) = binding.source {
+                                        // Verify that `join` isn't bound in an inner scope.
+                                        if self
+                                            .current_scopes()
+                                            .take(scope_index)
+                                            .all(|scope| !scope.has(name))
+                                        {
+                                            return Some(ImportedName {
+                                                name: (*name).to_string(),
+                                                range: self.statements[source].range(),
+                                                context: binding.context,
+                                            });
+                                        }
+                                    }
                                 }
                             }
                         }
+                        // Ex) Given `module="os"` and `object="name"`:
+                        // `import os.path ` -> `os.name`
+                        BindingKind::SubmoduleImport(SubmoduleImport { .. }) => {
+                            if name == module {
+                                if let Some(source) = binding.source {
+                                    // Verify that `os` isn't bound in an inner scope.
+                                    if self
+                                        .current_scopes()
+                                        .take(scope_index)
+                                        .all(|scope| !scope.has(name))
+                                    {
+                                        return Some(ImportedName {
+                                            name: format!("{name}.{member}"),
+                                            range: self.statements[source].range(),
+                                            context: binding.context,
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                        // Non-imports.
+                        _ => {}
                     }
-                    // Non-imports.
-                    _ => {}
-                }
-                None
+                    None
+                })
             })
-        })
     }
 
     /// Push a [`Stmt`] onto the stack.
-    pub fn push_stmt(&mut self, stmt: &'a Stmt) {
-        self.stmt_id = Some(self.stmts.insert(stmt, self.stmt_id));
+    pub fn push_statement(&mut self, stmt: &'a Stmt) {
+        self.statement_id = Some(self.statements.insert(stmt, self.statement_id));
     }
 
     /// Pop the current [`Stmt`] off the stack.
-    pub fn pop_stmt(&mut self) {
-        let node_id = self.stmt_id.expect("Attempted to pop without statement");
-        self.stmt_id = self.stmts.parent_id(node_id);
+    pub fn pop_statement(&mut self) {
+        let node_id = self
+            .statement_id
+            .expect("Attempted to pop without statement");
+        self.statement_id = self.statements.parent_id(node_id);
     }
 
-    /// Push an [`Expr`] onto the stack.
-    pub fn push_expr(&mut self, expr: &'a Expr) {
-        self.exprs.push(expr);
+    /// Push a [`Expr`] onto the stack.
+    pub fn push_expression(&mut self, expr: &'a Expr) {
+        self.expression_id = Some(self.expressions.insert(expr, self.expression_id));
     }
 
     /// Pop the current [`Expr`] off the stack.
-    pub fn pop_expr(&mut self) {
-        self.exprs
-            .pop()
+    pub fn pop_expression(&mut self) {
+        let node_id = self
+            .expression_id
             .expect("Attempted to pop without expression");
+        self.expression_id = self.expressions.parent_id(node_id);
     }
 
     /// Push a [`Scope`] with the given [`ScopeKind`] onto the stack.
@@ -808,59 +832,99 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Return the current `Stmt`.
-    pub fn stmt(&self) -> &'a Stmt {
-        let node_id = self.stmt_id.expect("No current statement");
-        self.stmts[node_id]
+    pub fn current_statement(&self) -> &'a Stmt {
+        let node_id = self.statement_id.expect("No current statement");
+        self.statements[node_id]
+    }
+
+    /// Returns an [`Iterator`] over the current statement hierarchy, from the current [`Stmt`]
+    /// through to any parents.
+    pub fn current_statements(&self) -> impl Iterator<Item = &'a Stmt> + '_ {
+        self.statement_id
+            .iter()
+            .flat_map(|id| {
+                self.statements
+                    .ancestor_ids(*id)
+                    .map(|id| &self.statements[id])
+            })
+            .copied()
     }
 
     /// Return the parent `Stmt` of the current `Stmt`, if any.
-    pub fn stmt_parent(&self) -> Option<&'a Stmt> {
-        let node_id = self.stmt_id.expect("No current statement");
-        let parent_id = self.stmts.parent_id(node_id)?;
-        Some(self.stmts[parent_id])
+    pub fn current_statement_parent(&self) -> Option<&'a Stmt> {
+        self.current_statements().nth(1)
+    }
+
+    /// Return the grandparent `Stmt` of the current `Stmt`, if any.
+    pub fn current_statement_grandparent(&self) -> Option<&'a Stmt> {
+        self.current_statements().nth(2)
     }
 
     /// Return the current `Expr`.
-    pub fn expr(&self) -> Option<&'a Expr> {
-        self.exprs.iter().last().copied()
+    pub fn current_expression(&self) -> Option<&'a Expr> {
+        let node_id = self.expression_id?;
+        Some(self.expressions[node_id])
     }
 
-    /// Return the parent `Expr` of the current `Expr`.
-    pub fn expr_parent(&self) -> Option<&'a Expr> {
-        self.exprs.iter().rev().nth(1).copied()
+    /// Returns an [`Iterator`] over the current statement hierarchy, from the current [`Expr`]
+    /// through to any parents.
+    pub fn current_expressions(&self) -> impl Iterator<Item = &'a Expr> + '_ {
+        self.expression_id
+            .iter()
+            .flat_map(|id| {
+                self.expressions
+                    .ancestor_ids(*id)
+                    .map(|id| &self.expressions[id])
+            })
+            .copied()
     }
 
-    /// Return the grandparent `Expr` of the current `Expr`.
-    pub fn expr_grandparent(&self) -> Option<&'a Expr> {
-        self.exprs.iter().rev().nth(2).copied()
+    /// Return the parent [`Expr`] of the current [`Expr`], if any.
+    pub fn current_expression_parent(&self) -> Option<&'a Expr> {
+        self.current_expressions().nth(1)
     }
 
-    /// Return an [`Iterator`] over the current `Expr` parents.
-    pub fn expr_ancestors(&self) -> impl Iterator<Item = &&Expr> {
-        self.exprs.iter().rev().skip(1)
+    /// Return the grandparent [`Expr`] of the current [`Expr`], if any.
+    pub fn current_expression_grandparent(&self) -> Option<&'a Expr> {
+        self.current_expressions().nth(2)
     }
 
-    /// Returns a reference to the global scope
+    /// Returns a reference to the global [`Scope`].
     pub fn global_scope(&self) -> &Scope<'a> {
         self.scopes.global()
     }
 
-    /// Returns a mutable reference to the global scope
+    /// Returns a mutable reference to the global [`Scope`].
     pub fn global_scope_mut(&mut self) -> &mut Scope<'a> {
         self.scopes.global_mut()
     }
 
-    /// Returns the current top most scope.
-    pub fn scope(&self) -> &Scope<'a> {
+    /// Returns the current top-most [`Scope`].
+    pub fn current_scope(&self) -> &Scope<'a> {
         &self.scopes[self.scope_id]
     }
 
-    /// Returns the parent of the given scope, if any.
+    /// Returns a mutable reference to the current top-most [`Scope`].
+    pub fn current_scope_mut(&mut self) -> &mut Scope<'a> {
+        &mut self.scopes[self.scope_id]
+    }
+
+    /// Returns an iterator over all scopes, starting from the current [`Scope`].
+    pub fn current_scopes(&self) -> impl Iterator<Item = &Scope> {
+        self.scopes.ancestors(self.scope_id)
+    }
+
+    /// Returns an iterator over all scopes IDs, starting from the current [`Scope`].
+    pub fn current_scope_ids(&self) -> impl Iterator<Item = ScopeId> + '_ {
+        self.scopes.ancestor_ids(self.scope_id)
+    }
+
+    /// Returns the parent of the given [`Scope`], if any.
     pub fn parent_scope(&self, scope: &Scope) -> Option<&Scope<'a>> {
         scope.parent.map(|scope_id| &self.scopes[scope_id])
     }
 
-    /// Returns the first parent of the given scope that is not a [`ScopeKind::Type`] scope, if any.
+    /// Returns the first parent of the given [`Scope`] that is not of [`ScopeKind::Type`], if any.
     pub fn first_non_type_parent_scope(&self, scope: &Scope) -> Option<&Scope<'a>> {
         let mut current_scope = scope;
         while let Some(parent) = self.parent_scope(current_scope) {
@@ -873,20 +937,29 @@ impl<'a> SemanticModel<'a> {
         None
     }
 
-    /// Returns a mutable reference to the current top most scope.
-    pub fn scope_mut(&mut self) -> &mut Scope<'a> {
-        &mut self.scopes[self.scope_id]
+    /// Return the [`Statements`] vector of all statements.
+    pub const fn statements(&self) -> &Statements<'a> {
+        &self.statements
     }
 
-    /// Returns an iterator over all scopes, starting from the current scope.
-    pub fn scopes(&self) -> impl Iterator<Item = &Scope> {
-        self.scopes.ancestors(self.scope_id)
+    /// Return the [`StatementId`] corresponding to the given [`Stmt`].
+    #[inline]
+    pub fn statement_id(&self, statement: &Stmt) -> Option<StatementId> {
+        self.statements.statement_id(statement)
     }
 
-    /// Returns an iterator over all parent statements.
-    pub fn parents(&self) -> impl Iterator<Item = &Stmt> + '_ {
-        let node_id = self.stmt_id.expect("No current statement");
-        self.stmts.ancestor_ids(node_id).map(|id| self.stmts[id])
+    /// Return the [`Stmt]` corresponding to the given [`StatementId`].
+    #[inline]
+    pub fn statement(&self, statement_id: StatementId) -> &'a Stmt {
+        self.statements[statement_id]
+    }
+
+    /// Given a [`Stmt`], return its parent, if any.
+    #[inline]
+    pub fn parent_statement(&self, statement_id: StatementId) -> Option<&'a Stmt> {
+        self.statements
+            .parent_id(statement_id)
+            .map(|id| self.statements[id])
     }
 
     /// Set the [`Globals`] for the current [`Scope`].
@@ -903,7 +976,7 @@ impl<'a> SemanticModel<'a> {
                     range: *range,
                     references: Vec::new(),
                     scope: self.scope_id,
-                    source: self.stmt_id,
+                    source: self.statement_id,
                     context: self.execution_context(),
                     exceptions: self.exceptions(),
                     flags: BindingFlags::empty(),
@@ -951,20 +1024,45 @@ impl<'a> SemanticModel<'a> {
     pub fn at_top_level(&self) -> bool {
         self.scope_id.is_global()
             && self
-                .stmt_id
-                .map_or(true, |stmt_id| self.stmts.parent_id(stmt_id).is_none())
+                .statement_id
+                .map_or(true, |stmt_id| self.statements.parent_id(stmt_id).is_none())
     }
 
     /// Return `true` if the model is in an async context.
     pub fn in_async_context(&self) -> bool {
-        for scope in self.scopes() {
-            if scope.kind.is_async_function() {
-                return true;
-            }
-            if scope.kind.is_function() {
-                return false;
+        for scope in self.current_scopes() {
+            if let ScopeKind::Function(ast::StmtFunctionDef { is_async, .. }) = scope.kind {
+                return *is_async;
             }
         }
+        false
+    }
+
+    /// Return `true` if the model is in a nested union expression (e.g., the inner `Union` in
+    /// `Union[Union[int, str], float]`).
+    pub fn in_nested_union(&self) -> bool {
+        // Ex) `Union[Union[int, str], float]`
+        if self
+            .current_expression_grandparent()
+            .and_then(Expr::as_subscript_expr)
+            .is_some_and(|parent| self.match_typing_expr(&parent.value, "Union"))
+        {
+            return true;
+        }
+
+        // Ex) `int | Union[str, float]`
+        if self.current_expression_parent().is_some_and(|parent| {
+            matches!(
+                parent,
+                Expr::BinOp(ast::ExprBinOp {
+                    op: Operator::BitOr,
+                    ..
+                })
+            )
+        }) {
+            return true;
+        }
+
         false
     }
 
@@ -1031,26 +1129,29 @@ impl<'a> SemanticModel<'a> {
         exceptions
     }
 
-    /// Generate a [`Snapshot`] of the current model.
+    /// Generate a [`Snapshot`] of the current semantic model.
     pub fn snapshot(&self) -> Snapshot {
         Snapshot {
             scope_id: self.scope_id,
-            stmt_id: self.stmt_id,
+            stmt_id: self.statement_id,
+            expr_id: self.expression_id,
             definition_id: self.definition_id,
             flags: self.flags,
         }
     }
 
-    /// Restore the model to the given [`Snapshot`].
+    /// Restore the semantic model to the given [`Snapshot`].
     pub fn restore(&mut self, snapshot: Snapshot) {
         let Snapshot {
             scope_id,
             stmt_id,
+            expr_id,
             definition_id,
             flags,
         } = snapshot;
         self.scope_id = scope_id;
-        self.stmt_id = stmt_id;
+        self.statement_id = stmt_id;
+        self.expression_id = expr_id;
         self.definition_id = definition_id;
         self.flags = flags;
     }
@@ -1463,7 +1564,8 @@ impl SemanticModelFlags {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Snapshot {
     scope_id: ScopeId,
-    stmt_id: Option<NodeId>,
+    stmt_id: Option<StatementId>,
+    expr_id: Option<ExpressionId>,
     definition_id: DefinitionId,
     flags: SemanticModelFlags,
 }

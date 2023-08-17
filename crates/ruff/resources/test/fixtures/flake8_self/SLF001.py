@@ -73,3 +73,7 @@ print(foo.__dict__)
 print(foo.__str__())
 print(foo().__class__)
 print(foo._asdict())
+
+import os
+
+os._exit()

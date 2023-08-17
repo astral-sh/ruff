@@ -5,7 +5,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, DiagnosticKind, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::{AnyImport, Binding, Imported, NodeId, ResolvedReferenceId, Scope};
+use ruff_python_semantic::{AnyImport, Binding, Imported, ResolvedReferenceId, Scope, StatementId};
 use ruff_text_size::TextRange;
 
 use crate::autofix;
@@ -20,17 +20,25 @@ use crate::rules::isort::{categorize, ImportSection, ImportType};
 ///
 /// ## Why is this bad?
 /// Unused imports add a performance overhead at runtime, and risk creating
-/// import cycles.
+/// import cycles. If an import is _only_ used in typing-only contexts, it can
+/// instead be imported conditionally under an `if TYPE_CHECKING:` block to
+/// minimize runtime overhead.
+///
+/// If a class _requires_ that type annotations be available at runtime (as is
+/// the case for Pydantic, SQLAlchemy, and other libraries), consider using
+/// the [`flake8-type-checking.runtime-evaluated-base-classes`] and
+/// [`flake8-type-checking.runtime-evaluated-decorators`] settings to mark them
+/// as such.
 ///
 /// ## Example
 /// ```python
 /// from __future__ import annotations
 ///
-/// import A
+/// import local_module
 ///
 ///
-/// def foo(a: A) -> int:
-///     return len(a)
+/// def func(sized: local_module.Container) -> int:
+///     return len(sized)
 /// ```
 ///
 /// Use instead:
@@ -40,12 +48,16 @@ use crate::rules::isort::{categorize, ImportSection, ImportType};
 /// from typing import TYPE_CHECKING
 ///
 /// if TYPE_CHECKING:
-///     import A
+///     import local_module
 ///
 ///
-/// def foo(a: A) -> int:
-///     return len(a)
+/// def func(sized: local_module.Container) -> int:
+///     return len(sized)
 /// ```
+///
+/// ## Options
+/// - `flake8-type-checking.runtime-evaluated-base-classes`
+/// - `flake8-type-checking.runtime-evaluated-decorators`
 ///
 /// ## References
 /// - [PEP 536](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
@@ -76,7 +88,15 @@ impl Violation for TypingOnlyFirstPartyImport {
 ///
 /// ## Why is this bad?
 /// Unused imports add a performance overhead at runtime, and risk creating
-/// import cycles.
+/// import cycles. If an import is _only_ used in typing-only contexts, it can
+/// instead be imported conditionally under an `if TYPE_CHECKING:` block to
+/// minimize runtime overhead.
+///
+/// If a class _requires_ that type annotations be available at runtime (as is
+/// the case for Pydantic, SQLAlchemy, and other libraries), consider using
+/// the [`flake8-type-checking.runtime-evaluated-base-classes`] and
+/// [`flake8-type-checking.runtime-evaluated-decorators`] settings to mark them
+/// as such.
 ///
 /// ## Example
 /// ```python
@@ -85,7 +105,7 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// import pandas as pd
 ///
 ///
-/// def foo(df: pd.DataFrame) -> int:
+/// def func(df: pd.DataFrame) -> int:
 ///     return len(df)
 /// ```
 ///
@@ -99,9 +119,13 @@ impl Violation for TypingOnlyFirstPartyImport {
 ///     import pandas as pd
 ///
 ///
-/// def foo(df: pd.DataFrame) -> int:
+/// def func(df: pd.DataFrame) -> int:
 ///     return len(df)
 /// ```
+///
+/// ## Options
+/// - `flake8-type-checking.runtime-evaluated-base-classes`
+/// - `flake8-type-checking.runtime-evaluated-decorators`
 ///
 /// ## References
 /// - [PEP 536](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
@@ -132,7 +156,15 @@ impl Violation for TypingOnlyThirdPartyImport {
 ///
 /// ## Why is this bad?
 /// Unused imports add a performance overhead at runtime, and risk creating
-/// import cycles.
+/// import cycles. If an import is _only_ used in typing-only contexts, it can
+/// instead be imported conditionally under an `if TYPE_CHECKING:` block to
+/// minimize runtime overhead.
+///
+/// If a class _requires_ that type annotations be available at runtime (as is
+/// the case for Pydantic, SQLAlchemy, and other libraries), consider using
+/// the [`flake8-type-checking.runtime-evaluated-base-classes`] and
+/// [`flake8-type-checking.runtime-evaluated-decorators`] settings to mark them
+/// as such.
 ///
 /// ## Example
 /// ```python
@@ -141,7 +173,7 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// from pathlib import Path
 ///
 ///
-/// def foo(path: Path) -> str:
+/// def func(path: Path) -> str:
 ///     return str(path)
 /// ```
 ///
@@ -155,9 +187,13 @@ impl Violation for TypingOnlyThirdPartyImport {
 ///     from pathlib import Path
 ///
 ///
-/// def foo(path: Path) -> str:
+/// def func(path: Path) -> str:
 ///     return str(path)
 /// ```
+///
+/// ## Options
+/// - `flake8-type-checking.runtime-evaluated-base-classes`
+/// - `flake8-type-checking.runtime-evaluated-decorators`
 ///
 /// ## References
 /// - [PEP 536](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
@@ -190,9 +226,9 @@ pub(crate) fn typing_only_runtime_import(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     // Collect all typing-only imports by statement and import type.
-    let mut errors_by_statement: FxHashMap<(NodeId, ImportType), Vec<ImportBinding>> =
+    let mut errors_by_statement: FxHashMap<(StatementId, ImportType), Vec<ImportBinding>> =
         FxHashMap::default();
-    let mut ignores_by_statement: FxHashMap<(NodeId, ImportType), Vec<ImportBinding>> =
+    let mut ignores_by_statement: FxHashMap<(StatementId, ImportType), Vec<ImportBinding>> =
         FxHashMap::default();
 
     for binding_id in scope.binding_ids() {
@@ -265,7 +301,7 @@ pub(crate) fn typing_only_runtime_import(
                 continue;
             }
 
-            let Some(stmt_id) = binding.source else {
+            let Some(statement_id) = binding.source else {
                 continue;
             };
 
@@ -282,12 +318,12 @@ pub(crate) fn typing_only_runtime_import(
                 })
             {
                 ignores_by_statement
-                    .entry((stmt_id, import_type))
+                    .entry((statement_id, import_type))
                     .or_default()
                     .push(import);
             } else {
                 errors_by_statement
-                    .entry((stmt_id, import_type))
+                    .entry((statement_id, import_type))
                     .or_default()
                     .push(import);
             }
@@ -296,9 +332,9 @@ pub(crate) fn typing_only_runtime_import(
 
     // Generate a diagnostic for every import, but share a fix across all imports within the same
     // statement (excluding those that are ignored).
-    for ((stmt_id, import_type), imports) in errors_by_statement {
+    for ((statement_id, import_type), imports) in errors_by_statement {
         let fix = if checker.patch(rule_for(import_type)) {
-            fix_imports(checker, stmt_id, &imports).ok()
+            fix_imports(checker, statement_id, &imports).ok()
         } else {
             None
         };
@@ -402,12 +438,18 @@ fn is_exempt(name: &str, exempt_modules: &[&str]) -> bool {
 }
 
 /// Generate a [`Fix`] to remove typing-only imports from a runtime context.
-fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[ImportBinding]) -> Result<Fix> {
-    let stmt = checker.semantic().stmts[stmt_id];
-    let parent = checker.semantic().stmts.parent(stmt);
+fn fix_imports(
+    checker: &Checker,
+    statement_id: StatementId,
+    imports: &[ImportBinding],
+) -> Result<Fix> {
+    let statement = checker.semantic().statement(statement_id);
+    let parent = checker.semantic().parent_statement(statement_id);
+
     let member_names: Vec<Cow<'_, str>> = imports
         .iter()
-        .map(|ImportBinding { import, .. }| import.member_name())
+        .map(|ImportBinding { import, .. }| import)
+        .map(Imported::member_name)
         .collect();
 
     // Find the first reference across all imports.
@@ -422,7 +464,7 @@ fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[ImportBinding]) ->
     // Step 1) Remove the import.
     let remove_import_edit = autofix::edits::remove_unused_imports(
         member_names.iter().map(AsRef::as_ref),
-        stmt,
+        statement,
         parent,
         checker.locator(),
         checker.stylist(),
@@ -432,7 +474,7 @@ fn fix_imports(checker: &Checker, stmt_id: NodeId, imports: &[ImportBinding]) ->
     // Step 2) Add the import to a `TYPE_CHECKING` block.
     let add_import_edit = checker.importer().typing_import_edit(
         &ImportedMembers {
-            statement: stmt,
+            statement,
             names: member_names.iter().map(AsRef::as_ref).collect(),
         },
         at,

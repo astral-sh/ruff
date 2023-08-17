@@ -22,5 +22,4 @@ ruff_text_size = { path = "../ruff_text_size" }
 
 itertools = { workspace = true }
 
-
 [dev-dependencies]

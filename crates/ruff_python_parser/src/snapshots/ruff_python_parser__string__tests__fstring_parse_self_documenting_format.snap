@@ -21,20 +21,24 @@ expression: parse_ast
             ),
             conversion: None,
             format_spec: Some(
-                JoinedStr(
-                    ExprJoinedStr {
+                FString(
+                    ExprFString {
                         range: 9..12,
                         values: [
                             Constant(
                                 ExprConstant {
                                     range: 9..12,
                                     value: Str(
-                                        ">10",
+                                        StringConstant {
+                                            value: ">10",
+                                            implicit_concatenated: false,
+                                        },
                                     ),
                                     kind: None,
                                 },
                             ),
                         ],
+                        implicit_concatenated: false,
                     },
                 ),
             ),

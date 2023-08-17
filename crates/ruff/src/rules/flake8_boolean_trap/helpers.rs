@@ -1,8 +1,4 @@
-use ruff_python_ast::{self as ast, Constant, Expr, Ranged};
-
-use ruff_diagnostics::{Diagnostic, DiagnosticKind};
-
-use crate::checkers::ast::Checker;
+use ruff_python_ast::{self as ast, Constant, Expr};
 
 /// Returns `true` if a function call is allowed to use a boolean trap.
 pub(super) fn is_allowed_func_call(name: &str) -> bool {
@@ -62,18 +58,13 @@ pub(super) fn allow_boolean_trap(func: &Expr) -> bool {
     false
 }
 
-const fn is_boolean_arg(arg: &Expr) -> bool {
+/// Returns `true` if an expression is a boolean literal.
+pub(super) const fn is_boolean(expr: &Expr) -> bool {
     matches!(
-        &arg,
+        &expr,
         Expr::Constant(ast::ExprConstant {
             value: Constant::Bool(_),
             ..
         })
     )
-}
-
-pub(super) fn add_if_boolean(checker: &mut Checker, arg: &Expr, kind: DiagnosticKind) {
-    if is_boolean_arg(arg) {
-        checker.diagnostics.push(Diagnostic::new(kind, arg.range()));
-    }
 }

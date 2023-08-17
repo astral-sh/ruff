@@ -1,9 +1,8 @@
-use ruff_python_ast::{self as ast, Expr, Ranged};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
-use ruff_python_semantic::ScopeKind;
+use ruff_python_ast::{self as ast, Expr, Ranged};
+use ruff_python_semantic::{BindingKind, ScopeKind};
 
 use crate::checkers::ast::Checker;
 
@@ -62,125 +61,132 @@ impl Violation for PrivateMemberAccess {
 
 /// SLF001
 pub(crate) fn private_member_access(checker: &mut Checker, expr: &Expr) {
-    if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = expr {
-        if (attr.starts_with("__") && !attr.ends_with("__"))
-            || (attr.starts_with('_') && !attr.starts_with("__"))
+    let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = expr else {
+        return;
+    };
+
+    if (attr.starts_with("__") && !attr.ends_with("__"))
+        || (attr.starts_with('_') && !attr.starts_with("__"))
+    {
+        if checker
+            .settings
+            .flake8_self
+            .ignore_names
+            .contains(attr.as_ref())
         {
+            return;
+        }
+
+        // Ignore accesses on instances within special methods (e.g., `__eq__`).
+        if let ScopeKind::Function(ast::StmtFunctionDef { name, .. }) =
+            checker.semantic().current_scope().kind
+        {
+            if matches!(
+                name.as_str(),
+                "__lt__"
+                    | "__le__"
+                    | "__eq__"
+                    | "__ne__"
+                    | "__gt__"
+                    | "__ge__"
+                    | "__add__"
+                    | "__sub__"
+                    | "__mul__"
+                    | "__matmul__"
+                    | "__truediv__"
+                    | "__floordiv__"
+                    | "__mod__"
+                    | "__divmod__"
+                    | "__pow__"
+                    | "__lshift__"
+                    | "__rshift__"
+                    | "__and__"
+                    | "__xor__"
+                    | "__or__"
+                    | "__radd__"
+                    | "__rsub__"
+                    | "__rmul__"
+                    | "__rmatmul__"
+                    | "__rtruediv__"
+                    | "__rfloordiv__"
+                    | "__rmod__"
+                    | "__rdivmod__"
+                    | "__rpow__"
+                    | "__rlshift__"
+                    | "__rrshift__"
+                    | "__rand__"
+                    | "__rxor__"
+                    | "__ror__"
+                    | "__iadd__"
+                    | "__isub__"
+                    | "__imul__"
+                    | "__imatmul__"
+                    | "__itruediv__"
+                    | "__ifloordiv__"
+                    | "__imod__"
+                    | "__ipow__"
+                    | "__ilshift__"
+                    | "__irshift__"
+                    | "__iand__"
+                    | "__ixor__"
+                    | "__ior__"
+            ) {
+                return;
+            }
+        }
+
+        // Allow some documented private methods, like `os._exit()`.
+        if let Some(call_path) = checker.semantic().resolve_call_path(expr) {
+            if matches!(call_path.as_slice(), ["os", "_exit"]) {
+                return;
+            }
+        }
+
+        if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
+            // Ignore `super()` calls.
+            if let Some(call_path) = collect_call_path(func) {
+                if matches!(call_path.as_slice(), ["super"]) {
+                    return;
+                }
+            }
+        }
+
+        if let Some(call_path) = collect_call_path(value) {
+            // Ignore `self` and `cls` accesses.
+            if matches!(call_path.as_slice(), ["self" | "cls" | "mcs"]) {
+                return;
+            }
+        }
+
+        if let Expr::Name(name) = value.as_ref() {
+            // Ignore accesses on class members from _within_ the class.
             if checker
-                .settings
-                .flake8_self
-                .ignore_names
-                .contains(attr.as_ref())
+                .semantic()
+                .resolve_name(name)
+                .and_then(|id| {
+                    if let BindingKind::ClassDefinition(scope) = checker.semantic().binding(id).kind
+                    {
+                        Some(scope)
+                    } else {
+                        None
+                    }
+                })
+                .is_some_and(|scope| {
+                    checker
+                        .semantic()
+                        .current_scope_ids()
+                        .any(|parent| scope == parent)
+                })
             {
                 return;
             }
-
-            // Ignore accesses on instances within special methods (e.g., `__eq__`).
-            if let ScopeKind::Function(ast::StmtFunctionDef { name, .. }) =
-                checker.semantic().scope().kind
-            {
-                if matches!(
-                    name.as_str(),
-                    "__lt__"
-                        | "__le__"
-                        | "__eq__"
-                        | "__ne__"
-                        | "__gt__"
-                        | "__ge__"
-                        | "__add__"
-                        | "__sub__"
-                        | "__mul__"
-                        | "__matmul__"
-                        | "__truediv__"
-                        | "__floordiv__"
-                        | "__mod__"
-                        | "__divmod__"
-                        | "__pow__"
-                        | "__lshift__"
-                        | "__rshift__"
-                        | "__and__"
-                        | "__xor__"
-                        | "__or__"
-                        | "__radd__"
-                        | "__rsub__"
-                        | "__rmul__"
-                        | "__rmatmul__"
-                        | "__rtruediv__"
-                        | "__rfloordiv__"
-                        | "__rmod__"
-                        | "__rdivmod__"
-                        | "__rpow__"
-                        | "__rlshift__"
-                        | "__rrshift__"
-                        | "__rand__"
-                        | "__rxor__"
-                        | "__ror__"
-                        | "__iadd__"
-                        | "__isub__"
-                        | "__imul__"
-                        | "__imatmul__"
-                        | "__itruediv__"
-                        | "__ifloordiv__"
-                        | "__imod__"
-                        | "__ipow__"
-                        | "__ilshift__"
-                        | "__irshift__"
-                        | "__iand__"
-                        | "__ixor__"
-                        | "__ior__"
-                ) {
-                    return;
-                }
-            }
-
-            if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
-                // Ignore `super()` calls.
-                if let Some(call_path) = collect_call_path(func) {
-                    if matches!(call_path.as_slice(), ["super"]) {
-                        return;
-                    }
-                }
-            } else if let Some(call_path) = collect_call_path(value) {
-                // Ignore `self` and `cls` accesses.
-                if matches!(call_path.as_slice(), ["self" | "cls" | "mcs"]) {
-                    return;
-                }
-
-                // Ignore accesses on class members from _within_ the class.
-                if checker
-                    .semantic()
-                    .scopes
-                    .iter()
-                    .rev()
-                    .find_map(|scope| match &scope.kind {
-                        ScopeKind::Class(ast::StmtClassDef { name, .. }) => Some(name),
-                        _ => None,
-                    })
-                    .is_some_and(|name| {
-                        if call_path.as_slice() == [name.as_str()] {
-                            checker
-                                .semantic()
-                                .find_binding(name)
-                                .is_some_and(|binding| {
-                                    // TODO(charlie): Could the name ever be bound to a
-                                    // _different_ class here?
-                                    binding.kind.is_class_definition()
-                                })
-                        } else {
-                            false
-                        }
-                    })
-                {
-                    return;
-                }
-            }
-
-            checker.diagnostics.push(Diagnostic::new(
-                PrivateMemberAccess {
-                    access: attr.to_string(),
-                },
-                expr.range(),
-            ));
         }
+
+        checker.diagnostics.push(Diagnostic::new(
+            PrivateMemberAccess {
+                access: attr.to_string(),
+            },
+            expr.range(),
+        ));
     }
 }

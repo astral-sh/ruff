@@ -2,7 +2,7 @@ use ruff_formatter::{write, FormatRuleWithOptions};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{Constant, Expr, ExprAttribute, ExprConstant};
 
-use crate::comments::{leading_comments, trailing_comments};
+use crate::comments::{leading_comments, trailing_comments, SourceComment};
 use crate::expression::parentheses::{
     is_expression_parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
 };
@@ -35,111 +35,122 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
 
         let call_chain_layout = self.call_chain_layout.apply_in_node(item, f);
 
-        let needs_parentheses = matches!(
-            value.as_ref(),
-            Expr::Constant(ExprConstant {
-                value: Constant::Int(_) | Constant::Float(_),
-                ..
-            })
-        );
+        let format_inner = format_with(|f: &mut PyFormatter| {
+            let needs_parentheses = matches!(
+                value.as_ref(),
+                Expr::Constant(ExprConstant {
+                    value: Constant::Int(_) | Constant::Float(_),
+                    ..
+                })
+            );
 
-        let comments = f.context().comments().clone();
-        let dangling_comments = comments.dangling_comments(item);
-        let leading_attribute_comments_start =
-            dangling_comments.partition_point(|comment| comment.line_position().is_end_of_line());
-        let (trailing_dot_comments, leading_attribute_comments) =
-            dangling_comments.split_at(leading_attribute_comments_start);
+            let comments = f.context().comments().clone();
+            let dangling_comments = comments.dangling_comments(item);
+            let leading_attribute_comments_start = dangling_comments
+                .partition_point(|comment| comment.line_position().is_end_of_line());
+            let (trailing_dot_comments, leading_attribute_comments) =
+                dangling_comments.split_at(leading_attribute_comments_start);
 
-        if needs_parentheses {
-            value.format().with_options(Parentheses::Always).fmt(f)?;
-        } else if call_chain_layout == CallChainLayout::Fluent {
-            match value.as_ref() {
-                Expr::Attribute(expr) => {
-                    expr.format().with_options(call_chain_layout).fmt(f)?;
-                }
-                Expr::Call(expr) => {
-                    expr.format().with_options(call_chain_layout).fmt(f)?;
-                    if call_chain_layout == CallChainLayout::Fluent {
-                        // Format the dot on its own line
-                        soft_line_break().fmt(f)?;
+            if needs_parentheses {
+                value.format().with_options(Parentheses::Always).fmt(f)?;
+            } else if call_chain_layout == CallChainLayout::Fluent {
+                match value.as_ref() {
+                    Expr::Attribute(expr) => {
+                        expr.format().with_options(call_chain_layout).fmt(f)?;
+                    }
+                    Expr::Call(expr) => {
+                        expr.format().with_options(call_chain_layout).fmt(f)?;
+                        if call_chain_layout == CallChainLayout::Fluent {
+                            // Format the dot on its own line
+                            soft_line_break().fmt(f)?;
+                        }
+                    }
+                    Expr::Subscript(expr) => {
+                        expr.format().with_options(call_chain_layout).fmt(f)?;
+                        if call_chain_layout == CallChainLayout::Fluent {
+                            // Format the dot on its own line
+                            soft_line_break().fmt(f)?;
+                        }
+                    }
+                    _ => {
+                        // This matches [`CallChainLayout::from_expression`]
+                        if is_expression_parenthesized(value.as_ref().into(), f.context().source())
+                        {
+                            value.format().with_options(Parentheses::Always).fmt(f)?;
+                            // Format the dot on its own line
+                            soft_line_break().fmt(f)?;
+                        } else {
+                            value.format().fmt(f)?;
+                        }
                     }
                 }
-                Expr::Subscript(expr) => {
-                    expr.format().with_options(call_chain_layout).fmt(f)?;
-                    if call_chain_layout == CallChainLayout::Fluent {
-                        // Format the dot on its own line
-                        soft_line_break().fmt(f)?;
-                    }
-                }
-                _ => {
-                    // This matches [`CallChainLayout::from_expression`]
-                    if is_expression_parenthesized(value.as_ref().into(), f.context().source()) {
-                        value.format().with_options(Parentheses::Always).fmt(f)?;
-                        // Format the dot on its own line
-                        soft_line_break().fmt(f)?;
-                    } else {
-                        value.format().fmt(f)?;
-                    }
-                }
+            } else {
+                value.format().fmt(f)?;
             }
-        } else {
-            value.format().fmt(f)?;
-        }
 
-        if comments.has_trailing_own_line_comments(value.as_ref()) {
-            hard_line_break().fmt(f)?;
-        }
+            if comments.has_trailing_own_line_comments(value.as_ref()) {
+                hard_line_break().fmt(f)?;
+            }
 
-        if call_chain_layout == CallChainLayout::Fluent {
-            // Fluent style has line breaks before the dot
-            // ```python
-            // blogs3 = (
-            //     Blog.objects.filter(
-            //         entry__headline__contains="Lennon",
-            //     )
-            //     .filter(
-            //         entry__pub_date__year=2008,
-            //     )
-            //     .filter(
-            //         entry__pub_date__year=2008,
-            //     )
-            // )
-            // ```
-            write!(
-                f,
-                [
-                    (!leading_attribute_comments.is_empty()).then_some(hard_line_break()),
-                    leading_comments(leading_attribute_comments),
-                    text("."),
-                    trailing_comments(trailing_dot_comments),
-                    attr.format()
-                ]
-            )
+            if call_chain_layout == CallChainLayout::Fluent {
+                // Fluent style has line breaks before the dot
+                // ```python
+                // blogs3 = (
+                //     Blog.objects.filter(
+                //         entry__headline__contains="Lennon",
+                //     )
+                //     .filter(
+                //         entry__pub_date__year=2008,
+                //     )
+                //     .filter(
+                //         entry__pub_date__year=2008,
+                //     )
+                // )
+                // ```
+                write!(
+                    f,
+                    [
+                        (!leading_attribute_comments.is_empty()).then_some(hard_line_break()),
+                        leading_comments(leading_attribute_comments),
+                        text("."),
+                        trailing_comments(trailing_dot_comments),
+                        attr.format()
+                    ]
+                )
+            } else {
+                // Regular style
+                // ```python
+                // blogs2 = Blog.objects.filter(
+                //     entry__headline__contains="Lennon",
+                // ).filter(
+                //     entry__pub_date__year=2008,
+                // )
+                // ```
+                write!(
+                    f,
+                    [
+                        text("."),
+                        trailing_comments(trailing_dot_comments),
+                        (!leading_attribute_comments.is_empty()).then_some(hard_line_break()),
+                        leading_comments(leading_attribute_comments),
+                        attr.format()
+                    ]
+                )
+            }
+        });
+
+        let is_call_chain_root = self.call_chain_layout == CallChainLayout::Default
+            && call_chain_layout == CallChainLayout::Fluent;
+        if is_call_chain_root {
+            write!(f, [group(&format_inner)])
         } else {
-            // Regular style
-            // ```python
-            // blogs2 = Blog.objects.filter(
-            //     entry__headline__contains="Lennon",
-            // ).filter(
-            //     entry__pub_date__year=2008,
-            // )
-            // ```
-            write!(
-                f,
-                [
-                    text("."),
-                    trailing_comments(trailing_dot_comments),
-                    (!leading_attribute_comments.is_empty()).then_some(hard_line_break()),
-                    leading_comments(leading_attribute_comments),
-                    attr.format()
-                ]
-            )
+            write!(f, [format_inner])
         }
     }
 
     fn fmt_dangling_comments(
         &self,
-        _node: &ExprAttribute,
+        _dangling_comments: &[SourceComment],
         _f: &mut PyFormatter,
     ) -> FormatResult<()> {
         // handle in `fmt_fields`

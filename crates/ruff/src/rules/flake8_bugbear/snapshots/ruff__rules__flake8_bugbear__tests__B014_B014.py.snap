@@ -64,4 +64,22 @@ B014.py:49:8: B014 [*] Exception handler with duplicate exception: `re.error`
 51 51 |     pass
 52 52 | 
 
+B014.py:82:8: B014 [*] Exception handler with duplicate exception: `ValueError`
+   |
+80 | try:
+81 |     pass
+82 | except (ValueError, ValueError, TypeError):
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B014
+83 |     pass
+   |
+   = help: De-duplicate exceptions
+
+ℹ Fix
+79 79 | # https://github.com/astral-sh/ruff/issues/6412
+80 80 | try:
+81 81 |     pass
+82    |-except (ValueError, ValueError, TypeError):
+   82 |+except (ValueError, TypeError):
+83 83 |     pass
+
 

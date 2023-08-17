@@ -65,7 +65,7 @@ pub(crate) fn non_lowercase_variable_in_function(checker: &mut Checker, expr: &E
         return;
     }
 
-    let parent = checker.semantic().stmt();
+    let parent = checker.semantic().current_statement();
     if helpers::is_named_tuple_assignment(parent, checker.semantic())
         || helpers::is_typed_dict_assignment(parent, checker.semantic())
         || helpers::is_type_var_assignment(parent, checker.semantic())

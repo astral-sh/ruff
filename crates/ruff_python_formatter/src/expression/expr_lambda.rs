@@ -1,4 +1,4 @@
-use crate::comments::dangling_node_comments;
+use crate::comments::{dangling_node_comments, SourceComment};
 use crate::context::PyFormatContext;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::other::parameters::ParametersParentheses;
@@ -22,7 +22,10 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
 
         write!(f, [text("lambda")])?;
 
-        if !parameters.args.is_empty() || parameters.vararg.is_some() || parameters.kwarg.is_some()
+        if !parameters.args.is_empty()
+            || !parameters.posonlyargs.is_empty()
+            || parameters.vararg.is_some()
+            || parameters.kwarg.is_some()
         {
             write!(
                 f,
@@ -52,7 +55,11 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
         )
     }
 
-    fn fmt_dangling_comments(&self, _node: &ExprLambda, _f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         // Override. Dangling comments are handled in `fmt_fields`.
         Ok(())
     }

@@ -111,3 +111,56 @@ f (
     1
     # abc
 )
+
+threshold_date = datetime.datetime.now() - datetime.timedelta(  # comment
+    days=threshold_days_threshold_days
+)
+
+# Parenthesized and opening-parenthesis comments
+func(
+    (x for x in y)
+)
+
+func(  # outer comment
+    (x for x in y)
+)
+
+func(
+    ( # inner comment
+        x for x in y
+    )
+)
+
+func(
+    (
+        # inner comment
+        x for x in y
+    )
+)
+
+func(  # outer comment
+    (  # inner comment
+        1
+    )
+)
+
+func(
+    # outer comment
+    ( # inner comment
+        x for x in y
+    )
+)
+
+
+func(
+    ( # inner comment
+        []
+    )
+)
+
+func(
+    # outer comment
+    ( # inner comment
+        []
+    )
+)
