@@ -1,17 +1,28 @@
+use anyhow::Result;
+
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Arguments, Expr};
-use ruff_text_size::TextRange;
+use ruff_python_ast::{self as ast, Arguments, Expr, Ranged};
+use ruff_python_semantic::SemanticModel;
 
+use crate::importer::ImportRequest;
 use crate::{checkers::ast::Checker, registry::Rule};
 
 /// ## What it does
-/// Avoid quadratic list summation, or the flattening of multiple lists into one via the use of the
-/// `sum()` built-in function.
+/// Checks for the use of `sum()` to flatten lists of lists, which has
+/// quadratic complexity.
 ///
 /// ## Why is this bad?
-/// Quadratic list summation is slower than other methods of list flattening. See the link in
-/// [`References`](#references) for `timeit` results on other ways of flattening lists.
+/// The use of `sum()` to flatten lists of lists is quadratic in the number of
+/// lists, as `sum()` creates a new list for each element in the summation.
+///
+/// Instead, consider using another method of flattening lists to avoid
+/// quadratic complexity. The following methods are all linear in the number of
+/// lists:
+///
+/// - `functools.reduce(operator.iconcat, lists, [])`
+/// - `list(itertools.chain.from_iterable(lists)`
+/// - `[item for sublist in lists for item in sublist]`
 ///
 /// ## Example
 /// ```python
@@ -21,23 +32,28 @@ use crate::{checkers::ast::Checker, registry::Rule};
 ///
 /// Use instead:
 /// ```python
+/// import functools
+/// import operator
+///
+///
 /// lists = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
-/// joined = [el for list in lists for el in list]
+/// functools.reduce(operator.iconcat, lists, [])
 /// ```
 ///
 /// ## References
-/// [How do I make a flat list out of a list of lists?](https://stackoverflow.com/questions/952914/how-do-i-make-a-flat-list-out-of-a-list-of-lists/953097#953097)
+/// - [_How Not to Flatten a List of Lists in Python_](https://mathieularose.com/how-not-to-flatten-a-list-of-lists-in-python)
+/// - [_How do I make a flat list out of a list of lists?_](https://stackoverflow.com/questions/952914/how-do-i-make-a-flat-list-out-of-a-list-of-lists/953097#953097)
 #[violation]
 pub struct QuadraticListSummation;
 
 impl AlwaysAutofixableViolation for QuadraticListSummation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Replace quadratic list summation with list comprehension")
+        format!("Avoid quadratic list summation")
     }
 
     fn autofix_title(&self) -> String {
-        format!("Convert to list comprehension")
+        format!("Replace with `functools.reduce`")
     }
 }
 
@@ -49,63 +65,69 @@ pub(crate) fn quadratic_list_summation(checker: &mut Checker, call: &ast::ExprCa
         range,
     } = call;
 
-    if !func_is_builtin(func, "sum", checker) {
+    if !func_is_builtin(func, "sum", checker.semantic()) {
         return;
     }
 
-    if !start_is_list(arguments, checker) {
+    if !start_is_empty_list(arguments, checker.semantic()) {
         return;
     };
 
-    let Arguments { args, .. } = arguments;
-    let Some(first) = args.first() else {
+    let Some(iterable) = arguments.args.first() else {
         return;
-    };
-
-    let list_as_str = match first {
-        Expr::Name(ast::ExprName { id, .. }) => Some(id.as_str()),
-        Expr::List(ast::ExprList { range, .. }) => Some(checker.locator().slice(*range)),
-        _ => return,
     };
 
     let mut diagnostic = Diagnostic::new(QuadraticListSummation, *range);
     if checker.patch(Rule::QuadraticListSummation) {
-        let Some(str_repr) = list_as_str else {
-            return;
-        };
-
-        diagnostic.set_fix(convert_to_comprehension(str_repr, *range));
+        diagnostic.try_set_fix(convert_to_reduce(iterable, call, checker));
     }
-
     checker.diagnostics.push(diagnostic);
 }
 
 /// Check if a function is a builtin with a given name.
-fn func_is_builtin(func: &Expr, name: &str, checker: &mut Checker) -> bool {
+fn func_is_builtin(func: &Expr, name: &str, semantic: &SemanticModel) -> bool {
     let Expr::Name(ast::ExprName { id, .. }) = func else {
         return false;
     };
-
-    id == name && checker.semantic().is_builtin(id)
+    id == name && semantic.is_builtin(id)
 }
 
-fn convert_to_comprehension(container_list_name: &str, range: TextRange) -> Fix {
-    Fix::suggested(Edit::range_replacement(
-        format!("[el for lst in {container_list_name} for el in lst]"),
-        range,
+/// Generate a [`Fix`] to convert a `sum()` call to a `functools.reduce()` call.
+fn convert_to_reduce(iterable: &Expr, call: &ast::ExprCall, checker: &Checker) -> Result<Fix> {
+    let (reduce_edit, reduce_binding) = checker.importer().get_or_import_symbol(
+        &ImportRequest::import("reduce", "reduce"),
+        call.start(),
+        checker.semantic(),
+    )?;
+
+    let (iadd_edit, iadd_binding) = checker.importer().get_or_import_symbol(
+        &ImportRequest::import("iadd", "iadd"),
+        iterable.start(),
+        checker.semantic(),
+    )?;
+
+    let iterable = checker.locator().slice(iterable.range());
+
+    Ok(Fix::suggested_edits(
+        Edit::range_replacement(
+            format!("{reduce_binding}({iadd_binding}, {iterable}, [])"),
+            call.range(),
+        ),
+        [reduce_edit, iadd_edit],
     ))
 }
 
-fn start_is_list(arguments: &Arguments, checker: &mut Checker) -> bool {
-    let Some(start_arg) = arguments.find_argument("start", 1) else {
+/// Returns `true` if the `start` argument to a `sum()` call is an empty list.
+fn start_is_empty_list(arguments: &Arguments, semantic: &SemanticModel) -> bool {
+    let Some(keyword) = arguments.find_keyword("start") else {
         return false;
     };
 
-    match start_arg {
-        Expr::Call(ast::ExprCall { func, .. }) => func_is_builtin(func, "list", checker),
-        Expr::List(ast::ExprList { elts, ctx, .. }) => {
-            elts.is_empty() && ctx == &ast::ExprContext::Load
-        }
+    match &keyword.value {
+        Expr::Call(ast::ExprCall {
+            func, arguments, ..
+        }) => arguments.is_empty() && func_is_builtin(func, "list", semantic),
+        Expr::List(ast::ExprList { elts, ctx, .. }) => elts.is_empty() && ctx.is_load(),
         _ => false,
     }
 }
