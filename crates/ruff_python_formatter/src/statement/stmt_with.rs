@@ -4,11 +4,12 @@ use ruff_python_ast::{Ranged, StmtWith};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::TextRange;
 
-use crate::comments::{trailing_comments, SourceComment};
+use crate::comments::SourceComment;
 use crate::expression::parentheses::{
     in_parentheses_only_soft_line_break_or_space, optional_parentheses, parenthesized,
 };
 use crate::prelude::*;
+use crate::statement::clause::{clause_header, ClauseHeader};
 use crate::FormatNodeRule;
 
 #[derive(Default)]
@@ -16,16 +17,6 @@ pub struct FormatStmtWith;
 
 impl FormatNodeRule<StmtWith> for FormatStmtWith {
     fn fmt_fields(&self, item: &StmtWith, f: &mut PyFormatter) -> FormatResult<()> {
-        write!(
-            f,
-            [
-                item.is_async
-                    .then_some(format_args![text("async"), space()]),
-                text("with"),
-                space()
-            ]
-        )?;
-
         // The `with` statement can have one dangling comment on the open parenthesis, like:
         // ```python
         // with (  # comment
@@ -48,41 +39,57 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
         });
         let (parenthesized_comments, colon_comments) = dangling_comments.split_at(partition_point);
 
-        if !parenthesized_comments.is_empty() {
-            let joined = format_with(|f: &mut PyFormatter| {
-                f.join_comma_separated(item.body.first().unwrap().start())
-                    .nodes(&item.items)
-                    .finish()
-            });
-
-            parenthesized("(", &joined, ")")
-                .with_dangling_comments(parenthesized_comments)
-                .fmt(f)?;
-        } else if are_with_items_parenthesized(item, f.context())? {
-            optional_parentheses(&format_with(|f| {
-                let mut joiner = f.join_comma_separated(item.body.first().unwrap().start());
-
-                for item in &item.items {
-                    joiner.entry_with_line_separator(
-                        item,
-                        &item.format(),
-                        in_parentheses_only_soft_line_break_or_space(),
-                    );
-                }
-                joiner.finish()
-            }))
-            .fmt(f)?;
-        } else {
-            f.join_with(format_args![text(","), space()])
-                .entries(item.items.iter().formatted())
-                .finish()?;
-        }
-
         write!(
             f,
             [
-                text(":"),
-                trailing_comments(colon_comments),
+                clause_header(
+                    ClauseHeader::With(item),
+                    colon_comments,
+                    &format_with(|f| {
+                        write!(
+                            f,
+                            [
+                                item.is_async
+                                    .then_some(format_args![text("async"), space()]),
+                                text("with"),
+                                space()
+                            ]
+                        )?;
+
+                        if !parenthesized_comments.is_empty() {
+                            let joined = format_with(|f: &mut PyFormatter| {
+                                f.join_comma_separated(item.body.first().unwrap().start())
+                                    .nodes(&item.items)
+                                    .finish()
+                            });
+
+                            parenthesized("(", &joined, ")")
+                                .with_dangling_comments(parenthesized_comments)
+                                .fmt(f)?;
+                        } else if are_with_items_parenthesized(item, f.context())? {
+                            optional_parentheses(&format_with(|f| {
+                                let mut joiner =
+                                    f.join_comma_separated(item.body.first().unwrap().start());
+
+                                for item in &item.items {
+                                    joiner.entry_with_line_separator(
+                                        item,
+                                        &item.format(),
+                                        in_parentheses_only_soft_line_break_or_space(),
+                                    );
+                                }
+                                joiner.finish()
+                            }))
+                            .fmt(f)?;
+                        } else {
+                            f.join_with(format_args![text(","), space()])
+                                .entries(item.items.iter().formatted())
+                                .finish()?;
+                        }
+
+                        Ok(())
+                    })
+                ),
                 block_indent(&item.body.format())
             ]
         )

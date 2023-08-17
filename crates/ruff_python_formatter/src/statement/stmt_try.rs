@@ -1,11 +1,12 @@
 use ruff_formatter::{write, FormatRuleWithOptions};
-use ruff_python_ast::{ExceptHandler, Ranged, StmtTry, Suite};
+use ruff_python_ast::{ExceptHandler, Ranged, StmtTry};
 
 use crate::comments;
+use crate::comments::leading_alternate_branch_comments;
 use crate::comments::SourceComment;
-use crate::comments::{leading_alternate_branch_comments, trailing_comments};
 use crate::other::except_handler_except_handler::ExceptHandlerKind;
 use crate::prelude::*;
+use crate::statement::clause::{clause_header, ClauseHeader, ElseClause};
 use crate::statement::{FormatRefWithRule, Stmt};
 use crate::{FormatNodeRule, PyFormatter};
 
@@ -55,8 +56,8 @@ impl FormatNodeRule<StmtTry> for FormatStmtTry {
         let StmtTry {
             body,
             handlers,
-            orelse,
-            finalbody,
+            orelse: _,
+            finalbody: _,
             is_star,
             range: _,
         } = item;
@@ -64,7 +65,7 @@ impl FormatNodeRule<StmtTry> for FormatStmtTry {
         let comments_info = f.context().comments().clone();
         let mut dangling_comments = comments_info.dangling_comments(item);
 
-        (_, dangling_comments) = format_case("try", body, None, dangling_comments, f)?;
+        (_, dangling_comments) = format_case(item, CaseKind::Try, None, dangling_comments, f)?;
         let mut previous_node = body.last();
 
         for handler in handlers {
@@ -86,9 +87,9 @@ impl FormatNodeRule<StmtTry> for FormatStmtTry {
         }
 
         (previous_node, dangling_comments) =
-            format_case("else", orelse, previous_node, dangling_comments, f)?;
+            format_case(item, CaseKind::Else, previous_node, dangling_comments, f)?;
 
-        format_case("finally", finalbody, previous_node, dangling_comments, f)?;
+        format_case(item, CaseKind::Finally, previous_node, dangling_comments, f)?;
 
         write!(f, [comments::dangling_comments(dangling_comments)])
     }
@@ -104,25 +105,39 @@ impl FormatNodeRule<StmtTry> for FormatStmtTry {
 }
 
 fn format_case<'a>(
-    name: &'static str,
-    body: &Suite,
+    try_statement: &StmtTry,
+    kind: CaseKind,
     previous_node: Option<&Stmt>,
     dangling_comments: &'a [SourceComment],
     f: &mut PyFormatter,
 ) -> FormatResult<(Option<&'a Stmt>, &'a [SourceComment])> {
+    let body = match kind {
+        CaseKind::Try => &try_statement.body,
+        CaseKind::Else => &try_statement.orelse,
+        CaseKind::Finally => &try_statement.finalbody,
+    };
+
     Ok(if let Some(last) = body.last() {
         let case_comments_start =
             dangling_comments.partition_point(|comment| comment.slice().end() <= last.end());
         let (case_comments, rest) = dangling_comments.split_at(case_comments_start);
         let partition_point =
             case_comments.partition_point(|comment| comment.line_position().is_own_line());
+
+        let (leading_case_comments, trailing_case_comments) =
+            case_comments.split_at(partition_point);
+
+        let header = match kind {
+            CaseKind::Try => ClauseHeader::Try(try_statement),
+            CaseKind::Else => ClauseHeader::OrElse(ElseClause::Try(try_statement)),
+            CaseKind::Finally => ClauseHeader::TryFinally(try_statement),
+        };
+
         write!(
             f,
             [
-                leading_alternate_branch_comments(&case_comments[..partition_point], previous_node),
-                text(name),
-                text(":"),
-                trailing_comments(&case_comments[partition_point..]),
+                clause_header(header, trailing_case_comments, &text(kind.keyword()))
+                    .with_leading_comments(leading_case_comments, previous_node),
                 block_indent(&body.format())
             ]
         )?;
@@ -130,4 +145,21 @@ fn format_case<'a>(
     } else {
         (None, dangling_comments)
     })
+}
+
+#[derive(Copy, Clone)]
+enum CaseKind {
+    Try,
+    Else,
+    Finally,
+}
+
+impl CaseKind {
+    fn keyword(self) -> &'static str {
+        match self {
+            CaseKind::Try => "try",
+            CaseKind::Else => "else",
+            CaseKind::Finally => "finally",
+        }
+    }
 }

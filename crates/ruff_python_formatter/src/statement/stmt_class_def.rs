@@ -5,6 +5,8 @@ use ruff_python_trivia::lines_after_ignoring_trivia;
 use crate::comments::{leading_comments, trailing_comments, SourceComment};
 use crate::prelude::*;
 use crate::statement::suite::SuiteKind;
+
+use crate::statement::clause::{clause_header, ClauseHeader};
 use crate::FormatNodeRule;
 
 #[derive(Default)]
@@ -30,78 +32,81 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
         let (leading_definition_comments, trailing_definition_comments) =
             dangling_comments.split_at(trailing_definition_comments_start);
 
-        FormatDecorators {
-            decorators: decorator_list,
-            leading_definition_comments,
-        }
-        .fmt(f)?;
-
-        write!(f, [text("class"), space(), name.format()])?;
-
-        if let Some(type_params) = type_params.as_deref() {
-            write!(f, [type_params.format()])?;
-        }
-
-        if let Some(arguments) = arguments.as_deref() {
-            // Drop empty the arguments node entirely (i.e., remove the parentheses) if it is empty,
-            // e.g., given:
-            // ```python
-            // class A():
-            //     ...
-            // ```
-            //
-            // Format as:
-            // ```python
-            // class A:
-            //     ...
-            // ```
-            //
-            // However, preserve any dangling end-of-line comments, e.g., given:
-            // ```python
-            // class A(  # comment
-            // ):
-            //     ...
-            //
-            // Format as:
-            // ```python
-            // class A:  # comment
-            //     ...
-            // ```
-            //
-            // However, the arguments contain any dangling own-line comments, we retain the
-            // parentheses, e.g., given:
-            // ```python
-            // class A(  # comment
-            //     # comment
-            // ):
-            //     ...
-            // ```
-            //
-            // Format as:
-            // ```python
-            // class A(  # comment
-            //     # comment
-            // ):
-            //     ...
-            // ```
-            if arguments.is_empty()
-                && comments
-                    .dangling_comments(arguments)
-                    .iter()
-                    .all(|comment| comment.line_position().is_end_of_line())
-            {
-                let dangling = comments.dangling_comments(arguments);
-                write!(f, [trailing_comments(dangling)])?;
-            } else {
-                write!(f, [arguments.format()])?;
-            }
-        }
-
         write!(
             f,
             [
-                text(":"),
-                trailing_comments(trailing_definition_comments),
+                FormatDecorators {
+                    decorators: decorator_list,
+                    leading_definition_comments,
+                },
+                clause_header(
+                    ClauseHeader::Class(item),
+                    trailing_definition_comments,
+                    &format_with(|f| {
+                        write!(f, [text("class"), space(), name.format()])?;
+
+                        if let Some(type_params) = type_params.as_deref() {
+                            write!(f, [type_params.format()])?;
+                        }
+
+                        if let Some(arguments) = arguments.as_deref() {
+                            // Drop empty the arguments node entirely (i.e., remove the parentheses) if it is empty,
+                            // e.g., given:
+                            // ```python
+                            // class A():
+                            //     ...
+                            // ```
+                            //
+                            // Format as:
+                            // ```python
+                            // class A:
+                            //     ...
+                            // ```
+                            //
+                            // However, preserve any dangling end-of-line comments, e.g., given:
+                            // ```python
+                            // class A(  # comment
+                            // ):
+                            //     ...
+                            //
+                            // Format as:
+                            // ```python
+                            // class A:  # comment
+                            //     ...
+                            // ```
+                            //
+                            // However, the arguments contain any dangling own-line comments, we retain the
+                            // parentheses, e.g., given:
+                            // ```python
+                            // class A(  # comment
+                            //     # comment
+                            // ):
+                            //     ...
+                            // ```
+                            //
+                            // Format as:
+                            // ```python
+                            // class A(  # comment
+                            //     # comment
+                            // ):
+                            //     ...
+                            // ```
+                            if arguments.is_empty()
+                                && comments
+                                    .dangling_comments(arguments)
+                                    .iter()
+                                    .all(|comment| comment.line_position().is_end_of_line())
+                            {
+                                let dangling = comments.dangling_comments(arguments);
+                                write!(f, [trailing_comments(dangling)])?;
+                            } else {
+                                write!(f, [arguments.format()])?;
+                            }
+                        }
+
+                        Ok(())
+                    }),
+                ),
                 block_indent(&body.format().with_options(SuiteKind::Class))
             ]
         )

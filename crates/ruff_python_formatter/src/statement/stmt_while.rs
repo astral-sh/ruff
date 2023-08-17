@@ -1,11 +1,12 @@
-use ruff_formatter::write;
+use ruff_formatter::{format_args, write};
 use ruff_python_ast::node::AstNode;
 use ruff_python_ast::{Ranged, Stmt, StmtWhile};
 
-use crate::comments::{leading_alternate_branch_comments, trailing_comments, SourceComment};
+use crate::comments::SourceComment;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
+use crate::statement::clause::{clause_header, ClauseHeader, ElseClause};
 use crate::FormatNodeRule;
 
 #[derive(Default)]
@@ -33,11 +34,15 @@ impl FormatNodeRule<StmtWhile> for FormatStmtWhile {
         write!(
             f,
             [
-                text("while"),
-                space(),
-                maybe_parenthesize_expression(test, item, Parenthesize::IfBreaks),
-                text(":"),
-                trailing_comments(trailing_condition_comments),
+                clause_header(
+                    ClauseHeader::While(item),
+                    trailing_condition_comments,
+                    &format_args![
+                        text("while"),
+                        space(),
+                        maybe_parenthesize_expression(test, item, Parenthesize::IfBreaks),
+                    ]
+                ),
                 block_indent(&body.format())
             ]
         )?;
@@ -52,9 +57,12 @@ impl FormatNodeRule<StmtWhile> for FormatStmtWhile {
             write!(
                 f,
                 [
-                    leading_alternate_branch_comments(leading, body.last()),
-                    text("else:"),
-                    trailing_comments(trailing),
+                    clause_header(
+                        ClauseHeader::OrElse(ElseClause::While(item)),
+                        trailing,
+                        &text("else")
+                    )
+                    .with_leading_comments(leading, body.last()),
                     block_indent(&orelse.format())
                 ]
             )?;

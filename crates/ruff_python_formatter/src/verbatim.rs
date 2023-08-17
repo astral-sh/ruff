@@ -15,6 +15,7 @@ use ruff_text_size::{TextRange, TextSize};
 use crate::comments::format::{empty_lines, format_comment};
 use crate::comments::{leading_comments, trailing_comments, SourceComment};
 use crate::prelude::*;
+use crate::statement::clause::ClauseHeader;
 use crate::statement::suite::SuiteChildStatement;
 
 /// Disables formatting for all statements between the `first_suppressed` that has a leading `fmt: off` comment
@@ -929,4 +930,29 @@ impl Format<PyFormatContext<'_>> for FormatSuppressedNode<'_> {
             ]
         )
     }
+}
+
+#[cold]
+pub(crate) fn write_suppressed_clause_header(
+    header: ClauseHeader,
+    f: &mut PyFormatter,
+) -> FormatResult<()> {
+    // Write the outer comments and format the node as verbatim
+    write!(
+        f,
+        [verbatim_text(
+            header.range(f.context().source())?,
+            ContainsNewlines::Detect
+        ),]
+    )?;
+
+    let comments = f.context().comments();
+    header.visit(&mut |child| {
+        for comment in comments.leading_trailing_comments(child) {
+            comment.mark_formatted();
+        }
+        comments.mark_verbatim_node_comments_formatted(child);
+    });
+
+    Ok(())
 }
