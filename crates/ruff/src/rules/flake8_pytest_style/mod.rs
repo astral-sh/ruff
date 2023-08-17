@@ -174,7 +174,7 @@ mod tests {
             raises_require_match_for: vec![IdentifierPattern::new("pickle.*").unwrap()],
             ..Settings::default()
         },
-        "PT011_glob_submodule"
+        "PT011_glob_prefix"
     )]
     #[test_case(
         Rule::PytestRaisesWithMultipleStatements,
