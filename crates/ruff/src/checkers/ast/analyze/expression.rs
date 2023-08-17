@@ -1101,22 +1101,15 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 }
             }
         }
-        Expr::UnaryOp(ast::ExprUnaryOp {
-            op,
-            operand,
-            range: _,
-        }) => {
-            let check_not_in = checker.enabled(Rule::NotInTest);
-            let check_not_is = checker.enabled(Rule::NotIsTest);
-            if check_not_in || check_not_is {
-                pycodestyle::rules::not_tests(
-                    checker,
-                    expr,
-                    *op,
-                    operand,
-                    check_not_in,
-                    check_not_is,
-                );
+        Expr::UnaryOp(
+            unary_op @ ast::ExprUnaryOp {
+                op,
+                operand,
+                range: _,
+            },
+        ) => {
+            if checker.any_enabled(&[Rule::NotInTest, Rule::NotIsTest]) {
+                pycodestyle::rules::not_tests(checker, unary_op);
             }
             if checker.enabled(Rule::UnaryPrefixIncrementDecrement) {
                 flake8_bugbear::rules::unary_prefix_increment_decrement(
@@ -1141,18 +1134,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 range: _,
             },
         ) => {
-            let check_none_comparisons = checker.enabled(Rule::NoneComparison);
-            let check_true_false_comparisons = checker.enabled(Rule::TrueFalseComparison);
-            if check_none_comparisons || check_true_false_comparisons {
-                pycodestyle::rules::literal_comparisons(
-                    checker,
-                    expr,
-                    left,
-                    ops,
-                    comparators,
-                    check_none_comparisons,
-                    check_true_false_comparisons,
-                );
+            if checker.any_enabled(&[Rule::NoneComparison, Rule::TrueFalseComparison]) {
+                pycodestyle::rules::literal_comparisons(checker, compare);
             }
             if checker.enabled(Rule::IsLiteral) {
                 pyflakes::rules::invalid_literal_comparison(checker, left, ops, comparators, expr);
