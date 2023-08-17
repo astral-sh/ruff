@@ -83,6 +83,7 @@ pub enum AnyNode {
     ExprIpyEscapeCommand(ast::ExprIpyEscapeCommand),
     ExceptHandlerExceptHandler(ast::ExceptHandlerExceptHandler),
     FormattedValue(ast::FormattedValue),
+    StringTodoName(ast::StringTodoName),
     PatternMatchValue(ast::PatternMatchValue),
     PatternMatchSingleton(ast::PatternMatchSingleton),
     PatternMatchSequence(ast::PatternMatchSequence),
@@ -159,6 +160,7 @@ impl AnyNode {
             | AnyNode::ExprCompare(_)
             | AnyNode::ExprCall(_)
             | AnyNode::FormattedValue(_)
+            | AnyNode::StringTodoName(_)
             | AnyNode::ExprFString(_)
             | AnyNode::ExprConstant(_)
             | AnyNode::ExprAttribute(_)
@@ -257,6 +259,7 @@ impl AnyNode {
             | AnyNode::StmtIpyEscapeCommand(_)
             | AnyNode::ExceptHandlerExceptHandler(_)
             | AnyNode::FormattedValue(_)
+            | AnyNode::StringTodoName(_)
             | AnyNode::PatternMatchValue(_)
             | AnyNode::PatternMatchSingleton(_)
             | AnyNode::PatternMatchSequence(_)
@@ -333,6 +336,7 @@ impl AnyNode {
             | AnyNode::ExprCompare(_)
             | AnyNode::ExprCall(_)
             | AnyNode::FormattedValue(_)
+            | AnyNode::StringTodoName(_)
             | AnyNode::ExprFString(_)
             | AnyNode::ExprConstant(_)
             | AnyNode::ExprAttribute(_)
@@ -428,6 +432,7 @@ impl AnyNode {
             | AnyNode::ExprCompare(_)
             | AnyNode::ExprCall(_)
             | AnyNode::FormattedValue(_)
+            | AnyNode::StringTodoName(_)
             | AnyNode::ExprFString(_)
             | AnyNode::ExprConstant(_)
             | AnyNode::ExprAttribute(_)
@@ -508,6 +513,7 @@ impl AnyNode {
             | AnyNode::ExprCompare(_)
             | AnyNode::ExprCall(_)
             | AnyNode::FormattedValue(_)
+            | AnyNode::StringTodoName(_)
             | AnyNode::ExprFString(_)
             | AnyNode::ExprConstant(_)
             | AnyNode::ExprAttribute(_)
@@ -613,6 +619,7 @@ impl AnyNode {
             Self::ExprCompare(node) => AnyNodeRef::ExprCompare(node),
             Self::ExprCall(node) => AnyNodeRef::ExprCall(node),
             Self::FormattedValue(node) => AnyNodeRef::FormattedValue(node),
+            Self::StringTodoName(node) => AnyNodeRef::StringTodoName(node),
             Self::ExprFString(node) => AnyNodeRef::ExprFString(node),
             Self::ExprConstant(node) => AnyNodeRef::ExprConstant(node),
             Self::ExprAttribute(node) => AnyNodeRef::ExprAttribute(node),
@@ -2609,6 +2616,41 @@ impl AstNode for ast::FormattedValue {
         }
     }
 }
+impl AstNode for ast::StringTodoName {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::StringTodoName(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::StringTodoName(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        // TODO: is this correct?
+    }
+}
 impl AstNode for ast::ExprFString {
     fn cast(kind: AnyNode) -> Option<Self>
     where
@@ -4446,6 +4488,12 @@ impl From<ast::FormattedValue> for AnyNode {
     }
 }
 
+impl From<ast::StringTodoName> for AnyNode {
+    fn from(node: ast::StringTodoName) -> Self {
+        AnyNode::StringTodoName(node)
+    }
+}
+
 impl From<ast::ExprFString> for AnyNode {
     fn from(node: ast::ExprFString) -> Self {
         AnyNode::ExprFString(node)
@@ -4693,6 +4741,7 @@ impl Ranged for AnyNode {
             AnyNode::ExprCompare(node) => node.range(),
             AnyNode::ExprCall(node) => node.range(),
             AnyNode::FormattedValue(node) => node.range(),
+            AnyNode::StringTodoName(node) => node.range(),
             AnyNode::ExprFString(node) => node.range(),
             AnyNode::ExprConstant(node) => node.range(),
             AnyNode::ExprAttribute(node) => node.range(),
@@ -4780,6 +4829,7 @@ pub enum AnyNodeRef<'a> {
     ExprCompare(&'a ast::ExprCompare),
     ExprCall(&'a ast::ExprCall),
     FormattedValue(&'a ast::FormattedValue),
+    StringTodoName(&'a ast::StringTodoName),
     ExprFString(&'a ast::ExprFString),
     ExprConstant(&'a ast::ExprConstant),
     ExprAttribute(&'a ast::ExprAttribute),
@@ -4866,6 +4916,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::ExprCompare(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprCall(node) => NonNull::from(*node).cast(),
             AnyNodeRef::FormattedValue(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::StringTodoName(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprFString(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprConstant(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprAttribute(node) => NonNull::from(*node).cast(),
@@ -4958,6 +5009,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::ExprCompare(_) => NodeKind::ExprCompare,
             AnyNodeRef::ExprCall(_) => NodeKind::ExprCall,
             AnyNodeRef::FormattedValue(_) => NodeKind::FormattedValue,
+            AnyNodeRef::StringTodoName(_) => NodeKind::StringTodoName,
             AnyNodeRef::ExprFString(_) => NodeKind::ExprFString,
             AnyNodeRef::ExprConstant(_) => NodeKind::ExprConstant,
             AnyNodeRef::ExprAttribute(_) => NodeKind::ExprAttribute,
@@ -5045,6 +5097,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprCompare(_)
             | AnyNodeRef::ExprCall(_)
             | AnyNodeRef::FormattedValue(_)
+            | AnyNodeRef::StringTodoName(_)
             | AnyNodeRef::ExprFString(_)
             | AnyNodeRef::ExprConstant(_)
             | AnyNodeRef::ExprAttribute(_)
@@ -5103,7 +5156,6 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprYieldFrom(_)
             | AnyNodeRef::ExprCompare(_)
             | AnyNodeRef::ExprCall(_)
-            | AnyNodeRef::FormattedValue(_)
             | AnyNodeRef::ExprFString(_)
             | AnyNodeRef::ExprConstant(_)
             | AnyNodeRef::ExprAttribute(_)
@@ -5143,6 +5195,8 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::StmtContinue(_)
             | AnyNodeRef::StmtIpyEscapeCommand(_)
             | AnyNodeRef::ExceptHandlerExceptHandler(_)
+            | AnyNodeRef::FormattedValue(_)
+            | AnyNodeRef::StringTodoName(_)
             | AnyNodeRef::PatternMatchValue(_)
             | AnyNodeRef::PatternMatchSingleton(_)
             | AnyNodeRef::PatternMatchSequence(_)
@@ -5218,6 +5272,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprCompare(_)
             | AnyNodeRef::ExprCall(_)
             | AnyNodeRef::FormattedValue(_)
+            | AnyNodeRef::StringTodoName(_)
             | AnyNodeRef::ExprFString(_)
             | AnyNodeRef::ExprConstant(_)
             | AnyNodeRef::ExprAttribute(_)
@@ -5313,6 +5368,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprCompare(_)
             | AnyNodeRef::ExprCall(_)
             | AnyNodeRef::FormattedValue(_)
+            | AnyNodeRef::StringTodoName(_)
             | AnyNodeRef::ExprFString(_)
             | AnyNodeRef::ExprConstant(_)
             | AnyNodeRef::ExprAttribute(_)
@@ -5393,6 +5449,7 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprCompare(_)
             | AnyNodeRef::ExprCall(_)
             | AnyNodeRef::FormattedValue(_)
+            | AnyNodeRef::StringTodoName(_)
             | AnyNodeRef::ExprFString(_)
             | AnyNodeRef::ExprConstant(_)
             | AnyNodeRef::ExprAttribute(_)
@@ -5507,6 +5564,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::ExprCompare(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprCall(node) => node.visit_preorder(visitor),
             AnyNodeRef::FormattedValue(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StringTodoName(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprFString(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprConstant(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprAttribute(node) => node.visit_preorder(visitor),
@@ -5820,6 +5878,12 @@ impl<'a> From<&'a ast::ExprCall> for AnyNodeRef<'a> {
 impl<'a> From<&'a ast::FormattedValue> for AnyNodeRef<'a> {
     fn from(node: &'a ast::FormattedValue) -> Self {
         AnyNodeRef::FormattedValue(node)
+    }
+}
+
+impl<'a> From<&'a ast::StringTodoName> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::StringTodoName) -> Self {
+        AnyNodeRef::StringTodoName(node)
     }
 }
 
@@ -6182,6 +6246,7 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::ExprCompare(node) => node.range(),
             AnyNodeRef::ExprCall(node) => node.range(),
             AnyNodeRef::FormattedValue(node) => node.range(),
+            AnyNodeRef::StringTodoName(node) => node.range(),
             AnyNodeRef::ExprFString(node) => node.range(),
             AnyNodeRef::ExprConstant(node) => node.range(),
             AnyNodeRef::ExprAttribute(node) => node.range(),
@@ -6271,6 +6336,7 @@ pub enum NodeKind {
     ExprCompare,
     ExprCall,
     FormattedValue,
+    StringTodoName,
     ExprFString,
     ExprConstant,
     ExprAttribute,
