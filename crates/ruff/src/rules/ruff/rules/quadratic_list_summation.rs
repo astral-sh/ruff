@@ -79,29 +79,21 @@ pub(crate) fn quadratic_list_summation(checker: &mut Checker, call: &ast::ExprCa
 
     let mut diagnostic = Diagnostic::new(QuadraticListSummation, *range);
     if checker.patch(Rule::QuadraticListSummation) {
-        diagnostic.try_set_fix(convert_to_reduce(iterable, call, checker));
+        diagnostic.try_set_fix(|| convert_to_reduce(iterable, call, checker));
     }
     checker.diagnostics.push(diagnostic);
-}
-
-/// Check if a function is a builtin with a given name.
-fn func_is_builtin(func: &Expr, name: &str, semantic: &SemanticModel) -> bool {
-    let Expr::Name(ast::ExprName { id, .. }) = func else {
-        return false;
-    };
-    id == name && semantic.is_builtin(id)
 }
 
 /// Generate a [`Fix`] to convert a `sum()` call to a `functools.reduce()` call.
 fn convert_to_reduce(iterable: &Expr, call: &ast::ExprCall, checker: &Checker) -> Result<Fix> {
     let (reduce_edit, reduce_binding) = checker.importer().get_or_import_symbol(
-        &ImportRequest::import("reduce", "reduce"),
+        &ImportRequest::import("functools", "reduce"),
         call.start(),
         checker.semantic(),
     )?;
 
     let (iadd_edit, iadd_binding) = checker.importer().get_or_import_symbol(
-        &ImportRequest::import("iadd", "iadd"),
+        &ImportRequest::import("operator", "iadd"),
         iterable.start(),
         checker.semantic(),
     )?;
@@ -115,6 +107,14 @@ fn convert_to_reduce(iterable: &Expr, call: &ast::ExprCall, checker: &Checker) -
         ),
         [reduce_edit, iadd_edit],
     ))
+}
+
+/// Check if a function is a builtin with a given name.
+fn func_is_builtin(func: &Expr, name: &str, semantic: &SemanticModel) -> bool {
+    let Expr::Name(ast::ExprName { id, .. }) = func else {
+        return false;
+    };
+    id == name && semantic.is_builtin(id)
 }
 
 /// Returns `true` if the `start` argument to a `sum()` call is an empty list.
