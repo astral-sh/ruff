@@ -17,19 +17,9 @@ impl FormatNodeRule<PatternMatchAs> for FormatPatternMatchAs {
 
         if let Some(name) = name {
             if let Some(pattern) = pattern {
-                write!(
-                    f,
-                    [
-                        pattern.format(),
-                        space(),
-                        text("as"),
-                        space(),
-                        name.format(),
-                    ]
-                )
-            } else {
-                name.format().fmt(f)
+                write!(f, [pattern.format(), space(), text("as"), space()])?;
             }
+            name.format().fmt(f)
         } else {
             debug_assert!(pattern.is_none());
             text("_").fmt(f)
