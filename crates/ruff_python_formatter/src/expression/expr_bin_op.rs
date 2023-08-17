@@ -1,13 +1,13 @@
 use std::iter;
 
+use smallvec::SmallVec;
+
+use ruff_formatter::{format_args, write, FormatOwnedWithRule, FormatRefWithRule};
+use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{
     Constant, Expr, ExprAttribute, ExprBinOp, ExprConstant, ExprUnaryOp, Operator, StringConstant,
     UnaryOp,
 };
-use smallvec::SmallVec;
-
-use ruff_formatter::{format_args, write, FormatOwnedWithRule, FormatRefWithRule};
-use ruff_python_ast::node::{AnyNodeRef, AstNode};
 
 use crate::comments::{trailing_comments, trailing_node_comments, SourceComment};
 use crate::expression::expr_constant::ExprConstantLayout;
@@ -73,10 +73,7 @@ impl FormatNodeRule<ExprBinOp> for FormatExprBinOp {
                     let binary_chain: SmallVec<[&ExprBinOp; 4]> =
                         iter::successors(Some(item), |parent| {
                             parent.left.as_bin_op_expr().and_then(|bin_expression| {
-                                if is_expression_parenthesized(
-                                    bin_expression.as_any_node_ref(),
-                                    source,
-                                ) {
+                                if is_expression_parenthesized(bin_expression.into(), source) {
                                     None
                                 } else {
                                     Some(bin_expression)
