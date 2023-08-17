@@ -1,4 +1,5 @@
 use ruff_diagnostics::Diagnostic;
+use ruff_python_ast::Ranged;
 use ruff_python_semantic::analyze::{branch_detection, visibility};
 use ruff_python_semantic::{Binding, BindingKind, ScopeKind};
 
@@ -81,7 +82,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                         pylint::rules::GlobalVariableNotAssigned {
                             name: (*name).to_string(),
                         },
-                        binding.range,
+                        binding.range(),
                     ));
                 }
             }
@@ -122,14 +123,14 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                     }
 
                     #[allow(deprecated)]
-                    let line = checker.locator.compute_line_index(shadowed.range.start());
+                    let line = checker.locator.compute_line_index(shadowed.start());
 
                     checker.diagnostics.push(Diagnostic::new(
                         pyflakes::rules::ImportShadowedByLoopVar {
                             name: name.to_string(),
                             line,
                         },
-                        binding.range,
+                        binding.range(),
                     ));
                 }
             }
@@ -218,13 +219,13 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                     }
 
                     #[allow(deprecated)]
-                    let line = checker.locator.compute_line_index(shadowed.range.start());
+                    let line = checker.locator.compute_line_index(shadowed.start());
                     let mut diagnostic = Diagnostic::new(
                         pyflakes::rules::RedefinedWhileUnused {
                             name: (*name).to_string(),
                             line,
                         },
-                        binding.range,
+                        binding.range(),
                     );
                     if let Some(range) = binding.parent_range(&checker.semantic) {
                         diagnostic.set_parent(range.start());

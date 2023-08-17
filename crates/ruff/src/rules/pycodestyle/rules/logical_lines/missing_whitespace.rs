@@ -1,9 +1,9 @@
-use ruff_text_size::TextSize;
-
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::Ranged;
 use ruff_python_parser::TokenKind;
+use ruff_text_size::TextSize;
 
 use crate::checkers::logical_lines::LogicalLinesContext;
 

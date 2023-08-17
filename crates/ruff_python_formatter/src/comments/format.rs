@@ -327,7 +327,7 @@ impl Format<PyFormatContext<'_>> for FormatComment<'_> {
         }
 
         let start = slice.start() + start_offset;
-        let end = slice.range().end() - trailing_whitespace_len;
+        let end = slice.end() - trailing_whitespace_len;
 
         write!(
             f,

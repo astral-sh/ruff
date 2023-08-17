@@ -445,7 +445,7 @@ fn handle_own_line_comment_between_branches<'a>(
 
     // It depends on the indentation level of the comment if it is a leading comment for the
     // following branch or if it a trailing comment of the previous body's last statement.
-    let comment_indentation = indentation_at_offset(comment.slice().range().start(), locator)
+    let comment_indentation = indentation_at_offset(comment.slice().start(), locator)
         .unwrap_or_default()
         .len();
 
@@ -529,7 +529,7 @@ fn handle_own_line_comment_after_branch<'a>(
 
     // We only care about the length because indentations with mixed spaces and tabs are only valid if
     // the indent-level doesn't depend on the tab width (the indent level must be the same if the tab width is 1 or 8).
-    let comment_indentation = indentation_at_offset(comment.slice().range().start(), locator)
+    let comment_indentation = indentation_at_offset(comment.slice().start(), locator)
         .unwrap_or_default()
         .len();
 
@@ -1314,7 +1314,7 @@ fn handle_comprehension_comment<'a>(
     //      b in c
     //  ]
     // ```
-    if comment.slice().end() < comprehension.target.range().start() {
+    if comment.slice().end() < comprehension.target.start() {
         return if is_own_line {
             // own line comments are correctly assigned as leading the target
             CommentPlacement::Default(comment)
@@ -1325,10 +1325,7 @@ fn handle_comprehension_comment<'a>(
     }
 
     let in_token = find_only_token_in_range(
-        TextRange::new(
-            comprehension.target.range().end(),
-            comprehension.iter.range().start(),
-        ),
+        TextRange::new(comprehension.target.end(), comprehension.iter.start()),
         SimpleTokenKind::In,
         locator,
     );
@@ -1361,7 +1358,7 @@ fn handle_comprehension_comment<'a>(
     //      c
     //  ]
     // ```
-    if comment.slice().start() < comprehension.iter.range().start() {
+    if comment.slice().start() < comprehension.iter.start() {
         return if is_own_line {
             CommentPlacement::Default(comment)
         } else {
@@ -1370,7 +1367,7 @@ fn handle_comprehension_comment<'a>(
         };
     }
 
-    let mut last_end = comprehension.iter.range().end();
+    let mut last_end = comprehension.iter.end();
 
     for if_node in &comprehension.ifs {
         // ```python
@@ -1391,7 +1388,7 @@ fn handle_comprehension_comment<'a>(
         // ]
         // ```
         let if_token = find_only_token_in_range(
-            TextRange::new(last_end, if_node.range().start()),
+            TextRange::new(last_end, if_node.start()),
             SimpleTokenKind::If,
             locator,
         );
@@ -1400,11 +1397,11 @@ fn handle_comprehension_comment<'a>(
                 return CommentPlacement::dangling(if_node, comment);
             }
         } else if if_token.start() < comment.slice().start()
-            && comment.slice().start() < if_node.range().start()
+            && comment.slice().start() < if_node.start()
         {
             return CommentPlacement::dangling(if_node, comment);
         }
-        last_end = if_node.range().end();
+        last_end = if_node.end();
     }
 
     CommentPlacement::Default(comment)

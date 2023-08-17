@@ -163,7 +163,7 @@ pub(crate) fn unused_loop_control_variable(checker: &mut Checker, target: &Expr,
                     if scope
                         .get_all(name)
                         .map(|binding_id| checker.semantic().binding(binding_id))
-                        .filter(|binding| binding.range.start() >= expr.range().start())
+                        .filter(|binding| binding.start() >= expr.start())
                         .all(|binding| !binding.is_used())
                     {
                         diagnostic.set_fix(Fix::suggested(Edit::range_replacement(

@@ -91,7 +91,7 @@ fn is_operand_parenthesized(unary: &ExprUnaryOp, source: &str) -> bool {
         UnaryOp::USub => '-'.text_len(),
     };
 
-    let trivia_range = TextRange::new(unary.range.start() + operator_len, unary.operand.start());
+    let trivia_range = TextRange::new(unary.start() + operator_len, unary.operand.start());
 
     if let Some(token) = SimpleTokenizer::new(source, trivia_range)
         .skip_trivia()

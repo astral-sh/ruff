@@ -1,4 +1,4 @@
-use ruff_python_ast::{Expr, ExprSlice, ExprUnaryOp, Ranged, UnaryOp};
+use ruff_python_ast::{Expr, ExprSlice, ExprUnaryOp, UnaryOp};
 use ruff_text_size::TextRange;
 
 use ruff_formatter::prelude::{hard_line_break, line_suffix_boundary, space, text};
@@ -20,13 +20,18 @@ impl FormatNodeRule<ExprSlice> for FormatExprSlice {
     fn fmt_fields(&self, item: &ExprSlice, f: &mut PyFormatter) -> FormatResult<()> {
         // `[lower:upper:step]`
         let ExprSlice {
-            range,
             lower,
             upper,
             step,
+            range,
         } = item;
 
-        let (first_colon, second_colon) = find_colons(f.context().source(), *range, lower, upper)?;
+        let (first_colon, second_colon) = find_colons(
+            f.context().source(),
+            *range,
+            lower.as_deref(),
+            upper.as_deref(),
+        )?;
 
         // Handle comment placement
         // In placements.rs, we marked comment for None nodes a dangling and associated all others
@@ -36,14 +41,14 @@ impl FormatNodeRule<ExprSlice> for FormatExprSlice {
         let comments = f.context().comments().clone();
         let slice_dangling_comments = comments.dangling_comments(item.as_any_node_ref());
         // Put the dangling comments (where the nodes are missing) into buckets
-        let first_colon_partition_index = slice_dangling_comments
-            .partition_point(|x| x.slice().start() < first_colon.range.start());
+        let first_colon_partition_index =
+            slice_dangling_comments.partition_point(|x| x.slice().start() < first_colon.start());
         let (dangling_lower_comments, dangling_upper_step_comments) =
             slice_dangling_comments.split_at(first_colon_partition_index);
         let (dangling_upper_comments, dangling_step_comments) =
             if let Some(second_colon) = &second_colon {
                 let second_colon_partition_index = dangling_upper_step_comments
-                    .partition_point(|x| x.slice().start() < second_colon.range.start());
+                    .partition_point(|x| x.slice().start() < second_colon.start());
                 dangling_upper_step_comments.split_at(second_colon_partition_index)
             } else {
                 // Without a second colon they remaining dangling comments belong between the first
@@ -153,27 +158,27 @@ impl FormatNodeRule<ExprSlice> for FormatExprSlice {
 pub(crate) fn find_colons(
     contents: &str,
     range: TextRange,
-    lower: &Option<Box<Expr>>,
-    upper: &Option<Box<Expr>>,
+    lower: Option<&Expr>,
+    upper: Option<&Expr>,
 ) -> FormatResult<(SimpleToken, Option<SimpleToken>)> {
     let after_lower = lower
         .as_ref()
-        .map_or(range.start(), |lower| lower.range().end());
+        .map_or(range.start(), ruff_python_ast::Ranged::end);
     let mut tokens = SimpleTokenizer::new(contents, TextRange::new(after_lower, range.end()))
         .skip_trivia()
         .skip_while(|token| token.kind == SimpleTokenKind::RParen);
     let first_colon = tokens.next().ok_or(FormatError::syntax_error(
-        "Din't find any token for slice first colon",
+        "Didn't find any token for slice first colon",
     ))?;
     if first_colon.kind != SimpleTokenKind::Colon {
         return Err(FormatError::syntax_error(
-            "slice first colon token was not a colon",
+            "Slice first colon token was not a colon",
         ));
     }
 
     let after_upper = upper
         .as_ref()
-        .map_or(first_colon.end(), |upper| upper.range().end());
+        .map_or(first_colon.end(), ruff_python_ast::Ranged::end);
     let mut tokens = SimpleTokenizer::new(contents, TextRange::new(after_upper, range.end()))
         .skip_trivia()
         .skip_while(|token| token.kind == SimpleTokenKind::RParen);
@@ -206,6 +211,7 @@ fn is_simple_expr(expr: &Expr) -> bool {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ExprSliceCommentSection {
     Lower,
     Upper,
@@ -229,21 +235,22 @@ pub(crate) fn assign_comment_in_slice(
     expr_slice: &ExprSlice,
 ) -> ExprSliceCommentSection {
     let ExprSlice {
-        range,
         lower,
         upper,
         step: _,
+        range,
     } = expr_slice;
 
-    let (first_colon, second_colon) = find_colons(contents, *range, lower, upper)
-        .expect("SyntaxError when trying to parse slice");
+    let (first_colon, second_colon) =
+        find_colons(contents, *range, lower.as_deref(), upper.as_deref())
+            .expect("SyntaxError when trying to parse slice");
 
-    if comment.start() < first_colon.range.start() {
+    if comment.start() < first_colon.start() {
         ExprSliceCommentSection::Lower
     } else {
         // We are to the right of the first colon
         if let Some(second_colon) = second_colon {
-            if comment.start() < second_colon.range.start() {
+            if comment.start() < second_colon.start() {
                 ExprSliceCommentSection::Upper
             } else {
                 ExprSliceCommentSection::Step

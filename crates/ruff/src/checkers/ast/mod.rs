@@ -1855,7 +1855,7 @@ impl<'a> Checker<'a> {
             .map(|binding_id| &self.semantic.bindings[binding_id])
             .filter_map(|binding| match &binding.kind {
                 BindingKind::Export(Export { names }) => {
-                    Some(names.iter().map(|name| (*name, binding.range)))
+                    Some(names.iter().map(|name| (*name, binding.range())))
                 }
                 _ => None,
             })

@@ -79,7 +79,7 @@ fn is_match_case_pattern_parenthesized(
 ) -> FormatResult<bool> {
     let mut tokenizer = SimpleTokenizer::new(
         context.source(),
-        TextRange::new(case.range().start(), pattern.range().start()),
+        TextRange::new(case.start(), pattern.start()),
     )
     .skip_trivia();
 

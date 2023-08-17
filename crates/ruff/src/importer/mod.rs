@@ -194,7 +194,7 @@ impl<'a> Importer<'a> {
         // import and the current location, and thus the symbol would not be available). It's also
         // unclear whether should add an import statement at the start of the file, since it could
         // be shadowed between the import and the current location.
-        if imported_name.range().start() > at {
+        if imported_name.start() > at {
             return Some(Err(ResolutionError::ImportAfterUsage));
         }
 

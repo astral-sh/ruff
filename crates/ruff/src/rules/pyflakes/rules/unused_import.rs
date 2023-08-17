@@ -5,6 +5,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::Ranged;
 use ruff_python_semantic::{AnyImport, Exceptions, Imported, Scope, StatementId};
 use ruff_text_size::TextRange;
 
@@ -124,11 +125,11 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
 
         let import = ImportBinding {
             import,
-            range: binding.range,
+            range: binding.range(),
             parent_range: binding.parent_range(checker.semantic()),
         };
 
-        if checker.rule_is_ignored(Rule::UnusedImport, import.range.start())
+        if checker.rule_is_ignored(Rule::UnusedImport, import.start())
             || import.parent_range.is_some_and(|parent_range| {
                 checker.rule_is_ignored(Rule::UnusedImport, parent_range.start())
             })
@@ -224,6 +225,12 @@ struct ImportBinding<'a> {
     range: TextRange,
     /// The range of the import's parent statement.
     parent_range: Option<TextRange>,
+}
+
+impl Ranged for ImportBinding<'_> {
+    fn range(&self) -> TextRange {
+        self.range
+    }
 }
 
 /// Generate a [`Fix`] to remove unused imports from a statement.

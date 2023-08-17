@@ -1,4 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Fix};
+use ruff_python_ast::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
@@ -29,7 +30,7 @@ pub(crate) fn bindings(checker: &mut Checker) {
                     pyflakes::rules::UnusedVariable {
                         name: binding.name(checker.locator).to_string(),
                     },
-                    binding.range,
+                    binding.range(),
                 );
                 if checker.patch(Rule::UnusedVariable) {
                     diagnostic.try_set_fix(|| {
