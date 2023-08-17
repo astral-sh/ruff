@@ -109,7 +109,7 @@ E731.py:57:5: E731 [*] Do not assign a `lambda` expression, use a `def`
    |
    = help: Rewrite `f` as a `def`
 
-ℹ Suggested fix
+ℹ Possible fix
 54 54 | 
 55 55 | class Scope:
 56 56 |     # E731
@@ -318,5 +318,43 @@ E731.py:135:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 135     |-    f: Callable[[str, int, list[str]], list[str]] = lambda a, b, /, c: [*c, a * b]
     135 |+    def f(a: str, b: int, /, c: list[str]) -> list[str]:
     136 |+        return [*c, a * b]
+136 137 | 
+137 138 | 
+138 139 | class TemperatureScales(Enum):
+
+E731.py:139:5: E731 [*] Do not assign a `lambda` expression, use a `def`
+    |
+138 | class TemperatureScales(Enum):
+139 |     CELSIUS = (lambda deg_c: deg_c)
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E731
+140 |     FAHRENHEIT = (lambda deg_c: deg_c * 9 / 5 + 32)
+    |
+    = help: Rewrite `CELSIUS` as a `def`
+
+ℹ Possible fix
+136 136 | 
+137 137 | 
+138 138 | class TemperatureScales(Enum):
+139     |-    CELSIUS = (lambda deg_c: deg_c)
+    139 |+    def CELSIUS(deg_c):
+    140 |+        return deg_c
+140 141 |     FAHRENHEIT = (lambda deg_c: deg_c * 9 / 5 + 32)
+
+E731.py:140:5: E731 [*] Do not assign a `lambda` expression, use a `def`
+    |
+138 | class TemperatureScales(Enum):
+139 |     CELSIUS = (lambda deg_c: deg_c)
+140 |     FAHRENHEIT = (lambda deg_c: deg_c * 9 / 5 + 32)
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E731
+    |
+    = help: Rewrite `FAHRENHEIT` as a `def`
+
+ℹ Possible fix
+137 137 | 
+138 138 | class TemperatureScales(Enum):
+139 139 |     CELSIUS = (lambda deg_c: deg_c)
+140     |-    FAHRENHEIT = (lambda deg_c: deg_c * 9 / 5 + 32)
+    140 |+    def FAHRENHEIT(deg_c):
+    141 |+        return deg_c * 9 / 5 + 32
 
 
