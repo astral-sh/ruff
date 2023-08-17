@@ -1,7 +1,7 @@
 use unicode_width::UnicodeWidthStr;
 
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::parenthesize::ParenthesizedExpression;
+use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{CmpOp, Expr, Ranged};
 use ruff_source_file::{Line, Locator};
 use ruff_text_size::{TextLen, TextRange};
@@ -25,7 +25,7 @@ pub(super) fn generate_comparison(
 
     // Add the left side of the comparison.
     contents.push_str(locator.slice(
-        ParenthesizedExpression::from_expr(left.into(), parent, locator.contents()).range(),
+        parenthesized_range(left.into(), parent, locator.contents()).unwrap_or(left.range()),
     ));
 
     for (op, comparator) in ops.iter().zip(comparators) {
@@ -46,8 +46,8 @@ pub(super) fn generate_comparison(
         // Add the right side of the comparison.
         contents.push_str(
             locator.slice(
-                ParenthesizedExpression::from_expr(comparator.into(), parent, locator.contents())
-                    .range(),
+                parenthesized_range(comparator.into(), parent, locator.contents())
+                    .unwrap_or(comparator.range()),
             ),
         );
     }

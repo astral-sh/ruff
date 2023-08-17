@@ -83,7 +83,8 @@ pub(crate) fn not_tests(checker: &mut Checker, unary_op: &ast::ExprUnaryOp) {
         ops,
         comparators,
         range: _,
-    }) = unary_op.operand.as_ref() else {
+    }) = unary_op.operand.as_ref()
+    else {
         return;
     };
 
