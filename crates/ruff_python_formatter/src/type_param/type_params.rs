@@ -6,7 +6,7 @@ use ruff_formatter::write;
 use ruff_formatter::FormatResult;
 use ruff_python_ast::node::AstNode;
 
-use ruff_python_ast::TypeParams;
+use ruff_python_ast::{Ranged, TypeParams};
 
 #[derive(Default)]
 pub struct FormatTypeParams;
@@ -26,7 +26,7 @@ impl FormatNodeRule<TypeParams> for FormatTypeParams {
         write!(f, [trailing_comments(dangling_comments)])?;
 
         let items = format_with(|f| {
-            f.join_comma_separated(item.range.end())
+            f.join_comma_separated(item.end())
                 .nodes(item.type_params.iter())
                 .finish()
         });

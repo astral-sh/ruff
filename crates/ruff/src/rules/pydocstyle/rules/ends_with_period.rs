@@ -3,6 +3,7 @@ use strum::IntoEnumIterator;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::Ranged;
 use ruff_source_file::{UniversalNewlineIterator, UniversalNewlines};
 
 use crate::checkers::ast::Checker;

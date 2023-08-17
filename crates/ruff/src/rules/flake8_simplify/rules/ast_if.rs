@@ -693,7 +693,7 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt) {
 fn body_range(branch: &IfElifBranch, locator: &Locator) -> TextRange {
     TextRange::new(
         locator.line_end(branch.test.end()),
-        locator.line_end(branch.range.end()),
+        locator.line_end(branch.end()),
     )
 }
 
@@ -731,7 +731,7 @@ pub(crate) fn if_with_same_arms(checker: &mut Checker, locator: &Locator, stmt_i
 
         checker.diagnostics.push(Diagnostic::new(
             IfWithSameArms,
-            TextRange::new(current_branch.range.start(), following_branch.range.end()),
+            TextRange::new(current_branch.start(), following_branch.end()),
         ));
     }
 }

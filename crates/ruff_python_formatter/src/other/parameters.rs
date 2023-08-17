@@ -416,7 +416,7 @@ pub(crate) fn find_parameter_separators(
             debug_assert!(star.kind() == SimpleTokenKind::Star, "{star:?}");
 
             Some(ParameterSeparator {
-                preceding_end: parameters.range.start(),
+                preceding_end: parameters.start(),
                 separator: star.range,
                 following_start: first_keyword_argument.start(),
             })

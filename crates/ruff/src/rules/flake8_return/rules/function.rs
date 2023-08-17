@@ -558,7 +558,7 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
                     // Replace from the start of the assignment statement to the end of the equals
                     // sign.
                     TextRange::new(
-                        assign.range().start(),
+                        assign.start(),
                         assign
                             .range()
                             .start()

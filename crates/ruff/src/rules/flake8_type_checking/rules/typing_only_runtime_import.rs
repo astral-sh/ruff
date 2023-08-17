@@ -5,6 +5,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, DiagnosticKind, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::Ranged;
 use ruff_python_semantic::{AnyImport, Binding, Imported, ResolvedReferenceId, Scope, StatementId};
 use ruff_text_size::TextRange;
 
@@ -308,11 +309,11 @@ pub(crate) fn typing_only_runtime_import(
             let import = ImportBinding {
                 import,
                 reference_id,
-                range: binding.range,
+                range: binding.range(),
                 parent_range: binding.parent_range(checker.semantic()),
             };
 
-            if checker.rule_is_ignored(rule_for(import_type), import.range.start())
+            if checker.rule_is_ignored(rule_for(import_type), import.start())
                 || import.parent_range.is_some_and(|parent_range| {
                     checker.rule_is_ignored(rule_for(import_type), parent_range.start())
                 })
@@ -390,6 +391,12 @@ struct ImportBinding<'a> {
     parent_range: Option<TextRange>,
 }
 
+impl Ranged for ImportBinding<'_> {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
 /// Return the [`Rule`] for the given import type.
 fn rule_for(import_type: ImportType) -> Rule {
     match import_type {
@@ -456,7 +463,7 @@ fn fix_imports(
     let at = imports
         .iter()
         .map(|ImportBinding { reference_id, .. }| {
-            checker.semantic().reference(*reference_id).range().start()
+            checker.semantic().reference(*reference_id).start()
         })
         .min()
         .expect("Expected at least one import");

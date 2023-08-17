@@ -66,7 +66,7 @@ pub(crate) fn validate_pos_params(
     if let Some(invalid) = first_invalid {
         return Err(LexicalError {
             error: LexicalErrorType::DefaultArgumentError,
-            location: invalid.parameter.range.start(),
+            location: invalid.parameter.start(),
         });
     }
     Ok(())

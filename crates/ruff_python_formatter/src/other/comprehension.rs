@@ -39,7 +39,7 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
         let dangling_item_comments = comments.dangling_comments(item);
         let (before_target_comments, before_in_comments) = dangling_item_comments.split_at(
             dangling_item_comments
-                .partition_point(|comment| comment.slice().end() < target.range().start()),
+                .partition_point(|comment| comment.slice().end() < target.start()),
         );
 
         let trailing_in_comments = comments.dangling_comments(iter);

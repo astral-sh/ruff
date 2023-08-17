@@ -2,6 +2,7 @@ use std::fmt::{Debug, Formatter};
 use std::iter::FusedIterator;
 
 use ruff_python_ast::docstrings::{leading_space, leading_words};
+use ruff_python_ast::Ranged;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use strum_macros::EnumIter;
 
@@ -363,6 +364,12 @@ impl<'a> SectionContext<'a> {
     /// Returns the absolute range of the following lines.
     pub(crate) fn following_range(&self) -> TextRange {
         self.following_range_relative() + self.offset()
+    }
+}
+
+impl Ranged for SectionContext<'_> {
+    fn range(&self) -> TextRange {
+        self.range()
     }
 }
 
