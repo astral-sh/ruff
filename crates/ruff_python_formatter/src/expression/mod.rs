@@ -6,7 +6,7 @@ use ruff_formatter::{
 use ruff_python_ast as ast;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::visitor::preorder::{walk_expr, PreorderVisitor};
-use ruff_python_ast::{Expr, Operator};
+use ruff_python_ast::{Expr, ExpressionRef, Operator};
 
 use crate::builders::parenthesize_if_expands;
 use crate::context::{NodeLevel, WithNodeLevel};
@@ -472,7 +472,7 @@ impl<'input> PreorderVisitor<'input> for CanOmitOptionalParenthesesVisitor<'inpu
         self.last = Some(expr);
 
         // Rule only applies for non-parenthesized expressions.
-        if is_expression_parenthesized(AnyNodeRef::from(expr), self.context.source()) {
+        if is_expression_parenthesized(expr.into(), self.context.source()) {
             self.any_parenthesized_expressions = true;
         } else {
             self.visit_subexpression(expr);
@@ -526,12 +526,12 @@ pub enum CallChainLayout {
 }
 
 impl CallChainLayout {
-    pub(crate) fn from_expression(mut expr: AnyNodeRef, source: &str) -> Self {
+    pub(crate) fn from_expression(mut expr: ExpressionRef, source: &str) -> Self {
         let mut attributes_after_parentheses = 0;
         loop {
             match expr {
-                AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, .. }) => {
-                    expr = AnyNodeRef::from(value.as_ref());
+                ExpressionRef::Attribute(ast::ExprAttribute { value, .. }) => {
+                    expr = ExpressionRef::from(value.as_ref());
                     // ```
                     // f().g
                     // ^^^ value
@@ -554,9 +554,9 @@ impl CallChainLayout {
                 // ^^^^^^^^^^ expr
                 // ^^^^ value
                 // ```
-                AnyNodeRef::ExprCall(ast::ExprCall { func: inner, .. })
-                | AnyNodeRef::ExprSubscript(ast::ExprSubscript { value: inner, .. }) => {
-                    expr = AnyNodeRef::from(inner.as_ref());
+                ExpressionRef::Call(ast::ExprCall { func: inner, .. })
+                | ExpressionRef::Subscript(ast::ExprSubscript { value: inner, .. }) => {
+                    expr = ExpressionRef::from(inner.as_ref());
                 }
                 _ => {
                     // We to format the following in fluent style:
@@ -586,7 +586,7 @@ impl CallChainLayout {
     /// formatting
     pub(crate) fn apply_in_node<'a>(
         self,
-        item: impl Into<AnyNodeRef<'a>>,
+        item: impl Into<ExpressionRef<'a>>,
         f: &mut PyFormatter,
     ) -> CallChainLayout {
         match self {
@@ -627,7 +627,7 @@ fn has_parentheses(expr: &Expr, context: &PyFormatContext) -> Option<OwnParenthe
 
     // Otherwise, if the node lacks parentheses (e.g., `(1)`) or only contains empty parentheses
     // (e.g., `([])`), we need to check for surrounding parentheses.
-    if is_expression_parenthesized(AnyNodeRef::from(expr), context.source()) {
+    if is_expression_parenthesized(expr.into(), context.source()) {
         return Some(OwnParentheses::NonEmpty);
     }
 

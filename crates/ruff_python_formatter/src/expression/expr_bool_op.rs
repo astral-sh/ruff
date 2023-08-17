@@ -1,12 +1,13 @@
+use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
+use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::{BoolOp, Expr, ExprBoolOp};
+
 use crate::comments::leading_comments;
 use crate::expression::parentheses::{
     in_parentheses_only_group, in_parentheses_only_soft_line_break_or_space, NeedsParentheses,
     OptionalParentheses,
 };
 use crate::prelude::*;
-use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
-use ruff_python_ast::node::{AnyNodeRef, AstNode};
-use ruff_python_ast::{BoolOp, Expr, ExprBoolOp};
 
 use super::parentheses::is_expression_parenthesized;
 
@@ -95,10 +96,7 @@ impl Format<PyFormatContext<'_>> for FormatValue<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         match self.value {
             Expr::BoolOp(bool_op)
-                if !is_expression_parenthesized(
-                    bool_op.as_any_node_ref(),
-                    f.context().source(),
-                ) =>
+                if !is_expression_parenthesized(bool_op.into(), f.context().source()) =>
             {
                 // Mark chained boolean operations e.g. `x and y or z` and avoid creating a new group
                 write!(f, [bool_op.format().with_options(BoolOpLayout::Chained)])
