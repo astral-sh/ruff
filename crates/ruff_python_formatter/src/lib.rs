@@ -19,6 +19,7 @@ use crate::comments::{
 };
 use crate::context::PyFormatContext;
 pub use crate::options::{MagicTrailingComma, PyFormatOptions, QuoteStyle};
+use crate::verbatim::suppressed_node;
 
 pub(crate) mod builders;
 pub mod cli;
@@ -50,24 +51,21 @@ where
 
         let node_comments = comments.leading_dangling_trailing_comments(node.as_any_node_ref());
 
-        write!(
-            f,
-            [
-                leading_comments(node_comments.leading),
-                source_position(node.start())
-            ]
-        )?;
+        if self.is_suppressed(node_comments.trailing, f.context()) {
+            suppressed_node(node.as_any_node_ref()).fmt(f)
+        } else {
+            leading_comments(node_comments.leading).fmt(f)?;
+            self.fmt_fields(node, f)?;
+            self.fmt_dangling_comments(node_comments.dangling, f)?;
 
-        self.fmt_fields(node, f)?;
-        self.fmt_dangling_comments(node_comments.dangling, f)?;
-
-        write!(
-            f,
-            [
-                source_position(node.end()),
-                trailing_comments(node_comments.trailing)
-            ]
-        )
+            write!(
+                f,
+                [
+                    source_position(node.end()),
+                    trailing_comments(node_comments.trailing)
+                ]
+            )
+        }
     }
 
     /// Formats the node's fields.
@@ -86,6 +84,14 @@ where
         f: &mut PyFormatter,
     ) -> FormatResult<()> {
         dangling_comments(dangling_node_comments).fmt(f)
+    }
+
+    fn is_suppressed(
+        &self,
+        _trailing_comments: &[SourceComment],
+        _context: &PyFormatContext,
+    ) -> bool {
+        false
     }
 }
 
@@ -236,16 +242,12 @@ if True:
     #[ignore]
     #[test]
     fn quick_test() {
-        let src = r#"def test():
-    # fmt: off
+        let src = r#"
+@MyDecorator(list = a) # fmt: skip
+# trailing comment
+class Test:
+    pass
 
-    a  + b
-
-
-
-        # suppressed comments
-
-a   + b # formatted
 
 "#;
         // Tokenize once

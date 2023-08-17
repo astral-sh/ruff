@@ -1,11 +1,12 @@
+use ruff_formatter::write;
+use ruff_python_ast::node::AstNode;
+use ruff_python_ast::{Ranged, Stmt, StmtWhile};
+
 use crate::comments::{leading_alternate_branch_comments, trailing_comments, SourceComment};
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
 use crate::FormatNodeRule;
-use ruff_formatter::write;
-use ruff_python_ast::node::AstNode;
-use ruff_python_ast::{Ranged, Stmt, StmtWhile};
 
 #[derive(Default)]
 pub struct FormatStmtWhile;

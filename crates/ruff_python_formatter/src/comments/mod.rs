@@ -215,6 +215,18 @@ pub(crate) enum SuppressionKind {
     Skip,
 }
 
+impl SuppressionKind {
+    pub(crate) fn has_skip_comment(trailing_comments: &[SourceComment], source: &str) -> bool {
+        trailing_comments.iter().any(|comment| {
+            comment.line_position().is_end_of_line()
+                && matches!(
+                    comment.suppression_kind(source),
+                    Some(SuppressionKind::Skip | SuppressionKind::Off)
+                )
+        })
+    }
+}
+
 impl Ranged for SourceComment {
     #[inline]
     fn range(&self) -> TextRange {

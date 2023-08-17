@@ -882,3 +882,51 @@ impl Format<PyFormatContext<'_>> for VerbatimText {
         Ok(())
     }
 }
+
+/// Disables formatting for `node` and instead uses the same formatting as the node has in source.
+///
+/// The `node` gets indented as any formatted node to avoid syntax errors when the indentation string changes (e.g. from 2 spaces to 4).
+/// The `node`s leading and trailing comments are formatted as usual, except if they fall into the suppressed node's range.
+#[cold]
+pub(crate) fn suppressed_node<'a, N>(node: N) -> FormatSuppressedNode<'a>
+where
+    N: Into<AnyNodeRef<'a>>,
+{
+    FormatSuppressedNode { node: node.into() }
+}
+
+pub(crate) struct FormatSuppressedNode<'a> {
+    node: AnyNodeRef<'a>,
+}
+
+impl Format<PyFormatContext<'_>> for FormatSuppressedNode<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+        let comments = f.context().comments().clone();
+        let node_comments = comments.leading_dangling_trailing_comments(self.node);
+
+        // Mark all comments as formatted that fall into the node range
+        for comment in node_comments.leading {
+            if comment.start() > self.node.start() {
+                comment.mark_formatted();
+            }
+        }
+
+        for comment in node_comments.trailing {
+            if comment.start() < self.node.end() {
+                comment.mark_formatted();
+            }
+        }
+
+        comments.mark_verbatim_node_comments_formatted(self.node);
+
+        // Write the outer comments and format the node as verbatim
+        write!(
+            f,
+            [
+                leading_comments(node_comments.leading),
+                verbatim_text(self.node, ContainsNewlines::Detect),
+                trailing_comments(node_comments.trailing)
+            ]
+        )
+    }
+}

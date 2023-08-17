@@ -1,6 +1,7 @@
-use crate::prelude::*;
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule};
 use ruff_python_ast::Stmt;
+
+use crate::prelude::*;
 
 pub(crate) mod stmt_ann_assign;
 pub(crate) mod stmt_assert;
@@ -59,7 +60,7 @@ impl FormatRule<Stmt, PyFormatContext<'_>> for FormatStmt {
             Stmt::Break(x) => x.format().fmt(f),
             Stmt::Continue(x) => x.format().fmt(f),
             Stmt::TypeAlias(x) => x.format().fmt(f),
-            Stmt::IpyEscapeCommand(_) => todo!(),
+            Stmt::IpyEscapeCommand(x) => x.format().fmt(f),
         }
     }
 }

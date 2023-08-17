@@ -1,4 +1,4 @@
-use ruff_formatter::{format_args, write, Buffer, FormatResult};
+use ruff_formatter::{format_args, write};
 use ruff_python_ast::{Expr, Ranged, Stmt, StmtFor};
 
 use crate::comments::{leading_alternate_branch_comments, trailing_comments, SourceComment};
@@ -6,7 +6,7 @@ use crate::expression::expr_tuple::TupleParentheses;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
-use crate::{FormatNodeRule, PyFormatter};
+use crate::FormatNodeRule;
 
 #[derive(Debug)]
 struct ExprTupleWithoutParentheses<'a>(&'a Expr);

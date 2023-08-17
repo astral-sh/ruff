@@ -1,3 +1,4 @@
+use crate::comments::{SourceComment, SuppressionKind};
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
@@ -41,5 +42,13 @@ impl FormatNodeRule<StmtAnnAssign> for FormatStmtAnnAssign {
         }
 
         Ok(())
+    }
+
+    fn is_suppressed(
+        &self,
+        trailing_comments: &[SourceComment],
+        context: &PyFormatContext,
+    ) -> bool {
+        SuppressionKind::has_skip_comment(trailing_comments, context.source())
     }
 }

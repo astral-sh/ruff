@@ -905,7 +905,7 @@ fn handle_leading_class_with_decorators_comment<'a>(
     comment: DecoratedComment<'a>,
     class_def: &'a ast::StmtClassDef,
 ) -> CommentPlacement<'a> {
-    if comment.start() < class_def.name.start() {
+    if comment.line_position().is_own_line() && comment.start() < class_def.name.start() {
         if let Some(decorator) = class_def.decorator_list.last() {
             if decorator.end() < comment.start() {
                 return CommentPlacement::dangling(class_def, comment);

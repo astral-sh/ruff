@@ -10,8 +10,9 @@ use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::expr_constant::ExprConstantLayout;
 use crate::expression::string::StringLayout;
 use crate::prelude::*;
+use crate::statement::stmt_expr::FormatStmtExpr;
 use crate::verbatim::{
-    write_suppressed_statements_starting_with_leading_comment,
+    suppressed_node, write_suppressed_statements_starting_with_leading_comment,
     write_suppressed_statements_starting_with_trailing_comment,
 };
 
@@ -399,27 +400,33 @@ impl<'a> DocstringStmt<'a> {
 
 impl Format<PyFormatContext<'_>> for DocstringStmt<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
-        // SAFETY: Safe because `DocStringStmt` guarantees that it only ever wraps a `ExprStmt` containing a `ConstantExpr`.
-        let constant = self
-            .0
-            .as_expr_stmt()
-            .unwrap()
-            .value
-            .as_constant_expr()
-            .unwrap();
         let comments = f.context().comments().clone();
+        let node_comments = comments.leading_dangling_trailing_comments(self.0);
 
-        // We format the expression, but the statement carries the comments
-        write!(
-            f,
-            [
-                leading_comments(comments.leading_comments(self.0)),
-                constant
-                    .format()
-                    .with_options(ExprConstantLayout::String(StringLayout::DocString)),
-                trailing_comments(comments.trailing_comments(self.0)),
-            ]
-        )
+        if FormatStmtExpr.is_suppressed(node_comments.trailing, f.context()) {
+            suppressed_node(self.0).fmt(f)
+        } else {
+            // SAFETY: Safe because `DocStringStmt` guarantees that it only ever wraps a `ExprStmt` containing a `ConstantExpr`.
+            let constant = self
+                .0
+                .as_expr_stmt()
+                .unwrap()
+                .value
+                .as_constant_expr()
+                .unwrap();
+
+            // We format the expression, but the statement carries the comments
+            write!(
+                f,
+                [
+                    leading_comments(node_comments.leading),
+                    constant
+                        .format()
+                        .with_options(ExprConstantLayout::String(StringLayout::DocString)),
+                    trailing_comments(node_comments.trailing),
+                ]
+            )
+        }
     }
 }
 

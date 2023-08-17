@@ -1,11 +1,12 @@
 use ruff_formatter::write;
 use ruff_python_ast::{Parameters, Ranged, StmtFunctionDef};
-use ruff_python_trivia::{lines_after_ignoring_trivia, SimpleTokenKind, SimpleTokenizer};
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 
-use crate::comments::{leading_comments, trailing_comments, SourceComment};
+use crate::comments::{trailing_comments, SourceComment};
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{Parentheses, Parenthesize};
 use crate::prelude::*;
+use crate::statement::stmt_class_def::FormatDecorators;
 use crate::statement::suite::SuiteKind;
 use crate::FormatNodeRule;
 
@@ -14,6 +15,17 @@ pub struct FormatStmtFunctionDef;
 
 impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
     fn fmt_fields(&self, item: &StmtFunctionDef, f: &mut PyFormatter) -> FormatResult<()> {
+        let StmtFunctionDef {
+            range: _,
+            is_async,
+            decorator_list,
+            name,
+            type_params,
+            parameters,
+            returns,
+            body,
+        } = item;
+
         let comments = f.context().comments().clone();
 
         let dangling_comments = comments.dangling_comments(item);
@@ -23,46 +35,26 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
         let (leading_definition_comments, trailing_definition_comments) =
             dangling_comments.split_at(trailing_definition_comments_start);
 
-        if let Some(last_decorator) = item.decorator_list.last() {
-            f.join_with(hard_line_break())
-                .entries(item.decorator_list.iter().formatted())
-                .finish()?;
-
-            if leading_definition_comments.is_empty() {
-                write!(f, [hard_line_break()])?;
-            } else {
-                // Write any leading definition comments (between last decorator and the header)
-                // while maintaining the right amount of empty lines between the comment
-                // and the last decorator.
-                let leading_line =
-                    if lines_after_ignoring_trivia(last_decorator.end(), f.context().source()) <= 1
-                    {
-                        hard_line_break()
-                    } else {
-                        empty_line()
-                    };
-
-                write!(
-                    f,
-                    [leading_line, leading_comments(leading_definition_comments)]
-                )?;
-            }
+        FormatDecorators {
+            decorators: decorator_list,
+            leading_definition_comments,
         }
+        .fmt(f)?;
 
-        if item.is_async {
+        if *is_async {
             write!(f, [text("async"), space()])?;
         }
 
-        write!(f, [text("def"), space(), item.name.format()])?;
+        write!(f, [text("def"), space(), name.format()])?;
 
-        if let Some(type_params) = item.type_params.as_ref() {
+        if let Some(type_params) = type_params.as_ref() {
             write!(f, [type_params.format()])?;
         }
 
         let format_inner = format_with(|f: &mut PyFormatter| {
-            write!(f, [item.parameters.format()])?;
+            write!(f, [parameters.format()])?;
 
-            if let Some(return_annotation) = item.returns.as_ref() {
+            if let Some(return_annotation) = returns.as_ref() {
                 write!(f, [space(), text("->"), space()])?;
 
                 if return_annotation.is_tuple_expr() {
@@ -110,7 +102,7 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
                         [maybe_parenthesize_expression(
                             return_annotation,
                             item,
-                            if empty_parameters(&item.parameters, f.context().source()) {
+                            if empty_parameters(parameters, f.context().source()) {
                                 // If the parameters are empty, add parentheses if the return annotation
                                 // breaks at all.
                                 Parenthesize::IfBreaksOrIfRequired
@@ -142,7 +134,7 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
             [
                 text(":"),
                 trailing_comments(trailing_definition_comments),
-                block_indent(&item.body.format().with_options(SuiteKind::Function))
+                block_indent(&body.format().with_options(SuiteKind::Function))
             ]
         )
     }
