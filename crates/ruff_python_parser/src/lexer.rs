@@ -38,6 +38,7 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 use unicode_ident::{is_xid_continue, is_xid_start};
 
 use crate::lexer::cursor::{Cursor, EOF_CHAR};
+use crate::lexer::fstring::{FStringContext, FStringContextFlags, FStrings};
 use crate::lexer::indentation::{Indentation, Indentations};
 use crate::{
     soft_keywords::SoftKeywordTransformer,
@@ -47,6 +48,7 @@ use crate::{
 };
 
 mod cursor;
+mod fstring;
 mod indentation;
 
 /// A lexer for Python source code.
@@ -63,6 +65,8 @@ pub struct Lexer<'source> {
     pending_indentation: Option<Indentation>,
     // Lexer mode.
     mode: Mode,
+    // F-string contexts.
+    fstrings: FStrings,
 }
 
 /// Contains a Token along with its `range`.
@@ -155,6 +159,7 @@ impl<'source> Lexer<'source> {
             source: input,
             cursor: Cursor::new(input),
             mode,
+            fstrings: FStrings::default(),
         };
         // TODO: Handle possible mismatch between BOM and explicit encoding declaration.
         // spell-checker:ignore feff
@@ -166,16 +171,24 @@ impl<'source> Lexer<'source> {
     /// Lex an identifier. Also used for keywords and string/bytes literals with a prefix.
     fn lex_identifier(&mut self, first: char) -> Result<Tok, LexicalError> {
         // Detect potential string like rb'' b'' f'' u'' r''
-        match self.cursor.first() {
-            quote @ ('\'' | '"') => {
+        match (first, self.cursor.first()) {
+            ('f' | 'F', quote @ ('\'' | '"')) => {
+                self.cursor.bump();
+                return Ok(self.lex_fstring_start(quote, false));
+            }
+            ('r' | 'R', 'f' | 'F') | ('f' | 'F', 'r' | 'R') if is_quote(self.cursor.second()) => {
+                self.cursor.bump();
+                let quote = self.cursor.bump().unwrap();
+                return Ok(self.lex_fstring_start(quote, true));
+            }
+            (_, quote @ ('\'' | '"')) => {
                 if let Ok(string_kind) = StringKind::try_from(first) {
                     self.cursor.bump();
                     return self.lex_string(string_kind, quote);
                 }
             }
-            second @ ('f' | 'F' | 'r' | 'R' | 'b' | 'B') if is_quote(self.cursor.second()) => {
+            (_, second @ ('r' | 'R' | 'b' | 'B')) if is_quote(self.cursor.second()) => {
                 self.cursor.bump();
-
                 if let Ok(string_kind) = StringKind::try_from([first, second]) {
                     let quote = self.cursor.bump().unwrap();
                     return self.lex_string(string_kind, quote);
@@ -491,6 +504,148 @@ impl<'source> Lexer<'source> {
         }
     }
 
+    /// Lex a f-string start token.
+    fn lex_fstring_start(&mut self, quote: char, is_raw_string: bool) -> Tok {
+        #[cfg(debug_assertions)]
+        debug_assert_eq!(self.cursor.previous(), quote);
+
+        let mut flags = FStringContextFlags::empty();
+        if quote == '"' {
+            flags |= FStringContextFlags::DOUBLE;
+        }
+        if is_raw_string {
+            flags |= FStringContextFlags::RAW;
+        }
+        if self.cursor.eat_char2(quote, quote) {
+            flags |= FStringContextFlags::TRIPLE;
+        };
+
+        self.fstrings.push(FStringContext::new(flags));
+        Tok::FStringStart
+    }
+
+    /// Lex a f-string middle or end token.
+    fn lex_fstring_middle_or_end(&mut self) -> Result<Option<Tok>, LexicalError> {
+        // SAFETY: Safe because the function is only called when `self.fstrings` is not empty.
+        let fstring = self.fstrings.current().unwrap();
+
+        // Check if we're at the end of the f-string.
+        if fstring.is_triple_quoted() {
+            let quote_char = fstring.quote_char();
+            if self.cursor.eat_char3(quote_char, quote_char, quote_char) {
+                return Ok(Some(Tok::FStringEnd));
+            }
+        } else if self.cursor.eat_char(fstring.quote_char()) {
+            return Ok(Some(Tok::FStringEnd));
+        }
+
+        // The normalized string if the token value is not yet normalized.
+        // This must remain empty if it's already normalized. Normalization
+        // is to replace `{{` and `}}` with `{` and `}` respectively.
+        let mut normalized = String::new();
+
+        // Tracks the last offset of token value that has been written to `normalized`.
+        let mut last_offset = self.offset();
+
+        let mut in_named_unicode = false;
+
+        loop {
+            match self.cursor.first() {
+                EOF_CHAR => {
+                    let error = if fstring.is_triple_quoted() {
+                        FStringErrorType::UnterminatedTripleQuotedString
+                    } else {
+                        FStringErrorType::UnterminatedString
+                    };
+                    // This is to avoid infinite loop where the lexer keeps returning
+                    // the error token because the f-string is still on the stack.
+                    self.fstrings.pop();
+                    return Err(LexicalError {
+                        error: LexicalErrorType::FStringError(error),
+                        location: self.offset(),
+                    });
+                }
+                '\n' if !fstring.is_triple_quoted() => {
+                    // This is to avoid infinite loop where the lexer keeps returning
+                    // the error token because the f-string is still on the stack.
+                    self.fstrings.pop();
+                    return Err(LexicalError {
+                        error: LexicalErrorType::FStringError(FStringErrorType::UnterminatedString),
+                        location: self.offset(),
+                    });
+                }
+                '\\' => {
+                    self.cursor.bump(); // '\'
+                    if matches!(self.cursor.first(), '{' | '}') {
+                        // Don't consume `{` or `}` as we want them to be emitted as tokens.
+                        break;
+                    } else if !fstring.is_raw_string() {
+                        if self.cursor.eat_char2('N', '{') {
+                            in_named_unicode = true;
+                            continue;
+                        }
+                    }
+                    // Consume the escaped character.
+                    self.cursor.bump();
+                }
+                quote @ ('\'' | '"') if quote == fstring.quote_char() => {
+                    if let Some(triple_quotes) = fstring.triple_quotes() {
+                        if self.cursor.rest().starts_with(triple_quotes) {
+                            break;
+                        }
+                        self.cursor.bump();
+                    } else {
+                        break;
+                    }
+                }
+                '{' => {
+                    if self.cursor.second() == '{' {
+                        self.cursor.bump();
+                        normalized
+                            .push_str(&self.source[TextRange::new(last_offset, self.offset())]);
+                        self.cursor.bump(); // Skip the second `{`
+                        last_offset = self.offset();
+                    } else {
+                        break;
+                    }
+                }
+                '}' => {
+                    if in_named_unicode {
+                        in_named_unicode = false;
+                        self.cursor.bump();
+                    } else if self.cursor.second() == '}' && !fstring.is_in_format_spec() {
+                        self.cursor.bump();
+                        normalized
+                            .push_str(&self.source[TextRange::new(last_offset, self.offset())]);
+                        self.cursor.bump(); // Skip the second `}`
+                        last_offset = self.offset();
+                    } else {
+                        break;
+                    }
+                }
+                _ => {
+                    self.cursor.bump();
+                }
+            }
+        }
+
+        let range = self.token_range();
+        if range.is_empty() {
+            return Ok(None);
+        }
+
+        let value = if normalized.is_empty() {
+            self.source[range].to_string()
+        } else {
+            normalized.push_str(&self.source[TextRange::new(last_offset, self.offset())]);
+            normalized
+        };
+        Ok(Some(Tok::FStringMiddle {
+            value,
+            is_raw: fstring.is_raw_string(),
+        }))
+    }
+
     /// Lex a string literal.
     fn lex_string(&mut self, kind: StringKind, quote: char) -> Result<Tok, LexicalError> {
         #[cfg(debug_assertions)]
@@ -512,6 +667,19 @@ impl<'source> Lexer<'source> {
                     }
                 }
                 Some('\r' | '\n') if !triple_quoted => {
+                    if let Some(fstring) = self.fstrings.current() {
+                        // When we are in an f-string, check whether does the initial quote
+                        // matches with f-strings quotes and if it is, then this must be a
+                        // missing '}' token so raise the proper error.
+                        if fstring.quote_char() == quote && !fstring.is_triple_quoted() {
+                            return Err(LexicalError {
+                                error: LexicalErrorType::FStringError(
+                                    FStringErrorType::UnclosedLbrace,
+                                ),
+                                location: self.offset() - fstring.quote_size(),
+                            });
+                        }
+                    }
                     return Err(LexicalError {
                         error: LexicalErrorType::OtherError(
                             "EOL while scanning string literal".to_owned(),
@@ -531,6 +699,21 @@ impl<'source> Lexer<'source> {
 
                 Some(_) => {}
                 None => {
+                    if let Some(fstring) = self.fstrings.current() {
+                        // When we are in an f-string, check whether does the initial quote
+                        // matches with f-strings quotes and if it is, then this must be a
+                        // missing '}' token so raise the proper error.
+                        if fstring.quote_char() == quote
+                            && fstring.is_triple_quoted() == triple_quoted
+                        {
+                            return Err(LexicalError {
+                                error: LexicalErrorType::FStringError(
+                                    FStringErrorType::UnclosedLbrace,
+                                ),
+                                location: self.offset() - fstring.quote_size(),
+                            });
+                        }
+                    }
                     return Err(LexicalError {
                         error: if triple_quoted {
                             LexicalErrorType::Eof
@@ -554,6 +737,18 @@ impl<'source> Lexer<'source> {
     // This is the main entry point. Call this function to retrieve the next token.
     // This function is used by the iterator implementation.
     pub fn next_token(&mut self) -> LexResult {
+        if let Some(fstring) = self.fstrings.current() {
+            if !fstring.is_in_expression() {
+                self.cursor.start_token();
+                if let Some(tok) = self.lex_fstring_middle_or_end()? {
+                    if matches!(tok, Tok::FStringEnd) {
+                        self.fstrings.pop();
+                    }
+                    return Ok((tok, self.token_range()));
+                }
+            }
+        }
+
         // Return dedent tokens until the current indentation level matches the indentation of the next token.
         if let Some(indentation) = self.pending_indentation.take() {
             if let Ok(Ordering::Greater) = self.indentations.current().try_compare(indentation) {
@@ -861,39 +1056,66 @@ impl<'source> Lexer<'source> {
                 if self.cursor.eat_char('=') {
                     Tok::NotEqual
                 } else {
-                    return Err(LexicalError {
-                        error: LexicalErrorType::UnrecognizedToken { tok: '!' },
-                        location: self.token_start(),
-                    });
+                    Tok::Exclamation
                 }
             }
             '~' => Tok::Tilde,
             '(' => {
+                if let Some(fstring) = self.fstrings.current_mut() {
+                    fstring.increment_opening_parentheses();
+                }
                 self.nesting += 1;
                 Tok::Lpar
             }
             ')' => {
+                if let Some(fstring) = self.fstrings.current_mut() {
+                    fstring.decrement_closing_parentheses();
+                }
                 self.nesting = self.nesting.saturating_sub(1);
                 Tok::Rpar
             }
             '[' => {
+                if let Some(fstring) = self.fstrings.current_mut() {
+                    fstring.increment_opening_parentheses();
+                }
                 self.nesting += 1;
                 Tok::Lsqb
             }
             ']' => {
+                if let Some(fstring) = self.fstrings.current_mut() {
+                    fstring.decrement_closing_parentheses();
+                }
                 self.nesting = self.nesting.saturating_sub(1);
                 Tok::Rsqb
             }
             '{' => {
+                if let Some(fstring) = self.fstrings.current_mut() {
+                    fstring.increment_opening_parentheses();
+                }
                 self.nesting += 1;
                 Tok::Lbrace
             }
             '}' => {
+                if let Some(fstring) = self.fstrings.current_mut() {
+                    if !fstring.has_open_parentheses() {
+                        return Err(LexicalError {
+                            error: LexicalErrorType::FStringError(FStringErrorType::SingleRbrace),
+                            location: self.token_start(),
+                        });
+                    }
+                    fstring.decrement_closing_parentheses();
+                }
                 self.nesting = self.nesting.saturating_sub(1);
                 Tok::Rbrace
             }
             ':' => {
-                if self.cursor.eat_char('=') {
+                if self
+                    .fstrings
+                    .current_mut()
+                    .is_some_and(FStringContext::try_start_format_spec)
+                {
+                    Tok::Colon
+                } else if self.cursor.eat_char('=') {
                     Tok::ColonEqual
                 } else {
                     Tok::Colon
@@ -1677,5 +1899,158 @@ def f(arg=%timeit a = b):
             }
             result => panic!("Expected an error token but found {result:?}"),
         }
+    }
+
+    #[test]
+    fn test_empty_fstrings() {
+        let source = r#"f"" "" F"" f'' '' f"""""" f''''''"#;
+        assert_debug_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_fstring_prefix() {
+        let source = r#"f"" F"" rf"" rF"" Rf"" RF"" fr"" Fr"" fR"" FR"""#;
+        assert_debug_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_fstring() {
+        let source = r#"f"normal {foo} {{another}} {bar} {{{three}}}""#;
+        assert_debug_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_fstring_parentheses() {
+        let source = r#"f"{}" f"{{}}" f" {}" f"{{{}}}" f"{{{{}}}}" f" {} {{}} {{{}}} {{{{}}}}  ""#;
+        assert_debug_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_fstring_escape() {
+        let source = r#"f"\{x:\"\{x}} \"\"\
+ end""#;
+        assert_debug_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_fstring_escape_raw() {
+        let source = r#"rf"\{x:\"\{x}} \"\"\
+ end""#;
+        assert_debug_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_fstring_named_unicode() {
+        let source = r#"f"\N{BULLET} normal \Nope \N""#;
+        assert_debug_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_fstring_named_unicode_raw() {
+        let source = r#"rf"\N{BULLET} normal""#;
+        assert_debug_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_fstring_with_named_expression() {
+        let source = r#"f"{x:=10} {(x:=10)} {x,{y:=10}} {[x:=10]}""#;
+        assert_debug_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_fstring_with_format_spec() {
+        let source = r#"f"{foo:} {x=!s:.3f} {x:.{y}f} {'':*^{1:{1}}}""#;
+        assert_debug_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_fstring_conversion() {
+        let source = r#"f"{x!s} {x=!r} {x:.3f!r} {{x!r}}""#;
+        assert_debug_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_fstring_nested() {
+        let source = r#"f"foo {f"bar {x + f"{wow}"}"} baz" f'foo {f'bar'} some {f"another"}'"#;
+        assert_debug_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_fstring_expression_multiline() {
+        let source = r#"f"first {
+    x
+        *
+            y
+} second""#;
+        assert_debug_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_fstring_multiline() {
+        let source = r#"f"""
+hello
+    world
+""" f'''
+    world
+hello
+''' f"some {f"""multiline
+allowed {x}"""} string""#;
+        assert_debug_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_fstring_comments() {
+        let source = r#"f"""
+# not a comment { # comment {
+    x
+} # not a comment
+""""#;
+        assert_debug_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_fstring_with_ipy_escape_command() {
+        let source = r#"f"foo {!pwd} bar""#;
+        assert_debug_snapshot!(lex_source(source));
+    }
+
+    fn lex_fstring_error(source: &str) -> FStringErrorType {
+        match lex(source, Mode::Module).find_map(std::result::Result::err) {
+            Some(err) => match err.error {
+                LexicalErrorType::FStringError(error) => error,
+                _ => panic!("Expected FStringError: {err:?}"),
+            },
+            _ => panic!("Expected atleast one FStringError"),
+        }
+    }
+
+    #[test]
+    fn test_fstring_error() {
+        use FStringErrorType::{
+            UnclosedLbrace, UnterminatedString, UnterminatedTripleQuotedString,
+        };
+
+        assert_eq!(lex_fstring_error(r#"f"{""#), UnclosedLbrace);
+        assert_eq!(lex_fstring_error(r#"f"{foo!r""#), UnclosedLbrace);
+        assert_eq!(
+            lex_fstring_error(
+                r#"f"{"
+"#
+            ),
+            UnclosedLbrace
+        );
+        assert_eq!(lex_fstring_error(r#"f"""{""""#), UnclosedLbrace);
+        assert_eq!(lex_fstring_error(r#"f""#), UnterminatedString);
+        assert_eq!(lex_fstring_error(r#"f'"#), UnterminatedString);
+        assert_eq!(lex_fstring_error(r#"f""""#), UnterminatedTripleQuotedString);
+        assert_eq!(lex_fstring_error(r#"f'''"#), UnterminatedTripleQuotedString);
+        assert_eq!(
+            lex_fstring_error(r#"f"""""#),
+            UnterminatedTripleQuotedString
+        );
+        assert_eq!(
+            lex_fstring_error(r#"f""""""#),
+            UnterminatedTripleQuotedString
+        );
     }
 }

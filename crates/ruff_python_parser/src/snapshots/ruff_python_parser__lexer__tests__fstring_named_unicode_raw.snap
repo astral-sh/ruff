@@ -1,0 +1,22 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: lex_source(source)
+---
+[
+    FStringStart,
+    FStringMiddle {
+        value: "\\N",
+        is_raw: true,
+    },
+    Lbrace,
+    Name {
+        name: "BULLET",
+    },
+    Rbrace,
+    FStringMiddle {
+        value: " normal",
+        is_raw: true,
+    },
+    FStringEnd,
+    Newline,
+]

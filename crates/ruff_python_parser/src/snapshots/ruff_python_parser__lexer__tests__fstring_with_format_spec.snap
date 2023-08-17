@@ -1,0 +1,84 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: lex_source(source)
+---
+[
+    FStringStart,
+    Lbrace,
+    Name {
+        name: "foo",
+    },
+    Colon,
+    Rbrace,
+    FStringMiddle {
+        value: " ",
+        is_raw: false,
+    },
+    Lbrace,
+    Name {
+        name: "x",
+    },
+    Equal,
+    Exclamation,
+    Name {
+        name: "s",
+    },
+    Colon,
+    FStringMiddle {
+        value: ".3f",
+        is_raw: false,
+    },
+    Rbrace,
+    FStringMiddle {
+        value: " ",
+        is_raw: false,
+    },
+    Lbrace,
+    Name {
+        name: "x",
+    },
+    Colon,
+    FStringMiddle {
+        value: ".",
+        is_raw: false,
+    },
+    Lbrace,
+    Name {
+        name: "y",
+    },
+    Rbrace,
+    FStringMiddle {
+        value: "f",
+        is_raw: false,
+    },
+    Rbrace,
+    FStringMiddle {
+        value: " ",
+        is_raw: false,
+    },
+    Lbrace,
+    String {
+        value: "",
+        kind: String,
+        triple_quoted: false,
+    },
+    Colon,
+    FStringMiddle {
+        value: "*^",
+        is_raw: false,
+    },
+    Lbrace,
+    Int {
+        value: 1,
+    },
+    Colon,
+    Lbrace,
+    Int {
+        value: 1,
+    },
+    Rbrace,
+    Rbrace,
+    Rbrace,
+    FStringEnd,
+    Newline,
+]
