@@ -48,7 +48,17 @@ bad_string_format_character.py:15:1: PLE1300 Unsupported format character 'y'
 15 | "{:s} {:y}".format("hello", "world")  # [bad-format-character]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLE1300
 16 | 
-17 | "{:*^30s}".format("centered")
+17 | "{:*^30s}".format("centered") # OK
+   |
+
+bad_string_format_character.py:20:1: PLE1300 Unsupported format character 'y'
+   |
+18 | "{:{s}}".format("hello", s="s")  # OK (nested replacement value not checked)
+19 | 
+20 | "{:{s:y}}".format("hello", s="s")  # [bad-format-character] (nested replacement format spec checked)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLE1300
+21 | 
+22 | ## f-strings
    |
 
 
