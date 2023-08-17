@@ -43,7 +43,7 @@ impl Format<PyFormatContext<'_>> for KeyValuePair<'_> {
             )
         } else {
             let comments = f.context().comments().clone();
-            let leading_value_comments = comments.leading_comments(self.value);
+            let leading_value_comments = comments.leading(self.value);
             write!(
                 f,
                 [
@@ -67,7 +67,7 @@ impl FormatNodeRule<ExprDict> for FormatExprDict {
         debug_assert_eq!(keys.len(), values.len());
 
         let comments = f.context().comments().clone();
-        let dangling = comments.dangling_comments(item);
+        let dangling = comments.dangling(item);
 
         if values.is_empty() {
             return empty_parenthesized("{", dangling, "}").fmt(f);

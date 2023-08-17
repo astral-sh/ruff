@@ -14,10 +14,7 @@ impl FormatNodeRule<StmtNonlocal> for FormatStmtNonlocal {
         // Join the `nonlocal` names, breaking across continuation lines if necessary, unless the
         // `nonlocal` statement has a trailing comment, in which case, breaking the names would
         // move the comment "off" of the `nonlocal` statement.
-        if f.context()
-            .comments()
-            .has_trailing_comments(item.as_any_node_ref())
-        {
+        if f.context().comments().has_trailing(item.as_any_node_ref()) {
             let joined = format_with(|f| {
                 f.join_with(format_args![text(","), space()])
                     .entries(item.names.iter().formatted())

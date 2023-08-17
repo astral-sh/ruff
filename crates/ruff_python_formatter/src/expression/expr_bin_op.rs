@@ -29,10 +29,7 @@ impl FormatNodeRule<ExprBinOp> for FormatExprBinOp {
 
         match Self::layout(item, f.context()) {
             BinOpLayout::LeftString(expression) => {
-                let right_has_leading_comment = f
-                    .context()
-                    .comments()
-                    .has_leading_comments(item.right.as_ref());
+                let right_has_leading_comment = comments.has_leading(item.right.as_ref());
 
                 let format_right_and_op = format_with(|f| {
                     if right_has_leading_comment {
@@ -98,7 +95,7 @@ impl FormatNodeRule<ExprBinOp> for FormatExprBinOp {
                             right,
                         } = current;
 
-                        let operator_comments = comments.dangling_comments(current);
+                        let operator_comments = comments.dangling(current);
                         let needs_space = !is_simple_power_expression(current);
 
                         let before_operator_space = if needs_space {
@@ -117,9 +114,7 @@ impl FormatNodeRule<ExprBinOp> for FormatExprBinOp {
                         )?;
 
                         // Format the operator on its own line if the right side has any leading comments.
-                        if comments.has_leading_comments(right.as_ref())
-                            || !operator_comments.is_empty()
-                        {
+                        if comments.has_leading(right.as_ref()) || !operator_comments.is_empty() {
                             hard_line_break().fmt(f)?;
                         } else if needs_space {
                             space().fmt(f)?;
@@ -171,8 +166,8 @@ impl FormatExprBinOp {
 
             if bin_op.op == Operator::Mod
                 && context.node_level().is_parenthesized()
-                && !comments.has_dangling_comments(constant)
-                && !comments.has_dangling_comments(bin_op)
+                && !comments.has_dangling(constant)
+                && !comments.has_dangling(bin_op)
             {
                 BinOpLayout::LeftString(constant)
             } else {

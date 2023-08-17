@@ -45,7 +45,7 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
             );
 
             let comments = f.context().comments().clone();
-            let dangling_comments = comments.dangling_comments(item);
+            let dangling_comments = comments.dangling(item);
             let leading_attribute_comments_start = dangling_comments
                 .partition_point(|comment| comment.line_position().is_end_of_line());
             let (trailing_dot_comments, leading_attribute_comments) =
@@ -88,7 +88,7 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
                 value.format().fmt(f)?;
             }
 
-            if comments.has_trailing_own_line_comments(value.as_ref()) {
+            if comments.has_trailing_own_line(value.as_ref()) {
                 hard_line_break().fmt(f)?;
             }
 
@@ -171,10 +171,10 @@ impl NeedsParentheses for ExprAttribute {
             OptionalParentheses::Multiline
         } else if context
             .comments()
-            .dangling_comments(self)
+            .dangling(self)
             .iter()
             .any(|comment| comment.line_position().is_own_line())
-            || context.comments().has_trailing_own_line_comments(self)
+            || context.comments().has_trailing_own_line(self)
         {
             OptionalParentheses::Always
         } else {

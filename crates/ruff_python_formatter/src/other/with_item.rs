@@ -19,7 +19,7 @@ impl FormatNodeRule<WithItem> for FormatWithItem {
         } = item;
 
         let comments = f.context().comments().clone();
-        let trailing_as_comments = comments.dangling_comments(item);
+        let trailing_as_comments = comments.dangling(item);
 
         write!(
             f,

@@ -22,7 +22,7 @@ impl FormatNodeRule<MatchCase> for FormatMatchCase {
         } = item;
 
         let comments = f.context().comments().clone();
-        let dangling_item_comments = comments.dangling_comments(item);
+        let dangling_item_comments = comments.dangling(item);
 
         write!(
             f,
@@ -33,7 +33,7 @@ impl FormatNodeRule<MatchCase> for FormatMatchCase {
                     &format_with(|f| {
                         write!(f, [text("case"), space()])?;
 
-                        let leading_pattern_comments = comments.leading_comments(pattern);
+                        let leading_pattern_comments = comments.leading(pattern);
                         if !leading_pattern_comments.is_empty() {
                             parenthesized(
                                 "(",

@@ -39,7 +39,7 @@ impl FormatNodeRule<ExprUnaryOp> for FormatExprUnaryOp {
         // (not # comment
         //      a)
         // ```
-        let leading_operand_comments = comments.leading_comments(operand.as_ref());
+        let leading_operand_comments = comments.leading(operand.as_ref());
         let trailing_operator_comments_end =
             leading_operand_comments.partition_point(|p| p.line_position().is_end_of_line());
         let (trailing_operator_comments, leading_operand_comments) =

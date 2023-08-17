@@ -21,7 +21,7 @@ impl FormatNodeRule<ExprList> for FormatExprList {
         } = item;
 
         let comments = f.context().comments().clone();
-        let dangling = comments.dangling_comments(item);
+        let dangling = comments.dangling(item);
 
         if elts.is_empty() {
             return empty_parenthesized("[", dangling, "]").fmt(f);

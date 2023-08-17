@@ -21,7 +21,7 @@ impl FormatNodeRule<StmtMatch> for FormatStmtMatch {
         } = item;
 
         let comments = f.context().comments().clone();
-        let dangling_item_comments = comments.dangling_comments(item);
+        let dangling_item_comments = comments.dangling(item);
 
         // There can be at most one dangling comment after the colon in a match statement.
         debug_assert!(dangling_item_comments.len() <= 1);
@@ -53,7 +53,7 @@ impl FormatNodeRule<StmtMatch> for FormatStmtMatch {
                 f,
                 [block_indent(&format_args!(
                     leading_alternate_branch_comments(
-                        comments.leading_comments(case),
+                        comments.leading(case),
                         last_case.body.last(),
                     ),
                     case.format()

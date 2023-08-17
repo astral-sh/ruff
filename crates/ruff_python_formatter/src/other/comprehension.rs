@@ -15,7 +15,7 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
 
         impl Format<PyFormatContext<'_>> for Spacer<'_> {
             fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-                if f.context().comments().has_leading_comments(self.0) {
+                if f.context().comments().has_leading(self.0) {
                     soft_line_break_or_space().fmt(f)
                 } else {
                     space().fmt(f)
@@ -36,13 +36,13 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
         }
 
         let comments = f.context().comments().clone();
-        let dangling_item_comments = comments.dangling_comments(item);
+        let dangling_item_comments = comments.dangling(item);
         let (before_target_comments, before_in_comments) = dangling_item_comments.split_at(
             dangling_item_comments
                 .partition_point(|comment| comment.slice().end() < target.start()),
         );
 
-        let trailing_in_comments = comments.dangling_comments(iter);
+        let trailing_in_comments = comments.dangling(iter);
 
         let in_spacer = format_with(|f| {
             if before_in_comments.is_empty() {
@@ -73,7 +73,7 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
             let joined = format_with(|f| {
                 let mut joiner = f.join_with(soft_line_break_or_space());
                 for if_case in ifs {
-                    let dangling_if_comments = comments.dangling_comments(if_case);
+                    let dangling_if_comments = comments.dangling(if_case);
 
                     let (own_line_if_comments, end_of_line_if_comments) = dangling_if_comments
                         .split_at(

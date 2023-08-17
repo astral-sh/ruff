@@ -29,7 +29,7 @@ impl FormatNodeRule<ExprCompare> for FormatExprCompare {
             assert_eq!(comparators.len(), ops.len());
 
             for (operator, comparator) in ops.iter().zip(comparators) {
-                let leading_comparator_comments = comments.leading_comments(comparator);
+                let leading_comparator_comments = comments.leading(comparator);
                 if leading_comparator_comments.is_empty() {
                     write!(f, [in_parentheses_only_soft_line_break_or_space()])?;
                 } else {

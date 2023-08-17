@@ -107,7 +107,7 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
         } = item;
 
         let comments = f.context().comments().clone();
-        let dangling = comments.dangling_comments(item);
+        let dangling = comments.dangling(item);
 
         // Handle the edge cases of an empty tuple and a tuple with one element
         //

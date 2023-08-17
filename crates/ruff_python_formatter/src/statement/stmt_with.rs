@@ -33,7 +33,7 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
         //     ...
         // ```
         let comments = f.context().comments().clone();
-        let dangling_comments = comments.dangling_comments(item.as_any_node_ref());
+        let dangling_comments = comments.dangling(item.as_any_node_ref());
         let partition_point = dangling_comments.partition_point(|comment| {
             item.items
                 .first()
@@ -86,9 +86,7 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
                         } else if let [item] = item.items.as_slice() {
                             // This is similar to `maybe_parenthesize_expression`, but we're not dealing with an
                             // expression here, it's a `WithItem`.
-                            if comments.has_leading_comments(item)
-                                || comments.has_trailing_own_line_comments(item)
-                            {
+                            if comments.has_leading(item) || comments.has_trailing_own_line(item) {
                                 optional_parentheses(&item.format()).fmt(f)?;
                             } else {
                                 item.format().fmt(f)?;

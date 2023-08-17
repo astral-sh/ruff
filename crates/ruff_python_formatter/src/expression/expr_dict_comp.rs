@@ -29,7 +29,7 @@ impl FormatNodeRule<ExprDictComp> for FormatExprDictComp {
         });
 
         let comments = f.context().comments().clone();
-        let dangling = comments.dangling_comments(item);
+        let dangling = comments.dangling(item);
 
         write!(
             f,

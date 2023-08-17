@@ -108,7 +108,7 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
 
         if parenthesize {
             let comments = f.context().comments().clone();
-            let open_parenthesis_comment = comments.open_parenthesis_comment(expression);
+            let open_parenthesis_comment = comments.open_parenthesis(expression);
             parenthesized("(", &format_expr, ")")
                 .with_dangling_comments(
                     open_parenthesis_comment
@@ -167,8 +167,8 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
         let preserve_parentheses = parenthesize.is_optional()
             && is_expression_parenthesized((*expression).into(), f.context().source());
 
-        let has_comments = comments.has_leading_comments(*expression)
-            || comments.has_trailing_own_line_comments(*expression);
+        let has_comments =
+            comments.has_leading(*expression) || comments.has_trailing_own_line(*expression);
 
         // If the expression has comments, we always want to preserve the parentheses. This also
         // ensures that we correctly handle parenthesized comments, and don't need to worry about
@@ -655,11 +655,7 @@ pub(crate) fn has_own_parentheses(
         Expr::List(ast::ExprList { elts, .. })
         | Expr::Set(ast::ExprSet { elts, .. })
         | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-            if !elts.is_empty()
-                || context
-                    .comments()
-                    .has_dangling_comments(AnyNodeRef::from(expr))
-            {
+            if !elts.is_empty() || context.comments().has_dangling(AnyNodeRef::from(expr)) {
                 Some(OwnParentheses::NonEmpty)
             } else {
                 Some(OwnParentheses::Empty)
@@ -667,22 +663,14 @@ pub(crate) fn has_own_parentheses(
         }
 
         Expr::Dict(ast::ExprDict { keys, .. }) => {
-            if !keys.is_empty()
-                || context
-                    .comments()
-                    .has_dangling_comments(AnyNodeRef::from(expr))
-            {
+            if !keys.is_empty() || context.comments().has_dangling(AnyNodeRef::from(expr)) {
                 Some(OwnParentheses::NonEmpty)
             } else {
                 Some(OwnParentheses::Empty)
             }
         }
         Expr::Call(ast::ExprCall { arguments, .. }) => {
-            if !arguments.is_empty()
-                || context
-                    .comments()
-                    .has_dangling_comments(AnyNodeRef::from(expr))
-            {
+            if !arguments.is_empty() || context.comments().has_dangling(AnyNodeRef::from(expr)) {
                 Some(OwnParentheses::NonEmpty)
             } else {
                 Some(OwnParentheses::Empty)

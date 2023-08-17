@@ -46,7 +46,7 @@ impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHan
         } = item;
 
         let comments_info = f.context().comments().clone();
-        let dangling_comments = comments_info.dangling_comments(item);
+        let dangling_comments = comments_info.dangling(item);
 
         write!(
             f,

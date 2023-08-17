@@ -63,7 +63,7 @@ impl Format<PyFormatContext<'_>> for FormatTargets<'_> {
         if let Some((first, rest)) = self.targets.split_first() {
             let comments = f.context().comments();
 
-            let parenthesize = if comments.has_leading_comments(first) {
+            let parenthesize = if comments.has_leading(first) {
                 ParenthesizeTarget::Always
             } else if has_own_parentheses(first, f.context()).is_some() {
                 ParenthesizeTarget::Never

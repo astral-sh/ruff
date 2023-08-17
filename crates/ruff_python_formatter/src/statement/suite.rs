@@ -70,9 +70,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 // Format the first statement in the body, which often has special formatting rules.
                 let first = match self.kind {
                     SuiteKind::Other => {
-                        if is_class_or_function_definition(first)
-                            && !comments.has_leading_comments(first)
-                        {
+                        if is_class_or_function_definition(first) && !comments.has_leading(first) {
                             // Add an empty line for any nested functions or classes defined within
                             // non-function or class compound statements, e.g., this is stable formatting:
                             // ```python
@@ -97,7 +95,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
 
                     SuiteKind::Class => {
                         if let Some(docstring) = DocstringStmt::try_from_statement(first) {
-                            if !comments.has_leading_comments(first)
+                            if !comments.has_leading(first)
                                 && lines_before(first.start(), source) > 1
                             {
                                 // Allow up to one empty line before a class docstring, e.g., this is
@@ -118,7 +116,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                     SuiteKind::TopLevel => SuiteChildStatement::Other(first),
                 };
 
-                let first_comments = comments.leading_dangling_trailing_comments(first);
+                let first_comments = comments.leading_dangling_trailing(first);
 
                 let (mut preceding, mut after_class_docstring) = if first_comments
                     .leading
@@ -158,8 +156,8 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                         match self.kind {
                             SuiteKind::TopLevel if source_type.is_stub() => {
                                 // Preserve the empty line if the definitions are separated by a comment
-                                if comments.has_trailing_comments(preceding)
-                                    || comments.has_leading_comments(following)
+                                if comments.has_trailing(preceding)
+                                    || comments.has_leading(following)
                                 {
                                     empty_line().fmt(f)?;
                                 } else {
@@ -220,8 +218,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                         // which is 0 instead of 1, the number of lines between the trailing comment and
                         // the leading comment. This is why the suite handling counts the lines before the
                         // start of the next statement or before the first leading comments for compound statements.
-                        let start = if let Some(first_leading) =
-                            comments.leading_comments(following).first()
+                        let start = if let Some(first_leading) = comments.leading(following).first()
                         {
                             first_leading.slice().start()
                         } else {
@@ -294,7 +291,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                         }
                     }
 
-                    let following_comments = comments.leading_dangling_trailing_comments(following);
+                    let following_comments = comments.leading_dangling_trailing(following);
 
                     if following_comments
                         .leading
@@ -401,7 +398,7 @@ impl<'a> DocstringStmt<'a> {
 impl Format<PyFormatContext<'_>> for DocstringStmt<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         let comments = f.context().comments().clone();
-        let node_comments = comments.leading_dangling_trailing_comments(self.0);
+        let node_comments = comments.leading_dangling_trailing(self.0);
 
         if FormatStmtExpr.is_suppressed(node_comments.trailing, f.context()) {
             suppressed_node(self.0).fmt(f)

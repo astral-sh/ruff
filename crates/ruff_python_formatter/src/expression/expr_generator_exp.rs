@@ -51,7 +51,7 @@ impl FormatNodeRule<ExprGeneratorExp> for FormatExprGeneratorExp {
         });
 
         let comments = f.context().comments().clone();
-        let dangling = comments.dangling_comments(item);
+        let dangling = comments.dangling(item);
 
         if self.parentheses == GeneratorExpParentheses::StripIfOnlyFunctionArg
             && dangling.is_empty()

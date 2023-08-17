@@ -33,7 +33,7 @@ impl Format<PyFormatContext<'_>> for FormatLeadingComments<'_> {
         let comments = f.context().comments().clone();
 
         let leading_comments = match self {
-            FormatLeadingComments::Node(node) => comments.leading_comments(*node),
+            FormatLeadingComments::Node(node) => comments.leading(*node),
             FormatLeadingComments::Comments(comments) => comments,
         };
 
@@ -124,7 +124,7 @@ impl Format<PyFormatContext<'_>> for FormatTrailingComments<'_> {
         let comments = f.context().comments().clone();
 
         let trailing_comments = match self {
-            FormatTrailingComments::Node(node) => comments.trailing_comments(*node),
+            FormatTrailingComments::Node(node) => comments.trailing(*node),
             FormatTrailingComments::Comments(comments) => comments,
         };
 
@@ -198,7 +198,7 @@ impl Format<PyFormatContext<'_>> for FormatDanglingComments<'_> {
 
         let dangling_comments = match self {
             Self::Comments(comments) => comments,
-            Self::Node(node) => comments.dangling_comments(*node),
+            Self::Node(node) => comments.dangling(*node),
         };
 
         let mut first = true;

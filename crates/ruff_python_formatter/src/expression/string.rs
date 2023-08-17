@@ -160,7 +160,7 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
         let comments = f.context().comments().clone();
         let locator = f.context().locator();
         let quote_style = f.options().quote_style();
-        let mut dangling_comments = comments.dangling_comments(self.string);
+        let mut dangling_comments = comments.dangling(self.string);
 
         let string_range = self.string.range();
         let string_content = locator.slice(string_range);

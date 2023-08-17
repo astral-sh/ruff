@@ -49,7 +49,7 @@ where
     fn fmt(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
         let comments = f.context().comments().clone();
 
-        let node_comments = comments.leading_dangling_trailing_comments(node.as_any_node_ref());
+        let node_comments = comments.leading_dangling_trailing(node.as_any_node_ref());
 
         if self.is_suppressed(node_comments.trailing, f.context()) {
             suppressed_node(node.as_any_node_ref()).fmt(f)
@@ -161,7 +161,7 @@ pub fn format_node<'a>(
     formatted
         .context()
         .comments()
-        .assert_formatted_all_comments(SourceCode::new(source));
+        .assert_all_formatted(SourceCode::new(source));
     Ok(formatted)
 }
 
