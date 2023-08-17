@@ -69,7 +69,7 @@ pub(crate) fn non_ascii_name(checker: &mut Checker, stmt: &Stmt) {
 }
 
 /// Return a `Vec<Name>` containing the identifiers present in any of the following
-/// statements: `ClassDef`, `FunctionDef`, `Assign`, `AugAssing`, `AnnAssign`
+/// statements: `ClassDef`, `FunctionDef`, `Assign`, `AugAssign`, `AnnAssign`
 /// or `Global`. Otherwise, return an empty `Vec`.
 fn get_stmt_names(stmt: &Stmt) -> Vec<Name> {
     let mut stmt_names = Vec::new();
