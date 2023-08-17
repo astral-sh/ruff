@@ -1335,15 +1335,19 @@ NamedExpressionTest: ast::Expr = {
     Test<"all">,
 }
 
+NamedExpressionName: ast::Expr = {
+    <location:@L> <id:Identifier> <end_location:@R> => ast::Expr::Name(
+        ast::ExprName { id: id.into(), ctx: ast::ExprContext::Store, range: (location..end_location).into() },
+    ),
+}
+
 NamedExpression: ast::Expr = {
-    <location:@L> <id:Identifier> <end_location:@R> ":=" <value:Test<"all">> => {
+    <location:@L> <target:NamedExpressionName> ":=" <value:Test<"all">> <end_location:@R> => {
         ast::Expr::NamedExpr(
             ast::ExprNamedExpr {
-                target: Box::new(ast::Expr::Name(
-                    ast::ExprName { id: id.into(), ctx: ast::ExprContext::Store, range: (location..end_location).into() },
-                )),
-                range: (location..value.end()).into(),
+                target: Box::new(target),
                 value: Box::new(value),
+                range: (location..end_location).into(),
             }
         )
     },
