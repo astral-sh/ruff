@@ -25,6 +25,12 @@ if (True) == TrueElement or x == TrueElement:
 if res == True != False:
     pass
 
+if(True) == TrueElement or x == TrueElement:
+    pass
+
+if (yield i) == True:
+      print("even")
+
 #: Okay
 if x not in y:
     pass

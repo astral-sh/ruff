@@ -46,6 +46,3 @@ pub fn if_elif_branches(stmt_if: &StmtIf) -> impl Iterator<Item = IfElifBranch> 
         })
     }))
 }
-
-#[cfg(test)]
-mod test {}
