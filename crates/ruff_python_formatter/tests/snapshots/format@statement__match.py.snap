@@ -230,7 +230,7 @@ match newlines:
 
     case "NOT_YET_IMPLEMENTED_PatternMatchValue":
         pass
-    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+    case _:
         pass
 
 
@@ -257,7 +257,7 @@ match long_lines:
 
 match pattern_comments:
     case (
-        x as NOT_YET_IMPLEMENTED_PatternMatchAs  # trailing 1
+        only_trailing  # trailing 1
         # trailing 2
         # trailing 3
     ):
@@ -267,7 +267,7 @@ match pattern_comments:
 match pattern_comments:
     case (
         # leading
-        x as NOT_YET_IMPLEMENTED_PatternMatchAs
+        only_leading
     ):
         pass
 
@@ -275,7 +275,7 @@ match pattern_comments:
 match pattern_comments:
     case (
         # leading
-        x as NOT_YET_IMPLEMENTED_PatternMatchAs  # trailing 1
+        leading_and_trailing  # trailing 1
         # trailing 2
         # trailing 3
     ):
@@ -283,7 +283,7 @@ match pattern_comments:
 
 
 match pattern_comments:
-    case (x as NOT_YET_IMPLEMENTED_PatternMatchAs):
+    case (no_comments):
         pass
 ```
 

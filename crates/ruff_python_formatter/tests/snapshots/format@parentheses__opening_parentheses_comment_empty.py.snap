@@ -139,7 +139,7 @@ with (  # d 1
     pass
 match (  # d 2
 ):
-    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+    case d2:
         pass
 match d3:
     case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:

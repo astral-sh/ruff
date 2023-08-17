@@ -153,8 +153,7 @@ def where_is(point):
 -    case ["drop", *objects]:
 +    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
          print("Dropping: ", *objects)
--    case _:
-+    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+     case _:
          print(f"Sorry, I couldn't understand {command!r}")
  
  match command.split():
@@ -197,8 +196,7 @@ def where_is(point):
 -    case KeyPress():
 +    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
          pass  # Ignore other keystrokes
--    case other_event:
-+    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+     case other_event:
          raise ValueError(f"Unrecognized event: {other_event}")
  
  match event.get():
@@ -224,8 +222,7 @@ def where_is(point):
 -        case Point():
 +        case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
              print("Somewhere else")
--        case _:
-+        case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+         case _:
              print("Not a point")
 ```
 
@@ -269,7 +266,7 @@ match command.split():
         print("Going:", direction)
     case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
         print("Dropping: ", *objects)
-    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+    case _:
         print(f"Sorry, I couldn't understand {command!r}")
 
 match command.split():
@@ -302,7 +299,7 @@ match event.get():
         game.go_north()
     case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
         pass  # Ignore other keystrokes
-    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+    case other_event:
         raise ValueError(f"Unrecognized event: {other_event}")
 
 match event.get():
@@ -322,7 +319,7 @@ def where_is(point):
             print(f"X={x}")
         case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
             print("Somewhere else")
-        case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+        case _:
             print("Not a point")
 ```
 

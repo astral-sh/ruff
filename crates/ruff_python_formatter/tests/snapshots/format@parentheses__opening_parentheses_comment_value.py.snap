@@ -219,12 +219,12 @@ with (  # d 1
 match (  # d 2
     x
 ):
-    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+    case d2:
         pass
 match d3:
     case (
         # d 3
-        x as NOT_YET_IMPLEMENTED_PatternMatchAs
+        x
     ):
         pass
 while (  # d 4

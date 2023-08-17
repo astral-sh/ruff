@@ -81,8 +81,7 @@ match match(
 -    ):
 +    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
          print(2)
--    case a:
-+    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+     case a:
          pass
  
 -match(arg)  # comment
@@ -127,7 +126,7 @@ match something:
         print(1)
     case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
         print(2)
-    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+    case a:
         pass
 
 match(
