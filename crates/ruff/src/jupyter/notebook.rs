@@ -424,12 +424,13 @@ impl Notebook {
     }
 
     /// Update the notebook with the given sourcemap and transformed content.
-    pub(crate) fn update(&mut self, source_map: &SourceMap, transformed: &str) {
+    pub(crate) fn update(&mut self, source_map: &SourceMap, transformed: String) {
         // Cell offsets must be updated before updating the cell content as
         // it depends on the offsets to extract the cell content.
+        self.index.take();
         self.update_cell_offsets(source_map);
-        self.update_cell_content(transformed);
-        self.source_code = transformed.to_string();
+        self.update_cell_content(&transformed);
+        self.source_code = transformed;
     }
 
     /// Return a slice of [`Cell`] in the Jupyter notebook.

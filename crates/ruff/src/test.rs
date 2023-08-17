@@ -1,6 +1,7 @@
 #![cfg(any(test, fuzzing))]
 //! Helper functions for the tests of rule implementations.
 
+use std::borrow::Cow;
 use std::path::Path;
 
 #[cfg(not(fuzzing))]
@@ -51,12 +52,7 @@ pub(crate) fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
 pub(crate) fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Message>> {
     let path = test_resource_path("fixtures").join(path);
     let contents = std::fs::read_to_string(&path)?;
-    Ok(test_contents(
-        &contents,
-        &mut SourceKind::Python,
-        &path,
-        settings,
-    ))
+    Ok(test_contents(&SourceKind::Python(contents), &path, settings).0)
 }
 
 pub(crate) struct TestedNotebook {
@@ -73,15 +69,10 @@ pub(crate) fn test_notebook_path(
 ) -> Result<TestedNotebook> {
     let source_notebook = read_jupyter_notebook(path.as_ref())?;
 
-    let mut source_kind = SourceKind::Jupyter(source_notebook.clone());
-    let messages = test_contents(
-        source_notebook.source_code(),
-        &mut source_kind,
-        path.as_ref(),
-        settings,
-    );
+    let source_kind = SourceKind::Jupyter(source_notebook);
+    let (messages, transformed) = test_contents(&source_kind, path.as_ref(), settings);
     let expected_notebook = read_jupyter_notebook(expected.as_ref())?;
-    let linted_notebook = source_kind.expect_jupyter();
+    let linted_notebook = transformed.into_owned().expect_jupyter();
 
     assert_eq!(
         linted_notebook.cell_offsets(),
@@ -95,7 +86,7 @@ pub(crate) fn test_notebook_path(
 
     Ok(TestedNotebook {
         messages,
-        source_notebook,
+        source_notebook: source_kind.expect_jupyter(),
         linted_notebook,
     })
 }
@@ -104,7 +95,7 @@ pub(crate) fn test_notebook_path(
 pub fn test_snippet(contents: &str, settings: &Settings) -> Vec<Message> {
     let path = Path::new("<filename>");
     let contents = dedent(contents);
-    test_contents(&contents, &mut SourceKind::Python, path, settings)
+    test_contents(&SourceKind::Python(contents.into_owned()), path, settings).0
 }
 
 thread_local! {
@@ -121,15 +112,15 @@ pub(crate) fn max_iterations() -> usize {
 
 /// A convenient wrapper around [`check_path`], that additionally
 /// asserts that autofixes converge after a fixed number of iterations.
-fn test_contents(
-    contents: &str,
-    source_kind: &mut SourceKind,
+fn test_contents<'a>(
+    source_kind: &'a SourceKind,
     path: &Path,
     settings: &Settings,
-) -> Vec<Message> {
+) -> (Vec<Message>, Cow<'a, SourceKind>) {
     let source_type = PySourceType::from(path);
-    let tokens: Vec<LexResult> = ruff_python_parser::tokenize(contents, source_type.as_mode());
-    let locator = Locator::new(contents);
+    let tokens: Vec<LexResult> =
+        ruff_python_parser::tokenize(source_kind.source_code(), source_type.as_mode());
+    let locator = Locator::new(source_kind.source_code());
     let stylist = Stylist::from_tokens(&tokens, &locator);
     let indexer = Indexer::from_tokens(&tokens, &locator);
     let directives = directives::extract_directives(
@@ -161,24 +152,29 @@ fn test_contents(
     // Detect autofixes that don't converge after multiple iterations.
     let mut iterations = 0;
 
+    let mut transformed = Cow::Borrowed(source_kind);
+
     if diagnostics
         .iter()
         .any(|diagnostic| diagnostic.fix.is_some())
     {
         let mut diagnostics = diagnostics.clone();
-        let mut contents = contents.to_string();
 
         while let Some(FixResult {
             code: fixed_contents,
             source_map,
             ..
-        }) = fix_file(&diagnostics, &Locator::new(&contents))
+        }) = fix_file(&diagnostics, &Locator::new(transformed.source_code()))
         {
             if iterations < max_iterations() {
                 iterations += 1;
             } else {
-                let output =
-                    print_diagnostics(diagnostics, path, &contents, source_kind.notebook());
+                let output = print_diagnostics(
+                    diagnostics,
+                    path,
+                    transformed.source_code(),
+                    source_kind.notebook(),
+                );
 
                 panic!(
                     "Failed to converge after {} iterations. This likely \
@@ -188,13 +184,11 @@ fn test_contents(
                 );
             }
 
-            if let Some(notebook) = source_kind.as_mut_jupyter() {
-                notebook.update(&source_map, &fixed_contents);
-            };
+            transformed = Cow::Owned(transformed.updated(fixed_contents, &source_map));
 
             let tokens: Vec<LexResult> =
-                ruff_python_parser::tokenize(&fixed_contents, source_type.as_mode());
-            let locator = Locator::new(&fixed_contents);
+                ruff_python_parser::tokenize(transformed.source_code(), source_type.as_mode());
+            let locator = Locator::new(transformed.source_code());
             let stylist = Stylist::from_tokens(&tokens, &locator);
             let indexer = Indexer::from_tokens(&tokens, &locator);
             let directives = directives::extract_directives(
@@ -224,15 +218,19 @@ fn test_contents(
             if let Some(fixed_error) = fixed_error {
                 if !source_has_errors {
                     // Previous fix introduced a syntax error, abort
-                    let fixes =
-                        print_diagnostics(diagnostics, path, &contents, source_kind.notebook());
+                    let fixes = print_diagnostics(
+                        diagnostics,
+                        path,
+                        source_kind.source_code(),
+                        source_kind.notebook(),
+                    );
 
                     let mut syntax_diagnostics = Vec::new();
                     syntax_error(&mut syntax_diagnostics, &fixed_error, &locator);
                     let syntax_errors = print_diagnostics(
                         syntax_diagnostics,
                         path,
-                        &fixed_contents,
+                        transformed.source_code(),
                         source_kind.notebook(),
                     );
 
@@ -242,23 +240,23 @@ fn test_contents(
 Last generated fixes:
 {fixes}
 Source with applied fixes:
-{fixed_contents}"#
+{}"#,
+                        transformed.source_code()
                     );
                 }
             }
 
             diagnostics = fixed_diagnostics;
-            contents = fixed_contents.to_string();
         }
     }
 
     let source_code = SourceFileBuilder::new(
         path.file_name().unwrap().to_string_lossy().as_ref(),
-        contents,
+        source_kind.source_code(),
     )
     .finish();
 
-    diagnostics
+    let messages = diagnostics
         .into_iter()
         .map(|diagnostic| {
             let rule = diagnostic.kind.rule();
@@ -285,7 +283,8 @@ Source with applied fixes:
             Message::from_diagnostic(diagnostic, source_code.clone(), noqa)
         })
         .sorted()
-        .collect()
+        .collect();
+    (messages, transformed)
 }
 
 fn print_diagnostics(
