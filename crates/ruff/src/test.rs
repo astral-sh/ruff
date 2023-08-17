@@ -59,24 +59,45 @@ pub(crate) fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<V
     ))
 }
 
+pub(crate) struct TestedNotebook {
+    pub(crate) messages: Vec<Message>,
+    pub(crate) source_notebook: Notebook,
+    pub(crate) linted_notebook: Notebook,
+}
+
 #[cfg(not(fuzzing))]
 pub(crate) fn test_notebook_path(
     path: impl AsRef<Path>,
     expected: impl AsRef<Path>,
     settings: &Settings,
-) -> Result<(Vec<Message>, SourceKind, SourceKind)> {
-    let notebook = read_jupyter_notebook(path.as_ref())?;
-    let contents = notebook.source_code().to_string();
-    let mut source_kind = SourceKind::Jupyter(notebook);
-    let original_source_kind = source_kind.clone();
-    let messages = test_contents(&contents, &mut source_kind, path.as_ref(), settings);
+) -> Result<TestedNotebook> {
+    let source_notebook = read_jupyter_notebook(path.as_ref())?;
+
+    let mut source_kind = SourceKind::Jupyter(source_notebook.clone());
+    let messages = test_contents(
+        source_notebook.source_code(),
+        &mut source_kind,
+        path.as_ref(),
+        settings,
+    );
     let expected_notebook = read_jupyter_notebook(expected.as_ref())?;
-    if let SourceKind::Jupyter(notebook) = &source_kind {
-        assert_eq!(notebook.cell_offsets(), expected_notebook.cell_offsets());
-        assert_eq!(notebook.index(), expected_notebook.index());
-        assert_eq!(notebook.source_code(), expected_notebook.source_code());
-    };
-    Ok((messages, original_source_kind, source_kind))
+    let linted_notebook = source_kind.expect_jupyter();
+
+    assert_eq!(
+        linted_notebook.cell_offsets(),
+        expected_notebook.cell_offsets()
+    );
+    assert_eq!(linted_notebook.index(), expected_notebook.index());
+    assert_eq!(
+        linted_notebook.source_code(),
+        expected_notebook.source_code()
+    );
+
+    Ok(TestedNotebook {
+        messages,
+        source_notebook,
+        linted_notebook,
+    })
 }
 
 /// Run [`check_path`] on a snippet of Python code.
@@ -156,7 +177,8 @@ fn test_contents(
             if iterations < max_iterations() {
                 iterations += 1;
             } else {
-                let output = print_diagnostics(diagnostics, path, &contents, source_kind);
+                let output =
+                    print_diagnostics(diagnostics, path, &contents, source_kind.notebook());
 
                 panic!(
                     "Failed to converge after {} iterations. This likely \
@@ -202,12 +224,17 @@ fn test_contents(
             if let Some(fixed_error) = fixed_error {
                 if !source_has_errors {
                     // Previous fix introduced a syntax error, abort
-                    let fixes = print_diagnostics(diagnostics, path, &contents, source_kind);
+                    let fixes =
+                        print_diagnostics(diagnostics, path, &contents, source_kind.notebook());
 
                     let mut syntax_diagnostics = Vec::new();
                     syntax_error(&mut syntax_diagnostics, &fixed_error, &locator);
-                    let syntax_errors =
-                        print_diagnostics(syntax_diagnostics, path, &fixed_contents, source_kind);
+                    let syntax_errors = print_diagnostics(
+                        syntax_diagnostics,
+                        path,
+                        &fixed_contents,
+                        source_kind.notebook(),
+                    );
 
                     panic!(
                         r#"Fixed source has a syntax error where the source document does not. This is a bug in one of the generated fixes:
@@ -265,7 +292,7 @@ fn print_diagnostics(
     diagnostics: Vec<Diagnostic>,
     file_path: &Path,
     source: &str,
-    source_kind: &SourceKind,
+    notebook: Option<&Notebook>,
 ) -> String {
     let filename = file_path.file_name().unwrap().to_string_lossy();
     let source_file = SourceFileBuilder::new(filename.as_ref(), source).finish();
@@ -279,8 +306,8 @@ fn print_diagnostics(
         })
         .collect();
 
-    if source_kind.is_jupyter() {
-        print_jupyter_messages(&messages, &filename, source_kind)
+    if let Some(notebook) = notebook {
+        print_jupyter_messages(&messages, &filename, notebook)
     } else {
         print_messages(&messages)
     }
@@ -289,7 +316,7 @@ fn print_diagnostics(
 pub(crate) fn print_jupyter_messages(
     messages: &[Message],
     filename: &str,
-    source_kind: &SourceKind,
+    notebook: &Notebook,
 ) -> String {
     let mut output = Vec::new();
 
@@ -302,7 +329,7 @@ pub(crate) fn print_jupyter_messages(
             messages,
             &EmitterContext::new(&FxHashMap::from_iter([(
                 filename.to_string(),
-                source_kind.clone(),
+                notebook.clone(),
             )])),
         )
         .unwrap();
@@ -329,10 +356,10 @@ pub(crate) fn print_messages(messages: &[Message]) -> String {
 
 #[macro_export]
 macro_rules! assert_messages {
-    ($value:expr, $path:expr, $source_kind:expr) => {{
+    ($value:expr, $path:expr, $notebook:expr) => {{
         insta::with_settings!({ omit_expression => true }, {
             insta::assert_snapshot!(
-                $crate::test::print_jupyter_messages(&$value, &$path, &$source_kind)
+                $crate::test::print_jupyter_messages(&$value, &$path, &$notebook)
             );
         });
     }};

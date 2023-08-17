@@ -445,9 +445,9 @@ mod tests {
         }
 
         // Not stored in the cache.
-        expected_diagnostics.source_kind.clear();
-        got_diagnostics.source_kind.clear();
-        assert!(expected_diagnostics == got_diagnostics);
+        expected_diagnostics.notebooks.clear();
+        got_diagnostics.notebooks.clear();
+        assert_eq!(expected_diagnostics, got_diagnostics);
     }
 
     #[test]

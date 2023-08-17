@@ -476,7 +476,9 @@ mod tests {
     use crate::jupyter::schema::Cell;
     use crate::jupyter::Notebook;
     use crate::registry::Rule;
-    use crate::test::{read_jupyter_notebook, test_notebook_path, test_resource_path};
+    use crate::test::{
+        read_jupyter_notebook, test_notebook_path, test_resource_path, TestedNotebook,
+    };
     use crate::{assert_messages, settings};
 
     /// Read a Jupyter cell from the `resources/test/fixtures/jupyter/cell` directory.
@@ -578,49 +580,64 @@ print("after empty cells")
     #[test]
     fn test_import_sorting() -> Result<()> {
         let path = "isort.ipynb".to_string();
-        let (diagnostics, source_kind, _) = test_notebook_path(
+        let TestedNotebook {
+            messages,
+            source_notebook,
+            ..
+        } = test_notebook_path(
             &path,
             Path::new("isort_expected.ipynb"),
             &settings::Settings::for_rule(Rule::UnsortedImports),
         )?;
-        assert_messages!(diagnostics, path, source_kind);
+        assert_messages!(messages, path, source_notebook);
         Ok(())
     }
 
     #[test]
     fn test_ipy_escape_command() -> Result<()> {
         let path = "ipy_escape_command.ipynb".to_string();
-        let (diagnostics, source_kind, _) = test_notebook_path(
+        let TestedNotebook {
+            messages,
+            source_notebook,
+            ..
+        } = test_notebook_path(
             &path,
             Path::new("ipy_escape_command_expected.ipynb"),
             &settings::Settings::for_rule(Rule::UnusedImport),
         )?;
-        assert_messages!(diagnostics, path, source_kind);
+        assert_messages!(messages, path, source_notebook);
         Ok(())
     }
 
     #[test]
     fn test_unused_variable() -> Result<()> {
         let path = "unused_variable.ipynb".to_string();
-        let (diagnostics, source_kind, _) = test_notebook_path(
+        let TestedNotebook {
+            messages,
+            source_notebook,
+            ..
+        } = test_notebook_path(
             &path,
             Path::new("unused_variable_expected.ipynb"),
             &settings::Settings::for_rule(Rule::UnusedVariable),
         )?;
-        assert_messages!(diagnostics, path, source_kind);
+        assert_messages!(messages, path, source_notebook);
         Ok(())
     }
 
     #[test]
     fn test_json_consistency() -> Result<()> {
         let path = "before_fix.ipynb".to_string();
-        let (_, _, source_kind) = test_notebook_path(
+        let TestedNotebook {
+            linted_notebook: fixed_notebook,
+            ..
+        } = test_notebook_path(
             path,
             Path::new("after_fix.ipynb"),
             &settings::Settings::for_rule(Rule::UnusedImport),
         )?;
         let mut writer = Vec::new();
-        source_kind.expect_jupyter().write_inner(&mut writer)?;
+        fixed_notebook.write_inner(&mut writer)?;
         let actual = String::from_utf8(writer)?;
         let expected =
             std::fs::read_to_string(test_resource_path("fixtures/jupyter/after_fix.ipynb"))?;

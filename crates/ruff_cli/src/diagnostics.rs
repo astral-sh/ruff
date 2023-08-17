@@ -5,19 +5,17 @@ use std::fs::write;
 use std::io;
 use std::io::Write;
 use std::ops::AddAssign;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
 use anyhow::{anyhow, Context, Result};
 use colored::Colorize;
 use filetime::FileTime;
 use log::{debug, error, warn};
-use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::FxHashMap;
 use similar::TextDiff;
-#[cfg(unix)]
-use std::os::unix::fs::PermissionsExt;
 
-use crate::cache::Cache;
 use ruff::jupyter::{Cell, Notebook};
 use ruff::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult};
 use ruff::logging::DisplayParseError;
@@ -33,6 +31,9 @@ use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::PySourceType;
 use ruff_python_stdlib::path::is_project_toml;
 use ruff_source_file::{LineIndex, SourceCode, SourceFileBuilder};
+use ruff_text_size::{TextRange, TextSize};
+
+use crate::cache::Cache;
 
 #[derive(CacheKey)]
 pub(crate) struct FileCacheKey {
@@ -64,7 +65,7 @@ pub(crate) struct Diagnostics {
     pub(crate) messages: Vec<Message>,
     pub(crate) fixed: FxHashMap<String, FixTable>,
     pub(crate) imports: ImportMap,
-    pub(crate) source_kind: FxHashMap<String, SourceKind>,
+    pub(crate) notebooks: FxHashMap<String, Notebook>,
 }
 
 impl Diagnostics {
@@ -73,7 +74,7 @@ impl Diagnostics {
             messages,
             fixed: FxHashMap::default(),
             imports,
-            source_kind: FxHashMap::default(),
+            notebooks: FxHashMap::default(),
         }
     }
 
@@ -118,7 +119,7 @@ impl AddAssign for Diagnostics {
                 }
             }
         }
-        self.source_kind.extend(other.source_kind);
+        self.notebooks.extend(other.notebooks);
     }
 }
 
@@ -413,16 +414,22 @@ pub(crate) fn lint_path(
         );
     }
 
+    let notebooks = if let SourceKind::Jupyter(notebook) = source_kind {
+        FxHashMap::from_iter([(
+            path.to_str()
+                .ok_or_else(|| anyhow!("Unable to parse filename: {:?}", path))?
+                .to_string(),
+            notebook,
+        )])
+    } else {
+        FxHashMap::default()
+    };
+
     Ok(Diagnostics {
         messages,
         fixed: FxHashMap::from_iter([(fs::relativize_path(path), fixed)]),
         imports,
-        source_kind: FxHashMap::from_iter([(
-            path.to_str()
-                .ok_or_else(|| anyhow!("Unable to parse filename: {:?}", path))?
-                .to_string(),
-            source_kind,
-        )]),
+        notebooks,
     })
 }
 
@@ -548,7 +555,7 @@ pub(crate) fn lint_stdin(
             fixed,
         )]),
         imports,
-        source_kind: FxHashMap::default(),
+        notebooks: FxHashMap::default(),
     })
 }
 

@@ -3,10 +3,8 @@ use std::collections::BTreeMap;
 use std::io::Write;
 use std::ops::Deref;
 
-use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::FxHashMap;
 
-use crate::source_kind::SourceKind;
 pub use azure::AzureEmitter;
 pub use github::GithubEmitter;
 pub use gitlab::GitlabEmitter;
@@ -17,7 +15,10 @@ pub use junit::JunitEmitter;
 pub use pylint::PylintEmitter;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
 use ruff_source_file::{SourceFile, SourceLocation};
+use ruff_text_size::{TextRange, TextSize};
 pub use text::TextEmitter;
+
+use crate::jupyter::Notebook;
 
 mod azure;
 mod diff;
@@ -129,33 +130,33 @@ pub trait Emitter {
 
 /// Context passed to [`Emitter`].
 pub struct EmitterContext<'a> {
-    source_kind: &'a FxHashMap<String, SourceKind>,
+    notebooks: &'a FxHashMap<String, Notebook>,
 }
 
 impl<'a> EmitterContext<'a> {
-    pub fn new(source_kind: &'a FxHashMap<String, SourceKind>) -> Self {
-        Self { source_kind }
+    pub fn new(source_kind: &'a FxHashMap<String, Notebook>) -> Self {
+        Self {
+            notebooks: source_kind,
+        }
     }
 
     /// Tests if the file with `name` is a jupyter notebook.
     pub fn is_jupyter_notebook(&self, name: &str) -> bool {
-        self.source_kind
-            .get(name)
-            .is_some_and(SourceKind::is_jupyter)
+        self.notebooks.contains_key(name)
     }
 
-    pub fn source_kind(&self, name: &str) -> Option<&SourceKind> {
-        self.source_kind.get(name)
+    pub fn notebook(&self, name: &str) -> Option<&Notebook> {
+        self.notebooks.get(name)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use ruff_text_size::{TextRange, TextSize};
     use rustc_hash::FxHashMap;
 
     use ruff_diagnostics::{Diagnostic, DiagnosticKind, Edit, Fix};
     use ruff_source_file::SourceFileBuilder;
+    use ruff_text_size::{TextRange, TextSize};
 
     use crate::message::{Emitter, EmitterContext, Message};
 
