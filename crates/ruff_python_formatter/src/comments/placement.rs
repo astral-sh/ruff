@@ -227,6 +227,7 @@ fn handle_enclosed_comment<'a>(
     }
 }
 
+/// Handle an end-of-line comment around a body.
 fn handle_end_of_line_comment_around_body<'a>(
     comment: DecoratedComment<'a>,
     locator: &Locator,
@@ -1326,22 +1327,22 @@ fn handle_with_comment<'a>(
     }
 }
 
-// Handle comments inside comprehensions, e.g.
-//
-// ```python
-// [
-//      a
-//      for  # dangling on the comprehension
-//      b
-//      # dangling on the comprehension
-//      in  # dangling on comprehension.iter
-//      # leading on the iter
-//      c
-//      # dangling on comprehension.if.n
-//      if  # dangling on comprehension.if.n
-//      d
-// ]
-// ```
+/// Handle comments inside comprehensions, e.g.
+///
+/// ```python
+/// [
+///      a
+///      for  # dangling on the comprehension
+///      b
+///      # dangling on the comprehension
+///      in  # dangling on comprehension.iter
+///      # leading on the iter
+///      c
+///      # dangling on comprehension.if.n
+///      if  # dangling on comprehension.if.n
+///      d
+/// ]
+/// ```
 fn handle_comprehension_comment<'a>(
     comment: DecoratedComment<'a>,
     comprehension: &'a Comprehension,
