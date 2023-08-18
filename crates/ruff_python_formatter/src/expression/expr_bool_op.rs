@@ -61,7 +61,7 @@ impl FormatNodeRule<ExprBoolOp> for FormatExprBoolOp {
                     )?;
                 }
 
-                write!(f, [op.format(), space(),])?;
+                write!(f, [op.format(), space()])?;
 
                 FormatValue { value }.fmt(f)?;
             }
