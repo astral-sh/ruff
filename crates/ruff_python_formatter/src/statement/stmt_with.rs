@@ -1,7 +1,7 @@
 use ruff_formatter::{format_args, write, FormatError};
 use ruff_python_ast::node::AstNode;
 use ruff_python_ast::{Ranged, StmtWith};
-use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::TextRange;
 
 use crate::builders::parenthesize_if_expands;
@@ -9,9 +9,10 @@ use crate::comments::SourceComment;
 use crate::expression::parentheses::{
     in_parentheses_only_soft_line_break_or_space, optional_parentheses, parenthesized,
 };
+use crate::other::commas;
 use crate::prelude::*;
 use crate::statement::clause::{clause_header, ClauseHeader};
-use crate::FormatNodeRule;
+use crate::{FormatNodeRule, PyFormatOptions};
 
 #[derive(Default)]
 pub struct FormatStmtWith;
@@ -67,7 +68,7 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
                             parenthesized("(", &joined, ")")
                                 .with_dangling_comments(parenthesized_comments)
                                 .fmt(f)?;
-                        } else if should_parenthesize(item, f.context())? {
+                        } else if should_parenthesize(item, f.options(), f.context())? {
                             parenthesize_if_expands(&format_with(|f| {
                                 let mut joiner =
                                     f.join_comma_separated(item.body.first().unwrap().start());
@@ -120,37 +121,35 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
 ///
 /// Black parenthesizes `with` items if there's more than one item and they're already
 /// parenthesized, _or_ there's a single item with a trailing comma.
-fn should_parenthesize(with: &StmtWith, context: &PyFormatContext) -> FormatResult<bool> {
-    if has_magic_trailing_comma(with, context) {
+fn should_parenthesize(
+    with: &StmtWith,
+    options: &PyFormatOptions,
+    context: &PyFormatContext,
+) -> FormatResult<bool> {
+    if has_magic_trailing_comma(with, options, context) {
         return Ok(true);
     }
 
-    if with.items.len() > 1 && are_with_items_parenthesized(with, context)? {
+    if are_with_items_parenthesized(with, context)? {
         return Ok(true);
     }
 
     Ok(false)
 }
 
-fn has_magic_trailing_comma(with: &StmtWith, context: &PyFormatContext) -> bool {
+fn has_magic_trailing_comma(
+    with: &StmtWith,
+    options: &PyFormatOptions,
+    context: &PyFormatContext,
+) -> bool {
     let Some(last_item) = with.items.last() else {
         return false;
     };
 
-    let first_token = SimpleTokenizer::new(
-        context.source(),
+    commas::has_magic_trailing_comma(
         TextRange::new(last_item.end(), with.end()),
-    )
-    .skip_trivia()
-    // Skip over any closing parentheses belonging to the expression
-    .find(|token| token.kind() != SimpleTokenKind::RParen);
-
-    matches!(
-        first_token,
-        Some(SimpleToken {
-            kind: SimpleTokenKind::Comma,
-            ..
-        })
+        options,
+        context,
     )
 }
 

@@ -21,7 +21,14 @@ impl FormatNodeRule<WithItem> for FormatWithItem {
         let comments = f.context().comments().clone();
         let trailing_as_comments = comments.dangling_comments(item);
 
-        maybe_parenthesize_expression(context_expr, item, Parenthesize::IfRequired).fmt(f)?;
+        write!(
+            f,
+            [maybe_parenthesize_expression(
+                context_expr,
+                item,
+                Parenthesize::IfRequired
+            )]
+        )?;
 
         if let Some(optional_vars) = optional_vars {
             write!(f, [space(), text("as"), space()])?;
@@ -29,13 +36,15 @@ impl FormatNodeRule<WithItem> for FormatWithItem {
             if trailing_as_comments.is_empty() {
                 write!(f, [optional_vars.format()])?;
             } else {
-                parenthesized(
-                    "(",
-                    &optional_vars.format().with_options(Parentheses::Never),
-                    ")",
-                )
-                .with_dangling_comments(trailing_as_comments)
-                .fmt(f)?;
+                write!(
+                    f,
+                    [parenthesized(
+                        "(",
+                        &optional_vars.format().with_options(Parentheses::Never),
+                        ")",
+                    )
+                    .with_dangling_comments(trailing_as_comments)]
+                )?;
             }
         }
 
