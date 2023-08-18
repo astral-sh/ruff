@@ -632,7 +632,7 @@ impl From<ExprUnaryOp> for Expr {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprLambda {
     pub range: TextRange,
-    pub parameters: Box<Parameters>,
+    pub parameters: Option<Box<Parameters>>,
     pub body: Box<Expr>,
 }
 

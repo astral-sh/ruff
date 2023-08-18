@@ -62,10 +62,14 @@ lambda x: lambda y: lambda z: (
 z)  # Trailing
 # Trailing
 
-
 a = (
     lambda  # Dangling
            : 1
+)
+
+a = (
+    lambda x # Dangling
+    , y: 1
 )
 
 # Regression test: lambda empty arguments ranges were too long, leading to unstable
@@ -99,6 +103,27 @@ lambda a, *args, b, **kwds,: 0
 lambda a, *, b, **kwds,: 0
 lambda a, /: a
 lambda a, /, c: a
+
+# Dangling comments without parameters.
+(
+    lambda
+    : # 3
+     None
+)
+
+(
+    lambda
+    # 3
+    : None
+)
+
+(
+    lambda  # 1
+    # 2
+    : # 3
+    # 4
+    None # 5
+)
 ```
 
 ## Output
@@ -159,9 +184,14 @@ lambda x: lambda y: lambda z: (
 )  # Trailing
 # Trailing
 
+a = (
+    lambda: # Dangling
+    1
+)
 
 a = (
-    lambda: 1  # Dangling
+    lambda x,  # Dangling
+    y: 1
 )
 
 # Regression test: lambda empty arguments ranges were too long, leading to unstable
@@ -188,7 +218,7 @@ lambda **kwds,: 0
 lambda a, *args,: 0
 lambda a, **kwds,: 0
 lambda *args, b,: 0
-lambda: 0
+lambda *, b,: 0
 lambda *args, **kwds,: 0
 lambda a, *args, b,: 0
 lambda a, *, b,: 0
@@ -199,6 +229,25 @@ lambda a, *args, b, **kwds,: 0
 lambda a, *, b, **kwds,: 0
 lambda a, /: a
 lambda a, /, c: a
+
+# Dangling comments without parameters.
+(
+    lambda: # 3
+    None
+)
+
+(
+    lambda: # 3
+    None
+)
+
+(
+    lambda: # 1
+    # 2
+    # 3
+    # 4
+    None  # 5
+)
 ```
 
 

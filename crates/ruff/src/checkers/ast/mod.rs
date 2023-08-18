@@ -874,18 +874,20 @@ where
                 },
             ) => {
                 // Visit the default arguments, but avoid the body, which will be deferred.
-                for ParameterWithDefault {
-                    default,
-                    parameter: _,
-                    range: _,
-                } in parameters
-                    .posonlyargs
-                    .iter()
-                    .chain(&parameters.args)
-                    .chain(&parameters.kwonlyargs)
-                {
-                    if let Some(expr) = &default {
-                        self.visit_expr(expr);
+                if let Some(parameters) = parameters {
+                    for ParameterWithDefault {
+                        default,
+                        parameter: _,
+                        range: _,
+                    } in parameters
+                        .posonlyargs
+                        .iter()
+                        .chain(&parameters.args)
+                        .chain(&parameters.kwonlyargs)
+                    {
+                        if let Some(expr) = &default {
+                            self.visit_expr(expr);
+                        }
                     }
                 }
 
@@ -1834,7 +1836,9 @@ impl<'a> Checker<'a> {
                     range: _,
                 }) = expr
                 {
-                    self.visit_parameters(parameters);
+                    if let Some(parameters) = parameters {
+                        self.visit_parameters(parameters);
+                    }
                     self.visit_expr(body);
                 } else {
                     unreachable!("Expected Expr::Lambda");

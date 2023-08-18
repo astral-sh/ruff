@@ -89,18 +89,19 @@ fn check_patch_call(call: &ast::ExprCall, index: usize) -> Option<Diagnostic> {
         .find_argument("new", index)?
         .as_lambda_expr()?;
 
-    // Walk the lambda body.
-    let mut visitor = LambdaBodyVisitor {
-        parameters,
-        uses_args: false,
-    };
-    visitor.visit_expr(body);
-
-    if visitor.uses_args {
-        None
-    } else {
-        Some(Diagnostic::new(PytestPatchWithLambda, call.func.range()))
+    // Walk the lambda body. If the lambda uses the arguments, then it's valid.
+    if let Some(parameters) = parameters {
+        let mut visitor = LambdaBodyVisitor {
+            parameters,
+            uses_args: false,
+        };
+        visitor.visit_expr(body);
+        if visitor.uses_args {
+            return None;
+        }
     }
+
+    Some(Diagnostic::new(PytestPatchWithLambda, call.func.range()))
 }
 
 /// PT008

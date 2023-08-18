@@ -436,7 +436,10 @@ pub(crate) fn unused_arguments(
                 }
             }
         }
-        ScopeKind::Lambda(ast::ExprLambda { parameters, .. }) => {
+        ScopeKind::Lambda(ast::ExprLambda {
+            parameters: Some(parameters),
+            ..
+        }) => {
             if checker.enabled(Argumentable::Lambda.rule_code()) {
                 function(
                     Argumentable::Lambda,
