@@ -141,3 +141,16 @@ match pattern_comments:
     no_comments
     ):
         pass
+
+
+match pattern_comments:
+    case (
+        # 1
+        pattern  # 2
+        # 3
+        as  # 4
+        # 5
+        name  # 6
+        # 7
+    ):
+        pass

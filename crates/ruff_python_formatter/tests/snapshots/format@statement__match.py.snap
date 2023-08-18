@@ -147,6 +147,19 @@ match pattern_comments:
     no_comments
     ):
         pass
+
+
+match pattern_comments:
+    case (
+        # 1
+        pattern  # 2
+        # 3
+        as  # 4
+        # 5
+        name  # 6
+        # 7
+    ):
+        pass
 ```
 
 ## Output
@@ -284,6 +297,18 @@ match pattern_comments:
 
 match pattern_comments:
     case (no_comments):
+        pass
+
+
+match pattern_comments:
+    case (
+        # 1
+        pattern as name  # 2
+        # 3
+        # 4
+        # 5  # 6
+        # 7
+    ):
         pass
 ```
 
