@@ -62,7 +62,7 @@ impl<'fmt, Context> Argument<'fmt, Context> {
 /// The [`format_args!`] macro will safely create an instance of this structure.
 ///
 /// You can use the `Arguments<a>` that [`format_args!]` return in `Format` context as seen below.
-/// It will call the `format` function for every of it's objects.
+/// It will call the `format` function for each of its objects.
 ///
 /// ```rust
 /// use ruff_formatter::prelude::*;
