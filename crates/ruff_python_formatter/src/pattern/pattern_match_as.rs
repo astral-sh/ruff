@@ -1,6 +1,7 @@
 use ruff_formatter::{write, Buffer, FormatResult};
-use ruff_python_ast::PatternMatchAs;
+use ruff_python_ast::{Pattern, PatternMatchAs};
 
+use crate::expression::parentheses::parenthesized;
 use crate::prelude::*;
 use crate::{FormatNodeRule, PyFormatter};
 
@@ -17,7 +18,20 @@ impl FormatNodeRule<PatternMatchAs> for FormatPatternMatchAs {
 
         if let Some(name) = name {
             if let Some(pattern) = pattern {
-                write!(f, [pattern.format(), space(), text("as"), space()])?;
+                // Parenthesize nested `PatternMatchAs` like `(a as b) as c`.
+                if matches!(
+                    pattern.as_ref(),
+                    Pattern::MatchAs(PatternMatchAs {
+                        pattern: Some(_),
+                        ..
+                    })
+                ) {
+                    parenthesized("(", &pattern.format(), ")").fmt(f)?;
+                } else {
+                    pattern.format().fmt(f)?;
+                }
+
+                write!(f, [space(), text("as"), space()])?;
             }
             name.format().fmt(f)
         } else {

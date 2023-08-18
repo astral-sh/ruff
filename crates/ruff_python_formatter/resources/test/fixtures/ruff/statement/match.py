@@ -154,3 +154,8 @@ match pattern_comments:
         # 7
     ):
         pass
+
+
+match x:
+    case (a as b) as c:
+        pass

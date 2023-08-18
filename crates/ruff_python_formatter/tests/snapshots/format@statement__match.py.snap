@@ -160,6 +160,11 @@ match pattern_comments:
         # 7
     ):
         pass
+
+
+match x:
+    case (a as b) as c:
+        pass
 ```
 
 ## Output
@@ -309,6 +314,11 @@ match pattern_comments:
         # 5  # 6
         # 7
     ):
+        pass
+
+
+match x:
+    case (a as b) as c:
         pass
 ```
 
