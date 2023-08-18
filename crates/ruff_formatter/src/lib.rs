@@ -1,6 +1,6 @@
 //! Infrastructure for code formatting
 //!
-//! This module defines [`FormatElement`], an IR to format code documents and provides a mean to print
+//! This module defines [`FormatElement`], an IR to format code documents and provides a means to print
 //! such a document to a string. Objects that know how to format themselves implement the [Format] trait.
 //!
 //! ## Formatting Traits
