@@ -354,7 +354,9 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
             body,
             range: _,
         }) => {
-            visitor.visit_parameters(parameters);
+            if let Some(parameters) = parameters {
+                visitor.visit_parameters(parameters);
+            }
             visitor.visit_expr(body);
         }
         Expr::IfExp(ast::ExprIfExp {

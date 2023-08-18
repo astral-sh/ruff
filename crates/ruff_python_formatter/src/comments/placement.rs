@@ -162,9 +162,14 @@ fn handle_enclosed_comment<'a>(
     locator: &Locator,
 ) -> CommentPlacement<'a> {
     match comment.enclosing_node() {
-        AnyNodeRef::Parameters(arguments) => {
-            handle_parameters_separator_comment(comment, arguments, locator)
-                .or_else(|comment| handle_bracketed_end_of_line_comment(comment, locator))
+        AnyNodeRef::Parameters(parameters) => {
+            handle_parameters_separator_comment(comment, parameters, locator).or_else(|comment| {
+                if are_parameters_parenthesized(parameters, locator.contents()) {
+                    handle_bracketed_end_of_line_comment(comment, locator)
+                } else {
+                    CommentPlacement::Default(comment)
+                }
+            })
         }
         AnyNodeRef::Arguments(_) | AnyNodeRef::TypeParams(_) => {
             handle_bracketed_end_of_line_comment(comment, locator)
@@ -1542,6 +1547,13 @@ fn is_first_statement_in_alternate_body(statement: AnyNodeRef, has_body: AnyNode
         }) => are_same_optional(statement, elif_else_clauses.first()),
         _ => false,
     }
+}
+
+/// Returns `true` if the parameters are parenthesized (as in a function definition), or `false` if
+/// not (as in a lambda).
+fn are_parameters_parenthesized(parameters: &Parameters, contents: &str) -> bool {
+    // A lambda never has parentheses around its parameters, but a function definition always does.
+    contents[parameters.range()].starts_with('(')
 }
 
 /// Counts the number of empty lines in `contents`.

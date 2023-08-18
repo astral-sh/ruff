@@ -9,39 +9,41 @@ expression: parse_ast
             value: Lambda(
                 ExprLambda {
                     range: 0..18,
-                    parameters: Parameters {
-                        range: 7..11,
-                        posonlyargs: [],
-                        args: [
-                            ParameterWithDefault {
-                                range: 7..8,
-                                parameter: Parameter {
+                    parameters: Some(
+                        Parameters {
+                            range: 7..11,
+                            posonlyargs: [],
+                            args: [
+                                ParameterWithDefault {
                                     range: 7..8,
-                                    name: Identifier {
-                                        id: "x",
+                                    parameter: Parameter {
                                         range: 7..8,
+                                        name: Identifier {
+                                            id: "x",
+                                            range: 7..8,
+                                        },
+                                        annotation: None,
                                     },
-                                    annotation: None,
+                                    default: None,
                                 },
-                                default: None,
-                            },
-                            ParameterWithDefault {
-                                range: 10..11,
-                                parameter: Parameter {
+                                ParameterWithDefault {
                                     range: 10..11,
-                                    name: Identifier {
-                                        id: "y",
+                                    parameter: Parameter {
                                         range: 10..11,
+                                        name: Identifier {
+                                            id: "y",
+                                            range: 10..11,
+                                        },
+                                        annotation: None,
                                     },
-                                    annotation: None,
+                                    default: None,
                                 },
-                                default: None,
-                            },
-                        ],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
+                            ],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kwarg: None,
+                        },
+                    ),
                     body: BinOp(
                         ExprBinOp {
                             range: 13..18,

@@ -184,7 +184,10 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                                 return false;
                             }
 
-                            if parameters.includes(&loaded.id) {
+                            if parameters
+                                .as_ref()
+                                .is_some_and(|parameters| parameters.includes(&loaded.id))
+                            {
                                 return false;
                             }
 

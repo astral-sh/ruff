@@ -542,7 +542,7 @@ pub struct ExprUnaryOp<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprLambda<'a> {
-    parameters: ComparableParameters<'a>,
+    parameters: Option<ComparableParameters<'a>>,
     body: Box<ComparableExpr<'a>>,
 }
 
@@ -773,7 +773,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 body,
                 range: _,
             }) => Self::Lambda(ExprLambda {
-                parameters: (parameters.as_ref()).into(),
+                parameters: parameters.as_ref().map(Into::into),
                 body: body.into(),
             }),
             ast::Expr::IfExp(ast::ExprIfExp {
