@@ -1,10 +1,12 @@
-use ast::Parameter;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, ParameterWithDefault};
-use ruff_python_semantic::Scope;
+use ruff_python_ast::{self as ast};
+use ruff_python_semantic::{
+    analyze::{function_type, visibility},
+    Scope,
+};
 
-use crate::{checkers::ast::Checker, rules::pylint::helpers::is_known_dunder_method};
+use crate::{checkers::ast::Checker, rules::flake8_unused_arguments::helpers};
 
 /// ## What it does
 /// Checks for the presence of unused `self` parameter in methods definitions.
@@ -51,49 +53,57 @@ impl Violation for NoSelfUse {
 
 /// PLR6301
 pub(crate) fn no_self_use(checker: &Checker, scope: &Scope, diagnostics: &mut Vec<Diagnostic>) {
-    // Make sure the parent scope is a class.
-    if checker
-        .semantic()
-        .first_non_type_parent_scope(scope)
-        .is_some_and(|parent_scope| parent_scope.kind.as_class().is_none())
-    {
+    let Some(parent) = &checker.semantic().first_non_type_parent_scope(scope) else {
         return;
-    }
-    let Some(function) = scope.kind.as_function() else {
+    };
+    let Some(ast::StmtFunctionDef {
+        name,
+        parameters,
+        body,
+        decorator_list,
+        ..
+    }) = scope.kind.as_function() else {
         return;
     };
 
-    if is_known_dunder_method(function.name.as_str()) {
+    if !matches!(
+        function_type::classify(
+            name,
+            decorator_list,
+            parent,
+            checker.semantic(),
+            &checker.settings.pep8_naming.classmethod_decorators,
+            &checker.settings.pep8_naming.staticmethod_decorators,
+        ),
+        function_type::FunctionType::Method
+    ) {
         return;
     }
 
-    for arg in function
-        .parameters
-        .args
-        .iter()
-        .filter_map(as_self_parameter)
+    if helpers::is_empty(body)
+        || visibility::is_magic(name)
+        || visibility::is_abstract(decorator_list, checker.semantic())
+        || visibility::is_override(decorator_list, checker.semantic())
+        || visibility::is_overload(decorator_list, checker.semantic())
+        || visibility::is_property(decorator_list, &[], checker.semantic())
     {
-        if scope
-            .get(arg.name.as_str())
-            .map(|binding_id| checker.semantic().binding(binding_id))
-            .is_some_and(|binding| binding.kind.is_argument() && !binding.is_used())
-        {
-            diagnostics.push(Diagnostic::new(
-                NoSelfUse {
-                    method_name: function.name.to_string(),
-                },
-                arg.range,
-            ));
-        }
+        return;
     }
-}
 
-/// Return a `Parameter` if `ParameterWithDefault` is the `self` parameter, otherwise `None`
-fn as_self_parameter(parameter_with_default: &ParameterWithDefault) -> Option<&Parameter> {
-    let parameter = parameter_with_default.as_parameter();
-    if parameter.name.as_str() == "self" {
-        Some(parameter)
-    } else {
-        None
+    let Some(arg) = parameters.args.get(0).map(ast::ParameterWithDefault::as_parameter) else {
+        return;
+    };
+
+    if scope
+        .get(arg.name.as_str())
+        .map(|binding_id| checker.semantic().binding(binding_id))
+        .is_some_and(|binding| binding.kind.is_argument() && !binding.is_used())
+    {
+        diagnostics.push(Diagnostic::new(
+            NoSelfUse {
+                method_name: name.to_string(),
+            },
+            arg.range,
+        ));
     }
 }
