@@ -141,13 +141,11 @@ with True:
 with True: ...  # comment
 
 match x:
-    case "NOT_YET_IMPLEMENTED_PatternMatchValue":
-        ...
+    case "NOT_YET_IMPLEMENTED_PatternMatchValue": ...
     case "NOT_YET_IMPLEMENTED_PatternMatchValue":
         # comment
         ...
-    case "NOT_YET_IMPLEMENTED_PatternMatchValue":
-        ...  # comment
+    case "NOT_YET_IMPLEMENTED_PatternMatchValue": ...  # comment
 ```
 
 
