@@ -134,14 +134,12 @@ pub struct EmitterContext<'a> {
 }
 
 impl<'a> EmitterContext<'a> {
-    pub fn new(source_kind: &'a FxHashMap<String, Notebook>) -> Self {
-        Self {
-            notebooks: source_kind,
-        }
+    pub fn new(notebooks: &'a FxHashMap<String, Notebook>) -> Self {
+        Self { notebooks }
     }
 
     /// Tests if the file with `name` is a jupyter notebook.
-    pub fn is_jupyter_notebook(&self, name: &str) -> bool {
+    pub fn is_notebook(&self, name: &str) -> bool {
         self.notebooks.contains_key(name)
     }
 

@@ -20,7 +20,7 @@ impl Emitter for GithubEmitter {
     ) -> anyhow::Result<()> {
         for message in messages {
             let source_location = message.compute_start_location();
-            let location = if context.is_jupyter_notebook(message.filename()) {
+            let location = if context.is_notebook(message.filename()) {
                 // We can't give a reasonable location for the structured formats,
                 // so we show one that's clearly a fallback
                 SourceLocation::default()

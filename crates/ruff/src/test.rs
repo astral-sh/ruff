@@ -20,7 +20,6 @@ use ruff_source_file::{Locator, SourceFileBuilder};
 
 use crate::autofix::{fix_file, FixResult};
 use crate::directives;
-#[cfg(not(fuzzing))]
 use crate::jupyter::Notebook;
 use crate::linter::{check_path, LinterResult};
 use crate::message::{Emitter, EmitterContext, Message, TextEmitter};
@@ -55,6 +54,7 @@ pub(crate) fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<V
     Ok(test_contents(&SourceKind::Python(contents), &path, settings).0)
 }
 
+#[cfg(not(fuzzing))]
 pub(crate) struct TestedNotebook {
     pub(crate) messages: Vec<Message>,
     pub(crate) source_notebook: Notebook,
@@ -169,12 +169,7 @@ fn test_contents<'a>(
             if iterations < max_iterations() {
                 iterations += 1;
             } else {
-                let output = print_diagnostics(
-                    diagnostics,
-                    path,
-                    transformed.source_code(),
-                    source_kind.notebook(),
-                );
+                let output = print_diagnostics(diagnostics, path, &transformed);
 
                 panic!(
                     "Failed to converge after {} iterations. This likely \
@@ -218,21 +213,11 @@ fn test_contents<'a>(
             if let Some(fixed_error) = fixed_error {
                 if !source_has_errors {
                     // Previous fix introduced a syntax error, abort
-                    let fixes = print_diagnostics(
-                        diagnostics,
-                        path,
-                        source_kind.source_code(),
-                        source_kind.notebook(),
-                    );
+                    let fixes = print_diagnostics(diagnostics, path, source_kind);
 
                     let mut syntax_diagnostics = Vec::new();
                     syntax_error(&mut syntax_diagnostics, &fixed_error, &locator);
-                    let syntax_errors = print_diagnostics(
-                        syntax_diagnostics,
-                        path,
-                        transformed.source_code(),
-                        source_kind.notebook(),
-                    );
+                    let syntax_errors = print_diagnostics(syntax_diagnostics, path, &transformed);
 
                     panic!(
                         r#"Fixed source has a syntax error where the source document does not. This is a bug in one of the generated fixes:
@@ -290,11 +275,10 @@ Source with applied fixes:
 fn print_diagnostics(
     diagnostics: Vec<Diagnostic>,
     file_path: &Path,
-    source: &str,
-    notebook: Option<&Notebook>,
+    source: &SourceKind,
 ) -> String {
     let filename = file_path.file_name().unwrap().to_string_lossy();
-    let source_file = SourceFileBuilder::new(filename.as_ref(), source).finish();
+    let source_file = SourceFileBuilder::new(filename.as_ref(), source.source_code()).finish();
 
     let messages: Vec<_> = diagnostics
         .into_iter()
@@ -305,7 +289,7 @@ fn print_diagnostics(
         })
         .collect();
 
-    if let Some(notebook) = notebook {
+    if let Some(notebook) = source.notebook() {
         print_jupyter_messages(&messages, &filename, notebook)
     } else {
         print_messages(&messages)
