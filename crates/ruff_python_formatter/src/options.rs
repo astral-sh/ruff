@@ -11,7 +11,7 @@ use std::str::FromStr;
     serde(default)
 )]
 pub struct PyFormatOptions {
-    /// Whether we're in a `.py` file or `.pyi` file, which have different rules
+    /// Whether we're in a `.py` file or `.pyi` file, which have different rules.
     source_type: PySourceType,
 
     /// Specifies the indent style:
@@ -27,7 +27,7 @@ pub struct PyFormatOptions {
     /// The preferred quote style to use (single vs double quotes).
     quote_style: QuoteStyle,
 
-    /// Whether to expand lists or elements if they have a trailing comma such as `(a, b,)`
+    /// Whether to expand lists or elements if they have a trailing comma such as `(a, b,)`.
     magic_trailing_comma: MagicTrailingComma,
 }
 
