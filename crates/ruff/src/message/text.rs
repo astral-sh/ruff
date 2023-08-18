@@ -6,9 +6,9 @@ use annotate_snippets::display_list::{DisplayList, FormatOptions};
 use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, SourceAnnotation};
 use bitflags::bitflags;
 use colored::Colorize;
-use ruff_text_size::{TextRange, TextSize};
 
 use ruff_source_file::{OneIndexed, SourceLocation};
+use ruff_text_size::{TextRange, TextSize};
 
 use crate::fs::relativize_path;
 use crate::jupyter::{JupyterIndex, Notebook};
@@ -16,7 +16,6 @@ use crate::line_width::{LineWidth, TabSize};
 use crate::message::diff::Diff;
 use crate::message::{Emitter, EmitterContext, Message};
 use crate::registry::AsRule;
-use crate::source_kind::SourceKind;
 
 bitflags! {
     #[derive(Default)]
@@ -72,10 +71,7 @@ impl Emitter for TextEmitter {
             )?;
 
             let start_location = message.compute_start_location();
-            let jupyter_index = context
-                .source_kind(message.filename())
-                .and_then(SourceKind::notebook)
-                .map(Notebook::index);
+            let jupyter_index = context.notebook(message.filename()).map(Notebook::index);
 
             // Check if we're working on a jupyter notebook and translate positions with cell accordingly
             let diagnostic_location = if let Some(jupyter_index) = jupyter_index {

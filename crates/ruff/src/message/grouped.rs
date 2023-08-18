@@ -13,7 +13,6 @@ use crate::message::text::{MessageCodeFrame, RuleCodeAndBody};
 use crate::message::{
     group_messages_by_filename, Emitter, EmitterContext, Message, MessageWithLocation,
 };
-use crate::source_kind::SourceKind;
 
 #[derive(Default)]
 pub struct GroupedEmitter {
@@ -66,10 +65,7 @@ impl Emitter for GroupedEmitter {
                     writer,
                     "{}",
                     DisplayGroupedMessage {
-                        jupyter_index: context
-                            .source_kind(message.filename())
-                            .and_then(SourceKind::notebook)
-                            .map(Notebook::index),
+                        jupyter_index: context.notebook(message.filename()).map(Notebook::index),
                         message,
                         show_fix_status: self.show_fix_status,
                         show_source: self.show_source,
