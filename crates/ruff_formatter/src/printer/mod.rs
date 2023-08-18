@@ -1698,7 +1698,7 @@ two lines`,
                 text("]")
             ]),
             text(";"),
-            &line_suffix(&format_args![space(), text("// trailing")])
+            line_suffix(&format_args![space(), text("// trailing")])
         ]);
 
         assert_eq!(printed.as_code(), "[1, 2, 3]; // trailing");

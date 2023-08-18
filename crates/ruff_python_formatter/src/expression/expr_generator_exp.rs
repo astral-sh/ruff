@@ -68,7 +68,7 @@ impl FormatNodeRule<ExprGeneratorExp> for FormatExprGeneratorExp {
                     &group(&format_args!(
                         group(&elt.format()),
                         soft_line_break_or_space(),
-                        &joined
+                        joined
                     )),
                     ")"
                 )

@@ -41,7 +41,7 @@ impl FormatNodeRule<ExprDictComp> for FormatExprDictComp {
                     space(),
                     value.format(),
                     soft_line_break_or_space(),
-                    &joined
+                    joined
                 )),
                 "}"
             )
