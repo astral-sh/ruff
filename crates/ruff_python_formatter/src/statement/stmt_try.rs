@@ -63,13 +63,13 @@ impl FormatNodeRule<StmtTry> for FormatStmtTry {
         } = item;
 
         let comments_info = f.context().comments().clone();
-        let mut dangling_comments = comments_info.dangling_comments(item);
+        let mut dangling_comments = comments_info.dangling(item);
 
         (_, dangling_comments) = format_case(item, CaseKind::Try, None, dangling_comments, f)?;
         let mut previous_node = body.last();
 
         for handler in handlers {
-            let handler_comments = comments_info.leading_comments(handler);
+            let handler_comments = comments_info.leading(handler);
             write!(
                 f,
                 [

@@ -22,7 +22,7 @@ impl FormatNodeRule<StmtWhile> for FormatStmtWhile {
         } = item;
 
         let comments = f.context().comments().clone();
-        let dangling_comments = comments.dangling_comments(item.as_any_node_ref());
+        let dangling_comments = comments.dangling(item.as_any_node_ref());
 
         let body_start = body.first().map_or(test.end(), Stmt::start);
         let or_else_comments_start =

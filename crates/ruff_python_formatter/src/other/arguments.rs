@@ -24,7 +24,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
         // ```
         if item.args.is_empty() && item.keywords.is_empty() {
             let comments = f.context().comments().clone();
-            let dangling = comments.dangling_comments(item);
+            let dangling = comments.dangling(item);
             return write!(f, [empty_parenthesized("(", dangling, ")")]);
         }
 
@@ -77,7 +77,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
         //     c,
         // )
         let comments = f.context().comments().clone();
-        let dangling_comments = comments.dangling_comments(item.as_any_node_ref());
+        let dangling_comments = comments.dangling(item.as_any_node_ref());
 
         write!(
             f,

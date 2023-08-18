@@ -22,7 +22,7 @@ impl FormatNodeRule<StmtIf> for FormatStmtIf {
         } = item;
 
         let comments = f.context().comments().clone();
-        let trailing_colon_comment = comments.dangling_comments(item);
+        let trailing_colon_comment = comments.dangling(item);
 
         write!(
             f,
@@ -73,8 +73,8 @@ pub(crate) fn format_elif_else_clause(
     } = item;
 
     let comments = f.context().comments().clone();
-    let trailing_colon_comment = comments.dangling_comments(item);
-    let leading_comments = comments.leading_comments(item);
+    let trailing_colon_comment = comments.dangling(item);
+    let leading_comments = comments.leading(item);
 
     write!(
         f,

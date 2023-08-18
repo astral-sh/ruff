@@ -332,16 +332,16 @@ impl<'a> Comments<'a> {
 
     /// Returns `true` if the given `node` has any [leading comments](self#leading-comments).
     #[inline]
-    pub(crate) fn has_leading_comments<T>(&self, node: T) -> bool
+    pub(crate) fn has_leading<T>(&self, node: T) -> bool
     where
         T: Into<AnyNodeRef<'a>>,
     {
-        !self.leading_comments(node).is_empty()
+        !self.leading(node).is_empty()
     }
 
     /// Returns the `node`'s [leading comments](self#leading-comments).
     #[inline]
-    pub(crate) fn leading_comments<T>(&self, node: T) -> &[SourceComment]
+    pub(crate) fn leading<T>(&self, node: T) -> &[SourceComment]
     where
         T: Into<AnyNodeRef<'a>>,
     {
@@ -351,15 +351,15 @@ impl<'a> Comments<'a> {
     }
 
     /// Returns `true` if node has any [dangling comments](self#dangling-comments).
-    pub(crate) fn has_dangling_comments<T>(&self, node: T) -> bool
+    pub(crate) fn has_dangling<T>(&self, node: T) -> bool
     where
         T: Into<AnyNodeRef<'a>>,
     {
-        !self.dangling_comments(node).is_empty()
+        !self.dangling(node).is_empty()
     }
 
     /// Returns the [dangling comments](self#dangling-comments) of `node`
-    pub(crate) fn dangling_comments<T>(&self, node: T) -> &[SourceComment]
+    pub(crate) fn dangling<T>(&self, node: T) -> &[SourceComment]
     where
         T: Into<AnyNodeRef<'a>>,
     {
@@ -370,7 +370,7 @@ impl<'a> Comments<'a> {
 
     /// Returns the `node`'s [trailing comments](self#trailing-comments).
     #[inline]
-    pub(crate) fn trailing_comments<T>(&self, node: T) -> &[SourceComment]
+    pub(crate) fn trailing<T>(&self, node: T) -> &[SourceComment]
     where
         T: Into<AnyNodeRef<'a>>,
     {
@@ -381,43 +381,35 @@ impl<'a> Comments<'a> {
 
     /// Returns `true` if the given `node` has any [trailing comments](self#trailing-comments).
     #[inline]
-    pub(crate) fn has_trailing_comments<T>(&self, node: T) -> bool
+    pub(crate) fn has_trailing<T>(&self, node: T) -> bool
     where
         T: Into<AnyNodeRef<'a>>,
     {
-        !self.trailing_comments(node).is_empty()
+        !self.trailing(node).is_empty()
     }
 
     /// Returns `true` if the given `node` has any [trailing own line comments](self#trailing-comments).
     #[inline]
-    pub(crate) fn has_trailing_own_line_comments<T>(&self, node: T) -> bool
+    pub(crate) fn has_trailing_own_line<T>(&self, node: T) -> bool
     where
         T: Into<AnyNodeRef<'a>>,
     {
-        self.trailing_comments(node)
+        self.trailing(node)
             .iter()
             .any(|comment| comment.line_position().is_own_line())
     }
 
     /// Returns an iterator over the [leading](self#leading-comments) and [trailing comments](self#trailing-comments) of `node`.
-    pub(crate) fn leading_trailing_comments<T>(
-        &self,
-        node: T,
-    ) -> impl Iterator<Item = &SourceComment>
+    pub(crate) fn leading_trailing<T>(&self, node: T) -> impl Iterator<Item = &SourceComment>
     where
         T: Into<AnyNodeRef<'a>>,
     {
-        let node = node.into();
-        self.leading_comments(node)
-            .iter()
-            .chain(self.trailing_comments(node).iter())
+        let comments = self.leading_dangling_trailing(node);
+        comments.leading.iter().chain(comments.trailing)
     }
 
     /// Returns an iterator over the [leading](self#leading-comments), [dangling](self#dangling-comments), and [trailing](self#trailing) comments of `node`.
-    pub(crate) fn leading_dangling_trailing_comments<T>(
-        &self,
-        node: T,
-    ) -> LeadingDanglingTrailingComments
+    pub(crate) fn leading_dangling_trailing<T>(&self, node: T) -> LeadingDanglingTrailingComments
     where
         T: Into<AnyNodeRef<'a>>,
     {
@@ -426,30 +418,12 @@ impl<'a> Comments<'a> {
             .leading_dangling_trailing(&NodeRefEqualityKey::from_ref(node.into()))
     }
 
-    /// Returns any comments on the open parenthesis of a `node`.
-    ///
-    /// For example, `# comment` in:
-    /// ```python
-    /// (  # comment
-    ///    foo.bar
-    /// )
-    /// ```
-    #[inline]
-    pub(crate) fn open_parenthesis_comment<T>(&self, node: T) -> Option<&SourceComment>
-    where
-        T: Into<AnyNodeRef<'a>>,
-    {
-        self.leading_comments(node)
-            .first()
-            .filter(|comment| comment.line_position.is_end_of_line())
-    }
-
     #[inline(always)]
     #[cfg(not(debug_assertions))]
-    pub(crate) fn assert_formatted_all_comments(&self, _source_code: SourceCode) {}
+    pub(crate) fn assert_all_formatted(&self, _source_code: SourceCode) {}
 
     #[cfg(debug_assertions)]
-    pub(crate) fn assert_formatted_all_comments(&self, source_code: SourceCode) {
+    pub(crate) fn assert_all_formatted(&self, source_code: SourceCode) {
         use std::fmt::Write;
 
         let mut output = String::new();
@@ -481,7 +455,7 @@ impl<'a> Comments<'a> {
     /// normally if `node` is the first or last node of a suppression range.
     #[cfg(debug_assertions)]
     pub(crate) fn mark_verbatim_node_comments_formatted(&self, node: AnyNodeRef) {
-        for dangling in self.dangling_comments(node) {
+        for dangling in self.dangling(node) {
             dangling.mark_formatted();
         }
 
@@ -505,7 +479,7 @@ struct MarkVerbatimCommentsAsFormattedVisitor<'a>(&'a Comments<'a>);
 
 impl<'a> PreorderVisitor<'a> for MarkVerbatimCommentsAsFormattedVisitor<'a> {
     fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
-        for comment in self.0.leading_dangling_trailing_comments(node) {
+        for comment in self.0.leading_dangling_trailing(node) {
             comment.mark_formatted();
         }
 

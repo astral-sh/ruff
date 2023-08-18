@@ -37,7 +37,7 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
         let call_chain_layout = self.call_chain_layout.apply_in_node(item, f);
 
         let comments = f.context().comments().clone();
-        let dangling_comments = comments.dangling_comments(item.as_any_node_ref());
+        let dangling_comments = comments.dangling(item.as_any_node_ref());
         debug_assert!(
             dangling_comments.len() <= 1,
             "A subscript expression can only have a single dangling comment, the one after the bracket"

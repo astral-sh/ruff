@@ -25,7 +25,7 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
 
         let comments = f.context().comments().clone();
 
-        let dangling_comments = comments.dangling_comments(item);
+        let dangling_comments = comments.dangling(item);
         let trailing_definition_comments_start =
             dangling_comments.partition_point(|comment| comment.line_position().is_own_line());
 
@@ -93,11 +93,11 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
                             // ```
                             if arguments.is_empty()
                                 && comments
-                                    .dangling_comments(arguments)
+                                    .dangling(arguments)
                                     .iter()
                                     .all(|comment| comment.line_position().is_end_of_line())
                             {
-                                let dangling = comments.dangling_comments(arguments);
+                                let dangling = comments.dangling(arguments);
                                 write!(f, [trailing_comments(dangling)])?;
                             } else {
                                 write!(f, [arguments.format()])?;

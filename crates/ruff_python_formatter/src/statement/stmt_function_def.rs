@@ -29,7 +29,7 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
 
         let comments = f.context().comments().clone();
 
-        let dangling_comments = comments.dangling_comments(item);
+        let dangling_comments = comments.dangling(item);
         let trailing_definition_comments_start =
             dangling_comments.partition_point(|comment| comment.line_position().is_own_line());
 
@@ -64,19 +64,17 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
                                 write!(f, [space(), text("->"), space()])?;
 
                                 if return_annotation.is_tuple_expr() {
-                                    let parentheses = if comments
-                                        .has_leading_comments(return_annotation.as_ref())
-                                    {
-                                        Parentheses::Always
-                                    } else {
-                                        Parentheses::Never
-                                    };
+                                    let parentheses =
+                                        if comments.has_leading(return_annotation.as_ref()) {
+                                            Parentheses::Always
+                                        } else {
+                                            Parentheses::Never
+                                        };
                                     write!(
                                         f,
                                         [return_annotation.format().with_options(parentheses)]
                                     )?;
-                                } else if comments.has_trailing_comments(return_annotation.as_ref())
-                                {
+                                } else if comments.has_trailing(return_annotation.as_ref()) {
                                     // Intentionally parenthesize any return annotations with trailing comments.
                                     // This avoids an instability in cases like:
                                     // ```python

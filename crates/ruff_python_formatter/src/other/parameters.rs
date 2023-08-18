@@ -63,7 +63,7 @@ impl FormatNodeRule<Parameters> for FormatParameters {
         let (slash, star) = find_parameter_separators(f.context().source(), item);
 
         let comments = f.context().comments().clone();
-        let dangling = comments.dangling_comments(item);
+        let dangling = comments.dangling(item);
 
         // First dangling comment: trailing the opening parenthesis, e.g.:
         // ```python

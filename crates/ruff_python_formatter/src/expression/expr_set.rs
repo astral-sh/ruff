@@ -22,7 +22,7 @@ impl FormatNodeRule<ExprSet> for FormatExprSet {
         });
 
         let comments = f.context().comments().clone();
-        let dangling = comments.dangling_comments(item);
+        let dangling = comments.dangling(item);
 
         parenthesized("{", &joined, "}")
             .with_dangling_comments(dangling)

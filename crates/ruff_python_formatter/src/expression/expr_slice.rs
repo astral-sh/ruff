@@ -39,7 +39,7 @@ impl FormatNodeRule<ExprSlice> for FormatExprSlice {
         // to handle newlines and spacing, or the node is None and we insert the corresponding
         // slice of dangling comments
         let comments = f.context().comments().clone();
-        let slice_dangling_comments = comments.dangling_comments(item.as_any_node_ref());
+        let slice_dangling_comments = comments.dangling(item.as_any_node_ref());
         // Put the dangling comments (where the nodes are missing) into buckets
         let first_colon_partition_index =
             slice_dangling_comments.partition_point(|x| x.slice().start() < first_colon.start());
@@ -102,7 +102,7 @@ impl FormatNodeRule<ExprSlice> for FormatExprSlice {
 
         // Upper
         if let Some(upper) = upper {
-            let upper_leading_comments = comments.leading_comments(upper.as_ref());
+            let upper_leading_comments = comments.leading(upper.as_ref());
             leading_comments_spacing(f, upper_leading_comments)?;
             write!(f, [upper.format(), line_suffix_boundary()])?;
         } else {
@@ -134,7 +134,7 @@ impl FormatNodeRule<ExprSlice> for FormatExprSlice {
                 space().fmt(f)?;
             }
             if let Some(step) = step {
-                let step_leading_comments = comments.leading_comments(step.as_ref());
+                let step_leading_comments = comments.leading(step.as_ref());
                 leading_comments_spacing(f, step_leading_comments)?;
                 step.format().fmt(f)?;
             } else if !dangling_step_comments.is_empty() {

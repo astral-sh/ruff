@@ -36,7 +36,7 @@ pub(crate) fn write_suppressed_statements_starting_with_leading_comment<'a>(
     let source = f.context().source();
 
     let mut leading_comment_ranges =
-        CommentRangeIter::outside_suppression(comments.leading_comments(first_suppressed), source);
+        CommentRangeIter::outside_suppression(comments.leading(first_suppressed), source);
 
     let before_format_off = leading_comment_ranges
         .next()
@@ -88,7 +88,7 @@ pub(crate) fn write_suppressed_statements_starting_with_trailing_comment<'a>(
     let source = f.context().source();
     let indentation = Indentation::from_stmt(last_formatted.statement(), source);
 
-    let trailing_node_comments = comments.trailing_comments(last_formatted);
+    let trailing_node_comments = comments.trailing(last_formatted);
     let mut trailing_comment_ranges =
         CommentRangeIter::outside_suppression(trailing_node_comments, source);
 
@@ -192,7 +192,7 @@ pub(crate) fn write_suppressed_statements_starting_with_trailing_comment<'a>(
         write_suppressed_statements(
             format_off_comment,
             SuiteChildStatement::Other(first_suppressed),
-            comments.leading_comments(first_suppressed),
+            comments.leading(first_suppressed),
             statements,
             f,
         )
@@ -300,7 +300,7 @@ fn write_suppressed_statements<'a>(
                         // Suppression ends here. Test if the node has a trailing suppression comment and, if so,
                         // recurse and format the trailing comments and the following statements as suppressed.
                         return if comments
-                            .trailing_comments(statement)
+                            .trailing(statement)
                             .iter()
                             .any(|comment| comment.is_suppression_off_comment(source))
                         {
@@ -325,8 +325,7 @@ fn write_suppressed_statements<'a>(
 
         comments.mark_verbatim_node_comments_formatted(AnyNodeRef::from(statement));
 
-        for range in CommentRangeIter::in_suppression(comments.trailing_comments(statement), source)
-        {
+        for range in CommentRangeIter::in_suppression(comments.trailing(statement), source) {
             match range {
                 // All leading comments are suppressed
                 // ```python
@@ -393,10 +392,10 @@ fn write_suppressed_statements<'a>(
 
         if let Some(next_statement) = statements.next() {
             statement = SuiteChildStatement::Other(next_statement);
-            leading_node_comments = comments.leading_comments(next_statement);
+            leading_node_comments = comments.leading(next_statement);
         } else {
             let end = comments
-                .trailing_comments(statement)
+                .trailing(statement)
                 .last()
                 .map_or(statement.end(), Ranged::end);
 
@@ -903,7 +902,7 @@ pub(crate) struct FormatSuppressedNode<'a> {
 impl Format<PyFormatContext<'_>> for FormatSuppressedNode<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         let comments = f.context().comments().clone();
-        let node_comments = comments.leading_dangling_trailing_comments(self.node);
+        let node_comments = comments.leading_dangling_trailing(self.node);
 
         // Mark all comments as formatted that fall into the node range
         for comment in node_comments.leading {
@@ -948,7 +947,7 @@ pub(crate) fn write_suppressed_clause_header(
 
     let comments = f.context().comments();
     header.visit(&mut |child| {
-        for comment in comments.leading_trailing_comments(child) {
+        for comment in comments.leading_trailing(child) {
             comment.mark_formatted();
         }
         comments.mark_verbatim_node_comments_formatted(child);
