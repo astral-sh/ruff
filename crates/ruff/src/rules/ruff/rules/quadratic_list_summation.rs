@@ -119,11 +119,11 @@ fn func_is_builtin(func: &Expr, name: &str, semantic: &SemanticModel) -> bool {
 
 /// Returns `true` if the `start` argument to a `sum()` call is an empty list.
 fn start_is_empty_list(arguments: &Arguments, semantic: &SemanticModel) -> bool {
-    let Some(keyword) = arguments.find_keyword("start") else {
+    let Some(start_arg) = arguments.find_argument("start", 1) else {
         return false;
     };
 
-    match &keyword.value {
+    match start_arg {
         Expr::Call(ast::ExprCall {
             func, arguments, ..
         }) => arguments.is_empty() && func_is_builtin(func, "list", semantic),
