@@ -76,3 +76,27 @@ match x:
         ...
     case 3:
         ... # comment
+
+try:
+    ...
+except:
+    ...
+finally:
+    ...
+
+try:
+    # comment
+    ...
+except:
+    # comment
+    ...
+finally:
+    # comment
+    ...
+
+try:
+    ...  # comment
+except:
+    ...  # comment
+finally:
+    ...  # comment
