@@ -9,18 +9,52 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/
 while True:
     ...
 
+if True:
+    # comment
+    ...
+
+with True:
+    ...  # comment
+
 for i in []:
     ...
+
+for i in []:
+    # comment
+    ...
+
+for i in []:
+    ... # comment
 
 if True:
     ...
 
+if True:
+    # comment
+    ...
+
+if True:
+    ... # comment
+
 with True:
     ...
 
+with True:
+    # comment
+    ...
+
+with True:
+    ... # comment
+
 match x:
     case 1:
-        ...```
+        ...
+    case 2:
+        # comment
+        ...
+    case 3:
+        ... # comment
+```
 
 ## Output
 ```py
@@ -28,15 +62,44 @@ match x:
 
 while True: ...
 
+if True:
+    # comment
+    ...
+
+with True: ...  # comment
+
 for i in []: ...
+
+for i in []:
+    # comment
+    ...
+
+for i in []: ...  # comment
 
 if True: ...
 
+if True:
+    # comment
+    ...
+
+if True: ...  # comment
+
 with True: ...
+
+with True:
+    # comment
+    ...
+
+with True: ...  # comment
 
 match x:
     case "NOT_YET_IMPLEMENTED_PatternMatchValue":
         ...
+    case "NOT_YET_IMPLEMENTED_PatternMatchValue":
+        # comment
+        ...
+    case "NOT_YET_IMPLEMENTED_PatternMatchValue":
+        ...  # comment
 ```
 
 
