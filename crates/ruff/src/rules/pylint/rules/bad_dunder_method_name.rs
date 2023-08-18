@@ -69,7 +69,7 @@ pub(crate) fn bad_dunder_method_name(checker: &mut Checker, class_body: &[Stmt])
 }
 
 /// Returns `true` if a method is a known dunder method.
-pub(super) fn is_known_dunder_method(method: &str) -> bool {
+fn is_known_dunder_method(method: &str) -> bool {
     matches!(
         method,
         "__abs__"
