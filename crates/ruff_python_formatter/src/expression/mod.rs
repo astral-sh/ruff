@@ -108,7 +108,20 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
 
         if parenthesize {
             let comments = f.context().comments().clone();
-            let open_parenthesis_comment = comments.open_parenthesis(expression);
+
+            // Any comments on the open parenthesis of a `node`.
+            //
+            // For example, `# comment` in:
+            // ```python
+            // (  # comment
+            //    foo.bar
+            // )
+            // ```
+            let open_parenthesis_comment = comments
+                .leading(expression)
+                .first()
+                .filter(|comment| comment.line_position().is_end_of_line());
+
             parenthesized("(", &format_expr, ")")
                 .with_dangling_comments(
                     open_parenthesis_comment

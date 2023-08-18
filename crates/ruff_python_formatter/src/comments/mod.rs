@@ -418,24 +418,6 @@ impl<'a> Comments<'a> {
             .leading_dangling_trailing(&NodeRefEqualityKey::from_ref(node.into()))
     }
 
-    /// Returns any comments on the open parenthesis of a `node`.
-    ///
-    /// For example, `# comment` in:
-    /// ```python
-    /// (  # comment
-    ///    foo.bar
-    /// )
-    /// ```
-    #[inline]
-    pub(crate) fn open_parenthesis<T>(&self, node: T) -> Option<&SourceComment>
-    where
-        T: Into<AnyNodeRef<'a>>,
-    {
-        self.leading(node)
-            .first()
-            .filter(|comment| comment.line_position.is_end_of_line())
-    }
-
     #[inline(always)]
     #[cfg(not(debug_assertions))]
     pub(crate) fn assert_all_formatted(&self, _source_code: SourceCode) {}
