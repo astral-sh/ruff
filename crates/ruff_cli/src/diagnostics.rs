@@ -1,5 +1,6 @@
 #![cfg_attr(target_family = "wasm", allow(dead_code))]
 
+use std::borrow::Cow;
 use std::fs::write;
 use std::io;
 use std::io::Write;
@@ -75,6 +76,31 @@ impl Diagnostics {
             source_kind: FxHashMap::default(),
         }
     }
+
+    /// Generate [`Diagnostics`] based on an [`io::Error`].
+    pub(crate) fn from_io_error(err: &io::Error, path: &Path, settings: &Settings) -> Self {
+        if settings.rules.enabled(Rule::IOError) {
+            let io_err = Diagnostic::new(
+                IOError {
+                    message: err.to_string(),
+                },
+                TextRange::default(),
+            );
+            let dummy = SourceFileBuilder::new(path.to_string_lossy().as_ref(), "").finish();
+            Self::new(
+                vec![Message::from_diagnostic(io_err, dummy, TextSize::default())],
+                ImportMap::default(),
+            )
+        } else {
+            warn!(
+                "{}{}{} {err}",
+                "Failed to lint ".bold(),
+                fs::relativize_path(path).bold(),
+                ":".bold()
+            );
+            Self::default()
+        }
+    }
 }
 
 impl AddAssign for Diagnostics {
@@ -131,11 +157,11 @@ fn notebook_from_path(path: &Path) -> Result<Notebook, Box<Diagnostics>> {
 /// Parse a Jupyter Notebook from a JSON string.
 ///
 /// Returns either an indexed Python Jupyter Notebook or a diagnostic (which is empty if we skip).
-fn notebook_from_contents(
-    contents: &str,
+fn notebook_from_source_code(
+    source_code: &str,
     path: Option<&Path>,
 ) -> Result<Notebook, Box<Diagnostics>> {
-    let notebook = match Notebook::from_contents(contents) {
+    let notebook = match Notebook::from_source_code(source_code) {
         Ok(notebook) => {
             if !notebook.is_python_notebook() {
                 // Not a python notebook, this could e.g. be an R notebook which we want to just skip.
@@ -202,31 +228,6 @@ pub(crate) fn lint_path(
 
     debug!("Checking: {}", path.display());
 
-    // In case of an io error we want to exit early
-    let io_error_diagnostics = |err: io::Error, path: &Path| -> Diagnostics {
-        if settings.lib.rules.enabled(Rule::IOError) {
-            let io_err = Diagnostic::new(
-                IOError {
-                    message: err.to_string(),
-                },
-                TextRange::default(),
-            );
-            let dummy = SourceFileBuilder::new(path.to_string_lossy().as_ref(), "").finish();
-            Diagnostics::new(
-                vec![Message::from_diagnostic(io_err, dummy, TextSize::default())],
-                ImportMap::default(),
-            )
-        } else {
-            warn!(
-                "{}{}{} {err}",
-                "Failed to lint ".bold(),
-                fs::relativize_path(path).bold(),
-                ":".bold()
-            );
-            Diagnostics::default()
-        }
-    };
-
     // We have to special case this here since the Python tokenizer doesn't work with TOML.
     if is_project_toml(path) {
         let messages = if settings
@@ -238,7 +239,7 @@ pub(crate) fn lint_path(
             let contents = match std::fs::read_to_string(path) {
                 Ok(contents) => contents,
                 Err(err) => {
-                    return Ok(io_error_diagnostics(err, path));
+                    return Ok(Diagnostics::from_io_error(&err, path, &settings.lib));
                 }
             };
             let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
@@ -252,26 +253,20 @@ pub(crate) fn lint_path(
         });
     }
 
-    let source_type = PySourceType::from(path);
-
-    // Read the file from disk
-    let mut source_kind = if source_type.is_jupyter() {
-        match notebook_from_path(path) {
-            Ok(notebook) => SourceKind::Jupyter(notebook),
-            Err(diagnostic) => return Ok(*diagnostic),
+    // Extract the sources from the file.
+    let LintSources {
+        source_type,
+        mut source_kind,
+        contents,
+    } = match LintSources::try_from_path(path) {
+        Ok(sources) => sources,
+        Err(SourceExtractionError::Io(err)) => {
+            return Ok(Diagnostics::from_io_error(&err, path, &settings.lib));
         }
-    } else {
-        // This is tested by ruff_cli integration test `unreadable_file`
-        let contents = match std::fs::read_to_string(path) {
-            Ok(contents) => contents,
-            Err(err) => {
-                return Ok(io_error_diagnostics(err, path));
-            }
-        };
-        SourceKind::Python(contents)
+        Err(SourceExtractionError::Diagnostics(diagnostics)) => {
+            return Ok(*diagnostics);
+        }
     };
-
-    let contents = source_kind.content().to_string();
 
     // Lint the file.
     let (
@@ -297,7 +292,7 @@ pub(crate) fn lint_path(
             if !fixed.is_empty() {
                 match autofix {
                     flags::FixMode::Apply => match &source_kind {
-                        SourceKind::Python(_) => {
+                        SourceKind::Python => {
                             write(path, transformed.as_bytes())?;
                         }
                         SourceKind::Jupyter(notebook) => {
@@ -306,9 +301,9 @@ pub(crate) fn lint_path(
                     },
                     flags::FixMode::Diff => {
                         match &source_kind {
-                            SourceKind::Python(_) => {
+                            SourceKind::Python => {
                                 let mut stdout = io::stdout().lock();
-                                TextDiff::from_lines(contents.as_str(), &transformed)
+                                TextDiff::from_lines(&contents, &transformed)
                                     .unified_diff()
                                     .header(&fs::relativize_path(path), &fs::relativize_path(path))
                                     .to_writer(&mut stdout)?;
@@ -441,19 +436,21 @@ pub(crate) fn lint_stdin(
     noqa: flags::Noqa,
     autofix: flags::FixMode,
 ) -> Result<Diagnostics> {
-    let source_type = path.map(PySourceType::from).unwrap_or_default();
-
-    let mut source_kind = if source_type.is_jupyter() {
-        // SAFETY: Jupyter isn't the default type, so we must have a path.
-        match notebook_from_contents(contents, path) {
-            Ok(notebook) => SourceKind::Jupyter(notebook),
-            Err(diagnostic) => return Ok(*diagnostic),
+    // Extract the sources from the file.
+    let LintSources {
+        source_type,
+        mut source_kind,
+        contents,
+    } = match LintSources::try_from_source_code(contents, path) {
+        Ok(sources) => sources,
+        Err(SourceExtractionError::Io(err)) => {
+            // SAFETY: An `io::Error` can only occur if we're reading from a path.
+            return Ok(Diagnostics::from_io_error(&err, path.unwrap(), settings));
         }
-    } else {
-        SourceKind::Python(contents.to_string())
+        Err(SourceExtractionError::Diagnostics(diagnostics)) => {
+            return Ok(*diagnostics);
+        }
     };
-
-    let contents = source_kind.content().to_string();
 
     // Lint the inputs.
     let (
@@ -484,7 +481,7 @@ pub(crate) fn lint_stdin(
                 flags::FixMode::Diff => {
                     // But only write a diff if it's non-empty.
                     if !fixed.is_empty() {
-                        let text_diff = TextDiff::from_lines(contents.as_str(), &transformed);
+                        let text_diff = TextDiff::from_lines(&contents, &transformed);
                         let mut unified_diff = text_diff.unified_diff();
                         if let Some(path) = path {
                             unified_diff
@@ -555,11 +552,84 @@ pub(crate) fn lint_stdin(
     })
 }
 
+#[derive(Debug)]
+struct LintSources<'a> {
+    /// The "type" of source code, e.g. `.py`, `.pyi`, `.ipynb`, etc.
+    source_type: PySourceType,
+    /// The "kind" of source, e.g. Python file, Jupyter Notebook, etc.
+    source_kind: SourceKind,
+    /// The contents of the source code.
+    contents: Cow<'a, str>,
+}
+
+impl<'a> LintSources<'a> {
+    /// Extract the lint [`LintSources`] from the given file path.
+    fn try_from_path(path: &Path) -> Result<LintSources, SourceExtractionError> {
+        let source_type = PySourceType::from(path);
+
+        // Read the file from disk.
+        if source_type.is_jupyter() {
+            let notebook = notebook_from_path(path).map_err(SourceExtractionError::Diagnostics)?;
+            let contents = notebook.source_code().to_string();
+            let source_kind = SourceKind::Jupyter(notebook);
+            Ok(LintSources {
+                source_type,
+                source_kind,
+                contents: Cow::Owned(contents),
+            })
+        } else {
+            // This is tested by ruff_cli integration test `unreadable_file`
+            let contents = std::fs::read_to_string(path).map_err(SourceExtractionError::Io)?;
+            Ok(LintSources {
+                source_type,
+                source_kind: SourceKind::Python,
+                contents: Cow::Owned(contents),
+            })
+        }
+    }
+
+    /// Extract the lint [`LintSources`] from the raw string contents, optionally accompanied by a
+    /// file path indicating the path to the file from which the contents were read. If provided,
+    /// the file path should be used for diagnostics, but not for reading the file from disk.
+    fn try_from_source_code(
+        source_code: &'a str,
+        path: Option<&Path>,
+    ) -> Result<LintSources<'a>, SourceExtractionError> {
+        let source_type = path.map(PySourceType::from).unwrap_or_default();
+
+        if source_type.is_jupyter() {
+            let notebook = notebook_from_source_code(source_code, path)
+                .map_err(SourceExtractionError::Diagnostics)?;
+            let contents = notebook.source_code().to_string();
+            let source_kind = SourceKind::Jupyter(notebook);
+            Ok(LintSources {
+                source_type,
+                source_kind,
+                contents: Cow::Owned(contents),
+            })
+        } else {
+            Ok(LintSources {
+                source_type,
+                source_kind: SourceKind::Python,
+                contents: Cow::Borrowed(source_code),
+            })
+        }
+    }
+}
+
+#[derive(Debug)]
+enum SourceExtractionError {
+    /// The extraction failed due to an [`io::Error`].
+    Io(io::Error),
+    /// The extraction failed, and generated [`Diagnostics`] to report.
+    Diagnostics(Box<Diagnostics>),
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::Path;
 
-    use crate::diagnostics::{notebook_from_contents, notebook_from_path, Diagnostics};
+    use crate::diagnostics::{notebook_from_path, notebook_from_source_code, Diagnostics};
 
     #[test]
     fn test_r() {
@@ -573,7 +643,7 @@ mod tests {
         let contents = std::fs::read_to_string(path).unwrap();
         // No diagnostics is used as skip signal.
         assert_eq!(
-            notebook_from_contents(&contents, Some(path)).unwrap_err(),
+            notebook_from_source_code(&contents, Some(path)).unwrap_err(),
             Box::<Diagnostics>::default()
         );
     }
