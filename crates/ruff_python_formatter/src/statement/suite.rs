@@ -339,13 +339,14 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
 pub(crate) fn contains_only_an_ellipsis(body: &[Stmt], comments: &Comments) -> bool {
     match body {
         [Stmt::Expr(ast::StmtExpr { value, .. })] => {
+            let [node] = body else { return false; };
             matches!(
                 value.as_ref(),
                 Expr::Constant(ast::ExprConstant {
                     value: Constant::Ellipsis,
                     ..
                 })
-            ) && !comments.has_comments(value.as_ref())
+            ) && !comments.has_leading(node)
         }
         _ => false,
     }
