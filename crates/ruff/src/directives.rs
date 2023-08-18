@@ -405,7 +405,7 @@ y = 2
 z = x + 1";
         assert_eq!(
             noqa_mappings(contents),
-            NoqaMapping::from_iter([TextRange::new(TextSize::from(0), TextSize::from(22)),])
+            NoqaMapping::from_iter([TextRange::new(TextSize::from(0), TextSize::from(22))])
         );
 
         let contents = "x = 1

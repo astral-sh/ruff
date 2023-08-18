@@ -943,7 +943,7 @@ pub(crate) fn write_suppressed_clause_header(
         [verbatim_text(
             header.range(f.context().source())?,
             ContainsNewlines::Detect
-        ),]
+        )]
     )?;
 
     let comments = f.context().comments();
