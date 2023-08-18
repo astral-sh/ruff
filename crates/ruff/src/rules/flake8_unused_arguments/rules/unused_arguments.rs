@@ -436,23 +436,22 @@ pub(crate) fn unused_arguments(
                 }
             }
         }
-        ScopeKind::Lambda(ast::ExprLambda {
-            parameters: Some(parameters),
-            ..
-        }) => {
-            if checker.enabled(Argumentable::Lambda.rule_code()) {
-                function(
-                    Argumentable::Lambda,
-                    parameters,
-                    scope,
-                    checker.semantic(),
-                    &checker.settings.dummy_variable_rgx,
-                    checker
-                        .settings
-                        .flake8_unused_arguments
-                        .ignore_variadic_names,
-                    diagnostics,
-                );
+        ScopeKind::Lambda(ast::ExprLambda { parameters, .. }) => {
+            if let Some(parameters) = parameters {
+                if checker.enabled(Argumentable::Lambda.rule_code()) {
+                    function(
+                        Argumentable::Lambda,
+                        parameters,
+                        scope,
+                        checker.semantic(),
+                        &checker.settings.dummy_variable_rgx,
+                        checker
+                            .settings
+                            .flake8_unused_arguments
+                            .ignore_variadic_names,
+                        diagnostics,
+                    );
+                }
             }
         }
         _ => panic!("Expected ScopeKind::Function | ScopeKind::Lambda"),
