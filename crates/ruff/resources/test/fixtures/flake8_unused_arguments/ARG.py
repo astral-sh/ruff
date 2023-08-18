@@ -27,6 +27,8 @@ def f(cls, x):
 ###
 lambda x: print("Hello, world!")
 
+lambda: print("Hello, world!")
+
 
 class C:
     ###
