@@ -153,8 +153,8 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatParenthesized<'_, 'ast> {
         let inner = format_with(|f| {
             group(&format_args![
                 text(self.left),
-                &dangling_open_parenthesis_comments(self.comments),
-                &soft_block_indent(&Arguments::from(&self.content)),
+                dangling_open_parenthesis_comments(self.comments),
+                soft_block_indent(&Arguments::from(&self.content)),
                 text(self.right)
             ])
             .fmt(f)

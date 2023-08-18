@@ -42,10 +42,10 @@ impl FormatNodeRule<StmtNonlocal> for FormatStmtNonlocal {
                 [
                     text("nonlocal"),
                     space(),
-                    &group(&format_args!(
+                    group(&format_args!(
                         if_group_breaks(&text("\\")),
                         soft_line_break(),
-                        &soft_block_indent(&joined)
+                        soft_block_indent(&joined)
                     ))
                 ]
             )

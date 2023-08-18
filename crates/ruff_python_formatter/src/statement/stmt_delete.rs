@@ -27,9 +27,9 @@ impl FormatNodeRule<StmtDelete> for FormatStmtDelete {
                         // del (
                         //     # Dangling comment
                         // )
-                        &text("("),
+                        text("("),
                         block_indent(&dangling_node_comments(item)),
-                        &text(")"),
+                        text(")"),
                     ]
                 )
             }
