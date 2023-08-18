@@ -1,0 +1,44 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+assertion_line: 160
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/ellipsis.pyi
+---
+## Input
+```py
+"""Compound statements with no body should be written on one line."""
+
+while True:
+    ...
+
+for i in []:
+    ...
+
+if True:
+    ...
+
+with True:
+    ...
+
+match x:
+    case 1:
+        ...```
+
+## Output
+```py
+"""Compound statements with no body should be written on one line."""
+
+while True: ...
+
+for i in []: ...
+
+if True: ...
+
+with True: ...
+
+match x:
+    case "NOT_YET_IMPLEMENTED_PatternMatchValue":
+        ...
+```
+
+
+

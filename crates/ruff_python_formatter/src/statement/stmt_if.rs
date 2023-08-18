@@ -6,7 +6,7 @@ use crate::comments::SourceComment;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
-use crate::statement::clause::{clause_header, ClauseHeader};
+use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
 use crate::FormatNodeRule;
 
 #[derive(Default)]
@@ -36,7 +36,7 @@ impl FormatNodeRule<StmtIf> for FormatStmtIf {
                         maybe_parenthesize_expression(test, item, Parenthesize::IfBreaks),
                     ],
                 ),
-                block_indent(&body.format())
+                clause_body(body, trailing_colon_comment),
             ]
         )?;
 
