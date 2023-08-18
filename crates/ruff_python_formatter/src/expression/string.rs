@@ -160,7 +160,7 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
         let comments = f.context().comments().clone();
         let locator = f.context().locator();
         let quote_style = f.options().quote_style();
-        let mut dangling_comments = comments.dangling_comments(self.string);
+        let mut dangling_comments = comments.dangling(self.string);
 
         let string_range = self.string.range();
         let string_content = locator.slice(string_range);
@@ -269,6 +269,12 @@ struct FormatStringPart {
     is_raw_string: bool,
 }
 
+impl Ranged for FormatStringPart {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
 impl FormatStringPart {
     fn new(range: TextRange, quoting: Quoting, locator: &Locator, quote_style: QuoteStyle) -> Self {
         let string_content = locator.slice(range);
@@ -317,10 +323,10 @@ impl Format<PyFormatContext<'_>> for FormatStringPart {
         write!(f, [self.prefix, self.preferred_quotes])?;
         match normalized {
             Cow::Borrowed(_) => {
-                source_text_slice(self.range, contains_newlines).fmt(f)?;
+                source_text_slice(self.range(), contains_newlines).fmt(f)?;
             }
             Cow::Owned(normalized) => {
-                dynamic_text(&normalized, Some(self.range.start())).fmt(f)?;
+                dynamic_text(&normalized, Some(self.start())).fmt(f)?;
             }
         }
         self.preferred_quotes.fmt(f)
@@ -781,12 +787,12 @@ fn format_docstring(string_part: &FormatStringPart, f: &mut PyFormatter) -> Form
     let locator = f.context().locator();
 
     // Black doesn't change the indentation of docstrings that contain an escaped newline
-    if locator.slice(string_part.range).contains("\\\n") {
+    if locator.slice(string_part.range()).contains("\\\n") {
         return string_part.fmt(f);
     }
 
     let (normalized, _) = normalize_string(
-        locator.slice(string_part.range),
+        locator.slice(string_part.range()),
         string_part.preferred_quotes,
         string_part.is_raw_string,
     );
@@ -799,13 +805,13 @@ fn format_docstring(string_part: &FormatStringPart, f: &mut PyFormatter) -> Form
     write!(
         f,
         [
-            source_position(string_part.range.start()),
+            source_position(string_part.start()),
             string_part.prefix,
             string_part.preferred_quotes
         ]
     )?;
     // We track where in the source docstring we are (in source code byte offsets)
-    let mut offset = string_part.range.start();
+    let mut offset = string_part.start();
 
     // The first line directly after the opening quotes has different rules than the rest, mainly
     // that we remove all leading whitespace as there's no indentation
@@ -892,7 +898,7 @@ fn format_docstring(string_part: &FormatStringPart, f: &mut PyFormatter) -> Form
         f,
         [
             string_part.preferred_quotes,
-            source_position(string_part.range.end())
+            source_position(string_part.end())
         ]
     )
 }

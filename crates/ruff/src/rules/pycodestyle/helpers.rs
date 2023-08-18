@@ -1,8 +1,10 @@
-use ruff_python_ast::{CmpOp, Expr, Ranged};
-use ruff_text_size::{TextLen, TextRange};
 use unicode_width::UnicodeWidthStr;
 
+use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::{CmpOp, Expr, Ranged};
 use ruff_source_file::{Line, Locator};
+use ruff_text_size::{TextLen, TextRange};
 
 use crate::line_width::{LineLength, LineWidth, TabSize};
 
@@ -10,10 +12,11 @@ pub(super) fn is_ambiguous_name(name: &str) -> bool {
     name == "l" || name == "I" || name == "O"
 }
 
-pub(super) fn compare(
+pub(super) fn generate_comparison(
     left: &Expr,
     ops: &[CmpOp],
     comparators: &[Expr],
+    parent: AnyNodeRef,
     locator: &Locator,
 ) -> String {
     let start = left.start();
@@ -21,7 +24,9 @@ pub(super) fn compare(
     let mut contents = String::with_capacity(usize::from(end - start));
 
     // Add the left side of the comparison.
-    contents.push_str(locator.slice(left.range()));
+    contents.push_str(locator.slice(
+        parenthesized_range(left.into(), parent, locator.contents()).unwrap_or(left.range()),
+    ));
 
     for (op, comparator) in ops.iter().zip(comparators) {
         // Add the operator.
@@ -39,7 +44,12 @@ pub(super) fn compare(
         });
 
         // Add the right side of the comparison.
-        contents.push_str(locator.slice(comparator.range()));
+        contents.push_str(
+            locator.slice(
+                parenthesized_range(comparator.into(), parent, locator.contents())
+                    .unwrap_or(comparator.range()),
+            ),
+        );
     }
 
     contents

@@ -2,7 +2,7 @@ use ruff_formatter::{format_args, write, Buffer, FormatResult, FormatRuleWithOpt
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::ExprGeneratorExp;
 
-use crate::comments::leading_comments;
+use crate::comments::SourceComment;
 use crate::context::PyFormatContext;
 use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
@@ -14,10 +14,11 @@ pub enum GeneratorExpParentheses {
     #[default]
     Default,
 
-    // skip parens if the generator exp is the only argument to a function, e.g.
-    // ```python
-    //  all(x for y in z)`
-    //  ```
+    /// Skip parens if the generator is the only argument to a function and doesn't contain any
+    /// dangling comments. For example:
+    /// ```python
+    /// all(x for y in z)`
+    /// ```
     StripIfOnlyFunctionArg,
 }
 
@@ -50,17 +51,14 @@ impl FormatNodeRule<ExprGeneratorExp> for FormatExprGeneratorExp {
         });
 
         let comments = f.context().comments().clone();
-        let dangling = comments.dangling_comments(item);
+        let dangling = comments.dangling(item);
 
-        if self.parentheses == GeneratorExpParentheses::StripIfOnlyFunctionArg {
+        if self.parentheses == GeneratorExpParentheses::StripIfOnlyFunctionArg
+            && dangling.is_empty()
+        {
             write!(
                 f,
-                [
-                    leading_comments(dangling),
-                    group(&elt.format()),
-                    soft_line_break_or_space(),
-                    &joined
-                ]
+                [group(&elt.format()), soft_line_break_or_space(), &joined]
             )
         } else {
             write!(
@@ -70,7 +68,7 @@ impl FormatNodeRule<ExprGeneratorExp> for FormatExprGeneratorExp {
                     &group(&format_args!(
                         group(&elt.format()),
                         soft_line_break_or_space(),
-                        &joined
+                        joined
                     )),
                     ")"
                 )
@@ -81,7 +79,7 @@ impl FormatNodeRule<ExprGeneratorExp> for FormatExprGeneratorExp {
 
     fn fmt_dangling_comments(
         &self,
-        _node: &ExprGeneratorExp,
+        _dangling_comments: &[SourceComment],
         _f: &mut PyFormatter,
     ) -> FormatResult<()> {
         // Handled as part of `fmt_fields`

@@ -173,7 +173,7 @@ fn is_unused(expr: &Expr, semantic: &SemanticModel) -> bool {
             scope
                 .get_all(id)
                 .map(|binding_id| semantic.binding(binding_id))
-                .filter(|binding| binding.range.start() >= expr.range().start())
+                .filter(|binding| binding.start() >= expr.start())
                 .all(|binding| !binding.is_used())
         }
         _ => false,

@@ -30,12 +30,12 @@ impl FormatNodeRule<ExprIfExp> for FormatExprIfExp {
             [in_parentheses_only_group(&format_args![
                 body.format(),
                 in_parentheses_only_soft_line_break_or_space(),
-                leading_comments(comments.leading_comments(test.as_ref())),
+                leading_comments(comments.leading(test.as_ref())),
                 text("if"),
                 space(),
                 test.format(),
                 in_parentheses_only_soft_line_break_or_space(),
-                leading_comments(comments.leading_comments(orelse.as_ref())),
+                leading_comments(comments.leading(orelse.as_ref())),
                 text("else"),
                 space(),
                 orelse.format()

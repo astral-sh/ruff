@@ -232,7 +232,8 @@ impl Settings {
                 .unwrap_or_default(),
             flake8_pytest_style: config
                 .flake8_pytest_style
-                .map(flake8_pytest_style::settings::Settings::from)
+                .map(flake8_pytest_style::settings::Settings::try_from)
+                .transpose()?
                 .unwrap_or_default(),
             flake8_quotes: config
                 .flake8_quotes

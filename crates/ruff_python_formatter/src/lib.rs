@@ -15,10 +15,11 @@ use ruff_source_file::Locator;
 use ruff_text_size::TextLen;
 
 use crate::comments::{
-    dangling_node_comments, leading_node_comments, trailing_node_comments, Comments,
+    dangling_comments, leading_comments, trailing_comments, Comments, SourceComment,
 };
 use crate::context::PyFormatContext;
 pub use crate::options::{MagicTrailingComma, PyFormatOptions, QuoteStyle};
+use crate::verbatim::suppressed_node;
 
 pub(crate) mod builders;
 pub mod cli;
@@ -46,17 +47,25 @@ where
     N: AstNode,
 {
     fn fmt(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
-        leading_node_comments(node).fmt(f)?;
-        self.fmt_node(node, f)?;
-        self.fmt_dangling_comments(node, f)?;
-        trailing_node_comments(node).fmt(f)
-    }
+        let comments = f.context().comments().clone();
 
-    /// Formats the node without comments. Ignores any suppression comments.
-    fn fmt_node(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
-        write!(f, [source_position(node.start())])?;
-        self.fmt_fields(node, f)?;
-        write!(f, [source_position(node.end())])
+        let node_comments = comments.leading_dangling_trailing(node.as_any_node_ref());
+
+        if self.is_suppressed(node_comments.trailing, f.context()) {
+            suppressed_node(node.as_any_node_ref()).fmt(f)
+        } else {
+            leading_comments(node_comments.leading).fmt(f)?;
+            self.fmt_fields(node, f)?;
+            self.fmt_dangling_comments(node_comments.dangling, f)?;
+
+            write!(
+                f,
+                [
+                    source_position(node.end()),
+                    trailing_comments(node_comments.trailing)
+                ]
+            )
+        }
     }
 
     /// Formats the node's fields.
@@ -69,8 +78,20 @@ where
     /// no comments are dropped.
     ///
     /// A node can have dangling comments if all its children are tokens or if all node children are optional.
-    fn fmt_dangling_comments(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
-        dangling_node_comments(node).fmt(f)
+    fn fmt_dangling_comments(
+        &self,
+        dangling_node_comments: &[SourceComment],
+        f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        dangling_comments(dangling_node_comments).fmt(f)
+    }
+
+    fn is_suppressed(
+        &self,
+        _trailing_comments: &[SourceComment],
+        _context: &PyFormatContext,
+    ) -> bool {
+        false
     }
 }
 
@@ -140,42 +161,8 @@ pub fn format_node<'a>(
     formatted
         .context()
         .comments()
-        .assert_formatted_all_comments(SourceCode::new(source));
+        .assert_all_formatted(SourceCode::new(source));
     Ok(formatted)
-}
-
-pub(crate) struct NotYetImplemented<'a>(AnyNodeRef<'a>);
-
-/// Formats a placeholder for nodes that have not yet been implemented
-pub(crate) fn not_yet_implemented<'a, T>(node: T) -> NotYetImplemented<'a>
-where
-    T: Into<AnyNodeRef<'a>>,
-{
-    NotYetImplemented(node.into())
-}
-
-impl Format<PyFormatContext<'_>> for NotYetImplemented<'_> {
-    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let text = std::format!("NOT_YET_IMPLEMENTED_{:?}", self.0.kind());
-
-        f.write_element(FormatElement::Tag(Tag::StartVerbatim(
-            tag::VerbatimKind::Verbatim {
-                length: text.text_len(),
-            },
-        )))?;
-
-        f.write_element(FormatElement::DynamicText {
-            text: Box::from(text),
-        })?;
-
-        f.write_element(FormatElement::Tag(Tag::EndVerbatim))?;
-
-        f.context()
-            .comments()
-            .mark_verbatim_node_comments_formatted(self.0);
-
-        Ok(())
-    }
 }
 
 pub(crate) struct NotYetImplementedCustomText<'a> {
@@ -203,11 +190,11 @@ impl Format<PyFormatContext<'_>> for NotYetImplementedCustomText<'_> {
             tag::VerbatimKind::Verbatim {
                 length: self.text.text_len(),
             },
-        )))?;
+        )));
 
         text(self.text).fmt(f)?;
 
-        f.write_element(FormatElement::Tag(Tag::EndVerbatim))?;
+        f.write_element(FormatElement::Tag(Tag::EndVerbatim));
 
         f.context()
             .comments()
@@ -255,16 +242,12 @@ if True:
     #[ignore]
     #[test]
     fn quick_test() {
-        let src = r#"def test():
-    # fmt: off
+        let src = r#"
+@MyDecorator(list = a) # fmt: skip
+# trailing comment
+class Test:
+    pass
 
-    a  + b
-
-
-
-        # suppressed comments
-
-a   + b # formatted
 
 "#;
         // Tokenize once

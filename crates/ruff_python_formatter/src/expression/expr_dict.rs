@@ -4,7 +4,7 @@ use ruff_python_ast::Ranged;
 use ruff_python_ast::{Expr, ExprDict};
 use ruff_text_size::TextRange;
 
-use crate::comments::leading_comments;
+use crate::comments::{leading_comments, SourceComment};
 use crate::expression::parentheses::{
     empty_parenthesized, parenthesized, NeedsParentheses, OptionalParentheses,
 };
@@ -43,7 +43,7 @@ impl Format<PyFormatContext<'_>> for KeyValuePair<'_> {
             )
         } else {
             let comments = f.context().comments().clone();
-            let leading_value_comments = comments.leading_comments(self.value);
+            let leading_value_comments = comments.leading(self.value);
             write!(
                 f,
                 [
@@ -67,7 +67,7 @@ impl FormatNodeRule<ExprDict> for FormatExprDict {
         debug_assert_eq!(keys.len(), values.len());
 
         let comments = f.context().comments().clone();
-        let dangling = comments.dangling_comments(item);
+        let dangling = comments.dangling(item);
 
         if values.is_empty() {
             return empty_parenthesized("{", dangling, "}").fmt(f);
@@ -89,7 +89,11 @@ impl FormatNodeRule<ExprDict> for FormatExprDict {
             .fmt(f)
     }
 
-    fn fmt_dangling_comments(&self, _node: &ExprDict, _f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         // Handled by `fmt_fields`
         Ok(())
     }

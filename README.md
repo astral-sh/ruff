@@ -30,7 +30,7 @@ An extremely fast Python linter, written in Rust.
 - 🤝 Python 3.11 compatibility
 - 📦 Built-in caching, to avoid re-analyzing unchanged files
 - 🔧 Autofix support, for automatic error correction (e.g., automatically remove unused imports)
-- 📏 Over [500 built-in rules](https://beta.ruff.rs/docs/rules/)
+- 📏 Over [600 built-in rules](https://beta.ruff.rs/docs/rules/)
 - ⚖️ [Near-parity](https://beta.ruff.rs/docs/faq/#how-does-ruff-compare-to-flake8) with the
     built-in Flake8 rule set
 - 🔌 Native re-implementations of dozens of Flake8 plugins, like flake8-bugbear
@@ -140,7 +140,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com) hook:
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.0.284
+  rev: v0.0.285
   hooks:
     - id: ruff
 ```

@@ -33,7 +33,7 @@ impl Format<PyFormatContext<'_>> for FormatLeadingComments<'_> {
         let comments = f.context().comments().clone();
 
         let leading_comments = match self {
-            FormatLeadingComments::Node(node) => comments.leading_comments(*node),
+            FormatLeadingComments::Node(node) => comments.leading(*node),
             FormatLeadingComments::Comments(comments) => comments,
         };
 
@@ -124,7 +124,7 @@ impl Format<PyFormatContext<'_>> for FormatTrailingComments<'_> {
         let comments = f.context().comments().clone();
 
         let trailing_comments = match self {
-            FormatTrailingComments::Node(node) => comments.trailing_comments(*node),
+            FormatTrailingComments::Node(node) => comments.trailing(*node),
             FormatTrailingComments::Comments(comments) => comments,
         };
 
@@ -198,7 +198,7 @@ impl Format<PyFormatContext<'_>> for FormatDanglingComments<'_> {
 
         let dangling_comments = match self {
             Self::Comments(comments) => comments,
-            Self::Node(node) => comments.dangling_comments(*node),
+            Self::Node(node) => comments.dangling(*node),
         };
 
         let mut first = true;
@@ -247,12 +247,11 @@ pub(crate) struct FormatDanglingOpenParenthesisComments<'a> {
 
 impl Format<PyFormatContext<'_>> for FormatDanglingOpenParenthesisComments<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext>) -> FormatResult<()> {
-        let mut comments = self
+        for comment in self
             .comments
             .iter()
-            .filter(|comment| comment.is_unformatted());
-
-        if let Some(comment) = comments.next() {
+            .filter(|comment| comment.is_unformatted())
+        {
             debug_assert!(
                 comment.line_position().is_end_of_line(),
                 "Expected dangling comment to be at the end of the line"
@@ -261,16 +260,11 @@ impl Format<PyFormatContext<'_>> for FormatDanglingOpenParenthesisComments<'_> {
             write!(
                 f,
                 [
-                    line_suffix(&format_args![space(), space(), format_comment(comment)]),
+                    line_suffix(&format_args!(space(), space(), format_comment(comment))),
                     expand_parent()
                 ]
             )?;
             comment.mark_formatted();
-
-            debug_assert!(
-                comments.next().is_none(),
-                "Expected at most one dangling comment"
-            );
         }
 
         Ok(())
@@ -327,7 +321,7 @@ impl Format<PyFormatContext<'_>> for FormatComment<'_> {
         }
 
         let start = slice.start() + start_offset;
-        let end = slice.range().end() - trailing_whitespace_len;
+        let end = slice.end() - trailing_whitespace_len;
 
         write!(
             f,

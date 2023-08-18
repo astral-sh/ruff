@@ -251,10 +251,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                 | FormatElement::StaticText { .. }
                 | FormatElement::DynamicText { .. }
                 | FormatElement::SourceCodeSlice { .. }) => {
-                    fn write_escaped(
-                        element: &FormatElement,
-                        f: &mut Formatter<IrFormatContext>,
-                    ) -> FormatResult<()> {
+                    fn write_escaped(element: &FormatElement, f: &mut Formatter<IrFormatContext>) {
                         let text = match element {
                             FormatElement::StaticText { text } => text,
                             FormatElement::DynamicText { text } => text.as_ref(),
@@ -267,9 +264,9 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                         if text.contains('"') {
                             f.write_element(FormatElement::DynamicText {
                                 text: text.replace('"', r#"\""#).into(),
-                            })
+                            });
                         } else {
-                            f.write_element(element.clone())
+                            f.write_element(element.clone());
                         }
                     }
 
@@ -284,7 +281,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                             write!(f, [text(" ")])?;
                         }
                         element if element.is_text() => {
-                            write_escaped(element, f)?;
+                            write_escaped(element, f);
                         }
                         _ => unreachable!(),
                     }
@@ -334,7 +331,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                     f.write_elements([
                         FormatElement::Tag(StartIndent),
                         FormatElement::Line(LineMode::Hard),
-                    ])?;
+                    ]);
 
                     for variant in variants {
                         write!(f, [&**variant, hard_line_break()])?;
@@ -343,7 +340,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                     f.write_elements([
                         FormatElement::Tag(EndIndent),
                         FormatElement::Line(LineMode::Hard),
-                    ])?;
+                    ]);
 
                     write!(f, [text("])")])?;
                 }
@@ -631,7 +628,9 @@ impl Format<IrFormatContext<'_>> for ContentArrayStart {
             FormatElement::Tag(StartGroup(tag::Group::new())),
             FormatElement::Tag(StartIndent),
             FormatElement::Line(LineMode::Soft),
-        ])
+        ]);
+
+        Ok(())
     }
 }
 
@@ -644,7 +643,7 @@ impl Format<IrFormatContext<'_>> for ContentArrayEnd {
             FormatElement::Tag(EndIndent),
             FormatElement::Line(LineMode::Soft),
             FormatElement::Tag(EndGroup),
-        ])?;
+        ]);
 
         write!(f, [text("]")])
     }

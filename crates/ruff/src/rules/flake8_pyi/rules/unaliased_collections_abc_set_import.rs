@@ -1,5 +1,6 @@
 use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::Ranged;
 use ruff_python_semantic::Imported;
 use ruff_python_semantic::{Binding, BindingKind};
 
@@ -63,7 +64,7 @@ pub(crate) fn unaliased_collections_abc_set_import(
         return None;
     }
 
-    let mut diagnostic = Diagnostic::new(UnaliasedCollectionsAbcSetImport, binding.range);
+    let mut diagnostic = Diagnostic::new(UnaliasedCollectionsAbcSetImport, binding.range());
     if checker.patch(diagnostic.kind.rule()) {
         if checker.semantic().is_available("AbstractSet") {
             diagnostic.try_set_fix(|| {

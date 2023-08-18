@@ -21,31 +21,37 @@ if [ ! -d "$dir/twine/.git" ]; then
   git clone --filter=tree:0 https://github.com/pypa/twine "$dir/twine"
 fi
 git -C "$dir/twine" checkout 0bb428c410b8df64c04dc881ac1db37d932f3066
+
 # web framework that implements a lot of magic
 if [ ! -d "$dir/django/.git" ]; then
   git clone --filter=tree:0 https://github.com/django/django "$dir/django"
 fi
 git -C "$dir/django" checkout 95e4d6b81312fdd9f8ebf3385be1c1331168b5cf
+
 # an ML project
 if [ ! -d "$dir/transformers/.git" ]; then
   git clone --filter=tree:0 https://github.com/huggingface/transformers "$dir/transformers"
 fi
-git -C "$dir/django" checkout 95e4d6b81312fdd9f8ebf3385be1c1331168b5cf
+git -C "$dir/transformers" checkout c9a82be592ca305180a7ab6a36e884bca1d426b8
+
 # type annotations
 if [ ! -d "$dir/typeshed/.git" ]; then
   git clone --filter=tree:0 https://github.com/python/typeshed "$dir/typeshed"
 fi
 git -C "$dir/typeshed" checkout 7d33060e6ae3ebe54462a891f0c566c97371915b
+
 # python 3.11, typing and 100% test coverage
 if [ ! -d "$dir/warehouse/.git" ]; then
   git clone --filter=tree:0 https://github.com/pypi/warehouse "$dir/warehouse"
 fi
 git -C "$dir/warehouse" checkout fe6455c0a946e81f61d72edc1049f536d8bba903
+
 # zulip, a django user
 if [ ! -d "$dir/zulip/.git" ]; then
   git clone --filter=tree:0 https://github.com/zulip/zulip "$dir/zulip"
 fi
 git -C "$dir/zulip" checkout 6cb080c4479546a7f5cb017fcddea56605910b48
+
 # cpython itself
 if [ ! -d "$dir/cpython/.git" ]; then
   git clone --filter=tree:0 https://github.com/python/cpython "$dir/cpython"

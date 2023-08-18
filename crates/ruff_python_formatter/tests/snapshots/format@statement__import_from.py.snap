@@ -89,7 +89,7 @@ from a import (  # comment
 )
 
 from a import (  # comment
-    bar
+    bar,
 )
 
 from a import (

@@ -1,7 +1,7 @@
 use ruff_formatter::prelude::tag::Condition;
 use ruff_formatter::{format_args, write, Argument, Arguments};
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::Ranged;
+use ruff_python_ast::{ExpressionRef, Ranged};
 use ruff_python_trivia::{first_non_trivia_token, SimpleToken, SimpleTokenKind, SimpleTokenizer};
 
 use crate::comments::{
@@ -80,7 +80,7 @@ pub enum Parentheses {
     Never,
 }
 
-pub(crate) fn is_expression_parenthesized(expr: AnyNodeRef, contents: &str) -> bool {
+pub(crate) fn is_expression_parenthesized(expr: ExpressionRef, contents: &str) -> bool {
     // First test if there's a closing parentheses because it tends to be cheaper.
     if matches!(
         first_non_trivia_token(expr.end(), contents),
@@ -153,8 +153,8 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatParenthesized<'_, 'ast> {
         let inner = format_with(|f| {
             group(&format_args![
                 text(self.left),
-                &dangling_open_parenthesis_comments(self.comments),
-                &soft_block_indent(&Arguments::from(&self.content)),
+                dangling_open_parenthesis_comments(self.comments),
+                soft_block_indent(&Arguments::from(&self.content)),
                 text(self.right)
             ])
             .fmt(f)
@@ -268,7 +268,8 @@ impl<'ast> Format<PyFormatContext<'ast>> for InParenthesesOnlyLineBreak {
                 f.write_element(FormatElement::Line(match self {
                     InParenthesesOnlyLineBreak::SoftLineBreak => LineMode::Soft,
                     InParenthesesOnlyLineBreak::SoftLineBreakOrSpace => LineMode::SoftOrSpace,
-                }))
+                }));
+                Ok(())
             }
         }
     }
@@ -377,7 +378,7 @@ impl Format<PyFormatContext<'_>> for FormatEmptyParenthesized<'_> {
 
 #[cfg(test)]
 mod tests {
-    use ruff_python_ast::node::AnyNodeRef;
+    use ruff_python_ast::ExpressionRef;
     use ruff_python_parser::parse_expression;
 
     use crate::expression::parentheses::is_expression_parenthesized;
@@ -387,7 +388,7 @@ mod tests {
         let expression = r#"(b().c("")).d()"#;
         let expr = parse_expression(expression, "<filename>").unwrap();
         assert!(!is_expression_parenthesized(
-            AnyNodeRef::from(&expr),
+            ExpressionRef::from(&expr),
             expression
         ));
     }

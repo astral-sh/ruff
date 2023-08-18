@@ -1,12 +1,15 @@
 //! Settings for the `flake8-pytest-style` plugin.
+use std::error::Error;
+use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
+use crate::settings::types::IdentifierPattern;
 use ruff_macros::{CacheKey, CombineOptions, ConfigurationOptions};
 
 use super::types;
 
-fn default_broad_exceptions() -> Vec<String> {
+fn default_broad_exceptions() -> Vec<IdentifierPattern> {
     [
         "BaseException",
         "Exception",
@@ -16,7 +19,7 @@ fn default_broad_exceptions() -> Vec<String> {
         "EnvironmentError",
         "socket.error",
     ]
-    .map(ToString::to_string)
+    .map(|pattern| IdentifierPattern::new(pattern).expect("invalid default exception pattern"))
     .to_vec()
 }
 
@@ -86,6 +89,9 @@ pub struct Options {
     )]
     /// List of exception names that require a match= parameter in a
     /// `pytest.raises()` call.
+    ///
+    /// Supports glob patterns. For more information on the glob syntax, refer
+    /// to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     pub raises_require_match_for: Option<Vec<String>>,
     #[option(
         default = "[]",
@@ -100,6 +106,9 @@ pub struct Options {
     /// the entire list.
     /// Note that this option does not remove any exceptions from the default
     /// list.
+    ///
+    /// Supports glob patterns. For more information on the glob syntax, refer
+    /// to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     pub raises_extend_require_match_for: Option<Vec<String>>,
     #[option(
         default = "true",
@@ -120,26 +129,44 @@ pub struct Settings {
     pub parametrize_names_type: types::ParametrizeNameType,
     pub parametrize_values_type: types::ParametrizeValuesType,
     pub parametrize_values_row_type: types::ParametrizeValuesRowType,
-    pub raises_require_match_for: Vec<String>,
-    pub raises_extend_require_match_for: Vec<String>,
+    pub raises_require_match_for: Vec<IdentifierPattern>,
+    pub raises_extend_require_match_for: Vec<IdentifierPattern>,
     pub mark_parentheses: bool,
 }
 
-impl From<Options> for Settings {
-    fn from(options: Options) -> Self {
-        Self {
+impl TryFrom<Options> for Settings {
+    type Error = SettingsError;
+
+    fn try_from(options: Options) -> Result<Self, Self::Error> {
+        Ok(Self {
             fixture_parentheses: options.fixture_parentheses.unwrap_or(true),
             parametrize_names_type: options.parametrize_names_type.unwrap_or_default(),
             parametrize_values_type: options.parametrize_values_type.unwrap_or_default(),
             parametrize_values_row_type: options.parametrize_values_row_type.unwrap_or_default(),
             raises_require_match_for: options
                 .raises_require_match_for
+                .map(|patterns| {
+                    patterns
+                        .into_iter()
+                        .map(|pattern| IdentifierPattern::new(&pattern))
+                        .collect()
+                })
+                .transpose()
+                .map_err(SettingsError::InvalidRaisesRequireMatchFor)?
                 .unwrap_or_else(default_broad_exceptions),
             raises_extend_require_match_for: options
                 .raises_extend_require_match_for
+                .map(|patterns| {
+                    patterns
+                        .into_iter()
+                        .map(|pattern| IdentifierPattern::new(&pattern))
+                        .collect()
+                })
+                .transpose()
+                .map_err(SettingsError::InvalidRaisesExtendRequireMatchFor)?
                 .unwrap_or_default(),
             mark_parentheses: options.mark_parentheses.unwrap_or(true),
-        }
+        })
     }
 }
 impl From<Settings> for Options {
@@ -149,8 +176,20 @@ impl From<Settings> for Options {
             parametrize_names_type: Some(settings.parametrize_names_type),
             parametrize_values_type: Some(settings.parametrize_values_type),
             parametrize_values_row_type: Some(settings.parametrize_values_row_type),
-            raises_require_match_for: Some(settings.raises_require_match_for),
-            raises_extend_require_match_for: Some(settings.raises_extend_require_match_for),
+            raises_require_match_for: Some(
+                settings
+                    .raises_require_match_for
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect(),
+            ),
+            raises_extend_require_match_for: Some(
+                settings
+                    .raises_extend_require_match_for
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect(),
+            ),
             mark_parentheses: Some(settings.mark_parentheses),
         }
     }
@@ -166,6 +205,35 @@ impl Default for Settings {
             raises_require_match_for: default_broad_exceptions(),
             raises_extend_require_match_for: vec![],
             mark_parentheses: true,
+        }
+    }
+}
+
+/// Error returned by the [`TryFrom`] implementation of [`Settings`].
+#[derive(Debug)]
+pub enum SettingsError {
+    InvalidRaisesRequireMatchFor(glob::PatternError),
+    InvalidRaisesExtendRequireMatchFor(glob::PatternError),
+}
+
+impl fmt::Display for SettingsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SettingsError::InvalidRaisesRequireMatchFor(err) => {
+                write!(f, "invalid raises-require-match-for pattern: {err}")
+            }
+            SettingsError::InvalidRaisesExtendRequireMatchFor(err) => {
+                write!(f, "invalid raises-extend-require-match-for pattern: {err}")
+            }
+        }
+    }
+}
+
+impl Error for SettingsError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            SettingsError::InvalidRaisesRequireMatchFor(err) => Some(err),
+            SettingsError::InvalidRaisesExtendRequireMatchFor(err) => Some(err),
         }
     }
 }

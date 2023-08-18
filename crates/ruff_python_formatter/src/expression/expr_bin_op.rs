@@ -1,15 +1,15 @@
 use std::iter;
 
+use smallvec::SmallVec;
+
+use ruff_formatter::{format_args, write, FormatOwnedWithRule, FormatRefWithRule};
+use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{
     Constant, Expr, ExprAttribute, ExprBinOp, ExprConstant, ExprUnaryOp, Operator, StringConstant,
     UnaryOp,
 };
-use smallvec::SmallVec;
 
-use ruff_formatter::{format_args, write, FormatOwnedWithRule, FormatRefWithRule};
-use ruff_python_ast::node::{AnyNodeRef, AstNode};
-
-use crate::comments::{trailing_comments, trailing_node_comments};
+use crate::comments::{trailing_comments, trailing_node_comments, SourceComment};
 use crate::expression::expr_constant::ExprConstantLayout;
 use crate::expression::parentheses::{
     in_parentheses_only_group, in_parentheses_only_soft_line_break,
@@ -29,10 +29,7 @@ impl FormatNodeRule<ExprBinOp> for FormatExprBinOp {
 
         match Self::layout(item, f.context()) {
             BinOpLayout::LeftString(expression) => {
-                let right_has_leading_comment = f
-                    .context()
-                    .comments()
-                    .has_leading_comments(item.right.as_ref());
+                let right_has_leading_comment = comments.has_leading(item.right.as_ref());
 
                 let format_right_and_op = format_with(|f| {
                     if right_has_leading_comment {
@@ -73,10 +70,7 @@ impl FormatNodeRule<ExprBinOp> for FormatExprBinOp {
                     let binary_chain: SmallVec<[&ExprBinOp; 4]> =
                         iter::successors(Some(item), |parent| {
                             parent.left.as_bin_op_expr().and_then(|bin_expression| {
-                                if is_expression_parenthesized(
-                                    bin_expression.as_any_node_ref(),
-                                    source,
-                                ) {
+                                if is_expression_parenthesized(bin_expression.into(), source) {
                                     None
                                 } else {
                                     Some(bin_expression)
@@ -101,7 +95,7 @@ impl FormatNodeRule<ExprBinOp> for FormatExprBinOp {
                             right,
                         } = current;
 
-                        let operator_comments = comments.dangling_comments(current);
+                        let operator_comments = comments.dangling(current);
                         let needs_space = !is_simple_power_expression(current);
 
                         let before_operator_space = if needs_space {
@@ -120,9 +114,7 @@ impl FormatNodeRule<ExprBinOp> for FormatExprBinOp {
                         )?;
 
                         // Format the operator on its own line if the right side has any leading comments.
-                        if comments.has_leading_comments(right.as_ref())
-                            || !operator_comments.is_empty()
-                        {
+                        if comments.has_leading(right.as_ref()) || !operator_comments.is_empty() {
                             hard_line_break().fmt(f)?;
                         } else if needs_space {
                             space().fmt(f)?;
@@ -147,7 +139,11 @@ impl FormatNodeRule<ExprBinOp> for FormatExprBinOp {
         }
     }
 
-    fn fmt_dangling_comments(&self, _node: &ExprBinOp, _f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         // Handled inside of `fmt_fields`
         Ok(())
     }
@@ -170,8 +166,8 @@ impl FormatExprBinOp {
 
             if bin_op.op == Operator::Mod
                 && context.node_level().is_parenthesized()
-                && !comments.has_dangling_comments(constant)
-                && !comments.has_dangling_comments(bin_op)
+                && !comments.has_dangling(constant)
+                && !comments.has_dangling(bin_op)
             {
                 BinOpLayout::LeftString(constant)
             } else {

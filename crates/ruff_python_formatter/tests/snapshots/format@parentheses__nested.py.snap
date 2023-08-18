@@ -89,8 +89,11 @@ a = (
     a
     + b
     + c
-    + d  # Hello
-    + (e + f + g)
+    + d
+    +
+    (  # Hello
+        e + f + g
+    )
 )
 
 a = int(  # type: ignore

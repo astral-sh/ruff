@@ -24,6 +24,12 @@ pub struct IfElifBranch<'a> {
     pub range: TextRange,
 }
 
+impl Ranged for IfElifBranch<'_> {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
 pub fn if_elif_branches(stmt_if: &StmtIf) -> impl Iterator<Item = IfElifBranch> {
     iter::once(IfElifBranch {
         kind: BranchKind::If,
@@ -40,6 +46,3 @@ pub fn if_elif_branches(stmt_if: &StmtIf) -> impl Iterator<Item = IfElifBranch> 
         })
     }))
 }
-
-#[cfg(test)]
-mod test {}

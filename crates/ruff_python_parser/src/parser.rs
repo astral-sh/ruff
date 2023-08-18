@@ -604,6 +604,13 @@ def func[T, U: str, *Ts, **P]():
     }
 
     #[test]
+    fn test_named_expression() {
+        let source = "(x := ( y * z ))";
+        let parse_ast = parse_expression(source, "<test>").unwrap();
+        insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
     fn test_with_statement() {
         let source = "\
 with 0: pass

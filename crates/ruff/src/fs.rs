@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use globset::GlobMatcher;
 use log::debug;
-use path_absolutize::{path_dedot, Absolutize};
+use path_absolutize::Absolutize;
 
 use crate::registry::RuleSet;
 
@@ -61,7 +61,13 @@ pub fn normalize_path_to<P: AsRef<Path>, R: AsRef<Path>>(path: P, project_root: 
 /// Convert an absolute path to be relative to the current working directory.
 pub fn relativize_path<P: AsRef<Path>>(path: P) -> String {
     let path = path.as_ref();
-    if let Ok(path) = path.strip_prefix(&*path_dedot::CWD) {
+
+    #[cfg(target_arch = "wasm32")]
+    let cwd = Path::new(".");
+    #[cfg(not(target_arch = "wasm32"))]
+    let cwd = path_absolutize::path_dedot::CWD.as_path();
+
+    if let Ok(path) = path.strip_prefix(cwd) {
         return format!("{}", path.display());
     }
     format!("{}", path.display())

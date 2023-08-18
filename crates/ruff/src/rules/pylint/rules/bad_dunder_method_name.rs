@@ -7,10 +7,13 @@ use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for any misspelled dunder name method and for any method
-/// defined with `__...__` that's not one of the pre-defined methods.
+/// defined with `_..._` that's not one of the pre-defined methods
 ///
 /// The pre-defined methods encompass all of Python's standard dunder
 /// methods.
+///
+/// Note this includes all methods starting and ending with at least
+/// one underscore to detect mistakes.
 ///
 /// ## Why is this bad?
 /// Misspelled dunder name methods may cause your code to not function

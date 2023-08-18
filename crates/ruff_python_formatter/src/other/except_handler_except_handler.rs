@@ -1,11 +1,13 @@
-use crate::comments::trailing_comments;
-use crate::expression::maybe_parenthesize_expression;
-use crate::expression::parentheses::Parenthesize;
-use crate::prelude::*;
-use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::FormatRuleWithOptions;
 use ruff_formatter::{write, Buffer, FormatResult};
 use ruff_python_ast::ExceptHandlerExceptHandler;
+
+use crate::comments::SourceComment;
+use crate::expression::maybe_parenthesize_expression;
+use crate::expression::parentheses::Parenthesize;
+use crate::prelude::*;
+use crate::statement::clause::{clause_header, ClauseHeader};
+use crate::{FormatNodeRule, PyFormatter};
 
 #[derive(Copy, Clone, Default)]
 pub enum ExceptHandlerKind {
@@ -44,44 +46,54 @@ impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHan
         } = item;
 
         let comments_info = f.context().comments().clone();
-        let dangling_comments = comments_info.dangling_comments(item);
+        let dangling_comments = comments_info.dangling(item);
 
         write!(
             f,
             [
-                text("except"),
-                match self.except_handler_kind {
-                    ExceptHandlerKind::Regular => None,
-                    ExceptHandlerKind::Starred => Some(text("*")),
-                }
-            ]
-        )?;
+                clause_header(
+                    ClauseHeader::ExceptHandler(item),
+                    dangling_comments,
+                    &format_with(|f| {
+                        write!(
+                            f,
+                            [
+                                text("except"),
+                                match self.except_handler_kind {
+                                    ExceptHandlerKind::Regular => None,
+                                    ExceptHandlerKind::Starred => Some(text("*")),
+                                }
+                            ]
+                        )?;
 
-        if let Some(type_) = type_ {
-            write!(
-                f,
-                [
-                    space(),
-                    maybe_parenthesize_expression(type_, item, Parenthesize::IfBreaks)
-                ]
-            )?;
-            if let Some(name) = name {
-                write!(f, [space(), text("as"), space(), name.format()])?;
-            }
-        }
-        write!(
-            f,
-            [
-                text(":"),
-                trailing_comments(dangling_comments),
-                block_indent(&body.format()),
+                        if let Some(type_) = type_ {
+                            write!(
+                                f,
+                                [
+                                    space(),
+                                    maybe_parenthesize_expression(
+                                        type_,
+                                        item,
+                                        Parenthesize::IfBreaks
+                                    )
+                                ]
+                            )?;
+                            if let Some(name) = name {
+                                write!(f, [space(), text("as"), space(), name.format()])?;
+                            }
+                        }
+
+                        Ok(())
+                    }),
+                ),
+                block_indent(&body.format())
             ]
         )
     }
 
     fn fmt_dangling_comments(
         &self,
-        _node: &ExceptHandlerExceptHandler,
+        _dangling_comments: &[SourceComment],
         _f: &mut PyFormatter,
     ) -> FormatResult<()> {
         // dangling comments are formatted as part of fmt_fields

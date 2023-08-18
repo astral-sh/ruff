@@ -63,6 +63,14 @@ def foo():
 
     yield from (yield l)
 
+    (
+        yield
+        #comment 1
+        * # comment 2
+        # comment 3
+        test, # comment 4
+        1
+    )
 ```
 
 ## Output
@@ -115,6 +123,18 @@ def foo():
         pass
 
     yield from (yield l)
+
+    (
+        yield (
+            # comment 1
+            (
+                # comment 2
+                # comment 3
+                *test,  # comment 4
+                1,
+            )
+        )
+    )
 ```
 
 

@@ -5,6 +5,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::Ranged;
 use ruff_python_semantic::{AnyImport, Imported, ResolvedReferenceId, Scope, StatementId};
 use ruff_text_size::TextRange;
 
@@ -101,11 +102,11 @@ pub(crate) fn runtime_import_in_type_checking_block(
             let import = ImportBinding {
                 import,
                 reference_id,
-                range: binding.range,
+                range: binding.range(),
                 parent_range: binding.parent_range(checker.semantic()),
             };
 
-            if checker.rule_is_ignored(Rule::RuntimeImportInTypeCheckingBlock, import.range.start())
+            if checker.rule_is_ignored(Rule::RuntimeImportInTypeCheckingBlock, import.start())
                 || import.parent_range.is_some_and(|parent_range| {
                     checker.rule_is_ignored(
                         Rule::RuntimeImportInTypeCheckingBlock,
@@ -192,6 +193,12 @@ struct ImportBinding<'a> {
     parent_range: Option<TextRange>,
 }
 
+impl Ranged for ImportBinding<'_> {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
 /// Generate a [`Fix`] to remove runtime imports from a type-checking block.
 fn fix_imports(
     checker: &Checker,
@@ -211,7 +218,7 @@ fn fix_imports(
     let at = imports
         .iter()
         .map(|ImportBinding { reference_id, .. }| {
-            checker.semantic().reference(*reference_id).range().start()
+            checker.semantic().reference(*reference_id).start()
         })
         .min()
         .expect("Expected at least one import");

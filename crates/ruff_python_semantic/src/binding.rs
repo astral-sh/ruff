@@ -283,6 +283,12 @@ bitflags! {
     }
 }
 
+impl Ranged for Binding<'_> {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
 /// ID uniquely identifying a [Binding] in a program.
 ///
 /// Using a `u32` to identify [Binding]s should is sufficient because Ruff only supports documents with a

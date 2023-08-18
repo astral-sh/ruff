@@ -320,7 +320,7 @@ pub(crate) fn unused_variable(checker: &Checker, scope: &Scope, diagnostics: &mu
                         | "__debuggerskip__"
                 )
             {
-                return Some((name.to_string(), binding.range, binding.source));
+                return Some((name.to_string(), binding.range(), binding.source));
             }
 
             None

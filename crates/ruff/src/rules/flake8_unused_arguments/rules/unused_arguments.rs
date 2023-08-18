@@ -2,7 +2,7 @@ use std::iter;
 
 use regex::Regex;
 use ruff_python_ast as ast;
-use ruff_python_ast::{Parameter, Parameters};
+use ruff_python_ast::{Parameter, Parameters, Ranged};
 
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -303,7 +303,7 @@ fn call<'a>(
         {
             Some(Diagnostic::new(
                 argumentable.check_for(arg.name.to_string()),
-                binding.range,
+                binding.range(),
             ))
         } else {
             None

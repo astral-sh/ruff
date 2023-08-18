@@ -1,4 +1,4 @@
-use crate::comments::{leading_comments, trailing_comments, Comments, SourceComment};
+use crate::comments::{leading_comments, trailing_comments, Comments};
 use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
 use ruff_python_ast::helpers::is_compound_statement;
 use ruff_python_ast::node::AnyNodeRef;
@@ -10,8 +10,9 @@ use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::expr_constant::ExprConstantLayout;
 use crate::expression::string::StringLayout;
 use crate::prelude::*;
+use crate::statement::stmt_expr::FormatStmtExpr;
 use crate::verbatim::{
-    write_suppressed_statements_starting_with_leading_comment,
+    suppressed_node, write_suppressed_statements_starting_with_leading_comment,
     write_suppressed_statements_starting_with_trailing_comment,
 };
 
@@ -70,9 +71,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 // Format the first statement in the body, which often has special formatting rules.
                 let first = match self.kind {
                     SuiteKind::Other => {
-                        if is_class_or_function_definition(first)
-                            && !comments.has_leading_comments(first)
-                        {
+                        if is_class_or_function_definition(first) && !comments.has_leading(first) {
                             // Add an empty line for any nested functions or classes defined within
                             // non-function or class compound statements, e.g., this is stable formatting:
                             // ```python
@@ -97,7 +96,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
 
                     SuiteKind::Class => {
                         if let Some(docstring) = DocstringStmt::try_from_statement(first) {
-                            if !comments.has_leading_comments(first)
+                            if !comments.has_leading(first)
                                 && lines_before(first.start(), source) > 1
                             {
                                 // Allow up to one empty line before a class docstring, e.g., this is
@@ -118,8 +117,10 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                     SuiteKind::TopLevel => SuiteChildStatement::Other(first),
                 };
 
-                let (mut preceding, mut after_class_docstring) = if comments
-                    .leading_comments(first)
+                let first_comments = comments.leading_dangling_trailing(first);
+
+                let (mut preceding, mut after_class_docstring) = if first_comments
+                    .leading
                     .iter()
                     .any(|comment| comment.is_suppression_off_comment(source))
                 {
@@ -129,8 +130,8 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                         )?,
                         false,
                     )
-                } else if comments
-                    .trailing_comments(first)
+                } else if first_comments
+                    .trailing
                     .iter()
                     .any(|comment| comment.is_suppression_off_comment(source))
                 {
@@ -156,8 +157,8 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                         match self.kind {
                             SuiteKind::TopLevel if source_type.is_stub() => {
                                 // Preserve the empty line if the definitions are separated by a comment
-                                if comments.has_trailing_comments(preceding)
-                                    || comments.has_leading_comments(following)
+                                if comments.has_trailing(preceding)
+                                    || comments.has_leading(following)
                                 {
                                     empty_line().fmt(f)?;
                                 } else {
@@ -227,8 +228,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                         // which is 0 instead of 1, the number of lines between the trailing comment and
                         // the leading comment. This is why the suite handling counts the lines before the
                         // start of the next statement or before the first leading comments for compound statements.
-                        let start = if let Some(first_leading) =
-                            comments.leading_comments(following).first()
+                        let start = if let Some(first_leading) = comments.leading(following).first()
                         {
                             first_leading.slice().start()
                         } else {
@@ -301,8 +301,10 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                         }
                     }
 
-                    if comments
-                        .leading_comments(following)
+                    let following_comments = comments.leading_dangling_trailing(following);
+
+                    if following_comments
+                        .leading
                         .iter()
                         .any(|comment| comment.is_suppression_off_comment(source))
                     {
@@ -311,8 +313,8 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                             &mut iter,
                             f,
                         )?;
-                    } else if comments
-                        .trailing_comments(following)
+                    } else if following_comments
+                        .trailing
                         .iter()
                         .any(|comment| comment.is_suppression_off_comment(source))
                     {
@@ -336,14 +338,14 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
 /// Returns `true` if a function or class body contains only an ellipsis with no comments.
 pub(crate) fn contains_only_an_ellipsis(body: &[Stmt], comments: &Comments) -> bool {
     match body {
-        [Stmt::Expr(ast::StmtExpr { value, .. })] if !comments.has_comments(value.as_ref()) => {
+        [Stmt::Expr(ast::StmtExpr { value, .. })] => {
             matches!(
                 value.as_ref(),
                 Expr::Constant(ast::ExprConstant {
                     value: Constant::Ellipsis,
                     ..
                 })
-            )
+            ) && !comments.has_comments(value.as_ref())
         }
         _ => false,
     }
@@ -407,27 +409,33 @@ impl<'a> DocstringStmt<'a> {
 
 impl Format<PyFormatContext<'_>> for DocstringStmt<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
-        // SAFETY: Safe because `DocStringStmt` guarantees that it only ever wraps a `ExprStmt` containing a `ConstantExpr`.
-        let constant = self
-            .0
-            .as_expr_stmt()
-            .unwrap()
-            .value
-            .as_constant_expr()
-            .unwrap();
         let comments = f.context().comments().clone();
+        let node_comments = comments.leading_dangling_trailing(self.0);
 
-        // We format the expression, but the statement carries the comments
-        write!(
-            f,
-            [
-                leading_comments(comments.leading_comments(self.0)),
-                constant
-                    .format()
-                    .with_options(ExprConstantLayout::String(StringLayout::DocString)),
-                trailing_comments(comments.trailing_comments(self.0)),
-            ]
-        )
+        if FormatStmtExpr.is_suppressed(node_comments.trailing, f.context()) {
+            suppressed_node(self.0).fmt(f)
+        } else {
+            // SAFETY: Safe because `DocStringStmt` guarantees that it only ever wraps a `ExprStmt` containing a `ConstantExpr`.
+            let constant = self
+                .0
+                .as_expr_stmt()
+                .unwrap()
+                .value
+                .as_constant_expr()
+                .unwrap();
+
+            // We format the expression, but the statement carries the comments
+            write!(
+                f,
+                [
+                    leading_comments(node_comments.leading),
+                    constant
+                        .format()
+                        .with_options(ExprConstantLayout::String(StringLayout::DocString)),
+                    trailing_comments(node_comments.trailing),
+                ]
+            )
+        }
     }
 }
 
@@ -467,51 +475,6 @@ impl Format<PyFormatContext<'_>> for SuiteChildStatement<'_> {
         match self {
             SuiteChildStatement::Docstring(docstring) => docstring.fmt(f),
             SuiteChildStatement::Other(statement) => statement.format().fmt(f),
-        }
-    }
-}
-
-pub(crate) struct FormatClauseBody<'a> {
-    body: &'a Suite,
-    kind: SuiteKind,
-    trailing_comments: &'a [SourceComment],
-}
-
-impl<'a> FormatClauseBody<'a> {}
-
-pub(crate) fn clause_body<'a>(
-    body: &'a Suite,
-    trailing_comments: &'a [SourceComment],
-) -> FormatClauseBody<'a> {
-    FormatClauseBody {
-        body,
-        kind: SuiteKind::default(),
-        trailing_comments,
-    }
-}
-
-impl Format<PyFormatContext<'_>> for FormatClauseBody<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
-        if f.options().source_type().is_stub()
-            && contains_only_an_ellipsis(self.body, f.context().comments())
-            && self.trailing_comments.is_empty()
-        {
-            write!(
-                f,
-                [
-                    space(),
-                    self.body.format().with_options(self.kind),
-                    hard_line_break()
-                ]
-            )
-        } else {
-            write!(
-                f,
-                [
-                    trailing_comments(self.trailing_comments),
-                    block_indent(&self.body.format().with_options(self.kind))
-                ]
-            )
         }
     }
 }

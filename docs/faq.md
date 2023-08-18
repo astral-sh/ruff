@@ -321,7 +321,7 @@ For a detailed explanation, see the [contributing guide](contributing.md).
 
 ## Does Ruff support Jupyter Notebooks?
 
-Ruff has built-in experimental support for linting [Jupyter Notebooks](https://jupyter.org/).
+Ruff has built-in support for linting [Jupyter Notebooks](https://jupyter.org/).
 
 To opt in to linting Jupyter Notebook (`.ipynb`) files, add the `*.ipynb` pattern to your
 [`include`](settings.md#include) setting, like so:

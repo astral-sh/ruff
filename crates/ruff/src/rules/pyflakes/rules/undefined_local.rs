@@ -2,6 +2,7 @@ use std::string::ToString;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::Ranged;
 use ruff_python_semantic::{Scope, ScopeId};
 
 use crate::checkers::ast::Checker;

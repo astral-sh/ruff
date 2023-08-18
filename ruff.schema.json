@@ -955,7 +955,7 @@
           ]
         },
         "raises-extend-require-match-for": {
-          "description": "List of additional exception names that require a match= parameter in a `pytest.raises()` call. This extends the default list of exceptions that require a match= parameter. This option is useful if you want to extend the default list of exceptions that require a match= parameter without having to specify the entire list. Note that this option does not remove any exceptions from the default list.",
+          "description": "List of additional exception names that require a match= parameter in a `pytest.raises()` call. This extends the default list of exceptions that require a match= parameter. This option is useful if you want to extend the default list of exceptions that require a match= parameter without having to specify the entire list. Note that this option does not remove any exceptions from the default list.\n\nSupports glob patterns. For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
           "type": [
             "array",
             "null"
@@ -965,7 +965,7 @@
           }
         },
         "raises-require-match-for": {
-          "description": "List of exception names that require a match= parameter in a `pytest.raises()` call.",
+          "description": "List of exception names that require a match= parameter in a `pytest.raises()` call.\n\nSupports glob patterns. For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
           "type": [
             "array",
             "null"
@@ -2322,6 +2322,7 @@
         "PT011",
         "PT012",
         "PT013",
+        "PT014",
         "PT015",
         "PT016",
         "PT017",
@@ -2470,6 +2471,7 @@
         "RUF013",
         "RUF015",
         "RUF016",
+        "RUF017",
         "RUF1",
         "RUF10",
         "RUF100",

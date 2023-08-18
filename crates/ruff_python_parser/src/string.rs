@@ -318,9 +318,8 @@ impl<'a> StringParser<'a> {
                                     )
                                 })?;
                         let leading =
-                            &expression[..usize::from(value.range().start() - start_location) - 1];
-                        let trailing =
-                            &expression[usize::from(value.range().end() - start_location) - 1..];
+                            &expression[..usize::from(value.start() - start_location) - 1];
+                        let trailing = &expression[usize::from(value.end() - start_location) - 1..];
                         vec![Expr::from(ast::ExprFormattedValue {
                             value: Box::new(value),
                             debug_text: Some(ast::DebugText {

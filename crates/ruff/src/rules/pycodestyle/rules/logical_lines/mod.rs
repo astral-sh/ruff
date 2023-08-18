@@ -13,6 +13,7 @@ use std::fmt::{Debug, Formatter};
 use std::iter::FusedIterator;
 
 use bitflags::bitflags;
+use ruff_python_ast::Ranged;
 use ruff_python_parser::lexer::LexResult;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
@@ -310,22 +311,11 @@ impl LogicalLineToken {
     pub(crate) const fn kind(&self) -> TokenKind {
         self.kind
     }
+}
 
-    /// Returns the token's start location
-    #[inline]
-    pub(crate) const fn start(&self) -> TextSize {
-        self.range.start()
-    }
-
-    /// Returns the token's end location
-    #[inline]
-    pub(crate) const fn end(&self) -> TextSize {
-        self.range.end()
-    }
-
+impl Ranged for LogicalLineToken {
     /// Returns a tuple with the token's `(start, end)` locations
-    #[inline]
-    pub(crate) const fn range(&self) -> TextRange {
+    fn range(&self) -> TextRange {
         self.range
     }
 }

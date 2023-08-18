@@ -1,11 +1,13 @@
-use crate::comments::{leading_alternate_branch_comments, trailing_comments};
+use ruff_formatter::{format_args, write};
+use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::{ElifElseClause, StmtIf};
+
+use crate::comments::SourceComment;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
+use crate::statement::clause::{clause_header, ClauseHeader};
 use crate::FormatNodeRule;
-use ruff_formatter::write;
-use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{ElifElseClause, StmtIf};
 
 #[derive(Default)]
 pub struct FormatStmtIf;
@@ -20,16 +22,20 @@ impl FormatNodeRule<StmtIf> for FormatStmtIf {
         } = item;
 
         let comments = f.context().comments().clone();
-        let trailing_colon_comment = comments.dangling_comments(item);
+        let trailing_colon_comment = comments.dangling(item);
 
         write!(
             f,
             [
-                text("if"),
-                space(),
-                maybe_parenthesize_expression(test, item, Parenthesize::IfBreaks),
-                text(":"),
-                trailing_comments(trailing_colon_comment),
+                clause_header(
+                    ClauseHeader::If(item),
+                    trailing_colon_comment,
+                    &format_args![
+                        text("if"),
+                        space(),
+                        maybe_parenthesize_expression(test, item, Parenthesize::IfBreaks),
+                    ],
+                ),
                 block_indent(&body.format())
             ]
         )?;
@@ -43,7 +49,11 @@ impl FormatNodeRule<StmtIf> for FormatStmtIf {
         Ok(())
     }
 
-    fn fmt_dangling_comments(&self, _node: &StmtIf, _f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         // Handled by `fmt_fields`
         Ok(())
     }
@@ -63,29 +73,31 @@ pub(crate) fn format_elif_else_clause(
     } = item;
 
     let comments = f.context().comments().clone();
-    let trailing_colon_comment = comments.dangling_comments(item);
-    let leading_comments = comments.leading_comments(item);
-
-    leading_alternate_branch_comments(leading_comments, last_node).fmt(f)?;
-
-    if let Some(test) = test {
-        write!(
-            f,
-            [
-                text("elif"),
-                space(),
-                maybe_parenthesize_expression(test, item, Parenthesize::IfBreaks),
-            ]
-        )?;
-    } else {
-        text("else").fmt(f)?;
-    }
+    let trailing_colon_comment = comments.dangling(item);
+    let leading_comments = comments.leading(item);
 
     write!(
         f,
         [
-            text(":"),
-            trailing_comments(trailing_colon_comment),
+            clause_header(
+                ClauseHeader::ElifElse(item),
+                trailing_colon_comment,
+                &format_with(|f| {
+                    if let Some(test) = test {
+                        write!(
+                            f,
+                            [
+                                text("elif"),
+                                space(),
+                                maybe_parenthesize_expression(test, item, Parenthesize::IfBreaks),
+                            ]
+                        )
+                    } else {
+                        text("else").fmt(f)
+                    }
+                }),
+            )
+            .with_leading_comments(leading_comments, last_node),
             block_indent(&body.format())
         ]
     )

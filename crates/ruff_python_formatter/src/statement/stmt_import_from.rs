@@ -1,11 +1,12 @@
-use ruff_formatter::prelude::{dynamic_text, format_with, space, text};
-use ruff_formatter::{write, Buffer, Format, FormatResult};
+use ruff_formatter::write;
 use ruff_python_ast::node::AstNode;
 use ruff_python_ast::{Ranged, StmtImportFrom};
 
-use crate::builders::{parenthesize_if_expands, PyFormatterExtensions};
+use crate::builders::{parenthesize_if_expands, PyFormatterExtensions, TrailingComma};
+use crate::comments::{SourceComment, SuppressionKind};
 use crate::expression::parentheses::parenthesized;
-use crate::{AsFormat, FormatNodeRule, PyFormatter};
+use crate::prelude::*;
+use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatStmtImportFrom;
@@ -45,6 +46,7 @@ impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
 
         let names = format_with(|f| {
             f.join_comma_separated(item.end())
+                .with_trailing_comma(TrailingComma::OneOrMore)
                 .entries(names.iter().map(|name| (name, name.format())))
                 .finish()
         });
@@ -57,7 +59,7 @@ impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
         // )
         // ```
         let comments = f.context().comments().clone();
-        let parenthesized_comments = comments.dangling_comments(item.as_any_node_ref());
+        let parenthesized_comments = comments.dangling(item.as_any_node_ref());
 
         if parenthesized_comments.is_empty() {
             parenthesize_if_expands(&names).fmt(f)
@@ -70,10 +72,18 @@ impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
 
     fn fmt_dangling_comments(
         &self,
-        _node: &StmtImportFrom,
+        _dangling_comments: &[SourceComment],
         _f: &mut PyFormatter,
     ) -> FormatResult<()> {
         // Handled in `fmt_fields`
         Ok(())
+    }
+
+    fn is_suppressed(
+        &self,
+        trailing_comments: &[SourceComment],
+        context: &PyFormatContext,
+    ) -> bool {
+        SuppressionKind::has_skip_comment(trailing_comments, context.source())
     }
 }

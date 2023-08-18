@@ -83,11 +83,5 @@ class EllipsisWithComment:
 def function_with_comment():
     ...  # comment
 
-
-class EllipsisWithLeadingComment:
-    # leading
-    ...
-
-
 class EllispsisWithMultipleTrailing: # trailing class comment
     ... # trailing ellipsis comment

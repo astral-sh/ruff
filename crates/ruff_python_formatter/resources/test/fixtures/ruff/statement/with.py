@@ -67,6 +67,24 @@ with (
     a as b
 ): ...
 
+with (
+    a as b
+    # trailing comment
+): ...
+
+with (
+    a as (
+        # leading comment
+        b
+    )
+): ...
+
+with (
+    a as (
+        b
+        # trailing comment
+    )
+): ...
 
 with (a # trailing same line comment
     # trailing own line comment
@@ -77,7 +95,6 @@ with (
     # trailing own line comment
     as b
 ): ...
-
 
 with (a # trailing same line comment
     # trailing own line comment
@@ -108,7 +125,6 @@ with (
 ):
     ...
 
-
 with [
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "bbbbbbbbbb",
@@ -125,7 +141,6 @@ with (  # comment
 ):
     ...
 
-
 with (  # outer comment
     (  # inner comment
         CtxManager1()
@@ -134,3 +149,108 @@ with (  # outer comment
     CtxManager3() as example3,
 ):
     ...
+
+with (  # outer comment
+    CtxManager()
+) as example:
+    ...
+
+with (  # outer comment
+    CtxManager()
+) as example, (  # inner comment
+    CtxManager2()
+) as example2:
+    ...
+
+with (  # outer comment
+    CtxManager1(),
+    CtxManager2(),
+) as example:
+    ...
+
+with (  # outer comment
+    (  # inner comment
+        CtxManager1()
+    ),
+    CtxManager2(),
+) as example:
+    ...
+
+# Breaking of with items.
+with (test  # bar
+      as  # foo
+      (
+          # test
+          foo)):
+    pass
+
+with test as (
+    # test
+    foo):
+    pass
+
+with (test  # bar
+      as  # foo
+      (  # baz
+          # test
+          foo)):
+    pass
+
+with (a as b, c as d):
+    pass
+
+with (
+    a as b,
+    # foo
+    c as d
+):
+    pass
+
+with (
+    a as (  # foo
+        b
+    )
+):
+    pass
+
+with (
+    f(a, ) as b
+
+):
+    pass
+
+with (x := 1) as d:
+    pass
+
+with (x[1, 2,] as d):
+    pass
+
+with (f(a, ) as b, c as d):
+    pass
+
+with f(a, ) as b, c as d:
+    pass
+
+with (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+) as b:
+    pass
+
+with aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb as b:
+    pass
+
+with (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+) as b, c as d:
+    pass
+
+with (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb as b, c as d):
+    pass
+
+with (
+    (aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb) as b, c as d):
+    pass
+
+with (foo() as bar, baz() as bop):
+    pass

@@ -812,7 +812,7 @@ checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flake8-to-ruff"
-version = "0.0.284"
+version = "0.0.285"
 dependencies = [
  "anyhow",
  "clap",
@@ -2064,7 +2064,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.0.284"
+version = "0.0.285"
 dependencies = [
  "annotate-snippets 0.9.1",
  "anyhow",
@@ -2164,7 +2164,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_cli"
-version = "0.0.284"
+version = "0.0.285"
 dependencies = [
  "annotate-snippets 0.9.1",
  "anyhow",
@@ -2378,7 +2378,6 @@ dependencies = [
  "is-macro",
  "itertools",
  "lexical-parse-float",
- "num-bigint",
  "num-traits",
  "rand",
  "unic-ucd-category",

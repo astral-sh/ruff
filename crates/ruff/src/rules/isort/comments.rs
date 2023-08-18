@@ -1,10 +1,9 @@
 use std::borrow::Cow;
 
-use ruff_python_ast::PySourceType;
+use ruff_python_ast::{PySourceType, Ranged};
 use ruff_python_parser::{lexer, AsMode, Tok};
-use ruff_text_size::{TextRange, TextSize};
-
 use ruff_source_file::Locator;
+use ruff_text_size::TextRange;
 
 #[derive(Debug)]
 pub(crate) struct Comment<'a> {
@@ -12,13 +11,9 @@ pub(crate) struct Comment<'a> {
     pub(crate) range: TextRange,
 }
 
-impl Comment<'_> {
-    pub(crate) const fn start(&self) -> TextSize {
-        self.range.start()
-    }
-
-    pub(crate) const fn end(&self) -> TextSize {
-        self.range.end()
+impl Ranged for Comment<'_> {
+    fn range(&self) -> TextRange {
+        self.range
     }
 }
 
