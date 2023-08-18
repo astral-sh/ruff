@@ -464,17 +464,17 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     flake8_pyi::rules::pass_statement_stub_body(checker, body);
                 }
                 if checker.enabled(Rule::PassInClassBody) {
-                    flake8_pyi::rules::pass_in_class_body(checker, stmt, body);
+                    flake8_pyi::rules::pass_in_class_body(checker, class_def);
                 }
             }
             if checker.enabled(Rule::EllipsisInNonEmptyClassBody) {
-                flake8_pyi::rules::ellipsis_in_non_empty_class_body(checker, stmt, body);
+                flake8_pyi::rules::ellipsis_in_non_empty_class_body(checker, body);
             }
             if checker.enabled(Rule::PytestIncorrectMarkParenthesesStyle) {
                 flake8_pytest_style::rules::marks(checker, decorator_list);
             }
             if checker.enabled(Rule::DuplicateClassFieldDefinition) {
-                flake8_pie::rules::duplicate_class_field_definition(checker, stmt, body);
+                flake8_pie::rules::duplicate_class_field_definition(checker, body);
             }
             if checker.enabled(Rule::NonUniqueEnums) {
                 flake8_pie::rules::non_unique_enums(checker, stmt, body);
