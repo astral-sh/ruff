@@ -1,33 +1,61 @@
 """Compound statements with no body should be written on one line."""
 
-while True:
+if True:
+    ...
+elif True:
+    ...
+else:
     ...
 
 if True:
     # comment
     ...
+elif True:
+    # comment
+    ...
+else:
+    # comment
+    ...
 
-with True:
-    ...  # comment
+if True:
+    ... # comment
+elif True:
+    ... # comment
+else:
+    ... # comment
 
 for i in []:
     ...
+else:
+    ...
 
 for i in []:
+    # comment
+    ...
+else:
     # comment
     ...
 
 for i in []:
     ... # comment
+else:
+    ... # comment
 
-if True:
+while True:
+    ...
+else:
     ...
 
-if True:
+while True:
+    # comment
+    ...
+else:
     # comment
     ...
 
-if True:
+while True:
+    ... # comment
+else:
     ... # comment
 
 with True:

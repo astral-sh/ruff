@@ -63,7 +63,7 @@ impl FormatNodeRule<StmtWhile> for FormatStmtWhile {
                         &text("else")
                     )
                     .with_leading_comments(leading, body.last()),
-                    block_indent(&orelse.format())
+                    clause_body(orelse, trailing),
                 ]
             )?;
         }

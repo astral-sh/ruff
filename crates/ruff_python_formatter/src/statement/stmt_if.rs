@@ -98,7 +98,7 @@ pub(crate) fn format_elif_else_clause(
                 }),
             )
             .with_leading_comments(leading_comments, last_node),
-            block_indent(&body.format())
+            clause_body(body, trailing_colon_comment),
         ]
     )
 }

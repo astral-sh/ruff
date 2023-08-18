@@ -6,34 +6,62 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/
 ```py
 """Compound statements with no body should be written on one line."""
 
-while True:
+if True:
+    ...
+elif True:
+    ...
+else:
     ...
 
 if True:
     # comment
     ...
+elif True:
+    # comment
+    ...
+else:
+    # comment
+    ...
 
-with True:
-    ...  # comment
+if True:
+    ... # comment
+elif True:
+    ... # comment
+else:
+    ... # comment
 
 for i in []:
     ...
+else:
+    ...
 
 for i in []:
+    # comment
+    ...
+else:
     # comment
     ...
 
 for i in []:
     ... # comment
+else:
+    ... # comment
 
-if True:
+while True:
+    ...
+else:
     ...
 
-if True:
+while True:
+    # comment
+    ...
+else:
     # comment
     ...
 
-if True:
+while True:
+    ... # comment
+else:
     ... # comment
 
 with True:
@@ -60,29 +88,49 @@ match x:
 ```py
 """Compound statements with no body should be written on one line."""
 
-while True: ...
-
-if True:
-    # comment
-    ...
-
-with True: ...  # comment
-
-for i in []: ...
-
-for i in []:
-    # comment
-    ...
-
-for i in []: ...  # comment
-
 if True: ...
+elif True: ...
+else: ...
 
 if True:
+    # comment
+    ...
+elif True:
+    # comment
+    ...
+else:
     # comment
     ...
 
 if True: ...  # comment
+elif True: ...  # comment
+else: ...  # comment
+
+for i in []: ...
+else: ...
+
+for i in []:
+    # comment
+    ...
+else:
+    # comment
+    ...
+
+for i in []: ...  # comment
+else: ...  # comment
+
+while True: ...
+else: ...
+
+while True:
+    # comment
+    ...
+else:
+    # comment
+    ...
+
+while True: ...  # comment
+else: ...  # comment
 
 with True: ...
 
