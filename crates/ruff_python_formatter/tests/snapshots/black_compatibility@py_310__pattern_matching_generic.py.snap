@@ -140,7 +140,7 @@ with match() as match:
                  y = 0
          self.assertIs(x, False)
          self.assertEqual(y, 0)
-@@ -73,14 +73,14 @@
+@@ -73,14 +73,18 @@
          x = 0
          y = None
          match x:
@@ -153,7 +153,11 @@ with match() as match:
          x = range(3)
          match x:
 -            case [y, case as x, z]:
-+            case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
++            case [
++                x as NOT_YET_IMPLEMENTED_PatternMatchAs,
++                x as NOT_YET_IMPLEMENTED_PatternMatchAs,
++                x as NOT_YET_IMPLEMENTED_PatternMatchAs,
++            ]:
                  w = 0
  
      # At least one of the above branches must have been taken, because every Python
@@ -244,7 +248,11 @@ def get_grammars(target_versions: Set[TargetVersion]) -> List[Grammar]:
 
         x = range(3)
         match x:
-            case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+            case [
+                x as NOT_YET_IMPLEMENTED_PatternMatchAs,
+                x as NOT_YET_IMPLEMENTED_PatternMatchAs,
+                x as NOT_YET_IMPLEMENTED_PatternMatchAs,
+            ]:
                 w = 0
 
     # At least one of the above branches must have been taken, because every Python

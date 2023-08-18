@@ -180,13 +180,21 @@ match [  # comment
     second,
     third,
 ]:  # another comment
-    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+    case [
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+    ]:
         pass
 
 match (  # comment
     "a b c"
 ).split():  # another comment
-    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+    case [
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+    ]:
         pass
 
 
@@ -194,7 +202,11 @@ match (  # comment
     # let's go
     yield foo
 ):  # another comment
-    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+    case [
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+    ]:
         pass
 
 
@@ -222,7 +234,10 @@ match newlines:
     case "NOT_YET_IMPLEMENTED_PatternMatchValue" if foo == 2:  # second
         pass
 
-    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2] if (foo := 1):  # third
+    case [
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+    ] if (foo := 1):  # third
         pass
 
     case "NOT_YET_IMPLEMENTED_PatternMatchValue":
