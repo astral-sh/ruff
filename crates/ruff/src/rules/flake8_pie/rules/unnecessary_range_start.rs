@@ -1,9 +1,9 @@
 use num_bigint::BigInt;
-use ruff_python_ast::{self as ast, Constant, Expr, Ranged};
 
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Constant, Expr, Ranged};
 
 use crate::autofix::edits::{remove_argument, Parentheses};
 use crate::checkers::ast::Checker;
@@ -45,34 +45,42 @@ impl AlwaysAutofixableViolation for UnnecessaryRangeStart {
 
 /// PIE808
 pub(crate) fn unnecessary_range_start(checker: &mut Checker, call: &ast::ExprCall) {
-    if !checker.semantic().is_builtin("range") {
-        return;
-    };
-    let ast::ExprCall {
-        func, arguments, ..
-    } = call;
-    let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else {
+    // Verify that the call is to the `range` builtin.
+    let Expr::Name(ast::ExprName { id, .. }) = call.func.as_ref() else {
         return
     };
     if id != "range" {
         return;
     };
-    let [start, _end] = &arguments.args[..] else {
+    if !checker.semantic().is_builtin("range") {
+        return;
+    };
+
+    // `range` doesn't accept keyword arguments.
+    if !call.arguments.keywords.is_empty() {
+        return;
+    }
+
+    // Verify that the call has exactly two arguments (no `step`).
+    let [start, _] = call.arguments.args.as_slice() else {
         return
     };
+
+    // Verify that the `start` argument is the literal `0`.
     let Expr::Constant(ast::ExprConstant { value: Constant::Int(value), .. }) = start else {
         return
     };
     if *value != BigInt::from(0) {
         return;
     };
-    let mut diagnostic = Diagnostic::new(UnnecessaryRangeStart {}, start.range());
+
+    let mut diagnostic = Diagnostic::new(UnnecessaryRangeStart, start.range());
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {
             remove_argument(
                 &start,
-                arguments,
-                Parentheses::Remove,
+                &call.arguments,
+                Parentheses::Preserve,
                 checker.locator(),
                 checker.source_type,
             )
