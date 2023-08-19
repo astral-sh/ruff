@@ -707,6 +707,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pie, "800") => (RuleGroup::Unspecified, rules::flake8_pie::rules::UnnecessarySpread),
         (Flake8Pie, "804") => (RuleGroup::Unspecified, rules::flake8_pie::rules::UnnecessaryDictKwargs),
         (Flake8Pie, "807") => (RuleGroup::Unspecified, rules::flake8_pie::rules::ReimplementedListBuiltin),
+        (Flake8Pie, "808") => (RuleGroup::Unspecified, rules::flake8_pie::rules::UnnecessaryRangeStart),
         (Flake8Pie, "810") => (RuleGroup::Unspecified, rules::flake8_pie::rules::MultipleStartsEndsWith),
 
         // flake8-commas

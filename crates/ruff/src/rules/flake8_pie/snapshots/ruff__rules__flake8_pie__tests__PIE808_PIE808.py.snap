@@ -1,0 +1,20 @@
+---
+source: crates/ruff/src/rules/flake8_pie/mod.rs
+---
+PIE808.py:1:7: PIE808 [*] `range(0, ...)` is equivalent to `range(...)`
+  |
+1 | range(0, 10)
+  |       ^ PIE808
+2 | 
+3 | range(x, 10)
+  |
+  = help: Remove the first argument
+
+ℹ Fix
+1   |-range(0, 10)
+  1 |+range(10)
+2 2 | 
+3 3 | range(x, 10)
+4 4 | range(-15, 10)
+
+
