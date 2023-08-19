@@ -338,9 +338,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::FStringDocstring) {
                 flake8_bugbear::rules::f_string_docstring(checker, body);
             }
-            if checker.enabled(Rule::YieldInForLoop) {
-                pyupgrade::rules::yield_in_for_loop(checker, stmt);
-            }
             if let ScopeKind::Class(class_def) = checker.semantic.current_scope().kind {
                 if checker.enabled(Rule::BuiltinAttributeShadowing) {
                     flake8_builtins::rules::builtin_method_shadowing(
@@ -1178,8 +1175,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             orelse,
             ..
         }) => {
-            if checker.any_enabled(&[Rule::UnusedLoopControlVariable, Rule::IncorrectDictIterator])
-            {
+            if checker.any_enabled(&[
+                Rule::UnusedLoopControlVariable,
+                Rule::IncorrectDictIterator,
+                Rule::YieldInForLoop,
+            ]) {
                 checker.deferred.for_loops.push(checker.semantic.snapshot());
             }
             if checker.enabled(Rule::LoopVariableOverridesIterator) {
