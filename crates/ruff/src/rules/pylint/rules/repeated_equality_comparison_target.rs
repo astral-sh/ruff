@@ -92,18 +92,20 @@ pub(crate) fn repeated_equality_comparison_target(checker: &mut Checker, bool_op
         .unwrap();
 
     // Report a violation for the expression with the highest count.
-    let (_, matches) = &left_to_comparators[expr_with_highest_count];
-    checker.diagnostics.push(Diagnostic::new(
-        RepeatedEqualityComparisonTarget {
-            expr: merged_membership_test(
-                expr_with_highest_count.as_expr(),
-                bool_op.op,
-                matches,
-                checker.locator(),
-            ),
-        },
-        bool_op.range(),
-    ));
+    let (count, matches) = &left_to_comparators[expr_with_highest_count];
+    if count > &1 {
+        checker.diagnostics.push(Diagnostic::new(
+            RepeatedEqualityComparisonTarget {
+                expr: merged_membership_test(
+                    expr_with_highest_count.as_expr(),
+                    bool_op.op,
+                    matches,
+                    checker.locator(),
+                ),
+            },
+            bool_op.range(),
+        ));
+    }
 }
 
 /// Return `true` if the given expression is compatible with a membership test.
