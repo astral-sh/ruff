@@ -25,7 +25,7 @@ use crate::registry::AsRule;
 /// range(3)
 /// ```
 #[violation]
-pub struct UnnecessaryRangeStart {}
+pub struct UnnecessaryRangeStart;
 
 impl AlwaysAutofixableViolation for UnnecessaryRangeStart {
     #[derive_message_formats]
