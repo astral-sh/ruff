@@ -1,9 +1,9 @@
-use ruff_python_ast::{self as ast, Expr, Ranged, Stmt};
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Expr, Ranged, Stmt};
 
 use crate::autofix;
 use crate::checkers::ast::Checker;
@@ -49,11 +49,7 @@ impl AlwaysAutofixableViolation for DuplicateClassFieldDefinition {
 }
 
 /// PIE794
-pub(crate) fn duplicate_class_field_definition(
-    checker: &mut Checker,
-    parent: &Stmt,
-    body: &[Stmt],
-) {
+pub(crate) fn duplicate_class_field_definition(checker: &mut Checker, body: &[Stmt]) {
     let mut seen_targets: FxHashSet<&str> = FxHashSet::default();
     for stmt in body {
         // Extract the property name from the assignment statement.
@@ -85,11 +81,11 @@ pub(crate) fn duplicate_class_field_definition(
             if checker.patch(diagnostic.kind.rule()) {
                 let edit = autofix::edits::delete_stmt(
                     stmt,
-                    Some(parent),
+                    Some(stmt),
                     checker.locator(),
                     checker.indexer(),
                 );
-                diagnostic.set_fix(Fix::suggested(edit).isolate(checker.isolation(Some(parent))));
+                diagnostic.set_fix(Fix::suggested(edit).isolate(checker.statement_isolation()));
             }
             checker.diagnostics.push(diagnostic);
         }
