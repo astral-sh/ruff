@@ -72,29 +72,38 @@ pub(crate) fn repeated_equality_comparison_target(checker: &mut Checker, bool_op
             left, comparators, ..
         }) = value
         {
-            let (count, matches) = left_to_comparators
+            let (l_count, l_matches) = left_to_comparators
                 .entry(left.deref().into())
                 .or_insert_with(|| (0, Vec::new()));
-            *count += 1;
-            matches.extend(comparators);
+            *l_count += 1;
+            l_matches.extend(comparators);
+            let (r_count, r_matches) = left_to_comparators
+                .entry((&comparators[0]).into())
+                .or_insert_with(|| (0, Vec::new()));
+            *r_count += 1;
+            r_matches.push(left);
         }
     }
 
-    for (left, (count, comparators)) in left_to_comparators {
-        if count > 1 {
-            checker.diagnostics.push(Diagnostic::new(
-                RepeatedEqualityComparisonTarget {
-                    expr: merged_membership_test(
-                        left.as_expr(),
-                        bool_op.op,
-                        &comparators,
-                        checker.locator(),
-                    ),
-                },
-                bool_op.range(),
-            ));
-        }
-    }
+    let expr_with_highest_count = left_to_comparators
+        .iter()
+        .max_by_key(|(_, (count, _))| *count)
+        .map(|(expr, _)| expr.clone())
+        .unwrap();
+
+    // Report a violation for the expression with the highest count.
+    let (_, matches) = &left_to_comparators[expr_with_highest_count];
+    checker.diagnostics.push(Diagnostic::new(
+        RepeatedEqualityComparisonTarget {
+            expr: merged_membership_test(
+                expr_with_highest_count.as_expr(),
+                bool_op.op,
+                matches,
+                checker.locator(),
+            ),
+        },
+        bool_op.range(),
+    ));
 }
 
 /// Return `true` if the given expression is compatible with a membership test.
@@ -102,14 +111,14 @@ pub(crate) fn repeated_equality_comparison_target(checker: &mut Checker, bool_op
 /// joined with `and`.
 fn is_allowed_value(bool_op: BoolOp, value: &Expr) -> bool {
     let Expr::Compare(ExprCompare {
-        left,
-        ops,
-        comparators,
-        ..
-    }) = value
-    else {
-        return false;
-    };
+                          left,
+                          ops,
+                          comparators,
+                          ..
+                      }) = value
+        else {
+            return false;
+        };
 
     ops.iter().all(|op| {
         if match bool_op {

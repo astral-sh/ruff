@@ -9,7 +9,6 @@ foo != "a" and foo != "b" and foo != "c"
 
 foo == a or foo == "b" or foo == 3  # Mixed types.
 
-# False negatives (the current implementation doesn't support Yoda conditions).
 "a" == foo or "b" == foo or "c" == foo
 
 "a" != foo and "b" != foo and "c" != foo

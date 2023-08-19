@@ -47,7 +47,37 @@ repeated_equality_comparison_target.py:10:1: PLR1714 Consider merging multiple c
 10 | foo == a or foo == "b" or foo == 3  # Mixed types.
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR1714
 11 | 
-12 | # False negatives (the current implementation doesn't support Yoda conditions).
+12 | "a" == foo or "b" == foo or "c" == foo
+   |
+
+repeated_equality_comparison_target.py:12:1: PLR1714 Consider merging multiple comparisons: `foo in ("a", "b", "c")`. Use a `set` if the elements are hashable.
+   |
+10 | foo == a or foo == "b" or foo == 3  # Mixed types.
+11 | 
+12 | "a" == foo or "b" == foo or "c" == foo
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR1714
+13 | 
+14 | "a" != foo and "b" != foo and "c" != foo
+   |
+
+repeated_equality_comparison_target.py:14:1: PLR1714 Consider merging multiple comparisons: `foo not in ("a", "b", "c")`. Use a `set` if the elements are hashable.
+   |
+12 | "a" == foo or "b" == foo or "c" == foo
+13 | 
+14 | "a" != foo and "b" != foo and "c" != foo
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR1714
+15 | 
+16 | "a" == foo or foo == "b" or "c" == foo
+   |
+
+repeated_equality_comparison_target.py:16:1: PLR1714 Consider merging multiple comparisons: `foo in ("a", "b", "c")`. Use a `set` if the elements are hashable.
+   |
+14 | "a" != foo and "b" != foo and "c" != foo
+15 | 
+16 | "a" == foo or foo == "b" or "c" == foo
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR1714
+17 | 
+18 | # OK
    |
 
 
