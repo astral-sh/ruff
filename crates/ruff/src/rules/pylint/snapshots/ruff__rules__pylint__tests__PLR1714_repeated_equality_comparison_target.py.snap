@@ -77,7 +77,37 @@ repeated_equality_comparison_target.py:16:1: PLR1714 Consider merging multiple c
 16 | "a" == foo or foo == "b" or "c" == foo
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR1714
 17 | 
-18 | # OK
+18 | foo == bar or baz == foo or qux == foo
+   |
+
+repeated_equality_comparison_target.py:18:1: PLR1714 Consider merging multiple comparisons: `foo in (bar, baz, qux)`. Use a `set` if the elements are hashable.
+   |
+16 | "a" == foo or foo == "b" or "c" == foo
+17 | 
+18 | foo == bar or baz == foo or qux == foo
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR1714
+19 | 
+20 | foo == "a" or "b" == foo or foo == "c"
+   |
+
+repeated_equality_comparison_target.py:20:1: PLR1714 Consider merging multiple comparisons: `foo in ("a", "b", "c")`. Use a `set` if the elements are hashable.
+   |
+18 | foo == bar or baz == foo or qux == foo
+19 | 
+20 | foo == "a" or "b" == foo or foo == "c"
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR1714
+21 | 
+22 | foo != "a" and "b" != foo and foo != "c"
+   |
+
+repeated_equality_comparison_target.py:22:1: PLR1714 Consider merging multiple comparisons: `foo not in ("a", "b", "c")`. Use a `set` if the elements are hashable.
+   |
+20 | foo == "a" or "b" == foo or foo == "c"
+21 | 
+22 | foo != "a" and "b" != foo and foo != "c"
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR1714
+23 | 
+24 | # OK
    |
 
 

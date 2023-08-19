@@ -17,6 +17,10 @@ foo == a or foo == "b" or foo == 3  # Mixed types.
 
 foo == bar or baz == foo or qux == foo
 
+foo == "a" or "b" == foo or foo == "c"
+
+foo != "a" and "b" != foo and foo != "c"
+
 # OK
 foo == "a" and foo == "b" and foo == "c"  # `and` mixed with `==`.
 
