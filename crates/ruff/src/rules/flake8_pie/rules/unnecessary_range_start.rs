@@ -47,7 +47,7 @@ impl AlwaysAutofixableViolation for UnnecessaryRangeStart {
 pub(crate) fn unnecessary_range_start(checker: &mut Checker, call: &ast::ExprCall) {
     // Verify that the call is to the `range` builtin.
     let Expr::Name(ast::ExprName { id, .. }) = call.func.as_ref() else {
-        return
+        return;
     };
     if id != "range" {
         return;
@@ -63,12 +63,16 @@ pub(crate) fn unnecessary_range_start(checker: &mut Checker, call: &ast::ExprCal
 
     // Verify that the call has exactly two arguments (no `step`).
     let [start, _] = call.arguments.args.as_slice() else {
-        return
+        return;
     };
 
     // Verify that the `start` argument is the literal `0`.
-    let Expr::Constant(ast::ExprConstant { value: Constant::Int(value), .. }) = start else {
-        return
+    let Expr::Constant(ast::ExprConstant {
+        value: Constant::Int(value),
+        ..
+    }) = start
+    else {
+        return;
     };
     if *value != BigInt::from(0) {
         return;
