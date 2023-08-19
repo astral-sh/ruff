@@ -30,11 +30,11 @@ pub struct UnnecessaryRangeStart {}
 impl AlwaysAutofixableViolation for UnnecessaryRangeStart {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`range(0, ...)` is equivalent to `range(...)`")
+        format!("Unnecessary `start` argument in `range`")
     }
 
     fn autofix_title(&self) -> String {
-        format!("Remove the `start` argument")
+        format!("Remove `start` argument")
     }
 }
 
