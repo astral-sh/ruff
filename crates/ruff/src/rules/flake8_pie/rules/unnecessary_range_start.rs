@@ -13,7 +13,9 @@ use crate::registry::AsRule;
 /// Checks for `range` calls with an unnecessary `start` argument.
 ///
 /// ## Why is this bad?
-/// `range(0, x)` is equivalent to `range(x)`. The `start` argument is unnecessary.
+/// `range(0, x)` is equivalent to `range(x)`, as `0` is the default value for
+/// the `start` argument. Omitting the `start` argument makes the code more
+/// concise and idiomatic.
 ///
 /// ## Example
 /// ```python
@@ -24,6 +26,9 @@ use crate::registry::AsRule;
 /// ```python
 /// range(3)
 /// ```
+///
+/// ## References
+/// - [Python documentation: `range`](https://docs.python.org/3/library/stdtypes.html#range)
 #[violation]
 pub struct UnnecessaryRangeStart;
 
