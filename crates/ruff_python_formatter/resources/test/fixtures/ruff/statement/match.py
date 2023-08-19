@@ -141,3 +141,24 @@ match pattern_comments:
     no_comments
     ):
         pass
+
+match foo:
+    case "a", "b":
+        pass
+    case ("a", "b"):
+        pass
+    case ["a", "b"]:
+        pass
+
+match foo:
+    case [  # leading
+# leading
+    # leading
+        # leading
+        "a",  # trailing
+# trailing
+    # trailing
+        # trailing
+        "b",
+    ]:
+        pass
