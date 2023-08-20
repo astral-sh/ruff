@@ -215,10 +215,16 @@ pub struct PytestDuplicateParametrizeTestCases {
 }
 
 impl Violation for PytestDuplicateParametrizeTestCases {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let PytestDuplicateParametrizeTestCases { index } = self;
         format!("Duplicate of test case at index {index} in `@pytest_mark.parametrize`")
+    }
+
+    fn autofix_title(&self) -> Option<String> {
+        Some("Remove duplicate test case".to_string())
     }
 }
 
@@ -558,19 +564,31 @@ fn check_duplicates(checker: &mut Checker, values: &Expr) {
     else {
         return;
     };
+    if elts.len() < 2 {
+        return;
+    }
 
     let mut seen: FxHashMap<ComparableExpr, usize> =
         FxHashMap::with_capacity_and_hasher(elts.len(), BuildHasherDefault::default());
+    let mut prev = &elts[0];
     for (index, elt) in elts.iter().enumerate() {
         let expr = ComparableExpr::from(elt);
         seen.entry(expr)
             .and_modify(|index| {
-                checker.diagnostics.push(Diagnostic::new(
+                let mut diagnostic = Diagnostic::new(
                     PytestDuplicateParametrizeTestCases { index: *index },
                     elt.range(),
-                ));
+                );
+                if checker.patch(diagnostic.kind.rule()) {
+                    let del_range = TextRange::new(prev.end(), elt.end());
+                    if !checker.indexer().comment_ranges().intersects(del_range) {
+                        diagnostic.set_fix(Fix::automatic(Edit::range_deletion(del_range)));
+                    }
+                }
+                checker.diagnostics.push(diagnostic);
             })
             .or_insert(index);
+        prev = elt;
     }
 }
 

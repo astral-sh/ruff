@@ -16,7 +16,15 @@ def test_error_expr_simple(x):
     ...
 
 
-@pytest.mark.parametrize("x", [(a, b), (a, b), (b, c)])
+@pytest.mark.parametrize(
+    "x",
+    [
+        (a, b),
+        # comment
+        (a, b),
+        (b, c),
+    ],
+)
 def test_error_expr_complex(x):
     ...
 
