@@ -21,6 +21,24 @@ impl Violation for IOError {
     }
 }
 
+/// ## What it does
+/// Checks for syntax errors in the code.
+///
+/// ## Why is this bad?
+/// Code with syntax errors cannot be executed or analyzed by static analysis tools.
+///
+/// ## Example
+/// ```python
+/// x =
+/// ```
+///
+/// Use instead:
+/// ```python
+/// x = 1
+/// ```
+///
+/// ## References
+/// - [Python documentation: Syntax Errors](https://docs.python.org/3/tutorial/errors.html#syntax-errors)
 #[violation]
 pub struct SyntaxError {
     pub message: String,
