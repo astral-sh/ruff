@@ -1193,6 +1193,7 @@ impl<'a> SemanticModel<'a> {
             scope_id: self.scope_id,
             stmt_id: self.statement_id,
             expr_id: self.expression_id,
+            branch_id: self.branch_id,
             definition_id: self.definition_id,
             flags: self.flags,
         }
@@ -1204,12 +1205,14 @@ impl<'a> SemanticModel<'a> {
             scope_id,
             stmt_id,
             expr_id,
+            branch_id,
             definition_id,
             flags,
         } = snapshot;
         self.scope_id = scope_id;
         self.statement_id = stmt_id;
         self.expression_id = expr_id;
+        self.branch_id = branch_id;
         self.definition_id = definition_id;
         self.flags = flags;
     }
@@ -1624,6 +1627,7 @@ pub struct Snapshot {
     scope_id: ScopeId,
     stmt_id: Option<StatementId>,
     expr_id: Option<ExpressionId>,
+    branch_id: Option<BranchId>,
     definition_id: DefinitionId,
     flags: SemanticModelFlags,
 }
