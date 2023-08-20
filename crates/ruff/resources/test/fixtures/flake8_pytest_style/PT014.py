@@ -11,7 +11,7 @@ b = 2
 c = 3
 
 
-@pytest.mark.parametrize("x", [a, a, b, b, (b), c])
+@pytest.mark.parametrize("x", [a, a, b, b, b, c])
 def test_error_expr_simple(x):
     ...
 
@@ -26,6 +26,25 @@ def test_error_expr_simple(x):
     ],
 )
 def test_error_expr_complex(x):
+    ...
+
+
+@pytest.mark.parametrize("x", [a, b, (a), c, ((a))])
+def test_error_parentheses(x):
+    ...
+
+
+@pytest.mark.parametrize(
+    "x",
+    [
+        a,
+        b,
+        (a),
+        c,
+        ((a)),
+    ],
+)
+def test_error_parentheses_trailing_comma(x):
     ...
 
 
