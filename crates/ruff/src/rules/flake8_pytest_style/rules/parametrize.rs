@@ -5,7 +5,7 @@ use ruff_python_ast::{
     self as ast, Arguments, Constant, Decorator, Expr, ExprContext, PySourceType, Ranged,
 };
 use ruff_python_parser::{lexer, AsMode, Tok};
-use ruff_text_size::TextRange;
+use ruff_text_size::{TextRange, TextSize};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -557,6 +557,30 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
     }
 }
 
+/// ```python
+/// @pytest.mark.parametrize(
+///     "x",
+///     [.., (elt), ..],
+///              ^^^^^
+///              Tokenize this range to locate the true end of `elt`.
+/// )
+/// ```
+fn true_elt_end(checker: &Checker, elt_end: TextSize, values_end: TextSize) -> TextSize {
+    for (tok, range) in lexer::lex_starts_at(
+        checker.locator().slice(TextRange::new(elt_end, values_end)),
+        checker.source_type.as_mode(),
+        elt_end,
+    )
+    .flatten()
+    {
+        match tok {
+            Tok::Comma => return range.start(),
+            _ => continue,
+        }
+    }
+    values_end
+}
+
 /// PT014
 fn check_duplicates(checker: &mut Checker, values: &Expr) {
     let (Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. })) =
@@ -582,9 +606,16 @@ fn check_duplicates(checker: &mut Checker, values: &Expr) {
                     elt.range(),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
-                    let del_range = TextRange::new(prev.end(), elt.end());
-                    if !checker.indexer().comment_ranges().intersects(del_range) {
-                        diagnostic.set_fix(Fix::automatic(Edit::range_deletion(del_range)));
+                    let values_end = values.range().sub_end(1.into()).end();
+                    let elt_end = true_elt_end(checker, elt.end(), values_end);
+                    let prev_end = true_elt_end(checker, prev.end(), values_end);
+                    let deletion_range = TextRange::new(prev_end, elt_end);
+                    if !checker
+                        .indexer()
+                        .comment_ranges()
+                        .intersects(deletion_range)
+                    {
+                        diagnostic.set_fix(Fix::automatic(Edit::range_deletion(deletion_range)));
                     }
                 }
                 checker.diagnostics.push(diagnostic);
