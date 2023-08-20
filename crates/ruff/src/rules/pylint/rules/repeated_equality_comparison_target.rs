@@ -111,24 +111,27 @@ fn is_allowed_value(bool_op: BoolOp, value: &Expr) -> bool {
         return false;
     };
 
-    ops.iter().all(|op| {
-        if match bool_op {
-            BoolOp::Or => !matches!(op, CmpOp::Eq),
-            BoolOp::And => !matches!(op, CmpOp::NotEq),
-        } {
-            return false;
-        }
+    // Ignore, e.g., `foo == bar == baz`.
+    let [op] = ops.as_slice() else {
+        return false;
+    };
 
-        if left.is_call_expr() {
-            return false;
-        }
+    if match bool_op {
+        BoolOp::Or => !matches!(op, CmpOp::Eq),
+        BoolOp::And => !matches!(op, CmpOp::NotEq),
+    } {
+        return false;
+    }
 
-        if any(comparators.iter(), Expr::is_call_expr) {
-            return false;
-        }
+    if left.is_call_expr() {
+        return false;
+    }
 
-        true
-    })
+    if any(comparators.iter(), Expr::is_call_expr) {
+        return false;
+    }
+
+    true
 }
 
 /// Generate a string like `obj in (a, b, c)` or `obj not in (a, b, c)`.
