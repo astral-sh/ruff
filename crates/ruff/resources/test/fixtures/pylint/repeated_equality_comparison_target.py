@@ -21,6 +21,8 @@ foo == "a" or "b" == foo or foo == "c"
 
 foo != "a" and "b" != foo and foo != "c"
 
+foo == "a" or foo == "b" or "c" == bar or "d" == bar  # Multiple targets
+
 # OK
 foo == "a" and foo == "b" and foo == "c"  # `and` mixed with `==`.
 
@@ -42,4 +44,4 @@ foo == "a" == "b" or foo == "c"  # Multiple comparisons.
 
 foo == bar == "b" or foo == "c"  # Multiple comparisons.
 
-foo == foo or foo == bar
+foo == foo or foo == bar  # Self-comparison.
