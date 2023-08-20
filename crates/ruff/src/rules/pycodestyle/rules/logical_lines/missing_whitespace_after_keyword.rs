@@ -14,12 +14,14 @@ use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 ///
 /// ## Example
 /// ```python
-/// from a import(b, c)
+/// if(True):
+///     pass
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// from a import (b, c)
+/// if (True):
+///     pass
 /// ```
 ///
 /// ## References
