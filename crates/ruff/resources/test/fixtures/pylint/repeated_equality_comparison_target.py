@@ -41,3 +41,5 @@ foo != "a"  # Single comparison.
 foo == "a" == "b" or foo == "c"  # Multiple comparisons.
 
 foo == bar == "b" or foo == "c"  # Multiple comparisons.
+
+foo == foo or foo == bar
