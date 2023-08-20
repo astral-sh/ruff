@@ -37,6 +37,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "indentation-with-invalid-multiple",
     "line-too-long",
     "missing-trailing-comma",
+    "missing-whitespace",
     "missing-whitespace-after-keyword",
     "missing-whitespace-around-arithmetic-operator",
     "missing-whitespace-around-bitwise-or-shift-operator",
