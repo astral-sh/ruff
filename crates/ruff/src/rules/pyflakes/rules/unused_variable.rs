@@ -1,6 +1,6 @@
 use itertools::Itertools;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, IsolationLevel, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::{self as ast, PySourceType, Ranged, Stmt};
@@ -207,6 +207,7 @@ fn remove_unused_variable(
     stmt: &Stmt,
     parent: Option<&Stmt>,
     range: TextRange,
+    isolation: IsolationLevel,
     checker: &Checker,
 ) -> Option<Fix> {
     // First case: simple assignment (`x = 1`)
@@ -229,7 +230,7 @@ fn remove_unused_variable(
                 } else {
                     // If (e.g.) assigning to a constant (`x = 1`), delete the entire statement.
                     let edit = delete_stmt(stmt, parent, checker.locator(), checker.indexer());
-                    Some(Fix::suggested(edit).isolate(checker.isolation(parent)))
+                    Some(Fix::suggested(edit).isolate(isolation))
                 };
             }
         }
@@ -257,7 +258,7 @@ fn remove_unused_variable(
             } else {
                 // If (e.g.) assigning to a constant (`x = 1`), delete the entire statement.
                 let edit = delete_stmt(stmt, parent, checker.locator(), checker.indexer());
-                Some(Fix::suggested(edit).isolate(checker.isolation(parent)))
+                Some(Fix::suggested(edit).isolate(isolation))
             };
         }
     }
@@ -331,7 +332,14 @@ pub(crate) fn unused_variable(checker: &Checker, scope: &Scope, diagnostics: &mu
             if let Some(statement_id) = source {
                 let statement = checker.semantic().statement(statement_id);
                 let parent = checker.semantic().parent_statement(statement_id);
-                if let Some(fix) = remove_unused_variable(statement, parent, range, checker) {
+                let isolation = checker
+                    .semantic()
+                    .parent_statement_id(statement_id)
+                    .map(|node_id| IsolationLevel::Group(node_id.into()))
+                    .unwrap_or_default();
+                if let Some(fix) =
+                    remove_unused_variable(statement, parent, range, isolation, checker)
+                {
                     diagnostic.set_fix(fix);
                 }
             }

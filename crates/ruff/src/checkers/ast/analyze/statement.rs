@@ -338,9 +338,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::FStringDocstring) {
                 flake8_bugbear::rules::f_string_docstring(checker, body);
             }
-            if checker.enabled(Rule::YieldInForLoop) {
-                pyupgrade::rules::yield_in_for_loop(checker, stmt);
-            }
             if let ScopeKind::Class(class_def) = checker.semantic.current_scope().kind {
                 if checker.enabled(Rule::BuiltinAttributeShadowing) {
                     flake8_builtins::rules::builtin_method_shadowing(
@@ -467,17 +464,17 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     flake8_pyi::rules::pass_statement_stub_body(checker, body);
                 }
                 if checker.enabled(Rule::PassInClassBody) {
-                    flake8_pyi::rules::pass_in_class_body(checker, stmt, body);
+                    flake8_pyi::rules::pass_in_class_body(checker, class_def);
                 }
             }
             if checker.enabled(Rule::EllipsisInNonEmptyClassBody) {
-                flake8_pyi::rules::ellipsis_in_non_empty_class_body(checker, stmt, body);
+                flake8_pyi::rules::ellipsis_in_non_empty_class_body(checker, body);
             }
             if checker.enabled(Rule::PytestIncorrectMarkParenthesesStyle) {
                 flake8_pytest_style::rules::marks(checker, decorator_list);
             }
             if checker.enabled(Rule::DuplicateClassFieldDefinition) {
-                flake8_pie::rules::duplicate_class_field_definition(checker, stmt, body);
+                flake8_pie::rules::duplicate_class_field_definition(checker, body);
             }
             if checker.enabled(Rule::NonUniqueEnums) {
                 flake8_pie::rules::non_unique_enums(checker, stmt, body);
@@ -1178,8 +1175,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             orelse,
             ..
         }) => {
-            if checker.any_enabled(&[Rule::UnusedLoopControlVariable, Rule::IncorrectDictIterator])
-            {
+            if checker.any_enabled(&[
+                Rule::UnusedLoopControlVariable,
+                Rule::IncorrectDictIterator,
+                Rule::YieldInForLoop,
+            ]) {
                 checker.deferred.for_loops.push(checker.semantic.snapshot());
             }
             if checker.enabled(Rule::LoopVariableOverridesIterator) {

@@ -23,20 +23,18 @@ struct ExpressionWithParent<'a> {
 
 /// The nodes of a program indexed by [`ExpressionId`]
 #[derive(Debug, Default)]
-pub struct Expressions<'a> {
-    nodes: IndexVec<ExpressionId, ExpressionWithParent<'a>>,
-}
+pub struct Expressions<'a>(IndexVec<ExpressionId, ExpressionWithParent<'a>>);
 
 impl<'a> Expressions<'a> {
     /// Inserts a new expression into the node tree and returns its unique id.
     pub(crate) fn insert(&mut self, node: &'a Expr, parent: Option<ExpressionId>) -> ExpressionId {
-        self.nodes.push(ExpressionWithParent { node, parent })
+        self.0.push(ExpressionWithParent { node, parent })
     }
 
     /// Return the [`ExpressionId`] of the parent node.
     #[inline]
     pub fn parent_id(&self, node_id: ExpressionId) -> Option<ExpressionId> {
-        self.nodes[node_id].parent
+        self.0[node_id].parent
     }
 
     /// Returns an iterator over all [`ExpressionId`] ancestors, starting from the given [`ExpressionId`].
@@ -44,7 +42,7 @@ impl<'a> Expressions<'a> {
         &self,
         node_id: ExpressionId,
     ) -> impl Iterator<Item = ExpressionId> + '_ {
-        std::iter::successors(Some(node_id), |&node_id| self.nodes[node_id].parent)
+        std::iter::successors(Some(node_id), |&node_id| self.0[node_id].parent)
     }
 }
 
@@ -53,6 +51,6 @@ impl<'a> Index<ExpressionId> for Expressions<'a> {
 
     #[inline]
     fn index(&self, index: ExpressionId) -> &Self::Output {
-        &self.nodes[index].node
+        &self.0[index].node
     }
 }

@@ -1,6 +1,6 @@
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::Ranged;
-use ruff_python_semantic::analyze::{branch_detection, visibility};
+use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{Binding, BindingKind, ScopeKind};
 
 use crate::checkers::ast::Checker;
@@ -112,11 +112,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                     // If the bindings are in different forks, abort.
                     if shadowed.source.map_or(true, |left| {
                         binding.source.map_or(true, |right| {
-                            branch_detection::different_forks(
-                                left,
-                                right,
-                                checker.semantic.statements(),
-                            )
+                            checker.semantic.different_branches(left, right)
                         })
                     }) {
                         continue;
@@ -208,11 +204,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                     // If the bindings are in different forks, abort.
                     if shadowed.source.map_or(true, |left| {
                         binding.source.map_or(true, |right| {
-                            branch_detection::different_forks(
-                                left,
-                                right,
-                                checker.semantic.statements(),
-                            )
+                            checker.semantic.different_branches(left, right)
                         })
                     }) {
                         continue;

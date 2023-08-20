@@ -256,5 +256,5 @@ fn fix_imports(
         checker.stylist(),
         checker.indexer(),
     )?;
-    Ok(Fix::automatic(edit).isolate(checker.isolation(parent)))
+    Ok(Fix::automatic(edit).isolate(checker.parent_isolation()))
 }
