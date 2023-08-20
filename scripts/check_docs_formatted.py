@@ -83,6 +83,7 @@ KNOWN_PARSE_ERRORS = [
     "mixed-spaces-and-tabs",
     "no-indented-block",
     "non-pep695-type-alias",  # requires Python 3.12
+    "syntax-error",
     "tab-after-comma",
     "tab-after-keyword",
     "tab-after-operator",
