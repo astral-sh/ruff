@@ -564,14 +564,16 @@ fn check_duplicates(checker: &mut Checker, values: &Expr) {
     else {
         return;
     };
-    if elts.len() < 2 {
+    let [first, rest @ ..] = elts.as_slice() else { return; };
+    if rest.is_empty() {
         return;
     }
-
     let mut seen: FxHashMap<ComparableExpr, usize> =
         FxHashMap::with_capacity_and_hasher(elts.len(), BuildHasherDefault::default());
-    let mut prev = &elts[0];
-    for (index, elt) in elts.iter().enumerate() {
+    seen.insert(ComparableExpr::from(first), 0);
+    let mut prev = first;
+    for (index, elt) in rest.iter().enumerate() {
+        let index = index + 1;
         let expr = ComparableExpr::from(elt);
         seen.entry(expr)
             .and_modify(|index| {
