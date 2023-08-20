@@ -6,6 +6,24 @@ use ruff_python_parser::TokenKind;
 use crate::checkers::logical_lines::LogicalLinesContext;
 use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 
+/// ## What it does
+/// Checks for missing whitespace after keywords.
+///
+/// ## Why is this bad?
+/// Missing whitespace after keywords makes the code harder to read.
+///
+/// ## Example
+/// ```python
+/// from a import(b, c)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from a import (b, c)
+/// ```
+///
+/// ## References
+/// - [Python documentation: Keywords](https://docs.python.org/3/reference/lexical_analysis.html#keywords)
 #[violation]
 pub struct MissingWhitespaceAfterKeyword;
 
