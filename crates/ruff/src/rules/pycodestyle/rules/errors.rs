@@ -22,10 +22,11 @@ impl Violation for IOError {
 }
 
 /// ## What it does
-/// Checks for syntax errors in the code.
+/// Checks for code that contains syntax errors.
 ///
 /// ## Why is this bad?
-/// Code with syntax errors cannot be executed or analyzed by static analysis tools.
+/// Code with syntax errors cannot be executed. Such errors are likely a
+/// mistake.
 ///
 /// ## Example
 /// ```python
