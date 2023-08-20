@@ -40,6 +40,23 @@ impl Violation for UnexpectedSpacesAroundKeywordParameterEquals {
     }
 }
 
+/// ## What it does
+/// Checks for missing whitespace around parameter equals.
+///
+/// ## Why is this bad?
+/// Missing whitespace around parameter equals makes the code harder to read.
+///
+/// ## Example
+/// ```python
+/// def add(a: int=0) -> int:
+///     return a + 1
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def add(a: int = 0) -> int:
+///     return a + 1
+/// ```
 #[violation]
 pub struct MissingWhitespaceAroundParameterEquals;
 

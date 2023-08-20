@@ -43,6 +43,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "missing-whitespace-around-bitwise-or-shift-operator",
     "missing-whitespace-around-modulo-operator",
     "missing-whitespace-around-operator",
+    "missing-whitespace-around-parameter-equals",
     "multi-line-implicit-string-concatenation",
     "multiple-leading-hashes-for-block-comment",
     "multiple-spaces-after-comma",
