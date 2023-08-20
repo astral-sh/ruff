@@ -63,8 +63,17 @@ pub(crate) fn subprocess_run_without_check(checker: &mut Checker, call: &ast::Ex
     {
         if call.arguments.find_keyword("check").is_none() {
             let mut diagnostic = Diagnostic::new(SubprocessRunWithoutCheck, call.func.range());
+            let text: &str = checker.locator().slice(call.range());
+            let ends_with_comma = text[..text.len() - 1].trim_end().ends_with(',');
             diagnostic.set_fix(Fix::automatic(Edit::insertion(
-                ", check=False".to_string(),
+                {
+                    if ends_with_comma {
+                        "check=False"
+                    } else {
+                        ", check=False"
+                    }
+                }
+                .to_string(),
                 call.range().end() - TextSize::from(1),
             )));
             checker.diagnostics.push(diagnostic);
