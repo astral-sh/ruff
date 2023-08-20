@@ -1,4 +1,6 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_text_size::TextSize;
+
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::Ranged;
@@ -41,10 +43,14 @@ use crate::checkers::ast::Checker;
 #[violation]
 pub struct SubprocessRunWithoutCheck;
 
-impl Violation for SubprocessRunWithoutCheck {
+impl AlwaysAutofixableViolation for SubprocessRunWithoutCheck {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`subprocess.run` without explicit `check` argument")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Add an explicit check=False".to_string()
     }
 }
 
@@ -56,10 +62,12 @@ pub(crate) fn subprocess_run_without_check(checker: &mut Checker, call: &ast::Ex
         .is_some_and(|call_path| matches!(call_path.as_slice(), ["subprocess", "run"]))
     {
         if call.arguments.find_keyword("check").is_none() {
-            checker.diagnostics.push(Diagnostic::new(
-                SubprocessRunWithoutCheck,
-                call.func.range(),
-            ));
+            let mut diagnostic = Diagnostic::new(SubprocessRunWithoutCheck, call.func.range());
+            diagnostic.set_fix(Fix::automatic(Edit::insertion(
+                ", check=False".to_string(),
+                call.range().end() - TextSize::from(1),
+            )));
+            checker.diagnostics.push(diagnostic);
         }
     }
 }
