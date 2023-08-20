@@ -1932,6 +1932,78 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExceptHandlerExceptHandler
     }
 }
 
+impl FormatRule<ast::FormattedValue, PyFormatContext<'_>>
+    for crate::other::formatted_value::FormatFormattedValue
+{
+    #[inline]
+    fn fmt(&self, node: &ast::FormattedValue, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::FormattedValue>::fmt(self, node, f)
+    }
+}
+impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::FormattedValue {
+    type Format<'a> = FormatRefWithRule<
+        'a,
+        ast::FormattedValue,
+        crate::other::formatted_value::FormatFormattedValue,
+        PyFormatContext<'ast>,
+    >;
+    fn format(&self) -> Self::Format<'_> {
+        FormatRefWithRule::new(
+            self,
+            crate::other::formatted_value::FormatFormattedValue::default(),
+        )
+    }
+}
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::FormattedValue {
+    type Format = FormatOwnedWithRule<
+        ast::FormattedValue,
+        crate::other::formatted_value::FormatFormattedValue,
+        PyFormatContext<'ast>,
+    >;
+    fn into_format(self) -> Self::Format {
+        FormatOwnedWithRule::new(
+            self,
+            crate::other::formatted_value::FormatFormattedValue::default(),
+        )
+    }
+}
+
+impl FormatRule<ast::PartialString, PyFormatContext<'_>>
+    for crate::other::partial_string::FormatPartialString
+{
+    #[inline]
+    fn fmt(&self, node: &ast::PartialString, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::PartialString>::fmt(self, node, f)
+    }
+}
+impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::PartialString {
+    type Format<'a> = FormatRefWithRule<
+        'a,
+        ast::PartialString,
+        crate::other::partial_string::FormatPartialString,
+        PyFormatContext<'ast>,
+    >;
+    fn format(&self) -> Self::Format<'_> {
+        FormatRefWithRule::new(
+            self,
+            crate::other::partial_string::FormatPartialString::default(),
+        )
+    }
+}
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PartialString {
+    type Format = FormatOwnedWithRule<
+        ast::PartialString,
+        crate::other::partial_string::FormatPartialString,
+        PyFormatContext<'ast>,
+    >;
+    fn into_format(self) -> Self::Format {
+        FormatOwnedWithRule::new(
+            self,
+            crate::other::partial_string::FormatPartialString::default(),
+        )
+    }
+}
+
 impl FormatRule<ast::PatternMatchValue, PyFormatContext<'_>>
     for crate::pattern::pattern_match_value::FormatPatternMatchValue
 {
