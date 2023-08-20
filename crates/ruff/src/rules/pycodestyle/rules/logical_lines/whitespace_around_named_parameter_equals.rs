@@ -7,6 +7,29 @@ use ruff_text_size::{TextRange, TextSize};
 use crate::checkers::logical_lines::LogicalLinesContext;
 use crate::rules::pycodestyle::rules::logical_lines::{LogicalLine, LogicalLineToken};
 
+/// ## What it does
+/// Checks for unexpected spaces around keyword / parameter equals.
+///
+/// ## Why is this bad?
+/// Unexpected spaces around keyword / parameter equals makes the code harder to read.
+///
+/// ## Example
+/// ```python
+/// def foo(bar = 0):
+///    pass
+///
+///
+/// foo(bar = 1)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo(bar=0):
+///    pass
+///
+///
+/// foo(bar=1)
+/// ```
 #[violation]
 pub struct UnexpectedSpacesAroundKeywordParameterEquals;
 

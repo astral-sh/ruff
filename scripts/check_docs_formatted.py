@@ -68,6 +68,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "triple-single-quotes",
     "under-indentation",
     "unexpected-indentation-comment",
+    "unexpected-spaces-around-keyword-parameter-equals",
     "unicode-kind-prefix",
     "unnecessary-class-parentheses",
     "useless-semicolon",
