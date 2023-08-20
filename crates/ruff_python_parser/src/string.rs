@@ -381,7 +381,7 @@ impl<'a> StringParser<'a> {
             match next {
                 '{' => {
                     if !constant_piece.is_empty() {
-                        spec_constructor.push(ast::FStringPart::String(ast::StringTodoName {
+                        spec_constructor.push(ast::FStringPart::Literal(ast::PartialString {
                             value: std::mem::take(&mut constant_piece),
                             range: self.range(start_location),
                         }));
@@ -401,7 +401,7 @@ impl<'a> StringParser<'a> {
             self.next_char();
         }
         if !constant_piece.is_empty() {
-            spec_constructor.push(ast::FStringPart::String(ast::StringTodoName {
+            spec_constructor.push(ast::FStringPart::Literal(ast::PartialString {
                 value: std::mem::take(&mut constant_piece),
                 range: self.range(start_location),
             }));
@@ -435,7 +435,7 @@ impl<'a> StringParser<'a> {
                         }
                     }
                     if !content.is_empty() {
-                        parts.push(ast::FStringPart::String(ast::StringTodoName {
+                        parts.push(ast::FStringPart::Literal(ast::PartialString {
                             value: std::mem::take(&mut content),
                             range: self.range(part_start_location),
                         }));
@@ -469,7 +469,7 @@ impl<'a> StringParser<'a> {
         }
 
         if !content.is_empty() {
-            parts.push(ast::FStringPart::String(ast::StringTodoName {
+            parts.push(ast::FStringPart::Literal(ast::PartialString {
                 value: content,
                 range: self.range(part_start_location),
             }));
@@ -634,7 +634,7 @@ pub(crate) fn parse_strings(
     let mut current_end = last_end;
 
     let take_current = |current: &mut Vec<String>, start, end| -> ast::FStringPart {
-        ast::FStringPart::String(ast::StringTodoName {
+        ast::FStringPart::Literal(ast::PartialString {
             value: current.drain(..).collect::<String>(),
             range: TextRange::new(start, end),
         })
@@ -646,7 +646,7 @@ pub(crate) fn parse_strings(
             Expr::FString(ast::ExprFString { parts, .. }) => {
                 for part in parts {
                     match part {
-                        ast::FStringPart::String(ast::StringTodoName {
+                        ast::FStringPart::Literal(ast::PartialString {
                             value: inner,
                             range,
                         }) => {

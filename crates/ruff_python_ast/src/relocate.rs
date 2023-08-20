@@ -197,7 +197,7 @@ pub fn relocate_expr(expr: &mut Expr, location: TextRange) {
 /// location.
 fn relocate_fstring_part(part: &mut nodes::FStringPart, location: TextRange) {
     match part {
-        nodes::FStringPart::String(nodes::StringTodoName { range, .. }) => {
+        nodes::FStringPart::Literal(nodes::PartialString { range, .. }) => {
             *range = location;
         }
         nodes::FStringPart::FormattedValue(nodes::FormattedValue {

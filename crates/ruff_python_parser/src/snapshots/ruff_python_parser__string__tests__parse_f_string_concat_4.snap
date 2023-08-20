@@ -11,8 +11,8 @@ expression: parse_ast
                     range: 0..31,
                     implicit_concatenated: true,
                     parts: [
-                        String(
-                            StringTodoName {
+                        Literal(
+                            PartialString {
                                 range: 1..16,
                                 value: "Hello world",
                             },
@@ -37,8 +37,8 @@ expression: parse_ast
                                 format_spec: [],
                             },
                         ),
-                        String(
-                            StringTodoName {
+                        Literal(
+                            PartialString {
                                 range: 24..30,
                                 value: "again!",
                             },

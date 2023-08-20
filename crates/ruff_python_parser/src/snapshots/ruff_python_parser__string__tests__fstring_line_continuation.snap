@@ -11,8 +11,8 @@ expression: parse_ast
                     range: 0..9,
                     implicit_concatenated: false,
                     parts: [
-                        String(
-                            StringTodoName {
+                        Literal(
+                            PartialString {
                                 range: 3..5,
                                 value: "\\\n",
                             },

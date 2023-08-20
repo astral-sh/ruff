@@ -37,8 +37,8 @@ FString(
                     format_spec: [],
                 },
             ),
-            String(
-                StringTodoName {
+            Literal(
+                PartialString {
                     range: 10..17,
                     value: "{foo}",
                 },

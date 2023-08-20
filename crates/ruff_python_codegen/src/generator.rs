@@ -1305,7 +1305,7 @@ impl<'a> Generator<'a> {
 
     fn unparse_fstring_elem(&mut self, part: &ast::FStringPart) {
         match part {
-            ast::FStringPart::String(ast::StringTodoName { value, .. }) => {
+            ast::FStringPart::Literal(ast::PartialString { value, .. }) => {
                 self.unparse_fstring_literal(value);
             }
             ast::FStringPart::FormattedValue(ast::FormattedValue {

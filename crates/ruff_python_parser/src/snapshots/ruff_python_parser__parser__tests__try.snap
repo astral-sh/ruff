@@ -83,8 +83,8 @@ expression: parse_ast
                                                             range: 62..81,
                                                             implicit_concatenated: false,
                                                             parts: [
-                                                                String(
-                                                                    StringTodoName {
+                                                                Literal(
+                                                                    PartialString {
                                                                         range: 64..71,
                                                                         value: "caught ",
                                                                     },
@@ -175,8 +175,8 @@ expression: parse_ast
                                                             range: 114..133,
                                                             implicit_concatenated: false,
                                                             parts: [
-                                                                String(
-                                                                    StringTodoName {
+                                                                Literal(
+                                                                    PartialString {
                                                                         range: 116..123,
                                                                         value: "caught ",
                                                                     },

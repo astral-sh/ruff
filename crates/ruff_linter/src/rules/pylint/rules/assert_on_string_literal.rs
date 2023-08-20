@@ -76,14 +76,14 @@ pub(crate) fn assert_on_string_literal(checker: &mut Checker, test: &Expr) {
             checker.diagnostics.push(Diagnostic::new(
                 AssertOnStringLiteral {
                     kind: if parts.iter().all(|part| match part {
-                        ast::FStringPart::String(ast::StringTodoName { value, .. }) => {
+                        ast::FStringPart::Literal(ast::PartialString { value, .. }) => {
                             value.is_empty()
                         }
                         ast::FStringPart::FormattedValue(_) => false,
                     }) {
                         Kind::Empty
                     } else if parts.iter().any(|part| match part {
-                        ast::FStringPart::String(ast::StringTodoName { value, .. }) => {
+                        ast::FStringPart::Literal(ast::PartialString { value, .. }) => {
                             !value.is_empty()
                         }
                         ast::FStringPart::FormattedValue(_) => false,

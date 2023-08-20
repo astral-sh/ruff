@@ -53,7 +53,7 @@ impl<'a> AnyString<'a> {
                         let string_content = locator.slice(*range);
                         string_content.contains(['"', '\''])
                     }
-                    ast::FStringPart::String(_) => false,
+                    ast::FStringPart::Literal(_) => false,
                 }) {
                     Quoting::Preserve
                 } else {

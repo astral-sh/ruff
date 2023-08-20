@@ -91,7 +91,7 @@ fn contains_message(expr: &Expr) -> bool {
     match expr {
         Expr::FString(ast::ExprFString { parts, .. }) => {
             for part in parts {
-                if let ast::FStringPart::String(ast::StringTodoName { value, .. }) = part {
+                if let ast::FStringPart::Literal(ast::PartialString { value, .. }) = part {
                     if value.chars().any(char::is_whitespace) {
                         return true;
                     }

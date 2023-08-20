@@ -20,8 +20,8 @@ FString(
                     debug_text: None,
                     conversion: None,
                     format_spec: [
-                        String(
-                            StringTodoName {
+                        Literal(
+                            PartialString {
                                 range: 7..11,
                                 value: "spec",
                             },

@@ -25,8 +25,8 @@ FString(
                     ),
                     conversion: None,
                     format_spec: [
-                        String(
-                            StringTodoName {
+                        Literal(
+                            PartialString {
                                 range: 9..12,
                                 value: ">10",
                             },
