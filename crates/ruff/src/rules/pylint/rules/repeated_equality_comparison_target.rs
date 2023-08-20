@@ -113,14 +113,14 @@ pub(crate) fn repeated_equality_comparison_target(checker: &mut Checker, bool_op
 /// joined with `and`.
 fn is_allowed_value(bool_op: BoolOp, value: &Expr) -> bool {
     let Expr::Compare(ExprCompare {
-                          left,
-                          ops,
-                          comparators,
-                          ..
-                      }) = value
-        else {
-            return false;
-        };
+        left,
+        ops,
+        comparators,
+        ..
+    }) = value
+    else {
+        return false;
+    };
 
     ops.iter().all(|op| {
         if match bool_op {
