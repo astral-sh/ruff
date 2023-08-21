@@ -155,6 +155,8 @@ match foo:
         pass
     case ["a", "b"]:
         pass
+    case (["a", "b"]):
+        pass
 
 match foo:
     case [  # leading
@@ -333,6 +335,13 @@ match foo:
         "NOT_YET_IMPLEMENTED_PatternMatchValue",
         "NOT_YET_IMPLEMENTED_PatternMatchValue",
     ]:
+        pass
+    case (
+        [
+            "NOT_YET_IMPLEMENTED_PatternMatchValue",
+            "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        ]
+    ):
         pass
 
 match foo:

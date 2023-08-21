@@ -149,6 +149,8 @@ match foo:
         pass
     case ["a", "b"]:
         pass
+    case (["a", "b"]):
+        pass
 
 match foo:
     case [  # leading
