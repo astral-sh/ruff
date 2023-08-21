@@ -97,20 +97,20 @@ def http_error(status):
 match point:
     case (0,   0):  # fmt: skip
         print("Origin")
-    case [
+    case (
         "NOT_YET_IMPLEMENTED_PatternMatchValue",
         x as NOT_YET_IMPLEMENTED_PatternMatchAs,
-    ]:
+    ):
         print(f"Y={y}")
-    case [
+    case (
         x as NOT_YET_IMPLEMENTED_PatternMatchAs,
         "NOT_YET_IMPLEMENTED_PatternMatchValue",
-    ]:
+    ):
         print(f"X={x}")
-    case [
+    case (
         x as NOT_YET_IMPLEMENTED_PatternMatchAs,
         x as NOT_YET_IMPLEMENTED_PatternMatchAs,
-    ]:
+    ):
         print(f"X={x}, Y={y}")
     case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
         raise ValueError("Not a point")
@@ -160,11 +160,11 @@ match test_variable:
             40
     ):  # fmt: skip
         print("A warning has been received.")
-    case [
+    case (
         "NOT_YET_IMPLEMENTED_PatternMatchValue",
         x as NOT_YET_IMPLEMENTED_PatternMatchAs,
         x as NOT_YET_IMPLEMENTED_PatternMatchAs,
-    ]:
+    ):
         print(f"An error {code} occurred.")
 
 
