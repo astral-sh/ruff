@@ -58,6 +58,15 @@ impl FormatNodeRule<PatternMatchSequence> for FormatPatternMatchSequence {
                     .with_dangling_comments(dangling)
                     .fmt(f)
             }
+            // If the match sequence is not parenthesized, inserting a comma after the last item
+            // will cause a syntax error. For example:
+            // ```python
+            // match:
+            //     case 1, 2,:
+            //         ...
+            //     case x, y, if x > 0:
+            //         ...
+            // ```
             SequenceType::TupleWithoutParentheses => f
                 .join_with(&format_args![text(","), space()])
                 .entries(patterns.iter().map(AsFormat::format))
