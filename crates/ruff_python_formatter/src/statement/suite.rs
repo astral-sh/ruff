@@ -59,8 +59,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
         let source = f.context().source();
         let source_type = f.options().source_type();
 
-        let mut with_node_level = WithNodeLevel::new(node_level, f);
-        let f = &mut with_node_level;
+        let f = &mut WithNodeLevel::new(node_level, f);
 
         let mut iter = statements.iter();
         let Some(first) = iter.next() else {
