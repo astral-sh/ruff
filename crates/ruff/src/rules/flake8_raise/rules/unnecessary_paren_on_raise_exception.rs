@@ -74,10 +74,7 @@ pub(crate) fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: 
 
         let mut diagnostic = Diagnostic::new(UnnecessaryParenOnRaiseException, arguments.range());
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Fix::automatic(Edit::deletion(
-                arguments.start(),
-                arguments.end(),
-            )));
+            diagnostic.set_fix(Fix::automatic(Edit::range_deletion(arguments.range())));
         }
         checker.diagnostics.push(diagnostic);
     }
