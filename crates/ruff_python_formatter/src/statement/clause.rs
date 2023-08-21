@@ -108,13 +108,17 @@ impl<'a> ClauseHeader<'a> {
                 is_async: _,
                 decorator_list: _,
                 name: _,
-                returns: _,
+                returns,
                 body: _,
             }) => {
                 if let Some(type_params) = type_params.as_ref() {
                     visit(type_params, visitor);
                 }
                 visit(parameters.as_ref(), visitor);
+
+                if let Some(returns) = returns.as_deref() {
+                    visit(returns, visitor);
+                }
             }
             ClauseHeader::If(StmtIf {
                 test,
