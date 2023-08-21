@@ -1,10 +1,5 @@
-use ruff_formatter::prelude::format_with;
-use ruff_formatter::prelude::space;
-use ruff_formatter::prelude::text;
-use ruff_formatter::Buffer;
-use ruff_formatter::Format;
-use ruff_formatter::FormatResult;
-use ruff_formatter::{format_args, write};
+use ruff_formatter::prelude::{format_with, space, text};
+use ruff_formatter::{format_args, write, Buffer, Format, FormatResult};
 use ruff_python_ast::PatternMatchSequence;
 
 use crate::builders::PyFormatterExtensions;
@@ -66,7 +61,7 @@ impl FormatNodeRule<PatternMatchSequence> for FormatPatternMatchSequence {
             SequenceType::TupleWithoutParentheses => {
                 let items = format_with(|f| {
                     f.join_with(&format_args![text(","), space()])
-                        .entries(patterns.iter().map(|p| p.format()))
+                        .entries(patterns.iter().map(AsFormat::format))
                         .finish()
                 });
                 write!(f, [items])
