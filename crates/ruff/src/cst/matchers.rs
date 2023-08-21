@@ -1,21 +1,16 @@
+use crate::autofix::codemods::CodegenStylist;
 use anyhow::{bail, Result};
 use libcst_native::{
     Arg, Attribute, Call, Comparison, CompoundStatement, Dict, Expression, FunctionDef,
     GeneratorExp, If, Import, ImportAlias, ImportFrom, ImportNames, IndentedBlock, Lambda,
     ListComp, Module, Name, SmallStatement, Statement, Suite, Tuple, With,
 };
+use ruff_python_codegen::Stylist;
 
 pub(crate) fn match_module(module_text: &str) -> Result<Module> {
     match libcst_native::parse_module(module_text, None) {
         Ok(module) => Ok(module),
         Err(_) => bail!("Failed to extract CST from source"),
-    }
-}
-
-pub(crate) fn match_expression(expression_text: &str) -> Result<Expression> {
-    match libcst_native::parse_expression(expression_text) {
-        Ok(expression) => Ok(expression),
-        Err(_) => bail!("Failed to extract expression from source"),
     }
 }
 
@@ -204,4 +199,60 @@ pub(crate) fn match_if<'a, 'b>(statement: &'a mut Statement<'b>) -> Result<&'a m
     } else {
         bail!("Expected Statement::Compound")
     }
+}
+
+/// Given the source code for an expression, return the parsed [`Expression`].
+///
+/// If the expression is not guaranteed to be valid as a standalone expression (e.g., if it may
+/// span multiple lines and/or require parentheses), use [`transform_expression`] instead.
+pub(crate) fn match_expression(expression_text: &str) -> Result<Expression> {
+    match libcst_native::parse_expression(expression_text) {
+        Ok(expression) => Ok(expression),
+        Err(_) => bail!("Failed to extract expression from source"),
+    }
+}
+
+/// Run a transformation function over an expression.
+///
+/// Passing an expression to [`match_expression`] directly can lead to parse errors if the
+/// expression is not a valid standalone expression (e.g., it was parenthesized in the original
+/// source). This method instead wraps the expression in "fake" parentheses, runs the
+/// transformation, then removes the "fake" parentheses.
+pub(crate) fn transform_expression(
+    source_code: &str,
+    stylist: &Stylist,
+    func: impl FnOnce(Expression) -> Result<Expression>,
+) -> Result<String> {
+    // Wrap the expression in parentheses.
+    let source_code = format!("({source_code})");
+    let expression = match_expression(&source_code)?;
+
+    // Run the function on the expression.
+    let expression = func(expression)?;
+
+    // Codegen the expression.
+    let mut source_code = expression.codegen_stylist(stylist);
+
+    // Drop the outer parentheses.
+    source_code.drain(0..1);
+    source_code.drain(source_code.len() - 1..source_code.len());
+    Ok(source_code)
+}
+
+/// Like [`transform_expression`], but operates on the source code of the expression, rather than
+/// the parsed [`Expression`]. This _shouldn't_ exist, but does to accommodate lifetime issues.
+pub(crate) fn transform_expression_text(
+    source_code: &str,
+    func: impl FnOnce(String) -> Result<String>,
+) -> Result<String> {
+    // Wrap the expression in parentheses.
+    let source_code = format!("({source_code})");
+
+    // Run the function on the expression.
+    let mut transformed = func(source_code)?;
+
+    // Drop the outer parentheses.
+    transformed.drain(0..1);
+    transformed.drain(transformed.len() - 1..transformed.len());
+    Ok(transformed)
 }

@@ -381,34 +381,34 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                                 Ok(summary) => {
                                     if checker.enabled(Rule::StringDotFormatExtraNamedArguments) {
                                         pyflakes::rules::string_dot_format_extra_named_arguments(
-                                            checker, &summary, keywords, location,
+                                            checker, call, &summary, keywords,
                                         );
                                     }
                                     if checker
                                         .enabled(Rule::StringDotFormatExtraPositionalArguments)
                                     {
                                         pyflakes::rules::string_dot_format_extra_positional_arguments(
-                                            checker, &summary, args, location,
+                                            checker, call, &summary, args,
                                         );
                                     }
                                     if checker.enabled(Rule::StringDotFormatMissingArguments) {
                                         pyflakes::rules::string_dot_format_missing_argument(
-                                            checker, &summary, args, keywords, location,
+                                            checker, call, &summary, args, keywords,
                                         );
                                     }
                                     if checker.enabled(Rule::StringDotFormatMixingAutomatic) {
                                         pyflakes::rules::string_dot_format_mixing_automatic(
-                                            checker, &summary, location,
+                                            checker, call, &summary,
                                         );
                                     }
                                     if checker.enabled(Rule::FormatLiterals) {
-                                        pyupgrade::rules::format_literals(checker, &summary, call);
+                                        pyupgrade::rules::format_literals(checker, call, &summary);
                                     }
                                     if checker.enabled(Rule::FString) {
                                         pyupgrade::rules::f_strings(
                                             checker,
+                                            call,
                                             &summary,
-                                            expr,
                                             value,
                                             checker.settings.line_length,
                                         );
