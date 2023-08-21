@@ -1,3 +1,4 @@
+use ast::{Constant, Expr};
 use ruff_python_ast::{self as ast, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -65,9 +66,31 @@ fn has_eq_without_hash(body: &[Stmt]) -> bool {
     let mut has_hash = false;
     let mut has_eq = false;
     for statement in body {
+        // check if `__hash__` was explicitly set to `None`
+        if let Stmt::Assign(ast::StmtAssign { targets, value, .. }) = statement {
+            let [target] = targets.as_slice() else {
+                continue;
+            };
+
+            let is_name_hash = target
+                .as_name_expr()
+                .is_some_and(|expr| expr.id == "__hash__");
+            has_hash = is_name_hash
+                && matches!(
+                    value.as_ref(),
+                    Expr::Constant(ast::ExprConstant {
+                        value: Constant::None,
+                        ..
+                    })
+                );
+
+            continue;
+        }
+
         let Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) = statement else {
             continue;
         };
+
         match name.as_str() {
             "__hash__" => has_hash = true,
             "__eq__" => has_eq = true,
