@@ -1139,7 +1139,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pygrep_hooks::rules::non_existent_mock_method(checker, test);
             }
         }
-        Stmt::With(with_ @ ast::StmtWith { items, body, .. }) => {
+        Stmt::With(with_stmt @ ast::StmtWith { items, body, .. }) => {
             if checker.enabled(Rule::AssertRaisesException) {
                 flake8_bugbear::rules::assert_raises_exception(checker, items);
             }
@@ -1149,7 +1149,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::MultipleWithStatements) {
                 flake8_simplify::rules::multiple_with_statements(
                     checker,
-                    with_,
+                    with_stmt,
                     checker.semantic.current_statement_parent(),
                 );
             }
@@ -1168,13 +1168,16 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 perflint::rules::try_except_in_loop(checker, body);
             }
         }
-        Stmt::For(ast::StmtFor {
-            target,
-            body,
-            iter,
-            orelse,
-            ..
-        }) => {
+        Stmt::For(
+            for_stmt @ ast::StmtFor {
+                target,
+                body,
+                iter,
+                orelse,
+                is_async,
+                ..
+            },
+        ) => {
             if checker.any_enabled(&[
                 Rule::UnusedLoopControlVariable,
                 Rule::IncorrectDictIterator,
@@ -1200,17 +1203,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::IterationOverSet) {
                 pylint::rules::iteration_over_set(checker, iter);
             }
-            if stmt.is_for_stmt() {
-                if checker.enabled(Rule::ReimplementedBuiltin) {
-                    flake8_simplify::rules::convert_for_loop_to_any_all(checker, stmt);
-                }
-                if checker.enabled(Rule::InDictKeys) {
-                    flake8_simplify::rules::key_in_dict_for(checker, target, iter);
-                }
-                if checker.enabled(Rule::TryExceptInLoop) {
-                    perflint::rules::try_except_in_loop(checker, body);
-                }
-            }
             if checker.enabled(Rule::ManualListComprehension) {
                 perflint::rules::manual_list_comprehension(checker, target, body);
             }
@@ -1219,6 +1211,17 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::UnnecessaryListCast) {
                 perflint::rules::unnecessary_list_cast(checker, iter);
+            }
+            if !is_async {
+                if checker.enabled(Rule::ReimplementedBuiltin) {
+                    flake8_simplify::rules::convert_for_loop_to_any_all(checker, stmt);
+                }
+                if checker.enabled(Rule::InDictKeys) {
+                    flake8_simplify::rules::key_in_dict_for(checker, for_stmt);
+                }
+                if checker.enabled(Rule::TryExceptInLoop) {
+                    perflint::rules::try_except_in_loop(checker, body);
+                }
             }
         }
         Stmt::Try(ast::StmtTry {

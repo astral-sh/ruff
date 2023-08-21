@@ -31,6 +31,8 @@ for key in list(obj.keys()):
 
 key in (obj or {}).keys()  # SIM118
 
+(key) in (obj or {}).keys()  # SIM118
+
 from typing import KeysView
 
 
