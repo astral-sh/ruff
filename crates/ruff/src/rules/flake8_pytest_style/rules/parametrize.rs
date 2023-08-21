@@ -5,12 +5,13 @@ use ruff_python_ast::{
     self as ast, Arguments, Constant, Decorator, Expr, ExprContext, PySourceType, Ranged,
 };
 use ruff_python_parser::{lexer, AsMode, Tok};
-use ruff_text_size::TextRange;
+use ruff_text_size::{TextRange, TextSize};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_codegen::Generator;
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::Locator;
 
 use crate::checkers::ast::Checker;
@@ -215,10 +216,16 @@ pub struct PytestDuplicateParametrizeTestCases {
 }
 
 impl Violation for PytestDuplicateParametrizeTestCases {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let PytestDuplicateParametrizeTestCases { index } = self;
         format!("Duplicate of test case at index {index} in `@pytest_mark.parametrize`")
+    }
+
+    fn autofix_title(&self) -> Option<String> {
+        Some("Remove duplicate test case".to_string())
     }
 }
 
@@ -551,6 +558,21 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
     }
 }
 
+/// Given an element in a list, return the comma that follows it:
+/// ```python
+/// @pytest.mark.parametrize(
+///     "x",
+///     [.., (elt), ..],
+///              ^^^^^
+///              Tokenize this range to locate the comma.
+/// )
+/// ```
+fn trailing_comma(element: &Expr, source: &str) -> Option<TextSize> {
+    SimpleTokenizer::starts_at(element.end(), source)
+        .find(|token| token.kind == SimpleTokenKind::Comma)
+        .map(|token| token.start())
+}
+
 /// PT014
 fn check_duplicates(checker: &mut Checker, values: &Expr) {
     let (Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. })) =
@@ -561,16 +583,37 @@ fn check_duplicates(checker: &mut Checker, values: &Expr) {
 
     let mut seen: FxHashMap<ComparableExpr, usize> =
         FxHashMap::with_capacity_and_hasher(elts.len(), BuildHasherDefault::default());
-    for (index, elt) in elts.iter().enumerate() {
-        let expr = ComparableExpr::from(elt);
+    let mut prev = None;
+    for (index, element) in elts.iter().enumerate() {
+        let expr = ComparableExpr::from(element);
         seen.entry(expr)
             .and_modify(|index| {
-                checker.diagnostics.push(Diagnostic::new(
+                let mut diagnostic = Diagnostic::new(
                     PytestDuplicateParametrizeTestCases { index: *index },
-                    elt.range(),
-                ));
+                    element.range(),
+                );
+                if checker.patch(diagnostic.kind.rule()) {
+                    if let Some(prev) = prev {
+                        let values_end = values.range().end() - TextSize::new(1);
+                        let previous_end = trailing_comma(prev, checker.locator().contents())
+                            .unwrap_or(values_end);
+                        let element_end = trailing_comma(element, checker.locator().contents())
+                            .unwrap_or(values_end);
+                        let deletion_range = TextRange::new(previous_end, element_end);
+                        if !checker
+                            .indexer()
+                            .comment_ranges()
+                            .intersects(deletion_range)
+                        {
+                            diagnostic
+                                .set_fix(Fix::suggested(Edit::range_deletion(deletion_range)));
+                        }
+                    }
+                }
+                checker.diagnostics.push(diagnostic);
             })
             .or_insert(index);
+        prev = Some(element);
     }
 }
 
