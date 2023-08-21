@@ -7,6 +7,27 @@ use ruff_source_file::Locator;
 
 use crate::logging::DisplayParseErrorType;
 
+/// ## What it does
+/// This is not a regular lint, instead it is raised when a file can not be read.
+///
+/// ## Why is this bad?
+/// This indicates an error in the development setup. A common cause of IO errors is that the
+/// current user doesn't have the permission to read the file. Another possible reason is a broken
+/// symlink.
+///
+/// ## Example
+/// On linux:
+/// ```shell
+/// $ echo 'print("hello world!")' > a.py
+/// $ chmod 000 a.py
+/// $ ruff a.py
+/// a.py:1:1: E902 Permission denied (os error 13)
+/// Found 1 error.
+/// ```
+///
+/// ## References
+/// - [UNIX Permissions introduction](https://mason.gmu.edu/~montecin/UNIXpermiss.htm)
+/// - [Command Line Basics: Symbolic Links](https://www.digitalocean.com/community/tutorials/workflow-symbolic-links)
 #[violation]
 pub struct IOError {
     pub message: String,
