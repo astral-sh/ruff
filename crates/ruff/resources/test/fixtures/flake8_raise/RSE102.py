@@ -52,3 +52,10 @@ class Class:
 
 # OK
 raise Class.error()
+
+
+import ctypes
+
+
+# OK
+raise ctypes.WinError(1)
