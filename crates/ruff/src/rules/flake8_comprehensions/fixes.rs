@@ -765,13 +765,14 @@ pub(crate) fn fix_unnecessary_double_cast_or_process(
     outer_call.args = match outer_call.args.split_first() {
         Some((first, rest)) => {
             let inner_call = match_call(&first.value)?;
-            if let Some(iterable) = inner_call.args.first() {
-                let mut args = vec![iterable.clone()];
-                args.extend_from_slice(rest);
-                args
-            } else {
-                bail!("Expected at least one argument in inner function call");
-            }
+            inner_call
+                .args
+                .iter()
+                .filter(|argument| argument.keyword.is_none())
+                .take(1)
+                .chain(rest.iter())
+                .cloned()
+                .collect::<Vec<_>>()
         }
         None => bail!("Expected at least one argument in outer function call"),
     };
