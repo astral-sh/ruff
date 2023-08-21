@@ -57,7 +57,7 @@ RSE102.py:16:17: RSE102 [*] Unnecessary parentheses on raised exception
 14 14 | 
 15 15 | # RSE102
 16    |-raise TypeError ()
-   16 |+raise TypeError
+   16 |+raise TypeError 
 17 17 | 
 18 18 | # RSE102
 19 19 | raise TypeError \
@@ -74,64 +74,109 @@ RSE102.py:20:5: RSE102 [*] Unnecessary parentheses on raised exception
    = help: Remove unnecessary parentheses
 
 ℹ Fix
-16 16 | raise TypeError ()
 17 17 | 
 18 18 | # RSE102
-19    |-raise TypeError \
+19 19 | raise TypeError \
 20    |-    ()
-   19 |+raise TypeError
-21 20 | 
-22 21 | # RSE102
-23 22 | raise TypeError(
-
-RSE102.py:23:16: RSE102 [*] Unnecessary parentheses on raised exception
-   |
-22 |   # RSE102
-23 |   raise TypeError(
-   |  ________________^
-24 | | 
-25 | | )
-   | |_^ RSE102
-26 |   
-27 |   # RSE102
-   |
-   = help: Remove unnecessary parentheses
-
-ℹ Fix
-20 20 |     ()
+   20 |+    
 21 21 | 
 22 22 | # RSE102
-23    |-raise TypeError(
-24    |-
-25    |-)
-   23 |+raise TypeError
-26 24 | 
-27 25 | # RSE102
-28 26 | raise TypeError(
+23 23 | raise TypeError \
 
-RSE102.py:28:16: RSE102 [*] Unnecessary parentheses on raised exception
+RSE102.py:24:5: RSE102 [*] Unnecessary parentheses on raised exception
    |
-27 |   # RSE102
-28 |   raise TypeError(
-   |  ________________^
-29 | |     # Hello, world!
-30 | | )
-   | |_^ RSE102
-31 |   
-32 |   # OK
+22 | # RSE102
+23 | raise TypeError \
+24 |     ();
+   |     ^^ RSE102
+25 | 
+26 | # RSE102
    |
    = help: Remove unnecessary parentheses
 
 ℹ Fix
-25 25 | )
-26 26 | 
-27 27 | # RSE102
-28    |-raise TypeError(
-29    |-    # Hello, world!
-30    |-)
-   28 |+raise TypeError
-31 29 | 
-32 30 | # OK
-33 31 | raise AssertionError
+21 21 | 
+22 22 | # RSE102
+23 23 | raise TypeError \
+24    |-    ();
+   24 |+    ;
+25 25 | 
+26 26 | # RSE102
+27 27 | raise TypeError(
+
+RSE102.py:27:16: RSE102 [*] Unnecessary parentheses on raised exception
+   |
+26 |   # RSE102
+27 |   raise TypeError(
+   |  ________________^
+28 | | 
+29 | | )
+   | |_^ RSE102
+30 |   
+31 |   # RSE102
+   |
+   = help: Remove unnecessary parentheses
+
+ℹ Fix
+24 24 |     ();
+25 25 | 
+26 26 | # RSE102
+27    |-raise TypeError(
+28    |-
+29    |-)
+   27 |+raise TypeError
+30 28 | 
+31 29 | # RSE102
+32 30 | raise (TypeError) (
+
+RSE102.py:32:19: RSE102 [*] Unnecessary parentheses on raised exception
+   |
+31 |   # RSE102
+32 |   raise (TypeError) (
+   |  ___________________^
+33 | | 
+34 | | )
+   | |_^ RSE102
+35 |   
+36 |   # RSE102
+   |
+   = help: Remove unnecessary parentheses
+
+ℹ Fix
+29 29 | )
+30 30 | 
+31 31 | # RSE102
+32    |-raise (TypeError) (
+33    |-
+34    |-)
+   32 |+raise (TypeError) 
+35 33 | 
+36 34 | # RSE102
+37 35 | raise TypeError(
+
+RSE102.py:37:16: RSE102 [*] Unnecessary parentheses on raised exception
+   |
+36 |   # RSE102
+37 |   raise TypeError(
+   |  ________________^
+38 | |     # Hello, world!
+39 | | )
+   | |_^ RSE102
+40 |   
+41 |   # OK
+   |
+   = help: Remove unnecessary parentheses
+
+ℹ Fix
+34 34 | )
+35 35 | 
+36 36 | # RSE102
+37    |-raise TypeError(
+38    |-    # Hello, world!
+39    |-)
+   37 |+raise TypeError
+40 38 | 
+41 39 | # OK
+42 40 | raise AssertionError
 
 
