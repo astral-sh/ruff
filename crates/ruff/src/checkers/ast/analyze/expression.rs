@@ -432,7 +432,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 pyupgrade::rules::deprecated_unittest_alias(checker, func);
             }
             if checker.enabled(Rule::SuperCallWithParameters) {
-                pyupgrade::rules::super_call_with_parameters(checker, expr, func, args);
+                pyupgrade::rules::super_call_with_parameters(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryEncodeUTF8) {
                 pyupgrade::rules::unnecessary_encode_utf8(checker, call);
