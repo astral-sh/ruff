@@ -1,0 +1,25 @@
+---
+source: crates/ruff_cli/tests/integration_test.rs
+info:
+  program: ruff
+  args:
+    - "-"
+    - "--isolated"
+    - "--no-cache"
+    - "--format"
+    - text
+    - "--select"
+    - ALL
+  stdin: "I=42\n"
+---
+success: false
+exit_code: 1
+----- stdout -----
+-:1:1: E741 Ambiguous variable name: `I`
+-:1:1: D100 Missing docstring in public module
+Found 2 errors.
+
+----- stderr -----
+warning: `one-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are incompatible. Ignoring `one-blank-line-before-class`.
+warning: `multi-line-summary-first-line` (D212) and `multi-line-summary-second-line` (D213) are incompatible. Ignoring `multi-line-summary-second-line`.
+

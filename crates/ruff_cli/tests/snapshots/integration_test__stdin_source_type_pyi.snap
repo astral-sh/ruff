@@ -1,0 +1,22 @@
+---
+source: crates/ruff_cli/tests/integration_test.rs
+info:
+  program: ruff
+  args:
+    - "-"
+    - "--format"
+    - text
+    - "--stdin-filename"
+    - TCH.pyi
+    - "--isolated"
+    - "--select"
+    - TCH
+    - "--no-cache"
+  stdin: "import os\n"
+---
+success: true
+exit_code: 0
+----- stdout -----
+
+----- stderr -----
+

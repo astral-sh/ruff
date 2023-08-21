@@ -1,0 +1,23 @@
+---
+source: crates/ruff_cli/tests/integration_test.rs
+info:
+  program: ruff
+  args:
+    - "-"
+    - "--isolated"
+    - "--no-cache"
+    - "--format"
+    - text
+    - "--fix"
+  stdin: "import os\nimport sys\n\nif (1, 2):\n     print(sys.version)\n"
+---
+success: false
+exit_code: 1
+----- stdout -----
+import sys
+
+if (1, 2):
+     print(sys.version)
+
+----- stderr -----
+

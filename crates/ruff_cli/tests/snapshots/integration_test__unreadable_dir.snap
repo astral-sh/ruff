@@ -1,0 +1,16 @@
+---
+source: crates/ruff_cli/tests/integration_test.rs
+info:
+  program: ruff
+  args:
+    - "--no-cache"
+    - "--isolated"
+    - /tmp/.tmpnfV6VI/unreadable_dir
+---
+success: true
+exit_code: 0
+----- stdout -----
+
+----- stderr -----
+warning: Encountered error: Permission denied (os error 13)
+

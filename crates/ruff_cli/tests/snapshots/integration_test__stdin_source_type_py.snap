@@ -1,0 +1,23 @@
+---
+source: crates/ruff_cli/tests/integration_test.rs
+info:
+  program: ruff
+  args:
+    - "-"
+    - "--format"
+    - text
+    - "--isolated"
+    - "--no-cache"
+    - "--stdin-filename"
+    - TCH.py
+  stdin: "import os\n"
+---
+success: false
+exit_code: 1
+----- stdout -----
+TCH.py:1:8: F401 [*] `os` imported but unused
+Found 1 error.
+[*] 1 potentially fixable with the --fix option.
+
+----- stderr -----
+

@@ -1,0 +1,22 @@
+---
+source: crates/ruff_cli/tests/integration_test.rs
+info:
+  program: ruff
+  args:
+    - "-"
+    - "--isolated"
+    - "--no-cache"
+    - "--format"
+    - text
+    - "--select"
+    - E225
+  stdin: "I=42\n"
+---
+success: false
+exit_code: 1
+----- stdout -----
+-:1:2: E225 Missing whitespace around operator
+Found 1 error.
+
+----- stderr -----
+

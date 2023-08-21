@@ -1,0 +1,17 @@
+---
+source: crates/ruff_cli/tests/integration_test.rs
+info:
+  program: ruff
+  args:
+    - "--explain"
+    - RUF404
+---
+success: false
+exit_code: 2
+----- stdout -----
+
+----- stderr -----
+error: invalid value 'RUF404' for '[RULE]': unknown rule code
+
+For more information, try '--help'.
+

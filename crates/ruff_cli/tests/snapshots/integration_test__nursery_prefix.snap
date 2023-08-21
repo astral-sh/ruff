@@ -1,0 +1,22 @@
+---
+source: crates/ruff_cli/tests/integration_test.rs
+info:
+  program: ruff
+  args:
+    - "-"
+    - "--isolated"
+    - "--no-cache"
+    - "--format"
+    - text
+    - "--select"
+    - E
+  stdin: "I=42\n"
+---
+success: false
+exit_code: 1
+----- stdout -----
+-:1:1: E741 Ambiguous variable name: `I`
+Found 1 error.
+
+----- stderr -----
+
