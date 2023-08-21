@@ -11,7 +11,7 @@ use crate::expression::parentheses::{
 };
 use crate::other::commas;
 use crate::prelude::*;
-use crate::statement::clause::{clause_header, ClauseHeader};
+use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
 use crate::{FormatNodeRule, PyFormatOptions};
 
 #[derive(Default)]
@@ -100,7 +100,7 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
                         Ok(())
                     })
                 ),
-                block_indent(&item.body.format())
+                clause_body(&item.body, colon_comments)
             ]
         )
     }

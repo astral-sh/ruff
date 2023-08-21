@@ -244,6 +244,6 @@ fn fix_imports(
 
     Ok(
         Fix::suggested_edits(remove_import_edit, add_import_edit.into_edits())
-            .isolate(checker.isolation(parent)),
+            .isolate(checker.parent_isolation()),
     )
 }

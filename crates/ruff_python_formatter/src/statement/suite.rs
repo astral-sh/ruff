@@ -1,4 +1,4 @@
-use crate::comments::{leading_comments, trailing_comments};
+use crate::comments::{leading_comments, trailing_comments, Comments};
 use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
 use ruff_python_ast::helpers::is_compound_statement;
 use ruff_python_ast::node::AnyNodeRef;
@@ -17,7 +17,7 @@ use crate::verbatim::{
 };
 
 /// Level at which the [`Suite`] appears in the source code.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Default)]
 pub enum SuiteKind {
     /// Statements at the module level / top level
     TopLevel,
@@ -29,6 +29,7 @@ pub enum SuiteKind {
     Class,
 
     /// Statements in any other body (e.g., `if` or `while`).
+    #[default]
     Other,
 }
 
@@ -168,9 +169,15 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                                     // ```
                                     let class_sequences_with_ellipsis_only =
                                         preceding.as_class_def_stmt().is_some_and(|class| {
-                                            contains_only_an_ellipsis(&class.body)
+                                            contains_only_an_ellipsis(
+                                                &class.body,
+                                                f.context().comments(),
+                                            )
                                         }) && following.as_class_def_stmt().is_some_and(|class| {
-                                            contains_only_an_ellipsis(&class.body)
+                                            contains_only_an_ellipsis(
+                                                &class.body,
+                                                f.context().comments(),
+                                            )
                                         });
 
                                     // Two subsequent functions where the preceding has an ellipsis only body
@@ -180,7 +187,10 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                                     // ```
                                     let function_with_ellipsis =
                                         preceding.as_function_def_stmt().is_some_and(|function| {
-                                            contains_only_an_ellipsis(&function.body)
+                                            contains_only_an_ellipsis(
+                                                &function.body,
+                                                f.context().comments(),
+                                            )
                                         }) && following.is_function_def_stmt();
 
                                     // Don't add an empty line between two classes that have an `...` body only or after
@@ -325,16 +335,19 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
     }
 }
 
-/// Returns `true` if a function or class body contains only an ellipsis.
-fn contains_only_an_ellipsis(body: &[Stmt]) -> bool {
+/// Returns `true` if a function or class body contains only an ellipsis with no comments.
+pub(crate) fn contains_only_an_ellipsis(body: &[Stmt], comments: &Comments) -> bool {
     match body {
-        [Stmt::Expr(ast::StmtExpr { value, .. })] => matches!(
-            value.as_ref(),
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::Ellipsis,
-                ..
-            })
-        ),
+        [Stmt::Expr(ast::StmtExpr { value, .. })] => {
+            let [node] = body else { return false; };
+            matches!(
+                value.as_ref(),
+                Expr::Constant(ast::ExprConstant {
+                    value: Constant::Ellipsis,
+                    ..
+                })
+            ) && !comments.has_leading(node)
+        }
         _ => false,
     }
 }

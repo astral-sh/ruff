@@ -6,7 +6,7 @@ use crate::comments::{leading_comments, trailing_comments, SourceComment};
 use crate::prelude::*;
 use crate::statement::suite::SuiteKind;
 
-use crate::statement::clause::{clause_header, ClauseHeader};
+use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
 use crate::FormatNodeRule;
 
 #[derive(Default)]
@@ -107,7 +107,7 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
                         Ok(())
                     }),
                 ),
-                block_indent(&body.format().with_options(SuiteKind::Class))
+                clause_body(body, trailing_definition_comments).with_kind(SuiteKind::Class),
             ]
         )
     }

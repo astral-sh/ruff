@@ -21,6 +21,7 @@ pub(crate) use quoted_annotation_in_stub::*;
 pub(crate) use redundant_literal_union::*;
 pub(crate) use redundant_numeric_union::*;
 pub(crate) use simple_defaults::*;
+use std::fmt;
 pub(crate) use str_or_repr_defined_in_stub::*;
 pub(crate) use string_or_bytes_too_long::*;
 pub(crate) use stub_body_multiple_statements::*;
@@ -69,3 +70,26 @@ mod unrecognized_platform;
 mod unrecognized_version_info;
 mod unsupported_method_call_on_all;
 mod unused_private_type_definition;
+
+// TODO(charlie): Replace this with a common utility for selecting the appropriate source
+// module for a given `typing` member.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TypingModule {
+    Typing,
+    TypingExtensions,
+}
+
+impl TypingModule {
+    fn as_str(self) -> &'static str {
+        match self {
+            TypingModule::Typing => "typing",
+            TypingModule::TypingExtensions => "typing_extensions",
+        }
+    }
+}
+
+impl fmt::Display for TypingModule {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.write_str(self.as_str())
+    }
+}

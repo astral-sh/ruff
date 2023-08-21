@@ -1,12 +1,12 @@
 //! Infrastructure for code formatting
 //!
-//! This module defines [`FormatElement`], an IR to format code documents and provides a mean to print
+//! This module defines [`FormatElement`], an IR to format code documents and provides a means to print
 //! such a document to a string. Objects that know how to format themselves implement the [Format] trait.
 //!
 //! ## Formatting Traits
 //!
-//! * [Format]: Implemented by objects that can be formatted.
-//! * [`FormatRule`]: Rule that knows how to format an object of another type. Necessary in the situation where
+//! * [`Format`]: Implemented by objects that can be formatted.
+//! * [`FormatRule`]: Rule that knows how to format an object of another type. Useful in the situation where
 //!  it's necessary to implement [Format] on an object from another crate. This module defines the
 //!  [`FormatRefWithRule`] and [`FormatOwnedWithRule`] structs to pass an item with its corresponding rule.
 //! * [`FormatWithRule`] implemented by objects that know how to format another type. Useful for implementing

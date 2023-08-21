@@ -9,6 +9,21 @@ use crate::checkers::logical_lines::LogicalLinesContext;
 
 use super::LogicalLine;
 
+/// ## What it does
+/// Checks for missing whitespace after `,`, `;`, and `:`.
+///
+/// ## Why is this bad?
+/// Missing whitespace after `,`, `;`, and `:` makes the code harder to read.
+///
+/// ## Example
+/// ```python
+/// a = (1,2)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// a = (1, 2)
+/// ```
 #[violation]
 pub struct MissingWhitespace {
     token: TokenKind,

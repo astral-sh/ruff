@@ -6,7 +6,7 @@ use crate::comments::SourceComment;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
-use crate::statement::clause::{clause_header, ClauseHeader};
+use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
 use crate::{FormatNodeRule, PyFormatter};
 
 #[derive(Copy, Clone, Default)]
@@ -86,7 +86,7 @@ impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHan
                         Ok(())
                     }),
                 ),
-                block_indent(&body.format())
+                clause_body(body, dangling_comments),
             ]
         )
     }

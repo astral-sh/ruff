@@ -6,7 +6,7 @@ use ruff_text_size::TextRange;
 use crate::comments::{leading_comments, SourceComment};
 use crate::expression::parentheses::parenthesized;
 use crate::prelude::*;
-use crate::statement::clause::{clause_header, ClauseHeader};
+use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
 use crate::{FormatError, FormatNodeRule, PyFormatter};
 
 #[derive(Default)]
@@ -57,7 +57,7 @@ impl FormatNodeRule<MatchCase> for FormatMatchCase {
                         Ok(())
                     }),
                 ),
-                block_indent(&body.format())
+                clause_body(body, dangling_item_comments),
             ]
         )
     }

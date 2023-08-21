@@ -73,8 +73,7 @@ pub(crate) fn useless_object_inheritance(checker: &mut Checker, class_def: &ast:
                     base,
                     arguments,
                     Parentheses::Remove,
-                    checker.locator(),
-                    checker.source_type,
+                    checker.locator().contents(),
                 )
                 .map(Fix::automatic)
             });

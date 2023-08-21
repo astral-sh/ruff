@@ -66,7 +66,7 @@ pub(crate) fn useless_metaclass_type(
         let stmt = checker.semantic().current_statement();
         let parent = checker.semantic().current_statement_parent();
         let edit = autofix::edits::delete_stmt(stmt, parent, checker.locator(), checker.indexer());
-        diagnostic.set_fix(Fix::automatic(edit).isolate(checker.isolation(parent)));
+        diagnostic.set_fix(Fix::automatic(edit).isolate(checker.parent_isolation()));
     }
     checker.diagnostics.push(diagnostic);
 }

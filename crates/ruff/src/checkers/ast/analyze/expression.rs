@@ -531,6 +531,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::UnnecessaryDictKwargs) {
                 flake8_pie::rules::unnecessary_dict_kwargs(checker, expr, keywords);
             }
+            if checker.enabled(Rule::UnnecessaryRangeStart) {
+                flake8_pie::rules::unnecessary_range_start(checker, call);
+            }
             if checker.enabled(Rule::ExecBuiltin) {
                 flake8_bandit::rules::exec_used(checker, func);
             }
