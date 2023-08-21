@@ -1,10 +1,9 @@
-use ruff_formatter::prelude::{format_with, space, text};
-use ruff_formatter::{format_args, Format, FormatResult};
+use ruff_formatter::prelude::format_with;
+use ruff_formatter::{Format, FormatResult};
 use ruff_python_ast::PatternMatchSequence;
 
 use crate::builders::PyFormatterExtensions;
 use crate::expression::parentheses::{empty_parenthesized, parenthesized};
-use crate::AsFormat;
 use crate::{FormatNodeRule, PyFormatter};
 
 #[derive(Default)]
@@ -42,13 +41,12 @@ impl FormatNodeRule<PatternMatchSequence> for FormatPatternMatchSequence {
                 .finish()
         });
         match sequence_type {
-            SequenceType::Tuple => parenthesized("(", &items, ")")
-                .with_dangling_comments(dangling)
-                .fmt(f),
+            SequenceType::Tuple | SequenceType::TupleWithoutParentheses => {
+                parenthesized("(", &items, ")")
+                    .with_dangling_comments(dangling)
+                    .fmt(f)
+            }
             SequenceType::List => parenthesized("[", &items, "]")
-                .with_dangling_comments(dangling)
-                .fmt(f),
-            SequenceType::TupleWithoutParentheses => parenthesized("(", &items, ")")
                 .with_dangling_comments(dangling)
                 .fmt(f),
         }
