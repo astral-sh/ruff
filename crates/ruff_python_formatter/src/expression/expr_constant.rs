@@ -1,5 +1,5 @@
 use crate::comments::SourceComment;
-use ruff_formatter::FormatRuleWithOptions;
+use ruff_formatter::{FormatContext, FormatOptions, FormatRuleWithOptions};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{Constant, ExprConstant, Ranged};
 use ruff_text_size::{TextLen, TextRange};
@@ -80,14 +80,17 @@ impl NeedsParentheses for ExprConstant {
         context: &PyFormatContext,
     ) -> OptionalParentheses {
         if self.value.is_implicit_concatenated() {
-            // Don't wrap triple quoted strings
-            if is_multiline_string(self, context.source()) {
-                OptionalParentheses::Never
-            } else {
-                OptionalParentheses::Multiline
-            }
-        } else {
+            OptionalParentheses::Multiline
+        } else if is_multiline_string(self, context.source()) {
             OptionalParentheses::Never
+        } else {
+            let text = &context.source()[self.range];
+
+            if text.len() < context.options().line_width().value() as usize && text.len() > 10 {
+                OptionalParentheses::IfFits
+            } else {
+                OptionalParentheses::Never
+            }
         }
     }
 }

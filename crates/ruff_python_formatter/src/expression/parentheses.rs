@@ -15,11 +15,16 @@ pub(crate) enum OptionalParentheses {
     /// Add parentheses if the expression expands over multiple lines
     Multiline,
 
-    /// Always set parentheses regardless if the expression breaks or if they were
+    /// Always set parentheses regardless if the expression breaks or if they are
     /// present in the source.
     Always,
 
-    /// Never add parentheses
+    /// Add parentheses if it helps to make this expression fit. Otherwise never add parentheses.
+    /// This mode should only be used for expressions that don't have their own split points, e.g. identifiers,
+    /// or constants.
+    IfFits,
+
+    /// Never add parentheses. Use it for expressions that have their own parentheses or if the expression body always spans multiple lines (multiline strings).
     Never,
 }
 
@@ -49,6 +54,7 @@ pub(crate) enum Parenthesize {
     /// Parenthesizes the expression if the group doesn't fit on a line (e.g., even name expressions are parenthesized), or if
     /// the expression doesn't break, but _does_ reports that it always requires parentheses in this position (e.g., walrus
     /// operators in function return annotations).
+    // TODO can this be replaced by IfBreaks
     IfBreaksOrIfRequired,
 }
 

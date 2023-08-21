@@ -243,12 +243,10 @@ if True:
     #[test]
     fn quick_test() {
         let src = r#"
-@MyDecorator(list = a) # fmt: skip
-# trailing comment
-class Test:
-    pass
-
-
+for converter in connection.ops.get_db_converters(
+    expression
+) + expression.get_db_converters(connection):
+    ...
 "#;
         // Tokenize once
         let mut tokens = Vec::new();
@@ -285,9 +283,10 @@ class Test:
 
         assert_eq!(
             printed.as_code(),
-            r#"while True:
-    if something.changed:
-        do.stuff()  # trailing comment
+            r#"for converter in connection.ops.get_db_converters(
+    expression
+) + expression.get_db_converters(connection):
+    ...
 "#
         );
     }

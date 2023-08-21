@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 
 use ruff_formatter::{
-    write, FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions,
+    format_args, write, FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions,
 };
 use ruff_python_ast as ast;
 use ruff_python_ast::node::AnyNodeRef;
@@ -223,6 +223,35 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                     }
                 }
             },
+            OptionalParentheses::IfFits => match parenthesize {
+                Parenthesize::IfBreaksOrIfRequired => {
+                    parenthesize_if_expands(&expression.format().with_options(Parentheses::Never))
+                        .fmt(f)
+                }
+
+                Parenthesize::Optional | Parenthesize::IfRequired => {
+                    expression.format().with_options(Parentheses::Never).fmt(f)
+                }
+                Parenthesize::IfBreaks => {
+                    let format_expression = expression
+                        .format()
+                        .with_options(Parentheses::Never)
+                        .memoized();
+
+                    best_fitting![
+                        format_expression,
+                        group(&format_args![
+                            text("("),
+                            soft_block_indent(&format_expression),
+                            text(")")
+                        ])
+                        .should_expand(true),
+                        format_expression
+                    ]
+                    .with_mode(BestFittingMode::AllLines)
+                    .fmt(f)
+                }
+            },
             OptionalParentheses::Never => match parenthesize {
                 Parenthesize::IfBreaksOrIfRequired => {
                     parenthesize_if_expands(&expression.format().with_options(Parentheses::Never))
@@ -233,6 +262,7 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                     expression.format().with_options(Parentheses::Never).fmt(f)
                 }
             },
+
             OptionalParentheses::Always => {
                 expression.format().with_options(Parentheses::Always).fmt(f)
             }

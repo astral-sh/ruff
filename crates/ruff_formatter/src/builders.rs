@@ -2525,6 +2525,7 @@ impl<'a, Context> BestFitting<'a, Context> {
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn with_mode(mut self, mode: BestFittingMode) -> Self {
         self.mode = mode;
         self

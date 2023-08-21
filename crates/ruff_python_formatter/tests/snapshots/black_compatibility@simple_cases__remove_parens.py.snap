@@ -80,24 +80,6 @@ def example8():
          except Exception as e:
              pass
  
-@@ -30,15 +32,11 @@
- 
- 
- def example2():
--    return (
--        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
--    )
-+    return "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
- 
- 
- def example3():
--    return (
--        1111111111111111111111111111111111111111111111111111111111111111111111111111111
--    )
-+    return 1111111111111111111111111111111111111111111111111111111111111111111111111111111
- 
- 
- def example4():
 ```
 
 ## Ruff Output
@@ -137,11 +119,15 @@ def example1point5():
 
 
 def example2():
-    return "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    return (
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    )
 
 
 def example3():
-    return 1111111111111111111111111111111111111111111111111111111111111111111111111111111
+    return (
+        1111111111111111111111111111111111111111111111111111111111111111111111111111111
+    )
 
 
 def example4():

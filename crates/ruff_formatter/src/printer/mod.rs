@@ -144,12 +144,7 @@ impl<'a> Printer<'a> {
             }
 
             FormatElement::Tag(StartGroup(group)) => {
-                let print_mode =
-                    self.print_group(TagKind::Group, group.mode(), args, queue, stack)?;
-
-                if let Some(id) = group.id() {
-                    self.state.group_modes.insert_print_mode(id, print_mode);
-                }
+                self.print_group(TagKind::Group, group.mode(), group.id(), args, queue, stack)?;
             }
 
             FormatElement::Tag(StartConditionalGroup(group)) => {
@@ -160,7 +155,14 @@ impl<'a> Printer<'a> {
                 };
 
                 if expected_mode == condition.mode {
-                    self.print_group(TagKind::ConditionalGroup, group.mode(), args, queue, stack)?;
+                    self.print_group(
+                        TagKind::ConditionalGroup,
+                        group.mode(),
+                        None,
+                        args,
+                        queue,
+                        stack,
+                    )?;
                 } else {
                     // Condition isn't met, render as normal content
                     stack.push(TagKind::ConditionalGroup, args);
@@ -293,6 +295,7 @@ impl<'a> Printer<'a> {
         &mut self,
         kind: TagKind,
         mode: GroupMode,
+        id: Option<GroupId>,
         args: PrintElementArgs,
         queue: &PrintQueue<'a>,
         stack: &mut PrintCallStack,
@@ -311,6 +314,14 @@ impl<'a> Printer<'a> {
                     _ => {
                         self.state.measured_group_fits = true;
 
+                        // Set the print mode for this group in case this group was measured as part of a
+                        // previous `fits_group` call.
+                        if let Some(id) = id {
+                            self.state
+                                .group_modes
+                                .insert_print_mode(id, PrintMode::Flat);
+                        }
+
                         // Measure to see if the group fits up on a single line. If that's the case,
                         // print the group in "flat" mode, otherwise continue in expanded mode
                         stack.push(kind, args.with_print_mode(PrintMode::Flat));
@@ -328,6 +339,10 @@ impl<'a> Printer<'a> {
         };
 
         stack.push(kind, args.with_print_mode(group_mode));
+
+        if let Some(id) = id {
+            self.state.group_modes.insert_print_mode(id, group_mode);
+        }
 
         Ok(group_mode)
     }
@@ -785,15 +800,14 @@ impl GroupModes {
         self.0[index] = Some(mode);
     }
 
-    fn get_print_mode(&self, group_id: GroupId) -> Option<PrintMode> {
-        let index = u32::from(group_id) as usize;
-        self.0
-            .get(index)
-            .and_then(|option| option.as_ref().copied())
-    }
-
     fn unwrap_print_mode(&self, group_id: GroupId, next_element: &FormatElement) -> PrintMode {
-        self.get_print_mode(group_id).unwrap_or_else(|| {
+        let index = u32::from(group_id) as usize;
+        let print_mode = self
+            .0
+            .get(index)
+            .and_then(|option| option.as_ref().copied());
+
+        print_mode.unwrap_or_else(|| {
             panic!("Expected group with id {group_id:?} to exist but it wasn't present in the document. Ensure that a group with such a document appears in the document before the element {next_element:?}.")
         })
     }
@@ -1123,10 +1137,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
 
                 let print_mode = match condition.group_id {
                     None => args.mode(),
-                    Some(group_id) => self
-                        .group_modes()
-                        .get_print_mode(group_id)
-                        .unwrap_or_else(|| args.mode()),
+                    Some(group_id) => self.group_modes().unwrap_print_mode(group_id, element),
                 };
 
                 if condition.mode == print_mode {
@@ -1143,10 +1154,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
             FormatElement::Tag(StartConditionalContent(condition)) => {
                 let print_mode = match condition.group_id {
                     None => args.mode(),
-                    Some(group_id) => self
-                        .group_modes()
-                        .get_print_mode(group_id)
-                        .unwrap_or_else(|| args.mode()),
+                    Some(group_id) => self.group_modes().unwrap_print_mode(group_id, element),
                 };
 
                 if condition.mode == print_mode {
@@ -1157,10 +1165,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
             }
 
             FormatElement::Tag(StartIndentIfGroupBreaks(id)) => {
-                let print_mode = self
-                    .group_modes()
-                    .get_print_mode(*id)
-                    .unwrap_or_else(|| args.mode());
+                let print_mode = self.group_modes().unwrap_print_mode(*id, element);
 
                 match print_mode {
                     PrintMode::Flat => {
@@ -1191,10 +1196,9 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                 let condition_met = match condition {
                     Some(condition) => {
                         let group_mode = match condition.group_id {
-                            Some(group_id) => self
-                                .group_modes()
-                                .get_print_mode(group_id)
-                                .unwrap_or_else(|| args.mode()),
+                            Some(group_id) => {
+                                self.group_modes().unwrap_print_mode(group_id, element)
+                            }
                             None => args.mode(),
                         };
 
@@ -1250,17 +1254,17 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
     fn fits_group(
         &mut self,
         kind: TagKind,
-        mode: GroupMode,
+        group_mode: GroupMode,
         id: Option<GroupId>,
         args: PrintElementArgs,
     ) -> Fits {
-        if self.must_be_flat && !mode.is_flat() {
+        if self.must_be_flat && !group_mode.is_flat() {
             return Fits::No;
         }
 
         // Continue printing groups in expanded mode if measuring a `best_fitting` element where
         // a group expands.
-        let print_mode = if mode.is_flat() {
+        let print_mode = if group_mode.is_flat() {
             args.mode()
         } else {
             PrintMode::Expanded

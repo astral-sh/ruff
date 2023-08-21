@@ -2,7 +2,7 @@ use crate::comments::SourceComment;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 use crate::FormatNodeRule;
-use ruff_formatter::{write, FormatContext};
+use ruff_formatter::{write, FormatContext, FormatOptions};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::ExprName;
 
@@ -38,9 +38,14 @@ impl NeedsParentheses for ExprName {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,
-        _context: &PyFormatContext,
+        context: &PyFormatContext,
     ) -> OptionalParentheses {
-        OptionalParentheses::Never
+        let text = &context.source()[self.range];
+        if text.len() < context.options().line_width().value() as usize && text.len() > 10 {
+            OptionalParentheses::IfFits
+        } else {
+            OptionalParentheses::Never
+        }
     }
 }
 

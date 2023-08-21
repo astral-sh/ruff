@@ -101,7 +101,10 @@ impl NeedsParentheses for ExprSubscript {
             {
                 OptionalParentheses::Multiline
             } else {
-                self.value.needs_parentheses(self.into(), context)
+                match self.value.needs_parentheses(self.into(), context) {
+                    OptionalParentheses::IfFits => OptionalParentheses::Never,
+                    parentheses => parentheses,
+                }
             }
         }
     }
