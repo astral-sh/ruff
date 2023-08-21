@@ -529,8 +529,8 @@ pub enum ComparableFStringPart<'a> {
 pub struct FormattedValue<'a> {
     expression: ComparableExpr<'a>,
     debug_text: Option<&'a ast::DebugText>,
-    pub conversion: ast::ConversionFlag,
-    pub format_spec: Vec<ComparableFStringPart<'a>>,
+    conversion: ast::ConversionFlag,
+    format_spec: Vec<ComparableFStringPart<'a>>,
 }
 
 impl<'a> From<&'a ast::FStringPart> for ComparableFStringPart<'a> {
