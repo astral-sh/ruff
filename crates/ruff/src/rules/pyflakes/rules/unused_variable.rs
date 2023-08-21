@@ -5,7 +5,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::{self as ast, PySourceType, Ranged, Stmt};
 use ruff_python_parser::{lexer, AsMode, Tok};
-use ruff_python_semantic::Scope;
+use ruff_python_semantic::{Binding, Scope};
 use ruff_source_file::Locator;
 use ruff_text_size::{TextRange, TextSize};
 
@@ -201,18 +201,23 @@ where
     None
 }
 
-/// Generate a [`Edit`] to remove an unused variable assignment, given the
-/// enclosing [`Stmt`] and the [`TextRange`] of the variable binding.
-fn remove_unused_variable(
-    stmt: &Stmt,
-    parent: Option<&Stmt>,
-    range: TextRange,
-    isolation: IsolationLevel,
-    checker: &Checker,
-) -> Option<Fix> {
+/// Generate a [`Edit`] to remove an unused variable assignment to a [`Binding`].
+fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
+    let statement_id = binding.source?;
+    let statement = checker.semantic().statement(statement_id);
+    let parent = checker.semantic().parent_statement(statement_id);
+    let isolation = checker
+        .semantic()
+        .parent_statement_id(statement_id)
+        .map(|node_id| IsolationLevel::Group(node_id.into()))
+        .unwrap_or_default();
+
     // First case: simple assignment (`x = 1`)
-    if let Stmt::Assign(ast::StmtAssign { targets, value, .. }) = stmt {
-        if let Some(target) = targets.iter().find(|target| range == target.range()) {
+    if let Stmt::Assign(ast::StmtAssign { targets, value, .. }) = statement {
+        if let Some(target) = targets
+            .iter()
+            .find(|target| binding.range() == target.range())
+        {
             if target.is_name_expr() {
                 return if targets.len() > 1
                     || contains_effect(value, |id| checker.semantic().is_builtin(id))
@@ -229,7 +234,7 @@ fn remove_unused_variable(
                     Some(Fix::suggested(edit))
                 } else {
                     // If (e.g.) assigning to a constant (`x = 1`), delete the entire statement.
-                    let edit = delete_stmt(stmt, parent, checker.locator(), checker.indexer());
+                    let edit = delete_stmt(statement, parent, checker.locator(), checker.indexer());
                     Some(Fix::suggested(edit).isolate(isolation))
                 };
             }
@@ -241,13 +246,13 @@ fn remove_unused_variable(
         target,
         value: Some(value),
         ..
-    }) = stmt
+    }) = statement
     {
         if target.is_name_expr() {
             return if contains_effect(value, |id| checker.semantic().is_builtin(id)) {
                 // If the expression is complex (`x = foo()`), remove the assignment,
                 // but preserve the right-hand side.
-                let start = stmt.start();
+                let start = statement.start();
                 let end =
                     match_token_after(start, checker.locator(), checker.source_type, |tok| {
                         tok == Tok::Equal
@@ -257,19 +262,19 @@ fn remove_unused_variable(
                 Some(Fix::suggested(edit))
             } else {
                 // If (e.g.) assigning to a constant (`x = 1`), delete the entire statement.
-                let edit = delete_stmt(stmt, parent, checker.locator(), checker.indexer());
+                let edit = delete_stmt(statement, parent, checker.locator(), checker.indexer());
                 Some(Fix::suggested(edit).isolate(isolation))
             };
         }
     }
 
     // Third case: with_item (`with foo() as x:`)
-    if let Stmt::With(ast::StmtWith { items, .. }) = stmt {
+    if let Stmt::With(ast::StmtWith { items, .. }) = statement {
         // Find the binding that matches the given `Range`.
         // TODO(charlie): Store the `WithItem` in the `Binding`.
         for item in items {
             if let Some(optional_vars) = &item.optional_vars {
-                if optional_vars.range() == range {
+                if optional_vars.range() == binding.range() {
                     // Find the first token before the `as` keyword.
                     let start = match_token_before(
                         item.context_expr.start(),
@@ -304,7 +309,7 @@ pub(crate) fn unused_variable(checker: &Checker, scope: &Scope, diagnostics: &mu
         return;
     }
 
-    for (name, range, source) in scope
+    for (name, binding) in scope
         .bindings()
         .map(|(name, binding_id)| (name, checker.semantic().binding(binding_id)))
         .filter_map(|(name, binding)| {
@@ -321,27 +326,21 @@ pub(crate) fn unused_variable(checker: &Checker, scope: &Scope, diagnostics: &mu
                         | "__debuggerskip__"
                 )
             {
-                return Some((name.to_string(), binding.range(), binding.source));
+                return Some((name, binding));
             }
 
             None
         })
     {
-        let mut diagnostic = Diagnostic::new(UnusedVariable { name }, range);
+        let mut diagnostic = Diagnostic::new(
+            UnusedVariable {
+                name: name.to_string(),
+            },
+            binding.range(),
+        );
         if checker.patch(diagnostic.kind.rule()) {
-            if let Some(statement_id) = source {
-                let statement = checker.semantic().statement(statement_id);
-                let parent = checker.semantic().parent_statement(statement_id);
-                let isolation = checker
-                    .semantic()
-                    .parent_statement_id(statement_id)
-                    .map(|node_id| IsolationLevel::Group(node_id.into()))
-                    .unwrap_or_default();
-                if let Some(fix) =
-                    remove_unused_variable(statement, parent, range, isolation, checker)
-                {
-                    diagnostic.set_fix(fix);
-                }
+            if let Some(fix) = remove_unused_variable(binding, checker) {
+                diagnostic.set_fix(fix);
             }
         }
         diagnostics.push(diagnostic);

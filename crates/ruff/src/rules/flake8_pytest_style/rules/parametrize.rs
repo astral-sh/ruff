@@ -687,19 +687,17 @@ pub(crate) fn parametrize(checker: &mut Checker, decorators: &[Decorator]) {
             }) = &decorator.expression
             {
                 if checker.enabled(Rule::PytestParametrizeNamesWrongType) {
-                    if let Some(names) = args.get(0) {
+                    if let [names, ..] = args.as_slice() {
                         check_names(checker, decorator, names);
                     }
                 }
                 if checker.enabled(Rule::PytestParametrizeValuesWrongType) {
-                    if let Some(names) = args.get(0) {
-                        if let Some(values) = args.get(1) {
-                            check_values(checker, names, values);
-                        }
+                    if let [names, values, ..] = args.as_slice() {
+                        check_values(checker, names, values);
                     }
                 }
                 if checker.enabled(Rule::PytestDuplicateParametrizeTestCases) {
-                    if let [_, values, ..] = &args[..] {
+                    if let [_, values, ..] = args.as_slice() {
                         check_duplicates(checker, values);
                     }
                 }
