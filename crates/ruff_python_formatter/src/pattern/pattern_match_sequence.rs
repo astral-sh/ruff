@@ -1,10 +1,15 @@
 use ruff_formatter::prelude::format_with;
+use ruff_formatter::prelude::space;
+use ruff_formatter::prelude::text;
+use ruff_formatter::Buffer;
 use ruff_formatter::Format;
 use ruff_formatter::FormatResult;
+use ruff_formatter::{format_args, write};
 use ruff_python_ast::PatternMatchSequence;
 
 use crate::builders::PyFormatterExtensions;
 use crate::expression::parentheses::{empty_parenthesized, parenthesized};
+use crate::AsFormat;
 use crate::{FormatNodeRule, PyFormatter};
 
 #[derive(Default)]
@@ -36,19 +41,36 @@ impl FormatNodeRule<PatternMatchSequence> for FormatPatternMatchSequence {
                 }
             };
         }
-        let items = format_with(|f| {
-            f.join_comma_separated(range.end())
-                .nodes(patterns.iter())
-                .finish()
-        });
+
         match sequence_type {
-            SequenceType::Tuple => parenthesized("(", &items, ")")
-                .with_dangling_comments(dangling)
-                .fmt(f),
-            SequenceType::List => parenthesized("[", &items, "]")
-                .with_dangling_comments(dangling)
-                .fmt(f),
-            SequenceType::TupleWithoutParentheses => items.fmt(f),
+            SequenceType::Tuple => {
+                let items = format_with(|f| {
+                    f.join_comma_separated(range.end())
+                        .nodes(patterns.iter())
+                        .finish()
+                });
+                parenthesized("(", &items, ")")
+                    .with_dangling_comments(dangling)
+                    .fmt(f)
+            }
+            SequenceType::List => {
+                let items = format_with(|f| {
+                    f.join_comma_separated(range.end())
+                        .nodes(patterns.iter())
+                        .finish()
+                });
+                parenthesized("[", &items, "]")
+                    .with_dangling_comments(dangling)
+                    .fmt(f)
+            }
+            SequenceType::TupleWithoutParentheses => {
+                let items = format_with(|f| {
+                    f.join_with(&format_args![text(","), space()])
+                        .entries(patterns.iter().map(|p| p.format()))
+                        .finish()
+                });
+                write!(f, [items])
+            }
         }
     }
 }
