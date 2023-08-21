@@ -90,8 +90,7 @@ impl AlwaysAutofixableViolation for DuplicateHandlerException {
     #[derive_message_formats]
     fn message(&self) -> String {
         let DuplicateHandlerException { names } = self;
-        if names.len() == 1 {
-            let name = &names[0];
+        if let [name] = names.as_slice() {
             format!("Exception handler with duplicate exception: `{name}`")
         } else {
             let names = names.iter().map(|name| format!("`{name}`")).join(", ");
