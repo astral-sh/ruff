@@ -16,7 +16,7 @@ use crate::logging::DisplayParseErrorType;
 /// symlink.
 ///
 /// ## Example
-/// On linux:
+/// On Linux or macOS:
 /// ```shell
 /// $ echo 'print("hello world!")' > a.py
 /// $ chmod 000 a.py
