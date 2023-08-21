@@ -2,12 +2,13 @@ use crate::comments::{
     leading_alternate_branch_comments, trailing_comments, SourceComment, SuppressionKind,
 };
 use crate::prelude::*;
+use crate::statement::suite::{contains_only_an_ellipsis, SuiteKind};
 use crate::verbatim::write_suppressed_clause_header;
-use ruff_formatter::{Argument, Arguments, FormatError};
+use ruff_formatter::{write, Argument, Arguments, FormatError};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{
     ElifElseClause, ExceptHandlerExceptHandler, MatchCase, Ranged, StmtClassDef, StmtFor,
-    StmtFunctionDef, StmtIf, StmtMatch, StmtTry, StmtWhile, StmtWith,
+    StmtFunctionDef, StmtIf, StmtMatch, StmtTry, StmtWhile, StmtWith, Suite,
 };
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{TextRange, TextSize};
@@ -349,6 +350,57 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatClauseHeader<'_, 'ast> {
         }
 
         trailing_comments(self.trailing_colon_comment).fmt(f)
+    }
+}
+
+pub(crate) struct FormatClauseBody<'a> {
+    body: &'a Suite,
+    kind: SuiteKind,
+    trailing_comments: &'a [SourceComment],
+}
+
+impl<'a> FormatClauseBody<'a> {
+    #[must_use]
+    pub(crate) fn with_kind(mut self, kind: SuiteKind) -> Self {
+        self.kind = kind;
+        self
+    }
+}
+
+pub(crate) fn clause_body<'a>(
+    body: &'a Suite,
+    trailing_comments: &'a [SourceComment],
+) -> FormatClauseBody<'a> {
+    FormatClauseBody {
+        body,
+        kind: SuiteKind::default(),
+        trailing_comments,
+    }
+}
+
+impl Format<PyFormatContext<'_>> for FormatClauseBody<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+        if f.options().source_type().is_stub()
+            && contains_only_an_ellipsis(self.body, f.context().comments())
+            && self.trailing_comments.is_empty()
+        {
+            write!(
+                f,
+                [
+                    space(),
+                    self.body.format().with_options(self.kind),
+                    hard_line_break()
+                ]
+            )
+        } else {
+            write!(
+                f,
+                [
+                    trailing_comments(self.trailing_comments),
+                    block_indent(&self.body.format().with_options(self.kind))
+                ]
+            )
+        }
     }
 }
 
