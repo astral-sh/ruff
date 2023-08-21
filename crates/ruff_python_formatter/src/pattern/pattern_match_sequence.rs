@@ -1,5 +1,5 @@
 use ruff_formatter::prelude::{format_with, space, text};
-use ruff_formatter::{format_args, write, Buffer, Format, FormatResult};
+use ruff_formatter::{format_args, Format, FormatResult};
 use ruff_python_ast::PatternMatchSequence;
 
 use crate::builders::PyFormatterExtensions;
@@ -58,14 +58,10 @@ impl FormatNodeRule<PatternMatchSequence> for FormatPatternMatchSequence {
                     .with_dangling_comments(dangling)
                     .fmt(f)
             }
-            SequenceType::TupleWithoutParentheses => {
-                let items = format_with(|f| {
-                    f.join_with(&format_args![text(","), space()])
-                        .entries(patterns.iter().map(AsFormat::format))
-                        .finish()
-                });
-                write!(f, [items])
-            }
+            SequenceType::TupleWithoutParentheses => f
+                .join_with(&format_args![text(","), space()])
+                .entries(patterns.iter().map(AsFormat::format))
+                .finish(),
         }
     }
 }
