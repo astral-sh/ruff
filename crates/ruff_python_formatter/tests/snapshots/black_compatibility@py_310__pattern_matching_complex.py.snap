@@ -292,7 +292,7 @@ match x:
          y = 0
  # case black_test_patma_232
  match x:
-@@ -108,37 +108,37 @@
+@@ -108,7 +108,7 @@
          y = 0
  # case black_test_patma_058
  match x:
@@ -301,8 +301,7 @@ match x:
          y = 0
  # case black_test_patma_233
  match x:
--    case False:
-+    case None:
+@@ -116,29 +116,29 @@
          y = 0
  # case black_test_patma_078
  match x:
@@ -460,7 +459,7 @@ match x:
         y = 0
 # case black_test_patma_233
 match x:
-    case None:
+    case False:
         y = 0
 # case black_test_patma_078
 match x:
