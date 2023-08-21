@@ -85,8 +85,7 @@ pub(crate) fn unnecessary_range_start(checker: &mut Checker, call: &ast::ExprCal
                 &start,
                 &call.arguments,
                 Parentheses::Preserve,
-                checker.locator(),
-                checker.source_type,
+                checker.locator().contents(),
             )
             .map(Fix::automatic)
         });

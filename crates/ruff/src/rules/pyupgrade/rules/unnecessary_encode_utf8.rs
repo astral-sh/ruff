@@ -194,8 +194,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                                 kwarg,
                                 &call.arguments,
                                 Parentheses::Preserve,
-                                checker.locator(),
-                                checker.source_type,
+                                checker.locator().contents(),
                             )
                             .map(Fix::automatic)
                         });
@@ -215,8 +214,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                                 arg,
                                 &call.arguments,
                                 Parentheses::Preserve,
-                                checker.locator(),
-                                checker.source_type,
+                                checker.locator().contents(),
                             )
                             .map(Fix::automatic)
                         });
@@ -243,8 +241,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                                 kwarg,
                                 &call.arguments,
                                 Parentheses::Preserve,
-                                checker.locator(),
-                                checker.source_type,
+                                checker.locator().contents(),
                             )
                             .map(Fix::automatic)
                         });
@@ -264,8 +261,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                                 arg,
                                 &call.arguments,
                                 Parentheses::Preserve,
-                                checker.locator(),
-                                checker.source_type,
+                                checker.locator().contents(),
                             )
                             .map(Fix::automatic)
                         });
