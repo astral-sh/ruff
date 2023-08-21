@@ -301,12 +301,14 @@ impl<'a> Importer<'a> {
             }
             if let Stmt::ImportFrom(ast::StmtImportFrom {
                 module: name,
+                names,
                 level,
-                ..
+                range: _,
             }) = stmt
             {
                 if level.map_or(true, |level| level.to_u32() == 0)
                     && name.as_ref().is_some_and(|name| name == module)
+                    && names.iter().all(|alias| alias.name.as_str() != "*")
                 {
                     import_from = Some(*stmt);
                 }
