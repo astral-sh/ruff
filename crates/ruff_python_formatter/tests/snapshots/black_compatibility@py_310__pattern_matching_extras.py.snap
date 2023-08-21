@@ -154,7 +154,7 @@ match bar1:
          print(x, y)
  
  
-@@ -15,40 +20,52 @@
+@@ -15,40 +20,61 @@
  case: int = re.match(something)
  
  match re.match(case):
@@ -178,10 +178,16 @@ match bar1:
  
  match maybe, multiple:
 -    case perhaps, 5:
-+    case x as NOT_YET_IMPLEMENTED_PatternMatchAs, "NOT_YET_IMPLEMENTED_PatternMatchValue":
++    case (
++        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
++        "NOT_YET_IMPLEMENTED_PatternMatchValue",
++    ):
          pass
 -    case perhaps, 6,:
-+    case x as NOT_YET_IMPLEMENTED_PatternMatchAs, "NOT_YET_IMPLEMENTED_PatternMatchValue":
++    case (
++        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
++        "NOT_YET_IMPLEMENTED_PatternMatchValue",
++    ):
          pass
  
  
@@ -191,9 +197,12 @@ match bar1:
 +    more := (than, one),
 +    indeed,
 +):
-+    case x as NOT_YET_IMPLEMENTED_PatternMatchAs, (
-+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
++    case (
++        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
++        (
++            "NOT_YET_IMPLEMENTED_PatternMatchValue",
++            "NOT_YET_IMPLEMENTED_PatternMatchValue",
++        ),
 +    ):
          pass
 -    case [[5], (6)], [7],:
@@ -219,7 +228,7 @@ match bar1:
          assert "map" == b
  
  
-@@ -59,61 +76,51 @@
+@@ -59,61 +85,63 @@
      ),
      case,
  ):
@@ -249,7 +258,11 @@ match bar1:
  
  match a, *b(), c:
 -    case d, *f, g:
-+    case x as NOT_YET_IMPLEMENTED_PatternMatchAs, *NOT_YET_IMPLEMENTED_PatternMatchStar, x as NOT_YET_IMPLEMENTED_PatternMatchAs:
++    case (
++        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
++        *NOT_YET_IMPLEMENTED_PatternMatchStar,
++        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
++    ):
          pass
  
  
@@ -271,11 +284,19 @@ match bar1:
          pass
  
 -    case 2 as b, 3 as c:
-+    case x as NOT_YET_IMPLEMENTED_PatternMatchAs, x as NOT_YET_IMPLEMENTED_PatternMatchAs:
++    case (
++        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
++        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
++    ):
          pass
  
 -    case 4 as d, (5 as e), (6 | 7 as g), *h:
-+    case x as NOT_YET_IMPLEMENTED_PatternMatchAs, x as NOT_YET_IMPLEMENTED_PatternMatchAs, x as NOT_YET_IMPLEMENTED_PatternMatchAs, *NOT_YET_IMPLEMENTED_PatternMatchStar:
++    case (
++        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
++        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
++        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
++        *NOT_YET_IMPLEMENTED_PatternMatchStar,
++    ):
          pass
  
  
@@ -336,9 +357,15 @@ def func(match: case, case: match) -> case:
 
 
 match maybe, multiple:
-    case x as NOT_YET_IMPLEMENTED_PatternMatchAs, "NOT_YET_IMPLEMENTED_PatternMatchValue":
+    case (
+        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+    ):
         pass
-    case x as NOT_YET_IMPLEMENTED_PatternMatchAs, "NOT_YET_IMPLEMENTED_PatternMatchValue":
+    case (
+        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+    ):
         pass
 
 
@@ -346,9 +373,12 @@ match (
     more := (than, one),
     indeed,
 ):
-    case x as NOT_YET_IMPLEMENTED_PatternMatchAs, (
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+    case (
+        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
+        (
+            "NOT_YET_IMPLEMENTED_PatternMatchValue",
+            "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        ),
     ):
         pass
     case [
@@ -393,7 +423,11 @@ match match:
 
 
 match a, *b(), c:
-    case x as NOT_YET_IMPLEMENTED_PatternMatchAs, *NOT_YET_IMPLEMENTED_PatternMatchStar, x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+    case (
+        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
+        *NOT_YET_IMPLEMENTED_PatternMatchStar,
+        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
+    ):
         pass
 
 
@@ -408,10 +442,18 @@ match something:
     case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
         pass
 
-    case x as NOT_YET_IMPLEMENTED_PatternMatchAs, x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+    case (
+        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
+        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
+    ):
         pass
 
-    case x as NOT_YET_IMPLEMENTED_PatternMatchAs, x as NOT_YET_IMPLEMENTED_PatternMatchAs, x as NOT_YET_IMPLEMENTED_PatternMatchAs, *NOT_YET_IMPLEMENTED_PatternMatchStar:
+    case (
+        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
+        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
+        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
+        *NOT_YET_IMPLEMENTED_PatternMatchStar,
+    ):
         pass
 
 

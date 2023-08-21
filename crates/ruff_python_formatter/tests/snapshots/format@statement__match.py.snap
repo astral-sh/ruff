@@ -151,6 +151,8 @@ match pattern_comments:
 match foo:
     case "a", "b":
         pass
+    case "a", "b",:
+        pass
     case ("a", "b"):
         pass
     case ["a", "b"]:
@@ -257,9 +259,10 @@ match newlines:
     case "NOT_YET_IMPLEMENTED_PatternMatchValue" if foo == 2:  # second
         pass
 
-    case "NOT_YET_IMPLEMENTED_PatternMatchValue", "NOT_YET_IMPLEMENTED_PatternMatchValue" if (
-        foo := 1
-    ):  # third
+    case (
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+    ) if (foo := 1):  # third
         pass
 
     case "NOT_YET_IMPLEMENTED_PatternMatchValue":
@@ -324,7 +327,15 @@ match pattern_comments:
         pass
 
 match foo:
-    case "NOT_YET_IMPLEMENTED_PatternMatchValue", "NOT_YET_IMPLEMENTED_PatternMatchValue":
+    case (
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+    ):
+        pass
+    case (
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+    ):
         pass
     case (
         "NOT_YET_IMPLEMENTED_PatternMatchValue",

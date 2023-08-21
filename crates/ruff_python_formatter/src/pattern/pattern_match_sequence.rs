@@ -36,41 +36,21 @@ impl FormatNodeRule<PatternMatchSequence> for FormatPatternMatchSequence {
                 }
             };
         }
-
+        let items = format_with(|f| {
+            f.join_comma_separated(range.end())
+                .nodes(patterns.iter())
+                .finish()
+        });
         match sequence_type {
-            SequenceType::Tuple => {
-                let items = format_with(|f| {
-                    f.join_comma_separated(range.end())
-                        .nodes(patterns.iter())
-                        .finish()
-                });
-                parenthesized("(", &items, ")")
-                    .with_dangling_comments(dangling)
-                    .fmt(f)
-            }
-            SequenceType::List => {
-                let items = format_with(|f| {
-                    f.join_comma_separated(range.end())
-                        .nodes(patterns.iter())
-                        .finish()
-                });
-                parenthesized("[", &items, "]")
-                    .with_dangling_comments(dangling)
-                    .fmt(f)
-            }
-            // If the match sequence is not parenthesized, inserting a comma after the last item
-            // will cause a syntax error. For example:
-            // ```python
-            // match:
-            //     case 1, 2,:
-            //         ...
-            //     case x, y, if x > 0:
-            //         ...
-            // ```
-            SequenceType::TupleWithoutParentheses => f
-                .join_with(&format_args![text(","), space()])
-                .entries(patterns.iter().map(AsFormat::format))
-                .finish(),
+            SequenceType::Tuple => parenthesized("(", &items, ")")
+                .with_dangling_comments(dangling)
+                .fmt(f),
+            SequenceType::List => parenthesized("[", &items, "]")
+                .with_dangling_comments(dangling)
+                .fmt(f),
+            SequenceType::TupleWithoutParentheses => parenthesized("(", &items, ")")
+                .with_dangling_comments(dangling)
+                .fmt(f),
         }
     }
 }
