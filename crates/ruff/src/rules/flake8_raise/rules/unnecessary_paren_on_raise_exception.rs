@@ -71,6 +71,16 @@ pub(crate) fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: 
             return;
         }
 
+        // `ctypes.WinError()` is a function, not a class. It's part of the standard library, so
+        // we might as well get it right.
+        if checker
+            .semantic()
+            .resolve_call_path(func)
+            .is_some_and(|call_path| matches!(call_path.as_slice(), ["ctypes", "WinError"]))
+        {
+            return;
+        }
+
         let range = match_parens(func.end(), checker.locator(), checker.source_type)
             .expect("Expected call to include parentheses");
         let mut diagnostic = Diagnostic::new(UnnecessaryParenOnRaiseException, range);
