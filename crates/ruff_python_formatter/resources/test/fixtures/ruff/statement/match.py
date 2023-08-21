@@ -145,6 +145,8 @@ match pattern_comments:
 match foo:
     case "a", "b":
         pass
+    case "a", "b",:
+        pass
     case ("a", "b"):
         pass
     case ["a", "b"]:
