@@ -75,7 +75,7 @@ impl NeedsParentheses for ExprNamedExpr {
         {
             OptionalParentheses::Always
         } else {
-            OptionalParentheses::Never
+            OptionalParentheses::Multiline
         }
     }
 }
