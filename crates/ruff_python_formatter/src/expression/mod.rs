@@ -192,13 +192,11 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
 
         let needs_parentheses = expression.needs_parentheses(*parent, f.context());
         let needs_parentheses = match parenthesize {
-            Parenthesize::IfRequired => {
-                if !needs_parentheses.is_always() && f.context().node_level().is_parenthesized() {
-                    OptionalParentheses::Never
-                } else {
-                    needs_parentheses
-                }
-            }
+            Parenthesize::IfRequired => match needs_parentheses {
+                OptionalParentheses::Always => OptionalParentheses::Always,
+                _ if f.context().node_level().is_parenthesized() => OptionalParentheses::Never,
+                needs_parentheses => needs_parentheses,
+            },
             Parenthesize::Optional
             | Parenthesize::IfBreaks
             | Parenthesize::IfBreaksOrIfRequired => needs_parentheses,
