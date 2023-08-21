@@ -11,6 +11,7 @@ use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_codegen::Generator;
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::Locator;
 
 use crate::checkers::ast::Checker;
@@ -557,28 +558,19 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
     }
 }
 
+/// Given an element in a list, return the comma that follows it:
 /// ```python
 /// @pytest.mark.parametrize(
 ///     "x",
 ///     [.., (elt), ..],
 ///              ^^^^^
-///              Tokenize this range to locate the true end of `elt`.
+///              Tokenize this range to locate the comma.
 /// )
 /// ```
-fn true_elt_end(checker: &Checker, elt_end: TextSize, values_end: TextSize) -> TextSize {
-    for (tok, range) in lexer::lex_starts_at(
-        checker.locator().slice(TextRange::new(elt_end, values_end)),
-        checker.source_type.as_mode(),
-        elt_end,
-    )
-    .flatten()
-    {
-        match tok {
-            Tok::Comma => return range.start(),
-            _ => continue,
-        }
-    }
-    values_end
+fn trailing_comma(element: &Expr, source: &str) -> Option<TextSize> {
+    SimpleTokenizer::starts_at(element.end(), source)
+        .find(|token| token.kind == SimpleTokenKind::Comma)
+        .map(|token| token.start())
 }
 
 /// PT014
@@ -588,40 +580,40 @@ fn check_duplicates(checker: &mut Checker, values: &Expr) {
     else {
         return;
     };
-    let [first, rest @ ..] = elts.as_slice() else { return; };
-    if rest.is_empty() {
-        return;
-    }
+
     let mut seen: FxHashMap<ComparableExpr, usize> =
         FxHashMap::with_capacity_and_hasher(elts.len(), BuildHasherDefault::default());
-    seen.insert(ComparableExpr::from(first), 0);
-    let mut prev = first;
-    for (index, elt) in rest.iter().enumerate() {
-        let index = index + 1;
-        let expr = ComparableExpr::from(elt);
+    let mut prev = None;
+    for (index, element) in elts.iter().enumerate() {
+        let expr = ComparableExpr::from(element);
         seen.entry(expr)
             .and_modify(|index| {
                 let mut diagnostic = Diagnostic::new(
                     PytestDuplicateParametrizeTestCases { index: *index },
-                    elt.range(),
+                    element.range(),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
-                    let values_end = values.range().sub_end(1.into()).end();
-                    let elt_end = true_elt_end(checker, elt.end(), values_end);
-                    let prev_end = true_elt_end(checker, prev.end(), values_end);
-                    let deletion_range = TextRange::new(prev_end, elt_end);
-                    if !checker
-                        .indexer()
-                        .comment_ranges()
-                        .intersects(deletion_range)
-                    {
-                        diagnostic.set_fix(Fix::automatic(Edit::range_deletion(deletion_range)));
+                    if let Some(prev) = prev {
+                        let values_end = values.range().end() - TextSize::new(1);
+                        let previous_end = trailing_comma(prev, checker.locator().contents())
+                            .unwrap_or(values_end);
+                        let element_end = trailing_comma(element, checker.locator().contents())
+                            .unwrap_or(values_end);
+                        let deletion_range = TextRange::new(previous_end, element_end);
+                        if !checker
+                            .indexer()
+                            .comment_ranges()
+                            .intersects(deletion_range)
+                        {
+                            diagnostic
+                                .set_fix(Fix::suggested(Edit::range_deletion(deletion_range)));
+                        }
                     }
                 }
                 checker.diagnostics.push(diagnostic);
             })
             .or_insert(index);
-        prev = elt;
+        prev = Some(element);
     }
 }
 
