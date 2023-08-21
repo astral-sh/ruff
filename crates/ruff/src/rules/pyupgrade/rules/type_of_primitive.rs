@@ -54,9 +54,9 @@ impl Violation for TypeOfPrimitive {
 
 /// UP003
 pub(crate) fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
-    if args.len() != 1 {
+    let [arg] = args else {
         return;
-    }
+    };
     if !checker
         .semantic()
         .resolve_call_path(func)
@@ -64,7 +64,7 @@ pub(crate) fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr,
     {
         return;
     }
-    let Expr::Constant(ast::ExprConstant { value, .. }) = &args[0] else {
+    let Expr::Constant(ast::ExprConstant { value, .. }) = &arg else {
         return;
     };
     let Some(primitive) = Primitive::from_constant(value) else {

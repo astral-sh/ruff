@@ -114,14 +114,17 @@ pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner:
         return;
     };
 
-    if !keywords.is_empty() || args.len() != 1 {
-        // If there are kwargs or more than one argument, this is some non-standard
-        // string join call.
+    // If there are kwargs or more than one argument, this is some non-standard
+    // string join call.
+    if !keywords.is_empty() {
         return;
     }
+    let [arg] = args.as_slice() else {
+        return;
+    };
 
     // Get the elements to join; skip (e.g.) generators, sets, etc.
-    let joinees = match &args[0] {
+    let joinees = match &arg {
         Expr::List(ast::ExprList { elts, .. }) if is_static_length(elts) => elts,
         Expr::Tuple(ast::ExprTuple { elts, .. }) if is_static_length(elts) => elts,
         _ => return,
