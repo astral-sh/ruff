@@ -1178,7 +1178,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 pylint::rules::magic_value_comparison(checker, left, comparators);
             }
             if checker.enabled(Rule::InDictKeys) {
-                flake8_simplify::rules::key_in_dict_compare(checker, expr, left, ops, comparators);
+                flake8_simplify::rules::key_in_dict_compare(checker, compare);
             }
             if checker.enabled(Rule::YodaConditions) {
                 flake8_simplify::rules::yoda_conditions(checker, expr, left, ops, comparators);
