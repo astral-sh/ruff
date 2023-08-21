@@ -1,8 +1,9 @@
 use anyhow::Result;
-use log::error;
-use ruff_text_size::{TextRange, TextSize};
+use log::debug;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+
+use ruff_text_size::{TextRange, TextSize};
 
 use crate::{Edit, Fix};
 
@@ -60,11 +61,10 @@ impl Diagnostic {
     /// Set the [`Fix`] used to fix the diagnostic, if the provided function returns `Ok`.
     /// Otherwise, log the error.
     #[inline]
-    #[allow(deprecated)]
     pub fn try_set_fix(&mut self, func: impl FnOnce() -> Result<Fix>) {
         match func() {
             Ok(fix) => self.fix = Some(fix),
-            Err(err) => error!("Failed to create fix for {}: {}", self.kind.name, err),
+            Err(err) => debug!("Failed to create fix for {}: {}", self.kind.name, err),
         }
     }
 
@@ -76,7 +76,7 @@ impl Diagnostic {
     pub fn try_set_fix_from_edit(&mut self, func: impl FnOnce() -> Result<Edit>) {
         match func() {
             Ok(edit) => self.fix = Some(Fix::unspecified(edit)),
-            Err(err) => error!("Failed to create fix for {}: {}", self.kind.name, err),
+            Err(err) => debug!("Failed to create fix for {}: {}", self.kind.name, err),
         }
     }
 
