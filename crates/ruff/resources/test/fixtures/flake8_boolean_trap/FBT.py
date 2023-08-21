@@ -69,6 +69,7 @@ g_action.set_enabled(True)
 settings.set_enable_developer_extras(True)
 foo.is_(True)
 bar.is_not(False)
+next(iter([]), False)
 
 class Registry:
     def __init__(self) -> None:
