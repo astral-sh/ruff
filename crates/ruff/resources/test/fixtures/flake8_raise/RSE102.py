@@ -20,7 +20,16 @@ raise TypeError \
     ()
 
 # RSE102
+raise TypeError \
+    ();
+
+# RSE102
 raise TypeError(
+
+)
+
+# RSE102
+raise (TypeError) (
 
 )
 
