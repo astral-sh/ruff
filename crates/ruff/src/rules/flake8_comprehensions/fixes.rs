@@ -1045,8 +1045,26 @@ pub(crate) fn fix_unnecessary_comprehension_any_all(
     let mut tree = match_expression(module_text)?;
     let call = match_call_mut(&mut tree)?;
 
-    let Expression::ListComp(list_comp) = &call.args[0].value else {
-        bail!("Expected Expression::ListComp");
+    let (whitespace_after, whitespace_before, elt, for_in, lpar, rpar) = match &call.args[0].value {
+        Expression::ListComp(list_comp) => (
+            &list_comp.lbracket.whitespace_after,
+            &list_comp.rbracket.whitespace_before,
+            &list_comp.elt,
+            &list_comp.for_in,
+            &list_comp.lpar,
+            &list_comp.rpar,
+        ),
+        Expression::SetComp(set_comp) => (
+            &set_comp.lbrace.whitespace_after,
+            &set_comp.rbrace.whitespace_before,
+            &set_comp.elt,
+            &set_comp.for_in,
+            &set_comp.lpar,
+            &set_comp.rpar,
+        ),
+        _ => {
+            bail!("Expected Expression::ListComp | Expression::SetComp");
+        }
     };
 
     let mut new_empty_lines = vec![];
@@ -1055,7 +1073,7 @@ pub(crate) fn fix_unnecessary_comprehension_any_all(
         first_line,
         empty_lines,
         ..
-    }) = &list_comp.lbracket.whitespace_after
+    }) = &whitespace_after
     {
         // If there's a comment on the line after the opening bracket, we need
         // to preserve it. The way we do this is by adding a new empty line
@@ -1144,7 +1162,7 @@ pub(crate) fn fix_unnecessary_comprehension_any_all(
                     ..
                 },
             ..
-        }) = &list_comp.rbracket.whitespace_before
+        }) = &whitespace_before
         {
             Some(format!("{}{}", whitespace.0, comment.0))
         } else {
@@ -1152,10 +1170,10 @@ pub(crate) fn fix_unnecessary_comprehension_any_all(
         };
 
     call.args[0].value = Expression::GeneratorExp(Box::new(GeneratorExp {
-        elt: list_comp.elt.clone(),
-        for_in: list_comp.for_in.clone(),
-        lpar: list_comp.lpar.clone(),
-        rpar: list_comp.rpar.clone(),
+        elt: elt.clone(),
+        for_in: for_in.clone(),
+        lpar: lpar.clone(),
+        rpar: rpar.clone(),
     }));
 
     let whitespace_after_arg = match &call.args[0].comma {
