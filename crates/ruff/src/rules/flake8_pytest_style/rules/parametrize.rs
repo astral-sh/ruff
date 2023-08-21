@@ -270,12 +270,11 @@ fn elts_to_csv(elts: &[Expr], generator: Generator) -> Option<String> {
 
 /// Returns the range of the `name` argument of `@pytest.mark.parametrize`.
 ///
-/// This accounts for implicit string concatenation with parenthesis.
-/// For example, the following code will return the range marked with `^`:
+/// This accounts for parenthesized expressions. For example, the following code
+/// will return the range marked with `^`:
 /// ```python
-/// @pytest.mark.parametrize(("a, " "b"), [(1, 2)])
-/// #                        ^^^^^^^^^^^
-/// #                        implicit string concatenation with parenthesis
+/// @pytest.mark.parametrize(("x"), [(1, 2)])
+/// #                        ^^^^^
 /// def test(a, b):
 ///     ...
 /// ```
@@ -288,7 +287,7 @@ fn get_parametrize_name_range(
     source_type: PySourceType,
 ) -> TextRange {
     let mut locations = Vec::new();
-    let mut implicit_concat = None;
+    let mut name_range = None;
 
     // The parenthesis are not part of the AST, so we need to tokenize the
     // decorator to find them.
@@ -303,7 +302,7 @@ fn get_parametrize_name_range(
             Tok::Lpar => locations.push(range.start()),
             Tok::Rpar => {
                 if let Some(start) = locations.pop() {
-                    implicit_concat = Some(TextRange::new(start, range.end()));
+                    name_range = Some(TextRange::new(start, range.end()));
                 }
             }
             // Stop after the first argument.
@@ -311,12 +310,7 @@ fn get_parametrize_name_range(
             _ => (),
         }
     }
-
-    if let Some(range) = implicit_concat {
-        range
-    } else {
-        expr.range()
-    }
+    name_range.unwrap_or_else(|| expr.range())
 }
 
 /// PT006
