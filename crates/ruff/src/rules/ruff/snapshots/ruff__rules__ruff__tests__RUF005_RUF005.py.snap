@@ -187,7 +187,7 @@ RUF005.py:47:16: RUF005 [*] Consider `("we all feel", *Fun.words)` instead of co
 49 49 | chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants") + zoob)
 50 50 | 
 
-RUF005.py:49:9: RUF005 [*] Consider `["a", "b", "c", *eggs, *list(("yes", "no", "pants") + zoob)]` instead of concatenation
+RUF005.py:49:9: RUF005 [*] Consider iterable unpacking instead of concatenation
    |
 47 | astonishment = ("we all feel",) + Fun.words
 48 | 
@@ -196,7 +196,7 @@ RUF005.py:49:9: RUF005 [*] Consider `["a", "b", "c", *eggs, *list(("yes", "no", 
 50 | 
 51 | baz = () + zoob
    |
-   = help: Replace with `["a", "b", "c", *eggs, *list(("yes", "no", "pants") + zoob)]`
+   = help: Replace with iterable unpacking
 
 ℹ Suggested fix
 46 46 | excitement = ("we all think",) + Fun().yay()
@@ -294,14 +294,14 @@ RUF005.py:56:15: RUF005 [*] Consider `[sys.executable, "-m", "pylint", *args, pa
 58 58 | b = a + [2, 3] + [4]
 59 59 | 
 
-RUF005.py:57:21: RUF005 [*] Consider `(sys.executable, "-m", "pylint", *args, path, path2)` instead of concatenation
+RUF005.py:57:21: RUF005 [*] Consider iterable unpacking instead of concatenation
    |
 56 | pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
 57 | pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF005
 58 | b = a + [2, 3] + [4]
    |
-   = help: Replace with `(sys.executable, "-m", "pylint", *args, path, path2)`
+   = help: Replace with iterable unpacking
 
 ℹ Suggested fix
 54 54 | ]
