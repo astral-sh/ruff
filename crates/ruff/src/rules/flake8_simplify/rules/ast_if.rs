@@ -721,10 +721,16 @@ pub(crate) fn if_with_same_arms(checker: &mut Checker, locator: &Locator, stmt_i
         // ...and the same comments
         let first_comments = checker
             .indexer()
-            .comments_in_range(body_range(&current_branch, locator), locator);
+            .comment_ranges()
+            .comments_in_range(body_range(&current_branch, locator))
+            .iter()
+            .map(|range| locator.slice(*range));
         let second_comments = checker
             .indexer()
-            .comments_in_range(body_range(following_branch, locator), locator);
+            .comment_ranges()
+            .comments_in_range(body_range(following_branch, locator))
+            .iter()
+            .map(|range| locator.slice(*range));
         if !first_comments.eq(second_comments) {
             continue;
         }
