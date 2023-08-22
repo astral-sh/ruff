@@ -243,12 +243,11 @@ if True:
     #[test]
     fn quick_test() {
         let src = r#"
-@MyDecorator(list = a) # fmt: skip
-# trailing comment
-class Test:
+try:
     pass
 
-
+finally:
+    pass
 "#;
         // Tokenize once
         let mut tokens = Vec::new();
