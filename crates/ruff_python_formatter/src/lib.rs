@@ -54,7 +54,13 @@ where
         if self.is_suppressed(node_comments.trailing, f.context()) {
             suppressed_node(node.as_any_node_ref()).fmt(f)
         } else {
-            leading_comments(node_comments.leading).fmt(f)?;
+            write!(
+                f,
+                [
+                    leading_comments(node_comments.leading),
+                    source_position(node.start())
+                ]
+            )?;
             self.fmt_fields(node, f)?;
             self.fmt_dangling_comments(node_comments.dangling, f)?;
 
