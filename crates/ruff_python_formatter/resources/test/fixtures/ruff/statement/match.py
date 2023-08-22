@@ -141,3 +141,20 @@ match pattern_comments:
     no_comments
     ):
         pass
+
+
+match pattern_singleton:
+    case (
+        # leading 1
+        # leading 2
+        None  # trailing
+        # trailing own 1
+        # trailing own 2
+    ):
+        pass
+    case (
+        True  # trailing
+    ):
+        ...
+    case False:
+        ...
