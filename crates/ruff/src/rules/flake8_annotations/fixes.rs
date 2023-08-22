@@ -30,6 +30,7 @@ pub(crate) fn add_return_annotation<T: Ranged>(
         if matches!(tok, Tok::Lpar) {
             if count == 0 {
                 seen_lpar = true;
+                seen_rpar = false;
             }
             count = count.saturating_add(1);
         }
