@@ -156,6 +156,18 @@ match pattern_comments:
         pass
 
 
+match pattern_comments:
+    case (
+        pattern
+        # 1
+		as # 2
+        # 3
+		name #4
+        # 5
+    ):
+        pass
+
+
 match x:
     case (a as b) as c:
         pass
