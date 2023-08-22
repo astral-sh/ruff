@@ -6,8 +6,8 @@ use crate::checkers::ast::Checker;
 use crate::rules::flake8_datetimez::rules::helpers::has_non_none_keyword;
 
 /// ## What it does
-/// Checks for usage of `datetime.datetime.strptime()` without `%tz` not
-/// followed by `.replace(tzinfo=)` or `.astimezone()`.
+/// Checks for uses of `datetime.datetime.strptime()` that lead to naive
+/// datetime objects.
 ///
 /// ## Why is this bad?
 /// Python datetime objects can be naive or timezone-aware. While an aware
@@ -16,7 +16,7 @@ use crate::rules::flake8_datetimez::rules::helpers::has_non_none_keyword;
 /// datetime objects. Since this can lead to errors, it is recommended to
 /// always use timezone-aware objects.
 ///
-/// `datetime.datetime.strptime()` without `%tz` returns a naive datetime
+/// `datetime.datetime.strptime()` without `%z` returns a naive datetime
 /// object. Follow it with `.replace(tzinfo=)` or `.astimezone()`.
 ///
 /// ## Example
@@ -42,7 +42,8 @@ use crate::rules::flake8_datetimez::rules::helpers::has_non_none_keyword;
 /// datetime.datetime.strptime("2022/01/31", "%Y/%m/%d").astimezone(datetime.timezone.utc)
 /// ```
 ///
-/// In Python 3.11, `datetime.timezone.utc` can be replaced with `datetime.UTC`.
+/// On Python 3.11 and later, `datetime.timezone.utc` can be replaced with
+/// `datetime.UTC`.
 ///
 /// ## References
 /// - [Python documentation: Aware and Naive Objects](https://docs.python.org/3/library/datetime.html#aware-and-naive-objects)
@@ -60,6 +61,7 @@ impl Violation for CallDatetimeStrptimeWithoutZone {
     }
 }
 
+/// DTZ007
 pub(crate) fn call_datetime_strptime_without_zone(checker: &mut Checker, call: &ast::ExprCall) {
     if !checker
         .semantic()
