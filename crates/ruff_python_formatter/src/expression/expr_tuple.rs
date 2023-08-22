@@ -8,7 +8,7 @@ use ruff_text_size::TextRange;
 use crate::builders::parenthesize_if_expands;
 use crate::comments::SourceComment;
 use crate::expression::parentheses::{
-    empty_parenthesized, parenthesized, NeedsParentheses, OptionalParentheses,
+    empty_parenthesized, optional_parentheses, parenthesized, NeedsParentheses, OptionalParentheses,
 };
 use crate::prelude::*;
 
@@ -138,7 +138,7 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                 }
             },
             // If the tuple has parentheses, we generally want to keep them. The exception are for
-            // loops, see `TupleParentheses::StripInsideForLoop` doc comment.
+            // loops, see `TupleParentheses::NeverPreserve` doc comment.
             //
             // Unlike other expression parentheses, tuple parentheses are part of the range of the
             // tuple itself.
@@ -159,7 +159,12 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                         .finish()
                 }
                 TupleParentheses::Preserve => group(&ExprSequence::new(item)).fmt(f),
-                _ => parenthesize_if_expands(&ExprSequence::new(item)).fmt(f),
+                TupleParentheses::NeverPreserve => {
+                    optional_parentheses(&ExprSequence::new(item)).fmt(f)
+                }
+                TupleParentheses::Default => {
+                    parenthesize_if_expands(&ExprSequence::new(item)).fmt(f)
+                }
             },
         }
     }
