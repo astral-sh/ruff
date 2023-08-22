@@ -5,6 +5,48 @@ use ruff_python_ast::{self as ast, Constant, Expr, Ranged};
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_datetimez::rules::helpers::has_non_none_keyword;
 
+/// ## What it does
+/// Checks for usage of `datetime.datetime.strptime()` without `%tz` not
+/// followed by `.replace(tzinfo=)` or `.astimezone()`.
+///
+/// ## Why is this bad?
+/// Python datetime objects can be naive or timezone-aware. While an aware
+/// object represents a specific moment in time, a naive object does not
+/// contain enough information to unambiguously locate itself relative to other
+/// datetime objects. Since this can lead to errors, it is recommended to
+/// always use timezone-aware objects.
+///
+/// `datetime.datetime.strptime()` without `%tz` returns a naive datetime
+/// object. Follow it with `.replace(tzinfo=)` or `.astimezone()`.
+///
+/// ## Example
+/// ```python
+/// import datetime
+///
+/// datetime.datetime.strptime("2022/01/31", "%Y/%m/%d")
+/// ```
+///
+/// Instead, use `.replace(tzinfo=)`:
+/// ```python
+/// import datetime
+///
+/// datetime.datetime.strptime("2022/01/31", "%Y/%m/%d").replace(
+///     tzinfo=datetime.timezone.utc
+/// )
+/// ```
+///
+/// Or, use `.astimezone()`:
+/// ```python
+/// import datetime
+///
+/// datetime.datetime.strptime("2022/01/31", "%Y/%m/%d").astimezone(datetime.timezone.utc)
+/// ```
+///
+/// In Python 3.11, `datetime.timezone.utc` can be replaced with `datetime.UTC`.
+///
+/// ## References
+/// - [Python documentation: Aware and Naive Objects](https://docs.python.org/3/library/datetime.html#aware-and-naive-objects)
+/// - [Python documentation: `strftime()` and `strptime()` Behavior](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-behavior)
 #[violation]
 pub struct CallDatetimeStrptimeWithoutZone;
 
@@ -18,7 +60,6 @@ impl Violation for CallDatetimeStrptimeWithoutZone {
     }
 }
 
-/// DTZ007
 pub(crate) fn call_datetime_strptime_without_zone(checker: &mut Checker, call: &ast::ExprCall) {
     if !checker
         .semantic()
