@@ -333,7 +333,7 @@ fn parse_nested_placeholder<'a>(
     text: &'a str,
 ) -> Result<&'a str, FormatSpecError> {
     match FormatString::parse_spec(text, AllowPlaceholderNesting::No) {
-        // Not a nested replacement, OK
+        // Not a nested placeholder, OK
         Err(FormatParseError::MissingStartBracket) => Ok(text),
         Err(err) => Err(FormatSpecError::InvalidPlaceholder(err)),
         Ok((format_part, text)) => {
@@ -464,7 +464,7 @@ impl std::fmt::Display for FormatParseError {
                 std::write!(fmt, "unescaped start bracket in literal")
             }
             Self::PlaceholderRecursionExceeded => {
-                std::write!(fmt, "multiply nested replacement not allowed")
+                std::write!(fmt, "multiply nested placeholder not allowed")
             }
             Self::UnknownConversion => {
                 std::write!(fmt, "unknown conversion")
@@ -790,7 +790,7 @@ mod tests {
     #[test]
     fn test_format_part() {
         let expected = Ok(FormatSpec::Dynamic(DynamicFormatSpec {
-            replacements: vec![FormatPart::Field {
+            placeholders: vec![FormatPart::Field {
                 field_name: "x".to_string(),
                 conversion_spec: None,
                 format_spec: String::new(),
@@ -802,7 +802,7 @@ mod tests {
     #[test]
     fn test_dynamic_format_spec() {
         let expected = Ok(FormatSpec::Dynamic(DynamicFormatSpec {
-            replacements: vec![
+            placeholders: vec![
                 FormatPart::Field {
                     field_name: "x".to_string(),
                     conversion_spec: None,
@@ -826,7 +826,7 @@ mod tests {
     #[test]
     fn test_dynamic_format_spec_with_others() {
         let expected = Ok(FormatSpec::Dynamic(DynamicFormatSpec {
-            replacements: vec![FormatPart::Field {
+            placeholders: vec![FormatPart::Field {
                 field_name: "x".to_string(),
                 conversion_spec: None,
                 format_spec: String::new(),
@@ -874,7 +874,7 @@ mod tests {
     }
 
     #[test]
-    fn test_format_parse_nested_replacement() {
+    fn test_format_parse_nested_placeholder() {
         let expected = Ok(FormatString {
             format_parts: vec![
                 FormatPart::Literal("abcd".to_owned()),
@@ -964,9 +964,9 @@ mod tests {
         assert_eq!(
             FormatSpec::parse("{}}"),
             // Note this should be an `InvalidFormatType` but we give up
-            // on all other parsing validation when we see a replacement
+            // on all other parsing validation when we see a placeholder
             Ok(FormatSpec::Dynamic(DynamicFormatSpec {
-                replacements: vec![FormatPart::Field {
+                placeholders: vec![FormatPart::Field {
                     field_name: String::new(),
                     conversion_spec: None,
                     format_spec: String::new()
