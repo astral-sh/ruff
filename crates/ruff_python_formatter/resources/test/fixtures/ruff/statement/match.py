@@ -158,7 +158,6 @@ match pattern_singleton:
     case False:
         ...
 
-
 match foo:
     case "a", "b":
         pass
