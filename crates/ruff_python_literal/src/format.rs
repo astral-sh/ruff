@@ -335,11 +335,7 @@ fn parse_nested_placeholder<'a>(
 }
 
 /// Parse and consume all placeholders in a format spec
-///
-/// This will also consume any intermediate characters such as `x` and `y` in
-/// ```
-/// "x{foo}y{bar}z"
-/// ```
+/// This will also consume any intermediate characters such as `x` and `y` in `"x{foo}y{bar}z"`
 fn consume_all_placeholders<'a>(
     placeholders: &mut Vec<FormatPart>,
     text: &'a str,
