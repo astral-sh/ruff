@@ -9,6 +9,7 @@ const CONVENTIONAL_ALIASES: &[(&str, &str)] = &[
     ("altair", "alt"),
     ("matplotlib", "mpl"),
     ("matplotlib.pyplot", "plt"),
+    ("networkx", "nx"),
     ("numpy", "np"),
     ("pandas", "pd"),
     ("seaborn", "sns"),

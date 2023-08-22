@@ -72,7 +72,7 @@ defaults.py:9:12: ICN001 [*] `pandas` should be imported as `pd`
    9  |+    import pandas as pd
 10 10 |     import seaborn
 11 11 |     import tkinter
-12 12 | 
+12 12 |     import networkx
 
 defaults.py:10:12: ICN001 [*] `seaborn` should be imported as `sns`
    |
@@ -81,6 +81,7 @@ defaults.py:10:12: ICN001 [*] `seaborn` should be imported as `sns`
 10 |     import seaborn
    |            ^^^^^^^ ICN001
 11 |     import tkinter
+12 |     import networkx
    |
    = help: Alias `seaborn` to `sns`
 
@@ -91,7 +92,7 @@ defaults.py:10:12: ICN001 [*] `seaborn` should be imported as `sns`
 10    |-    import seaborn
    10 |+    import seaborn as sns
 11 11 |     import tkinter
-12 12 | 
+12 12 |     import networkx
 13 13 | 
 
 defaults.py:11:12: ICN001 [*] `tkinter` should be imported as `tk`
@@ -100,6 +101,7 @@ defaults.py:11:12: ICN001 [*] `tkinter` should be imported as `tk`
 10 |     import seaborn
 11 |     import tkinter
    |            ^^^^^^^ ICN001
+12 |     import networkx
    |
    = help: Alias `tkinter` to `tk`
 
@@ -109,130 +111,172 @@ defaults.py:11:12: ICN001 [*] `tkinter` should be imported as `tk`
 10 10 |     import seaborn
 11    |-    import tkinter
    11 |+    import tkinter as tk
-12 12 | 
+12 12 |     import networkx
 13 13 | 
-14 14 | def unconventional_aliases():
+14 14 | 
 
-defaults.py:15:22: ICN001 [*] `altair` should be imported as `alt`
+defaults.py:12:12: ICN001 [*] `networkx` should be imported as `nx`
    |
-14 | def unconventional_aliases():
-15 |     import altair as altr
+10 |     import seaborn
+11 |     import tkinter
+12 |     import networkx
+   |            ^^^^^^^^ ICN001
+   |
+   = help: Alias `networkx` to `nx`
+
+ℹ Suggested fix
+9  9  |     import pandas
+10 10 |     import seaborn
+11 11 |     import tkinter
+12    |-    import networkx
+   12 |+    import networkx as nx
+13 13 | 
+14 14 | 
+15 15 | def unconventional_aliases():
+
+defaults.py:16:22: ICN001 [*] `altair` should be imported as `alt`
+   |
+15 | def unconventional_aliases():
+16 |     import altair as altr
    |                      ^^^^ ICN001
-16 |     import matplotlib.pyplot as plot
-17 |     import numpy as nmp
+17 |     import matplotlib.pyplot as plot
+18 |     import numpy as nmp
    |
    = help: Alias `altair` to `alt`
 
 ℹ Suggested fix
-12 12 | 
 13 13 | 
-14 14 | def unconventional_aliases():
-15    |-    import altair as altr
-   15 |+    import altair as alt
-16 16 |     import matplotlib.pyplot as plot
-17 17 |     import numpy as nmp
-18 18 |     import pandas as pdas
+14 14 | 
+15 15 | def unconventional_aliases():
+16    |-    import altair as altr
+   16 |+    import altair as alt
+17 17 |     import matplotlib.pyplot as plot
+18 18 |     import numpy as nmp
+19 19 |     import pandas as pdas
 
-defaults.py:16:33: ICN001 [*] `matplotlib.pyplot` should be imported as `plt`
+defaults.py:17:33: ICN001 [*] `matplotlib.pyplot` should be imported as `plt`
    |
-14 | def unconventional_aliases():
-15 |     import altair as altr
-16 |     import matplotlib.pyplot as plot
+15 | def unconventional_aliases():
+16 |     import altair as altr
+17 |     import matplotlib.pyplot as plot
    |                                 ^^^^ ICN001
-17 |     import numpy as nmp
-18 |     import pandas as pdas
+18 |     import numpy as nmp
+19 |     import pandas as pdas
    |
    = help: Alias `matplotlib.pyplot` to `plt`
 
 ℹ Suggested fix
-13 13 | 
-14 14 | def unconventional_aliases():
-15 15 |     import altair as altr
-16    |-    import matplotlib.pyplot as plot
-   16 |+    import matplotlib.pyplot as plt
-17 17 |     import numpy as nmp
-18 18 |     import pandas as pdas
-19 19 |     import seaborn as sbrn
+14 14 | 
+15 15 | def unconventional_aliases():
+16 16 |     import altair as altr
+17    |-    import matplotlib.pyplot as plot
+   17 |+    import matplotlib.pyplot as plt
+18 18 |     import numpy as nmp
+19 19 |     import pandas as pdas
+20 20 |     import seaborn as sbrn
 
-defaults.py:17:21: ICN001 [*] `numpy` should be imported as `np`
+defaults.py:18:21: ICN001 [*] `numpy` should be imported as `np`
    |
-15 |     import altair as altr
-16 |     import matplotlib.pyplot as plot
-17 |     import numpy as nmp
+16 |     import altair as altr
+17 |     import matplotlib.pyplot as plot
+18 |     import numpy as nmp
    |                     ^^^ ICN001
-18 |     import pandas as pdas
-19 |     import seaborn as sbrn
+19 |     import pandas as pdas
+20 |     import seaborn as sbrn
    |
    = help: Alias `numpy` to `np`
 
 ℹ Suggested fix
-14 14 | def unconventional_aliases():
-15 15 |     import altair as altr
-16 16 |     import matplotlib.pyplot as plot
-17    |-    import numpy as nmp
-   17 |+    import numpy as np
-18 18 |     import pandas as pdas
-19 19 |     import seaborn as sbrn
-20 20 |     import tkinter as tkr
+15 15 | def unconventional_aliases():
+16 16 |     import altair as altr
+17 17 |     import matplotlib.pyplot as plot
+18    |-    import numpy as nmp
+   18 |+    import numpy as np
+19 19 |     import pandas as pdas
+20 20 |     import seaborn as sbrn
+21 21 |     import tkinter as tkr
 
-defaults.py:18:22: ICN001 [*] `pandas` should be imported as `pd`
+defaults.py:19:22: ICN001 [*] `pandas` should be imported as `pd`
    |
-16 |     import matplotlib.pyplot as plot
-17 |     import numpy as nmp
-18 |     import pandas as pdas
+17 |     import matplotlib.pyplot as plot
+18 |     import numpy as nmp
+19 |     import pandas as pdas
    |                      ^^^^ ICN001
-19 |     import seaborn as sbrn
-20 |     import tkinter as tkr
+20 |     import seaborn as sbrn
+21 |     import tkinter as tkr
    |
    = help: Alias `pandas` to `pd`
 
 ℹ Suggested fix
-15 15 |     import altair as altr
-16 16 |     import matplotlib.pyplot as plot
-17 17 |     import numpy as nmp
-18    |-    import pandas as pdas
-   18 |+    import pandas as pd
-19 19 |     import seaborn as sbrn
-20 20 |     import tkinter as tkr
-21 21 | 
+16 16 |     import altair as altr
+17 17 |     import matplotlib.pyplot as plot
+18 18 |     import numpy as nmp
+19    |-    import pandas as pdas
+   19 |+    import pandas as pd
+20 20 |     import seaborn as sbrn
+21 21 |     import tkinter as tkr
+22 22 |     import networkx as nxy
 
-defaults.py:19:23: ICN001 [*] `seaborn` should be imported as `sns`
+defaults.py:20:23: ICN001 [*] `seaborn` should be imported as `sns`
    |
-17 |     import numpy as nmp
-18 |     import pandas as pdas
-19 |     import seaborn as sbrn
+18 |     import numpy as nmp
+19 |     import pandas as pdas
+20 |     import seaborn as sbrn
    |                       ^^^^ ICN001
-20 |     import tkinter as tkr
+21 |     import tkinter as tkr
+22 |     import networkx as nxy
    |
    = help: Alias `seaborn` to `sns`
 
 ℹ Suggested fix
-16 16 |     import matplotlib.pyplot as plot
-17 17 |     import numpy as nmp
-18 18 |     import pandas as pdas
-19    |-    import seaborn as sbrn
-   19 |+    import seaborn as sns
-20 20 |     import tkinter as tkr
-21 21 | 
-22 22 | 
+17 17 |     import matplotlib.pyplot as plot
+18 18 |     import numpy as nmp
+19 19 |     import pandas as pdas
+20    |-    import seaborn as sbrn
+   20 |+    import seaborn as sns
+21 21 |     import tkinter as tkr
+22 22 |     import networkx as nxy
+23 23 | 
 
-defaults.py:20:23: ICN001 [*] `tkinter` should be imported as `tk`
+defaults.py:21:23: ICN001 [*] `tkinter` should be imported as `tk`
    |
-18 |     import pandas as pdas
-19 |     import seaborn as sbrn
-20 |     import tkinter as tkr
+19 |     import pandas as pdas
+20 |     import seaborn as sbrn
+21 |     import tkinter as tkr
    |                       ^^^ ICN001
+22 |     import networkx as nxy
    |
    = help: Alias `tkinter` to `tk`
 
 ℹ Suggested fix
-17 17 |     import numpy as nmp
-18 18 |     import pandas as pdas
-19 19 |     import seaborn as sbrn
-20    |-    import tkinter as tkr
-   20 |+    import tkinter as tk
-21 21 | 
-22 22 | 
-23 23 | def conventional_aliases():
+18 18 |     import numpy as nmp
+19 19 |     import pandas as pdas
+20 20 |     import seaborn as sbrn
+21    |-    import tkinter as tkr
+   21 |+    import tkinter as tk
+22 22 |     import networkx as nxy
+23 23 | 
+24 24 | def conventional_aliases():
+
+defaults.py:22:24: ICN001 [*] `networkx` should be imported as `nx`
+   |
+20 |     import seaborn as sbrn
+21 |     import tkinter as tkr
+22 |     import networkx as nxy
+   |                        ^^^ ICN001
+23 | 
+24 | def conventional_aliases():
+   |
+   = help: Alias `networkx` to `nx`
+
+ℹ Suggested fix
+19 19 |     import pandas as pdas
+20 20 |     import seaborn as sbrn
+21 21 |     import tkinter as tkr
+22    |-    import networkx as nxy
+   22 |+    import networkx as nx
+23 23 | 
+24 24 | def conventional_aliases():
+25 25 |     import altair as alt
 
 
