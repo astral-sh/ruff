@@ -1213,6 +1213,9 @@ mod tests {
     use num_bigint::BigInt;
     use ruff_python_ast::IpyEscapeKind;
 
+    use insta::assert_debug_snapshot;
+    use test_case::test_case;
+
     use super::*;
 
     const WINDOWS_EOL: &str = "\r\n";
@@ -1229,23 +1232,10 @@ mod tests {
         lexer.map(|x| x.unwrap().0).collect()
     }
 
-    fn str_tok(s: &str) -> Tok {
-        Tok::String {
-            value: s.to_owned(),
-            kind: StringKind::String,
-            triple_quoted: false,
-        }
-    }
-
-    fn raw_str_tok(s: &str) -> Tok {
-        Tok::String {
-            value: s.to_owned(),
-            kind: StringKind::RawString,
-            triple_quoted: false,
-        }
-    }
-
-    fn assert_ipython_escape_command_line_continuation_with_eol(eol: &str) {
+    #[test_case(UNIX_EOL)]
+    #[test_case(MAC_EOL)]
+    #[test_case(WINDOWS_EOL)]
+    fn test_ipython_escape_command_line_continuation_eol(eol: &str) {
         let source = format!("%matplotlib \\{eol}  --inline");
         let tokens = lex_jupyter_source(&source);
         assert_eq!(
@@ -1260,22 +1250,10 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_ipython_escape_command_line_continuation_unix_eol() {
-        assert_ipython_escape_command_line_continuation_with_eol(UNIX_EOL);
-    }
-
-    #[test]
-    fn test_ipython_escape_command_line_continuation_mac_eol() {
-        assert_ipython_escape_command_line_continuation_with_eol(MAC_EOL);
-    }
-
-    #[test]
-    fn test_ipython_escape_command_line_continuation_windows_eol() {
-        assert_ipython_escape_command_line_continuation_with_eol(WINDOWS_EOL);
-    }
-
-    fn assert_ipython_escape_command_line_continuation_with_eol_and_eof(eol: &str) {
+    #[test_case(UNIX_EOL)]
+    #[test_case(MAC_EOL)]
+    #[test_case(WINDOWS_EOL)]
+    fn test_ipython_escape_command_line_continuation_with_eol_and_eof(eol: &str) {
         let source = format!("%matplotlib \\{eol}");
         let tokens = lex_jupyter_source(&source);
         assert_eq!(
@@ -1291,74 +1269,9 @@ mod tests {
     }
 
     #[test]
-    fn test_ipython_escape_command_line_continuation_unix_eol_and_eof() {
-        assert_ipython_escape_command_line_continuation_with_eol_and_eof(UNIX_EOL);
-    }
-
-    #[test]
-    fn test_ipython_escape_command_line_continuation_mac_eol_and_eof() {
-        assert_ipython_escape_command_line_continuation_with_eol_and_eof(MAC_EOL);
-    }
-
-    #[test]
-    fn test_ipython_escape_command_line_continuation_windows_eol_and_eof() {
-        assert_ipython_escape_command_line_continuation_with_eol_and_eof(WINDOWS_EOL);
-    }
-
-    #[test]
     fn test_empty_ipython_escape_command() {
         let source = "%\n%%\n!\n!!\n?\n??\n/\n,\n;";
-        let tokens = lex_jupyter_source(source);
-        assert_eq!(
-            tokens,
-            vec![
-                Tok::IpyEscapeCommand {
-                    value: String::new(),
-                    kind: IpyEscapeKind::Magic,
-                },
-                Tok::Newline,
-                Tok::IpyEscapeCommand {
-                    value: String::new(),
-                    kind: IpyEscapeKind::Magic2,
-                },
-                Tok::Newline,
-                Tok::IpyEscapeCommand {
-                    value: String::new(),
-                    kind: IpyEscapeKind::Shell,
-                },
-                Tok::Newline,
-                Tok::IpyEscapeCommand {
-                    value: String::new(),
-                    kind: IpyEscapeKind::ShCap,
-                },
-                Tok::Newline,
-                Tok::IpyEscapeCommand {
-                    value: String::new(),
-                    kind: IpyEscapeKind::Help,
-                },
-                Tok::Newline,
-                Tok::IpyEscapeCommand {
-                    value: String::new(),
-                    kind: IpyEscapeKind::Help2,
-                },
-                Tok::Newline,
-                Tok::IpyEscapeCommand {
-                    value: String::new(),
-                    kind: IpyEscapeKind::Paren,
-                },
-                Tok::Newline,
-                Tok::IpyEscapeCommand {
-                    value: String::new(),
-                    kind: IpyEscapeKind::Quote,
-                },
-                Tok::Newline,
-                Tok::IpyEscapeCommand {
-                    value: String::new(),
-                    kind: IpyEscapeKind::Quote2,
-                },
-                Tok::Newline,
-            ]
-        );
+        assert_debug_snapshot!(lex_jupyter_source(source));
     }
 
     #[test]
@@ -1379,67 +1292,7 @@ mod tests {
 !ls
 "
         .trim();
-        let tokens = lex_jupyter_source(source);
-        assert_eq!(
-            tokens,
-            vec![
-                Tok::IpyEscapeCommand {
-                    value: "foo".to_string(),
-                    kind: IpyEscapeKind::Help,
-                },
-                Tok::Newline,
-                Tok::IpyEscapeCommand {
-                    value: "foo".to_string(),
-                    kind: IpyEscapeKind::Help2,
-                },
-                Tok::Newline,
-                Tok::IpyEscapeCommand {
-                    value: "timeit a = b".to_string(),
-                    kind: IpyEscapeKind::Magic,
-                },
-                Tok::Newline,
-                Tok::IpyEscapeCommand {
-                    value: "timeit a % 3".to_string(),
-                    kind: IpyEscapeKind::Magic,
-                },
-                Tok::Newline,
-                Tok::IpyEscapeCommand {
-                    value: "matplotlib     --inline".to_string(),
-                    kind: IpyEscapeKind::Magic,
-                },
-                Tok::Newline,
-                Tok::IpyEscapeCommand {
-                    value: "pwd   && ls -a | sed 's/^/\\\\    /'".to_string(),
-                    kind: IpyEscapeKind::Shell,
-                },
-                Tok::Newline,
-                Tok::IpyEscapeCommand {
-                    value: "cd /Users/foo/Library/Application\\ Support/".to_string(),
-                    kind: IpyEscapeKind::ShCap,
-                },
-                Tok::Newline,
-                Tok::IpyEscapeCommand {
-                    value: "foo 1 2".to_string(),
-                    kind: IpyEscapeKind::Paren,
-                },
-                Tok::Newline,
-                Tok::IpyEscapeCommand {
-                    value: "foo 1 2".to_string(),
-                    kind: IpyEscapeKind::Quote,
-                },
-                Tok::Newline,
-                Tok::IpyEscapeCommand {
-                    value: "foo 1 2".to_string(),
-                    kind: IpyEscapeKind::Quote2,
-                },
-                Tok::Newline,
-                Tok::IpyEscapeCommand {
-                    value: "ls".to_string(),
-                    kind: IpyEscapeKind::Shell,
-                },
-                Tok::Newline,
-            ]
-        );
+        assert_debug_snapshot!(lex_jupyter_source(source));
     }
 
     #[test]
@@ -1464,92 +1317,7 @@ mod tests {
 %%foo???
 !pwd?"
             .trim();
-        let tokens = lex_jupyter_source(source);
-        assert_eq!(
-            tokens,
-            [
-                Tok::IpyEscapeCommand {
-                    value: "foo".to_string(),
-                    kind: IpyEscapeKind::Help,
-                },
-                Tok::Newline,
-                Tok::IpyEscapeCommand {
-                    value: "foo".to_string(),
-                    kind: IpyEscapeKind::Help,
-                },
-                Tok::Newline,
-                Tok::IpyEscapeCommand {
-                    value: "   foo  ?".to_string(),
-                    kind: IpyEscapeKind::Help2,
-                },
-                Tok::Newline,
-                Tok::IpyEscapeCommand {
-                    value: "foo".to_string(),
-                    kind: IpyEscapeKind::Help2,
-                },
-                Tok::Newline,
-                Tok::IpyEscapeCommand {
-                    value: "foo".to_string(),
-                    kind: IpyEscapeKind::Help2,
-                },
-                Tok::Newline,
-                Tok::IpyEscapeCommand {
-                    value: "foo".to_string(),
-                    kind: IpyEscapeKind::Help,
-                },
-                Tok::Newline,
-                Tok::IpyEscapeCommand {
-                    value: "foo".to_string(),
-                    kind: IpyEscapeKind::Help2,
-                },
-                Tok::Newline,
-                Tok::IpyEscapeCommand {
-                    value: "foo???".to_string(),
-                    kind: IpyEscapeKind::Help2,
-                },
-                Tok::Newline,
-                Tok::IpyEscapeCommand {
-                    value: "?foo???".to_string(),
-                    kind: IpyEscapeKind::Help2,
-                },
-                Tok::Newline,
-                Tok::IpyEscapeCommand {
-                    value: "foo".to_string(),
-                    kind: IpyEscapeKind::Help,
-                },
-                Tok::Newline,
-                Tok::IpyEscapeCommand {
-                    value: " ?".to_string(),
-                    kind: IpyEscapeKind::Help2,
-                },
-                Tok::Newline,
-                Tok::IpyEscapeCommand {
-                    value: "??".to_string(),
-                    kind: IpyEscapeKind::Help2,
-                },
-                Tok::Newline,
-                Tok::IpyEscapeCommand {
-                    value: "%foo".to_string(),
-                    kind: IpyEscapeKind::Help,
-                },
-                Tok::Newline,
-                Tok::IpyEscapeCommand {
-                    value: "%foo".to_string(),
-                    kind: IpyEscapeKind::Help2,
-                },
-                Tok::Newline,
-                Tok::IpyEscapeCommand {
-                    value: "foo???".to_string(),
-                    kind: IpyEscapeKind::Magic2,
-                },
-                Tok::Newline,
-                Tok::IpyEscapeCommand {
-                    value: "pwd".to_string(),
-                    kind: IpyEscapeKind::Help,
-                },
-                Tok::Newline,
-            ]
-        );
+        assert_debug_snapshot!(lex_jupyter_source(source));
     }
 
     #[test]
@@ -1559,23 +1327,7 @@ if True:
     %matplotlib \
         --inline"
             .trim();
-        let tokens = lex_jupyter_source(source);
-        assert_eq!(
-            tokens,
-            vec![
-                Tok::If,
-                Tok::True,
-                Tok::Colon,
-                Tok::Newline,
-                Tok::Indent,
-                Tok::IpyEscapeCommand {
-                    value: "matplotlib         --inline".to_string(),
-                    kind: IpyEscapeKind::Magic,
-                },
-                Tok::Newline,
-                Tok::Dedent,
-            ]
-        );
+        assert_debug_snapshot!(lex_jupyter_source(source));
     }
 
     #[test]
@@ -1587,48 +1339,7 @@ bar = %timeit a % 3
 baz = %matplotlib \
         inline"
             .trim();
-        let tokens = lex_jupyter_source(source);
-        assert_eq!(
-            tokens,
-            vec![
-                Tok::Name {
-                    name: "pwd".to_string()
-                },
-                Tok::Equal,
-                Tok::IpyEscapeCommand {
-                    value: "pwd".to_string(),
-                    kind: IpyEscapeKind::Shell,
-                },
-                Tok::Newline,
-                Tok::Name {
-                    name: "foo".to_string()
-                },
-                Tok::Equal,
-                Tok::IpyEscapeCommand {
-                    value: "timeit a = b".to_string(),
-                    kind: IpyEscapeKind::Magic,
-                },
-                Tok::Newline,
-                Tok::Name {
-                    name: "bar".to_string()
-                },
-                Tok::Equal,
-                Tok::IpyEscapeCommand {
-                    value: "timeit a % 3".to_string(),
-                    kind: IpyEscapeKind::Magic,
-                },
-                Tok::Newline,
-                Tok::Name {
-                    name: "baz".to_string()
-                },
-                Tok::Equal,
-                Tok::IpyEscapeCommand {
-                    value: "matplotlib         inline".to_string(),
-                    kind: IpyEscapeKind::Magic,
-                },
-                Tok::Newline,
-            ]
-        );
+        assert_debug_snapshot!(lex_jupyter_source(source));
     }
 
     fn assert_no_ipython_escape_command(tokens: &[Tok]) {
@@ -1659,260 +1370,166 @@ def f(arg=%timeit a = b):
     #[test]
     fn test_numbers() {
         let source = "0x2f 0o12 0b1101 0 123 123_45_67_890 0.2 1e+2 2.1e3 2j 2.2j";
-        let tokens = lex_source(source);
+        assert_debug_snapshot!(lex_source(source));
+    }
+
+    #[test_case(" foo"; "long")]
+    #[test_case("  "; "whitespace")]
+    #[test_case(" "; "single whitespace")]
+    #[test_case(""; "empty")]
+    fn test_line_comment(comment: &str) {
+        let source = format!("99232  # {comment}");
+        let tokens = lex_source(&source);
         assert_eq!(
             tokens,
             vec![
                 Tok::Int {
-                    value: BigInt::from(47),
+                    value: BigInt::from(99232)
                 },
-                Tok::Int {
-                    value: BigInt::from(10)
-                },
-                Tok::Int {
-                    value: BigInt::from(13),
-                },
-                Tok::Int {
-                    value: BigInt::from(0),
-                },
-                Tok::Int {
-                    value: BigInt::from(123),
-                },
-                Tok::Int {
-                    value: BigInt::from(1_234_567_890),
-                },
-                Tok::Float { value: 0.2 },
-                Tok::Float { value: 100.0 },
-                Tok::Float { value: 2100.0 },
-                Tok::Complex {
-                    real: 0.0,
-                    imag: 2.0,
-                },
-                Tok::Complex {
-                    real: 0.0,
-                    imag: 2.2,
-                },
-                Tok::Newline,
+                Tok::Comment(format!("# {comment}")),
+                Tok::Newline
             ]
         );
     }
 
-    macro_rules! test_line_comment {
-        ($($name:ident: $eol:expr,)*) => {
-            $(
-            #[test]
-
-            fn $name() {
-                let source = format!(r"99232  # {}", $eol);
-                let tokens = lex_source(&source);
-                assert_eq!(tokens, vec![Tok::Int { value: BigInt::from(99232) }, Tok::Comment(format!("# {}", $eol)), Tok::Newline]);
-            }
-            )*
-        }
-    }
-
-    test_line_comment! {
-        test_line_comment_long: " foo",
-        test_line_comment_whitespace: "  ",
-        test_line_comment_single_whitespace: " ",
-        test_line_comment_empty: "",
-    }
-
-    macro_rules! test_comment_until_eol {
-        ($($name:ident: $eol:expr,)*) => {
-            $(
-            #[test]
-
-            fn $name() {
-                let source = format!("123  # Foo{}456", $eol);
-                let tokens = lex_source(&source);
-                assert_eq!(
-                    tokens,
-                    vec![
-                        Tok::Int { value: BigInt::from(123) },
-                        Tok::Comment("# Foo".to_string()),
-                        Tok::Newline,
-                        Tok::Int { value: BigInt::from(456) },
-                        Tok::Newline,
-                    ]
-                )
-            }
-            )*
-        }
-    }
-
-    test_comment_until_eol! {
-        test_comment_until_windows_eol: WINDOWS_EOL,
-        test_comment_until_mac_eol: MAC_EOL,
-        test_comment_until_unix_eol: UNIX_EOL,
+    #[test_case(UNIX_EOL)]
+    #[test_case(MAC_EOL)]
+    #[test_case(WINDOWS_EOL)]
+    fn test_comment_until_eol(eol: &str) {
+        let source = format!("123  # Foo{eol}456");
+        let tokens = lex_source(&source);
+        assert_eq!(
+            tokens,
+            vec![
+                Tok::Int {
+                    value: BigInt::from(123)
+                },
+                Tok::Comment("# Foo".to_string()),
+                Tok::Newline,
+                Tok::Int {
+                    value: BigInt::from(456)
+                },
+                Tok::Newline,
+            ]
+        );
     }
 
     #[test]
     fn test_assignment() {
         let source = r"a_variable = 99 + 2-0";
-        let tokens = lex_source(source);
+        assert_debug_snapshot!(lex_source(source));
+    }
+
+    #[test_case(UNIX_EOL)]
+    #[test_case(MAC_EOL)]
+    #[test_case(WINDOWS_EOL)]
+    fn test_indentation_with_eol(eol: &str) {
+        let source = format!("def foo():{eol}    return 99{eol}{eol}");
+        let tokens = lex_source(&source);
         assert_eq!(
             tokens,
             vec![
+                Tok::Def,
                 Tok::Name {
-                    name: String::from("a_variable"),
+                    name: String::from("foo"),
                 },
-                Tok::Equal,
+                Tok::Lpar,
+                Tok::Rpar,
+                Tok::Colon,
+                Tok::Newline,
+                Tok::Indent,
+                Tok::Return,
                 Tok::Int {
                     value: BigInt::from(99)
                 },
-                Tok::Plus,
-                Tok::Int {
-                    value: BigInt::from(2)
-                },
-                Tok::Minus,
-                Tok::Int {
-                    value: BigInt::from(0)
-                },
                 Tok::Newline,
+                Tok::NonLogicalNewline,
+                Tok::Dedent,
             ]
         );
     }
 
-    macro_rules! test_indentation_with_eol {
-        ($($name:ident: $eol:expr,)*) => {
-            $(
-            #[test]
-
-            fn $name() {
-                let source = format!("def foo():{}   return 99{}{}", $eol, $eol, $eol);
-                let tokens = lex_source(&source);
-                assert_eq!(
-                    tokens,
-                    vec![
-                        Tok::Def,
-                        Tok::Name {
-                            name: String::from("foo"),
-                        },
-                        Tok::Lpar,
-                        Tok::Rpar,
-                        Tok::Colon,
-                        Tok::Newline,
-                        Tok::Indent,
-                        Tok::Return,
-                        Tok::Int { value: BigInt::from(99) },
-                        Tok::Newline,
-                        Tok::NonLogicalNewline,
-                        Tok::Dedent,
-                    ]
-                );
-            }
-            )*
-        };
+    #[test_case(UNIX_EOL)]
+    #[test_case(MAC_EOL)]
+    #[test_case(WINDOWS_EOL)]
+    fn test_double_dedent_with_eol(eol: &str) {
+        let source = format!("def foo():{eol} if x:{eol}{eol}  return 99{eol}{eol}");
+        let tokens = lex_source(&source);
+        assert_eq!(
+            tokens,
+            vec![
+                Tok::Def,
+                Tok::Name {
+                    name: String::from("foo"),
+                },
+                Tok::Lpar,
+                Tok::Rpar,
+                Tok::Colon,
+                Tok::Newline,
+                Tok::Indent,
+                Tok::If,
+                Tok::Name {
+                    name: String::from("x"),
+                },
+                Tok::Colon,
+                Tok::Newline,
+                Tok::NonLogicalNewline,
+                Tok::Indent,
+                Tok::Return,
+                Tok::Int {
+                    value: BigInt::from(99)
+                },
+                Tok::Newline,
+                Tok::NonLogicalNewline,
+                Tok::Dedent,
+                Tok::Dedent,
+            ]
+        );
     }
 
-    test_indentation_with_eol! {
-        test_indentation_windows_eol: WINDOWS_EOL,
-        test_indentation_mac_eol: MAC_EOL,
-        test_indentation_unix_eol: UNIX_EOL,
+    #[test_case(UNIX_EOL)]
+    #[test_case(MAC_EOL)]
+    #[test_case(WINDOWS_EOL)]
+    fn test_double_dedent_with_tabs(eol: &str) {
+        let source = format!("def foo():{eol}\tif x:{eol}{eol}\t\t return 99{eol}{eol}");
+        let tokens = lex_source(&source);
+        assert_eq!(
+            tokens,
+            vec![
+                Tok::Def,
+                Tok::Name {
+                    name: String::from("foo"),
+                },
+                Tok::Lpar,
+                Tok::Rpar,
+                Tok::Colon,
+                Tok::Newline,
+                Tok::Indent,
+                Tok::If,
+                Tok::Name {
+                    name: String::from("x"),
+                },
+                Tok::Colon,
+                Tok::Newline,
+                Tok::NonLogicalNewline,
+                Tok::Indent,
+                Tok::Return,
+                Tok::Int {
+                    value: BigInt::from(99)
+                },
+                Tok::Newline,
+                Tok::NonLogicalNewline,
+                Tok::Dedent,
+                Tok::Dedent,
+            ]
+        );
     }
 
-    macro_rules! test_double_dedent_with_eol {
-        ($($name:ident: $eol:expr,)*) => {
-        $(
-            #[test]
-
-            fn $name() {
-                let source = format!("def foo():{} if x:{}{}  return 99{}{}", $eol, $eol, $eol, $eol, $eol);
-                let tokens = lex_source(&source);
-                assert_eq!(
-                    tokens,
-                    vec![
-                        Tok::Def,
-                        Tok::Name {
-                            name: String::from("foo"),
-                        },
-                        Tok::Lpar,
-                        Tok::Rpar,
-                        Tok::Colon,
-                        Tok::Newline,
-                        Tok::Indent,
-                        Tok::If,
-                        Tok::Name {
-                            name: String::from("x"),
-                        },
-                        Tok::Colon,
-                        Tok::Newline,
-                        Tok::NonLogicalNewline,
-                        Tok::Indent,
-                        Tok::Return,
-                        Tok::Int { value: BigInt::from(99) },
-                        Tok::Newline,
-                        Tok::NonLogicalNewline,
-                        Tok::Dedent,
-                        Tok::Dedent,
-                    ]
-                );
-            }
-        )*
-        }
-    }
-
-    macro_rules! test_double_dedent_with_tabs {
-        ($($name:ident: $eol:expr,)*) => {
-        $(
-            #[test]
-
-            fn $name() {
-                let source = format!("def foo():{}\tif x:{}{}\t return 99{}{}", $eol, $eol, $eol, $eol, $eol);
-                let tokens = lex_source(&source);
-                assert_eq!(
-                    tokens,
-                    vec![
-                        Tok::Def,
-                        Tok::Name {
-                            name: String::from("foo"),
-                        },
-                        Tok::Lpar,
-                        Tok::Rpar,
-                        Tok::Colon,
-                        Tok::Newline,
-                        Tok::Indent,
-                        Tok::If,
-                        Tok::Name {
-                            name: String::from("x"),
-                        },
-                        Tok::Colon,
-                        Tok::Newline,
-                        Tok::NonLogicalNewline,
-                        Tok::Indent,
-                        Tok::Return,
-                        Tok::Int { value: BigInt::from(99) },
-                        Tok::Newline,
-                        Tok::NonLogicalNewline,
-                        Tok::Dedent,
-                        Tok::Dedent,
-                    ]
-                );
-            }
-        )*
-        }
-    }
-
-    test_double_dedent_with_eol! {
-        test_double_dedent_windows_eol: WINDOWS_EOL,
-        test_double_dedent_mac_eol: MAC_EOL,
-        test_double_dedent_unix_eol: UNIX_EOL,
-    }
-
-    test_double_dedent_with_tabs! {
-        test_double_dedent_tabs_windows_eol: WINDOWS_EOL,
-        test_double_dedent_tabs_mac_eol: MAC_EOL,
-        test_double_dedent_tabs_unix_eol: UNIX_EOL,
-    }
-
-    macro_rules! test_newline_in_brackets {
-        ($($name:ident: $eol:expr,)*) => {
-        $(
-            #[test]
-
-            fn $name() {
-                let source = r"x = [
+    #[test_case(UNIX_EOL)]
+    #[test_case(MAC_EOL)]
+    #[test_case(WINDOWS_EOL)]
+    fn test_newline_in_brackets(eol: &str) {
+        let source = r"x = [
 
     1,2
 ,(3,
@@ -1921,55 +1538,61 @@ def f(arg=%timeit a = b):
 5,
 6,\
 7}]
-".replace("\n", $eol);
-                let tokens = lex_source(&source);
-                assert_eq!(
-                    tokens,
-                    vec![
-                        Tok::Name {
-                            name: String::from("x"),
-                        },
-                        Tok::Equal,
-                        Tok::Lsqb,
-                        Tok::NonLogicalNewline,
-                        Tok::NonLogicalNewline,
-                        Tok::Int { value: BigInt::from(1) },
-                        Tok::Comma,
-                        Tok::Int { value: BigInt::from(2) },
-                        Tok::NonLogicalNewline,
-                        Tok::Comma,
-                        Tok::Lpar,
-                        Tok::Int { value: BigInt::from(3) },
-                        Tok::Comma,
-                        Tok::NonLogicalNewline,
-                        Tok::Int { value: BigInt::from(4) },
-                        Tok::Comma,
-                        Tok::NonLogicalNewline,
-                        Tok::Rpar,
-                        Tok::Comma,
-                        Tok::Lbrace,
-                        Tok::NonLogicalNewline,
-                        Tok::Int { value: BigInt::from(5) },
-                        Tok::Comma,
-                        Tok::NonLogicalNewline,
-                        Tok::Int { value: BigInt::from(6) },
-                        Tok::Comma,
-                        // Continuation here - no NonLogicalNewline.
-                        Tok::Int { value: BigInt::from(7) },
-                        Tok::Rbrace,
-                        Tok::Rsqb,
-                        Tok::Newline,
-                    ]
-                );
-            }
-        )*
-        };
-    }
-
-    test_newline_in_brackets! {
-        test_newline_in_brackets_windows_eol: WINDOWS_EOL,
-        test_newline_in_brackets_mac_eol: MAC_EOL,
-        test_newline_in_brackets_unix_eol: UNIX_EOL,
+"
+        .replace('\n', eol);
+        let tokens = lex_source(&source);
+        assert_eq!(
+            tokens,
+            vec![
+                Tok::Name {
+                    name: String::from("x"),
+                },
+                Tok::Equal,
+                Tok::Lsqb,
+                Tok::NonLogicalNewline,
+                Tok::NonLogicalNewline,
+                Tok::Int {
+                    value: BigInt::from(1)
+                },
+                Tok::Comma,
+                Tok::Int {
+                    value: BigInt::from(2)
+                },
+                Tok::NonLogicalNewline,
+                Tok::Comma,
+                Tok::Lpar,
+                Tok::Int {
+                    value: BigInt::from(3)
+                },
+                Tok::Comma,
+                Tok::NonLogicalNewline,
+                Tok::Int {
+                    value: BigInt::from(4)
+                },
+                Tok::Comma,
+                Tok::NonLogicalNewline,
+                Tok::Rpar,
+                Tok::Comma,
+                Tok::Lbrace,
+                Tok::NonLogicalNewline,
+                Tok::Int {
+                    value: BigInt::from(5)
+                },
+                Tok::Comma,
+                Tok::NonLogicalNewline,
+                Tok::Int {
+                    value: BigInt::from(6)
+                },
+                Tok::Comma,
+                // Continuation here - no NonLogicalNewline.
+                Tok::Int {
+                    value: BigInt::from(7)
+                },
+                Tok::Rbrace,
+                Tok::Rsqb,
+                Tok::Newline,
+            ]
+        );
     }
 
     #[test]
@@ -1981,112 +1604,68 @@ def f(arg=%timeit a = b):
     'c' \
     'd'
 )";
-        let tokens = lex_source(source);
-        assert_eq!(
-            tokens,
-            vec![
-                Tok::Lpar,
-                Tok::NonLogicalNewline,
-                str_tok("a"),
-                Tok::NonLogicalNewline,
-                str_tok("b"),
-                Tok::NonLogicalNewline,
-                Tok::NonLogicalNewline,
-                str_tok("c"),
-                str_tok("d"),
-                Tok::NonLogicalNewline,
-                Tok::Rpar,
-                Tok::Newline,
-            ]
-        );
+        assert_debug_snapshot!(lex_source(source));
     }
 
     #[test]
     fn test_logical_newline_line_comment() {
         let source = "#Hello\n#World\n";
-        let tokens = lex_source(source);
-        assert_eq!(
-            tokens,
-            vec![
-                Tok::Comment("#Hello".to_owned()),
-                Tok::NonLogicalNewline,
-                Tok::Comment("#World".to_owned()),
-                Tok::NonLogicalNewline,
-            ]
-        );
+        assert_debug_snapshot!(lex_source(source));
     }
 
     #[test]
     fn test_operators() {
         let source = "//////=/ /";
-        let tokens = lex_source(source);
-        assert_eq!(
-            tokens,
-            vec![
-                Tok::DoubleSlash,
-                Tok::DoubleSlash,
-                Tok::DoubleSlashEqual,
-                Tok::Slash,
-                Tok::Slash,
-                Tok::Newline,
-            ]
-        );
+        assert_debug_snapshot!(lex_source(source));
     }
 
     #[test]
     fn test_string() {
         let source = r#""double" 'single' 'can\'t' "\\\"" '\t\r\n' '\g' r'raw\'' '\420' '\200\0a'"#;
-        let tokens = lex_source(source);
-        assert_eq!(
-            tokens,
-            vec![
-                str_tok("double"),
-                str_tok("single"),
-                str_tok(r"can\'t"),
-                str_tok(r#"\\\""#),
-                str_tok(r"\t\r\n"),
-                str_tok(r"\g"),
-                raw_str_tok(r"raw\'"),
-                str_tok(r"\420"),
-                str_tok(r"\200\0a"),
-                Tok::Newline,
-            ]
-        );
+        assert_debug_snapshot!(lex_source(source));
     }
 
-    fn assert_string_continuation_with_eol(eol: &str) {
+    #[test_case(UNIX_EOL)]
+    #[test_case(MAC_EOL)]
+    #[test_case(WINDOWS_EOL)]
+    fn test_string_continuation_with_eol(eol: &str) {
         let source = format!("\"abc\\{eol}def\"");
         let tokens = lex_source(&source);
 
         assert_eq!(
             tokens,
-            vec![str_tok(&format!("abc\\{eol}def")), Tok::Newline]
+            vec![
+                Tok::String {
+                    value: format!("abc\\{eol}def"),
+                    kind: StringKind::String,
+                    triple_quoted: false,
+                },
+                Tok::Newline,
+            ]
         );
-    }
-
-    #[test]
-    fn test_string_continuation_windows_eol() {
-        assert_string_continuation_with_eol(WINDOWS_EOL);
-    }
-
-    #[test]
-    fn test_string_continuation_mac_eol() {
-        assert_string_continuation_with_eol(MAC_EOL);
-    }
-
-    #[test]
-    fn test_string_continuation_unix_eol() {
-        assert_string_continuation_with_eol(UNIX_EOL);
     }
 
     #[test]
     fn test_escape_unicode_name() {
         let source = r#""\N{EN SPACE}""#;
         let tokens = lex_source(source);
-        assert_eq!(tokens, vec![str_tok(r"\N{EN SPACE}"), Tok::Newline]);
+        assert_eq!(
+            tokens,
+            vec![
+                Tok::String {
+                    value: r"\N{EN SPACE}".to_string(),
+                    kind: StringKind::String,
+                    triple_quoted: false,
+                },
+                Tok::Newline
+            ]
+        );
     }
 
-    fn assert_triple_quoted(eol: &str) {
+    #[test_case(UNIX_EOL)]
+    #[test_case(MAC_EOL)]
+    #[test_case(WINDOWS_EOL)]
+    fn test_triple_quoted(eol: &str) {
         let source = format!("\"\"\"{eol} test string{eol} \"\"\"");
         let tokens = lex_source(&source);
         assert_eq!(
@@ -2100,20 +1679,5 @@ def f(arg=%timeit a = b):
                 Tok::Newline,
             ]
         );
-    }
-
-    #[test]
-    fn triple_quoted_windows_eol() {
-        assert_triple_quoted(WINDOWS_EOL);
-    }
-
-    #[test]
-    fn triple_quoted_unix_eol() {
-        assert_triple_quoted(UNIX_EOL);
-    }
-
-    #[test]
-    fn triple_quoted_macos_eol() {
-        assert_triple_quoted(MAC_EOL);
     }
 }
