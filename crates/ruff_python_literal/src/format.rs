@@ -318,7 +318,7 @@ fn parse_precision(text: &str) -> Result<(Option<usize>, &str), FormatSpecError>
     })
 }
 
-/// Parses a format part within a format spec
+/// Parses a placeholder within a format spec
 fn parse_nested_placeholder<'a>(
     placeholders: &mut Vec<FormatPart>,
     text: &'a str,
@@ -334,17 +334,22 @@ fn parse_nested_placeholder<'a>(
     }
 }
 
+/// Parse and consume all placeholders in a format spec
 ///
-fn consume_remaining_placeholders<'a>(
+/// This will also consume any intermediate characters such as `x` and `y` in
+/// ```
+/// "x{foo}y{bar}z"
+/// ```
+fn consume_all_placeholders<'a>(
     placeholders: &mut Vec<FormatPart>,
     text: &'a str,
 ) -> Result<&'a str, FormatSpecError> {
     let mut chars = text.chars();
+    let mut text = text;
     let mut placeholder_count = placeholders.len();
 
     while chars.clone().contains(&'{') {
-        dbg!(&chars, placeholder_count);
-        let text = parse_nested_placeholder(placeholders, chars.as_str())?;
+        text = parse_nested_placeholder(placeholders, chars.as_str())?;
         chars = text.chars();
         // If we did not parse a placeholder, consume a character
         if placeholder_count == placeholders.len() {
@@ -353,14 +358,11 @@ fn consume_remaining_placeholders<'a>(
             placeholder_count = placeholders.len();
         }
     }
-
-    Ok(chars.as_str())
+    Ok(text)
 }
 
 impl FormatSpec {
     pub fn parse(text: &str) -> Result<Self, FormatSpecError> {
-        println!();
-        dbg!(text);
         let mut replacements = vec![];
         let text = parse_nested_placeholder(&mut replacements, text)?;
         let (conversion, text) = FormatConversion::parse(text);
@@ -378,7 +380,7 @@ impl FormatSpec {
         let (grouping_option, text) = FormatGrouping::parse(text);
         let text = parse_nested_placeholder(&mut replacements, text)?;
         let (precision, text) = parse_precision(text)?;
-        let text = consume_remaining_placeholders(&mut replacements, text)?;
+        let text = consume_all_placeholders(&mut replacements, text)?;
 
         let (format_type, _text) = if text.is_empty() {
             (None, text)
