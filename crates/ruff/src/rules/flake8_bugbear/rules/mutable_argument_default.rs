@@ -50,6 +50,9 @@ use crate::registry::AsRule;
 /// l2 = add_to_list(1)  # [1]
 /// ```
 ///
+/// ## Options
+/// - `flake8-bugbear.extend-immutable-calls`
+///
 /// ## References
 /// - [Python documentation: Default Argument Values](https://docs.python.org/3/tutorial/controlflow.html#default-argument-values)
 #[violation]
