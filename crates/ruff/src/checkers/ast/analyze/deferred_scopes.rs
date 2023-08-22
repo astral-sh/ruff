@@ -30,6 +30,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         Rule::UnusedPrivateTypedDict,
         Rule::UnusedStaticMethodArgument,
         Rule::UnusedVariable,
+        Rule::NoSelfUse,
     ]) {
         return;
     }
@@ -300,6 +301,12 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
 
             if checker.enabled(Rule::UnusedImport) {
                 pyflakes::rules::unused_import(checker, scope, &mut diagnostics);
+            }
+        }
+
+        if scope.kind.is_function() {
+            if checker.enabled(Rule::NoSelfUse) {
+                pylint::rules::no_self_use(checker, scope, &mut diagnostics);
             }
         }
     }
