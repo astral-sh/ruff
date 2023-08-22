@@ -267,7 +267,7 @@ where
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         // Step 0: Pre-processing
-        self.semantic.push_statement(stmt);
+        self.semantic.push_node(stmt);
 
         // Track whether we've seen docstrings, non-imports, etc.
         match stmt {
@@ -779,7 +779,7 @@ where
         analyze::statement(stmt, self);
 
         self.semantic.flags = flags_snapshot;
-        self.semantic.pop_statement();
+        self.semantic.pop_node();
     }
 
     fn visit_annotation(&mut self, expr: &'b Expr) {
@@ -815,7 +815,7 @@ where
             return;
         }
 
-        self.semantic.push_expression(expr);
+        self.semantic.push_node(expr);
 
         // Store the flags prior to any further descent, so that we can restore them after visiting
         // the node.
@@ -1235,7 +1235,7 @@ where
         analyze::expression(expr, self);
 
         self.semantic.flags = flags_snapshot;
-        self.semantic.pop_expression();
+        self.semantic.pop_node();
     }
 
     fn visit_except_handler(&mut self, except_handler: &'b ExceptHandler) {
