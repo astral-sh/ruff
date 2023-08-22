@@ -190,7 +190,7 @@ impl FormatParse for FormatType {
 /// "hello {name:<20}".format(name="test")
 /// ```
 ///
-/// Format specifications allow nested replacements for dynamic formatting.
+/// Format specifications allow nested placeholders for dynamic formatting.
 /// For example, the following statements are equivalent:
 /// ```python
 /// "hello {name:{fmt}}".format(name="test", fmt="<20")
@@ -198,18 +198,18 @@ impl FormatParse for FormatType {
 /// "hello {name:<20{empty}>}".format(name="test", empty="")
 /// ```
 ///
-/// Nested replacements can include additional format specifiers.
+/// Nested placeholders can include additional format specifiers.
 /// ```python
 /// "hello {name:{fmt:*>}}".format(name="test", fmt="<20")
 /// ```
 ///
-/// However, replacements can only be singly nested (preserving our sanity).
+/// However, placeholders can only be singly nested (preserving our sanity).
 /// A [`FormatSpecError::PlaceholderRecursionExceeded`] will be raised while parsing in this case.
 /// ```python
 /// "hello {name:{fmt:{not_allowed}}}".format(name="test", fmt="<20")  # Syntax error
 /// ```
 ///
-/// When replacements are present in a format specification, parsing will return a [`DynamicFormatSpec`]
+/// When placeholders are present in a format specification, parsing will return a [`DynamicFormatSpec`]
 /// and avoid attempting to parse any of the clauses. Otherwise, a [`StaticFormatSpec`] will be used.
 #[derive(Debug, PartialEq)]
 pub enum FormatSpec {
@@ -242,7 +242,7 @@ pub struct StaticFormatSpec {
 #[derive(Debug, PartialEq)]
 pub struct DynamicFormatSpec {
     // Ex) `x` and `y` in `'{:*{x},{y}b}'`
-    pub replacements: Vec<FormatPart>,
+    pub placeholders: Vec<FormatPart>,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Default)]
@@ -329,7 +329,7 @@ fn parse_precision(text: &str) -> Result<(Option<usize>, &str), FormatSpecError>
 
 /// Parses a format part within a format spec
 fn parse_nested_placeholder<'a>(
-    parts: &mut Vec<FormatPart>,
+    placeholders: &mut Vec<FormatPart>,
     text: &'a str,
 ) -> Result<&'a str, FormatSpecError> {
     match FormatString::parse_spec(text, AllowPlaceholderNesting::No) {
@@ -337,7 +337,7 @@ fn parse_nested_placeholder<'a>(
         Err(FormatParseError::MissingStartBracket) => Ok(text),
         Err(err) => Err(FormatSpecError::InvalidPlaceholder(err)),
         Ok((format_part, text)) => {
-            parts.push(format_part);
+            placeholders.push(format_part);
             Ok(text)
         }
     }
@@ -372,12 +372,11 @@ fn consume_all_placeholders<'a>(
 
 impl FormatSpec {
     pub fn parse(text: &str) -> Result<Self, FormatSpecError> {
-        let mut replacements = vec![];
-        // get_integer in CPython
-        let text = consume_all_placeholders(&mut replacements, text)?;
+        let mut placeholders = vec![];
+        let text = consume_all_placeholders(&mut placeholders, text)?;
 
-        if !replacements.is_empty() {
-            return Ok(FormatSpec::Dynamic(DynamicFormatSpec { replacements }));
+        if !placeholders.is_empty() {
+            return Ok(FormatSpec::Dynamic(DynamicFormatSpec { placeholders }));
         }
 
         let (conversion, text) = FormatConversion::parse(text);
