@@ -16,8 +16,8 @@
 
 "{:*^30s}".format("centered") # OK
 "{:{s}}".format("hello", s="s")  # OK (nested replacement value not checked)
-
 "{:{s:y}}".format("hello", s="s")  # [bad-format-character] (nested replacement format spec checked)
+"{0:.{prec}g}".format(1.23, prec=15)  # OK (cannot validate after nested replacement)
 
 ## f-strings
 
