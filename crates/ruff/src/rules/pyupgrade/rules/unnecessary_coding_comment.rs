@@ -72,7 +72,10 @@ pub(crate) fn unnecessary_coding_comment(
             //    # coding=utf8
             // x = 2
             // ```
-            if let Some(_) = indexer.preceded_by_continuations(line_range.start(), locator) {
+            if indexer
+                .preceded_by_continuations(line_range.start(), locator)
+                .is_some()
+            {
                 continue;
             }
 
