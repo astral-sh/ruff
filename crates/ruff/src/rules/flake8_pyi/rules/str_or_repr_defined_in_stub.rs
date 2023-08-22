@@ -99,7 +99,9 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
         let stmt = checker.semantic().current_statement();
         let parent = checker.semantic().current_statement_parent();
         let edit = delete_stmt(stmt, parent, checker.locator(), checker.indexer());
-        diagnostic.set_fix(Fix::automatic(edit).isolate(checker.parent_isolation()));
+        diagnostic.set_fix(Fix::automatic(edit).isolate(Checker::isolation(
+            checker.semantic().current_statement_parent_id(),
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }

@@ -236,7 +236,8 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
     )?;
 
     Ok(
-        Fix::suggested_edits(remove_import_edit, add_import_edit.into_edits())
-            .isolate(checker.parent_isolation()),
+        Fix::suggested_edits(remove_import_edit, add_import_edit.into_edits()).isolate(
+            Checker::isolation(checker.semantic().parent_statement_id(node_id)),
+        ),
     )
 }
