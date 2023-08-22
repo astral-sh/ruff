@@ -190,16 +190,13 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
             return expression.format().with_options(Parentheses::Always).fmt(f);
         }
 
-        let needs_parentheses = expression.needs_parentheses(*parent, f.context());
-        let needs_parentheses = match parenthesize {
-            Parenthesize::IfRequired => match needs_parentheses {
-                OptionalParentheses::Always => OptionalParentheses::Always,
-                _ if f.context().node_level().is_parenthesized() => OptionalParentheses::Never,
-                needs_parentheses => needs_parentheses,
-            },
-            Parenthesize::Optional
-            | Parenthesize::IfBreaks
-            | Parenthesize::IfBreaksOrIfRequired => needs_parentheses,
+        let needs_parentheses = match expression.needs_parentheses(*parent, f.context()) {
+            OptionalParentheses::Always => OptionalParentheses::Always,
+            // The reason to add parentheses is to avoid a syntax error when breaking an expression over multiple lines.
+            // Therefore, it is unnecessary to add an additional pair of parentheses if an outer expression
+            // is parenthesized.
+            _ if f.context().node_level().is_parenthesized() => OptionalParentheses::Never,
+            needs_parentheses => needs_parentheses,
         };
 
         match needs_parentheses {
