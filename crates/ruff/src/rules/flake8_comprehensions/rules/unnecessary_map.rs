@@ -103,22 +103,18 @@ pub(crate) fn unnecessary_map(
                 return;
             };
 
-            if let Some(parameters) = parameters.as_ref() {
-                if late_binding(parameters, body) {
-                    return;
-                }
-
-                if parameters
-                    .posonlyargs
-                    .iter()
-                    .chain(&parameters.args)
-                    .chain(&parameters.kwonlyargs)
-                    .any(|param| param.default.is_some())
+            if parameters.as_ref().is_some_and(|parameters| {
+                late_binding(parameters, body)
+                    || parameters
+                        .posonlyargs
+                        .iter()
+                        .chain(&parameters.args)
+                        .chain(&parameters.kwonlyargs)
+                        .any(|param| param.default.is_some())
                     || parameters.vararg.is_some()
                     || parameters.kwarg.is_some()
-                {
-                    return;
-                }
+            }) {
+                return;
             }
         }
         ObjectType::List | ObjectType::Set => {
@@ -148,22 +144,18 @@ pub(crate) fn unnecessary_map(
                 return;
             };
 
-            if let Some(parameters) = parameters.as_ref() {
-                if late_binding(parameters, body) {
-                    return;
-                }
-
-                if parameters
-                    .posonlyargs
-                    .iter()
-                    .chain(&parameters.args)
-                    .chain(&parameters.kwonlyargs)
-                    .any(|param| param.default.is_some())
+            if parameters.as_ref().is_some_and(|parameters| {
+                late_binding(parameters, body)
+                    || parameters
+                        .posonlyargs
+                        .iter()
+                        .chain(&parameters.args)
+                        .chain(&parameters.kwonlyargs)
+                        .any(|param| param.default.is_some())
                     || parameters.vararg.is_some()
                     || parameters.kwarg.is_some()
-                {
-                    return;
-                }
+            }) {
+                return;
             }
         }
         ObjectType::Dict => {
@@ -199,22 +191,18 @@ pub(crate) fn unnecessary_map(
                 return;
             }
 
-            if let Some(parameters) = parameters.as_ref() {
-                if late_binding(parameters, body) {
-                    return;
-                }
-
-                if parameters
-                    .posonlyargs
-                    .iter()
-                    .chain(&parameters.args)
-                    .chain(&parameters.kwonlyargs)
-                    .any(|param| param.default.is_some())
+            if parameters.as_ref().is_some_and(|parameters| {
+                late_binding(parameters, body)
+                    || parameters
+                        .posonlyargs
+                        .iter()
+                        .chain(&parameters.args)
+                        .chain(&parameters.kwonlyargs)
+                        .any(|param| param.default.is_some())
                     || parameters.vararg.is_some()
                     || parameters.kwarg.is_some()
-                {
-                    return;
-                }
+            }) {
+                return;
             }
         }
     };
