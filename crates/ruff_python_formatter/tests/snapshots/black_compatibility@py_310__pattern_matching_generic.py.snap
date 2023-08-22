@@ -119,18 +119,6 @@ with match() as match:
 ```diff
 --- Black
 +++ Ruff
-@@ -24,9 +24,9 @@
-         ]
- 
-     match match:
--        case case:
-+        case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
-             match match:
--                case case:
-+                case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
-                     pass
- 
-     if all(version.is_python2() for version in target_versions):
 @@ -46,7 +46,7 @@
      def test_patma_139(self):
          x = False
@@ -188,9 +176,9 @@ def get_grammars(target_versions: Set[TargetVersion]) -> List[Grammar]:
         ]
 
     match match:
-        case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+        case case:
             match match:
-                case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+                case case:
                     pass
 
     if all(version.is_python2() for version in target_versions):

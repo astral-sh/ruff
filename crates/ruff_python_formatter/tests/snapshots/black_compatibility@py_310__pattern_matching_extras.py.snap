@@ -149,25 +149,23 @@ match bar1:
          print(x, y)
  
  
-@@ -15,40 +15,43 @@
+@@ -15,7 +15,7 @@
  case: int = re.match(something)
  
  match re.match(case):
 -    case type("match", match):
 +    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
          pass
--    case match:
-+    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+     case match:
          pass
- 
+@@ -23,32 +23,35 @@
  
  def func(match: case, case: match) -> case:
      match Something():
 -        case func(match, case):
 +        case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
              ...
--        case another:
-+        case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+         case another:
              ...
  
  
@@ -191,8 +189,7 @@ match bar1:
 -    case [[5], (6)], [7],:
 +    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
          pass
--    case _:
-+    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+     case _:
          pass
  
  
@@ -205,7 +202,7 @@ match bar1:
          assert "map" == b
  
  
-@@ -59,61 +62,51 @@
+@@ -59,15 +62,10 @@
      ),
      case,
  ):
@@ -222,15 +219,8 @@ match bar1:
 +    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
          pass
  
--    case case:
-+    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
-         pass
- 
- 
- match match:
--    case case:
-+    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
-         pass
+     case case:
+@@ -80,40 +78,35 @@
  
  
  match a, *b(), c:
@@ -253,7 +243,7 @@ match bar1:
  
  match something:
 -    case 1 as a:
-+    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
++    case "NOT_YET_IMPLEMENTED_PatternMatchValue" as a:
          pass
  
 -    case 2 as b, 3 as c:
@@ -269,8 +259,7 @@ match bar1:
 -    case Foo(aa=Callable() as aa, bb=int()):
 +    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
          print(bar1.aa, bar1.bb)
--    case _:
-+    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+     case _:
          print("no match", "\n")
  
  
@@ -304,7 +293,7 @@ case: int = re.match(something)
 match re.match(case):
     case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
         pass
-    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+    case match:
         pass
 
 
@@ -312,7 +301,7 @@ def func(match: case, case: match) -> case:
     match Something():
         case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
             ...
-        case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+        case another:
             ...
 
 
@@ -331,7 +320,7 @@ match (
         pass
     case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
         pass
-    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+    case _:
         pass
 
 
@@ -355,12 +344,12 @@ match match(
     case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
         pass
 
-    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+    case case:
         pass
 
 
 match match:
-    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+    case case:
         pass
 
 
@@ -377,7 +366,7 @@ match something:
 
 
 match something:
-    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+    case "NOT_YET_IMPLEMENTED_PatternMatchValue" as a:
         pass
 
     case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
@@ -390,7 +379,7 @@ match something:
 match bar1:
     case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
         print(bar1.aa, bar1.bb)
-    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+    case _:
         print("no match", "\n")
 
 

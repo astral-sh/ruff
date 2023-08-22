@@ -89,7 +89,7 @@ def http_error(status):
             return "Not found"
         case "NOT_YET_IMPLEMENTED_PatternMatchValue":
             return "I'm a teapot"
-        case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+        case _:
             return "Something's wrong with the internet"
 
 
@@ -103,7 +103,7 @@ match point:
         print(f"X={x}")
     case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
         print(f"X={x}, Y={y}")
-    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+    case _:
         raise ValueError("Not a point")
 
 
@@ -122,7 +122,7 @@ def location(point):
             print(f"X={x} and the point is on the x-axis.")
         case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
             print("The point is located somewhere else on the plane.")
-        case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+        case _:
             print("Not a point")
 
 
@@ -137,7 +137,7 @@ match points:
         print(f"A single point {x}, {y} is in the list.")
     case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
         print(f"Two points on the Y axis at {y1}, {y2} are in the list.")
-    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+    case _:
         print("Something else is found in the list.")
 
 
