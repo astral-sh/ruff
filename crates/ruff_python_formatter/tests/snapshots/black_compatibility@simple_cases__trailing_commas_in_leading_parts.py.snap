@@ -56,6 +56,18 @@ assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
  
  
  # Example from https://github.com/psf/black/issues/3229
+@@ -43,8 +41,6 @@
+ )
+ 
+ # Regression test for https://github.com/psf/black/issues/3414.
+-assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
+-    xxxxxxxxx
+-).xxxxxxxxxxxxxxxxxx(), (
+-    "xxx {xxxxxxxxx} xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+-)
++assert (
++    xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(xxxxxxxxx).xxxxxxxxxxxxxxxxxx()
++), "xxx {xxxxxxxxx} xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 ```
 
 ## Ruff Output
@@ -104,11 +116,9 @@ assert (
 )
 
 # Regression test for https://github.com/psf/black/issues/3414.
-assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
-    xxxxxxxxx
-).xxxxxxxxxxxxxxxxxx(), (
-    "xxx {xxxxxxxxx} xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-)
+assert (
+    xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(xxxxxxxxx).xxxxxxxxxxxxxxxxxx()
+), "xxx {xxxxxxxxx} xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 ```
 
 ## Black Output
