@@ -441,7 +441,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 pyupgrade::rules::redundant_open_modes(checker, call);
             }
             if checker.enabled(Rule::NativeLiterals) {
-                pyupgrade::rules::native_literals(checker, expr, func, args, keywords);
+                pyupgrade::rules::native_literals(checker, call);
             }
             if checker.enabled(Rule::OpenAlias) {
                 pyupgrade::rules::open_alias(checker, expr, func);

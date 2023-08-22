@@ -5,7 +5,7 @@ use num_bigint::BigInt;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Constant, Expr, Keyword, Ranged};
+use ruff_python_ast::{self as ast, Constant, Expr, Ranged};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -127,14 +127,19 @@ impl AlwaysAutofixableViolation for NativeLiterals {
 }
 
 /// UP018
-pub(crate) fn native_literals(
-    checker: &mut Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
-) {
-    let Expr::Name(ast::ExprName { id, .. }) = func else {
+pub(crate) fn native_literals(checker: &mut Checker, call: &ast::ExprCall) {
+    let ast::ExprCall {
+        func,
+        arguments:
+            ast::Arguments {
+                args,
+                keywords,
+                range: _,
+            },
+        range: _,
+    } = call;
+
+    let Expr::Name(ast::ExprName { ref id, .. }) = **func else {
         return;
     };
 
@@ -146,7 +151,7 @@ pub(crate) fn native_literals(
         return;
     };
 
-    if !checker.semantic().is_builtin(id) {
+    if !checker.semantic().is_builtin(&id) {
         return;
     }
 
@@ -165,13 +170,13 @@ pub(crate) fn native_literals(
 
     match args.get(0) {
         None => {
-            let mut diagnostic = Diagnostic::new(NativeLiterals { literal_type }, expr.range());
+            let mut diagnostic = Diagnostic::new(NativeLiterals { literal_type }, call.range());
             if checker.patch(diagnostic.kind.rule()) {
                 let constant = Constant::from(literal_type);
                 let content = checker.generator().constant(&constant);
                 diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                     content,
-                    expr.range(),
+                    call.range(),
                 )));
             }
             checker.diagnostics.push(diagnostic);
@@ -196,11 +201,11 @@ pub(crate) fn native_literals(
 
             let arg_code = checker.locator().slice(arg.range());
 
-            let mut diagnostic = Diagnostic::new(NativeLiterals { literal_type }, expr.range());
+            let mut diagnostic = Diagnostic::new(NativeLiterals { literal_type }, call.range());
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                     arg_code.to_string(),
-                    expr.range(),
+                    call.range(),
                 )));
             }
             checker.diagnostics.push(diagnostic);
