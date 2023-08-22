@@ -179,7 +179,7 @@ impl<'a> Visitor<'a> for TypeVarReferenceVisitor<'a> {
                         func, arguments, ..
                     }) => {
                         if self.semantic.match_typing_expr(func, "TypeVar")
-                            && arguments.args.len() >= 1
+                            && !arguments.args.is_empty()
                             && arguments.args.first().is_some_and(|arg| {
                                 matches!(
                                     arg,
