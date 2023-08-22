@@ -103,10 +103,17 @@ pub(crate) fn unnecessary_map(
                 return;
             };
 
-            if parameters
-                .as_ref()
-                .is_some_and(|parameters| late_binding(parameters, body))
-            {
+            if parameters.as_ref().is_some_and(|parameters| {
+                late_binding(parameters, body)
+                    || parameters
+                        .posonlyargs
+                        .iter()
+                        .chain(&parameters.args)
+                        .chain(&parameters.kwonlyargs)
+                        .any(|param| param.default.is_some())
+                    || parameters.vararg.is_some()
+                    || parameters.kwarg.is_some()
+            }) {
                 return;
             }
         }
@@ -137,10 +144,17 @@ pub(crate) fn unnecessary_map(
                 return;
             };
 
-            if parameters
-                .as_ref()
-                .is_some_and(|parameters| late_binding(parameters, body))
-            {
+            if parameters.as_ref().is_some_and(|parameters| {
+                late_binding(parameters, body)
+                    || parameters
+                        .posonlyargs
+                        .iter()
+                        .chain(&parameters.args)
+                        .chain(&parameters.kwonlyargs)
+                        .any(|param| param.default.is_some())
+                    || parameters.vararg.is_some()
+                    || parameters.kwarg.is_some()
+            }) {
                 return;
             }
         }
@@ -177,14 +191,21 @@ pub(crate) fn unnecessary_map(
                 return;
             }
 
-            if parameters
-                .as_ref()
-                .is_some_and(|parameters| late_binding(parameters, body))
-            {
+            if parameters.as_ref().is_some_and(|parameters| {
+                late_binding(parameters, body)
+                    || parameters
+                        .posonlyargs
+                        .iter()
+                        .chain(&parameters.args)
+                        .chain(&parameters.kwonlyargs)
+                        .any(|param| param.default.is_some())
+                    || parameters.vararg.is_some()
+                    || parameters.kwarg.is_some()
+            }) {
                 return;
             }
         }
-    }
+    };
 
     let mut diagnostic = Diagnostic::new(UnnecessaryMap { object_type }, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
