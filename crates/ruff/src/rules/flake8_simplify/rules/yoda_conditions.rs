@@ -8,10 +8,9 @@ use ruff_python_codegen::Stylist;
 use ruff_python_stdlib::str::{self};
 use ruff_source_file::Locator;
 
-use crate::autofix::codemods::CodegenStylist;
 use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;
-use crate::cst::matchers::{match_comparison, match_expression};
+use crate::cst::matchers::{match_comparison, transform_expression};
 use crate::registry::AsRule;
 
 /// ## What it does
@@ -96,68 +95,69 @@ fn is_constant_like(expr: &Expr) -> bool {
 /// Generate a fix to reverse a comparison.
 fn reverse_comparison(expr: &Expr, locator: &Locator, stylist: &Stylist) -> Result<String> {
     let range = expr.range();
-    let contents = locator.slice(range);
+    let source_code = locator.slice(range);
 
-    let mut expression = match_expression(contents)?;
-    let comparison = match_comparison(&mut expression)?;
+    transform_expression(source_code, stylist, |mut expression| {
+        let comparison = match_comparison(&mut expression)?;
 
-    let left = (*comparison.left).clone();
+        let left = (*comparison.left).clone();
 
-    // Copy the right side to the left side.
-    comparison.left = Box::new(comparison.comparisons[0].comparator.clone());
+        // Copy the right side to the left side.
+        comparison.left = Box::new(comparison.comparisons[0].comparator.clone());
 
-    // Copy the left side to the right side.
-    comparison.comparisons[0].comparator = left;
+        // Copy the left side to the right side.
+        comparison.comparisons[0].comparator = left;
 
-    // Reverse the operator.
-    let op = comparison.comparisons[0].operator.clone();
-    comparison.comparisons[0].operator = match op {
-        CompOp::LessThan {
-            whitespace_before,
-            whitespace_after,
-        } => CompOp::GreaterThan {
-            whitespace_before,
-            whitespace_after,
-        },
-        CompOp::GreaterThan {
-            whitespace_before,
-            whitespace_after,
-        } => CompOp::LessThan {
-            whitespace_before,
-            whitespace_after,
-        },
-        CompOp::LessThanEqual {
-            whitespace_before,
-            whitespace_after,
-        } => CompOp::GreaterThanEqual {
-            whitespace_before,
-            whitespace_after,
-        },
-        CompOp::GreaterThanEqual {
-            whitespace_before,
-            whitespace_after,
-        } => CompOp::LessThanEqual {
-            whitespace_before,
-            whitespace_after,
-        },
-        CompOp::Equal {
-            whitespace_before,
-            whitespace_after,
-        } => CompOp::Equal {
-            whitespace_before,
-            whitespace_after,
-        },
-        CompOp::NotEqual {
-            whitespace_before,
-            whitespace_after,
-        } => CompOp::NotEqual {
-            whitespace_before,
-            whitespace_after,
-        },
-        _ => panic!("Expected comparison operator"),
-    };
+        // Reverse the operator.
+        let op = comparison.comparisons[0].operator.clone();
+        comparison.comparisons[0].operator = match op {
+            CompOp::LessThan {
+                whitespace_before,
+                whitespace_after,
+            } => CompOp::GreaterThan {
+                whitespace_before,
+                whitespace_after,
+            },
+            CompOp::GreaterThan {
+                whitespace_before,
+                whitespace_after,
+            } => CompOp::LessThan {
+                whitespace_before,
+                whitespace_after,
+            },
+            CompOp::LessThanEqual {
+                whitespace_before,
+                whitespace_after,
+            } => CompOp::GreaterThanEqual {
+                whitespace_before,
+                whitespace_after,
+            },
+            CompOp::GreaterThanEqual {
+                whitespace_before,
+                whitespace_after,
+            } => CompOp::LessThanEqual {
+                whitespace_before,
+                whitespace_after,
+            },
+            CompOp::Equal {
+                whitespace_before,
+                whitespace_after,
+            } => CompOp::Equal {
+                whitespace_before,
+                whitespace_after,
+            },
+            CompOp::NotEqual {
+                whitespace_before,
+                whitespace_after,
+            } => CompOp::NotEqual {
+                whitespace_before,
+                whitespace_after,
+            },
+            _ => panic!("Expected comparison operator"),
+        };
 
-    Ok(expression.codegen_stylist(stylist))
+        Ok(expression)
+    })
 }
 
 /// SIM300

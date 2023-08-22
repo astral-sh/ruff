@@ -1,6 +1,6 @@
 use std::string::ToString;
 
-use ruff_python_ast::{self as ast, Constant, Expr, Identifier, Keyword};
+use ruff_python_ast::{self as ast, Constant, Expr, Identifier, Keyword, Ranged};
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
 
@@ -570,15 +570,16 @@ pub(crate) fn percent_format_extra_named_arguments(
     if summary.num_positional > 0 {
         return;
     }
-    let Expr::Dict(ast::ExprDict { keys, .. }) = &right else {
+    let Expr::Dict(dict) = &right else {
         return;
     };
     // If any of the keys are spread, abort.
-    if keys.iter().any(Option::is_none) {
+    if dict.keys.iter().any(Option::is_none) {
         return;
     }
 
-    let missing: Vec<(usize, &str)> = keys
+    let missing: Vec<(usize, &str)> = dict
+        .keys
         .iter()
         .enumerate()
         .filter_map(|(index, key)| match key {
@@ -613,7 +614,7 @@ pub(crate) fn percent_format_extra_named_arguments(
         diagnostic.try_set_fix(|| {
             let edit = remove_unused_format_arguments_from_dict(
                 &indexes,
-                right,
+                dict,
                 checker.locator(),
                 checker.stylist(),
             )?;
@@ -739,9 +740,9 @@ pub(crate) fn percent_format_star_requires_sequence(
 /// F522
 pub(crate) fn string_dot_format_extra_named_arguments(
     checker: &mut Checker,
+    call: &ast::ExprCall,
     summary: &FormatSummary,
     keywords: &[Keyword],
-    location: TextRange,
 ) {
     // If there are any **kwargs, abort.
     if has_star_star_kwargs(keywords) {
@@ -773,14 +774,14 @@ pub(crate) fn string_dot_format_extra_named_arguments(
         .collect();
     let mut diagnostic = Diagnostic::new(
         StringDotFormatExtraNamedArguments { missing: names },
-        location,
+        call.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
         let indexes: Vec<usize> = missing.iter().map(|(index, _)| *index).collect();
         diagnostic.try_set_fix(|| {
             let edit = remove_unused_keyword_arguments_from_format_call(
                 &indexes,
-                location,
+                call,
                 checker.locator(),
                 checker.stylist(),
             )?;
@@ -793,9 +794,9 @@ pub(crate) fn string_dot_format_extra_named_arguments(
 /// F523
 pub(crate) fn string_dot_format_extra_positional_arguments(
     checker: &mut Checker,
+    call: &ast::ExprCall,
     summary: &FormatSummary,
     args: &[Expr],
-    location: TextRange,
 ) {
     let missing: Vec<usize> = args
         .iter()
@@ -817,7 +818,7 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
                 .map(ToString::to_string)
                 .collect::<Vec<String>>(),
         },
-        location,
+        call.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
         // We can only fix if the positional arguments we're removing don't require re-indexing
@@ -849,7 +850,7 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
             diagnostic.try_set_fix(|| {
                 let edit = remove_unused_positional_arguments_from_format_call(
                     &missing,
-                    location,
+                    call,
                     checker.locator(),
                     checker.stylist(),
                 )?;
@@ -863,10 +864,10 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
 /// F524
 pub(crate) fn string_dot_format_missing_argument(
     checker: &mut Checker,
+    call: &ast::ExprCall,
     summary: &FormatSummary,
     args: &[Expr],
     keywords: &[Keyword],
-    location: TextRange,
 ) {
     if has_star_args(args) || has_star_star_kwargs(keywords) {
         return;
@@ -898,7 +899,7 @@ pub(crate) fn string_dot_format_missing_argument(
     if !missing.is_empty() {
         checker.diagnostics.push(Diagnostic::new(
             StringDotFormatMissingArguments { missing },
-            location,
+            call.range(),
         ));
     }
 }
@@ -906,12 +907,13 @@ pub(crate) fn string_dot_format_missing_argument(
 /// F525
 pub(crate) fn string_dot_format_mixing_automatic(
     checker: &mut Checker,
+    call: &ast::ExprCall,
     summary: &FormatSummary,
-    location: TextRange,
 ) {
     if !(summary.autos.is_empty() || summary.indices.is_empty()) {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(StringDotFormatMixingAutomatic, location));
+        checker.diagnostics.push(Diagnostic::new(
+            StringDotFormatMixingAutomatic,
+            call.range(),
+        ));
     }
 }
