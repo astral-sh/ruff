@@ -320,3 +320,9 @@ def end_of_statement():
         if True:
             return "" \
                 ;  # type: ignore
+
+
+def end_of_file():
+    if False:
+        return 1
+    x = 2 \
