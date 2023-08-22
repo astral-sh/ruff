@@ -41,9 +41,8 @@ pub(crate) enum Parenthesize {
     /// Parenthesizes the expression only if it doesn't fit on a line.
     IfBreaks,
 
-    /// Only adds parentheses if absolutely necessary:
-    /// * The expression is not enclosed by another parenthesized expression and it expands over multiple lines
-    /// * The expression has leading or trailing comments. Adding parentheses is desired to prevent the comments from wandering.
+    /// Only adds parentheses if the expression has leading or trailing comments.
+    /// Adding parentheses is desired to prevent the comments from wandering.
     IfRequired,
 
     /// Parenthesizes the expression if the group doesn't fit on a line (e.g., even name expressions are parenthesized), or if
