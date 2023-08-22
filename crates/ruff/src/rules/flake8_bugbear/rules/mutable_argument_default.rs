@@ -163,6 +163,9 @@ fn move_initialization(
             // If the docstring is the only statement, insert _before_ it.
             Edit::insertion(content, locator.full_line_end(statement.end()))
         }
+    } else if statement.is_import_stmt() || statement.is_import_from_stmt() {
+        // If the first statements in the function are an import, insert _after_ it.
+        Edit::insertion(content, locator.full_line_end(statement.end()))
     } else {
         // Otherwise, insert before the first statement.
         let at = locator.line_start(statement.start());

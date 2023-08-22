@@ -304,3 +304,11 @@ def single_line_func_wrong(value: dict[str, str] = {
 def single_line_func_wrong(value: dict[str, str] = {}) \
     : \
     """Docstring"""
+
+
+def import_module_wrong(value: dict[str, str] = {}):
+    import os
+
+
+def from_import_module_wrong(value: dict[str, str] = {}):
+    from os import path
