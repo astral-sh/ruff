@@ -27,3 +27,30 @@ aa = ([
 aaaa = ( # trailing
     # comment
     bbbbb) = cccccccccccccccc = 3
+
+x = (  # comment
+    [  # comment
+        a,
+        b,
+        c,
+    ]
+) = 1
+
+
+x = (
+    # comment
+    [
+        a,
+        b,
+        c,
+    ]
+) = 1
+
+
+x = (
+    [  # comment
+        a,
+        b,
+        c,
+    ]
+) = 1

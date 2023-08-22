@@ -22,6 +22,10 @@ tuple(
         "o"]
     )
 )
+set(set())
+set(list())
+set(tuple())
+sorted(reversed())
 
 # Nested sorts with differing keyword arguments. Not flagged.
 sorted(sorted(x, key=lambda y: y))

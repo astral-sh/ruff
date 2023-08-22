@@ -1,4 +1,4 @@
-use ruff_python_ast::{Expr, Ranged};
+use ruff_python_ast::{self as ast, Expr, ExprContext, Ranged};
 
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
@@ -44,8 +44,14 @@ impl Violation for PandasUseOfDotValues {
     }
 }
 
-pub(crate) fn attr(checker: &mut Checker, attr: &str, value: &Expr, attr_expr: &Expr) {
-    let violation: DiagnosticKind = match attr {
+pub(crate) fn attr(checker: &mut Checker, attribute: &ast::ExprAttribute) {
+    // Avoid, e.g., `x.values = y`.
+    if matches!(attribute.ctx, ExprContext::Store | ExprContext::Del) {
+        return;
+    }
+
+    let violation: DiagnosticKind = match attribute.attr.as_str() {
+        // PD011
         "values" if checker.settings.rules.enabled(Rule::PandasUseOfDotValues) => {
             PandasUseOfDotValues.into()
         }
@@ -62,7 +68,7 @@ pub(crate) fn attr(checker: &mut Checker, attr: &str, value: &Expr, attr_expr: &
     // Avoid flagging on non-DataFrames (e.g., `{"a": 1}.values`), and on irrelevant bindings
     // (like imports).
     if !matches!(
-        test_expression(value, checker.semantic()),
+        test_expression(attribute.value.as_ref(), checker.semantic()),
         Resolution::RelevantLocal
     ) {
         return;
@@ -70,5 +76,5 @@ pub(crate) fn attr(checker: &mut Checker, attr: &str, value: &Expr, attr_expr: &
 
     checker
         .diagnostics
-        .push(Diagnostic::new(violation, attr_expr.range()));
+        .push(Diagnostic::new(violation, attribute.range()));
 }

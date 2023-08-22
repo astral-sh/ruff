@@ -194,7 +194,7 @@ impl<'a> Importer<'a> {
         // import and the current location, and thus the symbol would not be available). It's also
         // unclear whether should add an import statement at the start of the file, since it could
         // be shadowed between the import and the current location.
-        if imported_name.range().start() > at {
+        if imported_name.start() > at {
             return Some(Err(ResolutionError::ImportAfterUsage));
         }
 
@@ -301,12 +301,14 @@ impl<'a> Importer<'a> {
             }
             if let Stmt::ImportFrom(ast::StmtImportFrom {
                 module: name,
+                names,
                 level,
-                ..
+                range: _,
             }) = stmt
             {
                 if level.map_or(true, |level| level.to_u32() == 0)
                     && name.as_ref().is_some_and(|name| name == module)
+                    && names.iter().all(|alias| alias.name.as_str() != "*")
                 {
                     import_from = Some(*stmt);
                 }

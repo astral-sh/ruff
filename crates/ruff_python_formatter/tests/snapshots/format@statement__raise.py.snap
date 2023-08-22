@@ -154,8 +154,7 @@ raise (
 )
 
 
-raise (
-    # hey
+raise (  # hey
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     # Holala
     + bbbbbbbbbbbbbbbbbbbbbbbbbb  # stay
@@ -165,8 +164,7 @@ raise (
 )  # whaaaaat
 # the end
 
-raise (
-    # hey 2
+raise (  # hey 2
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     # Holala
     "bbbbbbbbbbbbbbbbbbbbbbbb"  # stay

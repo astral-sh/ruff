@@ -457,7 +457,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                 implicit_return(checker, last_stmt);
             }
         }
-        Stmt::Return(_) | Stmt::Raise(_) | Stmt::Try(_) | Stmt::TryStar(_) => {}
+        Stmt::Return(_) | Stmt::Raise(_) | Stmt::Try(_) => {}
         Stmt::Expr(ast::StmtExpr { value, .. })
             if matches!(
                 value.as_ref(),
@@ -558,7 +558,7 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
                     // Replace from the start of the assignment statement to the end of the equals
                     // sign.
                     TextRange::new(
-                        assign.range().start(),
+                        assign.start(),
                         assign
                             .range()
                             .start()

@@ -5,12 +5,14 @@ pub mod all;
 pub mod call_path;
 pub mod comparable;
 pub mod docstrings;
+mod expression;
 pub mod hashable;
 pub mod helpers;
 pub mod identifier;
 pub mod imports;
 pub mod node;
 mod nodes;
+pub mod parenthesize;
 pub mod relocate;
 pub mod statement_visitor;
 pub mod stmt_if;
@@ -20,6 +22,7 @@ pub mod types;
 pub mod visitor;
 pub mod whitespace;
 
+pub use expression::*;
 pub use nodes::*;
 
 pub trait Ranged {

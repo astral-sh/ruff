@@ -68,11 +68,11 @@ pub(crate) fn unnecessary_map(
     func: &Expr,
     args: &[Expr],
 ) {
-    let Some(id) = helpers::expr_name(func) else {
+    let Some(func) = func.as_name_expr() else {
         return;
     };
 
-    let object_type = match id {
+    let object_type = match func.id.as_str() {
         "map" => ObjectType::Generator,
         "list" => ObjectType::List,
         "set" => ObjectType::Set,
@@ -80,20 +80,20 @@ pub(crate) fn unnecessary_map(
         _ => return,
     };
 
-    if !checker.semantic().is_builtin(id) {
+    if !checker.semantic().is_builtin(&func.id) {
         return;
     }
 
     match object_type {
         ObjectType::Generator => {
             // Exclude the parent if already matched by other arms.
-            if let Some(Expr::Call(ast::ExprCall { func, .. })) = parent {
-                if let Some(name) = helpers::expr_name(func) {
-                    if matches!(name, "list" | "set" | "dict") {
-                        return;
-                    }
-                }
-            };
+            if parent
+                .and_then(ruff_python_ast::Expr::as_call_expr)
+                .and_then(|call| call.func.as_name_expr())
+                .is_some_and(|name| matches!(name.id.as_str(), "list" | "set" | "dict"))
+            {
+                return;
+            }
 
             // Only flag, e.g., `map(lambda x: x + 1, iterable)`.
             let [Expr::Lambda(ast::ExprLambda {
@@ -103,7 +103,10 @@ pub(crate) fn unnecessary_map(
                 return;
             };
 
-            if late_binding(parameters, body) {
+            if parameters
+                .as_ref()
+                .is_some_and(|parameters| late_binding(parameters, body))
+            {
                 return;
             }
         }
@@ -134,7 +137,10 @@ pub(crate) fn unnecessary_map(
                 return;
             };
 
-            if late_binding(parameters, body) {
+            if parameters
+                .as_ref()
+                .is_some_and(|parameters| late_binding(parameters, body))
+            {
                 return;
             }
         }
@@ -171,7 +177,10 @@ pub(crate) fn unnecessary_map(
                 return;
             }
 
-            if late_binding(parameters, body) {
+            if parameters
+                .as_ref()
+                .is_some_and(|parameters| late_binding(parameters, body))
+            {
                 return;
             }
         }
@@ -240,7 +249,7 @@ struct LateBindingVisitor<'a> {
     /// The arguments to the current lambda.
     parameters: &'a Parameters,
     /// The arguments to any lambdas within the current lambda body.
-    lambdas: Vec<&'a Parameters>,
+    lambdas: Vec<Option<&'a Parameters>>,
     /// Whether any names within the current lambda body are late-bound within nested lambdas.
     late_bound: bool,
 }
@@ -261,7 +270,7 @@ impl<'a> Visitor<'a> for LateBindingVisitor<'a> {
     fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
             Expr::Lambda(ast::ExprLambda { parameters, .. }) => {
-                self.lambdas.push(parameters);
+                self.lambdas.push(parameters.as_deref());
                 visitor::walk_expr(self, expr);
                 self.lambdas.pop();
             }
@@ -275,11 +284,11 @@ impl<'a> Visitor<'a> for LateBindingVisitor<'a> {
                     // If the name is defined in the current lambda...
                     if self.parameters.includes(id) {
                         // And isn't overridden by any nested lambdas...
-                        if !self
-                            .lambdas
-                            .iter()
-                            .any(|parameters| parameters.includes(id))
-                        {
+                        if !self.lambdas.iter().any(|parameters| {
+                            parameters
+                                .as_ref()
+                                .is_some_and(|parameters| parameters.includes(id))
+                        }) {
                             // Then it's late-bound.
                             self.late_bound = true;
                         }

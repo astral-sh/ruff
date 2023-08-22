@@ -1,11 +1,10 @@
-use ruff_python_ast::{self as ast, CmpOp, Expr, Ranged, UnaryOp};
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, CmpOp, Expr, Ranged};
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
-use crate::rules::pycodestyle::helpers::compare;
+use crate::registry::{AsRule, Rule};
+use crate::rules::pycodestyle::helpers::generate_comparison;
 
 /// ## What it does
 /// Checks for negative comparison using `not {foo} in {bar}`.
@@ -74,54 +73,58 @@ impl AlwaysAutofixableViolation for NotIsTest {
 }
 
 /// E713, E714
-pub(crate) fn not_tests(
-    checker: &mut Checker,
-    expr: &Expr,
-    op: UnaryOp,
-    operand: &Expr,
-    check_not_in: bool,
-    check_not_is: bool,
-) {
-    if matches!(op, UnaryOp::Not) {
-        if let Expr::Compare(ast::ExprCompare {
-            left,
-            ops,
-            comparators,
-            range: _,
-        }) = operand
-        {
-            if !matches!(&ops[..], [CmpOp::In | CmpOp::Is]) {
-                return;
-            }
-            for op in ops {
-                match op {
-                    CmpOp::In => {
-                        if check_not_in {
-                            let mut diagnostic = Diagnostic::new(NotInTest, operand.range());
-                            if checker.patch(diagnostic.kind.rule()) {
-                                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                                    compare(left, &[CmpOp::NotIn], comparators, checker.locator()),
-                                    expr.range(),
-                                )));
-                            }
-                            checker.diagnostics.push(diagnostic);
-                        }
-                    }
-                    CmpOp::Is => {
-                        if check_not_is {
-                            let mut diagnostic = Diagnostic::new(NotIsTest, operand.range());
-                            if checker.patch(diagnostic.kind.rule()) {
-                                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                                    compare(left, &[CmpOp::IsNot], comparators, checker.locator()),
-                                    expr.range(),
-                                )));
-                            }
-                            checker.diagnostics.push(diagnostic);
-                        }
-                    }
-                    _ => {}
+pub(crate) fn not_tests(checker: &mut Checker, unary_op: &ast::ExprUnaryOp) {
+    if !unary_op.op.is_not() {
+        return;
+    }
+
+    let Expr::Compare(ast::ExprCompare {
+        left,
+        ops,
+        comparators,
+        range: _,
+    }) = unary_op.operand.as_ref()
+    else {
+        return;
+    };
+
+    match ops.as_slice() {
+        [CmpOp::In] => {
+            if checker.enabled(Rule::NotInTest) {
+                let mut diagnostic = Diagnostic::new(NotInTest, unary_op.operand.range());
+                if checker.patch(diagnostic.kind.rule()) {
+                    diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+                        generate_comparison(
+                            left,
+                            &[CmpOp::NotIn],
+                            comparators,
+                            unary_op.into(),
+                            checker.locator(),
+                        ),
+                        unary_op.range(),
+                    )));
                 }
+                checker.diagnostics.push(diagnostic);
             }
         }
+        [CmpOp::Is] => {
+            if checker.enabled(Rule::NotIsTest) {
+                let mut diagnostic = Diagnostic::new(NotIsTest, unary_op.operand.range());
+                if checker.patch(diagnostic.kind.rule()) {
+                    diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+                        generate_comparison(
+                            left,
+                            &[CmpOp::IsNot],
+                            comparators,
+                            unary_op.into(),
+                            checker.locator(),
+                        ),
+                        unary_op.range(),
+                    )));
+                }
+                checker.diagnostics.push(diagnostic);
+            }
+        }
+        _ => {}
     }
 }

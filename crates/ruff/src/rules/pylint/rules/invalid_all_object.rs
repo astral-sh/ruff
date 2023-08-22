@@ -1,5 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::Ranged;
 use ruff_python_semantic::Binding;
 
 /// ## What it does
@@ -37,7 +38,7 @@ impl Violation for InvalidAllObject {
 /// PLE0604
 pub(crate) fn invalid_all_object(binding: &Binding) -> Option<Diagnostic> {
     if binding.is_invalid_all_object() {
-        Some(Diagnostic::new(InvalidAllObject, binding.range))
+        Some(Diagnostic::new(InvalidAllObject, binding.range()))
     } else {
         None
     }

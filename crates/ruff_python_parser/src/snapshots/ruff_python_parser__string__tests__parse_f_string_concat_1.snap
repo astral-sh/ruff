@@ -14,12 +14,16 @@ expression: parse_ast
                             ExprConstant {
                                 range: 1..16,
                                 value: Str(
-                                    "Hello world",
+                                    StringConstant {
+                                        value: "Hello world",
+                                        implicit_concatenated: true,
+                                    },
                                 ),
                                 kind: None,
                             },
                         ),
                     ],
+                    implicit_concatenated: true,
                 },
             ),
         },

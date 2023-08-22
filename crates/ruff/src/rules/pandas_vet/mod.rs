@@ -212,6 +212,23 @@ mod tests {
     #[test_case(
         r#"
         import pandas as pd
+        x = pd.DataFrame()
+        x.values = 1
+    "#,
+        "PD011_pass_values_store"
+    )]
+    #[test_case(
+        r#"
+        class Class:
+            def __init__(self, values: str) -> None:
+                self.values = values
+                print(self.values)
+    "#,
+        "PD011_pass_values_instance"
+    )]
+    #[test_case(
+        r#"
+        import pandas as pd
         result = {}.values
     "#,
         "PD011_pass_values_dict"

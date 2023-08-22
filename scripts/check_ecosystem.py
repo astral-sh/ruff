@@ -109,6 +109,10 @@ REPOSITORIES: list[Repository] = [
     Repository("DisnakeDev", "disnake", "master"),
     Repository("apache", "airflow", "main", select="ALL"),
     Repository("bokeh", "bokeh", "branch-3.3", select="ALL"),
+    Repository("commaai", "openpilot", "master"),
+    Repository("freedomofpress", "securedrop", "develop"),
+    Repository("ibis-project", "ibis", "master"),
+    Repository("jrnl-org", "jrnl", "develop"),
     Repository("pypa", "build", "main"),
     Repository("pypa", "cibuildwheel", "main"),
     Repository("pypa", "pip", "main"),
@@ -118,6 +122,7 @@ REPOSITORIES: list[Repository] = [
     Repository("python-poetry", "poetry", "master"),
     Repository("scikit-build", "scikit-build", "main"),
     Repository("scikit-build", "scikit-build-core", "main"),
+    Repository("sphinx-doc", "sphinx", "master"),
     Repository("tiangolo", "fastapi", "master"),
     Repository("zulip", "zulip", "main", select="ALL"),
 ]
@@ -300,7 +305,6 @@ def read_projects_jsonl(projects_jsonl: Path) -> dict[tuple[str, str], Repositor
 DIFF_LINE_RE = re.compile(
     r"^(?P<pre>[+-]) (?P<inner>(?P<path>[^:]+):(?P<lnum>\d+):\d+:) (?P<post>.*)$",
 )
-
 
 T = TypeVar("T")
 

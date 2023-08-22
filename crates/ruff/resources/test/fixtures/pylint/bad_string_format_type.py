@@ -13,6 +13,7 @@ print("foo %(foo)d bar %(bar)d" % {"foo": "1", "bar": "2"})
 "%(key)d" % {"key": []}
 print("%d" % ("%s" % ("nested",),))
 "%d" % ((1, 2, 3),)
+"%d" % (1 if x > 0 else [])
 
 # False negatives
 WORD = "abc"
@@ -55,3 +56,4 @@ r'\%03o' % (ord(c),)
 "%d" % (len(foo),)
 '(%r, %r, %r, %r)' % (hostname, address, username, '$PASSWORD')
 '%r' % ({'server_school_roles': server_school_roles, 'is_school_multiserver_domain': is_school_multiserver_domain}, )
+"%d" % (1 if x > 0 else 2)

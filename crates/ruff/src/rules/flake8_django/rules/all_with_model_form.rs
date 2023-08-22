@@ -83,13 +83,13 @@ pub(crate) fn all_with_model_form(
                     continue;
                 };
                 match value {
-                    Constant::Str(s) => {
-                        if s == "__all__" {
+                    Constant::Str(ast::StringConstant { value, .. }) => {
+                        if value == "__all__" {
                             return Some(Diagnostic::new(DjangoAllWithModelForm, element.range()));
                         }
                     }
-                    Constant::Bytes(b) => {
-                        if b == "__all__".as_bytes() {
+                    Constant::Bytes(ast::BytesConstant { value, .. }) => {
+                        if value == "__all__".as_bytes() {
                             return Some(Diagnostic::new(DjangoAllWithModelForm, element.range()));
                         }
                     }

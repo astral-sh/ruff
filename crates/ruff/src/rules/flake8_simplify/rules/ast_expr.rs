@@ -115,7 +115,7 @@ pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Ex
         return;
     };
     let Expr::Constant(ast::ExprConstant {
-        value: Constant::Str(env_var),
+        value: Constant::Str(ast::StringConstant { value: env_var, .. }),
         ..
     }) = arg
     else {
@@ -167,7 +167,7 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
         return;
     }
     let Expr::Constant(ast::ExprConstant {
-        value: Constant::Str(env_var),
+        value: Constant::Str(ast::StringConstant { value: env_var, .. }),
         kind,
         range: _,
     }) = slice.as_ref()

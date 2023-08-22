@@ -76,17 +76,20 @@ where
                 range: _,
             }) => {
                 visitor::walk_expr(self, body);
-                for ParameterWithDefault {
-                    parameter,
-                    default: _,
-                    range: _,
-                } in parameters
-                    .posonlyargs
-                    .iter()
-                    .chain(&parameters.args)
-                    .chain(&parameters.kwonlyargs)
-                {
-                    self.names.remove(parameter.name.as_str());
+
+                if let Some(parameters) = parameters {
+                    for ParameterWithDefault {
+                        parameter,
+                        default: _,
+                        range: _,
+                    } in parameters
+                        .posonlyargs
+                        .iter()
+                        .chain(&parameters.args)
+                        .chain(&parameters.kwonlyargs)
+                    {
+                        self.names.remove(parameter.name.as_str());
+                    }
                 }
             }
             _ => visitor::walk_expr(self, expr),

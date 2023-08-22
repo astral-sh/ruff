@@ -52,10 +52,8 @@ assert (  # Dangle1
 assert (
     # Leading test value
     True  # Trailing test value same-line
-), (
     # Trailing test value own-line
-    "Some string"
-)  # Trailing msg same-line
+), "Some string"  # Trailing msg same-line
 # Trailing assert
 
 # Random dangler
@@ -65,11 +63,9 @@ assert (
 assert (
     # Leading test value
     True  # Trailing test value same-line
-), (
     # Trailing test value own-line
     # Test dangler
-    "Some string"
-)  # Trailing msg same-line
+), "Some string"  # Trailing msg same-line
 # Trailing assert
 ```
 

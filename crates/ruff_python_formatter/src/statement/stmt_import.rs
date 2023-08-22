@@ -1,7 +1,9 @@
-use crate::{FormatNodeRule, FormattedIterExt, PyFormatter};
-use ruff_formatter::prelude::{format_args, format_with, space, text};
-use ruff_formatter::{write, Buffer, FormatResult};
+use crate::prelude::*;
+use ruff_formatter::{format_args, write};
 use ruff_python_ast::StmtImport;
+
+use crate::comments::{SourceComment, SuppressionKind};
+use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatStmtImport;
@@ -15,5 +17,13 @@ impl FormatNodeRule<StmtImport> for FormatStmtImport {
                 .finish()
         });
         write!(f, [text("import"), space(), names])
+    }
+
+    fn is_suppressed(
+        &self,
+        trailing_comments: &[SourceComment],
+        context: &PyFormatContext,
+    ) -> bool {
+        SuppressionKind::has_skip_comment(trailing_comments, context.source())
     }
 }

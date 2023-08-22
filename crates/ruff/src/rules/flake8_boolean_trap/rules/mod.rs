@@ -1,7 +1,7 @@
-pub(crate) use check_boolean_default_value_in_function_definition::*;
-pub(crate) use check_boolean_positional_value_in_function_call::*;
-pub(crate) use check_positional_boolean_in_def::*;
+pub(crate) use boolean_default_value_positional_argument::*;
+pub(crate) use boolean_positional_value_in_call::*;
+pub(crate) use boolean_type_hint_positional_argument::*;
 
-mod check_boolean_default_value_in_function_definition;
-mod check_boolean_positional_value_in_function_call;
-mod check_positional_boolean_in_def;
+mod boolean_default_value_positional_argument;
+mod boolean_positional_value_in_call;
+mod boolean_type_hint_positional_argument;

@@ -21,9 +21,9 @@ pub struct Document {
 
 impl Document {
     /// Sets [`expand`](tag::Group::expand) to [`GroupMode::Propagated`] if the group contains any of:
-    /// - a group with [`expand`](tag::Group::expand) set to [GroupMode::Propagated] or [GroupMode::Expand].
-    /// - a non-soft [line break](FormatElement::Line) with mode [LineMode::Hard], [LineMode::Empty], or [LineMode::Literal].
-    /// - a [FormatElement::ExpandParent]
+    /// - a group with [`expand`](tag::Group::expand) set to [`GroupMode::Propagated`] or [`GroupMode::Expand`].
+    /// - a non-soft [line break](FormatElement::Line) with mode [`LineMode::Hard`], [`LineMode::Empty`], or [`LineMode::Literal`].
+    /// - a [`FormatElement::ExpandParent`]
     ///
     /// [`BestFitting`] elements act as expand boundaries, meaning that the fact that a
     /// [`BestFitting`]'s content expands is not propagated past the [`BestFitting`] element.
@@ -71,15 +71,16 @@ impl Document {
                         Some(Enclosing::ConditionalGroup(group)) => !group.mode().is_flat(),
                         _ => false,
                     },
-                    FormatElement::Interned(interned) => match checked_interned.get(interned) {
-                        Some(interned_expands) => *interned_expands,
-                        None => {
+                    FormatElement::Interned(interned) => {
+                        if let Some(interned_expands) = checked_interned.get(interned) {
+                            *interned_expands
+                        } else {
                             let interned_expands =
                                 propagate_expands(interned, enclosing, checked_interned);
                             checked_interned.insert(interned, interned_expands);
                             interned_expands
                         }
-                    },
+                    }
                     FormatElement::BestFitting { variants } => {
                         enclosing.push(Enclosing::BestFitting);
 
@@ -114,7 +115,7 @@ impl Document {
 
                 if element_expands {
                     expands = true;
-                    expand_parent(enclosing)
+                    expand_parent(enclosing);
                 }
             }
 
@@ -226,6 +227,7 @@ impl FormatOptions for IrFormatOptions {
 
 impl Format<IrFormatContext<'_>> for &[FormatElement] {
     fn fmt(&self, f: &mut Formatter<IrFormatContext>) -> FormatResult<()> {
+        #[allow(clippy::enum_glob_use)]
         use Tag::*;
 
         write!(f, [ContentArrayStart])?;
@@ -245,20 +247,11 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
             first_element = false;
 
             match element {
-                element @ FormatElement::Space
-                | element @ FormatElement::StaticText { .. }
-                | element @ FormatElement::DynamicText { .. }
-                | element @ FormatElement::SourceCodeSlice { .. } => {
-                    if !in_text {
-                        write!(f, [text("\"")])?;
-                    }
-
-                    in_text = true;
-
-                    fn write_escaped(
-                        element: &FormatElement,
-                        f: &mut Formatter<IrFormatContext>,
-                    ) -> FormatResult<()> {
+                element @ (FormatElement::Space
+                | FormatElement::StaticText { .. }
+                | FormatElement::DynamicText { .. }
+                | FormatElement::SourceCodeSlice { .. }) => {
+                    fn write_escaped(element: &FormatElement, f: &mut Formatter<IrFormatContext>) {
                         let text = match element {
                             FormatElement::StaticText { text } => text,
                             FormatElement::DynamicText { text } => text.as_ref(),
@@ -271,18 +264,24 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                         if text.contains('"') {
                             f.write_element(FormatElement::DynamicText {
                                 text: text.replace('"', r#"\""#).into(),
-                            })
+                            });
                         } else {
-                            f.write_element(element.clone())
+                            f.write_element(element.clone());
                         }
                     }
+
+                    if !in_text {
+                        write!(f, [text("\"")])?;
+                    }
+
+                    in_text = true;
 
                     match element {
                         FormatElement::Space => {
                             write!(f, [text(" ")])?;
                         }
                         element if element.is_text() => {
-                            write_escaped(element, f)?;
+                            write_escaped(element, f);
                         }
                         _ => unreachable!(),
                     }
@@ -317,7 +316,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                     write!(
                         f,
                         [dynamic_text(
-                            &std::format!("source_position({:?})", position),
+                            &std::format!("source_position({position:?})"),
                             None
                         )]
                     )?;
@@ -332,16 +331,16 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                     f.write_elements([
                         FormatElement::Tag(StartIndent),
                         FormatElement::Line(LineMode::Hard),
-                    ])?;
+                    ]);
 
                     for variant in variants {
-                        write!(f, [variant.deref(), hard_line_break()])?;
+                        write!(f, [&**variant, hard_line_break()])?;
                     }
 
                     f.write_elements([
                         FormatElement::Tag(EndIndent),
                         FormatElement::Line(LineMode::Hard),
-                    ])?;
+                    ]);
 
                     write!(f, [text("])")])?;
                 }
@@ -359,7 +358,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                                 [
                                     dynamic_text(&std::format!("<interned {index}>"), None),
                                     space(),
-                                    &interned.deref(),
+                                    &&**interned,
                                 ]
                             )?;
                         }
@@ -621,7 +620,7 @@ struct ContentArrayStart;
 
 impl Format<IrFormatContext<'_>> for ContentArrayStart {
     fn fmt(&self, f: &mut Formatter<IrFormatContext>) -> FormatResult<()> {
-        use Tag::*;
+        use Tag::{StartGroup, StartIndent};
 
         write!(f, [text("[")])?;
 
@@ -629,7 +628,9 @@ impl Format<IrFormatContext<'_>> for ContentArrayStart {
             FormatElement::Tag(StartGroup(tag::Group::new())),
             FormatElement::Tag(StartIndent),
             FormatElement::Line(LineMode::Soft),
-        ])
+        ]);
+
+        Ok(())
     }
 }
 
@@ -637,12 +638,12 @@ struct ContentArrayEnd;
 
 impl Format<IrFormatContext<'_>> for ContentArrayEnd {
     fn fmt(&self, f: &mut Formatter<IrFormatContext>) -> FormatResult<()> {
-        use Tag::*;
+        use Tag::{EndGroup, EndIndent};
         f.write_elements([
             FormatElement::Tag(EndIndent),
             FormatElement::Line(LineMode::Soft),
             FormatElement::Tag(EndGroup),
-        ])?;
+        ]);
 
         write!(f, [text("]")])
     }
@@ -650,7 +651,7 @@ impl Format<IrFormatContext<'_>> for ContentArrayEnd {
 
 impl FormatElements for [FormatElement] {
     fn will_break(&self) -> bool {
-        use Tag::*;
+        use Tag::{EndLineSuffix, StartLineSuffix};
         let mut ignore_depth = 0usize;
 
         for element in self {
@@ -687,9 +688,6 @@ impl FormatElements for [FormatElement] {
     }
 
     fn start_tag(&self, kind: TagKind) -> Option<&Tag> {
-        // Assert that the document ends at a tag with the specified kind;
-        let _ = self.end_tag(kind)?;
-
         fn traverse_slice<'a>(
             slice: &'a [FormatElement],
             kind: TagKind,
@@ -704,9 +702,8 @@ impl FormatElements for [FormatElement] {
                                 return None;
                             } else if *depth == 1 {
                                 return Some(tag);
-                            } else {
-                                *depth -= 1;
                             }
+                            *depth -= 1;
                         } else {
                             *depth += 1;
                         }
@@ -731,6 +728,8 @@ impl FormatElements for [FormatElement] {
 
             None
         }
+        // Assert that the document ends at a tag with the specified kind;
+        let _ = self.end_tag(kind)?;
 
         let mut depth = 0usize;
 

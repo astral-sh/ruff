@@ -59,7 +59,7 @@ impl Eq for LineWidth {}
 
 impl PartialOrd for LineWidth {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.width.partial_cmp(&other.width)
+        Some(self.cmp(other))
     }
 }
 

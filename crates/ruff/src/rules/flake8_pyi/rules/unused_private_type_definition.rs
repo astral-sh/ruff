@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{self as ast, Expr, Ranged, Stmt};
 use ruff_python_semantic::Scope;
 
 use crate::checkers::ast::Checker;
@@ -192,7 +192,7 @@ pub(crate) fn unused_private_type_var(
             UnusedPrivateTypeVar {
                 name: id.to_string(),
             },
-            binding.range,
+            binding.range(),
         ));
     }
 }
@@ -234,7 +234,7 @@ pub(crate) fn unused_private_protocol(
             UnusedPrivateProtocol {
                 name: class_def.name.to_string(),
             },
-            binding.range,
+            binding.range(),
         ));
     }
 }
@@ -280,7 +280,7 @@ pub(crate) fn unused_private_type_alias(
             UnusedPrivateTypeAlias {
                 name: id.to_string(),
             },
-            binding.range,
+            binding.range(),
         ));
     }
 }
@@ -321,7 +321,7 @@ pub(crate) fn unused_private_typed_dict(
             UnusedPrivateTypedDict {
                 name: class_def.name.to_string(),
             },
-            binding.range,
+            binding.range(),
         ));
     }
 }

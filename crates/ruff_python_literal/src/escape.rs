@@ -341,7 +341,7 @@ impl AsciiEscape<'_> {
         let mut single_count = 0;
         let mut double_count = 0;
 
-        for ch in source.iter() {
+        for ch in source {
             let incr = match ch {
                 b'\'' => {
                     single_count += 1;
@@ -425,7 +425,7 @@ impl<'a> Escape for AsciiEscape<'a> {
 
     #[cold]
     fn write_body_slow(&self, formatter: &mut impl std::fmt::Write) -> std::fmt::Result {
-        for ch in self.source.iter() {
+        for ch in self.source {
             Self::write_char(*ch, self.layout().quote, formatter)?;
         }
         Ok(())

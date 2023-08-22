@@ -40,3 +40,6 @@ pub(crate) enum Context {
     Docstring,
     Comment,
 }
+pub(crate) use quadratic_list_summation::*;
+
+mod quadratic_list_summation;

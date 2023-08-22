@@ -77,6 +77,7 @@ unfixable = ["B"]
 [tool.ruff.per-file-ignores]
 "__init__.py" = ["E402"]
 "path/to/file.py" = ["E402"]
+"**/{tests,docs,tools}/*" = ["E402"]
 ```
 
 Plugin configurations should be expressed as subsections, e.g.:
@@ -328,7 +329,7 @@ For example, `ruff check /path/to/excluded/file.py` will always lint `file.py`.
 
 ## Jupyter Notebook discovery
 
-Ruff has built-in experimental support for linting [Jupyter Notebooks](https://jupyter.org/).
+Ruff has built-in support for linting [Jupyter Notebooks](https://jupyter.org/).
 
 To opt in to linting Jupyter Notebook (`.ipynb`) files, add the `*.ipynb` pattern to your
 [`include`](settings.md#include) setting, like so:

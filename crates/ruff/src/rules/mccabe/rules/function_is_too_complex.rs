@@ -106,14 +106,7 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
                 handlers,
                 orelse,
                 finalbody,
-                range: _,
-            })
-            | Stmt::TryStar(ast::StmtTryStar {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                range: _,
+                ..
             }) => {
                 complexity += get_complexity_number(body);
                 if !orelse.is_empty() {

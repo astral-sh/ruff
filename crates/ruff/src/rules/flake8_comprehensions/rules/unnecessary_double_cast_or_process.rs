@@ -1,14 +1,11 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, Ranged};
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableKeyword;
+use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, Ranged};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 use crate::rules::flake8_comprehensions::fixes;
-
-use super::helpers;
 
 /// ## What it does
 /// Checks for unnecessary `list`, `reversed`, `set`, `sorted`, and `tuple`
@@ -72,15 +69,13 @@ pub(crate) fn unnecessary_double_cast_or_process(
     args: &[Expr],
     outer_kw: &[Keyword],
 ) {
-    let Some(outer) = helpers::expr_name(func) else {
+    let Some(outer) = func.as_name_expr() else {
         return;
     };
-    if !(outer == "list"
-        || outer == "tuple"
-        || outer == "set"
-        || outer == "reversed"
-        || outer == "sorted")
-    {
+    if !matches!(
+        outer.id.as_str(),
+        "list" | "tuple" | "set" | "reversed" | "sorted"
+    ) {
         return;
     }
     let Some(arg) = args.first() else {
@@ -96,16 +91,16 @@ pub(crate) fn unnecessary_double_cast_or_process(
     else {
         return;
     };
-    let Some(inner) = helpers::expr_name(func) else {
+    let Some(inner) = func.as_name_expr() else {
         return;
     };
-    if !checker.semantic().is_builtin(inner) || !checker.semantic().is_builtin(outer) {
+    if !checker.semantic().is_builtin(&inner.id) || !checker.semantic().is_builtin(&outer.id) {
         return;
     }
 
     // Avoid collapsing nested `sorted` calls with non-identical keyword arguments
     // (i.e., `key`, `reverse`).
-    if inner == "sorted" && outer == "sorted" {
+    if inner.id == "sorted" && outer.id == "sorted" {
         if inner_kw.len() != outer_kw.len() {
             return;
         }
@@ -118,18 +113,19 @@ pub(crate) fn unnecessary_double_cast_or_process(
         }
     }
 
-    // Ex) set(tuple(...))
-    // Ex) list(tuple(...))
-    // Ex) set(set(...))
-    if ((outer == "set" || outer == "sorted")
-        && (inner == "list" || inner == "tuple" || inner == "reversed" || inner == "sorted"))
-        || (outer == "set" && inner == "set")
-        || ((outer == "list" || outer == "tuple") && (inner == "list" || inner == "tuple"))
-    {
+    // Ex) `set(tuple(...))`
+    // Ex) `list(tuple(...))`
+    // Ex) `set(set(...))`
+    if matches!(
+        (outer.id.as_str(), inner.id.as_str()),
+        ("set" | "sorted", "list" | "tuple" | "reversed" | "sorted")
+            | ("set", "set")
+            | ("list" | "tuple", "list" | "tuple")
+    ) {
         let mut diagnostic = Diagnostic::new(
             UnnecessaryDoubleCastOrProcess {
-                inner: inner.to_string(),
-                outer: outer.to_string(),
+                inner: inner.id.to_string(),
+                outer: outer.id.to_string(),
             },
             expr.range(),
         );

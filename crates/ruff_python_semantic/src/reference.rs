@@ -3,6 +3,7 @@ use ruff_text_size::TextRange;
 use std::ops::Deref;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
+use ruff_python_ast::Ranged;
 use ruff_source_file::Locator;
 
 use crate::context::ExecutionContext;
@@ -26,11 +27,6 @@ impl ResolvedReference {
         self.scope_id
     }
 
-    /// The range of the reference in the source code.
-    pub const fn range(&self) -> TextRange {
-        self.range
-    }
-
     /// The [`ExecutionContext`] of the reference.
     pub const fn context(&self) -> ExecutionContext {
         if self.flags.intersects(SemanticModelFlags::TYPING_CONTEXT) {
@@ -38,6 +34,13 @@ impl ResolvedReference {
         } else {
             ExecutionContext::Runtime
         }
+    }
+}
+
+impl Ranged for ResolvedReference {
+    /// The range of the reference in the source code.
+    fn range(&self) -> TextRange {
+        self.range
     }
 }
 

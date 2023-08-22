@@ -39,7 +39,7 @@ impl FormatNodeRule<ExprUnaryOp> for FormatExprUnaryOp {
         // (not # comment
         //      a)
         // ```
-        let leading_operand_comments = comments.leading_comments(operand.as_ref());
+        let leading_operand_comments = comments.leading(operand.as_ref());
         let trailing_operator_comments_end =
             leading_operand_comments.partition_point(|p| p.line_position().is_end_of_line());
         let (trailing_operator_comments, leading_operand_comments) =
@@ -91,7 +91,7 @@ fn is_operand_parenthesized(unary: &ExprUnaryOp, source: &str) -> bool {
         UnaryOp::USub => '-'.text_len(),
     };
 
-    let trivia_range = TextRange::new(unary.range.start() + operator_len, unary.operand.start());
+    let trivia_range = TextRange::new(unary.start() + operator_len, unary.operand.start());
 
     if let Some(token) = SimpleTokenizer::new(source, trivia_range)
         .skip_trivia()

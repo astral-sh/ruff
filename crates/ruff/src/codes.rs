@@ -569,9 +569,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bandit, "701") => (RuleGroup::Unspecified, rules::flake8_bandit::rules::Jinja2AutoescapeFalse),
 
         // flake8-boolean-trap
-        (Flake8BooleanTrap, "001") => (RuleGroup::Unspecified, rules::flake8_boolean_trap::rules::BooleanPositionalArgInFunctionDefinition),
-        (Flake8BooleanTrap, "002") => (RuleGroup::Unspecified, rules::flake8_boolean_trap::rules::BooleanDefaultValueInFunctionDefinition),
-        (Flake8BooleanTrap, "003") => (RuleGroup::Unspecified, rules::flake8_boolean_trap::rules::BooleanPositionalValueInFunctionCall),
+        (Flake8BooleanTrap, "001") => (RuleGroup::Unspecified, rules::flake8_boolean_trap::rules::BooleanTypeHintPositionalArgument),
+        (Flake8BooleanTrap, "002") => (RuleGroup::Unspecified, rules::flake8_boolean_trap::rules::BooleanDefaultValuePositionalArgument),
+        (Flake8BooleanTrap, "003") => (RuleGroup::Unspecified, rules::flake8_boolean_trap::rules::BooleanPositionalValueInCall),
 
         // flake8-unused-arguments
         (Flake8UnusedArguments, "001") => (RuleGroup::Unspecified, rules::flake8_unused_arguments::rules::UnusedFunctionArgument),
@@ -686,6 +686,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8PytestStyle, "011") => (RuleGroup::Unspecified, rules::flake8_pytest_style::rules::PytestRaisesTooBroad),
         (Flake8PytestStyle, "012") => (RuleGroup::Unspecified, rules::flake8_pytest_style::rules::PytestRaisesWithMultipleStatements),
         (Flake8PytestStyle, "013") => (RuleGroup::Unspecified, rules::flake8_pytest_style::rules::PytestIncorrectPytestImport),
+        (Flake8PytestStyle, "014") => (RuleGroup::Unspecified, rules::flake8_pytest_style::rules::PytestDuplicateParametrizeTestCases),
         (Flake8PytestStyle, "015") => (RuleGroup::Unspecified, rules::flake8_pytest_style::rules::PytestAssertAlwaysFalse),
         (Flake8PytestStyle, "016") => (RuleGroup::Unspecified, rules::flake8_pytest_style::rules::PytestFailWithoutMessage),
         (Flake8PytestStyle, "017") => (RuleGroup::Unspecified, rules::flake8_pytest_style::rules::PytestAssertInExcept),
@@ -698,6 +699,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8PytestStyle, "024") => (RuleGroup::Unspecified, rules::flake8_pytest_style::rules::PytestUnnecessaryAsyncioMarkOnFixture),
         (Flake8PytestStyle, "025") => (RuleGroup::Unspecified, rules::flake8_pytest_style::rules::PytestErroneousUseFixturesOnFixture),
         (Flake8PytestStyle, "026") => (RuleGroup::Unspecified, rules::flake8_pytest_style::rules::PytestUseFixturesWithoutParameters),
+        (Flake8PytestStyle, "027") => (RuleGroup::Unspecified, rules::flake8_pytest_style::rules::PytestUnittestRaisesAssertion),
 
         // flake8-pie
         (Flake8Pie, "790") => (RuleGroup::Unspecified, rules::flake8_pie::rules::UnnecessaryPass),
@@ -706,6 +708,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pie, "800") => (RuleGroup::Unspecified, rules::flake8_pie::rules::UnnecessarySpread),
         (Flake8Pie, "804") => (RuleGroup::Unspecified, rules::flake8_pie::rules::UnnecessaryDictKwargs),
         (Flake8Pie, "807") => (RuleGroup::Unspecified, rules::flake8_pie::rules::ReimplementedListBuiltin),
+        (Flake8Pie, "808") => (RuleGroup::Unspecified, rules::flake8_pie::rules::UnnecessaryRangeStart),
         (Flake8Pie, "810") => (RuleGroup::Unspecified, rules::flake8_pie::rules::MultipleStartsEndsWith),
 
         // flake8-commas
@@ -815,6 +818,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "014") => (RuleGroup::Nursery, rules::ruff::rules::UnreachableCode),
         (Ruff, "015") => (RuleGroup::Unspecified, rules::ruff::rules::UnnecessaryIterableAllocationForFirstElement),
         (Ruff, "016") => (RuleGroup::Unspecified, rules::ruff::rules::InvalidIndexType),
+        (Ruff, "017") => (RuleGroup::Nursery, rules::ruff::rules::QuadraticListSummation),
         (Ruff, "100") => (RuleGroup::Unspecified, rules::ruff::rules::UnusedNOQA),
         (Ruff, "200") => (RuleGroup::Unspecified, rules::ruff::rules::InvalidPyprojectToml),
 

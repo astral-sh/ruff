@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use ruff_python_ast::call_path::from_qualified_name;
 use ruff_python_ast::helpers::map_callable;
-use ruff_python_ast::str::is_implicit_concatenation;
+use ruff_python_ast::Expr;
 use ruff_python_semantic::{Definition, SemanticModel};
 use ruff_source_file::UniversalNewlines;
 
@@ -63,9 +63,11 @@ pub(crate) fn should_ignore_definition(
 }
 
 /// Check if a docstring should be ignored.
-pub(crate) fn should_ignore_docstring(contents: &str) -> bool {
+pub(crate) fn should_ignore_docstring(docstring: &Expr) -> bool {
     // Avoid analyzing docstrings that contain implicit string concatenations.
     // Python does consider these docstrings, but they're almost certainly a
     // user error, and supporting them "properly" is extremely difficult.
-    is_implicit_concatenation(contents)
+    docstring
+        .as_constant_expr()
+        .is_some_and(|constant| constant.value.is_implicit_concatenated())
 }

@@ -1,9 +1,8 @@
-use ruff_python_ast::{Constant, ExprConstant, Ranged};
-use ruff_text_size::{TextLen, TextRange};
-
+use crate::comments::SourceComment;
 use ruff_formatter::FormatRuleWithOptions;
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::str::is_implicit_concatenation;
+use ruff_python_ast::{Constant, ExprConstant, Ranged};
+use ruff_text_size::{TextLen, TextRange};
 
 use crate::expression::number::{FormatComplex, FormatFloat, FormatInt};
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
@@ -67,7 +66,7 @@ impl FormatNodeRule<ExprConstant> for FormatExprConstant {
 
     fn fmt_dangling_comments(
         &self,
-        _node: &ExprConstant,
+        _dangling_comments: &[SourceComment],
         _f: &mut PyFormatter,
     ) -> FormatResult<()> {
         Ok(())
@@ -80,10 +79,9 @@ impl NeedsParentheses for ExprConstant {
         _parent: AnyNodeRef,
         context: &PyFormatContext,
     ) -> OptionalParentheses {
-        if self.value.is_str() || self.value.is_bytes() {
-            let contents = context.locator().slice(self.range());
+        if self.value.is_implicit_concatenated() {
             // Don't wrap triple quoted strings
-            if is_multiline_string(self, context.source()) || !is_implicit_concatenation(contents) {
+            if is_multiline_string(self, context.source()) {
                 OptionalParentheses::Never
             } else {
                 OptionalParentheses::Multiline

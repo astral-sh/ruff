@@ -63,7 +63,7 @@ pub struct FixerResult<'a> {
     /// The result returned by the linter, after applying any fixes.
     pub result: LinterResult<(Vec<Message>, Option<ImportMap>)>,
     /// The resulting source code, after applying any fixes.
-    pub transformed: Cow<'a, str>,
+    pub transformed: Cow<'a, SourceKind>,
     /// The number of fixes applied for each [`Rule`].
     pub fixed: FixTable,
 }
@@ -335,19 +335,19 @@ pub fn add_noqa_to_path(path: &Path, package: Option<&Path>, settings: &Settings
 /// Generate a [`Message`] for each [`Diagnostic`] triggered by the given source
 /// code.
 pub fn lint_only(
-    contents: &str,
     path: &Path,
     package: Option<&Path>,
     settings: &Settings,
     noqa: flags::Noqa,
-    source_kind: Option<&SourceKind>,
+    source_kind: &SourceKind,
     source_type: PySourceType,
 ) -> LinterResult<(Vec<Message>, Option<ImportMap>)> {
     // Tokenize once.
-    let tokens: Vec<LexResult> = ruff_python_parser::tokenize(contents, source_type.as_mode());
+    let tokens: Vec<LexResult> =
+        ruff_python_parser::tokenize(source_kind.source_code(), source_type.as_mode());
 
     // Map row and column locations to byte slices (lazily).
-    let locator = Locator::new(contents);
+    let locator = Locator::new(source_kind.source_code());
 
     // Detect the current code style (lazily).
     let stylist = Stylist::from_tokens(&tokens, &locator);
@@ -374,7 +374,7 @@ pub fn lint_only(
         &directives,
         settings,
         noqa,
-        source_kind,
+        Some(source_kind),
         source_type,
     );
 
@@ -416,15 +416,14 @@ fn diagnostics_to_messages(
 /// Generate `Diagnostic`s from source code content, iteratively autofixing
 /// until stable.
 pub fn lint_fix<'a>(
-    contents: &'a str,
     path: &Path,
     package: Option<&Path>,
     noqa: flags::Noqa,
     settings: &Settings,
-    source_kind: &mut SourceKind,
+    source_kind: &'a SourceKind,
     source_type: PySourceType,
 ) -> Result<FixerResult<'a>> {
-    let mut transformed = Cow::Borrowed(contents);
+    let mut transformed = Cow::Borrowed(source_kind);
 
     // Track the number of fixed errors across iterations.
     let mut fixed = FxHashMap::default();
@@ -439,10 +438,10 @@ pub fn lint_fix<'a>(
     loop {
         // Tokenize once.
         let tokens: Vec<LexResult> =
-            ruff_python_parser::tokenize(&transformed, source_type.as_mode());
+            ruff_python_parser::tokenize(transformed.source_code(), source_type.as_mode());
 
         // Map row and column locations to byte slices (lazily).
-        let locator = Locator::new(&transformed);
+        let locator = Locator::new(transformed.source_code());
 
         // Detect the current code style (lazily).
         let stylist = Stylist::from_tokens(&tokens, &locator);
@@ -482,7 +481,7 @@ pub fn lint_fix<'a>(
             if parseable && result.error.is_some() {
                 report_autofix_syntax_error(
                     path,
-                    &transformed,
+                    transformed.source_code(),
                     &result.error.unwrap(),
                     fixed.keys().copied(),
                 );
@@ -503,12 +502,7 @@ pub fn lint_fix<'a>(
                     *fixed.entry(rule).or_default() += count;
                 }
 
-                if let SourceKind::Jupyter(notebook) = source_kind {
-                    notebook.update(&source_map, &fixed_contents);
-                }
-
-                // Store the fixed contents.
-                transformed = Cow::Owned(fixed_contents);
+                transformed = Cow::Owned(transformed.updated(fixed_contents, &source_map));
 
                 // Increment the iteration count.
                 iterations += 1;
@@ -517,7 +511,7 @@ pub fn lint_fix<'a>(
                 continue;
             }
 
-            report_failed_to_converge_error(path, &transformed, &result.data.0);
+            report_failed_to_converge_error(path, transformed.source_code(), &result.data.0);
         }
 
         return Ok(FixerResult {

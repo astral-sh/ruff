@@ -57,3 +57,11 @@ def foo():
 
     yield from (yield l)
 
+    (
+        yield
+        #comment 1
+        * # comment 2
+        # comment 3
+        test, # comment 4
+        1
+    )

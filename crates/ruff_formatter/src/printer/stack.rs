@@ -19,7 +19,7 @@ impl<T> Stack<T> for Vec<T> {
     }
 
     fn push(&mut self, value: T) {
-        self.push(value)
+        self.push(value);
     }
 
     fn top(&self) -> Option<&T> {

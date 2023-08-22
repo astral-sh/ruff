@@ -1,7 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::format_call_path;
-use ruff_python_ast::call_path::from_qualified_name;
 use ruff_python_ast::helpers::is_compound_statement;
 use ruff_python_ast::{self as ast, Expr, Ranged, Stmt, WithItem};
 use ruff_python_semantic::SemanticModel;
@@ -22,6 +21,9 @@ use super::helpers::is_empty_or_null_string;
 ///
 /// ## Example
 /// ```python
+/// import pytest
+///
+///
 /// def test_foo():
 ///     with pytest.raises(MyError):
 ///         setup()  # may raise `MyError`
@@ -31,6 +33,9 @@ use super::helpers::is_empty_or_null_string;
 ///
 /// Use instead:
 /// ```python
+/// import pytest
+///
+///
 /// def test_foo():
 ///     setup()
 ///     with pytest.raises(MyException):
@@ -63,6 +68,9 @@ impl Violation for PytestRaisesWithMultipleStatements {
 ///
 /// ## Example
 /// ```python
+/// import pytest
+///
+///
 /// def test_foo():
 ///     with pytest.raises(ValueError):
 ///         ...
@@ -74,6 +82,9 @@ impl Violation for PytestRaisesWithMultipleStatements {
 ///
 /// Use instead:
 /// ```python
+/// import pytest
+///
+///
 /// def test_foo():
 ///     with pytest.raises(ValueError, match="expected message"):
 ///         ...
@@ -219,7 +230,8 @@ fn exception_needs_match(checker: &mut Checker, exception: &Expr) {
         .semantic()
         .resolve_call_path(exception)
         .and_then(|call_path| {
-            let is_broad_exception = checker
+            let call_path = format_call_path(&call_path);
+            checker
                 .settings
                 .flake8_pytest_style
                 .raises_require_match_for
@@ -230,12 +242,8 @@ fn exception_needs_match(checker: &mut Checker, exception: &Expr) {
                         .flake8_pytest_style
                         .raises_extend_require_match_for,
                 )
-                .any(|target| call_path == from_qualified_name(target));
-            if is_broad_exception {
-                Some(format_call_path(&call_path))
-            } else {
-                None
-            }
+                .any(|pattern| pattern.matches(&call_path))
+                .then_some(call_path)
         })
     {
         checker.diagnostics.push(Diagnostic::new(

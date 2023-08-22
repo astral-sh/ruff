@@ -100,7 +100,16 @@ def foo() -> tuple[int, int, int,]:
 ```diff
 --- Black
 +++ Ruff
-@@ -26,7 +26,11 @@
+@@ -22,11 +22,19 @@
+ 
+ 
+ # Don't lose the comments
+-def double(a: int) -> int:  # Hello
++def double(
++    a: int
++) -> (  # Hello
++    int
++):
      return 2 * a
  
  
@@ -142,7 +151,11 @@ def double(a: int) -> int:
 
 
 # Don't lose the comments
-def double(a: int) -> int:  # Hello
+def double(
+    a: int
+) -> (  # Hello
+    int
+):
     return 2 * a
 
 

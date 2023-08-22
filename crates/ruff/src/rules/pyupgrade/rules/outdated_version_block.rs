@@ -201,10 +201,10 @@ fn fix_py2_block(checker: &Checker, stmt_if: &StmtIf, branch: &IfElifBranch) -> 
                 .elif_else_clauses
                 .iter()
                 .map(Ranged::start)
-                .find(|start| *start > branch.range.start());
+                .find(|start| *start > branch.start());
             Some(Fix::suggested(Edit::deletion(
-                branch.range.start(),
-                next_start.unwrap_or(branch.range.end()),
+                branch.start(),
+                next_start.unwrap_or(branch.end()),
             )))
         }
     }
@@ -256,7 +256,7 @@ fn fix_py3_block(checker: &mut Checker, stmt_if: &StmtIf, branch: &IfElifBranch)
                 .slice(TextRange::new(branch.test.end(), end.end()));
             Some(Fix::suggested(Edit::range_replacement(
                 format!("else{text}"),
-                TextRange::new(branch.range.start(), stmt_if.end()),
+                TextRange::new(branch.start(), stmt_if.end()),
             )))
         }
     }

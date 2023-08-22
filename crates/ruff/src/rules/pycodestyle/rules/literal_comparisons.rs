@@ -1,15 +1,15 @@
-use itertools::izip;
-use ruff_python_ast::{self as ast, CmpOp, Constant, Expr, Ranged};
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers;
 use ruff_python_ast::helpers::is_const_none;
+use ruff_python_ast::{self as ast, CmpOp, Constant, Expr, Ranged};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Rule;
 use crate::registry::AsRule;
-use crate::rules::pycodestyle::helpers::compare;
+use crate::rules::pycodestyle::helpers::generate_comparison;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum EqCmpOp {
@@ -130,15 +130,7 @@ impl AlwaysAutofixableViolation for TrueFalseComparison {
 }
 
 /// E711, E712
-pub(crate) fn literal_comparisons(
-    checker: &mut Checker,
-    expr: &Expr,
-    left: &Expr,
-    ops: &[CmpOp],
-    comparators: &[Expr],
-    check_none_comparisons: bool,
-    check_true_false_comparisons: bool,
-) {
+pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprCompare) {
     // Mapping from (bad operator index) to (replacement operator). As we iterate
     // through the list of operators, we apply "dummy" fixes for each error,
     // then replace the entire expression at the end with one "real" fix, to
@@ -146,15 +138,18 @@ pub(crate) fn literal_comparisons(
     let mut bad_ops: FxHashMap<usize, CmpOp> = FxHashMap::default();
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
-    let op = ops.first().unwrap();
-
     // Check `left`.
-    let mut comparator = left;
-    let next = &comparators[0];
+    let mut comparator = compare.left.as_ref();
+    let [op, ..] = compare.ops.as_slice() else {
+        return;
+    };
+    let [next, ..] = compare.comparators.as_slice() else {
+        return;
+    };
 
     if !helpers::is_constant_non_singleton(next) {
         if let Some(op) = EqCmpOp::try_from(*op) {
-            if check_none_comparisons && is_const_none(comparator) {
+            if checker.enabled(Rule::NoneComparison) && is_const_none(comparator) {
                 match op {
                     EqCmpOp::Eq => {
                         let diagnostic = Diagnostic::new(NoneComparison(op), comparator.range());
@@ -173,7 +168,7 @@ pub(crate) fn literal_comparisons(
                 }
             }
 
-            if check_true_false_comparisons {
+            if checker.enabled(Rule::TrueFalseComparison) {
                 if let Expr::Constant(ast::ExprConstant {
                     value: Constant::Bool(value),
                     kind: None,
@@ -208,56 +203,63 @@ pub(crate) fn literal_comparisons(
     }
 
     // Check each comparator in order.
-    for (idx, (op, next)) in izip!(ops, comparators).enumerate() {
+    for (index, (op, next)) in compare
+        .ops
+        .iter()
+        .zip(compare.comparators.iter())
+        .enumerate()
+    {
         if helpers::is_constant_non_singleton(comparator) {
             comparator = next;
             continue;
         }
 
-        if let Some(op) = EqCmpOp::try_from(*op) {
-            if check_none_comparisons && is_const_none(next) {
+        let Some(op) = EqCmpOp::try_from(*op) else {
+            continue;
+        };
+
+        if checker.enabled(Rule::NoneComparison) && is_const_none(next) {
+            match op {
+                EqCmpOp::Eq => {
+                    let diagnostic = Diagnostic::new(NoneComparison(op), next.range());
+                    if checker.patch(diagnostic.kind.rule()) {
+                        bad_ops.insert(index, CmpOp::Is);
+                    }
+                    diagnostics.push(diagnostic);
+                }
+                EqCmpOp::NotEq => {
+                    let diagnostic = Diagnostic::new(NoneComparison(op), next.range());
+                    if checker.patch(diagnostic.kind.rule()) {
+                        bad_ops.insert(index, CmpOp::IsNot);
+                    }
+                    diagnostics.push(diagnostic);
+                }
+            }
+        }
+
+        if checker.enabled(Rule::TrueFalseComparison) {
+            if let Expr::Constant(ast::ExprConstant {
+                value: Constant::Bool(value),
+                kind: None,
+                range: _,
+            }) = next
+            {
                 match op {
                     EqCmpOp::Eq => {
-                        let diagnostic = Diagnostic::new(NoneComparison(op), next.range());
+                        let diagnostic =
+                            Diagnostic::new(TrueFalseComparison(*value, op), next.range());
                         if checker.patch(diagnostic.kind.rule()) {
-                            bad_ops.insert(idx, CmpOp::Is);
+                            bad_ops.insert(index, CmpOp::Is);
                         }
                         diagnostics.push(diagnostic);
                     }
                     EqCmpOp::NotEq => {
-                        let diagnostic = Diagnostic::new(NoneComparison(op), next.range());
+                        let diagnostic =
+                            Diagnostic::new(TrueFalseComparison(*value, op), next.range());
                         if checker.patch(diagnostic.kind.rule()) {
-                            bad_ops.insert(idx, CmpOp::IsNot);
+                            bad_ops.insert(index, CmpOp::IsNot);
                         }
                         diagnostics.push(diagnostic);
-                    }
-                }
-            }
-
-            if check_true_false_comparisons {
-                if let Expr::Constant(ast::ExprConstant {
-                    value: Constant::Bool(value),
-                    kind: None,
-                    range: _,
-                }) = next
-                {
-                    match op {
-                        EqCmpOp::Eq => {
-                            let diagnostic =
-                                Diagnostic::new(TrueFalseComparison(*value, op), next.range());
-                            if checker.patch(diagnostic.kind.rule()) {
-                                bad_ops.insert(idx, CmpOp::Is);
-                            }
-                            diagnostics.push(diagnostic);
-                        }
-                        EqCmpOp::NotEq => {
-                            let diagnostic =
-                                Diagnostic::new(TrueFalseComparison(*value, op), next.range());
-                            if checker.patch(diagnostic.kind.rule()) {
-                                bad_ops.insert(idx, CmpOp::IsNot);
-                            }
-                            diagnostics.push(diagnostic);
-                        }
                     }
                 }
             }
@@ -270,17 +272,24 @@ pub(crate) fn literal_comparisons(
     // `noqa`, but another doesn't, both will be removed here.
     if !bad_ops.is_empty() {
         // Replace the entire comparison expression.
-        let ops = ops
+        let ops = compare
+            .ops
             .iter()
             .enumerate()
             .map(|(idx, op)| bad_ops.get(&idx).unwrap_or(op))
             .copied()
             .collect::<Vec<_>>();
-        let content = compare(left, &ops, comparators, checker.locator());
+        let content = generate_comparison(
+            &compare.left,
+            &ops,
+            &compare.comparators,
+            compare.into(),
+            checker.locator(),
+        );
         for diagnostic in &mut diagnostics {
             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                 content.to_string(),
-                expr.range(),
+                compare.range(),
             )));
         }
     }

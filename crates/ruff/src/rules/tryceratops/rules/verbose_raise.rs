@@ -61,9 +61,6 @@ where
             }
             Stmt::Try(ast::StmtTry {
                 body, finalbody, ..
-            })
-            | Stmt::TryStar(ast::StmtTryStar {
-                body, finalbody, ..
             }) => {
                 for stmt in body.iter().chain(finalbody.iter()) {
                     walk_stmt(self, stmt);

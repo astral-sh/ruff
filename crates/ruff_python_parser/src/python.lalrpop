@@ -952,6 +952,7 @@ TryStatement: ast::Stmt = {
                 handlers,
                 orelse,
                 finalbody,
+                is_star: false,
                 range: (location..end_location).into()
             },
         )
@@ -965,12 +966,13 @@ TryStatement: ast::Stmt = {
             .map(Ranged::end)
             .or_else(|| handlers.last().map(Ranged::end))
             .unwrap();
-        ast::Stmt::TryStar(
-            ast::StmtTryStar {
+        ast::Stmt::Try(
+            ast::StmtTry {
                 body,
                 handlers,
                 orelse,
                 finalbody,
+                is_star: true,
                 range: (location..end_location).into()
             },
         )
@@ -985,6 +987,7 @@ TryStatement: ast::Stmt = {
                 handlers,
                 orelse,
                 finalbody,
+                is_star: false,
                 range: (location..end_location).into()
             },
         )
@@ -1332,29 +1335,31 @@ NamedExpressionTest: ast::Expr = {
     Test<"all">,
 }
 
+NamedExpressionName: ast::Expr = {
+    <location:@L> <id:Identifier> <end_location:@R> => ast::Expr::Name(
+        ast::ExprName { id: id.into(), ctx: ast::ExprContext::Store, range: (location..end_location).into() },
+    ),
+}
+
 NamedExpression: ast::Expr = {
-    <location:@L> <id:Identifier> <end_location:@R> ":=" <value:Test<"all">> => {
+    <location:@L> <target:NamedExpressionName> ":=" <value:Test<"all">> <end_location:@R> => {
         ast::Expr::NamedExpr(
             ast::ExprNamedExpr {
-                target: Box::new(ast::Expr::Name(
-                    ast::ExprName { id: id.into(), ctx: ast::ExprContext::Store, range: (location..end_location).into() },
-                )),
-                range: (location..value.end()).into(),
+                target: Box::new(target),
                 value: Box::new(value),
+                range: (location..end_location).into(),
             }
         )
     },
 };
 
 LambdaDef: ast::Expr = {
-    <location:@L> "lambda" <location_args:@L> <p:ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter>?> <end_location_args:@R> ":" <body:Test<"all">> <end_location:@R> =>? {
-        p.as_ref().map(validate_arguments).transpose()?;
-        let p = p
-            .unwrap_or_else(|| ast::Parameters::empty((location_args..end_location_args).into()));
+    <location:@L> "lambda" <location_args:@L> <parameters:ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter>?> <end_location_args:@R> ":" <body:Test<"all">> <end_location:@R> =>? {
+        parameters.as_ref().map(validate_arguments).transpose()?;
 
         Ok(ast::Expr::Lambda(
             ast::ExprLambda {
-                parameters: Box::new(p),
+                parameters: parameters.map(Box::new),
                 body: Box::new(body),
                 range: (location..end_location).into()
             }

@@ -1,12 +1,11 @@
-use crate::{verbatim_text, FormatNodeRule, PyFormatter};
-use ruff_formatter::{write, Buffer, FormatResult};
-use ruff_python_ast::ExprIpyEscapeCommand;
+use crate::prelude::*;
+use ruff_python_ast::{ExprIpyEscapeCommand, Ranged};
 
 #[derive(Default)]
 pub struct FormatExprIpyEscapeCommand;
 
 impl FormatNodeRule<ExprIpyEscapeCommand> for FormatExprIpyEscapeCommand {
     fn fmt_fields(&self, item: &ExprIpyEscapeCommand, f: &mut PyFormatter) -> FormatResult<()> {
-        write!(f, [verbatim_text(item)])
+        source_text_slice(item.range(), ContainsNewlines::No).fmt(f)
     }
 }

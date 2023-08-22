@@ -87,10 +87,8 @@ impl Strategy for StrategyRemoveModuleMember {
     ) -> Result<Box<dyn ExactSizeStringIter + 'a>> {
         let iter = ast.iter().map(|stmt| {
             // trim the newlines the range misses
-            input[..stmt.range().start().to_usize()]
-                .trim_end()
-                .to_string()
-                + input[stmt.range().end().to_usize()..].trim_start()
+            input[..stmt.start().to_usize()].trim_end().to_string()
+                + input[stmt.end().to_usize()..].trim_start()
         });
         Ok(Box::new(iter))
     }

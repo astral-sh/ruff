@@ -147,7 +147,10 @@ fn properties_from_dict_literal(keys: &[Option<Expr>], values: &[Expr]) -> Resul
         .zip(values.iter())
         .map(|(key, value)| match key {
             Some(Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(property),
+                value:
+                    Constant::Str(ast::StringConstant {
+                        value: property, ..
+                    }),
                 ..
             })) => {
                 if !is_identifier(property) {

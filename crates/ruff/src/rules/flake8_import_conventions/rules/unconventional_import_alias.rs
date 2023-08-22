@@ -2,6 +2,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::Ranged;
 use ruff_python_semantic::{Binding, Imported};
 
 use crate::checkers::ast::Checker;
@@ -76,16 +77,18 @@ pub(crate) fn unconventional_import_alias(
             name: qualified_name,
             asname: expected_alias.to_string(),
         },
-        binding.range,
+        binding.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        if checker.semantic().is_available(expected_alias) {
-            diagnostic.try_set_fix(|| {
-                let scope = &checker.semantic().scopes[binding.scope];
-                let (edit, rest) =
-                    Renamer::rename(name, expected_alias, scope, checker.semantic())?;
-                Ok(Fix::suggested_edits(edit, rest))
-            });
+        if !import.is_submodule_import() {
+            if checker.semantic().is_available(expected_alias) {
+                diagnostic.try_set_fix(|| {
+                    let scope = &checker.semantic().scopes[binding.scope];
+                    let (edit, rest) =
+                        Renamer::rename(name, expected_alias, scope, checker.semantic())?;
+                    Ok(Fix::suggested_edits(edit, rest))
+                });
+            }
         }
     }
     Some(diagnostic)

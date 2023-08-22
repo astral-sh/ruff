@@ -73,7 +73,49 @@ def e2() -> (  # e 2
 x): pass
 
 
-class E3(  # e 3
+def e3() -> (
+    # e 2
+x): pass
+
+
+def e4() -> (
+    x
+# e 4
+): pass
+
+
+def e5() -> (  # e 5
+    (  # e 5
+        x
+    )
+): pass
+
+
+def e6() -> (
+    (
+        # e 6
+        x
+    )
+): pass
+
+
+def e7() -> (
+    (
+        x
+        # e 7
+    )
+): pass
+
+
+def e8() -> (
+    (
+        x
+    )
+    # e 8
+): pass
+
+
+class E9(  # e 9
 x): pass
 
 

@@ -28,7 +28,7 @@ F521.py:3:1: F521 `.format` call has invalid format string: Expected '}' before 
 5 | "{:{:{}}}".format(1, 2, 3)
   |
 
-F521.py:5:1: F521 `.format` call has invalid format string: Max string recursion exceeded
+F521.py:5:1: F521 `.format` call has invalid format string: Max format placeholder recursion exceeded
   |
 3 | "{foo[}".format(foo=1)
 4 | # too much string recursion (placeholder-in-placeholder)

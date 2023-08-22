@@ -14,7 +14,10 @@
 
 "{:s} {:y}".format("hello", "world")  # [bad-format-character]
 
-"{:*^30s}".format("centered")
+"{:*^30s}".format("centered") # OK
+"{:{s}}".format("hello", s="s")  # OK (nested replacement value not checked)
+
+"{:{s:y}}".format("hello", s="s")  # [bad-format-character] (nested replacement format spec checked)
 
 ## f-strings
 

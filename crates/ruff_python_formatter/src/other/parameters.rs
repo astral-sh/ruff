@@ -7,8 +7,8 @@ use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::comments::{
-    dangling_open_parenthesis_comments, leading_comments, leading_node_comments, trailing_comments,
-    CommentLinePosition, SourceComment,
+    dangling_comments, dangling_open_parenthesis_comments, leading_comments, leading_node_comments,
+    trailing_comments, CommentLinePosition, SourceComment,
 };
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::parentheses::empty_parenthesized;
@@ -63,7 +63,7 @@ impl FormatNodeRule<Parameters> for FormatParameters {
         let (slash, star) = find_parameter_separators(f.context().source(), item);
 
         let comments = f.context().comments().clone();
-        let dangling = comments.dangling_comments(item);
+        let dangling = comments.dangling(item);
 
         // First dangling comment: trailing the opening parenthesis, e.g.:
         // ```python
@@ -242,7 +242,7 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             + usize::from(kwarg.is_some());
 
         if self.parentheses == ParametersParentheses::Never {
-            write!(f, [group(&format_inner)])
+            write!(f, [group(&format_inner), dangling_comments(dangling)])
         } else if num_parameters == 0 {
             // No parameters, format any dangling comments between `()`
             write!(f, [empty_parenthesized("(", dangling, ")")])
@@ -262,7 +262,11 @@ impl FormatNodeRule<Parameters> for FormatParameters {
         }
     }
 
-    fn fmt_dangling_comments(&self, _node: &Parameters, _f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         // Handled in `fmt_fields`
         Ok(())
     }
@@ -412,7 +416,7 @@ pub(crate) fn find_parameter_separators(
             debug_assert!(star.kind() == SimpleTokenKind::Star, "{star:?}");
 
             Some(ParameterSeparator {
-                preceding_end: parameters.range.start(),
+                preceding_end: parameters.start(),
                 separator: star.range,
                 following_start: first_keyword_argument.start(),
             })

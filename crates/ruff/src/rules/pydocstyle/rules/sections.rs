@@ -8,7 +8,7 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::docstrings::{clean_space, leading_space};
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::ParameterWithDefault;
+use ruff_python_ast::{ParameterWithDefault, Ranged};
 use ruff_python_semantic::analyze::visibility::is_staticmethod;
 use ruff_python_trivia::{textwrap::dedent, PythonWhitespace};
 use ruff_source_file::NewlineWithTrailingNewline;
@@ -1640,7 +1640,7 @@ fn common_section(
             if checker.patch(diagnostic.kind.rule()) {
                 // Replace the existing indentation with whitespace of the appropriate length.
                 let content = clean_space(docstring.indentation);
-                let fix_range = TextRange::at(context.range().start(), leading_space.text_len());
+                let fix_range = TextRange::at(context.start(), leading_space.text_len());
 
                 diagnostic.set_fix(Fix::automatic(if content.is_empty() {
                     Edit::range_deletion(fix_range)
@@ -1667,7 +1667,7 @@ fn common_section(
                     // Add a newline at the beginning of the next section.
                     diagnostic.set_fix(Fix::automatic(Edit::insertion(
                         line_end.to_string(),
-                        next.range().start(),
+                        next.start(),
                     )));
                 }
                 checker.diagnostics.push(diagnostic);
@@ -1684,7 +1684,7 @@ fn common_section(
                     // Add a newline after the section.
                     diagnostic.set_fix(Fix::automatic(Edit::insertion(
                         format!("{}{}", line_end, docstring.indentation),
-                        context.range().end(),
+                        context.end(),
                     )));
                 }
                 checker.diagnostics.push(diagnostic);
@@ -1704,7 +1704,7 @@ fn common_section(
                 // Add a blank line before the section.
                 diagnostic.set_fix(Fix::automatic(Edit::insertion(
                     line_end.to_string(),
-                    context.range().start(),
+                    context.start(),
                 )));
             }
             checker.diagnostics.push(diagnostic);

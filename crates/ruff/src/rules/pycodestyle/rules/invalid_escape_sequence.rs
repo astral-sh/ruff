@@ -129,7 +129,7 @@ pub(crate) fn invalid_escape_sequence(
             for diagnostic in &mut invalid_escape_sequence {
                 diagnostic.set_fix(Fix::automatic(Edit::insertion(
                     r"\".to_string(),
-                    diagnostic.range().start() + TextSize::from(1),
+                    diagnostic.start() + TextSize::from(1),
                 )));
             }
         } else {

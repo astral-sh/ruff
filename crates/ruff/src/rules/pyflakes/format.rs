@@ -11,7 +11,9 @@ pub(crate) fn error_to_string(err: &FormatParseError) -> String {
         FormatParseError::InvalidCharacterAfterRightBracket => {
             "Only '.' or '[' may follow ']' in format field specifier"
         }
-        FormatParseError::InvalidFormatSpecifier => "Max string recursion exceeded",
+        FormatParseError::PlaceholderRecursionExceeded => {
+            "Max format placeholder recursion exceeded"
+        }
         FormatParseError::MissingStartBracket => "Single '}' encountered in format string",
         FormatParseError::MissingRightBracket => "Expected '}' before end of string",
         FormatParseError::UnmatchedBracket => "Single '{' encountered in format string",

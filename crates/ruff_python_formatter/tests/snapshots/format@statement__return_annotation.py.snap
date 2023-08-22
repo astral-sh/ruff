@@ -223,7 +223,9 @@ def zrevrangebylex(
     min: _Value,
     start: int | None = None,
     num: int | None = None,
-) -> 1:  # type: ignore[override]
+) -> (  # type: ignore[override]
+    1
+):
     ...
 
 
@@ -248,7 +250,9 @@ def zrevrangebylex(
     min: _Value,
     start: int | None = None,
     num: int | None = None,
-) -> (1, 2):  # type: ignore[override]
+) -> (  # type: ignore[override]
+    (1, 2)
+):
     ...
 
 
@@ -264,7 +268,11 @@ def double(
     return 2 * a
 
 
-def double(a: int) -> int:  # Hello
+def double(
+    a: int
+) -> (  # Hello
+    int
+):
     return 2 * a
 
 

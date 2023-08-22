@@ -1,3 +1,4 @@
+use crate::comments::SourceComment;
 use ruff_formatter::write;
 use ruff_python_ast::node::AstNode;
 use ruff_python_ast::{Arguments, Expr, Ranged};
@@ -23,7 +24,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
         // ```
         if item.args.is_empty() && item.keywords.is_empty() {
             let comments = f.context().comments().clone();
-            let dangling = comments.dangling_comments(item);
+            let dangling = comments.dangling(item);
             return write!(f, [empty_parenthesized("(", dangling, ")")]);
         }
 
@@ -44,6 +45,9 @@ impl FormatNodeRule<Arguments> for FormatArguments {
                                 if is_single_argument_parenthesized(arg, item.end(), source) {
                                     Parentheses::Always
                                 } else {
+                                    // Note: no need to handle opening-parenthesis comments, since
+                                    // an opening-parenthesis comment implies that the argument is
+                                    // parenthesized.
                                     Parentheses::Never
                                 };
                             joiner.entry(other, &other.format().with_options(parentheses))
@@ -73,7 +77,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
         //     c,
         // )
         let comments = f.context().comments().clone();
-        let dangling_comments = comments.dangling_comments(item.as_any_node_ref());
+        let dangling_comments = comments.dangling(item.as_any_node_ref());
 
         write!(
             f,
@@ -99,7 +103,11 @@ impl FormatNodeRule<Arguments> for FormatArguments {
         )
     }
 
-    fn fmt_dangling_comments(&self, _node: &Arguments, _f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         // Handled in `fmt_fields`
         Ok(())
     }

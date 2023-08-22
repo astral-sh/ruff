@@ -10,10 +10,13 @@ expression: parse_ast
                 ExprConstant {
                     range: 0..6,
                     value: Bytes(
-                        [
-                            92,
-                            92,
-                        ],
+                        BytesConstant {
+                            value: [
+                                92,
+                                92,
+                            ],
+                            implicit_concatenated: false,
+                        },
                     ),
                     kind: None,
                 },

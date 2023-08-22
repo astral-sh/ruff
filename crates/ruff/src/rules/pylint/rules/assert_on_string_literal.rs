@@ -71,7 +71,7 @@ pub(crate) fn assert_on_string_literal(checker: &mut Checker, test: &Expr) {
             }
             _ => {}
         },
-        Expr::FString(ast::ExprFString { values, range: _ }) => {
+        Expr::FString(ast::ExprFString { values, .. }) => {
             checker.diagnostics.push(Diagnostic::new(
                 AssertOnStringLiteral {
                     kind: if values.iter().all(|value| match value {

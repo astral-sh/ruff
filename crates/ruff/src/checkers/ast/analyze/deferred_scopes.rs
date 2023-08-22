@@ -1,5 +1,6 @@
 use ruff_diagnostics::Diagnostic;
-use ruff_python_semantic::analyze::{branch_detection, visibility};
+use ruff_python_ast::Ranged;
+use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{Binding, BindingKind, ScopeKind};
 
 use crate::checkers::ast::Checker;
@@ -82,7 +83,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                         pylint::rules::GlobalVariableNotAssigned {
                             name: (*name).to_string(),
                         },
-                        binding.range,
+                        binding.range(),
                     ));
                 }
             }
@@ -112,25 +113,21 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                     // If the bindings are in different forks, abort.
                     if shadowed.source.map_or(true, |left| {
                         binding.source.map_or(true, |right| {
-                            branch_detection::different_forks(
-                                left,
-                                right,
-                                checker.semantic.statements(),
-                            )
+                            checker.semantic.different_branches(left, right)
                         })
                     }) {
                         continue;
                     }
 
                     #[allow(deprecated)]
-                    let line = checker.locator.compute_line_index(shadowed.range.start());
+                    let line = checker.locator.compute_line_index(shadowed.start());
 
                     checker.diagnostics.push(Diagnostic::new(
                         pyflakes::rules::ImportShadowedByLoopVar {
                             name: name.to_string(),
                             line,
                         },
-                        binding.range,
+                        binding.range(),
                     ));
                 }
             }
@@ -172,7 +169,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                             continue;
                         }
 
-                        let Some(statement_id) = shadowed.source else {
+                        let Some(node_id) = shadowed.source else {
                             continue;
                         };
 
@@ -180,7 +177,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                         if shadowed.kind.is_function_definition() {
                             if checker
                                 .semantic
-                                .statement(statement_id)
+                                .statement(node_id)
                                 .as_function_def_stmt()
                                 .is_some_and(|function| {
                                     visibility::is_overload(
@@ -208,24 +205,20 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                     // If the bindings are in different forks, abort.
                     if shadowed.source.map_or(true, |left| {
                         binding.source.map_or(true, |right| {
-                            branch_detection::different_forks(
-                                left,
-                                right,
-                                checker.semantic.statements(),
-                            )
+                            checker.semantic.different_branches(left, right)
                         })
                     }) {
                         continue;
                     }
 
                     #[allow(deprecated)]
-                    let line = checker.locator.compute_line_index(shadowed.range.start());
+                    let line = checker.locator.compute_line_index(shadowed.start());
                     let mut diagnostic = Diagnostic::new(
                         pyflakes::rules::RedefinedWhileUnused {
                             name: (*name).to_string(),
                             line,
                         },
-                        binding.range,
+                        binding.range(),
                     );
                     if let Some(range) = binding.parent_range(&checker.semantic) {
                         diagnostic.set_parent(range.start());

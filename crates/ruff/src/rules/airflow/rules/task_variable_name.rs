@@ -80,7 +80,7 @@ pub(crate) fn variable_name_task_id(
     // If the keyword argument is not a string, we can't do anything.
     let task_id = match &keyword.value {
         Expr::Constant(constant) => match &constant.value {
-            Constant::Str(value) => value,
+            Constant::Str(ast::StringConstant { value, .. }) => value,
             _ => return None,
         },
         _ => return None,

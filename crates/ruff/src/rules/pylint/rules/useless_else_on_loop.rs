@@ -73,13 +73,6 @@ fn loop_exits_early(body: &[Stmt]) -> bool {
             orelse,
             finalbody,
             ..
-        })
-        | Stmt::TryStar(ast::StmtTryStar {
-            body,
-            handlers,
-            orelse,
-            finalbody,
-            ..
         }) => {
             loop_exits_early(body)
                 || loop_exits_early(orelse)

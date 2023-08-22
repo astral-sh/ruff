@@ -1,12 +1,10 @@
 use num_bigint::BigInt;
-use ruff_python_ast::{self as ast, Constant, Expr, Ranged, UnaryOp};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Constant, Expr, Ranged, UnaryOp};
 
 use crate::checkers::ast::Checker;
-
-use super::helpers;
 
 /// ## What it does
 /// Checks for unnecessary subscript reversal of iterable.
@@ -52,13 +50,13 @@ pub(crate) fn unnecessary_subscript_reversal(
     let Some(first_arg) = args.first() else {
         return;
     };
-    let Some(id) = helpers::expr_name(func) else {
+    let Some(func) = func.as_name_expr() else {
         return;
     };
-    if !(id == "set" || id == "sorted" || id == "reversed") {
+    if !matches!(func.id.as_str(), "reversed" | "set" | "sorted") {
         return;
     }
-    if !checker.semantic().is_builtin(id) {
+    if !checker.semantic().is_builtin(&func.id) {
         return;
     }
     let Expr::Subscript(ast::ExprSubscript { slice, .. }) = first_arg else {
@@ -99,7 +97,7 @@ pub(crate) fn unnecessary_subscript_reversal(
     };
     checker.diagnostics.push(Diagnostic::new(
         UnnecessarySubscriptReversal {
-            func: id.to_string(),
+            func: func.id.to_string(),
         },
         expr.range(),
     ));

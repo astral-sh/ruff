@@ -1,10 +1,10 @@
-use ruff_python_parser::lexer::LexResult;
-use ruff_text_size::TextRange;
-
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
+use ruff_python_ast::Ranged;
 use ruff_python_codegen::Stylist;
+use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::TokenKind;
 use ruff_source_file::Locator;
+use ruff_text_size::TextRange;
 
 use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle::rules::logical_lines::{

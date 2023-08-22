@@ -70,7 +70,7 @@ where
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         match stmt {
             Stmt::Raise(_) => self.raises.push(stmt),
-            Stmt::Try(_) | Stmt::TryStar(_) => (),
+            Stmt::Try(_) => (),
             _ => walk_stmt(self, stmt),
         }
     }

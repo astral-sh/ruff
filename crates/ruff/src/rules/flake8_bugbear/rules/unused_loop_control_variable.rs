@@ -1,9 +1,9 @@
-use ruff_python_ast::{self as ast, Expr, Ranged, Stmt};
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{self as ast, Expr, Ranged};
 use ruff_python_ast::{helpers, visitor};
 
 use crate::checkers::ast::Checker;
@@ -105,16 +105,16 @@ where
 }
 
 /// B007
-pub(crate) fn unused_loop_control_variable(checker: &mut Checker, target: &Expr, body: &[Stmt]) {
+pub(crate) fn unused_loop_control_variable(checker: &mut Checker, stmt_for: &ast::StmtFor) {
     let control_names = {
         let mut finder = NameFinder::new();
-        finder.visit_expr(target);
+        finder.visit_expr(stmt_for.target.as_ref());
         finder.names
     };
 
     let used_names = {
         let mut finder = NameFinder::new();
-        for stmt in body {
+        for stmt in &stmt_for.body {
             finder.visit_stmt(stmt);
         }
         finder.names
@@ -132,9 +132,10 @@ pub(crate) fn unused_loop_control_variable(checker: &mut Checker, target: &Expr,
         }
 
         // Avoid fixing any variables that _may_ be used, but undetectably so.
-        let certainty = Certainty::from(!helpers::uses_magic_variable_access(body, |id| {
-            checker.semantic().is_builtin(id)
-        }));
+        let certainty =
+            Certainty::from(!helpers::uses_magic_variable_access(&stmt_for.body, |id| {
+                checker.semantic().is_builtin(id)
+            }));
 
         // Attempt to rename the variable by prepending an underscore, but avoid
         // applying the fix if doing so wouldn't actually cause us to ignore the
@@ -163,7 +164,7 @@ pub(crate) fn unused_loop_control_variable(checker: &mut Checker, target: &Expr,
                     if scope
                         .get_all(name)
                         .map(|binding_id| checker.semantic().binding(binding_id))
-                        .filter(|binding| binding.range.start() >= expr.range().start())
+                        .filter(|binding| binding.start() >= expr.start())
                         .all(|binding| !binding.is_used())
                     {
                         diagnostic.set_fix(Fix::suggested(Edit::range_replacement(

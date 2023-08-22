@@ -64,27 +64,6 @@ pub fn suite<'a>(stmt: &'a Stmt, parent: &'a Stmt) -> Option<&'a Suite> {
                     .find(|body| body.contains(stmt))
             }
         }
-        Stmt::TryStar(ast::StmtTryStar {
-            body,
-            handlers,
-            orelse,
-            finalbody,
-            ..
-        }) => {
-            if body.contains(stmt) {
-                Some(body)
-            } else if orelse.contains(stmt) {
-                Some(orelse)
-            } else if finalbody.contains(stmt) {
-                Some(finalbody)
-            } else {
-                handlers
-                    .iter()
-                    .filter_map(ExceptHandler::as_except_handler)
-                    .map(|handler| &handler.body)
-                    .find(|body| body.contains(stmt))
-            }
-        }
         _ => None,
     }
 }

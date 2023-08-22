@@ -110,57 +110,7 @@ elif   unformatted:
      },
  )
  
-@@ -27,7 +26,7 @@
- # Regression test for https://github.com/psf/black/issues/3026.
- def test_func():
-     # yapf: disable
--    if  unformatted(  args  ):
-+    if unformatted(args):
-         return True
-     # yapf: enable
-     elif b:
-@@ -39,10 +38,10 @@
- # Regression test for https://github.com/psf/black/issues/2567.
- if True:
-     # fmt: off
--    for _ in range( 1 ):
--    # fmt: on
--        print ( "This won't be formatted" )
--    print ( "This won't be formatted either" )
-+    for _ in range(1):
-+        # fmt: on
-+        print("This won't be formatted")
-+    print("This won't be formatted either")
- else:
-     print("This will be formatted")
- 
-@@ -52,14 +51,12 @@
-     async def call(param):
-         if param:
-             # fmt: off
--            if param[0:4] in (
--                "ABCD", "EFGH"
--            )  :
-+            if param[0:4] in ("ABCD", "EFGH"):
-                 # fmt: on
--                print ( "This won't be formatted" )
-+                print("This won't be formatted")
- 
-             elif param[0:4] in ("ZZZZ",):
--                print ( "This won't be formatted either" )
-+                print("This won't be formatted either")
- 
-         print("This will be formatted")
- 
-@@ -68,13 +65,13 @@
- class Named(t.Protocol):
-     # fmt: off
-     @property
--    def  this_wont_be_formatted ( self ) -> str: ...
-+    def this_wont_be_formatted(self) -> str:
-+        ...
- 
- 
+@@ -74,7 +73,6 @@
  class Factory(t.Protocol):
      def this_will_be_formatted(self, **kwargs) -> Named:
          ...
@@ -168,7 +118,7 @@ elif   unformatted:
      # fmt: on
  
  
-@@ -82,6 +79,6 @@
+@@ -82,6 +80,6 @@
  if x:
      return x
  # fmt: off
@@ -209,7 +159,7 @@ run(
 # Regression test for https://github.com/psf/black/issues/3026.
 def test_func():
     # yapf: disable
-    if unformatted(args):
+    if  unformatted(  args  ):
         return True
     # yapf: enable
     elif b:
@@ -221,10 +171,10 @@ def test_func():
 # Regression test for https://github.com/psf/black/issues/2567.
 if True:
     # fmt: off
-    for _ in range(1):
-        # fmt: on
-        print("This won't be formatted")
-    print("This won't be formatted either")
+    for _ in range( 1 ):
+    # fmt: on
+        print ( "This won't be formatted" )
+    print ( "This won't be formatted either" )
 else:
     print("This will be formatted")
 
@@ -234,12 +184,14 @@ class A:
     async def call(param):
         if param:
             # fmt: off
-            if param[0:4] in ("ABCD", "EFGH"):
+            if param[0:4] in (
+                "ABCD", "EFGH"
+            )  :
                 # fmt: on
-                print("This won't be formatted")
+                print ( "This won't be formatted" )
 
             elif param[0:4] in ("ZZZZ",):
-                print("This won't be formatted either")
+                print ( "This won't be formatted either" )
 
         print("This will be formatted")
 
@@ -248,8 +200,7 @@ class A:
 class Named(t.Protocol):
     # fmt: off
     @property
-    def this_wont_be_formatted(self) -> str:
-        ...
+    def  this_wont_be_formatted ( self ) -> str: ...
 
 
 class Factory(t.Protocol):

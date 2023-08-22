@@ -181,7 +181,7 @@ E712.py:22:5: E712 [*] Comparison to `True` should be `cond is True` or `if cond
 20 20 | var = 1 if cond == True else -1 if cond == False else cond
 21 21 | #: E712
 22    |-if (True) == TrueElement or x == TrueElement:
-   22 |+if True is TrueElement or x == TrueElement:
+   22 |+if (True) is TrueElement or x == TrueElement:
 23 23 |     pass
 24 24 | 
 25 25 | if res == True != False:
@@ -204,7 +204,7 @@ E712.py:25:11: E712 [*] Comparison to `True` should be `cond is True` or `if con
    25 |+if res is True is not False:
 26 26 |     pass
 27 27 | 
-28 28 | #: Okay
+28 28 | if(True) == TrueElement or x == TrueElement:
 
 E712.py:25:19: E712 [*] Comparison to `False` should be `cond is not False` or `if cond:`
    |
@@ -224,6 +224,46 @@ E712.py:25:19: E712 [*] Comparison to `False` should be `cond is not False` or `
    25 |+if res is True is not False:
 26 26 |     pass
 27 27 | 
-28 28 | #: Okay
+28 28 | if(True) == TrueElement or x == TrueElement:
+
+E712.py:28:4: E712 [*] Comparison to `True` should be `cond is True` or `if cond:`
+   |
+26 |     pass
+27 | 
+28 | if(True) == TrueElement or x == TrueElement:
+   |    ^^^^ E712
+29 |     pass
+   |
+   = help: Replace with `cond is True`
+
+ℹ Suggested fix
+25 25 | if res == True != False:
+26 26 |     pass
+27 27 | 
+28    |-if(True) == TrueElement or x == TrueElement:
+   28 |+if(True) is TrueElement or x == TrueElement:
+29 29 |     pass
+30 30 | 
+31 31 | if (yield i) == True:
+
+E712.py:31:17: E712 [*] Comparison to `True` should be `cond is True` or `if cond:`
+   |
+29 |     pass
+30 | 
+31 | if (yield i) == True:
+   |                 ^^^^ E712
+32 |       print("even")
+   |
+   = help: Replace with `cond is True`
+
+ℹ Suggested fix
+28 28 | if(True) == TrueElement or x == TrueElement:
+29 29 |     pass
+30 30 | 
+31    |-if (yield i) == True:
+   31 |+if (yield i) is True:
+32 32 |       print("even")
+33 33 | 
+34 34 | #: Okay
 
 

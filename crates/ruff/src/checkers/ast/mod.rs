@@ -32,8 +32,8 @@ use itertools::Itertools;
 use log::error;
 use ruff_python_ast::{
     self as ast, Arguments, Comprehension, Constant, ElifElseClause, ExceptHandler, Expr,
-    ExprContext, Keyword, Parameter, ParameterWithDefault, Parameters, Pattern, Ranged, Stmt,
-    Suite, UnaryOp,
+    ExprContext, Keyword, MatchCase, Parameter, ParameterWithDefault, Parameters, Pattern, Ranged,
+    Stmt, Suite, UnaryOp,
 };
 use ruff_text_size::{TextRange, TextSize};
 
@@ -193,18 +193,22 @@ impl<'a> Checker<'a> {
         }
     }
 
-    /// Returns the [`IsolationLevel`] for fixes in the current context.
+    /// Returns the [`IsolationLevel`] to isolate fixes for the current statement.
     ///
     /// The primary use-case for fix isolation is to ensure that we don't delete all statements
     /// in a given indented block, which would cause a syntax error. We therefore need to ensure
     /// that we delete at most one statement per indented block per fixer pass. Fix isolation should
     /// thus be applied whenever we delete a statement, but can otherwise be omitted.
-    pub(crate) fn isolation(&self, parent: Option<&Stmt>) -> IsolationLevel {
-        parent
-            .and_then(|stmt| self.semantic.statement_id(stmt))
-            .map_or(IsolationLevel::default(), |node_id| {
-                IsolationLevel::Group(node_id.into())
-            })
+    pub(crate) fn statement_isolation(&self) -> IsolationLevel {
+        IsolationLevel::Group(self.semantic.current_statement_id().into())
+    }
+
+    /// Returns the [`IsolationLevel`] to isolate fixes in the current statement's parent.
+    pub(crate) fn parent_isolation(&self) -> IsolationLevel {
+        self.semantic
+            .current_statement_parent_id()
+            .map(|node_id| IsolationLevel::Group(node_id.into()))
+            .unwrap_or_default()
     }
 
     /// The [`Locator`] for the current file, which enables extraction of source code from byte
@@ -263,7 +267,7 @@ where
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         // Step 0: Pre-processing
-        self.semantic.push_statement(stmt);
+        self.semantic.push_node(stmt);
 
         // Track whether we've seen docstrings, non-imports, etc.
         match stmt {
@@ -599,14 +603,7 @@ where
                 handlers,
                 orelse,
                 finalbody,
-                range: _,
-            })
-            | Stmt::TryStar(ast::StmtTryStar {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                range: _,
+                ..
             }) => {
                 let mut handled_exceptions = Exceptions::empty();
                 for type_ in extract_handled_exceptions(handlers) {
@@ -626,16 +623,28 @@ where
                     }
                 }
 
+                // Iterate over the `body`, then the `handlers`, then the `orelse`, then the
+                // `finalbody`, but treat the body and the `orelse` as a single branch for
+                // flow analysis purposes.
+                let branch = self.semantic.push_branch();
                 self.semantic.handled_exceptions.push(handled_exceptions);
                 self.visit_body(body);
                 self.semantic.handled_exceptions.pop();
+                self.semantic.pop_branch();
 
                 for except_handler in handlers {
+                    self.semantic.push_branch();
                     self.visit_except_handler(except_handler);
+                    self.semantic.pop_branch();
                 }
 
+                self.semantic.set_branch(branch);
                 self.visit_body(orelse);
+                self.semantic.pop_branch();
+
+                self.semantic.push_branch();
                 self.visit_body(finalbody);
+                self.semantic.pop_branch();
             }
             Stmt::AnnAssign(ast::StmtAnnAssign {
                 target,
@@ -715,6 +724,7 @@ where
             ) => {
                 self.visit_boolean_test(test);
 
+                self.semantic.push_branch();
                 if typing::is_type_checking_block(stmt_if, &self.semantic) {
                     if self.semantic.at_top_level() {
                         self.importer.visit_type_checking_block(stmt);
@@ -723,9 +733,12 @@ where
                 } else {
                     self.visit_body(body);
                 }
+                self.semantic.pop_branch();
 
                 for clause in elif_else_clauses {
+                    self.semantic.push_branch();
                     self.visit_elif_else_clause(clause);
+                    self.semantic.pop_branch();
                 }
             }
             _ => visitor::walk_stmt(self, stmt),
@@ -766,7 +779,7 @@ where
         analyze::statement(stmt, self);
 
         self.semantic.flags = flags_snapshot;
-        self.semantic.pop_statement();
+        self.semantic.pop_node();
     }
 
     fn visit_annotation(&mut self, expr: &'b Expr) {
@@ -802,7 +815,7 @@ where
             return;
         }
 
-        self.semantic.push_expression(expr);
+        self.semantic.push_node(expr);
 
         // Store the flags prior to any further descent, so that we can restore them after visiting
         // the node.
@@ -881,18 +894,20 @@ where
                 },
             ) => {
                 // Visit the default arguments, but avoid the body, which will be deferred.
-                for ParameterWithDefault {
-                    default,
-                    parameter: _,
-                    range: _,
-                } in parameters
-                    .posonlyargs
-                    .iter()
-                    .chain(&parameters.args)
-                    .chain(&parameters.kwonlyargs)
-                {
-                    if let Some(expr) = &default {
-                        self.visit_expr(expr);
+                if let Some(parameters) = parameters {
+                    for ParameterWithDefault {
+                        default,
+                        parameter: _,
+                        range: _,
+                    } in parameters
+                        .posonlyargs
+                        .iter()
+                        .chain(&parameters.args)
+                        .chain(&parameters.kwonlyargs)
+                    {
+                        if let Some(expr) = &default {
+                            self.visit_expr(expr);
+                        }
                     }
                 }
 
@@ -1220,7 +1235,7 @@ where
         analyze::expression(expr, self);
 
         self.semantic.flags = flags_snapshot;
-        self.semantic.pop_expression();
+        self.semantic.pop_node();
     }
 
     fn visit_except_handler(&mut self, except_handler: &'b ExceptHandler) {
@@ -1275,7 +1290,7 @@ where
 
     fn visit_format_spec(&mut self, format_spec: &'b Expr) {
         match format_spec {
-            Expr::FString(ast::ExprFString { values, range: _ }) => {
+            Expr::FString(ast::ExprFString { values, .. }) => {
                 for value in values {
                     self.visit_expr(value);
                 }
@@ -1356,6 +1371,17 @@ where
         for stmt in body {
             self.visit_stmt(stmt);
         }
+    }
+
+    fn visit_match_case(&mut self, match_case: &'b MatchCase) {
+        self.visit_pattern(&match_case.pattern);
+        if let Some(expr) = &match_case.guard {
+            self.visit_expr(expr);
+        }
+
+        self.semantic.push_branch();
+        self.visit_body(&match_case.body);
+        self.semantic.pop_branch();
     }
 
     fn visit_type_param(&mut self, type_param: &'b ast::TypeParam) {
@@ -1841,7 +1867,9 @@ impl<'a> Checker<'a> {
                     range: _,
                 }) = expr
                 {
-                    self.visit_parameters(parameters);
+                    if let Some(parameters) = parameters {
+                        self.visit_parameters(parameters);
+                    }
                     self.visit_expr(body);
                 } else {
                     unreachable!("Expected Expr::Lambda");
@@ -1862,7 +1890,7 @@ impl<'a> Checker<'a> {
             .map(|binding_id| &self.semantic.bindings[binding_id])
             .filter_map(|binding| match &binding.kind {
                 BindingKind::Export(Export { names }) => {
-                    Some(names.iter().map(|name| (*name, binding.range)))
+                    Some(names.iter().map(|name| (*name, binding.range())))
                 }
                 _ => None,
             })

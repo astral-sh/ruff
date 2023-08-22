@@ -1,3 +1,4 @@
+use crate::comments::{SourceComment, SuppressionKind};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Expr, Operator, StmtExpr};
 
@@ -18,6 +19,14 @@ impl FormatNodeRule<StmtExpr> for FormatStmtExpr {
         } else {
             value.format().fmt(f)
         }
+    }
+
+    fn is_suppressed(
+        &self,
+        trailing_comments: &[SourceComment],
+        context: &PyFormatContext,
+    ) -> bool {
+        SuppressionKind::has_skip_comment(trailing_comments, context.source())
     }
 }
 

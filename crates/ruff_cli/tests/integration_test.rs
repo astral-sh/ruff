@@ -81,6 +81,48 @@ Found 1 error.
     Ok(())
 }
 
+#[test]
+fn stdin_source_type() -> Result<()> {
+    // Raise `TCH` errors in `.py` files.
+    let mut cmd = Command::cargo_bin(BIN_NAME)?;
+    let output = cmd
+        .args([
+            "-",
+            "--format",
+            "text",
+            "--stdin-filename",
+            "TCH.py",
+            "--isolated",
+        ])
+        .write_stdin("import os\n")
+        .assert()
+        .failure();
+    assert_eq!(
+        str::from_utf8(&output.get_output().stdout)?,
+        r#"TCH.py:1:8: F401 [*] `os` imported but unused
+Found 1 error.
+[*] 1 potentially fixable with the --fix option.
+"#
+    );
+
+    // But not in `.pyi` files.
+    let mut cmd = Command::cargo_bin(BIN_NAME)?;
+    cmd.args([
+        "-",
+        "--format",
+        "text",
+        "--stdin-filename",
+        "TCH.pyi",
+        "--isolated",
+        "--select",
+        "TCH",
+    ])
+    .write_stdin("import os\n")
+    .assert()
+    .success();
+    Ok(())
+}
+
 #[cfg(unix)]
 #[test]
 fn stdin_json() -> Result<()> {

@@ -109,7 +109,7 @@ pub(crate) fn useless_return(
             checker.locator(),
             checker.indexer(),
         );
-        diagnostic.set_fix(Fix::automatic(edit).isolate(checker.isolation(Some(stmt))));
+        diagnostic.set_fix(Fix::automatic(edit).isolate(checker.statement_isolation()));
     }
     checker.diagnostics.push(diagnostic);
 }

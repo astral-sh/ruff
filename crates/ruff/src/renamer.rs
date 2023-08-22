@@ -4,6 +4,7 @@ use anyhow::{anyhow, Result};
 use itertools::Itertools;
 
 use ruff_diagnostics::Edit;
+use ruff_python_ast::Ranged;
 use ruff_python_semantic::{Binding, BindingKind, Scope, ScopeId, SemanticModel};
 
 pub(crate) struct Renamer;
@@ -220,12 +221,12 @@ impl Renamer {
             BindingKind::Import(_) | BindingKind::FromImport(_) => {
                 if binding.is_alias() {
                     // Ex) Rename `import pandas as alias` to `import pandas as pd`.
-                    Some(Edit::range_replacement(target.to_string(), binding.range))
+                    Some(Edit::range_replacement(target.to_string(), binding.range()))
                 } else {
                     // Ex) Rename `import pandas` to `import pandas as pd`.
                     Some(Edit::range_replacement(
                         format!("{name} as {target}"),
-                        binding.range,
+                        binding.range(),
                     ))
                 }
             }
@@ -234,7 +235,7 @@ impl Renamer {
                 let module_name = import.call_path.first().unwrap();
                 Some(Edit::range_replacement(
                     format!("{module_name} as {target}"),
-                    binding.range,
+                    binding.range(),
                 ))
             }
             // Avoid renaming builtins and other "special" bindings.
@@ -254,7 +255,7 @@ impl Renamer {
             | BindingKind::FunctionDefinition(_)
             | BindingKind::Deletion
             | BindingKind::UnboundException(_) => {
-                Some(Edit::range_replacement(target.to_string(), binding.range))
+                Some(Edit::range_replacement(target.to_string(), binding.range()))
             }
         }
     }

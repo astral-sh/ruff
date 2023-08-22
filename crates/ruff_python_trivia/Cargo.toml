@@ -24,4 +24,3 @@ unic-ucd-ident = "0.9.0"
 insta = { workspace = true }
 ruff_python_ast = { path = "../ruff_python_ast" }
 ruff_python_parser = { path = "../ruff_python_parser" }
-

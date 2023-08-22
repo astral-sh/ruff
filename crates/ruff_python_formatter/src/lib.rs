@@ -1,26 +1,25 @@
-use crate::comments::{
-    dangling_node_comments, leading_node_comments, trailing_node_comments, Comments,
-};
-use crate::context::PyFormatContext;
-pub use crate::options::{MagicTrailingComma, PyFormatOptions, QuoteStyle};
+use thiserror::Error;
+
 use ruff_formatter::format_element::tag;
-use ruff_formatter::prelude::{
-    dynamic_text, source_position, source_text_slice, text, ContainsNewlines, Formatter, Tag,
-};
+use ruff_formatter::prelude::{source_position, text, Formatter, Tag};
 use ruff_formatter::{
-    format, normalize_newlines, write, Buffer, Format, FormatElement, FormatError, FormatResult,
-    PrintError,
+    format, write, Buffer, Format, FormatElement, FormatError, FormatResult, PrintError,
 };
 use ruff_formatter::{Formatted, Printed, SourceCode};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
-use ruff_python_ast::{Mod, Ranged};
+use ruff_python_ast::Mod;
 use ruff_python_index::{CommentRanges, CommentRangesBuilder};
 use ruff_python_parser::lexer::{lex, LexicalError};
 use ruff_python_parser::{parse_tokens, Mode, ParseError};
 use ruff_source_file::Locator;
-use ruff_text_size::{TextLen, TextRange};
-use std::borrow::Cow;
-use thiserror::Error;
+use ruff_text_size::TextLen;
+
+use crate::comments::{
+    dangling_comments, leading_comments, trailing_comments, Comments, SourceComment,
+};
+use crate::context::PyFormatContext;
+pub use crate::options::{MagicTrailingComma, PyFormatOptions, QuoteStyle};
+use crate::verbatim::suppressed_node;
 
 pub(crate) mod builders;
 pub mod cli;
@@ -35,41 +34,42 @@ pub(crate) mod pattern;
 mod prelude;
 pub(crate) mod statement;
 pub(crate) mod type_param;
+mod verbatim;
 
 include!("../../ruff_formatter/shared_traits.rs");
 
 /// 'ast is the lifetime of the source code (input), 'buf is the lifetime of the buffer (output)
 pub(crate) type PyFormatter<'ast, 'buf> = Formatter<'buf, PyFormatContext<'ast>>;
 
-/// Rule for formatting a JavaScript [`AstNode`].
+/// Rule for formatting a Python [`AstNode`].
 pub(crate) trait FormatNodeRule<N>
 where
     N: AstNode,
 {
     fn fmt(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
-        self.fmt_leading_comments(node, f)?;
-        self.fmt_node(node, f)?;
-        self.fmt_dangling_comments(node, f)?;
-        self.fmt_trailing_comments(node, f)
-    }
+        let comments = f.context().comments().clone();
 
-    /// Formats the node without comments. Ignores any suppression comments.
-    fn fmt_node(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
-        write!(f, [source_position(node.start())])?;
-        self.fmt_fields(node, f)?;
-        write!(f, [source_position(node.end())])
+        let node_comments = comments.leading_dangling_trailing(node.as_any_node_ref());
+
+        if self.is_suppressed(node_comments.trailing, f.context()) {
+            suppressed_node(node.as_any_node_ref()).fmt(f)
+        } else {
+            leading_comments(node_comments.leading).fmt(f)?;
+            self.fmt_fields(node, f)?;
+            self.fmt_dangling_comments(node_comments.dangling, f)?;
+
+            write!(
+                f,
+                [
+                    source_position(node.end()),
+                    trailing_comments(node_comments.trailing)
+                ]
+            )
+        }
     }
 
     /// Formats the node's fields.
     fn fmt_fields(&self, item: &N, f: &mut PyFormatter) -> FormatResult<()>;
-
-    /// Formats the [leading comments](comments#leading-comments) of the node.
-    ///
-    /// You may want to override this method if you want to manually handle the formatting of comments
-    /// inside of the `fmt_fields` method or customize the formatting of the leading comments.
-    fn fmt_leading_comments(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
-        leading_node_comments(node).fmt(f)
-    }
 
     /// Formats the [dangling comments](comments#dangling-comments) of the node.
     ///
@@ -78,16 +78,20 @@ where
     /// no comments are dropped.
     ///
     /// A node can have dangling comments if all its children are tokens or if all node children are optional.
-    fn fmt_dangling_comments(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
-        dangling_node_comments(node).fmt(f)
+    fn fmt_dangling_comments(
+        &self,
+        dangling_node_comments: &[SourceComment],
+        f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        dangling_comments(dangling_node_comments).fmt(f)
     }
 
-    /// Formats the [trailing comments](comments#trailing-comments) of the node.
-    ///
-    /// You may want to override this method if you want to manually handle the formatting of comments
-    /// inside of the `fmt_fields` method or customize the formatting of the trailing comments.
-    fn fmt_trailing_comments(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
-        trailing_node_comments(node).fmt(f)
+    fn is_suppressed(
+        &self,
+        _trailing_comments: &[SourceComment],
+        _context: &PyFormatContext,
+    ) -> bool {
+        false
     }
 }
 
@@ -157,42 +161,8 @@ pub fn format_node<'a>(
     formatted
         .context()
         .comments()
-        .assert_formatted_all_comments(SourceCode::new(source));
+        .assert_all_formatted(SourceCode::new(source));
     Ok(formatted)
-}
-
-pub(crate) struct NotYetImplemented<'a>(AnyNodeRef<'a>);
-
-/// Formats a placeholder for nodes that have not yet been implemented
-pub(crate) fn not_yet_implemented<'a, T>(node: T) -> NotYetImplemented<'a>
-where
-    T: Into<AnyNodeRef<'a>>,
-{
-    NotYetImplemented(node.into())
-}
-
-impl Format<PyFormatContext<'_>> for NotYetImplemented<'_> {
-    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let text = std::format!("NOT_YET_IMPLEMENTED_{:?}", self.0.kind());
-
-        f.write_element(FormatElement::Tag(Tag::StartVerbatim(
-            tag::VerbatimKind::Verbatim {
-                length: text.text_len(),
-            },
-        )))?;
-
-        f.write_element(FormatElement::DynamicText {
-            text: Box::from(text),
-        })?;
-
-        f.write_element(FormatElement::Tag(Tag::EndVerbatim))?;
-
-        f.context()
-            .comments()
-            .mark_verbatim_node_comments_formatted(self.0);
-
-        Ok(())
-    }
 }
 
 pub(crate) struct NotYetImplementedCustomText<'a> {
@@ -220,11 +190,11 @@ impl Format<PyFormatContext<'_>> for NotYetImplementedCustomText<'_> {
             tag::VerbatimKind::Verbatim {
                 length: self.text.text_len(),
             },
-        )))?;
+        )));
 
         text(self.text).fmt(f)?;
 
-        f.write_element(FormatElement::Tag(Tag::EndVerbatim))?;
+        f.write_element(FormatElement::Tag(Tag::EndVerbatim));
 
         f.context()
             .comments()
@@ -234,53 +204,18 @@ impl Format<PyFormatContext<'_>> for NotYetImplementedCustomText<'_> {
     }
 }
 
-pub(crate) struct VerbatimText(TextRange);
-
-#[allow(unused)]
-pub(crate) fn verbatim_text<T>(item: &T) -> VerbatimText
-where
-    T: Ranged,
-{
-    VerbatimText(item.range())
-}
-
-impl Format<PyFormatContext<'_>> for VerbatimText {
-    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        f.write_element(FormatElement::Tag(Tag::StartVerbatim(
-            tag::VerbatimKind::Verbatim {
-                length: self.0.len(),
-            },
-        )))?;
-
-        match normalize_newlines(f.context().locator().slice(self.0), ['\r']) {
-            Cow::Borrowed(_) => {
-                write!(f, [source_text_slice(self.0, ContainsNewlines::Detect)])?;
-            }
-            Cow::Owned(cleaned) => {
-                write!(
-                    f,
-                    [
-                        dynamic_text(&cleaned, Some(self.0.start())),
-                        source_position(self.0.end())
-                    ]
-                )?;
-            }
-        }
-
-        f.write_element(FormatElement::Tag(Tag::EndVerbatim))?;
-        Ok(())
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::{format_module, format_node, PyFormatOptions};
+    use std::path::Path;
+
     use anyhow::Result;
     use insta::assert_snapshot;
+
     use ruff_python_index::CommentRangesBuilder;
     use ruff_python_parser::lexer::lex;
     use ruff_python_parser::{parse_tokens, Mode};
-    use std::path::Path;
+
+    use crate::{format_module, format_node, PyFormatOptions};
 
     /// Very basic test intentionally kept very similar to the CLI
     #[test]
@@ -308,30 +243,11 @@ if True:
     #[test]
     fn quick_test() {
         let src = r#"
-with (
-    [
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        "bbbbbbbbbb",
-        "cccccccccccccccccccccccccccccccccccccccccc",
-        dddddddddddddddddddddddddddddddd,
-    ] as example1,
-    aaaaaaaaaaaaaaaaaaaaaaaaaa
-    + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-    + cccccccccccccccccccccccccccc
-    + ddddddddddddddddd as example2,
-    CtxManager2() as example2,
-    CtxManager2() as example2,
-    CtxManager2() as example2,
-):
-    ...
+@MyDecorator(list = a) # fmt: skip
+# trailing comment
+class Test:
+    pass
 
-with [
-    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "bbbbbbbbbb",
-    "cccccccccccccccccccccccccccccccccccccccccc",
-    dddddddddddddddddddddddddddddddd,
-] as example1, aaaaaaaaaaaaaaaaaaaaaaaaaa * bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb * cccccccccccccccccccccccccccc + ddddddddddddddddd as example2, CtxManager222222222222222() as example2:
-    ...
 
 "#;
         // Tokenize once
@@ -356,9 +272,9 @@ with [
         // Use `dbg_write!(f, []) instead of `write!(f, [])` in your formatting code to print some IR
         // inside of a `Format` implementation
         // use ruff_formatter::FormatContext;
-        // dbg!(formatted
+        // formatted
         //     .document()
-        //     .display(formatted.context().source_code()));
+        //     .display(formatted.context().source_code());
         //
         // dbg!(formatted
         //     .context()

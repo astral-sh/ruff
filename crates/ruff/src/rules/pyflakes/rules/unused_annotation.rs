@@ -1,5 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::Ranged;
 use ruff_python_semantic::Scope;
 
 use crate::checkers::ast::Checker;
@@ -44,7 +45,7 @@ pub(crate) fn unused_annotation(
             && !binding.is_used()
             && !checker.settings.dummy_variable_rgx.is_match(name)
         {
-            Some((name.to_string(), binding.range))
+            Some((name.to_string(), binding.range()))
         } else {
             None
         }

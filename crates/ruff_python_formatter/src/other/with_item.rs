@@ -1,10 +1,9 @@
+use ruff_formatter::{write, Buffer, FormatResult};
 use ruff_python_ast::WithItem;
 
-use ruff_formatter::{write, Buffer, FormatResult};
-
-use crate::comments::{leading_comments, trailing_comments};
+use crate::comments::SourceComment;
 use crate::expression::maybe_parenthesize_expression;
-use crate::expression::parentheses::Parenthesize;
+use crate::expression::parentheses::{parenthesized, Parentheses, Parenthesize};
 use crate::prelude::*;
 use crate::{FormatNodeRule, PyFormatter};
 
@@ -20,34 +19,43 @@ impl FormatNodeRule<WithItem> for FormatWithItem {
         } = item;
 
         let comments = f.context().comments().clone();
-        let trailing_as_comments = comments.dangling_comments(item);
+        let trailing_as_comments = comments.dangling(item);
 
-        maybe_parenthesize_expression(context_expr, item, Parenthesize::IfRequired).fmt(f)?;
+        write!(
+            f,
+            [maybe_parenthesize_expression(
+                context_expr,
+                item,
+                Parenthesize::IfRequired
+            )]
+        )?;
 
         if let Some(optional_vars) = optional_vars {
-            write!(
-                f,
-                [space(), text("as"), trailing_comments(trailing_as_comments)]
-            )?;
-            let leading_var_comments = comments.leading_comments(optional_vars.as_ref());
-            if leading_var_comments.is_empty() {
-                write!(f, [space(), optional_vars.format()])?;
+            write!(f, [space(), text("as"), space()])?;
+
+            if trailing_as_comments.is_empty() {
+                write!(f, [optional_vars.format()])?;
             } else {
                 write!(
                     f,
-                    [
-                        // Otherwise the comment would end up on the same line as the `as`
-                        hard_line_break(),
-                        leading_comments(leading_var_comments),
-                        optional_vars.format()
-                    ]
+                    [parenthesized(
+                        "(",
+                        &optional_vars.format().with_options(Parentheses::Never),
+                        ")",
+                    )
+                    .with_dangling_comments(trailing_as_comments)]
                 )?;
             }
         }
+
         Ok(())
     }
 
-    fn fmt_dangling_comments(&self, _node: &WithItem, _f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         Ok(())
     }
 }

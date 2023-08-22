@@ -583,10 +583,10 @@ pub(crate) fn percent_format_extra_named_arguments(
         .enumerate()
         .filter_map(|(index, key)| match key {
             Some(Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(value),
+                value: Constant::Str(ast::StringConstant { value, .. }),
                 ..
             })) => {
-                if summary.keywords.contains(value) {
+                if summary.keywords.contains(value.as_str()) {
                     None
                 } else {
                     Some((index, value.as_str()))
@@ -646,7 +646,7 @@ pub(crate) fn percent_format_missing_arguments(
     for key in keys.iter().flatten() {
         match key {
             Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(value),
+                value: Constant::Str(ast::StringConstant { value, .. }),
                 ..
             }) => {
                 keywords.insert(value);

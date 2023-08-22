@@ -582,42 +582,6 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtTry {
     }
 }
 
-impl FormatRule<ast::StmtTryStar, PyFormatContext<'_>>
-    for crate::statement::stmt_try_star::FormatStmtTryStar
-{
-    #[inline]
-    fn fmt(&self, node: &ast::StmtTryStar, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::StmtTryStar>::fmt(self, node, f)
-    }
-}
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StmtTryStar {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::StmtTryStar,
-        crate::statement::stmt_try_star::FormatStmtTryStar,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::statement::stmt_try_star::FormatStmtTryStar::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtTryStar {
-    type Format = FormatOwnedWithRule<
-        ast::StmtTryStar,
-        crate::statement::stmt_try_star::FormatStmtTryStar,
-        PyFormatContext<'ast>,
-    >;
-    fn into_format(self) -> Self::Format {
-        FormatOwnedWithRule::new(
-            self,
-            crate::statement::stmt_try_star::FormatStmtTryStar::default(),
-        )
-    }
-}
-
 impl FormatRule<ast::StmtAssert, PyFormatContext<'_>>
     for crate::statement::stmt_assert::FormatStmtAssert
 {

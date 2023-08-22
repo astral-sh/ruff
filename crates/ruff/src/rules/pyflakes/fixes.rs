@@ -96,11 +96,9 @@ pub(crate) fn remove_exception_handler_assignment(
     locator: &Locator,
 ) -> Result<Edit> {
     // Lex backwards, to the token just before the `as`.
-    let mut tokenizer = SimpleTokenizer::up_to_without_back_comment(
-        bound_exception.range.start(),
-        locator.contents(),
-    )
-    .skip_trivia();
+    let mut tokenizer =
+        SimpleTokenizer::up_to_without_back_comment(bound_exception.start(), locator.contents())
+            .skip_trivia();
 
     // Eat the `as` token.
     let preceding = tokenizer
@@ -114,7 +112,7 @@ pub(crate) fn remove_exception_handler_assignment(
         .context("expected the exception name to be preceded by a token")?;
 
     // Lex forwards, to the `:` token.
-    let following = SimpleTokenizer::starts_at(bound_exception.range.end(), locator.contents())
+    let following = SimpleTokenizer::starts_at(bound_exception.end(), locator.contents())
         .skip_trivia()
         .next()
         .context("expected the exception name to be followed by a colon")?;

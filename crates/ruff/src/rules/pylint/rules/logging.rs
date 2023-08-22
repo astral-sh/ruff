@@ -109,7 +109,7 @@ pub(crate) fn logging_call(checker: &mut Checker, call: &ast::ExprCall) {
     }
 
     let Some(Expr::Constant(ast::ExprConstant {
-        value: Constant::Str(value),
+        value: Constant::Str(ast::StringConstant { value, .. }),
         ..
     })) = call.arguments.find_positional(0)
     else {

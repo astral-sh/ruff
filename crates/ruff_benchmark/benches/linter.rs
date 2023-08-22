@@ -7,6 +7,7 @@ use criterion::{
 
 use ruff::linter::lint_only;
 use ruff::settings::{flags, Settings};
+use ruff::source_kind::SourceKind;
 use ruff::RuleSelector;
 use ruff_benchmark::{TestCase, TestCaseSpeed, TestFile, TestFileDownloadError};
 use ruff_python_ast::PySourceType;
@@ -57,15 +58,15 @@ fn benchmark_linter(mut group: BenchmarkGroup<WallTime>, settings: &Settings) {
             BenchmarkId::from_parameter(case.name()),
             &case,
             |b, case| {
+                let kind = SourceKind::Python(case.code().to_string());
                 b.iter(|| {
                     let path = case.path();
                     let result = lint_only(
-                        case.code(),
                         &path,
                         None,
                         settings,
                         flags::Noqa::Enabled,
-                        None,
+                        &kind,
                         PySourceType::from(path.as_path()),
                     );
 

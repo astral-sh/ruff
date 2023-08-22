@@ -15,6 +15,7 @@ mod tests {
     #[test_case(Rule::DuplicateClassFieldDefinition, Path::new("PIE794.py"))]
     #[test_case(Rule::UnnecessaryDictKwargs, Path::new("PIE804.py"))]
     #[test_case(Rule::MultipleStartsEndsWith, Path::new("PIE810.py"))]
+    #[test_case(Rule::UnnecessaryRangeStart, Path::new("PIE808.py"))]
     #[test_case(Rule::UnnecessaryPass, Path::new("PIE790.py"))]
     #[test_case(Rule::UnnecessarySpread, Path::new("PIE800.py"))]
     #[test_case(Rule::ReimplementedListBuiltin, Path::new("PIE807.py"))]

@@ -23,7 +23,10 @@ expression: parse_ast
                                 ExprConstant {
                                     range: 8..20,
                                     value: Str(
-                                        "positional",
+                                        StringConstant {
+                                            value: "positional",
+                                            implicit_concatenated: false,
+                                        },
                                     ),
                                     kind: None,
                                 },

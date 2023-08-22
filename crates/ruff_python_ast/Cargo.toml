@@ -10,8 +10,6 @@ documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 
-
-
 [lib]
 
 [dependencies]

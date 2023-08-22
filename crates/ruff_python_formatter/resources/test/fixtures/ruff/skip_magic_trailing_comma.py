@@ -27,3 +27,7 @@ def g(a,): pass
 
 x1 = lambda y: 1
 x2 = lambda y,: 1
+
+# Ignore trailing comma.
+with (a,):  # magic trailing comma
+    ...

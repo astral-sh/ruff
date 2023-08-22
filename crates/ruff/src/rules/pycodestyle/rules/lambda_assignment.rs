@@ -91,7 +91,7 @@ pub(crate) fn lambda_assignment(
             let mut indented = String::new();
             for (idx, line) in function(
                 id,
-                parameters,
+                parameters.as_deref(),
                 body,
                 annotation,
                 checker.semantic(),
@@ -112,11 +112,14 @@ pub(crate) fn lambda_assignment(
             // If the assignment is in a class body, it might not be safe to replace it because the
             // assignment might be carrying a type annotation that will be used by some package like
             // dataclasses, which wouldn't consider the rewritten function definition to be
-            // equivalent. Similarly, if the lambda is shadowing a variable in the current scope,
-            // rewriting it as a function declaration may break type-checking.
+            // equivalent. Even if it _doesn't_ have an annotation, rewriting safely would require
+            // making this a static method.
             // See: https://github.com/astral-sh/ruff/issues/3046
+            //
+            // Similarly, if the lambda is shadowing a variable in the current scope,
+            // rewriting it as a function declaration may break type-checking.
             // See: https://github.com/astral-sh/ruff/issues/5421
-            if (annotation.is_some() && checker.semantic().current_scope().kind.is_class())
+            if checker.semantic().current_scope().kind.is_class()
                 || checker
                     .semantic()
                     .current_scope()
@@ -177,7 +180,7 @@ fn extract_types(annotation: &Expr, semantic: &SemanticModel) -> Option<(Vec<Exp
 
 fn function(
     name: &str,
-    parameters: &Parameters,
+    parameters: Option<&Parameters>,
     body: &Expr,
     annotation: Option<&Expr>,
     semantic: &SemanticModel,
@@ -187,6 +190,9 @@ fn function(
         value: Some(Box::new(body.clone())),
         range: TextRange::default(),
     });
+    let parameters = parameters
+        .cloned()
+        .unwrap_or_else(|| Parameters::empty(TextRange::default()));
     if let Some(annotation) = annotation {
         if let Some((arg_types, return_type)) = extract_types(annotation, semantic) {
             // A `lambda` expression can only have positional and positional-only
@@ -225,7 +231,7 @@ fn function(
                 parameters: Box::new(Parameters {
                     posonlyargs: new_posonlyargs,
                     args: new_args,
-                    ..parameters.clone()
+                    ..parameters
                 }),
                 body: vec![body],
                 decorator_list: vec![],
@@ -239,7 +245,7 @@ fn function(
     let func = Stmt::FunctionDef(ast::StmtFunctionDef {
         is_async: false,
         name: Identifier::new(name.to_string(), TextRange::default()),
-        parameters: Box::new(parameters.clone()),
+        parameters: Box::new(parameters),
         body: vec![body],
         decorator_list: vec![],
         returns: None,

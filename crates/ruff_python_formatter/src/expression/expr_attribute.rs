@@ -2,7 +2,7 @@ use ruff_formatter::{write, FormatRuleWithOptions};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{Constant, Expr, ExprAttribute, ExprConstant};
 
-use crate::comments::{leading_comments, trailing_comments};
+use crate::comments::{leading_comments, trailing_comments, SourceComment};
 use crate::expression::parentheses::{
     is_expression_parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
 };
@@ -45,7 +45,7 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
             );
 
             let comments = f.context().comments().clone();
-            let dangling_comments = comments.dangling_comments(item);
+            let dangling_comments = comments.dangling(item);
             let leading_attribute_comments_start = dangling_comments
                 .partition_point(|comment| comment.line_position().is_end_of_line());
             let (trailing_dot_comments, leading_attribute_comments) =
@@ -88,7 +88,7 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
                 value.format().fmt(f)?;
             }
 
-            if comments.has_trailing_own_line_comments(value.as_ref()) {
+            if comments.has_trailing_own_line(value.as_ref()) {
                 hard_line_break().fmt(f)?;
             }
 
@@ -150,7 +150,7 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
 
     fn fmt_dangling_comments(
         &self,
-        _node: &ExprAttribute,
+        _dangling_comments: &[SourceComment],
         _f: &mut PyFormatter,
     ) -> FormatResult<()> {
         // handle in `fmt_fields`
@@ -171,10 +171,10 @@ impl NeedsParentheses for ExprAttribute {
             OptionalParentheses::Multiline
         } else if context
             .comments()
-            .dangling_comments(self)
+            .dangling(self)
             .iter()
             .any(|comment| comment.line_position().is_own_line())
-            || context.comments().has_trailing_own_line_comments(self)
+            || context.comments().has_trailing_own_line(self)
         {
             OptionalParentheses::Always
         } else {

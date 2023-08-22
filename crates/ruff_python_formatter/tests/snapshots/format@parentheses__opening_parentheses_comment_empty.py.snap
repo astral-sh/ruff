@@ -139,10 +139,10 @@ with (  # d 1
     pass
 match (  # d 2
 ):
-    case NOT_YET_IMPLEMENTED_Pattern:
+    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
         pass
 match d3:
-    case NOT_YET_IMPLEMENTED_Pattern:
+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
         pass
 while (  # d 4
 ):

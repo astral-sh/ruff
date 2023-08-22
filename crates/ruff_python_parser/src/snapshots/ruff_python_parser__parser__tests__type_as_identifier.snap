@@ -663,27 +663,29 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
             value: Lambda(
                 ExprLambda {
                     range: 507..535,
-                    parameters: Parameters {
-                        range: 514..519,
-                        posonlyargs: [],
-                        args: [
-                            ParameterWithDefault {
-                                range: 514..519,
-                                parameter: Parameter {
+                    parameters: Some(
+                        Parameters {
+                            range: 514..519,
+                            posonlyargs: [],
+                            args: [
+                                ParameterWithDefault {
                                     range: 514..519,
-                                    name: Identifier {
-                                        id: "query",
+                                    parameter: Parameter {
                                         range: 514..519,
+                                        name: Identifier {
+                                            id: "query",
+                                            range: 514..519,
+                                        },
+                                        annotation: None,
                                     },
-                                    annotation: None,
+                                    default: None,
                                 },
-                                default: None,
-                            },
-                        ],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
+                            ],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kwarg: None,
+                        },
+                    ),
                     body: Compare(
                         ExprCompare {
                             range: 521..535,

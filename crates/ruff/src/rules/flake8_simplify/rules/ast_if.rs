@@ -264,15 +264,13 @@ fn is_main_check(expr: &Expr) -> bool {
     {
         if let Expr::Name(ast::ExprName { id, .. }) = left.as_ref() {
             if id == "__name__" {
-                if comparators.len() == 1 {
-                    if let Expr::Constant(ast::ExprConstant {
-                        value: Constant::Str(value),
-                        ..
-                    }) = &comparators[0]
-                    {
-                        if value == "__main__" {
-                            return true;
-                        }
+                if let [Expr::Constant(ast::ExprConstant {
+                    value: Constant::Str(ast::StringConstant { value, .. }),
+                    ..
+                })] = comparators.as_slice()
+                {
+                    if value == "__main__" {
+                        return true;
                     }
                 }
             }
@@ -695,7 +693,7 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt) {
 fn body_range(branch: &IfElifBranch, locator: &Locator) -> TextRange {
     TextRange::new(
         locator.line_end(branch.test.end()),
-        locator.line_end(branch.range.end()),
+        locator.line_end(branch.end()),
     )
 }
 
@@ -733,7 +731,7 @@ pub(crate) fn if_with_same_arms(checker: &mut Checker, locator: &Locator, stmt_i
 
         checker.diagnostics.push(Diagnostic::new(
             IfWithSameArms,
-            TextRange::new(current_branch.range.start(), following_branch.range.end()),
+            TextRange::new(current_branch.start(), following_branch.end()),
         ));
     }
 }
@@ -880,7 +878,7 @@ pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &ast::St
     else {
         return;
     };
-    if body_var.len() != 1 {
+    let [body_var] = body_var.as_slice() else {
         return;
     };
     let Stmt::Assign(ast::StmtAssign {
@@ -891,7 +889,7 @@ pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &ast::St
     else {
         return;
     };
-    if orelse_var.len() != 1 {
+    let [orelse_var] = orelse_var.as_slice() else {
         return;
     };
     let Expr::Compare(ast::ExprCompare {
@@ -903,27 +901,16 @@ pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &ast::St
     else {
         return;
     };
-    if test_dict.len() != 1 {
+    let [test_dict] = test_dict.as_slice() else {
         return;
-    }
+    };
     let (expected_var, expected_value, default_var, default_value) = match ops[..] {
-        [CmpOp::In] => (
-            &body_var[0],
-            body_value,
-            &orelse_var[0],
-            orelse_value.as_ref(),
-        ),
-        [CmpOp::NotIn] => (
-            &orelse_var[0],
-            orelse_value,
-            &body_var[0],
-            body_value.as_ref(),
-        ),
+        [CmpOp::In] => (body_var, body_value, orelse_var, orelse_value.as_ref()),
+        [CmpOp::NotIn] => (orelse_var, orelse_value, body_var, body_value.as_ref()),
         _ => {
             return;
         }
     };
-    let test_dict = &test_dict[0];
     let Expr::Subscript(ast::ExprSubscript {
         value: expected_subscript,
         slice: expected_slice,

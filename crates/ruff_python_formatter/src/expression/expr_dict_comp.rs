@@ -29,7 +29,7 @@ impl FormatNodeRule<ExprDictComp> for FormatExprDictComp {
         });
 
         let comments = f.context().comments().clone();
-        let dangling = comments.dangling_comments(item);
+        let dangling = comments.dangling(item);
 
         write!(
             f,
@@ -41,7 +41,7 @@ impl FormatNodeRule<ExprDictComp> for FormatExprDictComp {
                     space(),
                     value.format(),
                     soft_line_break_or_space(),
-                    &joined
+                    joined
                 )),
                 "}"
             )

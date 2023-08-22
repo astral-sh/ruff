@@ -27,6 +27,8 @@ def f(cls, x):
 ###
 lambda x: print("Hello, world!")
 
+lambda: print("Hello, world!")
+
 
 class C:
     ###
@@ -202,3 +204,14 @@ class C:
 ###
 def f(x: None) -> None:
     _ = cast(Any, _identity)(x=x)
+
+###
+# Unused arguments with `locals`.
+###
+def f(bar: str):
+    print(locals())
+
+
+class C:
+    def __init__(self, x) -> None:
+        print(locals())

@@ -13,7 +13,7 @@ use ruff_text_size::TextSize;
 
 /// Language agnostic IR for formatting source code.
 ///
-/// Use the helper functions like [crate::builders::space], [crate::builders::soft_line_break] etc. defined in this file to create elements.
+/// Use the helper functions like [`crate::builders::space`], [`crate::builders::soft_line_break`] etc. defined in this file to create elements.
 #[derive(Clone, Eq, PartialEq)]
 pub enum FormatElement {
     /// A space token, see [crate::builders::space] for documentation.
@@ -88,9 +88,7 @@ impl std::fmt::Debug for FormatElement {
                 .debug_struct("BestFitting")
                 .field("variants", variants)
                 .finish(),
-            FormatElement::Interned(interned) => {
-                fmt.debug_list().entries(interned.deref()).finish()
-            }
+            FormatElement::Interned(interned) => fmt.debug_list().entries(&**interned).finish(),
             FormatElement::Tag(tag) => fmt.debug_tuple("Tag").field(tag).finish(),
             FormatElement::SourcePosition(position) => {
                 fmt.debug_tuple("SourcePosition").field(position).finish()
@@ -180,7 +178,7 @@ impl Deref for Interned {
     type Target = [FormatElement];
 
     fn deref(&self) -> &Self::Target {
-        self.0.deref()
+        &self.0
     }
 }
 
@@ -217,12 +215,12 @@ pub fn normalize_newlines<const N: usize>(text: &str, terminators: [char; N]) ->
 }
 
 impl FormatElement {
-    /// Returns `true` if self is a [FormatElement::Tag]
+    /// Returns `true` if self is a [`FormatElement::Tag`]
     pub const fn is_tag(&self) -> bool {
         matches!(self, FormatElement::Tag(_))
     }
 
-    /// Returns `true` if self is a [FormatElement::Tag] and [Tag::is_start] is `true`.
+    /// Returns `true` if self is a [`FormatElement::Tag`] and [`Tag::is_start`] is `true`.
     pub const fn is_start_tag(&self) -> bool {
         match self {
             FormatElement::Tag(tag) => tag.is_start(),
@@ -230,7 +228,7 @@ impl FormatElement {
         }
     }
 
-    /// Returns `true` if self is a [FormatElement::Tag] and [Tag::is_end] is `true`.
+    /// Returns `true` if self is a [`FormatElement::Tag`] and [`Tag::is_end`] is `true`.
     pub const fn is_end_tag(&self) -> bool {
         match self {
             FormatElement::Tag(tag) => tag.is_end(),
@@ -313,6 +311,7 @@ impl BestFittingVariants {
     /// ## Safety
     /// The slice must contain at least two variants.
     #[doc(hidden)]
+    #[allow(unsafe_code)]
     pub unsafe fn from_vec_unchecked(variants: Vec<Box<[FormatElement]>>) -> Self {
         debug_assert!(
             variants.len() >= 2,
@@ -359,9 +358,9 @@ impl<'a> IntoIterator for &'a BestFittingVariants {
 }
 
 pub trait FormatElements {
-    /// Returns true if this [FormatElement] is guaranteed to break across multiple lines by the printer.
+    /// Returns true if this [`FormatElement`] is guaranteed to break across multiple lines by the printer.
     /// This is the case if this format element recursively contains a:
-    /// - [crate::builders::empty_line] or [crate::builders::hard_line_break]
+    /// - [`crate::builders::empty_line`] or [`crate::builders::hard_line_break`]
     /// - A token containing '\n'
     ///
     /// Use this with caution, this is only a heuristic and the printer may print the element over multiple

@@ -25,7 +25,7 @@ impl std::fmt::Debug for DebugGroupId {
 
 /// Unique identification for a group.
 ///
-/// See [crate::Formatter::group_id] on how to get a unique id.
+/// See [`crate::Formatter::group_id`] on how to get a unique id.
 #[repr(transparent)]
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub struct ReleaseGroupId {

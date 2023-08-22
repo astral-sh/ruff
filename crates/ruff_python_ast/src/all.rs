@@ -24,7 +24,7 @@ where
     fn add_to_names<'a>(elts: &'a [Expr], names: &mut Vec<&'a str>, flags: &mut DunderAllFlags) {
         for elt in elts {
             if let Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(value),
+                value: Constant::Str(ast::StringConstant { value, .. }),
                 ..
             }) = elt
             {

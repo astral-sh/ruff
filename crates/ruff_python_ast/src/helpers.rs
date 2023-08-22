@@ -25,7 +25,6 @@ pub const fn is_compound_statement(stmt: &Stmt) -> bool {
             | Stmt::With(_)
             | Stmt::If(_)
             | Stmt::Try(_)
-            | Stmt::TryStar(_)
     )
 }
 
@@ -123,10 +122,8 @@ where
         return true;
     }
     match expr {
-        Expr::BoolOp(ast::ExprBoolOp {
-            values, range: _, ..
-        })
-        | Expr::FString(ast::ExprFString { values, range: _ }) => {
+        Expr::BoolOp(ast::ExprBoolOp { values, .. })
+        | Expr::FString(ast::ExprFString { values, .. }) => {
             values.iter().any(|expr| any_over_expr(expr, func))
         }
         Expr::NamedExpr(ast::ExprNamedExpr {
@@ -480,13 +477,7 @@ where
             handlers,
             orelse,
             finalbody,
-            range: _,
-        })
-        | Stmt::TryStar(ast::StmtTryStar {
-            body,
-            handlers,
-            orelse,
-            finalbody,
+            is_star: _,
             range: _,
         }) => {
             any_over_body(body, func)
@@ -922,7 +913,7 @@ where
                 self.raises
                     .push((stmt.range(), exc.as_deref(), cause.as_deref()));
             }
-            Stmt::ClassDef(_) | Stmt::FunctionDef(_) | Stmt::Try(_) | Stmt::TryStar(_) => {}
+            Stmt::ClassDef(_) | Stmt::FunctionDef(_) | Stmt::Try(_) => {}
             Stmt::If(ast::StmtIf {
                 body,
                 elif_else_clauses,
@@ -983,7 +974,7 @@ pub fn in_nested_block<'a>(mut parents: impl Iterator<Item = &'a Stmt>) -> bool 
     parents.any(|parent| {
         matches!(
             parent,
-            Stmt::Try(_) | Stmt::TryStar(_) | Stmt::If(_) | Stmt::With(_) | Stmt::Match(_)
+            Stmt::Try(_) | Stmt::If(_) | Stmt::With(_) | Stmt::Match(_)
         )
     })
 }
@@ -1087,25 +1078,26 @@ impl Truthiness {
             Expr::Constant(ast::ExprConstant { value, .. }) => match value {
                 Constant::Bool(value) => Some(*value),
                 Constant::None => Some(false),
-                Constant::Str(string) => Some(!string.is_empty()),
+                Constant::Str(ast::StringConstant { value, .. }) => Some(!value.is_empty()),
                 Constant::Bytes(bytes) => Some(!bytes.is_empty()),
                 Constant::Int(int) => Some(!int.is_zero()),
                 Constant::Float(float) => Some(*float != 0.0),
                 Constant::Complex { real, imag } => Some(*real != 0.0 || *imag != 0.0),
                 Constant::Ellipsis => Some(true),
             },
-            Expr::FString(ast::ExprFString { values, range: _ }) => {
+            Expr::FString(ast::ExprFString { values, .. }) => {
                 if values.is_empty() {
                     Some(false)
                 } else if values.iter().any(|value| {
-                    let Expr::Constant(ast::ExprConstant {
-                        value: Constant::Str(string),
+                    if let Expr::Constant(ast::ExprConstant {
+                        value: Constant::Str(ast::StringConstant { value, .. }),
                         ..
                     }) = &value
-                    else {
-                        return false;
-                    };
-                    !string.is_empty()
+                    {
+                        !value.is_empty()
+                    } else {
+                        false
+                    }
                 }) {
                     Some(true)
                 } else {

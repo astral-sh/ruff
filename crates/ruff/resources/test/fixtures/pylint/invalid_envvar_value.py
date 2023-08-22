@@ -10,6 +10,8 @@ os.getenv(key="foo", default="bar")
 os.getenv(key=f"foo", default="bar")
 os.getenv(key="foo" + "bar", default=1)
 os.getenv(key=1 + "bar", default=1)  # [invalid-envvar-value]
+os.getenv("PATH_TEST" if using_clear_path else "PATH_ORIG")
+os.getenv(1 if using_clear_path else "PATH_ORIG")
 
 AA = "aa"
 os.getenv(AA)

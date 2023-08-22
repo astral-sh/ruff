@@ -1,5 +1,6 @@
 use ruff_diagnostics::{DiagnosticKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::Ranged;
 use ruff_python_parser::TokenKind;
 
 use crate::checkers::logical_lines::LogicalLinesContext;

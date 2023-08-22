@@ -10,71 +10,73 @@ Ok(
                 value: Lambda(
                     ExprLambda {
                         range: 0..26,
-                        parameters: Parameters {
-                            range: 7..23,
-                            posonlyargs: [],
-                            args: [],
-                            vararg: None,
-                            kwonlyargs: [
-                                ParameterWithDefault {
-                                    range: 10..11,
-                                    parameter: Parameter {
+                        parameters: Some(
+                            Parameters {
+                                range: 7..23,
+                                posonlyargs: [],
+                                args: [],
+                                vararg: None,
+                                kwonlyargs: [
+                                    ParameterWithDefault {
                                         range: 10..11,
-                                        name: Identifier {
-                                            id: "a",
+                                        parameter: Parameter {
                                             range: 10..11,
+                                            name: Identifier {
+                                                id: "a",
+                                                range: 10..11,
+                                            },
+                                            annotation: None,
                                         },
-                                        annotation: None,
+                                        default: None,
                                     },
-                                    default: None,
-                                },
-                                ParameterWithDefault {
-                                    range: 13..17,
-                                    parameter: Parameter {
-                                        range: 13..14,
-                                        name: Identifier {
-                                            id: "b",
+                                    ParameterWithDefault {
+                                        range: 13..17,
+                                        parameter: Parameter {
                                             range: 13..14,
-                                        },
-                                        annotation: None,
-                                    },
-                                    default: Some(
-                                        Constant(
-                                            ExprConstant {
-                                                range: 15..17,
-                                                value: Int(
-                                                    20,
-                                                ),
-                                                kind: None,
+                                            name: Identifier {
+                                                id: "b",
+                                                range: 13..14,
                                             },
+                                            annotation: None,
+                                        },
+                                        default: Some(
+                                            Constant(
+                                                ExprConstant {
+                                                    range: 15..17,
+                                                    value: Int(
+                                                        20,
+                                                    ),
+                                                    kind: None,
+                                                },
+                                            ),
                                         ),
-                                    ),
-                                },
-                                ParameterWithDefault {
-                                    range: 19..23,
-                                    parameter: Parameter {
-                                        range: 19..20,
-                                        name: Identifier {
-                                            id: "c",
+                                    },
+                                    ParameterWithDefault {
+                                        range: 19..23,
+                                        parameter: Parameter {
                                             range: 19..20,
-                                        },
-                                        annotation: None,
-                                    },
-                                    default: Some(
-                                        Constant(
-                                            ExprConstant {
-                                                range: 21..23,
-                                                value: Int(
-                                                    30,
-                                                ),
-                                                kind: None,
+                                            name: Identifier {
+                                                id: "c",
+                                                range: 19..20,
                                             },
+                                            annotation: None,
+                                        },
+                                        default: Some(
+                                            Constant(
+                                                ExprConstant {
+                                                    range: 21..23,
+                                                    value: Int(
+                                                        30,
+                                                    ),
+                                                    kind: None,
+                                                },
+                                            ),
                                         ),
-                                    ),
-                                },
-                            ],
-                            kwarg: None,
-                        },
+                                    },
+                                ],
+                                kwarg: None,
+                            },
+                        ),
                         body: Constant(
                             ExprConstant {
                                 range: 25..26,

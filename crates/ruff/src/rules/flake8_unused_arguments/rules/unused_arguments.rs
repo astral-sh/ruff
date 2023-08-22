@@ -2,7 +2,7 @@ use std::iter;
 
 use regex::Regex;
 use ruff_python_ast as ast;
-use ruff_python_ast::{Parameter, Parameters};
+use ruff_python_ast::{Parameter, Parameters, Ranged};
 
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -216,7 +216,7 @@ impl Argumentable {
 fn function(
     argumentable: Argumentable,
     parameters: &Parameters,
-    values: &Scope,
+    scope: &Scope,
     semantic: &SemanticModel,
     dummy_variable_rgx: &Regex,
     ignore_variadic_names: bool,
@@ -241,7 +241,7 @@ fn function(
     call(
         argumentable,
         args,
-        values,
+        scope,
         semantic,
         dummy_variable_rgx,
         diagnostics,
@@ -252,7 +252,7 @@ fn function(
 fn method(
     argumentable: Argumentable,
     parameters: &Parameters,
-    values: &Scope,
+    scope: &Scope,
     semantic: &SemanticModel,
     dummy_variable_rgx: &Regex,
     ignore_variadic_names: bool,
@@ -278,7 +278,7 @@ fn method(
     call(
         argumentable,
         args,
-        values,
+        scope,
         semantic,
         dummy_variable_rgx,
         diagnostics,
@@ -288,13 +288,13 @@ fn method(
 fn call<'a>(
     argumentable: Argumentable,
     parameters: impl Iterator<Item = &'a Parameter>,
-    values: &Scope,
+    scope: &Scope,
     semantic: &SemanticModel,
     dummy_variable_rgx: &Regex,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     diagnostics.extend(parameters.filter_map(|arg| {
-        let binding = values
+        let binding = scope
             .get(arg.name.as_str())
             .map(|binding_id| semantic.binding(binding_id))?;
         if binding.kind.is_argument()
@@ -303,7 +303,7 @@ fn call<'a>(
         {
             Some(Diagnostic::new(
                 argumentable.check_for(arg.name.to_string()),
-                binding.range,
+                binding.range(),
             ))
         } else {
             None
@@ -317,6 +317,10 @@ pub(crate) fn unused_arguments(
     scope: &Scope,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
+    if scope.uses_locals() {
+        return;
+    }
+
     let Some(parent) = &checker.semantic().first_non_type_parent_scope(scope) else {
         return;
     };
@@ -433,19 +437,21 @@ pub(crate) fn unused_arguments(
             }
         }
         ScopeKind::Lambda(ast::ExprLambda { parameters, .. }) => {
-            if checker.enabled(Argumentable::Lambda.rule_code()) {
-                function(
-                    Argumentable::Lambda,
-                    parameters,
-                    scope,
-                    checker.semantic(),
-                    &checker.settings.dummy_variable_rgx,
-                    checker
-                        .settings
-                        .flake8_unused_arguments
-                        .ignore_variadic_names,
-                    diagnostics,
-                );
+            if let Some(parameters) = parameters {
+                if checker.enabled(Argumentable::Lambda.rule_code()) {
+                    function(
+                        Argumentable::Lambda,
+                        parameters,
+                        scope,
+                        checker.semantic(),
+                        &checker.settings.dummy_variable_rgx,
+                        checker
+                            .settings
+                            .flake8_unused_arguments
+                            .ignore_variadic_names,
+                        diagnostics,
+                    );
+                }
             }
         }
         _ => panic!("Expected ScopeKind::Function | ScopeKind::Lambda"),

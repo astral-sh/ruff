@@ -62,11 +62,7 @@ def single_quote_docstring_over_line_limit2():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,9 +1,11 @@
- def docstring_almost_at_line_limit():
--    """long docstring................................................................."""
-+    """long docstring.................................................................
-+    """
+@@ -3,7 +3,8 @@
  
  
  def docstring_almost_at_line_limit_with_prefix():
@@ -82,8 +78,7 @@ def single_quote_docstring_over_line_limit2():
 
 ```py
 def docstring_almost_at_line_limit():
-    """long docstring.................................................................
-    """
+    """long docstring................................................................."""
 
 
 def docstring_almost_at_line_limit_with_prefix():

@@ -1,10 +1,10 @@
-use ruff_text_size::{TextLen, TextRange, TextSize};
-
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::Ranged;
 use ruff_python_parser::TokenKind;
 use ruff_python_trivia::PythonWhitespace;
 use ruff_source_file::Locator;
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::checkers::logical_lines::LogicalLinesContext;
 use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;

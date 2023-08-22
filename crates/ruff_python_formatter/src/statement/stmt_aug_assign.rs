@@ -1,9 +1,11 @@
+use ruff_formatter::write;
+use ruff_python_ast::StmtAugAssign;
+
+use crate::comments::{SourceComment, SuppressionKind};
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
-use crate::{AsFormat, FormatNodeRule, PyFormatter};
-use ruff_formatter::prelude::{space, text};
-use ruff_formatter::{write, Buffer, FormatResult};
-use ruff_python_ast::StmtAugAssign;
+use crate::prelude::*;
+use crate::{AsFormat, FormatNodeRule};
 
 #[derive(Default)]
 pub struct FormatStmtAugAssign;
@@ -27,5 +29,13 @@ impl FormatNodeRule<StmtAugAssign> for FormatStmtAugAssign {
                 maybe_parenthesize_expression(value, item, Parenthesize::IfBreaks)
             ]
         )
+    }
+
+    fn is_suppressed(
+        &self,
+        trailing_comments: &[SourceComment],
+        context: &PyFormatContext,
+    ) -> bool {
+        SuppressionKind::has_skip_comment(trailing_comments, context.source())
     }
 }

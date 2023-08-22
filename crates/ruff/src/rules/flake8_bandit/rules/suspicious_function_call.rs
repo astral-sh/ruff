@@ -76,7 +76,7 @@ impl Violation for SuspiciousPickleUsage {
 /// import marshal
 ///
 /// with open("foo.marshal", "rb") as file:
-///     foo = pickle.load(file)
+///     foo = marshal.load(file)
 /// ```
 ///
 /// Use instead:

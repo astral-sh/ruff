@@ -1,11 +1,10 @@
 use std::fmt;
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::Ranged;
 use ruff_python_ast::{Arguments, Expr};
-
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
@@ -58,8 +57,8 @@ impl AlwaysAutofixableViolation for IncorrectDictIterator {
 }
 
 /// PERF102
-pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, target: &Expr, iter: &Expr) {
-    let Expr::Tuple(ast::ExprTuple { elts, .. }) = target else {
+pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, stmt_for: &ast::StmtFor) {
+    let Expr::Tuple(ast::ExprTuple { elts, .. }) = stmt_for.target.as_ref() else {
         return;
     };
     let [key, value] = elts.as_slice() else {
@@ -69,7 +68,7 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, target: &Expr, iter
         func,
         arguments: Arguments { args, .. },
         ..
-    }) = iter
+    }) = stmt_for.iter.as_ref()
     else {
         return;
     };
@@ -105,7 +104,7 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, target: &Expr, iter
                 let replace_attribute = Edit::range_replacement("values".to_string(), attr.range());
                 let replace_target = Edit::range_replacement(
                     checker.locator().slice(value.range()).to_string(),
-                    target.range(),
+                    stmt_for.target.range(),
                 );
                 diagnostic.set_fix(Fix::suggested_edits(replace_attribute, [replace_target]));
             }
@@ -123,7 +122,7 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, target: &Expr, iter
                 let replace_attribute = Edit::range_replacement("keys".to_string(), attr.range());
                 let replace_target = Edit::range_replacement(
                     checker.locator().slice(key.range()).to_string(),
-                    target.range(),
+                    stmt_for.target.range(),
                 );
                 diagnostic.set_fix(Fix::suggested_edits(replace_attribute, [replace_target]));
             }
@@ -173,7 +172,7 @@ fn is_unused(expr: &Expr, semantic: &SemanticModel) -> bool {
             scope
                 .get_all(id)
                 .map(|binding_id| semantic.binding(binding_id))
-                .filter(|binding| binding.range.start() >= expr.range().start())
+                .filter(|binding| binding.start() >= expr.start())
                 .all(|binding| !binding.is_used())
         }
         _ => false,

@@ -35,7 +35,7 @@ impl<'buf, Context> Formatter<'buf, Context> {
     }
 
     /// Creates a new group id that is unique to this document. The passed debug name is used in the
-    /// [std::fmt::Debug] of the document if this is a debug build.
+    /// [`std::fmt::Debug`] of the document if this is a debug build.
     /// The name is unused for production builds and has no meaning on the equality of two group ids.
     pub fn group_id(&self, debug_name: &'static str) -> GroupId {
         self.state().group_id(debug_name)
@@ -108,7 +108,7 @@ impl<'buf, Context> Formatter<'buf, Context> {
         JoinBuilder::with_separator(self, joiner)
     }
 
-    /// Concatenates a list of [crate::Format] objects with spaces and line breaks to fit
+    /// Concatenates a list of [`crate::Format`] objects with spaces and line breaks to fit
     /// them on as few lines as possible. Each element introduces a conceptual group. The printer
     /// first tries to print the item in flat mode but then prints it in expanded mode if it doesn't fit.
     ///
@@ -205,16 +205,16 @@ where
 impl<Context> Buffer for Formatter<'_, Context> {
     type Context = Context;
 
-    #[inline(always)]
-    fn write_element(&mut self, element: FormatElement) -> FormatResult<()> {
-        self.buffer.write_element(element)
+    #[inline]
+    fn write_element(&mut self, element: FormatElement) {
+        self.buffer.write_element(element);
     }
 
     fn elements(&self) -> &[FormatElement] {
         self.buffer.elements()
     }
 
-    #[inline(always)]
+    #[inline]
     fn write_fmt(&mut self, arguments: Arguments<Self::Context>) -> FormatResult<()> {
         for argument in arguments.items() {
             argument.format(self)?;
@@ -235,7 +235,7 @@ impl<Context> Buffer for Formatter<'_, Context> {
     }
 
     fn restore_snapshot(&mut self, snapshot: BufferSnapshot) {
-        self.buffer.restore_snapshot(snapshot)
+        self.buffer.restore_snapshot(snapshot);
     }
 }
 
