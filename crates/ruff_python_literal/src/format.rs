@@ -320,7 +320,7 @@ fn parse_precision(text: &str) -> Result<(Option<usize>, &str), FormatSpecError>
 
 /// Parses a format part within a format spec
 fn parse_nested_placeholder<'a>(
-    parts: &mut Vec<FormatPart>,
+    placeholders: &mut Vec<FormatPart>,
     text: &'a str,
 ) -> Result<&'a str, FormatSpecError> {
     match FormatString::parse_spec(text, AllowPlaceholderNesting::No) {
@@ -328,7 +328,7 @@ fn parse_nested_placeholder<'a>(
         Err(FormatParseError::MissingStartBracket) => Ok(text),
         Err(err) => Err(FormatSpecError::InvalidPlaceholder(err)),
         Ok((format_part, text)) => {
-            parts.push(format_part);
+            placeholders.push(format_part);
             Ok(text)
         }
     }
@@ -337,7 +337,6 @@ fn parse_nested_placeholder<'a>(
 impl FormatSpec {
     pub fn parse(text: &str) -> Result<Self, FormatSpecError> {
         let mut replacements = vec![];
-        // get_integer in CPython
         let text = parse_nested_placeholder(&mut replacements, text)?;
         let (conversion, text) = FormatConversion::parse(text);
         let text = parse_nested_placeholder(&mut replacements, text)?;
