@@ -1,3 +1,4 @@
+use ast::call_path::{from_qualified_name, CallPath};
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_docstring_stmt;
@@ -84,11 +85,18 @@ pub(crate) fn mutable_argument_default(checker: &mut Checker, function_def: &ast
             continue;
         };
 
+        let extend_immutable_calls: Vec<CallPath> = checker
+            .settings
+            .flake8_bugbear
+            .extend_immutable_calls
+            .iter()
+            .map(|target| from_qualified_name(target))
+            .collect();
+
         if is_mutable_expr(default, checker.semantic())
-            && !parameter
-                .annotation
-                .as_ref()
-                .is_some_and(|expr| is_immutable_annotation(expr, checker.semantic()))
+            && !parameter.annotation.as_ref().is_some_and(|expr| {
+                is_immutable_annotation(expr, checker.semantic(), extend_immutable_calls.as_slice())
+            })
         {
             let mut diagnostic = Diagnostic::new(MutableArgumentDefault, default.range());
 

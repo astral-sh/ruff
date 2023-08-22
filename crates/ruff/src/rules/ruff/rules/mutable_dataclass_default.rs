@@ -76,7 +76,7 @@ pub(crate) fn mutable_dataclass_default(checker: &mut Checker, class_def: &ast::
         {
             if is_mutable_expr(value, checker.semantic())
                 && !is_class_var_annotation(annotation, checker.semantic())
-                && !is_immutable_annotation(annotation, checker.semantic())
+                && !is_immutable_annotation(annotation, checker.semantic(), vec![].as_slice())
             {
                 checker
                     .diagnostics

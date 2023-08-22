@@ -60,7 +60,7 @@ pub(crate) fn mutable_class_default(checker: &mut Checker, class_def: &ast::Stmt
                     && is_mutable_expr(value, checker.semantic())
                     && !is_class_var_annotation(annotation, checker.semantic())
                     && !is_final_annotation(annotation, checker.semantic())
-                    && !is_immutable_annotation(annotation, checker.semantic())
+                    && !is_immutable_annotation(annotation, checker.semantic(), vec![].as_slice())
                     && !is_dataclass(class_def, checker.semantic())
                 {
                     // Avoid Pydantic models, which end up copying defaults on instance creation.

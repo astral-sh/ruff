@@ -186,12 +186,19 @@ pub fn to_pep604_operator(
 
 /// Return `true` if `Expr` represents a reference to a type annotation that resolves to an
 /// immutable type.
-pub fn is_immutable_annotation(expr: &Expr, semantic: &SemanticModel) -> bool {
+pub fn is_immutable_annotation(
+    expr: &Expr,
+    semantic: &SemanticModel,
+    extend_immutable_calls: &[CallPath],
+) -> bool {
     match expr {
         Expr::Name(_) | Expr::Attribute(_) => {
             semantic.resolve_call_path(expr).is_some_and(|call_path| {
                 is_immutable_non_generic_type(call_path.as_slice())
                     || is_immutable_generic_type(call_path.as_slice())
+                    || extend_immutable_calls
+                        .iter()
+                        .any(|target| call_path == *target)
             })
         }
         Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
@@ -200,17 +207,19 @@ pub fn is_immutable_annotation(expr: &Expr, semantic: &SemanticModel) -> bool {
                     true
                 } else if matches!(call_path.as_slice(), ["typing", "Union"]) {
                     if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
-                        elts.iter()
-                            .all(|elt| is_immutable_annotation(elt, semantic))
+                        elts.iter().all(|elt| {
+                            is_immutable_annotation(elt, semantic, extend_immutable_calls)
+                        })
                     } else {
                         false
                     }
                 } else if matches!(call_path.as_slice(), ["typing", "Optional"]) {
-                    is_immutable_annotation(slice, semantic)
+                    is_immutable_annotation(slice, semantic, extend_immutable_calls)
                 } else if is_pep_593_generic_type(call_path.as_slice()) {
                     if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
-                        elts.first()
-                            .is_some_and(|elt| is_immutable_annotation(elt, semantic))
+                        elts.first().is_some_and(|elt| {
+                            is_immutable_annotation(elt, semantic, extend_immutable_calls)
+                        })
                     } else {
                         false
                     }
@@ -224,7 +233,10 @@ pub fn is_immutable_annotation(expr: &Expr, semantic: &SemanticModel) -> bool {
             op: Operator::BitOr,
             right,
             range: _,
-        }) => is_immutable_annotation(left, semantic) && is_immutable_annotation(right, semantic),
+        }) => {
+            is_immutable_annotation(left, semantic, extend_immutable_calls)
+                && is_immutable_annotation(right, semantic, extend_immutable_calls)
+        }
         Expr::Constant(ast::ExprConstant {
             value: Constant::None,
             ..
