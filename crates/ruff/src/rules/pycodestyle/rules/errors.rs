@@ -8,11 +8,12 @@ use ruff_source_file::Locator;
 use crate::logging::DisplayParseErrorType;
 
 /// ## What it does
-/// This is not a regular lint, instead it is raised when a file can not be read.
+/// This is not a regular diagnostic; instead, it's raised when a file cannot be read
+/// from disk.
 ///
 /// ## Why is this bad?
-/// This indicates an error in the development setup. A common cause of IO errors is that the
-/// current user doesn't have the permission to read the file. Another possible reason is a broken
+/// An `IOError` indicates an error in the development setup. For example, the user may
+/// not have permissions to read a given file, or the filesystem may contain a broken
 /// symlink.
 ///
 /// ## Example
