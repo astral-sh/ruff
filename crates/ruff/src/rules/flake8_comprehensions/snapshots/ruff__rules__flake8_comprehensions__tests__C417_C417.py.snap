@@ -226,7 +226,7 @@ C417.py:15:8: C417 [*] Unnecessary `map` usage (rewrite using a `set` comprehens
    15 |+_ = f"{ {x % 2 == 0 for x in nums} }"
 16 16 | _ = f"{dict(map(lambda v: (v, v**2), nums))}"
 17 17 | 
-18 18 | # Error, but unfixable.
+18 18 | # False negatives.
 
 C417.py:16:8: C417 [*] Unnecessary `map` usage (rewrite using a `dict` comprehension)
    |
@@ -235,7 +235,7 @@ C417.py:16:8: C417 [*] Unnecessary `map` usage (rewrite using a `dict` comprehen
 16 | _ = f"{dict(map(lambda v: (v, v**2), nums))}"
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
 17 | 
-18 | # Error, but unfixable.
+18 | # False negatives.
    |
    = help: Replace `map` with a `dict` comprehension
 
@@ -246,27 +246,27 @@ C417.py:16:8: C417 [*] Unnecessary `map` usage (rewrite using a `dict` comprehen
 16    |-_ = f"{dict(map(lambda v: (v, v**2), nums))}"
    16 |+_ = f"{ {v: v**2 for v in nums} }"
 17 17 | 
-18 18 | # Error, but unfixable.
-19 19 | # For simple expressions, this could be: `(x if x else 1 for x in nums)`.
+18 18 | # False negatives.
+19 19 | map(lambda x=2, y=1: x + y, nums, nums)
 
-C417.py:39:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
+C417.py:34:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
    |
-38 | # Error: the `x` is overridden by the inner lambda.
-39 | map(lambda x: lambda x: x, range(4))
+33 | # Error: the `x` is overridden by the inner lambda.
+34 | map(lambda x: lambda x: x, range(4))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
-40 | 
-41 | # Error, but unfixable
+35 | 
+36 | # Ok because of the default parameters, and variadic arguments.
    |
    = help: Replace `map` with a generator expression
 
 ℹ Suggested fix
-36 36 | map(lambda x: lambda: x, range(4))
-37 37 | 
-38 38 | # Error: the `x` is overridden by the inner lambda.
-39    |-map(lambda x: lambda x: x, range(4))
-   39 |+(lambda x: x for x in range(4))
-40 40 | 
-41 41 | # Error, but unfixable
-42 42 | map(lambda *args: len(args), range(4))
+31 31 | map(lambda x: lambda: x, range(4))
+32 32 | 
+33 33 | # Error: the `x` is overridden by the inner lambda.
+34    |-map(lambda x: lambda x: x, range(4))
+   34 |+(lambda x: x for x in range(4))
+35 35 | 
+36 36 | # Ok because of the default parameters, and variadic arguments.
+37 37 | map(lambda x=1: x, nums)
 
 
