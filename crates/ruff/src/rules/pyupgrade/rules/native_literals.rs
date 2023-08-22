@@ -127,7 +127,11 @@ impl AlwaysAutofixableViolation for NativeLiterals {
 }
 
 /// UP018
-pub(crate) fn native_literals(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn native_literals(
+    checker: &mut Checker,
+    call: &ast::ExprCall,
+    parent_expr: Option<&ast::Expr>,
+) {
     let ast::ExprCall {
         func,
         arguments:
@@ -173,9 +177,9 @@ pub(crate) fn native_literals(checker: &mut Checker, call: &ast::ExprCall) {
             let mut diagnostic = Diagnostic::new(NativeLiterals { literal_type }, call.range());
             if checker.patch(diagnostic.kind.rule()) {
                 let constant = Constant::from(literal_type);
-                let content = checker.generator().constant(&constant);
+                let constant_code = checker.generator().constant(&constant);
                 diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                    content,
+                    parenthesize_int_attribute_access(parent_expr, &constant, constant_code),
                     call.range(),
                 )));
             }
@@ -204,11 +208,26 @@ pub(crate) fn native_literals(checker: &mut Checker, call: &ast::ExprCall) {
             let mut diagnostic = Diagnostic::new(NativeLiterals { literal_type }, call.range());
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                    arg_code.to_string(),
+                    parenthesize_int_attribute_access(parent_expr, &value, arg_code.to_string()),
                     call.range(),
                 )));
             }
             checker.diagnostics.push(diagnostic);
         }
+    }
+}
+
+/// Parenthesize a code replacement for an `int` literal call with attribute access
+/// Attribute access on an integer requires the integer to be parenthesized to disambiguate from floats
+///
+/// Ex) `(7).denominator` is valid but `7.denominator` is not
+fn parenthesize_int_attribute_access(
+    parent_expr: Option<&Expr>,
+    value: &Constant,
+    content: String,
+) -> String {
+    match (parent_expr, value) {
+        (Some(Expr::Attribute(_)), Constant::Int(_)) => format!("({content})").to_string(),
+        _ => content,
     }
 }
