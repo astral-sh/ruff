@@ -28,3 +28,6 @@ mdtypes_template = {
     'tag_full': [('mdtype', 'u4'), ('byte_count', 'u4')],
     'tag_smalldata':[('byte_count_mdtype', 'u4'), ('data', 'S4')],
 }
+
+#: Okay
+a = (1,

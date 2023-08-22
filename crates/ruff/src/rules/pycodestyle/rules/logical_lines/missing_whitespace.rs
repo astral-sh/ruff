@@ -81,10 +81,10 @@ pub(crate) fn missing_whitespace(
             TokenKind::Comma | TokenKind::Semi | TokenKind::Colon => {
                 let after = line.text_after(token);
 
-                if !after
+                if after
                     .chars()
                     .next()
-                    .is_some_and(|c| char::is_whitespace(c) || c == '\\')
+                    .is_some_and(|c| !(char::is_whitespace(c) || c == '\\'))
                 {
                     if let Some(next_token) = iter.peek() {
                         match (kind, next_token.kind()) {
