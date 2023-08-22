@@ -174,6 +174,27 @@ match pattern_comments:
         pass
 
 
+match pattern_comments:
+    case (
+        pattern
+        # 1
+		as
+        # 2
+		name
+        # 3
+    ):
+        pass
+
+
+match subject:
+    case (
+        pattern # 1
+        as # 2
+        name # 3
+    ):
+        pass
+
+
 match x:
     case (a as b) as c:
         pass
@@ -379,10 +400,11 @@ match pattern_comments:
 match pattern_comments:
     case (
         # 1
-        pattern as name  # 2
+        pattern  # 2
         # 3
-        # 4
-        # 5  # 6
+        as  # 4
+        # 5
+        name  # 6
         # 7
     ):
         pass
@@ -390,11 +412,33 @@ match pattern_comments:
 
 match pattern_comments:
     case (
-        pattern as name
+        pattern
         # 1
-        # 2
-        # 3  # 4
+        as  # 2
+        # 3
+        name  # 4
         # 5
+    ):
+        pass
+
+
+match pattern_comments:
+    case (
+        pattern
+        # 1
+        as
+        # 2
+        name
+        # 3
+    ):
+        pass
+
+
+match subject:
+    case (
+        pattern  # 1
+        as  # 2
+        name  # 3
     ):
         pass
 
