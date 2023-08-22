@@ -380,5 +380,24 @@ RET503.py:320:9: RET503 [*] Missing explicit `return` at the end of function abl
 321 321 |             return "" \
 322 322 |                 ;  # type: ignore
     323 |+        return None
+323 324 | 
+324 325 | 
+325 326 | def end_of_file():
+
+RET503.py:328:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+    |
+326 |     if False:
+327 |         return 1
+328 |     x = 2 \
+    |     ^^^^^ RET503
+    |
+    = help: Add explicit `return` statement
+
+ℹ Suggested fix
+326 326 |     if False:
+327 327 |         return 1
+328 328 |     x = 2 \
+    329 |+
+    330 |+    return None
 
 
