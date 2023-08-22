@@ -9,7 +9,7 @@ use crate::{ExpressionRef, Ranged};
 pub fn parenthesized_range(
     expr: ExpressionRef,
     parent: AnyNodeRef,
-    contents: &str,
+    source: &str,
 ) -> Option<TextRange> {
     // If the parent is a node that brings its own parentheses, exclude the closing parenthesis
     // from our search range. Otherwise, we risk matching on calls, like `func(x)`, for which
@@ -28,20 +28,25 @@ pub fn parenthesized_range(
         parent.end()
     };
 
-    // First, test if there's a closing parenthesis because it tends to be cheaper.
-    let tokenizer =
-        SimpleTokenizer::new(contents, TextRange::new(expr.end(), exclusive_parent_end));
-    let right = tokenizer.skip_trivia().next()?;
+    let right_tokenizer =
+        SimpleTokenizer::new(source, TextRange::new(expr.end(), exclusive_parent_end))
+            .skip_trivia()
+            .take_while(|token| token.kind == SimpleTokenKind::RParen);
 
-    if right.kind == SimpleTokenKind::RParen {
-        // Next, test for the opening parenthesis.
-        let mut tokenizer =
-            SimpleTokenizer::up_to_without_back_comment(expr.start(), contents).skip_trivia();
-        let left = tokenizer.next_back()?;
-        if left.kind == SimpleTokenKind::LParen {
-            return Some(TextRange::new(left.start(), right.end()));
+    let mut left_tokenizer = SimpleTokenizer::up_to_without_back_comment(expr.start(), source)
+        .skip_trivia()
+        .rev()
+        .take_while(|token| token.kind == SimpleTokenKind::LParen);
+
+    // Test for closing parentheses, then for the corresponding open parenthesis, as closing
+    // parenthesis testing is cheaper. Iterate to support nested parentheses.
+    let mut range = None;
+    for right_paren in right_tokenizer {
+        if let Some(left_paren) = left_tokenizer.next() {
+            range = Some(TextRange::new(left_paren.start(), right_paren.end()));
+        } else {
+            break;
         }
     }
-
-    None
+    range
 }
