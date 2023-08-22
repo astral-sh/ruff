@@ -9,6 +9,7 @@ def unconventional():
     import pandas
     import seaborn
     import tkinter
+    import networkx
 
 
 def unconventional_aliases():
@@ -18,7 +19,7 @@ def unconventional_aliases():
     import pandas as pdas
     import seaborn as sbrn
     import tkinter as tkr
-
+    import networkx as nxy
 
 def conventional_aliases():
     import altair as alt
@@ -27,3 +28,4 @@ def conventional_aliases():
     import pandas as pd
     import seaborn as sns
     import tkinter as tk
+    import networkx as nx
