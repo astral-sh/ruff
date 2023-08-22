@@ -334,8 +334,33 @@ fn parse_nested_placeholder<'a>(
     }
 }
 
+///
+fn consume_remaining_placeholders<'a>(
+    placeholders: &mut Vec<FormatPart>,
+    text: &'a str,
+) -> Result<&'a str, FormatSpecError> {
+    let mut chars = text.chars();
+    let mut placeholder_count = placeholders.len();
+
+    while chars.clone().contains(&'{') {
+        dbg!(&chars, placeholder_count);
+        let text = parse_nested_placeholder(placeholders, chars.as_str())?;
+        chars = text.chars();
+        // If we did not parse a placeholder, consume a character
+        if placeholder_count == placeholders.len() {
+            chars.next();
+        } else {
+            placeholder_count = placeholders.len();
+        }
+    }
+
+    Ok(chars.as_str())
+}
+
 impl FormatSpec {
     pub fn parse(text: &str) -> Result<Self, FormatSpecError> {
+        println!();
+        dbg!(text);
         let mut replacements = vec![];
         let text = parse_nested_placeholder(&mut replacements, text)?;
         let (conversion, text) = FormatConversion::parse(text);
@@ -353,7 +378,7 @@ impl FormatSpec {
         let (grouping_option, text) = FormatGrouping::parse(text);
         let text = parse_nested_placeholder(&mut replacements, text)?;
         let (precision, text) = parse_precision(text)?;
-        let text = parse_nested_placeholder(&mut replacements, text)?;
+        let text = consume_remaining_placeholders(&mut replacements, text)?;
 
         let (format_type, _text) = if text.is_empty() {
             (None, text)
