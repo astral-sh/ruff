@@ -477,7 +477,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
             is_async: false,
             items: [
                 WithItem {
-                    range: 239..240,
+                    range: 239..243,
                     context_expr: Constant(
                         ExprConstant {
                             range: 239..240,
@@ -490,7 +490,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     optional_vars: None,
                 },
                 WithItem {
-                    range: 242..243,
+                    range: 239..243,
                     context_expr: Constant(
                         ExprConstant {
                             range: 242..243,
