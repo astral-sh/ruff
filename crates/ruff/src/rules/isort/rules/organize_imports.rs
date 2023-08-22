@@ -106,7 +106,7 @@ pub(crate) fn organize_imports(
     let comments = comments::collect_comments(
         TextRange::new(range.start(), locator.full_line_end(range.end())),
         locator,
-        source_type,
+        indexer,
     );
 
     let trailing_line_end = if block.trailer.is_none() {
