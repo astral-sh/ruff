@@ -56,8 +56,8 @@ pub(crate) fn unnecessary_coding_comment(
     // The coding comment must be on one of the first two lines. Since each comment spans at least
     // one line, we only need to check the first two comments at most.
     for range in indexer.comment_ranges().iter().take(2) {
-        let line = locator.slice(*range);
-        if CODING_COMMENT_REGEX.is_match(line) {
+        let comment = locator.slice(*range);
+        if CODING_COMMENT_REGEX.is_match(comment) {
             #[allow(deprecated)]
             let line = locator.compute_line_index(range.start());
             if line.to_zero_indexed() > 1 {
@@ -67,7 +67,7 @@ pub(crate) fn unnecessary_coding_comment(
             let mut diagnostic = Diagnostic::new(UTF8EncodingDeclaration, *range);
             if settings.rules.should_fix(diagnostic.kind.rule()) {
                 diagnostic.set_fix(Fix::automatic(Edit::deletion(
-                    range.start(),
+                    locator.line_start(range.start()),
                     locator.full_line_end(range.end()),
                 )));
             }
