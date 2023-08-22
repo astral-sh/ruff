@@ -310,5 +310,20 @@ def import_module_wrong(value: dict[str, str] = {}):
     import os
 
 
+def import_modules_wrong(value: dict[str, str] = {}):
+    import os
+    import sys
+
+
 def from_import_module_wrong(value: dict[str, str] = {}):
     from os import path
+
+
+def from_imports_module_wrong(value: dict[str, str] = {}):
+    from os import path
+    from sys import version_info
+
+
+def from_imports_module_wrong(value: dict[str, str] = {}):
+    import os
+    from sys import version_info

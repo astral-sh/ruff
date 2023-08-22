@@ -164,8 +164,16 @@ fn move_initialization(
             Edit::insertion(content, locator.full_line_end(statement.end()))
         }
     } else if statement.is_import_stmt() || statement.is_import_from_stmt() {
+        let mut pos = statement.end();
+        for stmt in function_def.body.iter() {
+            if stmt.is_import_stmt() || stmt.is_import_from_stmt() {
+                pos = stmt.end();
+            } else {
+                break
+            }
+        }
+        Edit::insertion(content, locator.full_line_end(pos))
         // If the first statements in the function are an import, insert _after_ it.
-        Edit::insertion(content, locator.full_line_end(statement.end()))
     } else {
         // Otherwise, insert before the first statement.
         let at = locator.line_start(statement.start());
