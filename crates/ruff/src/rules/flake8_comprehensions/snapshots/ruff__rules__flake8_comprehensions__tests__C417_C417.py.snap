@@ -265,6 +265,8 @@ C417.py:39:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expres
 38 | # Error: the `x` is overridden by the inner lambda.
 39 | map(lambda x: lambda x: x, range(4))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
+40 | 
+41 | # Error, but unfixable
    |
    = help: Replace `map` with a generator expression
 
@@ -274,5 +276,26 @@ C417.py:39:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expres
 38 38 | # Error: the `x` is overridden by the inner lambda.
 39    |-map(lambda x: lambda x: x, range(4))
    39 |+(lambda x: x for x in range(4))
+40 40 | 
+41 41 | # Error, but unfixable
+42 42 | map(lambda *args: len(args), range(4))
+
+C417.py:42:1: C417 Unnecessary `map` usage (rewrite using a generator expression)
+   |
+41 | # Error, but unfixable
+42 | map(lambda *args: len(args), range(4))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
+43 | map(lambda **kwargs: len(kwargs), range(4))
+   |
+   = help: Replace `map` with a generator expression
+
+C417.py:43:1: C417 Unnecessary `map` usage (rewrite using a generator expression)
+   |
+41 | # Error, but unfixable
+42 | map(lambda *args: len(args), range(4))
+43 | map(lambda **kwargs: len(kwargs), range(4))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
+   |
+   = help: Replace `map` with a generator expression
 
 

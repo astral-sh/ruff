@@ -37,3 +37,7 @@ map(lambda x: lambda: x, range(4))
 
 # Error: the `x` is overridden by the inner lambda.
 map(lambda x: lambda x: x, range(4))
+
+# Error, but unfixable
+map(lambda *args: len(args), range(4))
+map(lambda **kwargs: len(kwargs), range(4))

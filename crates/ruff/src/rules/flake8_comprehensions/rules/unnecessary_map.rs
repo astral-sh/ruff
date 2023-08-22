@@ -114,6 +114,8 @@ pub(crate) fn unnecessary_map(
                     .chain(&parameters.args)
                     .chain(&parameters.kwonlyargs)
                     .any(|param| param.default.is_some())
+                    || parameters.vararg.is_some()
+                    || parameters.kwarg.is_some()
             } else {
                 false
             }
@@ -156,6 +158,8 @@ pub(crate) fn unnecessary_map(
                     .chain(&parameters.args)
                     .chain(&parameters.kwonlyargs)
                     .any(|param| param.default.is_some())
+                    || parameters.vararg.is_some()
+                    || parameters.kwarg.is_some()
             } else {
                 false
             }
@@ -204,6 +208,8 @@ pub(crate) fn unnecessary_map(
                     .chain(&parameters.args)
                     .chain(&parameters.kwonlyargs)
                     .any(|param| param.default.is_some())
+                    || parameters.vararg.is_some()
+                    || parameters.kwarg.is_some()
             } else {
                 false
             }
