@@ -39,6 +39,7 @@ mod tests {
     #[test_case(Rule::NewLineAfterLastParagraph, Path::new("D.py"))]
     #[test_case(Rule::NewLineAfterSectionName, Path::new("sections.py"))]
     #[test_case(Rule::NoBlankLineAfterFunction, Path::new("D.py"))]
+    #[test_case(Rule::FitsOnOneLine, Path::new("D200.py"))]
     #[test_case(Rule::NoBlankLineAfterFunction, Path::new("D202.py"))]
     #[test_case(Rule::BlankLineBeforeClass, Path::new("D.py"))]
     #[test_case(Rule::NoBlankLineBeforeFunction, Path::new("D.py"))]

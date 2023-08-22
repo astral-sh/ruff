@@ -74,7 +74,8 @@ pub(crate) fn one_liner(checker: &mut Checker, docstring: &Docstring) {
                 // characters, avoid applying the fix.
                 let body = docstring.body();
                 let trimmed = body.trim();
-                if !trimmed.ends_with(trailing.chars().last().unwrap())
+                if trimmed.chars().rev().take_while(|c| *c == '\\').count() % 2 == 0
+                    && !trimmed.ends_with(trailing.chars().last().unwrap())
                     && !trimmed.starts_with(leading.chars().last().unwrap())
                 {
                     diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
