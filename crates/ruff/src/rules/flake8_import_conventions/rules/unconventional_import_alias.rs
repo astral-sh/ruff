@@ -80,13 +80,15 @@ pub(crate) fn unconventional_import_alias(
         binding.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        if checker.semantic().is_available(expected_alias) {
-            diagnostic.try_set_fix(|| {
-                let scope = &checker.semantic().scopes[binding.scope];
-                let (edit, rest) =
-                    Renamer::rename(name, expected_alias, scope, checker.semantic())?;
-                Ok(Fix::suggested_edits(edit, rest))
-            });
+        if !import.is_submodule_import() {
+            if checker.semantic().is_available(expected_alias) {
+                diagnostic.try_set_fix(|| {
+                    let scope = &checker.semantic().scopes[binding.scope];
+                    let (edit, rest) =
+                        Renamer::rename(name, expected_alias, scope, checker.semantic())?;
+                    Ok(Fix::suggested_edits(edit, rest))
+                });
+            }
         }
     }
     Some(diagnostic)

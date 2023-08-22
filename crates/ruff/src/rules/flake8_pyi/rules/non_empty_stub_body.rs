@@ -22,10 +22,7 @@ impl AlwaysAutofixableViolation for NonEmptyStubBody {
 
 /// PYI010
 pub(crate) fn non_empty_stub_body(checker: &mut Checker, body: &[Stmt]) {
-    if body.len() != 1 {
-        return;
-    }
-    if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = &body[0] {
+    if let [Stmt::Expr(ast::StmtExpr { value, range: _ })] = body {
         if let Expr::Constant(ast::ExprConstant { value, .. }) = value.as_ref() {
             if matches!(value, Constant::Ellipsis | Constant::Str(_)) {
                 return;

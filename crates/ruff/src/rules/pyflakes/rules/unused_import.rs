@@ -6,7 +6,7 @@ use rustc_hash::FxHashMap;
 use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::Ranged;
-use ruff_python_semantic::{AnyImport, Exceptions, Imported, Scope, StatementId};
+use ruff_python_semantic::{AnyImport, Exceptions, Imported, NodeId, Scope};
 use ruff_text_size::TextRange;
 
 use crate::autofix;
@@ -100,9 +100,8 @@ impl Violation for UnusedImport {
 
 pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut Vec<Diagnostic>) {
     // Collect all unused imports by statement.
-    let mut unused: FxHashMap<(StatementId, Exceptions), Vec<ImportBinding>> = FxHashMap::default();
-    let mut ignored: FxHashMap<(StatementId, Exceptions), Vec<ImportBinding>> =
-        FxHashMap::default();
+    let mut unused: FxHashMap<(NodeId, Exceptions), Vec<ImportBinding>> = FxHashMap::default();
+    let mut ignored: FxHashMap<(NodeId, Exceptions), Vec<ImportBinding>> = FxHashMap::default();
 
     for binding_id in scope.binding_ids() {
         let binding = checker.semantic().binding(binding_id);
@@ -119,7 +118,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             continue;
         };
 
-        let Some(statement_id) = binding.source else {
+        let Some(node_id) = binding.source else {
             continue;
         };
 
@@ -135,12 +134,12 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             })
         {
             ignored
-                .entry((statement_id, binding.exceptions))
+                .entry((node_id, binding.exceptions))
                 .or_default()
                 .push(import);
         } else {
             unused
-                .entry((statement_id, binding.exceptions))
+                .entry((node_id, binding.exceptions))
                 .or_default()
                 .push(import);
         }
@@ -151,13 +150,13 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
 
     // Generate a diagnostic for every import, but share a fix across all imports within the same
     // statement (excluding those that are ignored).
-    for ((statement_id, exceptions), imports) in unused {
+    for ((node_id, exceptions), imports) in unused {
         let in_except_handler =
             exceptions.intersects(Exceptions::MODULE_NOT_FOUND_ERROR | Exceptions::IMPORT_ERROR);
         let multiple = imports.len() > 1;
 
         let fix = if !in_init && !in_except_handler && checker.patch(Rule::UnusedImport) {
-            fix_imports(checker, statement_id, &imports).ok()
+            fix_imports(checker, node_id, &imports).ok()
         } else {
             None
         };
@@ -234,13 +233,9 @@ impl Ranged for ImportBinding<'_> {
 }
 
 /// Generate a [`Fix`] to remove unused imports from a statement.
-fn fix_imports(
-    checker: &Checker,
-    statement_id: StatementId,
-    imports: &[ImportBinding],
-) -> Result<Fix> {
-    let statement = checker.semantic().statement(statement_id);
-    let parent = checker.semantic().parent_statement(statement_id);
+fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) -> Result<Fix> {
+    let statement = checker.semantic().statement(node_id);
+    let parent = checker.semantic().parent_statement(node_id);
 
     let member_names: Vec<Cow<'_, str>> = imports
         .iter()

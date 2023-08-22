@@ -142,6 +142,23 @@ match pattern_comments:
     ):
         pass
 
+match pattern_singleton:
+    case (
+        # leading 1
+        # leading 2
+        None  # trailing
+        # trailing own 1
+        # trailing own 2
+    ):
+        pass
+    case (
+        True  # trailing
+    ):
+        ...
+    case False:
+        ...
+
+
 match foo:
     case "a", "b":
         pass

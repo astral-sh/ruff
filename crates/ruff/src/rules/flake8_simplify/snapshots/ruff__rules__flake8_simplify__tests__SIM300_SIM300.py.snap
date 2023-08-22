@@ -290,7 +290,7 @@ SIM300.py:15:1: SIM300 [*] Yoda conditions are discouraged, use `(number - 100) 
 17 17 | 
 18 18 | # OK
 
-SIM300.py:16:1: SIM300 [*] Yoda conditions are discouraged, use `(60 * 60) < SomeClass().settings.SOME_CONSTANT_VALUE` instead
+SIM300.py:16:1: SIM300 [*] Yoda conditions are discouraged
    |
 14 | JediOrder.YODA == age  # SIM300
 15 | 0 < (number - 100)  # SIM300
@@ -299,7 +299,7 @@ SIM300.py:16:1: SIM300 [*] Yoda conditions are discouraged, use `(60 * 60) < Som
 17 | 
 18 | # OK
    |
-   = help: Replace Yoda condition with `(60 * 60) < SomeClass().settings.SOME_CONSTANT_VALUE`
+   = help: Replace Yoda condition
 
 ℹ Fix
 13 13 | YODA >= age  # SIM300

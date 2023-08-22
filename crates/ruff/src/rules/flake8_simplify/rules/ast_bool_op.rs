@@ -465,16 +465,15 @@ fn match_eq_target(expr: &Expr) -> Option<(&str, &Expr)> {
     else {
         return None;
     };
-    if ops.len() != 1 || comparators.len() != 1 {
-        return None;
-    }
-    if !matches!(&ops[0], CmpOp::Eq) {
+    if ops != &[CmpOp::Eq] {
         return None;
     }
     let Expr::Name(ast::ExprName { id, .. }) = left.as_ref() else {
         return None;
     };
-    let comparator = &comparators[0];
+    let [comparator] = comparators.as_slice() else {
+        return None;
+    };
     if !matches!(&comparator, Expr::Name(_)) {
         return None;
     }

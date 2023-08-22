@@ -47,6 +47,13 @@ if (
 ):
     pass
 
+if (
+    x # 2
+    := # 3
+    y
+):
+    pass
+
 y0 = (y1 := f(x))
 
 f(x:=y, z=True)

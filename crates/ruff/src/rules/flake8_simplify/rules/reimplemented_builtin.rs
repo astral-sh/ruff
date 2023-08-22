@@ -267,13 +267,10 @@ fn match_loop(stmt: &Stmt) -> Option<Loop> {
     else {
         return None;
     };
-    if nested_body.len() != 1 {
-        return None;
-    }
     if !nested_elif_else_clauses.is_empty() {
         return None;
     }
-    let Stmt::Return(ast::StmtReturn { value, range: _ }) = &nested_body[0] else {
+    let [Stmt::Return(ast::StmtReturn { value, range: _ })] = nested_body.as_slice() else {
         return None;
     };
     let Some(value) = value else {

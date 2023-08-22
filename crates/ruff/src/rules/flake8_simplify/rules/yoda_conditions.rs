@@ -1,14 +1,15 @@
 use anyhow::Result;
 use libcst_native::CompOp;
-use ruff_python_ast::{self as ast, CmpOp, Expr, Ranged, UnaryOp};
 
-use crate::autofix::codemods::CodegenStylist;
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, CmpOp, Expr, Ranged, UnaryOp};
 use ruff_python_codegen::Stylist;
 use ruff_python_stdlib::str::{self};
 use ruff_source_file::Locator;
 
+use crate::autofix::codemods::CodegenStylist;
+use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_comparison, match_expression};
 use crate::registry::AsRule;
@@ -45,7 +46,7 @@ use crate::registry::AsRule;
 /// - [Python documentation: Assignment statements](https://docs.python.org/3/reference/simple_stmts.html#assignment-statements)
 #[violation]
 pub struct YodaConditions {
-    pub suggestion: Option<String>,
+    suggestion: Option<SourceCodeSnippet>,
 }
 
 impl Violation for YodaConditions {
@@ -54,7 +55,10 @@ impl Violation for YodaConditions {
     #[derive_message_formats]
     fn message(&self) -> String {
         let YodaConditions { suggestion } = self;
-        if let Some(suggestion) = suggestion {
+        if let Some(suggestion) = suggestion
+            .as_ref()
+            .and_then(SourceCodeSnippet::full_display)
+        {
             format!("Yoda conditions are discouraged, use `{suggestion}` instead")
         } else {
             format!("Yoda conditions are discouraged")
@@ -63,9 +67,13 @@ impl Violation for YodaConditions {
 
     fn autofix_title(&self) -> Option<String> {
         let YodaConditions { suggestion } = self;
-        suggestion
-            .as_ref()
-            .map(|suggestion| format!("Replace Yoda condition with `{suggestion}`"))
+        suggestion.as_ref().map(|suggestion| {
+            if let Some(suggestion) = suggestion.full_display() {
+                format!("Replace Yoda condition with `{suggestion}`")
+            } else {
+                format!("Replace Yoda condition")
+            }
+        })
     }
 }
 
@@ -178,7 +186,7 @@ pub(crate) fn yoda_conditions(
     if let Ok(suggestion) = reverse_comparison(expr, checker.locator(), checker.stylist()) {
         let mut diagnostic = Diagnostic::new(
             YodaConditions {
-                suggestion: Some(suggestion.to_string()),
+                suggestion: Some(SourceCodeSnippet::new(suggestion.clone())),
             },
             expr.range(),
         );

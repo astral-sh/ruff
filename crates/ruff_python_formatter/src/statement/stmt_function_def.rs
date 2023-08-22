@@ -6,7 +6,7 @@ use crate::comments::SourceComment;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{Parentheses, Parenthesize};
 use crate::prelude::*;
-use crate::statement::clause::{clause_header, ClauseHeader};
+use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
 use crate::statement::stmt_class_def::FormatDecorators;
 use crate::statement::suite::SuiteKind;
 use crate::FormatNodeRule;
@@ -142,7 +142,7 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
                         group(&format_inner).fmt(f)
                     }),
                 ),
-                block_indent(&body.format().with_options(SuiteKind::Function))
+                clause_body(body, trailing_definition_comments).with_kind(SuiteKind::Function),
             ]
         )
     }

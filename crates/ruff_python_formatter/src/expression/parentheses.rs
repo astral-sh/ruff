@@ -23,12 +23,6 @@ pub(crate) enum OptionalParentheses {
     Never,
 }
 
-impl OptionalParentheses {
-    pub(crate) const fn is_always(self) -> bool {
-        matches!(self, OptionalParentheses::Always)
-    }
-}
-
 pub(crate) trait NeedsParentheses {
     /// Determines if this object needs optional parentheses or if it is safe to omit the parentheses.
     fn needs_parentheses(

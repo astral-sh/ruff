@@ -432,7 +432,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 pyupgrade::rules::deprecated_unittest_alias(checker, func);
             }
             if checker.enabled(Rule::SuperCallWithParameters) {
-                pyupgrade::rules::super_call_with_parameters(checker, expr, func, args);
+                pyupgrade::rules::super_call_with_parameters(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryEncodeUTF8) {
                 pyupgrade::rules::unnecessary_encode_utf8(checker, call);
@@ -1178,7 +1178,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 pylint::rules::magic_value_comparison(checker, left, comparators);
             }
             if checker.enabled(Rule::InDictKeys) {
-                flake8_simplify::rules::key_in_dict_compare(checker, expr, left, ops, comparators);
+                flake8_simplify::rules::key_in_dict_compare(checker, compare);
             }
             if checker.enabled(Rule::YodaConditions) {
                 flake8_simplify::rules::yoda_conditions(checker, expr, left, ops, comparators);

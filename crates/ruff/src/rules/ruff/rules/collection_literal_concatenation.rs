@@ -1,9 +1,9 @@
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, ExprContext, Operator, Ranged};
 use ruff_text_size::TextRange;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
-use ruff_macros::{derive_message_formats, violation};
-
+use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
@@ -39,7 +39,7 @@ use crate::registry::AsRule;
 /// - [Python documentation: Sequence Types — `list`, `tuple`, `range`](https://docs.python.org/3/library/stdtypes.html#sequence-types-list-tuple-range)
 #[violation]
 pub struct CollectionLiteralConcatenation {
-    expr: String,
+    expression: SourceCodeSnippet,
 }
 
 impl Violation for CollectionLiteralConcatenation {
@@ -47,13 +47,21 @@ impl Violation for CollectionLiteralConcatenation {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let CollectionLiteralConcatenation { expr } = self;
-        format!("Consider `{expr}` instead of concatenation")
+        let CollectionLiteralConcatenation { expression } = self;
+        if let Some(expression) = expression.full_display() {
+            format!("Consider `{expression}` instead of concatenation")
+        } else {
+            format!("Consider iterable unpacking instead of concatenation")
+        }
     }
 
     fn autofix_title(&self) -> Option<String> {
-        let CollectionLiteralConcatenation { expr } = self;
-        Some(format!("Replace with `{expr}`"))
+        let CollectionLiteralConcatenation { expression } = self;
+        if let Some(expression) = expression.full_display() {
+            Some(format!("Replace with `{expression}`"))
+        } else {
+            Some(format!("Replace with iterable unpacking"))
+        }
     }
 }
 
@@ -186,7 +194,7 @@ pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Exp
     };
     let mut diagnostic = Diagnostic::new(
         CollectionLiteralConcatenation {
-            expr: contents.clone(),
+            expression: SourceCodeSnippet::new(contents.clone()),
         },
         expr.range(),
     );
