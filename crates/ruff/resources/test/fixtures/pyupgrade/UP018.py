@@ -51,5 +51,5 @@ bool()
 bool(True)
 bool(False)
 
-# These become a literal but retain parentehsis
+# These become a literal but retain parentheses
 int(1).denominator

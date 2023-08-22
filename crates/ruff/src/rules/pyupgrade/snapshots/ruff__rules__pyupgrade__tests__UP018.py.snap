@@ -276,7 +276,7 @@ UP018.py:51:1: UP018 [*] Unnecessary `bool` call (rewrite as a literal)
    51 |+True
 52 52 | bool(False)
 53 53 | 
-54 54 | # These become a literal but retain parentehsis
+54 54 | # These become a literal but retain parentheses
 
 UP018.py:52:1: UP018 [*] Unnecessary `bool` call (rewrite as a literal)
    |
@@ -285,7 +285,7 @@ UP018.py:52:1: UP018 [*] Unnecessary `bool` call (rewrite as a literal)
 52 | bool(False)
    | ^^^^^^^^^^^ UP018
 53 | 
-54 | # These become a literal but retain parentehsis
+54 | # These become a literal but retain parentheses
    |
    = help: Replace with `False`
 
@@ -296,12 +296,12 @@ UP018.py:52:1: UP018 [*] Unnecessary `bool` call (rewrite as a literal)
 52    |-bool(False)
    52 |+False
 53 53 | 
-54 54 | # These become a literal but retain parentehsis
+54 54 | # These become a literal but retain parentheses
 55 55 | int(1).denominator
 
 UP018.py:55:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
    |
-54 | # These become a literal but retain parentehsis
+54 | # These become a literal but retain parentheses
 55 | int(1).denominator
    | ^^^^^^ UP018
    |
@@ -310,7 +310,7 @@ UP018.py:55:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
 ℹ Fix
 52 52 | bool(False)
 53 53 | 
-54 54 | # These become a literal but retain parentehsis
+54 54 | # These become a literal but retain parentheses
 55    |-int(1).denominator
    55 |+(1).denominator
 
