@@ -304,7 +304,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
             }
         }
 
-        if matches!(scope.kind, ScopeKind::Function(_)) {
+        if scope.kind.is_function() {
             if checker.enabled(Rule::NoSelfUse) {
                 pylint::rules::no_self_use(checker, scope, &mut diagnostics);
             }
