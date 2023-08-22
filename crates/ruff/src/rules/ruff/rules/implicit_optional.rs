@@ -90,7 +90,8 @@ impl Violation for ImplicitOptional {
     }
 
     fn autofix_title(&self) -> Option<String> {
-        Some(format!("Convert to `{}`", self.conversion_type))
+        let ImplicitOptional { conversion_type } = self;
+        Some(format!("Convert to `{conversion_type}`"))
     }
 }
 

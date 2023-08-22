@@ -878,9 +878,11 @@ impl<'a> Generator<'a> {
                 range: _,
             }) => {
                 group_if!(precedence::LAMBDA, {
-                    let npos = parameters.args.len() + parameters.posonlyargs.len();
-                    self.p(if npos > 0 { "lambda " } else { "lambda" });
-                    self.unparse_parameters(parameters);
+                    self.p("lambda");
+                    if let Some(parameters) = parameters {
+                        self.p(" ");
+                        self.unparse_parameters(parameters);
+                    }
                     self.p(": ");
                     self.unparse_expr(body, precedence::LAMBDA);
                 });

@@ -1,7 +1,6 @@
-use ruff_python_ast::{Ranged, Stmt};
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{Ranged, Stmt};
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -22,15 +21,15 @@ impl AlwaysAutofixableViolation for PassStatementStubBody {
 
 /// PYI009
 pub(crate) fn pass_statement_stub_body(checker: &mut Checker, body: &[Stmt]) {
-    if body.len() != 1 {
+    let [stmt] = body else {
         return;
-    }
-    if body[0].is_pass_stmt() {
-        let mut diagnostic = Diagnostic::new(PassStatementStubBody, body[0].range());
+    };
+    if stmt.is_pass_stmt() {
+        let mut diagnostic = Diagnostic::new(PassStatementStubBody, stmt.range());
         if checker.patch(Rule::PassStatementStubBody) {
             diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                 format!("..."),
-                body[0].range(),
+                stmt.range(),
             )));
         };
         checker.diagnostics.push(diagnostic);

@@ -1,13 +1,14 @@
-use crate::comments::{dangling_node_comments, SourceComment};
+use ruff_formatter::prelude::{space, text};
+use ruff_formatter::{write, Buffer, FormatResult};
+use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::ExprLambda;
+
+use crate::comments::{dangling_comments, SourceComment};
 use crate::context::PyFormatContext;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::other::parameters::ParametersParentheses;
 use crate::AsFormat;
 use crate::{FormatNodeRule, PyFormatter};
-use ruff_formatter::prelude::{space, text};
-use ruff_formatter::{write, Buffer, FormatResult};
-use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::ExprLambda;
 
 #[derive(Default)]
 pub struct FormatExprLambda;
@@ -20,13 +21,12 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
             body,
         } = item;
 
+        let comments = f.context().comments().clone();
+        let dangling = comments.dangling(item);
+
         write!(f, [text("lambda")])?;
 
-        if !parameters.args.is_empty()
-            || !parameters.posonlyargs.is_empty()
-            || parameters.vararg.is_some()
-            || parameters.kwarg.is_some()
-        {
+        if let Some(parameters) = parameters {
             write!(
                 f,
                 [
@@ -38,21 +38,15 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
             )?;
         }
 
-        write!(
-            f,
-            [
-                text(":"),
-                space(),
-                body.format(),
-                // It's possible for some `Arguments` of `lambda`s to be assigned dangling comments.
-                //
-                // a = (
-                //     lambda  # Dangling
-                //     : 1
-                // )
-                dangling_node_comments(parameters.as_ref())
-            ]
-        )
+        write!(f, [text(":")])?;
+
+        if dangling.is_empty() {
+            write!(f, [space()])?;
+        } else {
+            write!(f, [dangling_comments(dangling)])?;
+        }
+
+        write!(f, [body.format()])
     }
 
     fn fmt_dangling_comments(

@@ -2,8 +2,7 @@ use anyhow::Result;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Keyword, PySourceType, Ranged};
-use ruff_source_file::Locator;
+use ruff_python_ast::{self as ast, Keyword, Ranged};
 
 use crate::autofix::edits::{remove_argument, Parentheses};
 use crate::checkers::ast::Checker;
@@ -55,8 +54,7 @@ fn generate_fix(
     stdout: &Keyword,
     stderr: &Keyword,
     call: &ast::ExprCall,
-    locator: &Locator,
-    source_type: PySourceType,
+    source: &str,
 ) -> Result<Fix> {
     let (first, second) = if stdout.start() < stderr.start() {
         (stdout, stderr)
@@ -69,8 +67,7 @@ fn generate_fix(
             second,
             &call.arguments,
             Parentheses::Preserve,
-            locator,
-            source_type,
+            source,
         )?],
     ))
 }
@@ -105,9 +102,8 @@ pub(crate) fn replace_stdout_stderr(checker: &mut Checker, call: &ast::ExprCall)
 
         let mut diagnostic = Diagnostic::new(ReplaceStdoutStderr, call.range());
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.try_set_fix(|| {
-                generate_fix(stdout, stderr, call, checker.locator(), checker.source_type)
-            });
+            diagnostic
+                .try_set_fix(|| generate_fix(stdout, stderr, call, checker.locator().contents()));
         }
         checker.diagnostics.push(diagnostic);
     }

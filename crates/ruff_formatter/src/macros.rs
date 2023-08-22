@@ -1,6 +1,6 @@
 /// Constructs the parameters for other formatting macros.
 ///
-/// This macro functions by taking a list of objects implementing [`crate::Format`]. It canonicalize the
+/// This macro functions by taking a list of objects implementing [`crate::Format`]. It will canonicalize the
 /// arguments into a single type.
 ///
 /// This macro produces a value of type [`crate::Arguments`]. This value can be passed to

@@ -6,7 +6,7 @@ use rustc_hash::FxHashMap;
 use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::Ranged;
-use ruff_python_semantic::{AnyImport, Imported, ResolvedReferenceId, Scope, StatementId};
+use ruff_python_semantic::{AnyImport, Imported, NodeId, ResolvedReferenceId, Scope};
 use ruff_text_size::TextRange;
 
 use crate::autofix;
@@ -72,8 +72,8 @@ pub(crate) fn runtime_import_in_type_checking_block(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     // Collect all runtime imports by statement.
-    let mut errors_by_statement: FxHashMap<StatementId, Vec<ImportBinding>> = FxHashMap::default();
-    let mut ignores_by_statement: FxHashMap<StatementId, Vec<ImportBinding>> = FxHashMap::default();
+    let mut errors_by_statement: FxHashMap<NodeId, Vec<ImportBinding>> = FxHashMap::default();
+    let mut ignores_by_statement: FxHashMap<NodeId, Vec<ImportBinding>> = FxHashMap::default();
 
     for binding_id in scope.binding_ids() {
         let binding = checker.semantic().binding(binding_id);
@@ -95,7 +95,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
                     .is_runtime()
             })
         {
-            let Some(statement_id) = binding.source else {
+            let Some(node_id) = binding.source else {
                 continue;
             };
 
@@ -115,23 +115,20 @@ pub(crate) fn runtime_import_in_type_checking_block(
                 })
             {
                 ignores_by_statement
-                    .entry(statement_id)
+                    .entry(node_id)
                     .or_default()
                     .push(import);
             } else {
-                errors_by_statement
-                    .entry(statement_id)
-                    .or_default()
-                    .push(import);
+                errors_by_statement.entry(node_id).or_default().push(import);
             }
         }
     }
 
     // Generate a diagnostic for every import, but share a fix across all imports within the same
     // statement (excluding those that are ignored).
-    for (statement_id, imports) in errors_by_statement {
+    for (node_id, imports) in errors_by_statement {
         let fix = if checker.patch(Rule::RuntimeImportInTypeCheckingBlock) {
-            fix_imports(checker, statement_id, &imports).ok()
+            fix_imports(checker, node_id, &imports).ok()
         } else {
             None
         };
@@ -200,13 +197,9 @@ impl Ranged for ImportBinding<'_> {
 }
 
 /// Generate a [`Fix`] to remove runtime imports from a type-checking block.
-fn fix_imports(
-    checker: &Checker,
-    statement_id: StatementId,
-    imports: &[ImportBinding],
-) -> Result<Fix> {
-    let statement = checker.semantic().statement(statement_id);
-    let parent = checker.semantic().parent_statement(statement_id);
+fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) -> Result<Fix> {
+    let statement = checker.semantic().statement(node_id);
+    let parent = checker.semantic().parent_statement(node_id);
 
     let member_names: Vec<Cow<'_, str>> = imports
         .iter()
@@ -243,7 +236,8 @@ fn fix_imports(
     )?;
 
     Ok(
-        Fix::suggested_edits(remove_import_edit, add_import_edit.into_edits())
-            .isolate(checker.isolation(parent)),
+        Fix::suggested_edits(remove_import_edit, add_import_edit.into_edits()).isolate(
+            Checker::isolation(checker.semantic().parent_statement_id(node_id)),
+        ),
     )
 }

@@ -1,17 +1,12 @@
 use anyhow::Result;
-use libcst_native::ParenthesizableWhitespace;
-use ruff_python_ast::{Expr, Ranged};
+
+use ruff_python_codegen::Stylist;
 use ruff_python_parser::{lexer, Mode, Tok};
+use ruff_source_file::Locator;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::autofix::codemods::CodegenStylist;
-use ruff_diagnostics::Edit;
-use ruff_python_codegen::Stylist;
-use ruff_source_file::Locator;
-
-use crate::cst::matchers::{
-    match_call_mut, match_expression, match_function_def, match_indented_block, match_statement,
-};
+use crate::cst::matchers::{match_function_def, match_indented_block, match_statement};
 
 /// Safely adjust the indentation of the indented block at [`TextRange`].
 pub(crate) fn adjust_indentation(
@@ -37,29 +32,6 @@ pub(crate) fn adjust_indentation(
         .unwrap()
         .to_string();
     Ok(module_text)
-}
-
-/// Generate a fix to remove arguments from a `super` call.
-pub(crate) fn remove_super_arguments(
-    locator: &Locator,
-    stylist: &Stylist,
-    expr: &Expr,
-) -> Option<Edit> {
-    let range = expr.range();
-    let contents = locator.slice(range);
-
-    let mut tree = match_expression(contents).ok()?;
-
-    let body = match_call_mut(&mut tree).ok()?;
-
-    body.args = vec![];
-    body.whitespace_before_args = ParenthesizableWhitespace::default();
-    body.whitespace_after_func = ParenthesizableWhitespace::default();
-
-    Some(Edit::range_replacement(
-        tree.codegen_stylist(stylist),
-        range,
-    ))
 }
 
 /// Remove any imports matching `members` from an import-from statement.

@@ -82,6 +82,19 @@ class Test2(A):
 def b(): ...
 # comment
 def c(): ...
+
+class EllipsisWithComment:
+    ...  # comment
+
+def function_with_comment():
+    ...  # comment
+
+class EllispsisWithMultipleTrailing: # trailing class comment
+    ... # trailing ellipsis comment
+
+class EllipsisWithLeadingComment:
+    # leading
+    ...
 ```
 
 ## Output
@@ -97,18 +110,13 @@ class B:
 def foo():
     pass
 
-class Del(expr_context):
-    ...
-class Load(expr_context):
-    ...
+class Del(expr_context): ...
+class Load(expr_context): ...
 
 # Some comment.
-class Other(expr_context):
-    ...
-class Store(expr_context):
-    ...
-class Foo(Bar):
-    ...
+class Other(expr_context): ...
+class Store(expr_context): ...
+class Foo(Bar): ...
 
 class Baz(Qux):
     def __init__(self):
@@ -123,29 +131,33 @@ class Quuz(Qux):
     def __init__(self):
         pass
 
-def bar():
-    ...
-def baz():
-    ...
+def bar(): ...
+def baz(): ...
 def quux():
     """Some docstring."""
 
 def quuz():
     """Some docstring."""
 
-def a():
-    ...
+def a(): ...
 
-class Test:
-    ...
-class Test2(A):
-    ...
+class Test: ...
+class Test2(A): ...
 
-def b():
-    ...
+def b(): ...
 
 # comment
-def c():
+def c(): ...
+
+class EllipsisWithComment: ...  # comment
+
+def function_with_comment(): ...  # comment
+
+class EllispsisWithMultipleTrailing:  # trailing class comment
+    ...  # trailing ellipsis comment
+
+class EllipsisWithLeadingComment:
+    # leading
     ...
 ```
 

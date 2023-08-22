@@ -7,8 +7,8 @@ use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::comments::{
-    dangling_open_parenthesis_comments, leading_comments, leading_node_comments, trailing_comments,
-    CommentLinePosition, SourceComment,
+    dangling_comments, dangling_open_parenthesis_comments, leading_comments, leading_node_comments,
+    trailing_comments, CommentLinePosition, SourceComment,
 };
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::parentheses::empty_parenthesized;
@@ -242,7 +242,7 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             + usize::from(kwarg.is_some());
 
         if self.parentheses == ParametersParentheses::Never {
-            write!(f, [group(&format_inner)])
+            write!(f, [group(&format_inner), dangling_comments(dangling)])
         } else if num_parameters == 0 {
             // No parameters, format any dangling comments between `()`
             write!(f, [empty_parenthesized("(", dangling, ")")])

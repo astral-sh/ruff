@@ -11,8 +11,8 @@ use ruff_text_size::TextRange;
 
 use crate::context::ExecutionContext;
 use crate::model::SemanticModel;
+use crate::nodes::NodeId;
 use crate::reference::ResolvedReferenceId;
-use crate::statements::StatementId;
 use crate::ScopeId;
 
 #[derive(Debug, Clone)]
@@ -24,7 +24,7 @@ pub struct Binding<'a> {
     /// The context in which the [`Binding`] was created.
     pub context: ExecutionContext,
     /// The statement in which the [`Binding`] was defined.
-    pub source: Option<StatementId>,
+    pub source: Option<NodeId>,
     /// The references to the [`Binding`].
     pub references: Vec<ResolvedReferenceId>,
     /// The exceptions that were handled when the [`Binding`] was defined.
@@ -185,7 +185,7 @@ impl<'a> Binding<'a> {
     /// Returns the range of the binding's parent.
     pub fn parent_range(&self, semantic: &SemanticModel) -> Option<TextRange> {
         self.source
-            .map(|statement_id| semantic.statement(statement_id))
+            .map(|id| semantic.statement(id))
             .and_then(|parent| {
                 if parent.is_import_from_stmt() {
                     Some(parent.range())

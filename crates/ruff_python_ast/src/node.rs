@@ -2038,7 +2038,9 @@ impl AstNode for ast::ExprLambda {
             range: _,
         } = self;
 
-        visitor.visit_parameters(parameters);
+        if let Some(parameters) = parameters {
+            visitor.visit_parameters(parameters);
+        }
         visitor.visit_expr(body);
     }
 }

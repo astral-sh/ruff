@@ -59,12 +59,7 @@ pub(crate) fn reimplemented_list_builtin(checker: &mut Checker, expr: &ExprLambd
         range: _,
     } = expr;
 
-    if parameters.args.is_empty()
-        && parameters.kwonlyargs.is_empty()
-        && parameters.posonlyargs.is_empty()
-        && parameters.vararg.is_none()
-        && parameters.kwarg.is_none()
-    {
+    if parameters.is_none() {
         if let Expr::List(ast::ExprList { elts, .. }) = body.as_ref() {
             if elts.is_empty() {
                 let mut diagnostic = Diagnostic::new(ReimplementedListBuiltin, expr.range());

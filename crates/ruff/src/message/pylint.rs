@@ -19,7 +19,7 @@ impl Emitter for PylintEmitter {
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         for message in messages {
-            let row = if context.is_jupyter_notebook(message.filename()) {
+            let row = if context.is_notebook(message.filename()) {
                 // We can't give a reasonable location for the structured formats,
                 // so we show one that's clearly a fallback
                 OneIndexed::from_zero_indexed(0)

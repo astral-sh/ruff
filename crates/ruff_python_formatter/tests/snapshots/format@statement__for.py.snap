@@ -48,6 +48,34 @@ for x in (1, 2, 3):
 
 for x in 1, 2, 3,:
     pass
+
+# Don't keep parentheses around right target if it can made fit by breaking sub expressions
+for column_name, (
+    referenced_column_name,
+    referenced_table_name,
+) in relations.items():
+    pass
+
+for column_name, [
+    referenced_column_name,
+    referenced_table_name,
+] in relations.items():
+    pass
+
+for column_name, [
+    referenced_column_name,
+    referenced_table_name,
+], in relations.items():
+    pass
+
+for (
+    # leading comment
+    column_name, [
+    referenced_column_name,
+    referenced_table_name,
+]) in relations.items():
+    pass
+
 ```
 
 ## Output
@@ -99,6 +127,38 @@ for x in (
     2,
     3,
 ):
+    pass
+
+# Don't keep parentheses around right target if it can made fit by breaking sub expressions
+for column_name, (
+    referenced_column_name,
+    referenced_table_name,
+) in relations.items():
+    pass
+
+for column_name, [
+    referenced_column_name,
+    referenced_table_name,
+] in relations.items():
+    pass
+
+for (
+    column_name,
+    [
+        referenced_column_name,
+        referenced_table_name,
+    ],
+) in relations.items():
+    pass
+
+for (
+    # leading comment
+    column_name,
+    [
+        referenced_column_name,
+        referenced_table_name,
+    ],
+) in relations.items():
     pass
 ```
 

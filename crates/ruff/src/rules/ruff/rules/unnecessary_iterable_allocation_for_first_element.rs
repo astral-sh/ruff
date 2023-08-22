@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 
 use num_traits::Zero;
-use unicode_width::UnicodeWidthStr;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -9,6 +8,7 @@ use ruff_python_ast::{self as ast, Arguments, Comprehension, Constant, Expr, Ran
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{TextRange, TextSize};
 
+use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
@@ -47,32 +47,21 @@ use crate::registry::AsRule;
 /// - [Iterators and Iterables in Python: Run Efficient Iterations](https://realpython.com/python-iterators-iterables/#when-to-use-an-iterator-in-python)
 #[violation]
 pub(crate) struct UnnecessaryIterableAllocationForFirstElement {
-    iterable: String,
+    iterable: SourceCodeSnippet,
 }
 
 impl AlwaysAutofixableViolation for UnnecessaryIterableAllocationForFirstElement {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnnecessaryIterableAllocationForFirstElement { iterable } = self;
-        let iterable = Self::truncate(iterable);
+        let iterable = iterable.truncated_display();
         format!("Prefer `next({iterable})` over single element slice")
     }
 
     fn autofix_title(&self) -> String {
         let UnnecessaryIterableAllocationForFirstElement { iterable } = self;
-        let iterable = Self::truncate(iterable);
+        let iterable = iterable.truncated_display();
         format!("Replace with `next({iterable})`")
-    }
-}
-
-impl UnnecessaryIterableAllocationForFirstElement {
-    /// If the iterable is too long, or spans multiple lines, truncate it.
-    fn truncate(iterable: &str) -> &str {
-        if iterable.width() > 40 || iterable.contains(['\r', '\n']) {
-            "..."
-        } else {
-            iterable
-        }
     }
 }
 
@@ -104,7 +93,7 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(
 
     let mut diagnostic = Diagnostic::new(
         UnnecessaryIterableAllocationForFirstElement {
-            iterable: iterable.to_string(),
+            iterable: SourceCodeSnippet::new(iterable.to_string()),
         },
         *range,
     );

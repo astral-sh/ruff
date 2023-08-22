@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: e2b75c2709648429269934006c032842f6800678baccab09dedfb746463c30b4
+// sha3: 6ec03d3255ad27917601bff9ad0b1df5f8702124139879a78e7dca689ca1b113
 use num_bigint::BigInt;
 use ruff_text_size::TextSize;
 use ruff_python_ast::{self as ast, Ranged, IpyEscapeKind};
@@ -35817,7 +35817,7 @@ fn __action184<
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, location_args, _): (TextSize, TextSize, TextSize),
-    (_, p, _): (TextSize, core::option::Option<ast::Parameters>, TextSize),
+    (_, parameters, _): (TextSize, core::option::Option<ast::Parameters>, TextSize),
     (_, end_location_args, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, body, _): (TextSize, ast::Expr, TextSize),
@@ -35825,13 +35825,11 @@ fn __action184<
 ) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     {
-        p.as_ref().map(validate_arguments).transpose()?;
-        let p = p
-            .unwrap_or_else(|| ast::Parameters::empty((location_args..end_location_args).into()));
+        parameters.as_ref().map(validate_arguments).transpose()?;
 
         Ok(ast::Expr::Lambda(
             ast::ExprLambda {
-                parameters: Box::new(p),
+                parameters: parameters.map(Box::new),
                 body: Box::new(body),
                 range: (location..end_location).into()
             }

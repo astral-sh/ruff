@@ -1,7 +1,6 @@
-use ruff_python_ast::{Ranged, Stmt};
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Ranged};
 
 use crate::autofix;
 use crate::checkers::ast::Checker;
@@ -22,26 +21,24 @@ impl AlwaysAutofixableViolation for PassInClassBody {
 }
 
 /// PYI012
-pub(crate) fn pass_in_class_body(checker: &mut Checker, parent: &Stmt, body: &[Stmt]) {
+pub(crate) fn pass_in_class_body(checker: &mut Checker, class_def: &ast::StmtClassDef) {
     // `pass` is required in these situations (or handled by `pass_statement_stub_body`).
-    if body.len() < 2 {
+    if class_def.body.len() < 2 {
         return;
     }
 
-    for stmt in body {
+    for stmt in &class_def.body {
         if !stmt.is_pass_stmt() {
             continue;
         }
 
         let mut diagnostic = Diagnostic::new(PassInClassBody, stmt.range());
         if checker.patch(diagnostic.kind.rule()) {
-            let edit = autofix::edits::delete_stmt(
-                stmt,
-                Some(parent),
-                checker.locator(),
-                checker.indexer(),
-            );
-            diagnostic.set_fix(Fix::automatic(edit).isolate(checker.isolation(Some(parent))));
+            let edit =
+                autofix::edits::delete_stmt(stmt, Some(stmt), checker.locator(), checker.indexer());
+            diagnostic.set_fix(Fix::automatic(edit).isolate(Checker::isolation(Some(
+                checker.semantic().current_statement_id(),
+            ))));
         }
         checker.diagnostics.push(diagnostic);
     }

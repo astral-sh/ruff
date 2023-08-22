@@ -32,3 +32,7 @@ foo not in {"a", "b", "c"}  # Uses membership test already.
 foo == "a"  # Single comparison.
 
 foo != "a"  # Single comparison.
+
+foo == "a" == "b" or foo == "c"  # Multiple comparisons.
+
+foo == bar == "b" or foo == "c"  # Multiple comparisons.

@@ -1,17 +1,18 @@
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::call_path::CallPath;
 use ruff_python_ast::{
     self as ast, Arguments, Constant, Expr, Operator, ParameterWithDefault, Parameters, Ranged,
     Stmt, UnaryOp,
 };
-
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
-use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::CallPath;
 use ruff_python_semantic::{ScopeKind, SemanticModel};
 use ruff_source_file::Locator;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::registry::AsRule;
+use crate::rules::flake8_pyi::rules::TypingModule;
+use crate::settings::types::PythonVersion;
 
 #[violation]
 pub struct TypedArgumentDefaultInStub;
@@ -124,6 +125,7 @@ impl Violation for UnassignedSpecialVariableInStub {
 /// ```
 #[violation]
 pub struct TypeAliasWithoutAnnotation {
+    module: TypingModule,
     name: String,
     value: String,
 }
@@ -131,12 +133,16 @@ pub struct TypeAliasWithoutAnnotation {
 impl AlwaysAutofixableViolation for TypeAliasWithoutAnnotation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TypeAliasWithoutAnnotation { name, value } = self;
-        format!("Use `typing.TypeAlias` for type alias, e.g., `{name}: typing.TypeAlias = {value}`")
+        let TypeAliasWithoutAnnotation {
+            module,
+            name,
+            value,
+        } = self;
+        format!("Use `{module}.TypeAlias` for type alias, e.g., `{name}: TypeAlias = {value}`")
     }
 
     fn autofix_title(&self) -> String {
-        "Add `typing.TypeAlias` annotation".to_string()
+        "Add `TypeAlias` annotation".to_string()
     }
 }
 
@@ -606,7 +612,7 @@ pub(crate) fn unassigned_special_variable_in_stub(
     ));
 }
 
-/// PIY026
+/// PYI026
 pub(crate) fn type_alias_without_annotation(checker: &mut Checker, value: &Expr, targets: &[Expr]) {
     let [target] = targets else {
         return;
@@ -620,8 +626,15 @@ pub(crate) fn type_alias_without_annotation(checker: &mut Checker, value: &Expr,
         return;
     }
 
+    let module = if checker.settings.target_version >= PythonVersion::Py310 {
+        TypingModule::Typing
+    } else {
+        TypingModule::TypingExtensions
+    };
+
     let mut diagnostic = Diagnostic::new(
         TypeAliasWithoutAnnotation {
+            module,
             name: id.to_string(),
             value: checker.generator().expr(value),
         },
@@ -630,7 +643,7 @@ pub(crate) fn type_alias_without_annotation(checker: &mut Checker, value: &Expr,
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import("typing", "TypeAlias"),
+                &ImportRequest::import(module.as_str(), "TypeAlias"),
                 target.start(),
                 checker.semantic(),
             )?;

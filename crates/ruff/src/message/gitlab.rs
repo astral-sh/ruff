@@ -63,7 +63,7 @@ impl Serialize for SerializedMessages<'_> {
             let start_location = message.compute_start_location();
             let end_location = message.compute_end_location();
 
-            let lines = if self.context.is_jupyter_notebook(message.filename()) {
+            let lines = if self.context.is_notebook(message.filename()) {
                 // We can't give a reasonable location for the structured formats,
                 // so we show one that's clearly a fallback
                 json!({

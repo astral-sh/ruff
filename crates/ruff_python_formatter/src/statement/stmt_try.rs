@@ -6,7 +6,7 @@ use crate::comments::leading_alternate_branch_comments;
 use crate::comments::SourceComment;
 use crate::other::except_handler_except_handler::ExceptHandlerKind;
 use crate::prelude::*;
-use crate::statement::clause::{clause_header, ClauseHeader, ElseClause};
+use crate::statement::clause::{clause_body, clause_header, ClauseHeader, ElseClause};
 use crate::statement::{FormatRefWithRule, Stmt};
 use crate::{FormatNodeRule, PyFormatter};
 
@@ -105,9 +105,9 @@ impl FormatNodeRule<StmtTry> for FormatStmtTry {
 }
 
 fn format_case<'a>(
-    try_statement: &StmtTry,
+    try_statement: &'a StmtTry,
     kind: CaseKind,
-    previous_node: Option<&Stmt>,
+    previous_node: Option<&'a Stmt>,
     dangling_comments: &'a [SourceComment],
     f: &mut PyFormatter,
 ) -> FormatResult<(Option<&'a Stmt>, &'a [SourceComment])> {
@@ -138,12 +138,12 @@ fn format_case<'a>(
             [
                 clause_header(header, trailing_case_comments, &text(kind.keyword()))
                     .with_leading_comments(leading_case_comments, previous_node),
-                block_indent(&body.format())
+                clause_body(body, trailing_case_comments),
             ]
         )?;
-        (None, rest)
+        (Some(last), rest)
     } else {
-        (None, dangling_comments)
+        (previous_node, dangling_comments)
     })
 }
 

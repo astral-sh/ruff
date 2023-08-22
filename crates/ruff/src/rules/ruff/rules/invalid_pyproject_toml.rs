@@ -40,6 +40,7 @@ impl Violation for InvalidPyprojectToml {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Failed to parse pyproject.toml: {}", self.message)
+        let InvalidPyprojectToml { message } = self;
+        format!("Failed to parse pyproject.toml: {message}")
     }
 }

@@ -381,34 +381,34 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                                 Ok(summary) => {
                                     if checker.enabled(Rule::StringDotFormatExtraNamedArguments) {
                                         pyflakes::rules::string_dot_format_extra_named_arguments(
-                                            checker, &summary, keywords, location,
+                                            checker, call, &summary, keywords,
                                         );
                                     }
                                     if checker
                                         .enabled(Rule::StringDotFormatExtraPositionalArguments)
                                     {
                                         pyflakes::rules::string_dot_format_extra_positional_arguments(
-                                            checker, &summary, args, location,
+                                            checker, call, &summary, args,
                                         );
                                     }
                                     if checker.enabled(Rule::StringDotFormatMissingArguments) {
                                         pyflakes::rules::string_dot_format_missing_argument(
-                                            checker, &summary, args, keywords, location,
+                                            checker, call, &summary, args, keywords,
                                         );
                                     }
                                     if checker.enabled(Rule::StringDotFormatMixingAutomatic) {
                                         pyflakes::rules::string_dot_format_mixing_automatic(
-                                            checker, &summary, location,
+                                            checker, call, &summary,
                                         );
                                     }
                                     if checker.enabled(Rule::FormatLiterals) {
-                                        pyupgrade::rules::format_literals(checker, &summary, call);
+                                        pyupgrade::rules::format_literals(checker, call, &summary);
                                     }
                                     if checker.enabled(Rule::FString) {
                                         pyupgrade::rules::f_strings(
                                             checker,
+                                            call,
                                             &summary,
-                                            expr,
                                             value,
                                             checker.settings.line_length,
                                         );
@@ -432,7 +432,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 pyupgrade::rules::deprecated_unittest_alias(checker, func);
             }
             if checker.enabled(Rule::SuperCallWithParameters) {
-                pyupgrade::rules::super_call_with_parameters(checker, expr, func, args);
+                pyupgrade::rules::super_call_with_parameters(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryEncodeUTF8) {
                 pyupgrade::rules::unnecessary_encode_utf8(checker, call);
@@ -530,6 +530,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::UnnecessaryDictKwargs) {
                 flake8_pie::rules::unnecessary_dict_kwargs(checker, expr, keywords);
+            }
+            if checker.enabled(Rule::UnnecessaryRangeStart) {
+                flake8_pie::rules::unnecessary_range_start(checker, call);
             }
             if checker.enabled(Rule::ExecBuiltin) {
                 flake8_bandit::rules::exec_used(checker, func);
@@ -1175,7 +1178,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 pylint::rules::magic_value_comparison(checker, left, comparators);
             }
             if checker.enabled(Rule::InDictKeys) {
-                flake8_simplify::rules::key_in_dict_compare(checker, expr, left, ops, comparators);
+                flake8_simplify::rules::key_in_dict_compare(checker, compare);
             }
             if checker.enabled(Rule::YodaConditions) {
                 flake8_simplify::rules::yoda_conditions(checker, expr, left, ops, comparators);

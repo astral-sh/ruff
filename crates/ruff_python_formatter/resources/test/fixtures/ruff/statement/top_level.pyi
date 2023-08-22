@@ -76,3 +76,16 @@ class Test2(A):
 def b(): ...
 # comment
 def c(): ...
+
+class EllipsisWithComment:
+    ...  # comment
+
+def function_with_comment():
+    ...  # comment
+
+class EllispsisWithMultipleTrailing: # trailing class comment
+    ... # trailing ellipsis comment
+
+class EllipsisWithLeadingComment:
+    # leading
+    ...

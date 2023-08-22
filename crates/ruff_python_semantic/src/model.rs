@@ -15,16 +15,16 @@ use crate::binding::{
     Binding, BindingFlags, BindingId, BindingKind, Bindings, Exceptions, FromImport, Import,
     SubmoduleImport,
 };
+use crate::branches::{BranchId, Branches};
 use crate::context::ExecutionContext;
 use crate::definition::{Definition, DefinitionId, Definitions, Member, Module};
-use crate::expressions::{ExpressionId, Expressions};
 use crate::globals::{Globals, GlobalsArena};
+use crate::nodes::{NodeId, NodeRef, Nodes};
 use crate::reference::{
     ResolvedReference, ResolvedReferenceId, ResolvedReferences, UnresolvedReference,
     UnresolvedReferenceFlags, UnresolvedReferences,
 };
 use crate::scope::{Scope, ScopeId, ScopeKind, Scopes};
-use crate::statements::{StatementId, Statements};
 use crate::Imported;
 
 /// A semantic model for a Python module, to enable querying the module's semantic information.
@@ -32,17 +32,17 @@ pub struct SemanticModel<'a> {
     typing_modules: &'a [String],
     module_path: Option<&'a [String]>,
 
-    /// Stack of all visited statements.
-    statements: Statements<'a>,
+    /// Stack of all AST nodes in the program.
+    nodes: Nodes<'a>,
 
-    /// The identifier of the current statement.
-    statement_id: Option<StatementId>,
+    /// The ID of the current AST node.
+    node_id: Option<NodeId>,
 
-    /// Stack of all visited expressions.
-    expressions: Expressions<'a>,
+    /// Stack of all branches in the program.
+    branches: Branches,
 
-    /// The identifier of the current expression.
-    expression_id: Option<ExpressionId>,
+    /// The ID of the current branch.
+    branch_id: Option<BranchId>,
 
     /// Stack of all scopes, along with the identifier of the current scope.
     pub scopes: Scopes<'a>,
@@ -134,10 +134,10 @@ impl<'a> SemanticModel<'a> {
         Self {
             typing_modules,
             module_path: module.path(),
-            statements: Statements::default(),
-            statement_id: None,
-            expressions: Expressions::default(),
-            expression_id: None,
+            nodes: Nodes::default(),
+            node_id: None,
+            branches: Branches::default(),
+            branch_id: None,
             scopes: Scopes::default(),
             scope_id: ScopeId::global(),
             definitions: Definitions::for_module(module),
@@ -227,7 +227,7 @@ impl<'a> SemanticModel<'a> {
             flags,
             references: Vec::new(),
             scope: self.scope_id,
-            source: self.statement_id,
+            source: self.node_id,
             context: self.execution_context(),
             exceptions: self.exceptions(),
         })
@@ -719,7 +719,7 @@ impl<'a> SemanticModel<'a> {
                                     {
                                         return Some(ImportedName {
                                             name: format!("{name}.{member}"),
-                                            range: self.statements[source].range(),
+                                            range: self.nodes[source].range(),
                                             context: binding.context,
                                         });
                                     }
@@ -743,7 +743,7 @@ impl<'a> SemanticModel<'a> {
                                         {
                                             return Some(ImportedName {
                                                 name: (*name).to_string(),
-                                                range: self.statements[source].range(),
+                                                range: self.nodes[source].range(),
                                                 context: binding.context,
                                             });
                                         }
@@ -764,7 +764,7 @@ impl<'a> SemanticModel<'a> {
                                     {
                                         return Some(ImportedName {
                                             name: format!("{name}.{member}"),
-                                            range: self.statements[source].range(),
+                                            range: self.nodes[source].range(),
                                             context: binding.context,
                                         });
                                     }
@@ -779,30 +779,15 @@ impl<'a> SemanticModel<'a> {
             })
     }
 
-    /// Push a [`Stmt`] onto the stack.
-    pub fn push_statement(&mut self, stmt: &'a Stmt) {
-        self.statement_id = Some(self.statements.insert(stmt, self.statement_id));
+    /// Push an AST node [`NodeRef`] onto the stack.
+    pub fn push_node<T: Into<NodeRef<'a>>>(&mut self, node: T) {
+        self.node_id = Some(self.nodes.insert(node.into(), self.node_id, self.branch_id));
     }
 
-    /// Pop the current [`Stmt`] off the stack.
-    pub fn pop_statement(&mut self) {
-        let node_id = self
-            .statement_id
-            .expect("Attempted to pop without statement");
-        self.statement_id = self.statements.parent_id(node_id);
-    }
-
-    /// Push a [`Expr`] onto the stack.
-    pub fn push_expression(&mut self, expr: &'a Expr) {
-        self.expression_id = Some(self.expressions.insert(expr, self.expression_id));
-    }
-
-    /// Pop the current [`Expr`] off the stack.
-    pub fn pop_expression(&mut self) {
-        let node_id = self
-            .expression_id
-            .expect("Attempted to pop without expression");
-        self.expression_id = self.expressions.parent_id(node_id);
+    /// Pop the current AST node [`NodeRef`] off the stack.
+    pub fn pop_node(&mut self) {
+        let node_id = self.node_id.expect("Attempted to pop without node");
+        self.node_id = self.nodes.parent_id(node_id);
     }
 
     /// Push a [`Scope`] with the given [`ScopeKind`] onto the stack.
@@ -831,52 +816,56 @@ impl<'a> SemanticModel<'a> {
         self.definition_id = member.parent;
     }
 
-    /// Return the current `Stmt`.
-    pub fn current_statement(&self) -> &'a Stmt {
-        let node_id = self.statement_id.expect("No current statement");
-        self.statements[node_id]
+    /// Push a new branch onto the stack, returning its [`BranchId`].
+    pub fn push_branch(&mut self) -> Option<BranchId> {
+        self.branch_id = Some(self.branches.insert(self.branch_id));
+        self.branch_id
+    }
+
+    /// Pop the current [`BranchId`] off the stack.
+    pub fn pop_branch(&mut self) {
+        let node_id = self.branch_id.expect("Attempted to pop without branch");
+        self.branch_id = self.branches.parent_id(node_id);
+    }
+
+    /// Set the current [`BranchId`].
+    pub fn set_branch(&mut self, branch_id: Option<BranchId>) {
+        self.branch_id = branch_id;
     }
 
     /// Returns an [`Iterator`] over the current statement hierarchy, from the current [`Stmt`]
     /// through to any parents.
     pub fn current_statements(&self) -> impl Iterator<Item = &'a Stmt> + '_ {
-        self.statement_id
-            .iter()
-            .flat_map(|id| {
-                self.statements
-                    .ancestor_ids(*id)
-                    .map(|id| &self.statements[id])
-            })
-            .copied()
+        let id = self.node_id.expect("No current node");
+        self.nodes
+            .ancestor_ids(id)
+            .filter_map(move |id| self.nodes[id].as_statement())
     }
 
-    /// Return the parent `Stmt` of the current `Stmt`, if any.
+    /// Return the current [`Stmt`].
+    pub fn current_statement(&self) -> &'a Stmt {
+        self.current_statements()
+            .next()
+            .expect("No current statement")
+    }
+
+    /// Return the parent [`Stmt`] of the current [`Stmt`], if any.
     pub fn current_statement_parent(&self) -> Option<&'a Stmt> {
         self.current_statements().nth(1)
     }
 
-    /// Return the grandparent `Stmt` of the current `Stmt`, if any.
-    pub fn current_statement_grandparent(&self) -> Option<&'a Stmt> {
-        self.current_statements().nth(2)
-    }
-
-    /// Return the current `Expr`.
-    pub fn current_expression(&self) -> Option<&'a Expr> {
-        let node_id = self.expression_id?;
-        Some(self.expressions[node_id])
-    }
-
-    /// Returns an [`Iterator`] over the current statement hierarchy, from the current [`Expr`]
+    /// Returns an [`Iterator`] over the current expression hierarchy, from the current [`Expr`]
     /// through to any parents.
     pub fn current_expressions(&self) -> impl Iterator<Item = &'a Expr> + '_ {
-        self.expression_id
-            .iter()
-            .flat_map(|id| {
-                self.expressions
-                    .ancestor_ids(*id)
-                    .map(|id| &self.expressions[id])
-            })
-            .copied()
+        let id = self.node_id.expect("No current node");
+        self.nodes
+            .ancestor_ids(id)
+            .filter_map(move |id| self.nodes[id].as_expression())
+    }
+
+    /// Return the current [`Expr`].
+    pub fn current_expression(&self) -> Option<&'a Expr> {
+        self.current_expressions().next()
     }
 
     /// Return the parent [`Expr`] of the current [`Expr`], if any.
@@ -887,6 +876,27 @@ impl<'a> SemanticModel<'a> {
     /// Return the grandparent [`Expr`] of the current [`Expr`], if any.
     pub fn current_expression_grandparent(&self) -> Option<&'a Expr> {
         self.current_expressions().nth(2)
+    }
+
+    /// Returns an [`Iterator`] over the current statement hierarchy represented as [`NodeId`],
+    /// from the current [`NodeId`] through to any parents.
+    pub fn current_statement_ids(&self) -> impl Iterator<Item = NodeId> + '_ {
+        self.node_id
+            .iter()
+            .flat_map(|id| self.nodes.ancestor_ids(*id))
+            .filter(|id| self.nodes[*id].is_statement())
+    }
+
+    /// Return the [`NodeId`] of the current [`Stmt`].
+    pub fn current_statement_id(&self) -> NodeId {
+        self.current_statement_ids()
+            .next()
+            .expect("No current statement")
+    }
+
+    /// Return the [`NodeId`] of the current [`Stmt`] parent, if any.
+    pub fn current_statement_parent_id(&self) -> Option<NodeId> {
+        self.current_statement_ids().nth(1)
     }
 
     /// Returns a reference to the global [`Scope`].
@@ -937,29 +947,36 @@ impl<'a> SemanticModel<'a> {
         None
     }
 
-    /// Return the [`Statements`] vector of all statements.
-    pub const fn statements(&self) -> &Statements<'a> {
-        &self.statements
+    /// Return the [`Stmt`] corresponding to the given [`NodeId`].
+    #[inline]
+    pub fn node(&self, node_id: NodeId) -> &NodeRef<'a> {
+        &self.nodes[node_id]
     }
 
-    /// Return the [`StatementId`] corresponding to the given [`Stmt`].
+    /// Return the [`Stmt`] corresponding to the given [`NodeId`].
     #[inline]
-    pub fn statement_id(&self, statement: &Stmt) -> Option<StatementId> {
-        self.statements.statement_id(statement)
-    }
-
-    /// Return the [`Stmt]` corresponding to the given [`StatementId`].
-    #[inline]
-    pub fn statement(&self, statement_id: StatementId) -> &'a Stmt {
-        self.statements[statement_id]
+    pub fn statement(&self, node_id: NodeId) -> &'a Stmt {
+        self.nodes
+            .ancestor_ids(node_id)
+            .find_map(|id| self.nodes[id].as_statement())
+            .expect("No statement found")
     }
 
     /// Given a [`Stmt`], return its parent, if any.
     #[inline]
-    pub fn parent_statement(&self, statement_id: StatementId) -> Option<&'a Stmt> {
-        self.statements
-            .parent_id(statement_id)
-            .map(|id| self.statements[id])
+    pub fn parent_statement(&self, node_id: NodeId) -> Option<&'a Stmt> {
+        self.nodes
+            .ancestor_ids(node_id)
+            .filter_map(|id| self.nodes[id].as_statement())
+            .nth(1)
+    }
+
+    /// Given a [`NodeId`], return the [`NodeId`] of the parent statement, if any.
+    pub fn parent_statement_id(&self, node_id: NodeId) -> Option<NodeId> {
+        self.nodes
+            .ancestor_ids(node_id)
+            .filter(|id| self.nodes[*id].is_statement())
+            .nth(1)
     }
 
     /// Set the [`Globals`] for the current [`Scope`].
@@ -976,7 +993,7 @@ impl<'a> SemanticModel<'a> {
                     range: *range,
                     references: Vec::new(),
                     scope: self.scope_id,
-                    source: self.statement_id,
+                    source: self.node_id,
                     context: self.execution_context(),
                     exceptions: self.exceptions(),
                     flags: BindingFlags::empty(),
@@ -1022,10 +1039,7 @@ impl<'a> SemanticModel<'a> {
     /// Return `true` if the model is at the top level of the module (i.e., in the module scope,
     /// and not nested within any statements).
     pub fn at_top_level(&self) -> bool {
-        self.scope_id.is_global()
-            && self
-                .statement_id
-                .map_or(true, |stmt_id| self.statements.parent_id(stmt_id).is_none())
+        self.scope_id.is_global() && self.current_statement_parent_id().is_none()
     }
 
     /// Return `true` if the model is in an async context.
@@ -1064,6 +1078,33 @@ impl<'a> SemanticModel<'a> {
         }
 
         false
+    }
+
+    /// Returns `true` if `left` and `right` are on different branches of an `if`, `match`, or
+    /// `try` statement.
+    ///
+    /// This implementation assumes that the statements are in the same scope.
+    pub fn different_branches(&self, left: NodeId, right: NodeId) -> bool {
+        // Collect the branch path for the left statement.
+        let left = self
+            .nodes
+            .branch_id(left)
+            .iter()
+            .flat_map(|branch_id| self.branches.ancestor_ids(*branch_id))
+            .collect::<Vec<_>>();
+
+        // Collect the branch path for the right statement.
+        let right = self
+            .nodes
+            .branch_id(right)
+            .iter()
+            .flat_map(|branch_id| self.branches.ancestor_ids(*branch_id))
+            .collect::<Vec<_>>();
+
+        !left
+            .iter()
+            .zip(right.iter())
+            .all(|(left, right)| left == right)
     }
 
     /// Returns `true` if the given [`BindingId`] is used.
@@ -1133,8 +1174,8 @@ impl<'a> SemanticModel<'a> {
     pub fn snapshot(&self) -> Snapshot {
         Snapshot {
             scope_id: self.scope_id,
-            stmt_id: self.statement_id,
-            expr_id: self.expression_id,
+            node_id: self.node_id,
+            branch_id: self.branch_id,
             definition_id: self.definition_id,
             flags: self.flags,
         }
@@ -1144,14 +1185,14 @@ impl<'a> SemanticModel<'a> {
     pub fn restore(&mut self, snapshot: Snapshot) {
         let Snapshot {
             scope_id,
-            stmt_id,
-            expr_id,
+            node_id,
+            branch_id,
             definition_id,
             flags,
         } = snapshot;
         self.scope_id = scope_id;
-        self.statement_id = stmt_id;
-        self.expression_id = expr_id;
+        self.node_id = node_id;
+        self.branch_id = branch_id;
         self.definition_id = definition_id;
         self.flags = flags;
     }
@@ -1564,8 +1605,8 @@ impl SemanticModelFlags {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Snapshot {
     scope_id: ScopeId,
-    stmt_id: Option<StatementId>,
-    expr_id: Option<ExpressionId>,
+    node_id: Option<NodeId>,
+    branch_id: Option<BranchId>,
     definition_id: DefinitionId,
     flags: SemanticModelFlags,
 }

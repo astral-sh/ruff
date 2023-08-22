@@ -109,7 +109,9 @@ pub(crate) fn useless_return(
             checker.locator(),
             checker.indexer(),
         );
-        diagnostic.set_fix(Fix::automatic(edit).isolate(checker.isolation(Some(stmt))));
+        diagnostic.set_fix(Fix::automatic(edit).isolate(Checker::isolation(Some(
+            checker.semantic().current_statement_id(),
+        ))));
     }
     checker.diagnostics.push(diagnostic);
 }

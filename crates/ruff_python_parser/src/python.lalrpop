@@ -1354,14 +1354,12 @@ NamedExpression: ast::Expr = {
 };
 
 LambdaDef: ast::Expr = {
-    <location:@L> "lambda" <location_args:@L> <p:ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter>?> <end_location_args:@R> ":" <body:Test<"all">> <end_location:@R> =>? {
-        p.as_ref().map(validate_arguments).transpose()?;
-        let p = p
-            .unwrap_or_else(|| ast::Parameters::empty((location_args..end_location_args).into()));
+    <location:@L> "lambda" <location_args:@L> <parameters:ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter>?> <end_location_args:@R> ":" <body:Test<"all">> <end_location:@R> =>? {
+        parameters.as_ref().map(validate_arguments).transpose()?;
 
         Ok(ast::Expr::Lambda(
             ast::ExprLambda {
-                parameters: Box::new(p),
+                parameters: parameters.map(Box::new),
                 body: Box::new(body),
                 range: (location..end_location).into()
             }

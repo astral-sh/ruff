@@ -37,7 +37,7 @@ pub(crate) fn run_stdin(
     let mut diagnostics = lint_stdin(
         filename,
         package_root,
-        &stdin,
+        stdin,
         &pyproject_config.settings.lib,
         noqa,
         autofix,

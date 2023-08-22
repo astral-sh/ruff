@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_pyi/mod.rs
 ---
-PYI026.pyi:3:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `NewAny: typing.TypeAlias = Any`
+PYI026.pyi:3:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `NewAny: TypeAlias = Any`
   |
 1 | from typing import Literal, Any
 2 | 
@@ -10,7 +10,7 @@ PYI026.pyi:3:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `NewAny:
 4 | OptionalStr = typing.Optional[str]
 5 | Foo = Literal["foo"]
   |
-  = help: Add `typing.TypeAlias` annotation
+  = help: Add `TypeAlias` annotation
 
 ℹ Suggested fix
 1   |-from typing import Literal, Any
@@ -22,7 +22,7 @@ PYI026.pyi:3:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `NewAny:
 5 5 | Foo = Literal["foo"]
 6 6 | IntOrStr = int | str
 
-PYI026.pyi:4:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `OptionalStr: typing.TypeAlias = typing.Optional[str]`
+PYI026.pyi:4:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `OptionalStr: TypeAlias = typing.Optional[str]`
   |
 3 | NewAny = Any
 4 | OptionalStr = typing.Optional[str]
@@ -30,7 +30,7 @@ PYI026.pyi:4:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `Optiona
 5 | Foo = Literal["foo"]
 6 | IntOrStr = int | str
   |
-  = help: Add `typing.TypeAlias` annotation
+  = help: Add `TypeAlias` annotation
 
 ℹ Suggested fix
 1   |-from typing import Literal, Any
@@ -43,7 +43,7 @@ PYI026.pyi:4:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `Optiona
 6 6 | IntOrStr = int | str
 7 7 | AliasNone = None
 
-PYI026.pyi:5:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `Foo: typing.TypeAlias = Literal["foo"]`
+PYI026.pyi:5:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `Foo: TypeAlias = Literal["foo"]`
   |
 3 | NewAny = Any
 4 | OptionalStr = typing.Optional[str]
@@ -52,7 +52,7 @@ PYI026.pyi:5:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `Foo: ty
 6 | IntOrStr = int | str
 7 | AliasNone = None
   |
-  = help: Add `typing.TypeAlias` annotation
+  = help: Add `TypeAlias` annotation
 
 ℹ Suggested fix
 1   |-from typing import Literal, Any
@@ -66,7 +66,7 @@ PYI026.pyi:5:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `Foo: ty
 7 7 | AliasNone = None
 8 8 | 
 
-PYI026.pyi:6:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `IntOrStr: typing.TypeAlias = int | str`
+PYI026.pyi:6:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `IntOrStr: TypeAlias = int | str`
   |
 4 | OptionalStr = typing.Optional[str]
 5 | Foo = Literal["foo"]
@@ -74,7 +74,7 @@ PYI026.pyi:6:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `IntOrSt
   | ^^^^^^^^ PYI026
 7 | AliasNone = None
   |
-  = help: Add `typing.TypeAlias` annotation
+  = help: Add `TypeAlias` annotation
 
 ℹ Suggested fix
 1   |-from typing import Literal, Any
@@ -89,7 +89,7 @@ PYI026.pyi:6:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `IntOrSt
 8 8 | 
 9 9 | NewAny: typing.TypeAlias = Any
 
-PYI026.pyi:7:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `AliasNone: typing.TypeAlias = None`
+PYI026.pyi:7:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `AliasNone: TypeAlias = None`
   |
 5 | Foo = Literal["foo"]
 6 | IntOrStr = int | str
@@ -98,7 +98,7 @@ PYI026.pyi:7:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `AliasNo
 8 | 
 9 | NewAny: typing.TypeAlias = Any
   |
-  = help: Add `typing.TypeAlias` annotation
+  = help: Add `TypeAlias` annotation
 
 ℹ Suggested fix
 1   |-from typing import Literal, Any

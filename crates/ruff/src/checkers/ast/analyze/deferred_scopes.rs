@@ -1,6 +1,6 @@
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::Ranged;
-use ruff_python_semantic::analyze::{branch_detection, visibility};
+use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{Binding, BindingKind, ScopeKind};
 
 use crate::checkers::ast::Checker;
@@ -30,6 +30,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         Rule::UnusedPrivateTypedDict,
         Rule::UnusedStaticMethodArgument,
         Rule::UnusedVariable,
+        Rule::NoSelfUse,
     ]) {
         return;
     }
@@ -112,11 +113,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                     // If the bindings are in different forks, abort.
                     if shadowed.source.map_or(true, |left| {
                         binding.source.map_or(true, |right| {
-                            branch_detection::different_forks(
-                                left,
-                                right,
-                                checker.semantic.statements(),
-                            )
+                            checker.semantic.different_branches(left, right)
                         })
                     }) {
                         continue;
@@ -172,7 +169,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                             continue;
                         }
 
-                        let Some(statement_id) = shadowed.source else {
+                        let Some(node_id) = shadowed.source else {
                             continue;
                         };
 
@@ -180,7 +177,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                         if shadowed.kind.is_function_definition() {
                             if checker
                                 .semantic
-                                .statement(statement_id)
+                                .statement(node_id)
                                 .as_function_def_stmt()
                                 .is_some_and(|function| {
                                     visibility::is_overload(
@@ -208,11 +205,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                     // If the bindings are in different forks, abort.
                     if shadowed.source.map_or(true, |left| {
                         binding.source.map_or(true, |right| {
-                            branch_detection::different_forks(
-                                left,
-                                right,
-                                checker.semantic.statements(),
-                            )
+                            checker.semantic.different_branches(left, right)
                         })
                     }) {
                         continue;
@@ -308,6 +301,12 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
 
             if checker.enabled(Rule::UnusedImport) {
                 pyflakes::rules::unused_import(checker, scope, &mut diagnostics);
+            }
+        }
+
+        if scope.kind.is_function() {
+            if checker.enabled(Rule::NoSelfUse) {
+                pylint::rules::no_self_use(checker, scope, &mut diagnostics);
             }
         }
     }

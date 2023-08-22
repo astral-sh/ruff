@@ -1,93 +1,88 @@
 use anyhow::{Context, Ok, Result};
-use ruff_python_ast::{Expr, Ranged};
-use ruff_text_size::TextRange;
 
 use ruff_diagnostics::Edit;
+use ruff_python_ast::{self as ast, Ranged};
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::Binding;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::Locator;
 
-use crate::autofix::codemods::CodegenStylist;
-use crate::cst::matchers::{match_call_mut, match_dict, match_expression};
+use crate::cst::matchers::{match_call_mut, match_dict, transform_expression};
 
 /// Generate a [`Edit`] to remove unused keys from format dict.
 pub(super) fn remove_unused_format_arguments_from_dict(
     unused_arguments: &[usize],
-    stmt: &Expr,
+    dict: &ast::ExprDict,
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Edit> {
-    let module_text = locator.slice(stmt.range());
-    let mut tree = match_expression(module_text)?;
-    let dict = match_dict(&mut tree)?;
+    let source_code = locator.slice(dict.range());
+    transform_expression(source_code, stylist, |mut expression| {
+        let dict = match_dict(&mut expression)?;
 
-    // Remove the elements at the given indexes.
-    let mut index = 0;
-    dict.elements.retain(|_| {
-        let is_unused = unused_arguments.contains(&index);
-        index += 1;
-        !is_unused
-    });
+        // Remove the elements at the given indexes.
+        let mut index = 0;
+        dict.elements.retain(|_| {
+            let is_unused = unused_arguments.contains(&index);
+            index += 1;
+            !is_unused
+        });
 
-    Ok(Edit::range_replacement(
-        tree.codegen_stylist(stylist),
-        stmt.range(),
-    ))
+        Ok(expression)
+    })
+    .map(|output| Edit::range_replacement(output, dict.range()))
 }
 
 /// Generate a [`Edit`] to remove unused keyword arguments from a `format` call.
 pub(super) fn remove_unused_keyword_arguments_from_format_call(
     unused_arguments: &[usize],
-    location: TextRange,
+    call: &ast::ExprCall,
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Edit> {
-    let module_text = locator.slice(location);
-    let mut tree = match_expression(module_text)?;
-    let call = match_call_mut(&mut tree)?;
+    let source_code = locator.slice(call.range());
+    transform_expression(source_code, stylist, |mut expression| {
+        let call = match_call_mut(&mut expression)?;
 
-    // Remove the keyword arguments at the given indexes.
-    let mut index = 0;
-    call.args.retain(|arg| {
-        if arg.keyword.is_none() {
-            return true;
-        }
+        // Remove the keyword arguments at the given indexes.
+        let mut index = 0;
+        call.args.retain(|arg| {
+            if arg.keyword.is_none() {
+                return true;
+            }
 
-        let is_unused = unused_arguments.contains(&index);
-        index += 1;
-        !is_unused
-    });
+            let is_unused = unused_arguments.contains(&index);
+            index += 1;
+            !is_unused
+        });
 
-    Ok(Edit::range_replacement(
-        tree.codegen_stylist(stylist),
-        location,
-    ))
+        Ok(expression)
+    })
+    .map(|output| Edit::range_replacement(output, call.range()))
 }
 
 /// Generate a [`Edit`] to remove unused positional arguments from a `format` call.
 pub(crate) fn remove_unused_positional_arguments_from_format_call(
     unused_arguments: &[usize],
-    location: TextRange,
+    call: &ast::ExprCall,
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Edit> {
-    let module_text = locator.slice(location);
-    let mut tree = match_expression(module_text)?;
-    let call = match_call_mut(&mut tree)?;
+    let source_code = locator.slice(call.range());
+    transform_expression(source_code, stylist, |mut expression| {
+        let call = match_call_mut(&mut expression)?;
 
-    // Remove any unused arguments.
-    let mut index = 0;
-    call.args.retain(|_| {
-        let is_unused = unused_arguments.contains(&index);
-        index += 1;
-        !is_unused
-    });
+        // Remove any unused arguments.
+        let mut index = 0;
+        call.args.retain(|_| {
+            let is_unused = unused_arguments.contains(&index);
+            index += 1;
+            !is_unused
+        });
 
-    Ok(Edit::range_replacement(
-        tree.codegen_stylist(stylist),
-        location,
-    ))
+        Ok(expression)
+    })
+    .map(|output| Edit::range_replacement(output, call.range()))
 }
 
 /// Generate a [`Edit`] to remove the binding from an exception handler.

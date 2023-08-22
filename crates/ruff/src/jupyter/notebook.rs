@@ -33,7 +33,7 @@ pub fn round_trip(path: &Path) -> anyhow::Result<String> {
             err
         )
     })?;
-    let code = notebook.content().to_string();
+    let code = notebook.source_code().to_string();
     notebook.update_cell_content(&code);
     let mut writer = Vec::new();
     notebook.write_inner(&mut writer)?;
@@ -103,7 +103,7 @@ pub struct Notebook {
     /// separated by a newline and a trailing newline. The trailing newline
     /// is added to make sure that each cell ends with a newline which will
     /// be removed when updating the cell content.
-    content: String,
+    source_code: String,
     /// The index of the notebook. This is used to map between the concatenated
     /// source code and the original notebook.
     index: OnceCell<JupyterIndex>,
@@ -132,8 +132,8 @@ impl Notebook {
     }
 
     /// Read the Jupyter Notebook from its JSON string.
-    pub fn from_contents(contents: &str) -> Result<Self, Box<Diagnostic>> {
-        Self::from_reader(Cursor::new(contents))
+    pub fn from_source_code(source_code: &str) -> Result<Self, Box<Diagnostic>> {
+        Self::from_reader(Cursor::new(source_code))
     }
 
     /// Read a Jupyter Notebook from a [`Read`] implementor.
@@ -268,7 +268,7 @@ impl Notebook {
             // The additional newline at the end is to maintain consistency for
             // all cells. These newlines will be removed before updating the
             // source code with the transformed content. Refer `update_cell_content`.
-            content: contents.join("\n") + "\n",
+            source_code: contents.join("\n") + "\n",
             cell_offsets,
             valid_code_cells,
             trailing_newline,
@@ -404,8 +404,8 @@ impl Notebook {
     /// Return the notebook content.
     ///
     /// This is the concatenation of all Python code cells.
-    pub(crate) fn content(&self) -> &str {
-        &self.content
+    pub fn source_code(&self) -> &str {
+        &self.source_code
     }
 
     /// Return the Jupyter notebook index.
@@ -424,12 +424,13 @@ impl Notebook {
     }
 
     /// Update the notebook with the given sourcemap and transformed content.
-    pub(crate) fn update(&mut self, source_map: &SourceMap, transformed: &str) {
+    pub(crate) fn update(&mut self, source_map: &SourceMap, transformed: String) {
         // Cell offsets must be updated before updating the cell content as
         // it depends on the offsets to extract the cell content.
+        self.index.take();
         self.update_cell_offsets(source_map);
-        self.update_cell_content(transformed);
-        self.content = transformed.to_string();
+        self.update_cell_content(&transformed);
+        self.source_code = transformed;
     }
 
     /// Return a slice of [`Cell`] in the Jupyter notebook.
@@ -476,14 +477,16 @@ mod tests {
     use crate::jupyter::schema::Cell;
     use crate::jupyter::Notebook;
     use crate::registry::Rule;
-    use crate::test::{read_jupyter_notebook, test_notebook_path, test_resource_path};
+    use crate::test::{
+        read_jupyter_notebook, test_notebook_path, test_resource_path, TestedNotebook,
+    };
     use crate::{assert_messages, settings};
 
     /// Read a Jupyter cell from the `resources/test/fixtures/jupyter/cell` directory.
     fn read_jupyter_cell(path: impl AsRef<Path>) -> Result<Cell> {
         let path = test_resource_path("fixtures/jupyter/cell").join(path);
-        let contents = std::fs::read_to_string(path)?;
-        Ok(serde_json::from_str(&contents)?)
+        let source_code = std::fs::read_to_string(path)?;
+        Ok(serde_json::from_str(&source_code)?)
     }
 
     #[test]
@@ -536,7 +539,7 @@ mod tests {
     fn test_concat_notebook() -> Result<()> {
         let notebook = read_jupyter_notebook(Path::new("valid.ipynb"))?;
         assert_eq!(
-            notebook.content,
+            notebook.source_code,
             r#"def unused_variable():
     x = 1
     y = 2
@@ -578,49 +581,64 @@ print("after empty cells")
     #[test]
     fn test_import_sorting() -> Result<()> {
         let path = "isort.ipynb".to_string();
-        let (diagnostics, source_kind, _) = test_notebook_path(
+        let TestedNotebook {
+            messages,
+            source_notebook,
+            ..
+        } = test_notebook_path(
             &path,
             Path::new("isort_expected.ipynb"),
             &settings::Settings::for_rule(Rule::UnsortedImports),
         )?;
-        assert_messages!(diagnostics, path, source_kind);
+        assert_messages!(messages, path, source_notebook);
         Ok(())
     }
 
     #[test]
     fn test_ipy_escape_command() -> Result<()> {
         let path = "ipy_escape_command.ipynb".to_string();
-        let (diagnostics, source_kind, _) = test_notebook_path(
+        let TestedNotebook {
+            messages,
+            source_notebook,
+            ..
+        } = test_notebook_path(
             &path,
             Path::new("ipy_escape_command_expected.ipynb"),
             &settings::Settings::for_rule(Rule::UnusedImport),
         )?;
-        assert_messages!(diagnostics, path, source_kind);
+        assert_messages!(messages, path, source_notebook);
         Ok(())
     }
 
     #[test]
     fn test_unused_variable() -> Result<()> {
         let path = "unused_variable.ipynb".to_string();
-        let (diagnostics, source_kind, _) = test_notebook_path(
+        let TestedNotebook {
+            messages,
+            source_notebook,
+            ..
+        } = test_notebook_path(
             &path,
             Path::new("unused_variable_expected.ipynb"),
             &settings::Settings::for_rule(Rule::UnusedVariable),
         )?;
-        assert_messages!(diagnostics, path, source_kind);
+        assert_messages!(messages, path, source_notebook);
         Ok(())
     }
 
     #[test]
     fn test_json_consistency() -> Result<()> {
         let path = "before_fix.ipynb".to_string();
-        let (_, _, source_kind) = test_notebook_path(
+        let TestedNotebook {
+            linted_notebook: fixed_notebook,
+            ..
+        } = test_notebook_path(
             path,
             Path::new("after_fix.ipynb"),
             &settings::Settings::for_rule(Rule::UnusedImport),
         )?;
         let mut writer = Vec::new();
-        source_kind.expect_jupyter().write_inner(&mut writer)?;
+        fixed_notebook.write_inner(&mut writer)?;
         let actual = String::from_utf8(writer)?;
         let expected =
             std::fs::read_to_string(test_resource_path("fixtures/jupyter/after_fix.ipynb"))?;

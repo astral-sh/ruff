@@ -216,6 +216,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "R1722") => (RuleGroup::Unspecified, rules::pylint::rules::SysExitAlias),
         (Pylint, "R2004") => (RuleGroup::Unspecified, rules::pylint::rules::MagicValueComparison),
         (Pylint, "R5501") => (RuleGroup::Unspecified, rules::pylint::rules::CollapsibleElseIf),
+        (Pylint, "R6301") => (RuleGroup::Nursery, rules::pylint::rules::NoSelfUse),
         (Pylint, "W0120") => (RuleGroup::Unspecified, rules::pylint::rules::UselessElseOnLoop),
         (Pylint, "W0127") => (RuleGroup::Unspecified, rules::pylint::rules::SelfAssigningVariable),
         (Pylint, "W0129") => (RuleGroup::Unspecified, rules::pylint::rules::AssertOnStringLiteral),
@@ -707,6 +708,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pie, "800") => (RuleGroup::Unspecified, rules::flake8_pie::rules::UnnecessarySpread),
         (Flake8Pie, "804") => (RuleGroup::Unspecified, rules::flake8_pie::rules::UnnecessaryDictKwargs),
         (Flake8Pie, "807") => (RuleGroup::Unspecified, rules::flake8_pie::rules::ReimplementedListBuiltin),
+        (Flake8Pie, "808") => (RuleGroup::Unspecified, rules::flake8_pie::rules::UnnecessaryRangeStart),
         (Flake8Pie, "810") => (RuleGroup::Unspecified, rules::flake8_pie::rules::MultipleStartsEndsWith),
 
         // flake8-commas

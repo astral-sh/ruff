@@ -36,7 +36,8 @@ pub struct BadStringFormatCharacter {
 impl Violation for BadStringFormatCharacter {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unsupported format character '{}'", self.format_char)
+        let BadStringFormatCharacter { format_char } = self;
+        format!("Unsupported format character '{format_char}'")
     }
 }
 
