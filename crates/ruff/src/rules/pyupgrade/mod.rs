@@ -70,6 +70,7 @@ mod tests {
     #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_6.py"))]
     #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_7.py"))]
     #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_8.py"))]
+    #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_9.py"))]
     #[test_case(Rule::UnicodeKindPrefix, Path::new("UP025.py"))]
     #[test_case(Rule::UnnecessaryBuiltinImport, Path::new("UP029.py"))]
     #[test_case(Rule::UnnecessaryClassParentheses, Path::new("UP039.py"))]

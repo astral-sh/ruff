@@ -65,6 +65,17 @@ pub(crate) fn unnecessary_coding_comment(
                 continue;
             }
 
+            // Do not apply to lines with continuations; a fix will result in invalid syntax
+            // Ex)
+            // ```
+            // x = 1 \
+            //    # coding=utf8
+            // x = 2
+            // ```
+            if let Some(_) = indexer.preceded_by_continuations(line_range.start(), locator) {
+                continue;
+            }
+
             let mut diagnostic = Diagnostic::new(UTF8EncodingDeclaration, *comment_range);
             if settings.rules.should_fix(diagnostic.kind.rule()) {
                 diagnostic.set_fix(Fix::automatic(Edit::deletion(
