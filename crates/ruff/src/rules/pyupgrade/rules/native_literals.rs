@@ -155,7 +155,7 @@ pub(crate) fn native_literals(
         return;
     };
 
-    if !checker.semantic().is_builtin(&id) {
+    if !checker.semantic().is_builtin(id) {
         return;
     }
 
@@ -208,7 +208,7 @@ pub(crate) fn native_literals(
             let mut diagnostic = Diagnostic::new(NativeLiterals { literal_type }, call.range());
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                    parenthesize_int_attribute_access(parent_expr, &value, arg_code.to_string()),
+                    parenthesize_int_attribute_access(parent_expr, value, arg_code.to_string()),
                     call.range(),
                 )));
             }
