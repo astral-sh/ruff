@@ -84,7 +84,7 @@ pub(crate) fn unnecessary_map(
         return;
     }
 
-    let has_default_parameters = match object_type {
+    match object_type {
         ObjectType::Generator => {
             // Exclude the parent if already matched by other arms.
             if parent
@@ -108,7 +108,7 @@ pub(crate) fn unnecessary_map(
                     return;
                 }
 
-                parameters
+                if parameters
                     .posonlyargs
                     .iter()
                     .chain(&parameters.args)
@@ -116,8 +116,9 @@ pub(crate) fn unnecessary_map(
                     .any(|param| param.default.is_some())
                     || parameters.vararg.is_some()
                     || parameters.kwarg.is_some()
-            } else {
-                false
+                {
+                    return;
+                }
             }
         }
         ObjectType::List | ObjectType::Set => {
@@ -152,7 +153,7 @@ pub(crate) fn unnecessary_map(
                     return;
                 }
 
-                parameters
+                if parameters
                     .posonlyargs
                     .iter()
                     .chain(&parameters.args)
@@ -160,8 +161,9 @@ pub(crate) fn unnecessary_map(
                     .any(|param| param.default.is_some())
                     || parameters.vararg.is_some()
                     || parameters.kwarg.is_some()
-            } else {
-                false
+                {
+                    return;
+                }
             }
         }
         ObjectType::Dict => {
@@ -202,7 +204,7 @@ pub(crate) fn unnecessary_map(
                     return;
                 }
 
-                parameters
+                if parameters
                     .posonlyargs
                     .iter()
                     .chain(&parameters.args)
@@ -210,14 +212,15 @@ pub(crate) fn unnecessary_map(
                     .any(|param| param.default.is_some())
                     || parameters.vararg.is_some()
                     || parameters.kwarg.is_some()
-            } else {
-                false
+                {
+                    return;
+                }
             }
         }
     };
 
     let mut diagnostic = Diagnostic::new(UnnecessaryMap { object_type }, expr.range());
-    if checker.patch(diagnostic.kind.rule()) && !has_default_parameters {
+    if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {
             fixes::fix_unnecessary_map(
                 checker.locator(),

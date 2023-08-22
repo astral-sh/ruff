@@ -249,17 +249,6 @@ C417.py:16:8: C417 [*] Unnecessary `map` usage (rewrite using a `dict` comprehen
 18 18 | # Error, but unfixable.
 19 19 | # For simple expressions, this could be: `(x if x else 1 for x in nums)`.
 
-C417.py:21:1: C417 Unnecessary `map` usage (rewrite using a generator expression)
-   |
-19 | # For simple expressions, this could be: `(x if x else 1 for x in nums)`.
-20 | # For more complex expressions, this would differ: `(x + 2 if x else 3 for x in nums)`.
-21 | map(lambda x=1: x, nums)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^ C417
-22 | 
-23 | # False negatives.
-   |
-   = help: Replace `map` with a generator expression
-
 C417.py:39:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
    |
 38 | # Error: the `x` is overridden by the inner lambda.
@@ -279,23 +268,5 @@ C417.py:39:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expres
 40 40 | 
 41 41 | # Error, but unfixable
 42 42 | map(lambda *args: len(args), range(4))
-
-C417.py:42:1: C417 Unnecessary `map` usage (rewrite using a generator expression)
-   |
-41 | # Error, but unfixable
-42 | map(lambda *args: len(args), range(4))
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
-43 | map(lambda **kwargs: len(kwargs), range(4))
-   |
-   = help: Replace `map` with a generator expression
-
-C417.py:43:1: C417 Unnecessary `map` usage (rewrite using a generator expression)
-   |
-41 | # Error, but unfixable
-42 | map(lambda *args: len(args), range(4))
-43 | map(lambda **kwargs: len(kwargs), range(4))
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
-   |
-   = help: Replace `map` with a generator expression
 
 
