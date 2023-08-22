@@ -644,6 +644,30 @@ with (0 as a, 1 as b,): pass
     }
 
     #[test]
+    fn test_parenthesized_with_statement() {
+        let source = "\
+with ((a), (b)): pass
+with ((a), (b), c as d, (e)): pass
+with (a, b): pass
+with (a, b) as c: pass
+with ((a, b) as c): pass
+with (a as b): pass
+with (a): pass
+with (a := 0): pass
+with (a := 0) as x: pass
+with ((a)): pass
+with ((a := 0)): pass
+with (a as b, (a := 0)): pass
+with (a, (a := 0)): pass
+with (yield): pass
+with (yield from a): pass
+with ((yield)): pass
+with ((yield from a)): pass
+";
+        insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
+    }
+
+    #[test]
     fn test_with_statement_invalid() {
         for source in [
             "with 0,: pass",
