@@ -99,7 +99,7 @@ UP040.py:18:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
 16 16 | # UP040 bounded generic (todo)
 17 17 | T = typing.TypeVar("T", bound=int)
 18    |-x: typing.TypeAlias = list[T]
-   18 |+type x = list[T]
+   18 |+type x[T: int] = list[T]
 19 19 | 
 20 20 | T = typing.TypeVar("T", int, str)
 21 21 | x: typing.TypeAlias = list[T]
@@ -119,7 +119,7 @@ UP040.py:21:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
 19 19 | 
 20 20 | T = typing.TypeVar("T", int, str)
 21    |-x: typing.TypeAlias = list[T]
-   21 |+type x = list[T]
+   21 |+type x[T: (int, str)] = list[T]
 22 22 | 
 23 23 | # UP040 contravariant generic (todo)
 24 24 | T = typing.TypeVar("T", contravariant=True)
@@ -140,7 +140,7 @@ UP040.py:25:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
 23 23 | # UP040 contravariant generic (todo)
 24 24 | T = typing.TypeVar("T", contravariant=True)
 25    |-x: typing.TypeAlias = list[T]
-   25 |+type x = list[T]
+   25 |+type x[T] = list[T]
 26 26 | 
 27 27 | # UP040 covariant generic (todo)
 28 28 | T = typing.TypeVar("T", covariant=True)
@@ -161,7 +161,7 @@ UP040.py:29:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
 27 27 | # UP040 covariant generic (todo)
 28 28 | T = typing.TypeVar("T", covariant=True)
 29    |-x: typing.TypeAlias = list[T]
-   29 |+type x = list[T]
+   29 |+type x[T] = list[T]
 30 30 | 
 31 31 | # UP040 in class scope
 32 32 | T = typing.TypeVar["T"]

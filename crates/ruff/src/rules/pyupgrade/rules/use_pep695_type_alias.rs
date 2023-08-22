@@ -83,24 +83,34 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
     let mut diagnostic = Diagnostic::new(NonPEP695TypeAlias { name: name.clone() }, stmt.range());
     if checker.patch(diagnostic.kind.rule()) {
         let mut visitor = TypeVarReferenceVisitor {
-            names: vec![],
+            vars: vec![],
             semantic: checker.semantic(),
         };
         visitor.visit_expr(value);
 
-        let type_params = if visitor.names.is_empty() {
+        let type_params = if visitor.vars.is_empty() {
             None
         } else {
             Some(ast::TypeParams {
                 range: TextRange::default(),
                 type_params: visitor
-                    .names
-                    .iter()
-                    .map(|name| {
+                    .vars
+                    .into_iter()
+                    .map(|TypeVar { name, restriction }| {
                         TypeParam::TypeVar(TypeParamTypeVar {
                             range: TextRange::default(),
                             name: Identifier::new(name.id.clone(), TextRange::default()),
-                            bound: None,
+                            bound: match restriction {
+                                Some(TypeVarRestriction::Bound(ty)) => Some(Box::new(ty.clone())),
+                                Some(TypeVarRestriction::Constraint(tys)) => {
+                                    Some(Box::new(Expr::Tuple(ast::ExprTuple {
+                                        range: TextRange::default(),
+                                        elts: tys.into_iter().cloned().collect(),
+                                        ctx: ast::ExprContext::Load,
+                                    })))
+                                }
+                                None => None,
+                            },
                         })
                     })
                     .collect(),
@@ -120,8 +130,18 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
     checker.diagnostics.push(diagnostic);
 }
 
+enum TypeVarRestriction<'a> {
+    Constraint(Vec<&'a Expr>),
+    Bound(&'a Expr),
+}
+
+struct TypeVar<'a> {
+    name: &'a ExprName,
+    restriction: Option<TypeVarRestriction<'a>>,
+}
+
 struct TypeVarReferenceVisitor<'a> {
-    names: Vec<&'a ExprName>,
+    vars: Vec<TypeVar<'a>>,
     semantic: &'a SemanticModel<'a>,
 }
 
@@ -149,16 +169,17 @@ impl<'a> Visitor<'a> for TypeVarReferenceVisitor<'a> {
                         ..
                     }) => {
                         if self.semantic.match_typing_expr(subscript_value, "TypeVar") {
-                            self.names.push(name);
+                            self.vars.push(TypeVar {
+                                name,
+                                restriction: None,
+                            });
                         }
                     }
                     Expr::Call(ExprCall {
                         func, arguments, ..
                     }) => {
-                        // TODO(zanieb): Add support for bounds and variance declarations
-                        //               for now this only supports `TypeVar("...")`
                         if self.semantic.match_typing_expr(func, "TypeVar")
-                            && arguments.args.len() == 1
+                            && arguments.args.len() >= 1
                             && arguments.args.first().is_some_and(|arg| {
                                 matches!(
                                     arg,
@@ -168,9 +189,18 @@ impl<'a> Visitor<'a> for TypeVarReferenceVisitor<'a> {
                                     })
                                 )
                             })
-                            && arguments.keywords.is_empty()
                         {
-                            self.names.push(name);
+                            let restriction = if let Some(bound) = arguments.find_keyword("bound") {
+                                Some(TypeVarRestriction::Bound(&bound.value))
+                            } else if arguments.args.len() > 1 {
+                                Some(TypeVarRestriction::Constraint(
+                                    arguments.args.iter().skip(1).collect(),
+                                ))
+                            } else {
+                                None
+                            };
+
+                            self.vars.push(TypeVar { name, restriction });
                         }
                     }
                     _ => {}
