@@ -1,36 +1,317 @@
-#: E301:5:5
-class X:
+"""Fixtures for the errors E301, E302, E303, E304, E305 and E306.
 
-    def a():
-        pass
-    def b():
-        pass
-#: E301:6:5
-class X:
+Since these errors are about new lines, each test starts with either "No error" or "# E30X".
+Each test's end is signaled by a "# end" line.
 
-    def a():
+There should be no E30X error outside of a test's bound.
+"""
+
+
+# No error
+class Class:
+    pass
+# end
+
+
+# No error
+def func():
+    pass
+# end
+
+
+# No error
+# comment
+class Class:
+    pass
+# end
+
+
+# No error
+# comment
+def func():
+    pass
+# end
+
+
+# no error
+def foo():
+    pass
+
+
+def bar():
+    pass
+
+
+class Foo(object):
+    pass
+
+
+class Bar(object):
+    pass
+# end
+
+
+# No error
+class Class(object):
+
+    def func1():
+        pass
+
+    def func2():
+        pass
+# end
+
+
+# No error
+class Class:
+
+    def func1():
+        pass
+
+    # comment
+    def func2():
+        pass
+
+    # This is a
+    # ... multi-line comment
+
+    def func3():
+        pass
+
+
+# This is a
+# ... multi-line comment
+
+@decorator
+class Class:
+
+    def func1():
+        pass
+
+    # comment
+
+    def func2():
+        pass
+
+    @property
+    def func3():
+        pass
+
+# end
+
+
+# No error
+try:
+    from nonexistent import Bar
+except ImportError:
+    class Bar(object):
+        """This is a Bar replacement"""
+# end
+
+
+# No error
+def with_feature(f):
+    """Some decorator"""
+    wrapper = f
+    if has_this_feature(f):
+        def wrapper(*args):
+            call_feature(args[0])
+            return f(*args)
+    return wrapper
+# end
+
+
+# No error
+try:
+    next
+except NameError:
+    def next(iterator, default):
+        for item in iterator:
+            return item
+        return default
+# end
+
+
+# No error
+def fn():
+    pass
+
+
+class Foo():
+    """Class Foo"""
+
+    def fn():
+
+        pass
+# end
+
+
+# No error
+# comment
+def c():
+    pass
+
+
+# comment
+
+
+def d():
+    pass
+
+# This is a
+# ... multi-line comment
+
+# And this one is
+# ... a second paragraph
+# ... which spans on 3 lines
+
+
+# Function `e` is below
+# NOTE: Hey this is a testcase
+
+def e():
+    pass
+
+
+def fn():
+    print()
+
+    # comment
+
+    print()
+
+    print()
+
+# Comment 1
+
+# Comment 2
+
+
+# Comment 3
+
+def fn2():
+
+    pass
+# end
+
+
+# no error
+if __name__ == '__main__':
+    foo()
+# end
+
+
+# no error
+defaults = {}
+defaults.update({})
+# end
+
+
+# no error
+def foo(x):
+    classification = x
+    definitely = not classification
+# end
+
+
+# no error
+def bar(): pass
+def baz(): pass
+# end
+
+
+# no error
+def foo():
+    def bar(): pass
+    def baz(): pass
+# end
+
+
+# no error
+from typing import overload
+from typing import Union
+# end
+
+
+# no error
+@overload
+def f(x: int) -> int: ...
+@overload
+def f(x: str) -> str: ...
+# end
+
+
+# no error
+def f(x: Union[int, str]) -> Union[int, str]:
+    return x
+# end
+
+
+# no error
+from typing import Protocol
+
+
+class C(Protocol):
+    @property
+    def f(self) -> int: ...
+    @property
+    def g(self) -> str: ...
+# end
+
+
+# no error
+def f(
+    a,
+):
+    pass
+# end
+
+
+# E301
+class Class(object):
+
+    def func1():
+        pass
+    def func2():
+        pass
+# end
+
+
+# E301
+class Class:
+
+    def fn1():
         pass
     # comment
-    def b():
+    def fn2():
         pass
-#:
+# end
 
 
-#: E302:2:1
+# E302
 """Main module."""
-def _main():
+def fn():
     pass
-#: E302:2:1
+# end
+
+
+# E302
 import sys
 def get_sys_path():
     return sys.path
-#: E302:4:1
+# end
+
+
+# E302
 def a():
     pass
 
 def b():
     pass
-#: E302:6:1
+# end
+
+
+# E302
 def a():
     pass
 
@@ -38,32 +319,93 @@ def a():
 
 def b():
     pass
-#:
-#: E302:4:1
+# end
+
+
+# E302
 def a():
     pass
 
 async def b():
     pass
-#:
-
-#: E303:5:1
-print
+# end
 
 
+# E302
+async  def x():
+    pass
 
-print
-#: E303:5:1
-print
+async  def x(y: int = 1):
+    pass
+# end
+
+
+# E302
+def bar():
+    pass
+def baz(): pass
+# end
+
+
+# E302
+def bar(): pass
+def baz():
+    pass
+# end
+
+
+# E302
+def f():
+    pass
+# end
+
+
+# E303
+def fn():
+    _ = None
+
+
+    # arbitrary comment
+
+    def inner():  # E306 not expected
+        pass
+# end
+
+
+# E303
+def fn():
+    _ = None
+
+
+    # arbitrary comment
+    def inner():  # E306 not expected
+        pass
+# end
+
+
+# E303
+print()
+
+
+
+print()
+# end
+
+
+# E303:5:1
+print()
 
 
 
 # comment
 
-print
-#: E303:5:5 E303:8:5
+print()
+# end
+
+
+# E303:5:5 E303:8:5
 def a():
-    print
+    print()
 
 
     # comment
@@ -71,16 +413,11 @@ def a():
 
     # another comment
 
-    print
-#:
+    print()
+# end
 
 
-#: E304:3:1
-@decorator
-
-def function():
-    pass
-#: E303:5:1
+# E303
 #!python
 
 
@@ -88,63 +425,63 @@ def function():
 """This class docstring comes on line 5.
 It gives error E303: too many blank lines (3)
 """
-#:
+# end
 
-#: E305:7:1
-def a():
-    print
+
+# E304
+@decorator
+
+def function():
+    pass
+# end
+
+
+# E305:7:1
+def fn():
+    print()
 
     # comment
 
     # another comment
-a()
-#: E305:8:1
-def a():
-    print
+fn()
+# end
+
+
+# E305
+class Class():
+    pass
+
+    # comment
+
+    # another comment
+a = 1
+# end
+
+
+# E305:8:1
+def fn():
+    print()
 
     # comment
 
     # another comment
 
 try:
-    a()
+    fn()
 except Exception:
     pass
-#: E305:5:1
+# end
+
+
+# E305:5:1
 def a():
     print
 
 # Two spaces before comments, too.
 if a():
     a()
-#:
+# end
 
-#: E306:3:5
-def a():
-    x = 1
-    def b():
-        pass
-#: E306:3:5
-async def a():
-    x = 1
-    def b():
-        pass
-#: E306:3:5 E306:5:9
-def a():
-    x = 2
-    def b():
-        x = 1
-        def c():
-            pass
-#: E306:3:5 E306:6:5
-def a():
-    x = 1
-    class C:
-        pass
-    x = 2
-    def b():
-        pass
-#:
 
 #: E305:8:1
 # Example from https://github.com/PyCQA/pycodestyle/issues/400
@@ -156,36 +493,71 @@ def main():
 
 if __name__ == '__main__':
     main()
-# Previously just E272:1:6 E272:4:6
-#: E302:4:1 E271:1:6 E271:4:6
-async  def x():
-    pass
+# end
 
-async  def x(y: int = 1):
-    pass
-#: E704:3:1 E302:3:1
-def bar():
-    pass
-def baz(): pass
-#: E704:1:1 E302:2:1
-def bar(): pass
-def baz():
-    pass
-#: E704:4:5 E306:4:5
+
+# E306:3:5
+def a():
+    x = 1
+    def b():
+        pass
+# end
+
+
+#: E306:3:5
+async def a():
+    x = 1
+    def b():
+        pass
+# end
+
+
+#: E306:3:5 E306:5:9
+def a():
+    x = 2
+    def b():
+        x = 1
+        def c():
+            pass
+# end
+
+
+# E306:3:5 E306:6:5
+def a():
+    x = 1
+    class C:
+        pass
+    x = 2
+    def b():
+        pass
+# end
+
+
+# E306:4:5
 def foo():
     def bar():
         pass
     def baz(): pass
-#: E704:2:5 E306:3:5
+# end
+
+
+# E306:3:5
 def foo():
     def bar(): pass
     def baz():
         pass
-#: E302:5:1
-def f():
-    pass
+# end
 
-# wat
-@hi
-def g():
-    pass
+
+# E306
+class C:
+    def f():
+        pass
+# end
+
+
+# E306
+def f():
+    def f():
+        pass
+# end
