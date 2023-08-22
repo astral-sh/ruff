@@ -154,7 +154,7 @@ match bar1:
          print(x, y)
  
  
-@@ -15,40 +20,61 @@
+@@ -15,40 +20,58 @@
  case: int = re.match(something)
  
  match re.match(case):
@@ -197,12 +197,9 @@ match bar1:
 +    more := (than, one),
 +    indeed,
 +):
-+    case (
-+        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
-+        (
-+            "NOT_YET_IMPLEMENTED_PatternMatchValue",
-+            "NOT_YET_IMPLEMENTED_PatternMatchValue",
-+        ),
++    case x as NOT_YET_IMPLEMENTED_PatternMatchAs, (
++        "NOT_YET_IMPLEMENTED_PatternMatchValue",
++        "NOT_YET_IMPLEMENTED_PatternMatchValue",
 +    ):
          pass
 -    case [[5], (6)], [7],:
@@ -228,7 +225,7 @@ match bar1:
          assert "map" == b
  
  
-@@ -59,61 +85,63 @@
+@@ -59,61 +82,63 @@
      ),
      case,
  ):
@@ -373,12 +370,9 @@ match (
     more := (than, one),
     indeed,
 ):
-    case (
-        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
-        (
-            "NOT_YET_IMPLEMENTED_PatternMatchValue",
-            "NOT_YET_IMPLEMENTED_PatternMatchValue",
-        ),
+    case x as NOT_YET_IMPLEMENTED_PatternMatchAs, (
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
     ):
         pass
     case [

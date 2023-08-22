@@ -148,7 +148,6 @@ match pattern_comments:
     ):
         pass
 
-
 match pattern_singleton:
     case (
         # leading 1
@@ -164,6 +163,31 @@ match pattern_singleton:
         ...
     case False:
         ...
+
+match foo:
+    case "a", "b":
+        pass
+    case "a", "b",:
+        pass
+    case ("a", "b"):
+        pass
+    case ["a", "b"]:
+        pass
+    case (["a", "b"]):
+        pass
+
+match foo:
+    case [  # leading
+# leading
+    # leading
+        # leading
+        "a",  # trailing
+# trailing
+    # trailing
+        # trailing
+        "b",
+    ]:
+        pass
 ```
 
 ## Output
@@ -318,7 +342,6 @@ match pattern_comments:
     case (x as NOT_YET_IMPLEMENTED_PatternMatchAs):
         pass
 
-
 match pattern_singleton:
     case (
         # leading 1
@@ -334,6 +357,49 @@ match pattern_singleton:
         ...
     case False:
         ...
+
+match foo:
+    case (
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+    ):
+        pass
+    case (
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+    ):
+        pass
+    case (
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+    ):
+        pass
+    case [
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+    ]:
+        pass
+    case (
+        [
+            "NOT_YET_IMPLEMENTED_PatternMatchValue",
+            "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        ]
+    ):
+        pass
+
+match foo:
+    case [
+        # leading
+        # leading
+        # leading
+        # leading
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",  # trailing
+        # trailing
+        # trailing
+        # trailing
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+    ]:
+        pass
 ```
 
 
