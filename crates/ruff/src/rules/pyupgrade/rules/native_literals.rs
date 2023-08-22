@@ -175,11 +175,18 @@ pub(crate) fn native_literals(
     match args.get(0) {
         None => {
             let mut diagnostic = Diagnostic::new(NativeLiterals { literal_type }, call.range());
+
+            // Do not suggest fix for attribute access on an int like `int().attribute`
+            // Ex) `int().denominator` is valid but `0.denominator` is not
+            if literal_type == LiteralType::Int && matches!(parent_expr, Some(Expr::Attribute(_))) {
+                return;
+            }
+
             if checker.patch(diagnostic.kind.rule()) {
                 let constant = Constant::from(literal_type);
-                let constant_code = checker.generator().constant(&constant);
+                let content = checker.generator().constant(&constant);
                 diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                    parenthesize_int_attribute_access(parent_expr, &constant, constant_code),
+                    content,
                     call.range(),
                 )));
             }
@@ -205,29 +212,21 @@ pub(crate) fn native_literals(
 
             let arg_code = checker.locator().slice(arg.range());
 
+            // Attribute access on an integer requires the integer to be parenthesized to disambiguate from a float
+            // Ex) `(7).denominator` is valid but `7.denominator` is not
+            let content = match (parent_expr, value) {
+                (Some(Expr::Attribute(_)), Constant::Int(_)) => format!("({arg_code})"),
+                _ => arg_code.to_string(),
+            };
+
             let mut diagnostic = Diagnostic::new(NativeLiterals { literal_type }, call.range());
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                    parenthesize_int_attribute_access(parent_expr, value, arg_code.to_string()),
+                    content,
                     call.range(),
                 )));
             }
             checker.diagnostics.push(diagnostic);
         }
-    }
-}
-
-/// Parenthesize a code replacement for an `int` literal call with attribute access
-/// Attribute access on an integer requires the integer to be parenthesized to disambiguate from floats
-///
-/// Ex) `(7).denominator` is valid but `7.denominator` is not
-fn parenthesize_int_attribute_access(
-    parent_expr: Option<&Expr>,
-    value: &Constant,
-    content: String,
-) -> String {
-    match (parent_expr, value) {
-        (Some(Expr::Attribute(_)), Constant::Int(_)) => format!("({content})").to_string(),
-        _ => content,
     }
 }
