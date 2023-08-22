@@ -18,6 +18,14 @@ use crate::registry::AsRule;
 /// `|` operator. This syntax is more concise and readable than the previous
 /// `typing.Union` and `typing.Optional` syntaxes.
 ///
+/// This rule is enabled when targeting Python 3.10 or later (see:
+/// [`target-version`]). By default, it's _also_ enabled for earlier Python
+/// versions if `from __future__ import annotations` is present, as
+/// `__future__` annotations are not evaluated at runtime. If your code relies
+/// on runtime type annotations (either directly or via a library like
+/// Pydantic), you can disable this behavior for Python versions prior to 3.10
+/// by setting [`pyupgrade.keep-runtime-typing`] to `true`.
+///
 /// ## Example
 /// ```python
 /// from typing import Union
