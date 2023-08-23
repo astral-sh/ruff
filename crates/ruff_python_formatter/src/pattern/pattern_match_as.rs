@@ -1,7 +1,9 @@
 use ruff_formatter::{write, Buffer, FormatResult};
+use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::PatternMatchAs;
 
 use crate::comments::{dangling_comments, SourceComment};
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 use crate::{FormatNodeRule, PyFormatter};
 
@@ -54,5 +56,15 @@ impl FormatNodeRule<PatternMatchAs> for FormatPatternMatchAs {
         _f: &mut PyFormatter,
     ) -> FormatResult<()> {
         Ok(())
+    }
+}
+
+impl NeedsParentheses for PatternMatchAs {
+    fn needs_parentheses(
+        &self,
+        _parent: AnyNodeRef,
+        _context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        OptionalParentheses::Multiline
     }
 }

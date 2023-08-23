@@ -485,7 +485,7 @@ match pattern_comments:
 
 
 match pattern_comments:
-    case (no_comments):
+    case no_comments:
         pass
 
 
@@ -549,9 +549,7 @@ match pattern_singleton:
         # trailing own 2
     ):
         pass
-    case (
-        True  # trailing
-    ):
+    case True:  # trailing
         ...
     case False:
         ...
@@ -569,7 +567,7 @@ match foo:
         pass
     case ["a", "b"]:
         pass
-    case (["a", "b"]):
+    case ["a", "b"]:
         pass
 
 
@@ -590,9 +588,9 @@ match foo:
 match foo:
     case 1:
         y = 0
-    case (1):
+    case 1:
         y = 1
-    case ("a"):
+    case "a":
         y = 1
     case (  # comment
         1
@@ -603,9 +601,7 @@ match foo:
         1
     ):
         y = 1
-    case (
-        1  # comment
-    ):
+    case 1:  # comment
         y = 1
     case (
         1
@@ -676,9 +672,9 @@ match foo:
 
 
 match foo:
-    case (1):
+    case 1:
         pass
-    case (1):
+    case 1:
         pass
     case [(1), 2]:
         pass

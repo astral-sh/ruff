@@ -1,9 +1,10 @@
-use ruff_formatter::{prelude::text, write, Buffer, FormatResult};
+use ruff_formatter::{write, Buffer, FormatResult};
+use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::PatternMatchStar;
 
 use crate::comments::{dangling_comments, SourceComment};
-use crate::AsFormat;
-use crate::{FormatNodeRule, PyFormatter};
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
+use crate::prelude::*;
 
 #[derive(Default)]
 pub struct FormatPatternMatchStar;
@@ -30,5 +31,15 @@ impl FormatNodeRule<PatternMatchStar> for FormatPatternMatchStar {
     ) -> FormatResult<()> {
         // Handled by `fmt_fields`
         Ok(())
+    }
+}
+
+impl NeedsParentheses for PatternMatchStar {
+    fn needs_parentheses(
+        &self,
+        _parent: AnyNodeRef,
+        _context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        OptionalParentheses::Never
     }
 }

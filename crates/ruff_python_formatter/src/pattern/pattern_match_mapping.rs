@@ -1,6 +1,9 @@
 use ruff_formatter::{write, Buffer, FormatResult};
+use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::PatternMatchMapping;
 
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
+use crate::prelude::*;
 use crate::{not_yet_implemented_custom_text, FormatNodeRule, PyFormatter};
 
 #[derive(Default)]
@@ -15,5 +18,15 @@ impl FormatNodeRule<PatternMatchMapping> for FormatPatternMatchMapping {
                 item
             )]
         )
+    }
+}
+
+impl NeedsParentheses for PatternMatchMapping {
+    fn needs_parentheses(
+        &self,
+        _parent: AnyNodeRef,
+        _context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        OptionalParentheses::Never
     }
 }

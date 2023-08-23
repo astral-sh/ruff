@@ -1,9 +1,13 @@
 use ruff_formatter::prelude::format_with;
 use ruff_formatter::{Format, FormatResult};
+use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::PatternMatchSequence;
 
 use crate::builders::PyFormatterExtensions;
-use crate::expression::parentheses::{empty_parenthesized, optional_parentheses, parenthesized};
+use crate::context::PyFormatContext;
+use crate::expression::parentheses::{
+    empty_parenthesized, optional_parentheses, parenthesized, NeedsParentheses, OptionalParentheses,
+};
 use crate::{FormatNodeRule, PyFormatter};
 
 #[derive(Default)]
@@ -49,5 +53,15 @@ impl FormatNodeRule<PatternMatchSequence> for FormatPatternMatchSequence {
                 .fmt(f),
             SequenceType::TupleNoParens => optional_parentheses(&items).fmt(f),
         }
+    }
+}
+
+impl NeedsParentheses for PatternMatchSequence {
+    fn needs_parentheses(
+        &self,
+        _parent: AnyNodeRef,
+        _context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        OptionalParentheses::Never
     }
 }

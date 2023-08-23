@@ -1,8 +1,11 @@
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions};
+use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{Pattern, Ranged};
 use ruff_python_trivia::{first_non_trivia_token, SimpleToken, SimpleTokenKind, SimpleTokenizer};
 
-use crate::expression::parentheses::{parenthesized, Parentheses};
+use crate::expression::parentheses::{
+    parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
+};
 use crate::prelude::*;
 
 pub(crate) mod pattern_match_as;
@@ -113,5 +116,24 @@ fn is_pattern_parenthesized(pattern: &Pattern, contents: &str) -> bool {
         )
     } else {
         false
+    }
+}
+
+impl NeedsParentheses for Pattern {
+    fn needs_parentheses(
+        &self,
+        parent: AnyNodeRef,
+        context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        match self {
+            Pattern::MatchValue(pattern) => pattern.needs_parentheses(parent, context),
+            Pattern::MatchSingleton(pattern) => pattern.needs_parentheses(parent, context),
+            Pattern::MatchSequence(pattern) => pattern.needs_parentheses(parent, context),
+            Pattern::MatchMapping(pattern) => pattern.needs_parentheses(parent, context),
+            Pattern::MatchClass(pattern) => pattern.needs_parentheses(parent, context),
+            Pattern::MatchStar(pattern) => pattern.needs_parentheses(parent, context),
+            Pattern::MatchAs(pattern) => pattern.needs_parentheses(parent, context),
+            Pattern::MatchOr(pattern) => pattern.needs_parentheses(parent, context),
+        }
     }
 }
