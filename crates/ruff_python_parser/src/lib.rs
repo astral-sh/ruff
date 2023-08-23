@@ -109,7 +109,6 @@
 //! [parsing]: https://en.wikipedia.org/wiki/Parsing
 //! [lexer]: crate::lexer
 
-use crate::lexer::LexResult;
 pub use parser::{
     parse, parse_expression, parse_expression_starts_at, parse_program, parse_starts_at,
     parse_suite, parse_tokens, ParseError, ParseErrorType,
@@ -118,6 +117,8 @@ use ruff_python_ast::{CmpOp, Expr, Mod, PySourceType, Ranged, Suite};
 use ruff_text_size::{TextRange, TextSize};
 pub use string::FStringErrorType;
 pub use token::{StringKind, Tok, TokenKind};
+
+use crate::lexer::LexResult;
 
 mod function;
 // Skip flattening lexer to distinguish from full ruff_python_parser
@@ -157,25 +158,6 @@ pub fn parse_program_tokens(
         Mod::Module(m) => Ok(m.body),
         Mod::Expression(_) => unreachable!("Mode::Module doesn't return other variant"),
     }
-}
-
-/// Return the `Range` of the first `Tok::Colon` token in a `Range`.
-pub fn first_colon_range(
-    range: TextRange,
-    source: &str,
-    is_jupyter_notebook: bool,
-) -> Option<TextRange> {
-    let contents = &source[range];
-    let mode = if is_jupyter_notebook {
-        Mode::Jupyter
-    } else {
-        Mode::Module
-    };
-    let range = lexer::lex_starts_at(contents, mode, range.start())
-        .flatten()
-        .find(|(tok, _)| tok.is_colon())
-        .map(|(_, range)| range);
-    range
 }
 
 /// Extract all [`CmpOp`] operators from an expression snippet, with appropriate
@@ -373,24 +355,12 @@ mod python {
 
 #[cfg(test)]
 mod tests {
-    use crate::{first_colon_range, locate_cmp_ops, parse_expression, LocatedCmpOp};
     use anyhow::Result;
+
     use ruff_python_ast::CmpOp;
+    use ruff_text_size::TextSize;
 
-    use ruff_text_size::{TextLen, TextRange, TextSize};
-
-    #[test]
-    fn extract_first_colon_range() {
-        let contents = "with a: pass";
-        let range = first_colon_range(
-            TextRange::new(TextSize::from(0), contents.text_len()),
-            contents,
-            false,
-        )
-        .unwrap();
-        assert_eq!(&contents[range], ":");
-        assert_eq!(range, TextRange::new(TextSize::from(6), TextSize::from(7)));
-    }
+    use crate::{locate_cmp_ops, parse_expression, LocatedCmpOp};
 
     #[test]
     fn extract_cmp_op_location() -> Result<()> {

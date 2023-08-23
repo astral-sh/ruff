@@ -1,12 +1,12 @@
 use log::error;
-use ruff_python_ast::{self as ast, Ranged, Stmt, WithItem};
-use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{AutofixKind, Violation};
 use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_parser::first_colon_range;
+use ruff_python_ast::{self as ast, Ranged, Stmt, WithItem};
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::UniversalNewlines;
+use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
 use crate::line_width::LineWidth;
@@ -106,32 +106,24 @@ pub(crate) fn multiple_with_statements(
         }
     }
 
-    if let Some((is_async, items, body)) = next_with(&with_stmt.body) {
+    if let Some((is_async, items, _body)) = next_with(&with_stmt.body) {
         if is_async != with_stmt.is_async {
             // One of the statements is an async with, while the other is not,
             // we can't merge those statements.
             return;
         }
 
-        let last_item = items.last().expect("Expected items to be non-empty");
-        let colon = first_colon_range(
-            TextRange::new(
-                last_item
-                    .optional_vars
-                    .as_ref()
-                    .map_or(last_item.context_expr.end(), |v| v.end()),
-                body.first().expect("Expected body to be non-empty").start(),
-            ),
-            checker.locator().contents(),
-            checker.source_type.is_jupyter(),
-        );
+        let Some(colon) = items.last().and_then(|item| {
+            SimpleTokenizer::starts_at(item.end(), checker.locator().contents())
+                .skip_trivia()
+                .find(|token| token.kind == SimpleTokenKind::Colon)
+        }) else {
+            return;
+        };
 
         let mut diagnostic = Diagnostic::new(
             MultipleWithStatements,
-            colon.map_or_else(
-                || with_stmt.range(),
-                |colon| TextRange::new(with_stmt.start(), colon.end()),
-            ),
+            TextRange::new(with_stmt.start(), colon.end()),
         );
         if checker.patch(diagnostic.kind.rule()) {
             if !checker
