@@ -96,17 +96,21 @@ pub(crate) fn repeated_equality_comparison_target(
             return;
         };
 
-        let (left_count, left_matches) = value_to_comparators
-            .entry(left.deref().into())
-            .or_insert_with(|| (0, Vec::new()));
-        *left_count += 1;
-        left_matches.push(right);
+        if matches!(left.as_ref(), Expr::Name(_) | Expr::Attribute(_)) {
+            let (left_count, left_matches) = value_to_comparators
+                .entry(left.deref().into())
+                .or_insert_with(|| (0, Vec::new()));
+            *left_count += 1;
+            left_matches.push(right);
+        }
 
-        let (right_count, right_matches) = value_to_comparators
-            .entry(right.into())
-            .or_insert_with(|| (0, Vec::new()));
-        *right_count += 1;
-        right_matches.push(left);
+        if matches!(right, Expr::Name(_) | Expr::Attribute(_)) {
+            let (right_count, right_matches) = value_to_comparators
+                .entry(right.into())
+                .or_insert_with(|| (0, Vec::new()));
+            *right_count += 1;
+            right_matches.push(left);
+        }
     }
 
     for (value, (count, comparators)) in value_to_comparators {

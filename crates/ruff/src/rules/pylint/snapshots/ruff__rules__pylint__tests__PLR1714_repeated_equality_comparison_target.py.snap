@@ -117,7 +117,7 @@ repeated_equality_comparison_target.py:24:1: PLR1714 Consider merging multiple c
 24 | foo == "a" or foo == "b" or "c" == bar or "d" == bar  # Multiple targets
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR1714
 25 | 
-26 | # OK
+26 | foo.bar == "a" or foo.bar == "b"  # Attributes.
    |
 
 repeated_equality_comparison_target.py:24:1: PLR1714 Consider merging multiple comparisons: `bar in ("c", "d")`. Use a `set` if the elements are hashable.
@@ -127,7 +127,17 @@ repeated_equality_comparison_target.py:24:1: PLR1714 Consider merging multiple c
 24 | foo == "a" or foo == "b" or "c" == bar or "d" == bar  # Multiple targets
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR1714
 25 | 
-26 | # OK
+26 | foo.bar == "a" or foo.bar == "b"  # Attributes.
+   |
+
+repeated_equality_comparison_target.py:26:1: PLR1714 Consider merging multiple comparisons: `foo.bar in ("a", "b")`. Use a `set` if the elements are hashable.
+   |
+24 | foo == "a" or foo == "b" or "c" == bar or "d" == bar  # Multiple targets
+25 | 
+26 | foo.bar == "a" or foo.bar == "b"  # Attributes.
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR1714
+27 | 
+28 | # OK
    |
 
 
