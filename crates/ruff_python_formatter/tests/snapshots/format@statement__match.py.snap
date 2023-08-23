@@ -248,6 +248,10 @@ match foo:
         pass
     case [1, 2, *_]:
         pass
+    case [*rest, 1, 2]:
+        pass
+    case [*_, 1, 2]:
+        pass
     case [
         1,
         2,
@@ -260,7 +264,12 @@ match foo:
     case [1, 2, * # comment
         _]:
         pass
-```
+    case [* # comment
+        rest, 1, 2]:
+        pass
+    case [* # comment
+        _, 1, 2]:
+        pass```
 
 ## Output
 ```py
@@ -540,6 +549,18 @@ match foo:
     ]:
         pass
     case [
+        *rest,
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+    ]:
+        pass
+    case [
+        *_,
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+    ]:
+        pass
+    case [
         "NOT_YET_IMPLEMENTED_PatternMatchValue",
         "NOT_YET_IMPLEMENTED_PatternMatchValue",
         *rest,
@@ -555,6 +576,18 @@ match foo:
         "NOT_YET_IMPLEMENTED_PatternMatchValue",
         "NOT_YET_IMPLEMENTED_PatternMatchValue",
         *_,  # comment
+    ]:
+        pass
+    case [
+        *rest,  # comment
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+    ]:
+        pass
+    case [
+        *_,  # comment
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
     ]:
         pass
 ```
