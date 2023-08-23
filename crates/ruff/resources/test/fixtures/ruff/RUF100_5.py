@@ -3,7 +3,8 @@
 
 dictionary = {
     # "key1": 123,  # noqa: ERA001
-    # "key2": 456,
+    # "key2": 456,  # noqa
+    # "key3": 789,
 }
 
 
