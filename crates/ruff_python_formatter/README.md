@@ -117,7 +117,7 @@ Available options:
 - `--error-file`: Write all errors to the given file.
 - `--log-file`: Write all messages to the given file.
 - `--stats-file`: Use together with `--multi-project`, this writes the similarity index as unicode
-  table to the given file.
+    table to the given file.
 
 **Large ecosystem checks** It is also possible to check a large number of repositories. This dataset
 is large (~60GB), so we only do this occasionally:
