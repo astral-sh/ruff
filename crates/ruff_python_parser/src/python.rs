@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: 674e8225f7210c11b2339bea117c3c1bd00b690d886377f57e63df2eb7208eb2
+// sha3: 6ec03d3255ad27917601bff9ad0b1df5f8702124139879a78e7dca689ca1b113
 use num_bigint::BigInt;
 use ruff_text_size::TextSize;
 use ruff_python_ast::{self as ast, Ranged, IpyEscapeKind};
@@ -34234,40 +34234,7 @@ fn __action105<
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Pattern
 {
-    match pattern {
-        ast::Pattern::MatchValue(pattern) => ast::Pattern::MatchValue(ast::PatternMatchValue {
-            range: (location..end_location).into(),
-            ..pattern
-        }),
-        ast::Pattern::MatchSingleton(pattern) => ast::Pattern::MatchSingleton(ast::PatternMatchSingleton {
-            range: (location..end_location).into(),
-            ..pattern
-        }),
-        ast::Pattern::MatchSequence(pattern) => ast::Pattern::MatchSequence(ast::PatternMatchSequence {
-            range: (location..end_location).into(),
-            ..pattern
-        }),
-        ast::Pattern::MatchMapping(pattern) => ast::Pattern::MatchMapping(ast::PatternMatchMapping {
-            range: (location..end_location).into(),
-            ..pattern
-        }),
-        ast::Pattern::MatchClass(pattern) => ast::Pattern::MatchClass(ast::PatternMatchClass {
-            range: (location..end_location).into(),
-            ..pattern
-        }),
-        ast::Pattern::MatchStar(pattern) => ast::Pattern::MatchStar(ast::PatternMatchStar {
-            range: (location..end_location).into(),
-            ..pattern
-        }),
-        ast::Pattern::MatchAs(pattern) => ast::Pattern::MatchAs(ast::PatternMatchAs {
-            range: (location..end_location).into(),
-            ..pattern
-        }),
-        ast::Pattern::MatchOr(pattern) => ast::Pattern::MatchOr(ast::PatternMatchOr {
-            range: (location..end_location).into(),
-            ..pattern
-        }),
-    }
+    pattern
 }
 
 #[allow(unused_variables)]

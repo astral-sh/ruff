@@ -1361,7 +1361,6 @@ fn handle_match_case_comment<'a>(
     comment: DecoratedComment<'a>,
     match_case: &'a MatchCase,
 ) -> CommentPlacement<'a> {
-    println!("handle_match_case_comment: {:?}", comment);
     if comment.line_position().is_end_of_line() && comment.start() < match_case.pattern.start() {
         CommentPlacement::dangling(comment.enclosing_node(), comment)
     } else {

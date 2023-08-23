@@ -590,41 +590,7 @@ ClosedPattern: ast::Pattern = {
 
 SequencePattern: ast::Pattern = {
     // A single-item tuple is a special case: it's a group pattern, _not_ a sequence pattern.
-    // Expand the range to include the parentheses.
-    <location:@L> "(" <pattern:Pattern> ")" <end_location:@R> => match pattern {
-        ast::Pattern::MatchValue(pattern) => ast::Pattern::MatchValue(ast::PatternMatchValue {
-            range: (location..end_location).into(),
-            ..pattern
-        }),
-        ast::Pattern::MatchSingleton(pattern) => ast::Pattern::MatchSingleton(ast::PatternMatchSingleton {
-            range: (location..end_location).into(),
-            ..pattern
-        }),
-        ast::Pattern::MatchSequence(pattern) => ast::Pattern::MatchSequence(ast::PatternMatchSequence {
-            range: (location..end_location).into(),
-            ..pattern
-        }),
-        ast::Pattern::MatchMapping(pattern) => ast::Pattern::MatchMapping(ast::PatternMatchMapping {
-            range: (location..end_location).into(),
-            ..pattern
-        }),
-        ast::Pattern::MatchClass(pattern) => ast::Pattern::MatchClass(ast::PatternMatchClass {
-            range: (location..end_location).into(),
-            ..pattern
-        }),
-        ast::Pattern::MatchStar(pattern) => ast::Pattern::MatchStar(ast::PatternMatchStar {
-            range: (location..end_location).into(),
-            ..pattern
-        }),
-        ast::Pattern::MatchAs(pattern) => ast::Pattern::MatchAs(ast::PatternMatchAs {
-            range: (location..end_location).into(),
-            ..pattern
-        }),
-        ast::Pattern::MatchOr(pattern) => ast::Pattern::MatchOr(ast::PatternMatchOr {
-            range: (location..end_location).into(),
-            ..pattern
-        }),
-    },
+    <location:@L> "(" <pattern:Pattern> ")" <end_location:@R> => pattern,
     <location:@L> "(" ")" <end_location:@R> => ast::PatternMatchSequence {
         patterns: vec![],
         range: (location..end_location).into()

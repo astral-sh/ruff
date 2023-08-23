@@ -243,6 +243,8 @@ match foo:
         y = 0
     case (1):
         y = 1
+    case (("a")):
+        y = 1
     case (  # comment
         1
     ):
