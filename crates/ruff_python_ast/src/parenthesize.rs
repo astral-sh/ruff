@@ -33,20 +33,16 @@ pub fn parenthesized_range(
             .skip_trivia()
             .take_while(|token| token.kind == SimpleTokenKind::RParen);
 
-    let mut left_tokenizer = SimpleTokenizer::up_to_without_back_comment(expr.start(), source)
+    let left_tokenizer = SimpleTokenizer::up_to_without_back_comment(expr.start(), source)
         .skip_trivia()
         .rev()
         .take_while(|token| token.kind == SimpleTokenKind::LParen);
 
-    // Test for closing parentheses, then for the corresponding open parenthesis, as closing
-    // parenthesis testing is cheaper. Iterate to support nested parentheses.
-    let mut range = None;
-    for right_paren in right_tokenizer {
-        if let Some(left_paren) = left_tokenizer.next() {
-            range = Some(TextRange::new(left_paren.start(), right_paren.end()));
-        } else {
-            break;
-        }
-    }
-    range
+    // Zip closing parenthesis with opening parenthesis. The order is intentional, as testing for
+    // closing parentheses is cheaper, and `zip` will avoid progressing the `left_tokenizer` if
+    // the `right_tokenizer` is exhausted.
+    right_tokenizer
+        .zip(left_tokenizer)
+        .last()
+        .map(|(right, left)| TextRange::new(left.start(), right.end()))
 }

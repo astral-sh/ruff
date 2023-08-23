@@ -1,7 +1,0 @@
----
-source: crates/ruff_python_ast/tests/parenthesize.rs
-expression: parenthesized
----
-Some(
-    2..5,
-)
