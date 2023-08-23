@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix, Violation};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
@@ -11,7 +11,6 @@ use ruff_python_stdlib::typing::simple_magic_return_type;
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
-use crate::rules::flake8_annotations::fixes;
 use crate::rules::ruff::typing::type_hint_resolves_to_any;
 
 /// ## What it does
@@ -704,15 +703,10 @@ pub(crate) fn definition(
                         function.identifier(),
                     );
                     if checker.patch(diagnostic.kind.rule()) {
-                        diagnostic.try_set_fix(|| {
-                            fixes::add_return_annotation(
-                                function,
-                                "None",
-                                checker.source_type,
-                                checker.locator(),
-                            )
-                            .map(Fix::suggested)
-                        });
+                        diagnostic.set_fix(Fix::suggested(Edit::insertion(
+                            " -> None".to_string(),
+                            function.parameters.range().end(),
+                        )));
                     }
                     diagnostics.push(diagnostic);
                 }
@@ -727,15 +721,10 @@ pub(crate) fn definition(
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(return_type) = simple_magic_return_type(name) {
-                        diagnostic.try_set_fix(|| {
-                            fixes::add_return_annotation(
-                                function,
-                                return_type,
-                                checker.source_type,
-                                checker.locator(),
-                            )
-                            .map(Fix::suggested)
-                        });
+                        diagnostic.set_fix(Fix::suggested(Edit::insertion(
+                            format!(" -> {return_type}"),
+                            function.parameters.range().end(),
+                        )));
                     }
                 }
                 diagnostics.push(diagnostic);

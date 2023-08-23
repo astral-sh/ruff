@@ -1,5 +1,4 @@
 //! Rules from [flake8-annotations](https://pypi.org/project/flake8-annotations/).
-mod fixes;
 pub(crate) mod helpers;
 pub(crate) mod rules;
 pub mod settings;
