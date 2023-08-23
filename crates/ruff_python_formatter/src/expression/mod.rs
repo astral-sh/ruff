@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 
 use ruff_formatter::{
-    write, FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions,
+    format_args, write, FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions,
 };
 use ruff_python_ast as ast;
 use ruff_python_ast::node::AnyNodeRef;
@@ -220,6 +220,64 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                     }
                 }
             },
+            OptionalParentheses::BestFit => match parenthesize {
+                Parenthesize::IfBreaksOrIfRequired => {
+                    parenthesize_if_expands(&expression.format().with_options(Parentheses::Never))
+                        .fmt(f)
+                }
+
+                Parenthesize::Optional | Parenthesize::IfRequired => {
+                    expression.format().with_options(Parentheses::Never).fmt(f)
+                }
+                Parenthesize::IfBreaks => {
+                    let group_id = f.group_id("optional_parentheses");
+                    let f = &mut WithNodeLevel::new(NodeLevel::Expression(Some(group_id)), f);
+                    let mut format_expression = expression
+                        .format()
+                        .with_options(Parentheses::Never)
+                        .memoized();
+
+                    // Don't use best fitting if it is known that the expression can never fit
+                    if format_expression.inspect(f)?.will_break() {
+                        // The group here is necessary because `format_expression` may contain IR elements
+                        // that refer to the group id
+                        group(&format_expression)
+                            .with_group_id(Some(group_id))
+                            .should_expand(true)
+                            .fmt(f)
+                    } else {
+                        // Only add parentheses if it makes the expression fit on the line.
+                        // Using the flat version as the most expanded version gives a left-to-right splitting behavior
+                        // which differs from when using regular groups, because they split right-to-left.
+                        best_fitting![
+                            // ---------------------------------------------------------------------
+                            // Variant 1:
+                            // Try to fit the expression without any parentheses
+                            group(&format_expression).with_group_id(Some(group_id)),
+                            // ---------------------------------------------------------------------
+                            // Variant 2:
+                            // Try to fit the expression by adding parentheses and indenting the expression.
+                            group(&format_args![
+                                text("("),
+                                soft_block_indent(&format_expression),
+                                text(")")
+                            ])
+                            .with_group_id(Some(group_id))
+                            .should_expand(true),
+                            // ---------------------------------------------------------------------
+                            // Variant 3: Fallback, no parentheses
+                            // Expression doesn't fit regardless of adding the parentheses. Remove the parentheses again.
+                            group(&format_expression)
+                                .with_group_id(Some(group_id))
+                                .should_expand(true)
+                        ]
+                        // Measure all lines, to avoid that the printer decides that this fits right after hitting
+                        // the `(`.
+                        .with_mode(BestFittingMode::AllLines)
+                        .fmt(f)
+                    }
+                }
+            },
             OptionalParentheses::Never => match parenthesize {
                 Parenthesize::IfBreaksOrIfRequired => {
                     parenthesize_if_expands(&expression.format().with_options(Parentheses::Never))
@@ -230,6 +288,7 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                     expression.format().with_options(Parentheses::Never).fmt(f)
                 }
             },
+
             OptionalParentheses::Always => {
                 expression.format().with_options(Parentheses::Always).fmt(f)
             }

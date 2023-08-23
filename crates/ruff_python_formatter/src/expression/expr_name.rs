@@ -1,5 +1,5 @@
 use crate::comments::SourceComment;
-use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
+use crate::expression::parentheses::{should_use_best_fit, NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 use crate::FormatNodeRule;
 use ruff_formatter::{write, FormatContext};
@@ -38,9 +38,13 @@ impl NeedsParentheses for ExprName {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,
-        _context: &PyFormatContext,
+        context: &PyFormatContext,
     ) -> OptionalParentheses {
-        OptionalParentheses::Never
+        if should_use_best_fit(self, context) {
+            OptionalParentheses::BestFit
+        } else {
+            OptionalParentheses::Never
+        }
     }
 }
 

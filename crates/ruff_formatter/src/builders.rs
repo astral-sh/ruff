@@ -2534,17 +2534,17 @@ impl<'a, Context> BestFitting<'a, Context> {
 
 impl<Context> Format<Context> for BestFitting<'_, Context> {
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
-        let mut buffer = VecBuffer::new(f.state_mut());
         let variants = self.variants.items();
 
         let mut formatted_variants = Vec::with_capacity(variants.len());
 
         for variant in variants {
+            let mut buffer = VecBuffer::with_capacity(8, f.state_mut());
             buffer.write_element(FormatElement::Tag(StartEntry));
             buffer.write_fmt(Arguments::from(variant))?;
             buffer.write_element(FormatElement::Tag(EndEntry));
 
-            formatted_variants.push(buffer.take_vec().into_boxed_slice());
+            formatted_variants.push(buffer.into_vec().into_boxed_slice());
         }
 
         // SAFETY: The constructor guarantees that there are always at least two variants. It's, therefore,
