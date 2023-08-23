@@ -210,6 +210,7 @@ fn handle_enclosed_comment<'a>(
             handle_leading_class_with_decorators_comment(comment, class_def)
         }
         AnyNodeRef::StmtImportFrom(import_from) => handle_import_from_comment(comment, import_from),
+        AnyNodeRef::MatchCase(match_case) => handle_match_case_comment(comment, match_case),
         AnyNodeRef::StmtWith(with_) => handle_with_comment(comment, with_),
         AnyNodeRef::ExprConstant(_) => {
             if let Some(AnyNodeRef::ExprFString(fstring)) = comment.enclosing_parent() {
@@ -1297,6 +1298,28 @@ fn handle_import_from_comment<'a>(
             import_from.start() < comment.start() && comment.start() < first_name.start()
         })
     {
+        CommentPlacement::dangling(comment.enclosing_node(), comment)
+    } else {
+        CommentPlacement::Default(comment)
+    }
+}
+
+/// Attach an enclosed end-of-line comment to a [`MatchCase`].
+///
+/// For example, given:
+/// ```python
+/// case (  # comment
+///    pattern
+/// ):
+///     ...
+/// ```
+///
+/// The comment will be attached to the [`MatchCase`] node as a dangling comment.
+fn handle_match_case_comment<'a>(
+    comment: DecoratedComment<'a>,
+    match_case: &'a MatchCase,
+) -> CommentPlacement<'a> {
+    if comment.line_position().is_end_of_line() && comment.start() < match_case.pattern.start() {
         CommentPlacement::dangling(comment.enclosing_node(), comment)
     } else {
         CommentPlacement::Default(comment)

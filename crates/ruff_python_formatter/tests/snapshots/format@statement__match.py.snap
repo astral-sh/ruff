@@ -354,8 +354,7 @@ match pattern_comments:
 
 
 match pattern_comments:
-    case (
-        # leading
+    case (  # leading
         only_leading
     ):
         pass
