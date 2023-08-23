@@ -41,14 +41,6 @@ impl Diagnostic {
         self.fix = Some(fix);
     }
 
-    /// Set the [`Fix`] used to fix the diagnostic.
-    #[inline]
-    #[deprecated(note = "Use `Diagnostic::set_fix` instead.")]
-    #[allow(deprecated)]
-    pub fn set_fix_from_edit(&mut self, edit: Edit) {
-        self.fix = Some(Fix::unspecified(edit));
-    }
-
     /// Consumes `self` and returns a new `Diagnostic` with the given `fix`.
     #[inline]
     #[must_use]
@@ -60,7 +52,6 @@ impl Diagnostic {
     /// Set the [`Fix`] used to fix the diagnostic, if the provided function returns `Ok`.
     /// Otherwise, log the error.
     #[inline]
-    #[allow(deprecated)]
     pub fn try_set_fix(&mut self, func: impl FnOnce() -> Result<Fix>) {
         match func() {
             Ok(fix) => self.fix = Some(fix),
