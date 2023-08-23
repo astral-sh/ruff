@@ -1,6 +1,8 @@
-use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule};
-use ruff_python_ast::Pattern;
+use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions};
+use ruff_python_ast::{Pattern, Ranged};
+use ruff_python_trivia::{first_non_trivia_token, SimpleToken, SimpleTokenKind, SimpleTokenizer};
 
+use crate::expression::parentheses::{parenthesized, Parentheses};
 use crate::prelude::*;
 
 pub(crate) mod pattern_match_as;
@@ -12,20 +14,64 @@ pub(crate) mod pattern_match_singleton;
 pub(crate) mod pattern_match_star;
 pub(crate) mod pattern_match_value;
 
-#[derive(Default)]
-pub struct FormatPattern;
+#[derive(Copy, Clone, PartialEq, Eq, Default)]
+pub struct FormatPattern {
+    parentheses: Parentheses,
+}
+
+impl FormatRuleWithOptions<Pattern, PyFormatContext<'_>> for FormatPattern {
+    type Options = Parentheses;
+
+    fn with_options(mut self, options: Self::Options) -> Self {
+        self.parentheses = options;
+        self
+    }
+}
 
 impl FormatRule<Pattern, PyFormatContext<'_>> for FormatPattern {
-    fn fmt(&self, item: &Pattern, f: &mut PyFormatter) -> FormatResult<()> {
-        match item {
-            Pattern::MatchValue(p) => p.format().fmt(f),
-            Pattern::MatchSingleton(p) => p.format().fmt(f),
-            Pattern::MatchSequence(p) => p.format().fmt(f),
-            Pattern::MatchMapping(p) => p.format().fmt(f),
-            Pattern::MatchClass(p) => p.format().fmt(f),
-            Pattern::MatchStar(p) => p.format().fmt(f),
-            Pattern::MatchAs(p) => p.format().fmt(f),
-            Pattern::MatchOr(p) => p.format().fmt(f),
+    fn fmt(&self, pattern: &Pattern, f: &mut PyFormatter) -> FormatResult<()> {
+        let format_pattern = format_with(|f| match pattern {
+            Pattern::MatchValue(pattern) => pattern.format().fmt(f),
+            Pattern::MatchSingleton(pattern) => pattern.format().fmt(f),
+            Pattern::MatchSequence(pattern) => pattern.format().fmt(f),
+            Pattern::MatchMapping(pattern) => pattern.format().fmt(f),
+            Pattern::MatchClass(pattern) => pattern.format().fmt(f),
+            Pattern::MatchStar(pattern) => pattern.format().fmt(f),
+            Pattern::MatchAs(pattern) => pattern.format().fmt(f),
+            Pattern::MatchOr(pattern) => pattern.format().fmt(f),
+        });
+
+        let parenthesize = match self.parentheses {
+            Parentheses::Preserve => is_pattern_parenthesized(pattern, f.context().source()),
+            Parentheses::Always => true,
+            Parentheses::Never => false,
+        };
+
+        if parenthesize {
+            let comments = f.context().comments().clone();
+
+            // Any comments on the open parenthesis.
+            //
+            // For example, `# comment` in:
+            // ```python
+            // (  # comment
+            //    1
+            // )
+            // ```
+            let open_parenthesis_comment = comments
+                .leading(pattern)
+                .first()
+                .filter(|comment| comment.line_position().is_end_of_line());
+
+            parenthesized("(", &format_pattern, ")")
+                .with_dangling_comments(
+                    open_parenthesis_comment
+                        .map(std::slice::from_ref)
+                        .unwrap_or_default(),
+                )
+                .fmt(f)
+        } else {
+            format_pattern.fmt(f)
         }
     }
 }
@@ -34,7 +80,7 @@ impl<'ast> AsFormat<PyFormatContext<'ast>> for Pattern {
     type Format<'a> = FormatRefWithRule<'a, Pattern, FormatPattern, PyFormatContext<'ast>>;
 
     fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, FormatPattern)
+        FormatRefWithRule::new(self, FormatPattern::default())
     }
 }
 
@@ -42,6 +88,30 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Pattern {
     type Format = FormatOwnedWithRule<Pattern, FormatPattern, PyFormatContext<'ast>>;
 
     fn into_format(self) -> Self::Format {
-        FormatOwnedWithRule::new(self, FormatPattern)
+        FormatOwnedWithRule::new(self, FormatPattern::default())
+    }
+}
+
+fn is_pattern_parenthesized(pattern: &Pattern, contents: &str) -> bool {
+    // First test if there's a closing parentheses because it tends to be cheaper.
+    if matches!(
+        first_non_trivia_token(pattern.end(), contents),
+        Some(SimpleToken {
+            kind: SimpleTokenKind::RParen,
+            ..
+        })
+    ) {
+        let mut tokenizer =
+            SimpleTokenizer::up_to_without_back_comment(pattern.start(), contents).skip_trivia();
+
+        matches!(
+            tokenizer.next_back(),
+            Some(SimpleToken {
+                kind: SimpleTokenKind::LParen,
+                ..
+            })
+        )
+    } else {
+        false
     }
 }

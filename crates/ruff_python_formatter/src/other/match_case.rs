@@ -4,7 +4,7 @@ use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::TextRange;
 
 use crate::comments::SourceComment;
-use crate::expression::parentheses::parenthesized;
+use crate::expression::parentheses::{parenthesized, Parentheses};
 use crate::prelude::*;
 use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
 use crate::{FormatError, FormatNodeRule, PyFormatter};
@@ -39,9 +39,13 @@ impl FormatNodeRule<MatchCase> for FormatMatchCase {
                         write!(f, [text("case"), space()])?;
 
                         if is_match_case_pattern_parenthesized(item, pattern, f.context())? {
-                            parenthesized("(", &pattern.format(), ")")
-                                .with_dangling_comments(open_parenthesis_comments)
-                                .fmt(f)?;
+                            parenthesized(
+                                "(",
+                                &pattern.format().with_options(Parentheses::Never),
+                                ")",
+                            )
+                            .with_dangling_comments(open_parenthesis_comments)
+                            .fmt(f)?;
                         } else {
                             pattern.format().fmt(f)?;
                         }

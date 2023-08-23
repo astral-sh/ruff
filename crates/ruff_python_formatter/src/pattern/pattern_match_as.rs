@@ -1,8 +1,7 @@
 use ruff_formatter::{write, Buffer, FormatResult};
-use ruff_python_ast::{Pattern, PatternMatchAs};
+use ruff_python_ast::PatternMatchAs;
 
 use crate::comments::{dangling_comments, SourceComment};
-use crate::expression::parentheses::parenthesized;
 use crate::prelude::*;
 use crate::{FormatNodeRule, PyFormatter};
 
@@ -21,18 +20,7 @@ impl FormatNodeRule<PatternMatchAs> for FormatPatternMatchAs {
 
         if let Some(name) = name {
             if let Some(pattern) = pattern {
-                // Parenthesize nested `PatternMatchAs` like `(a as b) as c`.
-                if matches!(
-                    pattern.as_ref(),
-                    Pattern::MatchAs(PatternMatchAs {
-                        pattern: Some(_),
-                        ..
-                    })
-                ) {
-                    parenthesized("(", &pattern.format(), ")").fmt(f)?;
-                } else {
-                    pattern.format().fmt(f)?;
-                }
+                pattern.format().fmt(f)?;
 
                 if comments.has_trailing(pattern.as_ref()) {
                     write!(f, [hard_line_break()])?;
