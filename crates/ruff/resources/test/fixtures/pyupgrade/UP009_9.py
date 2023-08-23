@@ -3,5 +3,5 @@ x = 1 \
 x = 2
 
 """
-Should not be modified due to continuation in preceding line
+Invalid coding declaration due to continuation on preceding line
 """
