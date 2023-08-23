@@ -1,47 +1,6 @@
 ---
 source: crates/ruff/src/rules/ruff/mod.rs
 ---
-RUF100_5.py:5:21: RUF100 [*] Unused `noqa` directive (unused: `ERA001`)
-  |
-4 | dictionary = {
-5 |     # "key1": 123,  # noqa: ERA001
-  |                     ^^^^^^^^^^^^^^ RUF100
-6 |     # "key2": 456,  # noqa
-7 |     # "key3": 789,
-  |
-  = help: Remove unused `noqa` directive
-
-ℹ Suggested fix
-2 2 | #import os  # noqa: ERA001
-3 3 | 
-4 4 | dictionary = {
-5   |-    # "key1": 123,  # noqa: ERA001
-  5 |+    # "key1": 123,
-6 6 |     # "key2": 456,  # noqa
-7 7 |     # "key3": 789,
-8 8 | }
-
-RUF100_5.py:6:21: RUF100 [*] Unused blanket `noqa` directive
-  |
-4 | dictionary = {
-5 |     # "key1": 123,  # noqa: ERA001
-6 |     # "key2": 456,  # noqa
-  |                     ^^^^^^ RUF100
-7 |     # "key3": 789,
-8 | }
-  |
-  = help: Remove unused `noqa` directive
-
-ℹ Suggested fix
-3 3 | 
-4 4 | dictionary = {
-5 5 |     # "key1": 123,  # noqa: ERA001
-6   |-    # "key2": 456,  # noqa
-  6 |+    # "key2": 456,
-7 7 |     # "key3": 789,
-8 8 | }
-9 9 | 
-
 RUF100_5.py:7:5: ERA001 [*] Found commented-out code
   |
 5 |     # "key1": 123,  # noqa: ERA001

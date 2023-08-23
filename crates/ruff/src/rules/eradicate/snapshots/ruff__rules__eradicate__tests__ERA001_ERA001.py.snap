@@ -125,5 +125,7 @@ ERA001.py:26:5: ERA001 [*] Found commented-out code
 25 25 |     # "key1": 123,  # noqa: ERA001
 26    |-    # "key2": 456,
 27 26 | }
+28 27 | 
+29 28 | #import os  # noqa
 
 
