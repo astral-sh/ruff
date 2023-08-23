@@ -26,6 +26,10 @@ use crate::registry::AsRule;
 /// default, and initialize a new mutable object inside the function body
 /// for each call.
 ///
+/// Arguments with immutable type annotations will be ignored by this rule.
+/// Types outside of the standard library can be marked as immutable with the
+/// [`flake8-bugbear.extend-immutable-calls`] configuration option.
+///
 /// ## Example
 /// ```python
 /// def add_to_list(item, some_list=[]):
