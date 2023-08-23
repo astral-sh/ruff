@@ -206,6 +206,7 @@ fn handle_enclosed_comment<'a>(
         }
         AnyNodeRef::WithItem(_) => handle_with_item_comment(comment, locator),
         AnyNodeRef::PatternMatchAs(_) => handle_pattern_match_as_comment(comment, locator),
+        AnyNodeRef::PatternMatchStar(_) => handle_pattern_match_star_comment(comment, locator),
         AnyNodeRef::StmtFunctionDef(_) => handle_leading_function_with_decorators_comment(comment),
         AnyNodeRef::StmtClassDef(class_def) => {
             handle_leading_class_with_decorators_comment(comment, class_def)
@@ -1185,6 +1186,27 @@ fn handle_pattern_match_as_comment<'a>(
         // trailing comments on the pattern match item, rather than enclosed by it.)
         CommentPlacement::dangling(comment.enclosing_node(), comment)
     }
+}
+
+/// Handles dangling comments between the `*` token and identifier of a pattern match star:
+///
+/// ```python
+/// case [
+///   ...,
+///   *  # dangling end of line comment
+///   # dangling end of line comment
+///   rest,
+/// ]: ...
+/// ```
+fn handle_pattern_match_star_comment<'a>(
+    comment: DecoratedComment<'a>,
+    _locator: &Locator,
+) -> CommentPlacement<'a> {
+    debug_assert!(comment.enclosing_node().is_pattern_match_star());
+    let AnyNodeRef::PatternMatchStar(range, ..) = comment.enclosing_node() else {
+        return CommentPlacement::Default(comment);
+    };
+    CommentPlacement::trailing(range, comment)
 }
 
 /// Handles comments around the `:=` token in a named expression (walrus operator).
