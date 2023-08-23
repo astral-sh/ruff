@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
+assertion_line: 160
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/match.py
 ---
 ## Input
@@ -174,27 +175,6 @@ match pattern_comments:
         pass
 
 
-match pattern_comments:
-    case (
-        pattern
-        # 1
-		as
-        # 2
-		name
-        # 3
-    ):
-        pass
-
-
-match subject:
-    case (
-        pattern # 1
-        as # 2
-        name # 3
-    ):
-        pass
-
-
 match x:
     case (a as b) as c:
         pass
@@ -242,6 +222,31 @@ match foo:
         "b",
     ]:
         pass
+
+
+match foo:
+    case 1:
+        y = 0
+    case (1):
+        y = 1
+    case (  # comment
+        1
+    ):
+        y = 1
+    case (
+        # comment
+        1
+    ):
+        y = 1
+    case (
+        1  # comment
+    ):
+        y = 1
+    case (
+        1
+        # comment
+    ):
+        y = 1
 ```
 
 ## Output
@@ -360,7 +365,8 @@ match pattern_comments:
 
 
 match pattern_comments:
-    case (  # leading
+    case (
+        # leading
         only_leading
     ):
         pass
@@ -384,11 +390,10 @@ match pattern_comments:
 match pattern_comments:
     case (
         # 1
-        pattern  # 2
+        pattern as name  # 2
         # 3
-        as  # 4
-        # 5
-        name  # 6
+        # 4
+        # 5  # 6
         # 7
     ):
         pass
@@ -396,33 +401,11 @@ match pattern_comments:
 
 match pattern_comments:
     case (
-        pattern
+        pattern as name
         # 1
-        as  # 2
-        # 3
-        name  # 4
-        # 5
-    ):
-        pass
-
-
-match pattern_comments:
-    case (
-        pattern
-        # 1
-        as
         # 2
-        name
-        # 3
-    ):
-        pass
-
-
-match subject:
-    case (
-        pattern  # 1
-        as  # 2
-        name  # 3
+        # 3  # 4
+        # 5
     ):
         pass
 
@@ -478,6 +461,32 @@ match foo:
         "b",
     ]:
         pass
+
+
+match foo:
+    case 1:
+        y = 0
+    case ((1)):
+        y = 1
+    case (
+        # comment
+        (1)
+    ):
+        y = 1
+    case (
+        # comment
+        (1)
+    ):
+        y = 1
+    case (
+        (1)  # comment
+    ):
+        y = 1
+    case (
+        (1)
+        # comment
+    ):
+        y = 1
 ```
 
 
