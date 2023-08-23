@@ -1,5 +1,3 @@
-extern crate core;
-
 use thiserror::Error;
 
 use ruff_formatter::format_element::tag;
