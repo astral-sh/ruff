@@ -194,6 +194,8 @@ struct. Since it implements `Format`, you can directly use it in write calls:
 write!(f, [empty_parenthesized(dangling_end_of_line_comments)])?;
 ```
 
+Check the `builders` module for existing primitives.
+
 ## Adding new syntax
 
 Occasionally, Python will add new syntax. After adding it to `ruff_python_ast`, run `generate.py`
@@ -239,8 +241,6 @@ impl FormatNodeRule<StmtReturn> for FormatStmtReturn {
     }
 }
 ```
-
-Check the `builders` module for the primitives that you can use.
 
 If something such as list or a tuple can break into multiple lines if it is too long for a single
 line, wrap it into a `group`. Ignoring comments, we could format a tuple with two items like this:
@@ -370,10 +370,10 @@ the `break` and wrongly formatted as such. We can identify these cases by lookin
 between two bodies that have the same indentation level as the keyword, e.g. in our case the
 leading else comment is inside the `while` node (which spans the entire snippet) and on the same
 level as the `else`. We identify those case in
-[`handle_in_between_bodies_own_line_comment`](https://github.com/astral-sh/ruff/blob/be11cae619d5a24adb4da34e64d3c5f270f9727b/crates/ruff_python_formatter/src/comments/placement.rs#L196)
+[`handle_own_line_comment_around_body`](https://github.com/astral-sh/ruff/blob/4bdd99f8822d914a59f918fc46bbd17a88e2fe47/crates/ruff_python_formatter/src/comments/placement.rs#L390)
 and mark them as dangling for manual formatting later. Similarly, we find and mark comment after
 the colon(s) in
-[`handle_trailing_end_of_line_condition_comment`](https://github.com/astral-sh/ruff/blob/main/crates/ruff_python_formatter/src/comments/placement.rs#L518)
+[`handle_end_of_line_comment_around_body`](https://github.com/astral-sh/ruff/blob/4bdd99f8822d914a59f918fc46bbd17a88e2fe47/crates/ruff_python_formatter/src/comments/placement.rs#L238C4-L238C14)
 .
 
 The comments don't carry any extra information such as why we marked the comment as trailing,
