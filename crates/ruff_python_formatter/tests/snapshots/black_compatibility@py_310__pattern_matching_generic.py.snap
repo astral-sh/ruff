@@ -119,18 +119,6 @@ with match() as match:
 ```diff
 --- Black
 +++ Ruff
-@@ -24,9 +24,9 @@
-         ]
- 
-     match match:
--        case case:
-+        case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
-             match match:
--                case case:
-+                case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
-                     pass
- 
-     if all(version.is_python2() for version in target_versions):
 @@ -46,7 +46,7 @@
      def test_patma_139(self):
          x = False
@@ -140,7 +128,7 @@ with match() as match:
                  y = 0
          self.assertIs(x, False)
          self.assertEqual(y, 0)
-@@ -73,14 +73,18 @@
+@@ -73,7 +73,7 @@
          x = 0
          y = None
          match x:
@@ -149,18 +137,6 @@ with match() as match:
                  y = 0
          self.assertEqual(x, 0)
          self.assertIs(y, None)
- 
-         x = range(3)
-         match x:
--            case [y, case as x, z]:
-+            case [
-+                x as NOT_YET_IMPLEMENTED_PatternMatchAs,
-+                x as NOT_YET_IMPLEMENTED_PatternMatchAs,
-+                x as NOT_YET_IMPLEMENTED_PatternMatchAs,
-+            ]:
-                 w = 0
- 
-     # At least one of the above branches must have been taken, because every Python
 ```
 
 ## Ruff Output
@@ -192,9 +168,9 @@ def get_grammars(target_versions: Set[TargetVersion]) -> List[Grammar]:
         ]
 
     match match:
-        case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+        case case:
             match match:
-                case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+                case case:
                     pass
 
     if all(version.is_python2() for version in target_versions):
@@ -248,11 +224,7 @@ def get_grammars(target_versions: Set[TargetVersion]) -> List[Grammar]:
 
         x = range(3)
         match x:
-            case [
-                x as NOT_YET_IMPLEMENTED_PatternMatchAs,
-                x as NOT_YET_IMPLEMENTED_PatternMatchAs,
-                x as NOT_YET_IMPLEMENTED_PatternMatchAs,
-            ]:
+            case [y, case as x, z]:
                 w = 0
 
     # At least one of the above branches must have been taken, because every Python

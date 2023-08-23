@@ -28,6 +28,6 @@
 "{1}{3}".format(1, 2, 3, 4)  # F523, # F524
 "{1} {8}".format(0, 1)  # F523, # F524
 
-# Not fixable
+# Multiline
 (''
 .format(2))

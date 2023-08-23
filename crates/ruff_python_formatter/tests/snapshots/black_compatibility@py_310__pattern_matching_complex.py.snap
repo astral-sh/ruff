@@ -156,7 +156,7 @@ match x:
 ```diff
 --- Black
 +++ Ruff
-@@ -2,105 +2,120 @@
+@@ -2,97 +2,108 @@
  
  # case black_test_patma_098
  match x:
@@ -283,11 +283,7 @@ match x:
  # case black_test_patma_191
  match w:
 -    case [x, y, *_]:
-+    case [
-+        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
-+        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
-+        *NOT_YET_IMPLEMENTED_PatternMatchStar,
-+    ]:
++    case [x, y, *NOT_YET_IMPLEMENTED_PatternMatchStar]:
          z = 0
  # case black_test_patma_110
  match x:
@@ -296,8 +292,7 @@ match x:
          y = 0
  # case black_test_patma_151
  match (x,):
--    case [y]:
-+    case [x as NOT_YET_IMPLEMENTED_PatternMatchAs]:
+@@ -100,7 +111,7 @@
          z = 0
  # case black_test_patma_114
  match x:
@@ -306,7 +301,7 @@ match x:
          y = 0
  # case black_test_patma_232
  match x:
-@@ -108,7 +123,7 @@
+@@ -108,7 +119,7 @@
          y = 0
  # case black_test_patma_058
  match x:
@@ -315,7 +310,7 @@ match x:
          y = 0
  # case black_test_patma_233
  match x:
-@@ -118,27 +133,31 @@
+@@ -118,9 +129,9 @@
  match x:
      case []:
          y = 0
@@ -327,17 +322,12 @@ match x:
          y = 2
  # case black_test_patma_156
  match x:
--    case z:
-+    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+@@ -128,17 +139,17 @@
          y = 0
  # case black_test_patma_189
  match w:
 -    case [x, y, *rest]:
-+    case [
-+        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
-+        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
-+        *NOT_YET_IMPLEMENTED_PatternMatchStar,
-+    ]:
++    case [x, y, *NOT_YET_IMPLEMENTED_PatternMatchStar]:
          z = 0
  # case black_test_patma_042
  match x:
@@ -460,11 +450,7 @@ match x:
         y = 2
 # case black_test_patma_191
 match w:
-    case [
-        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
-        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
-        *NOT_YET_IMPLEMENTED_PatternMatchStar,
-    ]:
+    case [x, y, *NOT_YET_IMPLEMENTED_PatternMatchStar]:
         z = 0
 # case black_test_patma_110
 match x:
@@ -472,7 +458,7 @@ match x:
         y = 0
 # case black_test_patma_151
 match (x,):
-    case [x as NOT_YET_IMPLEMENTED_PatternMatchAs]:
+    case [y]:
         z = 0
 # case black_test_patma_114
 match x:
@@ -500,15 +486,11 @@ match x:
         y = 2
 # case black_test_patma_156
 match x:
-    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+    case z:
         y = 0
 # case black_test_patma_189
 match w:
-    case [
-        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
-        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
-        *NOT_YET_IMPLEMENTED_PatternMatchStar,
-    ]:
+    case [x, y, *NOT_YET_IMPLEMENTED_PatternMatchStar]:
         z = 0
 # case black_test_patma_042
 match x:

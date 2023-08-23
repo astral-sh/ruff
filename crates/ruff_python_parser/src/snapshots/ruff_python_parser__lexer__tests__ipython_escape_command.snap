@@ -1,0 +1,61 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: lex_jupyter_source(source)
+---
+[
+    IpyEscapeCommand {
+        value: "foo",
+        kind: Help,
+    },
+    Newline,
+    IpyEscapeCommand {
+        value: "foo",
+        kind: Help2,
+    },
+    Newline,
+    IpyEscapeCommand {
+        value: "timeit a = b",
+        kind: Magic,
+    },
+    Newline,
+    IpyEscapeCommand {
+        value: "timeit a % 3",
+        kind: Magic,
+    },
+    Newline,
+    IpyEscapeCommand {
+        value: "matplotlib     --inline",
+        kind: Magic,
+    },
+    Newline,
+    IpyEscapeCommand {
+        value: "pwd   && ls -a | sed 's/^/\\\\    /'",
+        kind: Shell,
+    },
+    Newline,
+    IpyEscapeCommand {
+        value: "cd /Users/foo/Library/Application\\ Support/",
+        kind: ShCap,
+    },
+    Newline,
+    IpyEscapeCommand {
+        value: "foo 1 2",
+        kind: Paren,
+    },
+    Newline,
+    IpyEscapeCommand {
+        value: "foo 1 2",
+        kind: Quote,
+    },
+    Newline,
+    IpyEscapeCommand {
+        value: "foo 1 2",
+        kind: Quote2,
+    },
+    Newline,
+    IpyEscapeCommand {
+        value: "ls",
+        kind: Shell,
+    },
+    Newline,
+]

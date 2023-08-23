@@ -85,7 +85,9 @@ pub(crate) fn duplicate_class_field_definition(checker: &mut Checker, body: &[St
                     checker.locator(),
                     checker.indexer(),
                 );
-                diagnostic.set_fix(Fix::suggested(edit).isolate(checker.statement_isolation()));
+                diagnostic.set_fix(Fix::suggested(edit).isolate(Checker::isolation(Some(
+                    checker.semantic().current_statement_id(),
+                ))));
             }
             checker.diagnostics.push(diagnostic);
         }

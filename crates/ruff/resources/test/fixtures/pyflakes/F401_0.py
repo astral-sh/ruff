@@ -99,3 +99,16 @@ import foo.bar as bop
 import foo.bar.baz
 
 print(bop.baz.read_csv("test.csv"))
+
+# Test: isolated deletions.
+if TYPE_CHECKING:
+    import a1
+
+    import a2
+
+
+match *0, 1, *2:
+    case 0,:
+        import b1
+
+        import b2

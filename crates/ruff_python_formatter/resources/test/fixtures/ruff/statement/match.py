@@ -142,6 +142,37 @@ match pattern_comments:
     ):
         pass
 
+
+match pattern_comments:
+    case (
+        # 1
+        pattern  # 2
+        # 3
+        as  # 4
+        # 5
+        name  # 6
+        # 7
+    ):
+        pass
+
+
+match pattern_comments:
+    case (
+        pattern
+        # 1
+		as # 2
+        # 3
+		name #4
+        # 5
+    ):
+        pass
+
+
+match x:
+    case (a as b) as c:
+        pass
+
+
 match pattern_singleton:
     case (
         # leading 1
@@ -158,6 +189,7 @@ match pattern_singleton:
     case False:
         ...
 
+
 match foo:
     case "a", "b":
         pass
@@ -169,6 +201,7 @@ match foo:
         pass
     case (["a", "b"]):
         pass
+
 
 match foo:
     case [  # leading

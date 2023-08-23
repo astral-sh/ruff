@@ -192,7 +192,19 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                     }
                 }
             } else if is_import_definition(preceding) && !is_import_definition(following) {
-                empty_line().fmt(f)?;
+                // Enforce _at least_ one empty line after an import statement (but allow up to
+                // two at the top-level).
+                match self.kind {
+                    SuiteKind::TopLevel => {
+                        match lines_after_ignoring_trivia(preceding.end(), source) {
+                            0 | 1 | 2 => empty_line().fmt(f)?,
+                            _ => write!(f, [empty_line(), empty_line()])?,
+                        }
+                    }
+                    SuiteKind::Function | SuiteKind::Class | SuiteKind::Other => {
+                        empty_line().fmt(f)?;
+                    }
+                }
             } else if is_compound_statement(preceding) {
                 // Handles the case where a body has trailing comments. The issue is that RustPython does not include
                 // the comments in the range of the suite. This means, the body ends right after the last statement in the body.

@@ -89,7 +89,7 @@ def http_error(status):
             return "Not found"
         case "NOT_YET_IMPLEMENTED_PatternMatchValue":
             return "I'm a teapot"
-        case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+        case _:
             return "Something's wrong with the internet"
 
 
@@ -97,22 +97,13 @@ def http_error(status):
 match point:
     case (0,   0):  # fmt: skip
         print("Origin")
-    case (
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
-    ):
+    case ("NOT_YET_IMPLEMENTED_PatternMatchValue", y):
         print(f"Y={y}")
-    case (
-        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-    ):
+    case (x, "NOT_YET_IMPLEMENTED_PatternMatchValue"):
         print(f"X={x}")
-    case (
-        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
-        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
-    ):
+    case (x, y):
         print(f"X={x}, Y={y}")
-    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+    case _:
         raise ValueError("Not a point")
 
 
@@ -131,7 +122,7 @@ def location(point):
             print(f"X={x} and the point is on the x-axis.")
         case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
             print("The point is located somewhere else on the plane.")
-        case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+        case _:
             print("Not a point")
 
 
@@ -149,7 +140,7 @@ match points:
         NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0),
     ]:
         print(f"Two points on the Y axis at {y1}, {y2} are in the list.")
-    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+    case _:
         print("Something else is found in the list.")
 
 
@@ -160,11 +151,7 @@ match test_variable:
             40
     ):  # fmt: skip
         print("A warning has been received.")
-    case (
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
-        x as NOT_YET_IMPLEMENTED_PatternMatchAs,
-    ):
+    case ("NOT_YET_IMPLEMENTED_PatternMatchValue", code, _):
         print(f"An error {code} occurred.")
 
 

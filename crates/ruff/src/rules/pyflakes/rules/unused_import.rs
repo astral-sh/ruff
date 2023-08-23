@@ -217,6 +217,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
 }
 
 /// An unused import with its surrounding context.
+#[derive(Debug)]
 struct ImportBinding<'a> {
     /// The qualified name of the import (e.g., `typing.List` for `from typing import List`).
     import: AnyImport<'a>,
@@ -251,5 +252,7 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
         checker.stylist(),
         checker.indexer(),
     )?;
-    Ok(Fix::automatic(edit).isolate(checker.parent_isolation()))
+    Ok(Fix::automatic(edit).isolate(Checker::isolation(
+        checker.semantic().parent_statement_id(node_id),
+    )))
 }
