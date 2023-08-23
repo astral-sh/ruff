@@ -755,9 +755,9 @@ pub(crate) fn composite_condition(
                 && msg.is_none()
                 && !checker.indexer().comment_ranges().intersects(stmt.range())
             {
-                #[allow(deprecated)]
-                diagnostic.try_set_fix_from_edit(|| {
+                diagnostic.try_set_fix(|| {
                     fix_composite_condition(stmt, checker.locator(), checker.stylist())
+                        .map(Fix::suggested)
                 });
             }
         }

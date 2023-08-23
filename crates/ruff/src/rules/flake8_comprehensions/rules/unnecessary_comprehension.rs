@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Comprehension, Expr, Ranged};
 
@@ -63,9 +63,9 @@ fn add_diagnostic(checker: &mut Checker, expr: &Expr) {
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        #[allow(deprecated)]
-        diagnostic.try_set_fix_from_edit(|| {
+        diagnostic.try_set_fix(|| {
             fixes::fix_unnecessary_comprehension(checker.locator(), checker.stylist(), expr)
+                .map(Fix::suggested)
         });
     }
     checker.diagnostics.push(diagnostic);
