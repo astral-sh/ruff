@@ -31,6 +31,7 @@ bool("foo")
 bool("")
 bool(b"")
 bool(1.0)
+int().denominator
 
 # These become string or byte literals
 str()
@@ -49,3 +50,6 @@ float(1.0)
 bool()
 bool(True)
 bool(False)
+
+# These become a literal but retain parentheses
+int(1).denominator
