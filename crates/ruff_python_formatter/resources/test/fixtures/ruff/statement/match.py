@@ -168,6 +168,27 @@ match pattern_comments:
         pass
 
 
+match pattern_comments:
+    case (
+        pattern
+        # 1
+		as
+        # 2
+		name
+        # 3
+    ):
+        pass
+
+
+match subject:
+    case (
+        pattern # 1
+        as # 2
+        name # 3
+    ):
+        pass
+
+
 match x:
     case (a as b) as c:
         pass

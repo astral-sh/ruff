@@ -205,6 +205,7 @@ fn handle_enclosed_comment<'a>(
             handle_module_level_own_line_comment_before_class_or_function_comment(comment, locator)
         }
         AnyNodeRef::WithItem(_) => handle_with_item_comment(comment, locator),
+        AnyNodeRef::PatternMatchAs(_) => handle_pattern_match_as_comment(comment, locator),
         AnyNodeRef::StmtFunctionDef(_) => handle_leading_function_with_decorators_comment(comment),
         AnyNodeRef::StmtClassDef(class_def) => {
             handle_leading_class_with_decorators_comment(comment, class_def)
@@ -1142,6 +1143,47 @@ fn handle_with_item_comment<'a>(
         CommentPlacement::dangling(comment.enclosing_node(), comment)
     } else {
         CommentPlacement::leading(optional_vars, comment)
+    }
+}
+
+/// Handles trailing comments after the `as` keyword of a pattern match item:
+///
+/// ```python
+/// case (
+///     pattern
+///     as # dangling end of line comment
+///     # dangling own line comment
+///     name
+/// ): ...
+/// ```
+fn handle_pattern_match_as_comment<'a>(
+    comment: DecoratedComment<'a>,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    debug_assert!(comment.enclosing_node().is_pattern_match_as());
+
+    let Some(pattern) = comment.preceding_node() else {
+        return CommentPlacement::Default(comment);
+    };
+
+    let mut tokens = SimpleTokenizer::starts_at(pattern.end(), locator.contents())
+        .skip_trivia()
+        .skip_while(|token| token.kind == SimpleTokenKind::RParen);
+
+    let Some(as_token) = tokens
+        .next()
+        .filter(|token| token.kind == SimpleTokenKind::As)
+    else {
+        return CommentPlacement::Default(comment);
+    };
+
+    if comment.end() < as_token.start() {
+        // If before the `as` keyword, then it must be a trailing comment of the pattern.
+        CommentPlacement::trailing(pattern, comment)
+    } else {
+        // Otherwise, must be a dangling comment. (Any comments that follow the name will be
+        // trailing comments on the pattern match item, rather than enclosed by it.)
+        CommentPlacement::dangling(comment.enclosing_node(), comment)
     }
 }
 
