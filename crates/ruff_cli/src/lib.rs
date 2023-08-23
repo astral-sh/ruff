@@ -90,12 +90,11 @@ fn is_stdin(files: &[PathBuf], stdin_filename: Option<&Path>) -> bool {
         return true;
     }
 
+    let [file] = files else {
+        return false;
+    };
     // If the user provided exactly `-`, read from standard input.
-    if files.len() == 1 && files[0] == Path::new("-") {
-        return true;
-    }
-
-    false
+    file == Path::new("-")
 }
 
 pub fn run(

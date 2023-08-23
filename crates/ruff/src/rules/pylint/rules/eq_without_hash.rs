@@ -1,7 +1,7 @@
-use ruff_python_ast::{self as ast, Ranged, Stmt};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::is_const_none;
+use ruff_python_ast::{self as ast, Expr, Ranged, Stmt};
 
 use crate::checkers::ast::Checker;
 
@@ -65,12 +65,29 @@ fn has_eq_without_hash(body: &[Stmt]) -> bool {
     let mut has_hash = false;
     let mut has_eq = false;
     for statement in body {
-        let Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) = statement else {
-            continue;
-        };
-        match name.as_str() {
-            "__hash__" => has_hash = true,
-            "__eq__" => has_eq = true,
+        match statement {
+            Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
+                let [Expr::Name(ast::ExprName { id, .. })] = targets.as_slice() else {
+                    continue;
+                };
+
+                // Check if `__hash__` was explicitly set to `None`, as in:
+                // ```python
+                // class Class:
+                //     def __eq__(self, other):
+                //         return True
+                //
+                //     __hash__ = None
+                // ```
+                if id == "__hash__" && is_const_none(value) {
+                    has_hash = true;
+                }
+            }
+            Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) => match name.as_str() {
+                "__hash__" => has_hash = true,
+                "__eq__" => has_eq = true,
+                _ => {}
+            },
             _ => {}
         }
     }

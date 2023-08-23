@@ -15,11 +15,6 @@ filter(func, map(lambda v: v, nums))
 _ = f"{set(map(lambda x: x % 2 == 0, nums))}"
 _ = f"{dict(map(lambda v: (v, v**2), nums))}"
 
-# Error, but unfixable.
-# For simple expressions, this could be: `(x if x else 1 for x in nums)`.
-# For more complex expressions, this would differ: `(x + 2 if x else 3 for x in nums)`.
-map(lambda x=1: x, nums)
-
 # False negatives.
 map(lambda x=2, y=1: x + y, nums, nums)
 set(map(lambda x, y: x, nums, nums))
@@ -37,3 +32,8 @@ map(lambda x: lambda: x, range(4))
 
 # Error: the `x` is overridden by the inner lambda.
 map(lambda x: lambda x: x, range(4))
+
+# Ok because of the default parameters, and variadic arguments.
+map(lambda x=1: x, nums)
+map(lambda *args: len(args), range(4))
+map(lambda **kwargs: len(kwargs), range(4))

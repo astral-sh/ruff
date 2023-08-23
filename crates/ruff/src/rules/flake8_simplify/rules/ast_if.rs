@@ -721,10 +721,16 @@ pub(crate) fn if_with_same_arms(checker: &mut Checker, locator: &Locator, stmt_i
         // ...and the same comments
         let first_comments = checker
             .indexer()
-            .comments_in_range(body_range(&current_branch, locator), locator);
+            .comment_ranges()
+            .comments_in_range(body_range(&current_branch, locator))
+            .iter()
+            .map(|range| locator.slice(*range));
         let second_comments = checker
             .indexer()
-            .comments_in_range(body_range(following_branch, locator), locator);
+            .comment_ranges()
+            .comments_in_range(body_range(following_branch, locator))
+            .iter()
+            .map(|range| locator.slice(*range));
         if !first_comments.eq(second_comments) {
             continue;
         }
@@ -878,7 +884,7 @@ pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &ast::St
     else {
         return;
     };
-    if body_var.len() != 1 {
+    let [body_var] = body_var.as_slice() else {
         return;
     };
     let Stmt::Assign(ast::StmtAssign {
@@ -889,7 +895,7 @@ pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &ast::St
     else {
         return;
     };
-    if orelse_var.len() != 1 {
+    let [orelse_var] = orelse_var.as_slice() else {
         return;
     };
     let Expr::Compare(ast::ExprCompare {
@@ -901,27 +907,16 @@ pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &ast::St
     else {
         return;
     };
-    if test_dict.len() != 1 {
+    let [test_dict] = test_dict.as_slice() else {
         return;
-    }
+    };
     let (expected_var, expected_value, default_var, default_value) = match ops[..] {
-        [CmpOp::In] => (
-            &body_var[0],
-            body_value,
-            &orelse_var[0],
-            orelse_value.as_ref(),
-        ),
-        [CmpOp::NotIn] => (
-            &orelse_var[0],
-            orelse_value,
-            &body_var[0],
-            body_value.as_ref(),
-        ),
+        [CmpOp::In] => (body_var, body_value, orelse_var, orelse_value.as_ref()),
+        [CmpOp::NotIn] => (orelse_var, orelse_value, body_var, body_value.as_ref()),
         _ => {
             return;
         }
     };
-    let test_dict = &test_dict[0];
     let Expr::Subscript(ast::ExprSubscript {
         value: expected_subscript,
         slice: expected_slice,

@@ -154,3 +154,14 @@ def f() -> None:
         print("hello")
     except A as e :
         print("oh no!")
+
+
+def f():
+    x = 1
+    y = 2
+
+
+def f():
+    x = 1
+
+    y = 2

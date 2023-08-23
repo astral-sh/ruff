@@ -732,8 +732,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &D
                                     keyword,
                                     arguments,
                                     edits::Parentheses::Preserve,
-                                    checker.locator(),
-                                    checker.source_type,
+                                    checker.locator().contents(),
                                 )
                                 .map(Fix::suggested)
                             });

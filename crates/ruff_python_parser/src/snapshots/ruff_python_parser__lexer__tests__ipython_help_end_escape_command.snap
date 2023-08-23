@@ -1,0 +1,86 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: lex_jupyter_source(source)
+---
+[
+    IpyEscapeCommand {
+        value: "foo",
+        kind: Help,
+    },
+    Newline,
+    IpyEscapeCommand {
+        value: "foo",
+        kind: Help,
+    },
+    Newline,
+    IpyEscapeCommand {
+        value: "   foo  ?",
+        kind: Help2,
+    },
+    Newline,
+    IpyEscapeCommand {
+        value: "foo",
+        kind: Help2,
+    },
+    Newline,
+    IpyEscapeCommand {
+        value: "foo",
+        kind: Help2,
+    },
+    Newline,
+    IpyEscapeCommand {
+        value: "foo",
+        kind: Help,
+    },
+    Newline,
+    IpyEscapeCommand {
+        value: "foo",
+        kind: Help2,
+    },
+    Newline,
+    IpyEscapeCommand {
+        value: "foo???",
+        kind: Help2,
+    },
+    Newline,
+    IpyEscapeCommand {
+        value: "?foo???",
+        kind: Help2,
+    },
+    Newline,
+    IpyEscapeCommand {
+        value: "foo",
+        kind: Help,
+    },
+    Newline,
+    IpyEscapeCommand {
+        value: " ?",
+        kind: Help2,
+    },
+    Newline,
+    IpyEscapeCommand {
+        value: "??",
+        kind: Help2,
+    },
+    Newline,
+    IpyEscapeCommand {
+        value: "%foo",
+        kind: Help,
+    },
+    Newline,
+    IpyEscapeCommand {
+        value: "%foo",
+        kind: Help2,
+    },
+    Newline,
+    IpyEscapeCommand {
+        value: "foo???",
+        kind: Magic2,
+    },
+    Newline,
+    IpyEscapeCommand {
+        value: "pwd",
+        kind: Help,
+    },
+    Newline,
+]

@@ -147,6 +147,80 @@ match pattern_comments:
     no_comments
     ):
         pass
+
+
+match pattern_comments:
+    case (
+        # 1
+        pattern  # 2
+        # 3
+        as  # 4
+        # 5
+        name  # 6
+        # 7
+    ):
+        pass
+
+
+match pattern_comments:
+    case (
+        pattern
+        # 1
+		as # 2
+        # 3
+		name #4
+        # 5
+    ):
+        pass
+
+
+match x:
+    case (a as b) as c:
+        pass
+
+
+match pattern_singleton:
+    case (
+        # leading 1
+        # leading 2
+        None  # trailing
+        # trailing own 1
+        # trailing own 2
+    ):
+        pass
+    case (
+        True  # trailing
+    ):
+        ...
+    case False:
+        ...
+
+
+match foo:
+    case "a", "b":
+        pass
+    case "a", "b",:
+        pass
+    case ("a", "b"):
+        pass
+    case ["a", "b"]:
+        pass
+    case (["a", "b"]):
+        pass
+
+
+match foo:
+    case [  # leading
+# leading
+    # leading
+        # leading
+        "a",  # trailing
+# trailing
+    # trailing
+        # trailing
+        "b",
+    ]:
+        pass
 ```
 
 ## Output
@@ -180,13 +254,21 @@ match [  # comment
     second,
     third,
 ]:  # another comment
-    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+    case [
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+    ]:
         pass
 
 match (  # comment
     "a b c"
 ).split():  # another comment
-    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+    case [
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+    ]:
         pass
 
 
@@ -194,7 +276,11 @@ match (  # comment
     # let's go
     yield foo
 ):  # another comment
-    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+    case [
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+    ]:
         pass
 
 
@@ -222,7 +308,10 @@ match newlines:
     case "NOT_YET_IMPLEMENTED_PatternMatchValue" if foo == 2:  # second
         pass
 
-    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2] if (foo := 1):  # third
+    case (
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+    ) if (foo := 1):  # third
         pass
 
     case "NOT_YET_IMPLEMENTED_PatternMatchValue":
@@ -230,7 +319,7 @@ match newlines:
 
     case "NOT_YET_IMPLEMENTED_PatternMatchValue":
         pass
-    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+    case _:
         pass
 
 
@@ -257,7 +346,7 @@ match long_lines:
 
 match pattern_comments:
     case (
-        x as NOT_YET_IMPLEMENTED_PatternMatchAs  # trailing 1
+        only_trailing  # trailing 1
         # trailing 2
         # trailing 3
     ):
@@ -267,7 +356,7 @@ match pattern_comments:
 match pattern_comments:
     case (
         # leading
-        x as NOT_YET_IMPLEMENTED_PatternMatchAs
+        only_leading
     ):
         pass
 
@@ -275,7 +364,7 @@ match pattern_comments:
 match pattern_comments:
     case (
         # leading
-        x as NOT_YET_IMPLEMENTED_PatternMatchAs  # trailing 1
+        leading_and_trailing  # trailing 1
         # trailing 2
         # trailing 3
     ):
@@ -283,7 +372,97 @@ match pattern_comments:
 
 
 match pattern_comments:
-    case (x as NOT_YET_IMPLEMENTED_PatternMatchAs):
+    case (no_comments):
+        pass
+
+
+match pattern_comments:
+    case (
+        # 1
+        pattern as name  # 2
+        # 3
+        # 4
+        # 5  # 6
+        # 7
+    ):
+        pass
+
+
+match pattern_comments:
+    case (
+        pattern as name
+        # 1
+        # 2
+        # 3  # 4
+        # 5
+    ):
+        pass
+
+
+match x:
+    case (a as b) as c:
+        pass
+
+
+match pattern_singleton:
+    case (
+        # leading 1
+        # leading 2
+        None  # trailing
+        # trailing own 1
+        # trailing own 2
+    ):
+        pass
+    case (
+        True  # trailing
+    ):
+        ...
+    case False:
+        ...
+
+
+match foo:
+    case (
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+    ):
+        pass
+    case (
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+    ):
+        pass
+    case (
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+    ):
+        pass
+    case [
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+    ]:
+        pass
+    case (
+        [
+            "NOT_YET_IMPLEMENTED_PatternMatchValue",
+            "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        ]
+    ):
+        pass
+
+
+match foo:
+    case [
+        # leading
+        # leading
+        # leading
+        # leading
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",  # trailing
+        # trailing
+        # trailing
+        # trailing
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+    ]:
         pass
 ```
 

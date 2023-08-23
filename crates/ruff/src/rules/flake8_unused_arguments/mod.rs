@@ -1,5 +1,5 @@
 //! Rules from [flake8-unused-arguments](https://pypi.org/project/flake8-unused-arguments/).
-mod helpers;
+pub(crate) mod helpers;
 pub(crate) mod rules;
 pub mod settings;
 

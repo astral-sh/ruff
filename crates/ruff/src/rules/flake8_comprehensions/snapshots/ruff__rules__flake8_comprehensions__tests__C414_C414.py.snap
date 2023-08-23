@@ -365,8 +365,8 @@ C414.py:19:1: C414 [*] Unnecessary `list` call within `tuple()`
 23 | |     )
 24 | | )
    | |_^ C414
-25 |   
-26 |   # Nested sorts with differing keyword arguments. Not flagged.
+25 |   set(set())
+26 |   set(list())
    |
    = help: Remove the inner `list` call
 
@@ -380,8 +380,91 @@ C414.py:19:1: C414 [*] Unnecessary `list` call within `tuple()`
 22 21 |         "o"]
 23 22 |     )
 24    |-)
-25 23 | 
-26 24 | # Nested sorts with differing keyword arguments. Not flagged.
-27 25 | sorted(sorted(x, key=lambda y: y))
+25 23 | set(set())
+26 24 | set(list())
+27 25 | set(tuple())
+
+C414.py:25:1: C414 [*] Unnecessary `set` call within `set()`
+   |
+23 |     )
+24 | )
+25 | set(set())
+   | ^^^^^^^^^^ C414
+26 | set(list())
+27 | set(tuple())
+   |
+   = help: Remove the inner `set` call
+
+ℹ Suggested fix
+22 22 |         "o"]
+23 23 |     )
+24 24 | )
+25    |-set(set())
+   25 |+set()
+26 26 | set(list())
+27 27 | set(tuple())
+28 28 | sorted(reversed())
+
+C414.py:26:1: C414 [*] Unnecessary `list` call within `set()`
+   |
+24 | )
+25 | set(set())
+26 | set(list())
+   | ^^^^^^^^^^^ C414
+27 | set(tuple())
+28 | sorted(reversed())
+   |
+   = help: Remove the inner `list` call
+
+ℹ Suggested fix
+23 23 |     )
+24 24 | )
+25 25 | set(set())
+26    |-set(list())
+   26 |+set()
+27 27 | set(tuple())
+28 28 | sorted(reversed())
+29 29 | 
+
+C414.py:27:1: C414 [*] Unnecessary `tuple` call within `set()`
+   |
+25 | set(set())
+26 | set(list())
+27 | set(tuple())
+   | ^^^^^^^^^^^^ C414
+28 | sorted(reversed())
+   |
+   = help: Remove the inner `tuple` call
+
+ℹ Suggested fix
+24 24 | )
+25 25 | set(set())
+26 26 | set(list())
+27    |-set(tuple())
+   27 |+set()
+28 28 | sorted(reversed())
+29 29 | 
+30 30 | # Nested sorts with differing keyword arguments. Not flagged.
+
+C414.py:28:1: C414 [*] Unnecessary `reversed` call within `sorted()`
+   |
+26 | set(list())
+27 | set(tuple())
+28 | sorted(reversed())
+   | ^^^^^^^^^^^^^^^^^^ C414
+29 | 
+30 | # Nested sorts with differing keyword arguments. Not flagged.
+   |
+   = help: Remove the inner `reversed` call
+
+ℹ Suggested fix
+25 25 | set(set())
+26 26 | set(list())
+27 27 | set(tuple())
+28    |-sorted(reversed())
+   28 |+sorted()
+29 29 | 
+30 30 | # Nested sorts with differing keyword arguments. Not flagged.
+31 31 | sorted(sorted(x, key=lambda y: y))
 
 

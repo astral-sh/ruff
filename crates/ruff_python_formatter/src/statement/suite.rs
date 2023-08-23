@@ -1,4 +1,4 @@
-use crate::comments::{leading_comments, trailing_comments};
+use crate::comments::{leading_comments, trailing_comments, Comments};
 use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
 use ruff_python_ast::helpers::is_compound_statement;
 use ruff_python_ast::node::AnyNodeRef;
@@ -17,7 +17,7 @@ use crate::verbatim::{
 };
 
 /// Level at which the [`Suite`] appears in the source code.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Default)]
 pub enum SuiteKind {
     /// Statements at the module level / top level
     TopLevel,
@@ -29,6 +29,7 @@ pub enum SuiteKind {
     Class,
 
     /// Statements in any other body (e.g., `if` or `while`).
+    #[default]
     Other,
 }
 
@@ -58,283 +59,288 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
         let source = f.context().source();
         let source_type = f.options().source_type();
 
-        let mut f = WithNodeLevel::new(node_level, f);
-        write!(
-            f,
-            [format_with(|f| {
-                let mut iter = statements.iter();
-                let Some(first) = iter.next() else {
-                    return Ok(());
-                };
+        let f = &mut WithNodeLevel::new(node_level, f);
 
-                // Format the first statement in the body, which often has special formatting rules.
-                let first = match self.kind {
-                    SuiteKind::Other => {
-                        if is_class_or_function_definition(first) && !comments.has_leading(first) {
-                            // Add an empty line for any nested functions or classes defined within
-                            // non-function or class compound statements, e.g., this is stable formatting:
-                            // ```python
-                            // if True:
-                            //
-                            //     def test():
-                            //         ...
-                            // ```
-                            empty_line().fmt(f)?;
-                        }
+        let mut iter = statements.iter();
+        let Some(first) = iter.next() else {
+            return Ok(());
+        };
 
-                        SuiteChildStatement::Other(first)
-                    }
-
-                    SuiteKind::Function => {
-                        if let Some(docstring) = DocstringStmt::try_from_statement(first) {
-                            SuiteChildStatement::Docstring(docstring)
-                        } else {
-                            SuiteChildStatement::Other(first)
-                        }
-                    }
-
-                    SuiteKind::Class => {
-                        if let Some(docstring) = DocstringStmt::try_from_statement(first) {
-                            if !comments.has_leading(first)
-                                && lines_before(first.start(), source) > 1
-                            {
-                                // Allow up to one empty line before a class docstring, e.g., this is
-                                // stable formatting:
-                                // ```python
-                                // class Test:
-                                //
-                                //     """Docstring"""
-                                // ```
-                                empty_line().fmt(f)?;
-                            }
-
-                            SuiteChildStatement::Docstring(docstring)
-                        } else {
-                            SuiteChildStatement::Other(first)
-                        }
-                    }
-                    SuiteKind::TopLevel => SuiteChildStatement::Other(first),
-                };
-
-                let first_comments = comments.leading_dangling_trailing(first);
-
-                let (mut preceding, mut after_class_docstring) = if first_comments
-                    .leading
-                    .iter()
-                    .any(|comment| comment.is_suppression_off_comment(source))
-                {
-                    (
-                        write_suppressed_statements_starting_with_leading_comment(
-                            first, &mut iter, f,
-                        )?,
-                        false,
-                    )
-                } else if first_comments
-                    .trailing
-                    .iter()
-                    .any(|comment| comment.is_suppression_off_comment(source))
-                {
-                    (
-                        write_suppressed_statements_starting_with_trailing_comment(
-                            first, &mut iter, f,
-                        )?,
-                        false,
-                    )
-                } else {
-                    first.fmt(f)?;
-                    (
-                        first.statement(),
-                        matches!(first, SuiteChildStatement::Docstring(_))
-                            && matches!(self.kind, SuiteKind::Class),
-                    )
-                };
-
-                while let Some(following) = iter.next() {
-                    if is_class_or_function_definition(preceding)
-                        || is_class_or_function_definition(following)
-                    {
-                        match self.kind {
-                            SuiteKind::TopLevel if source_type.is_stub() => {
-                                // Preserve the empty line if the definitions are separated by a comment
-                                if comments.has_trailing(preceding)
-                                    || comments.has_leading(following)
-                                {
-                                    empty_line().fmt(f)?;
-                                } else {
-                                    // Two subsequent classes that both have an ellipsis only body
-                                    // ```python
-                                    // class A: ...
-                                    // class B: ...
-                                    // ```
-                                    let class_sequences_with_ellipsis_only =
-                                        preceding.as_class_def_stmt().is_some_and(|class| {
-                                            contains_only_an_ellipsis(&class.body)
-                                        }) && following.as_class_def_stmt().is_some_and(|class| {
-                                            contains_only_an_ellipsis(&class.body)
-                                        });
-
-                                    // Two subsequent functions where the preceding has an ellipsis only body
-                                    // ```python
-                                    // def test(): ...
-                                    // def b(): a
-                                    // ```
-                                    let function_with_ellipsis =
-                                        preceding.as_function_def_stmt().is_some_and(|function| {
-                                            contains_only_an_ellipsis(&function.body)
-                                        }) && following.is_function_def_stmt();
-
-                                    // Don't add an empty line between two classes that have an `...` body only or after
-                                    // a function with an `...` body. Otherwise add an empty line.
-                                    if !class_sequences_with_ellipsis_only
-                                        && !function_with_ellipsis
-                                    {
-                                        empty_line().fmt(f)?;
-                                    }
-                                }
-                            }
-                            SuiteKind::TopLevel => {
-                                write!(f, [empty_line(), empty_line()])?;
-                            }
-                            SuiteKind::Function | SuiteKind::Class | SuiteKind::Other => {
-                                empty_line().fmt(f)?;
-                            }
-                        }
-                    } else if is_import_definition(preceding) && !is_import_definition(following) {
-                        empty_line().fmt(f)?;
-                    } else if is_compound_statement(preceding) {
-                        // Handles the case where a body has trailing comments. The issue is that RustPython does not include
-                        // the comments in the range of the suite. This means, the body ends right after the last statement in the body.
-                        // ```python
-                        // def test():
-                        //      ...
-                        //      # The body of `test` ends right after `...` and before this comment
-                        //
-                        // # leading comment
-                        //
-                        //
-                        // a = 10
-                        // ```
-                        // Using `lines_after` for the node doesn't work because it would count the lines after the `...`
-                        // which is 0 instead of 1, the number of lines between the trailing comment and
-                        // the leading comment. This is why the suite handling counts the lines before the
-                        // start of the next statement or before the first leading comments for compound statements.
-                        let start = if let Some(first_leading) = comments.leading(following).first()
-                        {
-                            first_leading.slice().start()
-                        } else {
-                            following.start()
-                        };
-
-                        match lines_before(start, source) {
-                            0 | 1 => hard_line_break().fmt(f)?,
-                            2 => empty_line().fmt(f)?,
-                            3.. => match self.kind {
-                                SuiteKind::TopLevel => write!(f, [empty_line(), empty_line()])?,
-                                SuiteKind::Function | SuiteKind::Class | SuiteKind::Other => {
-                                    empty_line().fmt(f)?;
-                                }
-                            },
-                        }
-                    } else if after_class_docstring {
-                        // Enforce an empty line after a class docstring, e.g., these are both stable
-                        // formatting:
-                        // ```python
-                        // class Test:
-                        //     """Docstring"""
-                        //
-                        //     ...
-                        //
-                        //
-                        // class Test:
-                        //
-                        //     """Docstring"""
-                        //
-                        //     ...
-                        // ```
-                        empty_line().fmt(f)?;
-                        after_class_docstring = false;
-                    } else {
-                        // Insert the appropriate number of empty lines based on the node level, e.g.:
-                        // * [`NodeLevel::Module`]: Up to two empty lines
-                        // * [`NodeLevel::CompoundStatement`]: Up to one empty line
-                        // * [`NodeLevel::Expression`]: No empty lines
-
-                        let count_lines = |offset| {
-                            // It's necessary to skip any trailing line comment because RustPython doesn't include trailing comments
-                            // in the node's range
-                            // ```python
-                            // a # The range of `a` ends right before this comment
-                            //
-                            // b
-                            // ```
-                            //
-                            // Simply using `lines_after` doesn't work if a statement has a trailing comment because
-                            // it then counts the lines between the statement and the trailing comment, which is
-                            // always 0. This is why it skips any trailing trivia (trivia that's on the same line)
-                            // and counts the lines after.
-                            lines_after_ignoring_trivia(offset, source)
-                        };
-
-                        match node_level {
-                            NodeLevel::TopLevel => match count_lines(preceding.end()) {
-                                0 | 1 => hard_line_break().fmt(f)?,
-                                2 => empty_line().fmt(f)?,
-                                _ => write!(f, [empty_line(), empty_line()])?,
-                            },
-                            NodeLevel::CompoundStatement => match count_lines(preceding.end()) {
-                                0 | 1 => hard_line_break().fmt(f)?,
-                                _ => empty_line().fmt(f)?,
-                            },
-                            NodeLevel::Expression(_) | NodeLevel::ParenthesizedExpression => {
-                                hard_line_break().fmt(f)?;
-                            }
-                        }
-                    }
-
-                    let following_comments = comments.leading_dangling_trailing(following);
-
-                    if following_comments
-                        .leading
-                        .iter()
-                        .any(|comment| comment.is_suppression_off_comment(source))
-                    {
-                        preceding = write_suppressed_statements_starting_with_leading_comment(
-                            SuiteChildStatement::Other(following),
-                            &mut iter,
-                            f,
-                        )?;
-                    } else if following_comments
-                        .trailing
-                        .iter()
-                        .any(|comment| comment.is_suppression_off_comment(source))
-                    {
-                        preceding = write_suppressed_statements_starting_with_trailing_comment(
-                            SuiteChildStatement::Other(following),
-                            &mut iter,
-                            f,
-                        )?;
-                    } else {
-                        following.format().fmt(f)?;
-                        preceding = following;
-                    }
+        // Format the first statement in the body, which often has special formatting rules.
+        let first = match self.kind {
+            SuiteKind::Other => {
+                if is_class_or_function_definition(first) && !comments.has_leading(first) {
+                    // Add an empty line for any nested functions or classes defined within
+                    // non-function or class compound statements, e.g., this is stable formatting:
+                    // ```python
+                    // if True:
+                    //
+                    //     def test():
+                    //         ...
+                    // ```
+                    empty_line().fmt(f)?;
                 }
 
-                Ok(())
-            })]
-        )
+                SuiteChildStatement::Other(first)
+            }
+
+            SuiteKind::Function => {
+                if let Some(docstring) = DocstringStmt::try_from_statement(first) {
+                    SuiteChildStatement::Docstring(docstring)
+                } else {
+                    SuiteChildStatement::Other(first)
+                }
+            }
+
+            SuiteKind::Class => {
+                if let Some(docstring) = DocstringStmt::try_from_statement(first) {
+                    if !comments.has_leading(first) && lines_before(first.start(), source) > 1 {
+                        // Allow up to one empty line before a class docstring, e.g., this is
+                        // stable formatting:
+                        // ```python
+                        // class Test:
+                        //
+                        //     """Docstring"""
+                        // ```
+                        empty_line().fmt(f)?;
+                    }
+
+                    SuiteChildStatement::Docstring(docstring)
+                } else {
+                    SuiteChildStatement::Other(first)
+                }
+            }
+            SuiteKind::TopLevel => SuiteChildStatement::Other(first),
+        };
+
+        let first_comments = comments.leading_dangling_trailing(first);
+
+        let (mut preceding, mut after_class_docstring) = if first_comments
+            .leading
+            .iter()
+            .any(|comment| comment.is_suppression_off_comment(source))
+        {
+            (
+                write_suppressed_statements_starting_with_leading_comment(first, &mut iter, f)?,
+                false,
+            )
+        } else if first_comments
+            .trailing
+            .iter()
+            .any(|comment| comment.is_suppression_off_comment(source))
+        {
+            (
+                write_suppressed_statements_starting_with_trailing_comment(first, &mut iter, f)?,
+                false,
+            )
+        } else {
+            first.fmt(f)?;
+            (
+                first.statement(),
+                matches!(first, SuiteChildStatement::Docstring(_))
+                    && matches!(self.kind, SuiteKind::Class),
+            )
+        };
+
+        while let Some(following) = iter.next() {
+            if is_class_or_function_definition(preceding)
+                || is_class_or_function_definition(following)
+            {
+                match self.kind {
+                    SuiteKind::TopLevel if source_type.is_stub() => {
+                        // Preserve the empty line if the definitions are separated by a comment
+                        if comments.has_trailing(preceding) || comments.has_leading(following) {
+                            empty_line().fmt(f)?;
+                        } else {
+                            // Two subsequent classes that both have an ellipsis only body
+                            // ```python
+                            // class A: ...
+                            // class B: ...
+                            // ```
+                            let class_sequences_with_ellipsis_only =
+                                preceding.as_class_def_stmt().is_some_and(|class| {
+                                    contains_only_an_ellipsis(&class.body, f.context().comments())
+                                }) && following.as_class_def_stmt().is_some_and(|class| {
+                                    contains_only_an_ellipsis(&class.body, f.context().comments())
+                                });
+
+                            // Two subsequent functions where the preceding has an ellipsis only body
+                            // ```python
+                            // def test(): ...
+                            // def b(): a
+                            // ```
+                            let function_with_ellipsis =
+                                preceding.as_function_def_stmt().is_some_and(|function| {
+                                    contains_only_an_ellipsis(
+                                        &function.body,
+                                        f.context().comments(),
+                                    )
+                                }) && following.is_function_def_stmt();
+
+                            // Don't add an empty line between two classes that have an `...` body only or after
+                            // a function with an `...` body. Otherwise add an empty line.
+                            if !class_sequences_with_ellipsis_only && !function_with_ellipsis {
+                                empty_line().fmt(f)?;
+                            }
+                        }
+                    }
+                    SuiteKind::TopLevel => {
+                        write!(f, [empty_line(), empty_line()])?;
+                    }
+                    SuiteKind::Function | SuiteKind::Class | SuiteKind::Other => {
+                        empty_line().fmt(f)?;
+                    }
+                }
+            } else if is_import_definition(preceding) && !is_import_definition(following) {
+                // Enforce _at least_ one empty line after an import statement (but allow up to
+                // two at the top-level).
+                match self.kind {
+                    SuiteKind::TopLevel => {
+                        match lines_after_ignoring_trivia(preceding.end(), source) {
+                            0 | 1 | 2 => empty_line().fmt(f)?,
+                            _ => write!(f, [empty_line(), empty_line()])?,
+                        }
+                    }
+                    SuiteKind::Function | SuiteKind::Class | SuiteKind::Other => {
+                        empty_line().fmt(f)?;
+                    }
+                }
+            } else if is_compound_statement(preceding) {
+                // Handles the case where a body has trailing comments. The issue is that RustPython does not include
+                // the comments in the range of the suite. This means, the body ends right after the last statement in the body.
+                // ```python
+                // def test():
+                //      ...
+                //      # The body of `test` ends right after `...` and before this comment
+                //
+                // # leading comment
+                //
+                //
+                // a = 10
+                // ```
+                // Using `lines_after` for the node doesn't work because it would count the lines after the `...`
+                // which is 0 instead of 1, the number of lines between the trailing comment and
+                // the leading comment. This is why the suite handling counts the lines before the
+                // start of the next statement or before the first leading comments for compound statements.
+                let start = if let Some(first_leading) = comments.leading(following).first() {
+                    first_leading.slice().start()
+                } else {
+                    following.start()
+                };
+
+                match lines_before(start, source) {
+                    0 | 1 => hard_line_break().fmt(f)?,
+                    2 => empty_line().fmt(f)?,
+                    3.. => match self.kind {
+                        SuiteKind::TopLevel => write!(f, [empty_line(), empty_line()])?,
+                        SuiteKind::Function | SuiteKind::Class | SuiteKind::Other => {
+                            empty_line().fmt(f)?;
+                        }
+                    },
+                }
+            } else if after_class_docstring {
+                // Enforce an empty line after a class docstring, e.g., these are both stable
+                // formatting:
+                // ```python
+                // class Test:
+                //     """Docstring"""
+                //
+                //     ...
+                //
+                //
+                // class Test:
+                //
+                //     """Docstring"""
+                //
+                //     ...
+                // ```
+                empty_line().fmt(f)?;
+                after_class_docstring = false;
+            } else {
+                // Insert the appropriate number of empty lines based on the node level, e.g.:
+                // * [`NodeLevel::Module`]: Up to two empty lines
+                // * [`NodeLevel::CompoundStatement`]: Up to one empty line
+                // * [`NodeLevel::Expression`]: No empty lines
+
+                let count_lines = |offset| {
+                    // It's necessary to skip any trailing line comment because RustPython doesn't include trailing comments
+                    // in the node's range
+                    // ```python
+                    // a # The range of `a` ends right before this comment
+                    //
+                    // b
+                    // ```
+                    //
+                    // Simply using `lines_after` doesn't work if a statement has a trailing comment because
+                    // it then counts the lines between the statement and the trailing comment, which is
+                    // always 0. This is why it skips any trailing trivia (trivia that's on the same line)
+                    // and counts the lines after.
+                    lines_after_ignoring_trivia(offset, source)
+                };
+
+                match node_level {
+                    NodeLevel::TopLevel => match count_lines(preceding.end()) {
+                        0 | 1 => hard_line_break().fmt(f)?,
+                        2 => empty_line().fmt(f)?,
+                        _ => write!(f, [empty_line(), empty_line()])?,
+                    },
+                    NodeLevel::CompoundStatement => match count_lines(preceding.end()) {
+                        0 | 1 => hard_line_break().fmt(f)?,
+                        _ => empty_line().fmt(f)?,
+                    },
+                    NodeLevel::Expression(_) | NodeLevel::ParenthesizedExpression => {
+                        hard_line_break().fmt(f)?;
+                    }
+                }
+            }
+
+            let following_comments = comments.leading_dangling_trailing(following);
+
+            if following_comments
+                .leading
+                .iter()
+                .any(|comment| comment.is_suppression_off_comment(source))
+            {
+                preceding = write_suppressed_statements_starting_with_leading_comment(
+                    SuiteChildStatement::Other(following),
+                    &mut iter,
+                    f,
+                )?;
+            } else if following_comments
+                .trailing
+                .iter()
+                .any(|comment| comment.is_suppression_off_comment(source))
+            {
+                preceding = write_suppressed_statements_starting_with_trailing_comment(
+                    SuiteChildStatement::Other(following),
+                    &mut iter,
+                    f,
+                )?;
+            } else {
+                following.format().fmt(f)?;
+                preceding = following;
+            }
+        }
+
+        Ok(())
     }
 }
 
-/// Returns `true` if a function or class body contains only an ellipsis.
-fn contains_only_an_ellipsis(body: &[Stmt]) -> bool {
+/// Returns `true` if a function or class body contains only an ellipsis with no comments.
+pub(crate) fn contains_only_an_ellipsis(body: &[Stmt], comments: &Comments) -> bool {
     match body {
-        [Stmt::Expr(ast::StmtExpr { value, .. })] => matches!(
-            value.as_ref(),
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::Ellipsis,
-                ..
-            })
-        ),
+        [Stmt::Expr(ast::StmtExpr { value, .. })] => {
+            let [node] = body else {
+                return false;
+            };
+            matches!(
+                value.as_ref(),
+                Expr::Constant(ast::ExprConstant {
+                    value: Constant::Ellipsis,
+                    ..
+                })
+            ) && !comments.has_leading(node)
+        }
         _ => false,
     }
 }

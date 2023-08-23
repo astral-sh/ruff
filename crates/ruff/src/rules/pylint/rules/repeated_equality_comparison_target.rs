@@ -2,15 +2,16 @@ use std::hash::BuildHasherDefault;
 use std::ops::Deref;
 
 use itertools::{any, Itertools};
-use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr, Ranged};
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::hashable::HashableExpr;
+use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr, Ranged};
 use ruff_source_file::Locator;
 
+use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -43,16 +44,22 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
 #[violation]
 pub struct RepeatedEqualityComparisonTarget {
-    expr: String,
+    expression: SourceCodeSnippet,
 }
 
 impl Violation for RepeatedEqualityComparisonTarget {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RepeatedEqualityComparisonTarget { expr } = self;
-        format!(
-            "Consider merging multiple comparisons: `{expr}`. Use a `set` if the elements are hashable."
-        )
+        let RepeatedEqualityComparisonTarget { expression } = self;
+        if let Some(expression) = expression.full_display() {
+            format!(
+                "Consider merging multiple comparisons: `{expression}`. Use a `set` if the elements are hashable."
+            )
+        } else {
+            format!(
+                "Consider merging multiple comparisons. Use a `set` if the elements are hashable."
+            )
+        }
     }
 }
 
@@ -106,12 +113,12 @@ pub(crate) fn repeated_equality_comparison_target(
         if count > 1 {
             checker.diagnostics.push(Diagnostic::new(
                 RepeatedEqualityComparisonTarget {
-                    expr: merged_membership_test(
+                    expression: SourceCodeSnippet::new(merged_membership_test(
                         value.as_expr(),
                         bool_op.op,
                         &comparators,
                         checker.locator(),
-                    ),
+                    )),
                 },
                 bool_op.range(),
             ));

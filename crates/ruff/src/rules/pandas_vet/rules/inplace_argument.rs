@@ -1,7 +1,7 @@
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_true;
-use ruff_python_ast::{self as ast, Keyword, PySourceType, Ranged};
+use ruff_python_ast::{self as ast, Keyword, Ranged};
 use ruff_source_file::Locator;
 
 use crate::autofix::edits::{remove_argument, Parentheses};
@@ -78,12 +78,9 @@ pub(crate) fn inplace_argument(checker: &mut Checker, call: &ast::ExprCall) {
                         && checker.semantic().current_statement().is_expr_stmt()
                         && checker.semantic().current_expression_parent().is_none()
                     {
-                        if let Some(fix) = convert_inplace_argument_to_assignment(
-                            call,
-                            keyword,
-                            checker.source_type,
-                            checker.locator(),
-                        ) {
+                        if let Some(fix) =
+                            convert_inplace_argument_to_assignment(call, keyword, checker.locator())
+                        {
                             diagnostic.set_fix(fix);
                         }
                     }
@@ -103,7 +100,6 @@ pub(crate) fn inplace_argument(checker: &mut Checker, call: &ast::ExprCall) {
 fn convert_inplace_argument_to_assignment(
     call: &ast::ExprCall,
     keyword: &Keyword,
-    source_type: PySourceType,
     locator: &Locator,
 ) -> Option<Fix> {
     // Add the assignment.
@@ -118,8 +114,7 @@ fn convert_inplace_argument_to_assignment(
         keyword,
         &call.arguments,
         Parentheses::Preserve,
-        locator,
-        source_type,
+        locator.contents(),
     )
     .ok()?;
 

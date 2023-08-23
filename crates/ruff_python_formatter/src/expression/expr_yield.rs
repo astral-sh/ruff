@@ -90,7 +90,7 @@ impl Format<PyFormatContext<'_>> for AnyExpressionYield<'_> {
                 [
                     text(keyword),
                     space(),
-                    maybe_parenthesize_expression(val, self, Parenthesize::IfRequired)
+                    maybe_parenthesize_expression(val, self, Parenthesize::Optional)
                 ]
             )?;
         } else {
