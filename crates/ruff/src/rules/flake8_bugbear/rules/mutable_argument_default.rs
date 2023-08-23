@@ -169,7 +169,7 @@ fn move_initialization(
             pos = locator.full_line_end(statement.end());
         } else {
             // Otherwise, insert before the first statement.
-            break
+            break;
         };
     }
     let initialization_edit = Edit::insertion(content, pos);
