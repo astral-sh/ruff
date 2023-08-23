@@ -143,7 +143,7 @@ pub(crate) fn native_literals(
         range: _,
     } = call;
 
-    let Expr::Name(ast::ExprName { ref id, .. }) = **func else {
+    let Expr::Name(ast::ExprName { ref id, .. }) = func.as_ref() else {
         return;
     };
 
