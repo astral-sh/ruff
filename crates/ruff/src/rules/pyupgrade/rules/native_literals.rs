@@ -214,6 +214,8 @@ pub(crate) fn native_literals(
 
             // Attribute access on an integer requires the integer to be parenthesized to disambiguate from a float
             // Ex) `(7).denominator` is valid but `7.denominator` is not
+            // Note that floats do not have this problem
+            // Ex) `(1.0).real` is valid and `1.0.real` is too
             let content = match (parent_expr, value) {
                 (Some(Expr::Attribute(_)), Constant::Int(_)) => format!("({arg_code})"),
                 _ => arg_code.to_string(),
