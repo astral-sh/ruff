@@ -93,21 +93,31 @@ formatting pass looks different than the first (formatter instability or lack of
 printing invalid syntax (e.g. missing parentheses around multiline expressions) and panics (mostly
 in debug assertions). You should ensure that your changes don't decrease the similarity index.
 
+**Terminology** For `()`, `[]` and `{}` we use the following terminology:
+
+- parentheses: `(`, `)` or all kind of parentheses (`()`, `[]` and `{}`, e.g.
+    `has_own_parentheses`)
+- brackets: `[`, `]`
+- braces: `{`, `}`
+
 ## `format_dev`
 
 It's possible to format an entire project:
 
 ```shell
-cargo run --bin ruff_dev -- format-dev --write my_project
+cargo run --bin ruff_dev -- format-dev --write /path/to/my_project
 ```
 
-You can set the following options for `format_dev`:
+Available options:
 
-- `--write`: Format the files and write them back to disk
-- `--stability-check`: Format twice (but don't write to disk) and check for differences and crashes
+- `--write`: Format the files and write them back to disk.
+- `--stability-check`: Format twice (but don't write to disk without `--write`) and check for
+    differences and crashes.
 - `--multi-project`: Treat every subdirectory as a separate project. Useful for ecosystem checks.
-- `--error-file`, `--log-file`, `--stats-file`: Use together with `--multi-project`, this writes
-    all errors, all message and just the similarity index as unicode tables to files.
+- `--error-file`: Write all errors to the given file.
+- `--log-file`: Write all messages to the given file.
+- `--stats-file`: Use together with `--multi-project`, this writes the similarity index as unicode
+  table to the given file.
 
 **Large ecosystem checks** It is also possible to check a large number of repositories. This dataset
 is large (~60GB), so we only do this occasionally:

@@ -207,14 +207,24 @@ pub(crate) struct Args {
 pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
     setup_logging(&args.log_level_args, args.log_file.as_deref())?;
 
+    let mut error_file = match &args.error_file {
+        Some(error_file) => Some(BufWriter::new(
+            File::create(error_file).context("Couldn't open error file")?,
+        )),
+        None => None,
+    };
+
     let all_success = if args.multi_project {
-        format_dev_multi_project(args)?
+        format_dev_multi_project(args, error_file)?
     } else {
         let result = format_dev_project(&args.files, args.stability_check, args.write)?;
         let error_count = result.error_count();
 
         if result.error_count() > 0 {
             error!(parent: None, "{}", result.display(args.format));
+        }
+        if let Some(error_file) = &mut error_file {
+            write!(error_file, "{}", result.display(args.format)).unwrap();
         }
         info!(
             parent: None,
@@ -281,7 +291,10 @@ fn setup_logging(log_level_args: &LogLevelArgs, log_file: Option<&Path>) -> io::
 }
 
 /// Checks a directory of projects
-fn format_dev_multi_project(args: &Args) -> anyhow::Result<bool> {
+fn format_dev_multi_project(
+    args: &Args,
+    mut error_file: Option<BufWriter<File>>,
+) -> anyhow::Result<bool> {
     let mut total_errors = 0;
     let mut total_files = 0;
     let mut total_syntax_error_in_input = 0;
@@ -306,13 +319,6 @@ fn format_dev_multi_project(args: &Args) -> anyhow::Result<bool> {
     pb_span.pb_set_style(&ProgressStyle::default_bar());
     pb_span.pb_set_length(project_paths.len() as u64);
     let pb_span_enter = pb_span.enter();
-
-    let mut error_file = match &args.error_file {
-        Some(error_file) => Some(BufWriter::new(
-            File::create(error_file).context("Couldn't open error file")?,
-        )),
-        None => None,
-    };
 
     let mut results = Vec::new();
 
@@ -344,7 +350,6 @@ fn format_dev_multi_project(args: &Args) -> anyhow::Result<bool> {
                 }
                 if let Some(error_file) = &mut error_file {
                     write!(error_file, "{}", result.display(args.format)).unwrap();
-                    error_file.flush().unwrap();
                 }
                 results.push(result);
 
