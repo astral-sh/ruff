@@ -222,8 +222,7 @@ match (  # d 2
     case d2:
         pass
 match d3:
-    case (
-        # d 3
+    case (  # d 3
         x
     ):
         pass

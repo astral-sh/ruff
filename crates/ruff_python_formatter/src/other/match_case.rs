@@ -1,9 +1,9 @@
-use ruff_formatter::{format_args, write, Buffer, FormatResult};
+use ruff_formatter::{write, Buffer, FormatResult};
 use ruff_python_ast::{MatchCase, Pattern, Ranged};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::TextRange;
 
-use crate::comments::{leading_comments, SourceComment};
+use crate::comments::SourceComment;
 use crate::expression::parentheses::parenthesized;
 use crate::prelude::*;
 use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
@@ -21,8 +21,13 @@ impl FormatNodeRule<MatchCase> for FormatMatchCase {
             body,
         } = item;
 
+        // Distinguish dangling comments that appear on the open parenthesis from those that
+        // appear on the trailing colon.
         let comments = f.context().comments().clone();
         let dangling_item_comments = comments.dangling(item);
+        let (open_parenthesis_comments, trailing_colon_comments) = dangling_item_comments.split_at(
+            dangling_item_comments.partition_point(|comment| comment.start() < pattern.start()),
+        );
 
         write!(
             f,
@@ -33,19 +38,10 @@ impl FormatNodeRule<MatchCase> for FormatMatchCase {
                     &format_with(|f| {
                         write!(f, [text("case"), space()])?;
 
-                        let leading_pattern_comments = comments.leading(pattern);
-                        if !leading_pattern_comments.is_empty() {
-                            parenthesized(
-                                "(",
-                                &format_args![
-                                    leading_comments(leading_pattern_comments),
-                                    pattern.format()
-                                ],
-                                ")",
-                            )
-                            .fmt(f)?;
-                        } else if is_match_case_pattern_parenthesized(item, pattern, f.context())? {
-                            parenthesized("(", &pattern.format(), ")").fmt(f)?;
+                        if is_match_case_pattern_parenthesized(item, pattern, f.context())? {
+                            parenthesized("(", &pattern.format(), ")")
+                                .with_dangling_comments(open_parenthesis_comments)
+                                .fmt(f)?;
                         } else {
                             pattern.format().fmt(f)?;
                         }
@@ -57,7 +53,7 @@ impl FormatNodeRule<MatchCase> for FormatMatchCase {
                         Ok(())
                     }),
                 ),
-                clause_body(body, dangling_item_comments),
+                clause_body(body, trailing_colon_comments),
             ]
         )
     }
