@@ -226,25 +226,25 @@ fn trailing_semicolon(offset: TextSize, locator: &Locator) -> Option<TextSize> {
 fn next_stmt_break(semicolon: TextSize, locator: &Locator) -> TextSize {
     let start_location = semicolon + TextSize::from(1);
 
-    let contents = &locator.contents()[usize::from(start_location)..];
-    for line in NewlineWithTrailingNewline::from(contents) {
+    for line in
+        NewlineWithTrailingNewline::with_offset(locator.after(start_location), start_location)
+    {
         let trimmed = line.trim_whitespace();
         // Skip past any continuations.
         if trimmed.starts_with('\\') {
             continue;
         }
 
-        return start_location
-            + if trimmed.is_empty() {
-                // If the line is empty, then despite the previous statement ending in a
-                // semicolon, we know that it's not a multi-statement line.
-                line.start()
-            } else {
-                // Otherwise, find the start of the next statement. (Or, anything that isn't
-                // whitespace.)
-                let relative_offset = line.find(|c: char| !is_python_whitespace(c)).unwrap();
-                line.start() + TextSize::try_from(relative_offset).unwrap()
-            };
+        return if trimmed.is_empty() {
+            // If the line is empty, then despite the previous statement ending in a
+            // semicolon, we know that it's not a multi-statement line.
+            line.start()
+        } else {
+            // Otherwise, find the start of the next statement. (Or, anything that isn't
+            // whitespace.)
+            let relative_offset = line.find(|c: char| !is_python_whitespace(c)).unwrap();
+            line.start() + TextSize::try_from(relative_offset).unwrap()
+        };
     }
 
     locator.line_end(start_location)

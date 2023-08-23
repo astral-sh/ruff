@@ -140,7 +140,7 @@ fn move_initialization(
     let mut body = function_def.body.iter();
 
     let statement = body.next()?;
-    if indexer.preceded_by_multi_statement_line(statement, locator) {
+    if indexer.in_multi_statement_line(statement, locator) {
         return None;
     }
 
@@ -170,7 +170,7 @@ fn move_initialization(
         if let Some(statement) = body.next() {
             // If there's a second statement, insert _before_ it, but ensure this isn't a
             // multi-statement line.
-            if indexer.preceded_by_multi_statement_line(statement, locator) {
+            if indexer.in_multi_statement_line(statement, locator) {
                 return None;
             }
             Edit::insertion(content, locator.line_start(statement.start()))
