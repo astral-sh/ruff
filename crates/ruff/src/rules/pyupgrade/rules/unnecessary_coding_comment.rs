@@ -58,7 +58,12 @@ pub(crate) fn unnecessary_coding_comment(
     for comment_range in indexer.comment_ranges().iter().take(2) {
         let line_range = locator.full_line_range(comment_range.start());
         let line = locator.slice(line_range);
-        if CODING_COMMENT_REGEX.is_match(line) {
+        let comment = locator.slice(*comment_range);
+
+        // Both the line and the comment itself must match to prevent false positives
+        // where the comment is on a line that includes content that looks like a coding comment
+        // or the coding comment is preceded by non-whitespace
+        if CODING_COMMENT_REGEX.is_match(line) && CODING_COMMENT_REGEX.is_match(comment) {
             #[allow(deprecated)]
             let index = locator.compute_line_index(line_range.start());
             if index.to_zero_indexed() > 1 {
