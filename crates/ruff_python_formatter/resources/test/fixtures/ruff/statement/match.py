@@ -172,6 +172,7 @@ match x:
     case (a as b) as c:
         pass
 
+
 match pattern_singleton:
     case (
         # leading 1
@@ -187,3 +188,30 @@ match pattern_singleton:
         ...
     case False:
         ...
+
+
+match foo:
+    case "a", "b":
+        pass
+    case "a", "b",:
+        pass
+    case ("a", "b"):
+        pass
+    case ["a", "b"]:
+        pass
+    case (["a", "b"]):
+        pass
+
+
+match foo:
+    case [  # leading
+# leading
+    # leading
+        # leading
+        "a",  # trailing
+# trailing
+    # trailing
+        # trailing
+        "b",
+    ]:
+        pass

@@ -104,54 +104,47 @@ def where_is(point):
 ```diff
 --- Black
 +++ Ruff
-@@ -1,92 +1,92 @@
- # Cases sampled from PEP 636 examples
- 
- match command.split():
--    case [action, obj]:
-+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
-         ...  # interpret action, obj
- 
- match command.split():
--    case [action]:
-+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
-         ...  # interpret single-verb action
--    case [action, obj]:
-+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+@@ -11,82 +11,97 @@
          ...  # interpret action, obj
  
  match command.split():
 -    case ["quit"]:
-+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
++    case ["NOT_YET_IMPLEMENTED_PatternMatchValue"]:
          print("Goodbye!")
          quit_game()
 -    case ["look"]:
-+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
++    case ["NOT_YET_IMPLEMENTED_PatternMatchValue"]:
          current_room.describe()
 -    case ["get", obj]:
-+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
++    case ["NOT_YET_IMPLEMENTED_PatternMatchValue", obj]:
          character.get(obj, current_room)
 -    case ["go", direction]:
-+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
++    case ["NOT_YET_IMPLEMENTED_PatternMatchValue", direction]:
          current_room = current_room.neighbor(direction)
      # The rest of your commands go here
  
  match command.split():
 -    case ["drop", *objects]:
-+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
++    case [
++        "NOT_YET_IMPLEMENTED_PatternMatchValue",
++        *NOT_YET_IMPLEMENTED_PatternMatchStar,
++    ]:
          for obj in objects:
              character.drop(obj, current_room)
      # The rest of your commands go here
  
  match command.split():
 -    case ["quit"]:
-+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
++    case ["NOT_YET_IMPLEMENTED_PatternMatchValue"]:
          pass
 -    case ["go", direction]:
-+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
++    case ["NOT_YET_IMPLEMENTED_PatternMatchValue", direction]:
          print("Going:", direction)
 -    case ["drop", *objects]:
-+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
++    case [
++        "NOT_YET_IMPLEMENTED_PatternMatchValue",
++        *NOT_YET_IMPLEMENTED_PatternMatchStar,
++    ]:
          print("Dropping: ", *objects)
      case _:
          print(f"Sorry, I couldn't understand {command!r}")
@@ -166,21 +159,30 @@ def where_is(point):
  
  match command.split():
 -    case ["go", ("north" | "south" | "east" | "west")]:
-+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
++    case [
++        "NOT_YET_IMPLEMENTED_PatternMatchValue",
++        NOT_YET_IMPLEMENTED_PatternMatchOf | (y),
++    ]:
          current_room = current_room.neighbor(...)
          # how do I know which direction to go?
  
  match command.split():
 -    case ["go", ("north" | "south" | "east" | "west") as direction]:
-+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
++    case [
++        "NOT_YET_IMPLEMENTED_PatternMatchValue",
++        NOT_YET_IMPLEMENTED_PatternMatchOf | (y) as direction,
++    ]:
          current_room = current_room.neighbor(direction)
  
  match command.split():
 -    case ["go", direction] if direction in current_room.exits:
-+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2] if direction in current_room.exits:
++    case [
++        "NOT_YET_IMPLEMENTED_PatternMatchValue",
++        direction,
++    ] if direction in current_room.exits:
          current_room = current_room.neighbor(direction)
 -    case ["go", _]:
-+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
++    case ["NOT_YET_IMPLEMENTED_PatternMatchValue", _]:
          print("Sorry, you can't go that way")
  
  match event.get():
@@ -232,39 +234,45 @@ def where_is(point):
 # Cases sampled from PEP 636 examples
 
 match command.split():
-    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+    case [action, obj]:
         ...  # interpret action, obj
 
 match command.split():
-    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+    case [action]:
         ...  # interpret single-verb action
-    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+    case [action, obj]:
         ...  # interpret action, obj
 
 match command.split():
-    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+    case ["NOT_YET_IMPLEMENTED_PatternMatchValue"]:
         print("Goodbye!")
         quit_game()
-    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+    case ["NOT_YET_IMPLEMENTED_PatternMatchValue"]:
         current_room.describe()
-    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+    case ["NOT_YET_IMPLEMENTED_PatternMatchValue", obj]:
         character.get(obj, current_room)
-    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+    case ["NOT_YET_IMPLEMENTED_PatternMatchValue", direction]:
         current_room = current_room.neighbor(direction)
     # The rest of your commands go here
 
 match command.split():
-    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+    case [
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        *NOT_YET_IMPLEMENTED_PatternMatchStar,
+    ]:
         for obj in objects:
             character.drop(obj, current_room)
     # The rest of your commands go here
 
 match command.split():
-    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+    case ["NOT_YET_IMPLEMENTED_PatternMatchValue"]:
         pass
-    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+    case ["NOT_YET_IMPLEMENTED_PatternMatchValue", direction]:
         print("Going:", direction)
-    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+    case [
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        *NOT_YET_IMPLEMENTED_PatternMatchStar,
+    ]:
         print("Dropping: ", *objects)
     case _:
         print(f"Sorry, I couldn't understand {command!r}")
@@ -276,18 +284,27 @@ match command.split():
         ...  # Code for picking up the given object
 
 match command.split():
-    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+    case [
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        NOT_YET_IMPLEMENTED_PatternMatchOf | (y),
+    ]:
         current_room = current_room.neighbor(...)
         # how do I know which direction to go?
 
 match command.split():
-    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+    case [
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        NOT_YET_IMPLEMENTED_PatternMatchOf | (y) as direction,
+    ]:
         current_room = current_room.neighbor(direction)
 
 match command.split():
-    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2] if direction in current_room.exits:
+    case [
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        direction,
+    ] if direction in current_room.exits:
         current_room = current_room.neighbor(direction)
-    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+    case ["NOT_YET_IMPLEMENTED_PatternMatchValue", _]:
         print("Sorry, you can't go that way")
 
 match event.get():
