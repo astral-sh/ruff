@@ -71,8 +71,27 @@ mod tests {
     }
 
     #[test]
-    fn extend_immutable_calls() -> Result<()> {
-        let snapshot = "extend_immutable_calls".to_string();
+    fn extend_immutable_calls_arg_annotation() -> Result<()> {
+        let snapshot = "extend_immutable_calls_arg_annotation".to_string();
+        let diagnostics = test_path(
+            Path::new("flake8_bugbear/B006_extended.py"),
+            &Settings {
+                flake8_bugbear: super::settings::Settings {
+                    extend_immutable_calls: vec![
+                        "custom.ImmutableTypeA".to_string(),
+                        "custom.ImmutableTypeB".to_string(),
+                    ],
+                },
+                ..Settings::for_rule(Rule::MutableArgumentDefault)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn extend_immutable_calls_arg_default() -> Result<()> {
+        let snapshot = "extend_immutable_calls_arg_default".to_string();
         let diagnostics = test_path(
             Path::new("flake8_bugbear/B008_extended.py"),
             &Settings {
