@@ -69,7 +69,7 @@ def f():  # a
 
 </details>
 
-The other option is to use the playground:
+The other option is to use the playground (also check the playground README):
 
 ```shell
 cd playground && npm run dev:wasm && npm install && npm run dev
@@ -81,11 +81,11 @@ Run`npm run dev:wasm` and reload the page in the browser to refresh.
 lot faster. We use [insta](https://insta.rs/) to create snapshots of all tests in
 `crates/ruff_python_formatter/resources/test/fixtures/ruff`. We have copied the majority of tests
 over from Black to check the difference between Ruff and Black output. Whenever we have no more
-differences on a black input file, we delete then snapshot.
+differences on a Black input file, the snapshot is deleted.
 
-**Ecosystem checks** `scripts/formatter_ecosystem_checks.sh` runs black compatibility and stability
+**Ecosystem checks** `scripts/formatter_ecosystem_checks.sh` runs Black compatibility and stability
 checks on a number of selected projects. It will print the similarity index, the percentage of lines
-that remains unchanged between black's formatting and our formatting. You could compute it as the
+that remains unchanged between Black's formatting and our formatting. You could compute it as the
 number of neutral lines in a diff divided by the neutral plus the removed lines. We run this script
 in CI, you can view the results in a PR page under "Checks" > "CI" > "Summary" at the bottom of the
 page. The stability checks catch for three common problems: The second
@@ -95,10 +95,10 @@ in debug assertions). You should ensure that your changes don't decrease the sim
 
 **Terminology** For `()`, `[]` and `{}` we use the following terminology:
 
-- parentheses: `(`, `)` or all kind of parentheses (`()`, `[]` and `{}`, e.g.
+- Parentheses: `(`, `)` or all kind of parentheses (`()`, `[]` and `{}`, e.g.
     `has_own_parentheses`)
-- brackets: `[`, `]`
-- braces: `{`, `}`
+- Brackets: `[`, `]`
+- Braces: `{`, `}`
 
 ## `format_dev`
 
@@ -148,27 +148,33 @@ a different strategy until all strategies are exhausted.
 
 ## Helper structs
 
-To abstract formatting something into a helper, create a new struct which the data you want to
+To abstract formatting something into a helper, create a new struct with the data you want to
 format and implement `Format<PyFormatContext<'_>> for MyStruct`. Below is a small dummy example.
 
 ```rust
-// Helper to hide the fields for the struct
+/// Helper to hide the fields for the struct
 pub(crate) fn empty_parenthesized<'content>(
     comments: &'content [SourceComment],
+    has_plus_prefix: bool,
 ) -> FormatEmptyParenthesized<'content> {
     FormatEmptyParenthesized {
         comments,
+        has_plus_prefix,
     }
 }
 
-// The wrapper struct
+/// The wrapper struct
 pub(crate) struct FormatEmptyParenthesized<'content> {
     comments: &'content [SourceComment],
+    has_plus_prefix: bool,
 }
 
 impl Format<PyFormatContext<'_>> for FormatEmptyParenthesized<'_> {
-    // Here we implement the actual formatting
+    /// Here we implement the actual formatting
     fn fmt(&self, f: &mut Formatter<PyFormatContext>) -> FormatResult<()> {
+        if self.has_plus_prefix {
+            text("+").fmt(f)?; // This is equivalent to `write!(f, [text("*")])?;`
+        }
         write!(
             f,
             [
