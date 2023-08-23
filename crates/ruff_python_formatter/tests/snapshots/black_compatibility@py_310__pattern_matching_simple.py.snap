@@ -104,51 +104,7 @@ def where_is(point):
 ```diff
 --- Black
 +++ Ruff
-<<<<<<< HEAD
-@@ -11,82 +11,91 @@
-         ...  # interpret action, obj
- 
- match command.split():
--    case ["quit"]:
-+    case ["NOT_YET_IMPLEMENTED_PatternMatchValue"]:
-         print("Goodbye!")
-         quit_game()
--    case ["look"]:
-+    case ["NOT_YET_IMPLEMENTED_PatternMatchValue"]:
-         current_room.describe()
--    case ["get", obj]:
-+    case ["NOT_YET_IMPLEMENTED_PatternMatchValue", obj]:
-         character.get(obj, current_room)
--    case ["go", direction]:
-+    case ["NOT_YET_IMPLEMENTED_PatternMatchValue", direction]:
-         current_room = current_room.neighbor(direction)
-=======
-@@ -23,7 +23,7 @@
->>>>>>> main
-     # The rest of your commands go here
- 
- match command.split():
--    case ["drop", *objects]:
-<<<<<<< HEAD
-+    case ["NOT_YET_IMPLEMENTED_PatternMatchValue", *objects]:
-=======
-+    case ["drop", *NOT_YET_IMPLEMENTED_PatternMatchStar]:
->>>>>>> main
-         for obj in objects:
-             character.drop(obj, current_room)
-     # The rest of your commands go here
-@@ -33,24 +33,24 @@
-         pass
-     case ["go", direction]:
-         print("Going:", direction)
--    case ["drop", *objects]:
-<<<<<<< HEAD
-+    case ["NOT_YET_IMPLEMENTED_PatternMatchValue", *objects]:
-=======
-+    case ["drop", *NOT_YET_IMPLEMENTED_PatternMatchStar]:
->>>>>>> main
-         print("Dropping: ", *objects)
-     case _:
+@@ -39,18 +39,18 @@
          print(f"Sorry, I couldn't understand {command!r}")
  
  match command.split():
@@ -245,11 +201,7 @@ match command.split():
     # The rest of your commands go here
 
 match command.split():
-<<<<<<< HEAD
-    case ["NOT_YET_IMPLEMENTED_PatternMatchValue", *objects]:
-=======
-    case ["drop", *NOT_YET_IMPLEMENTED_PatternMatchStar]:
->>>>>>> main
+    case ["drop", *objects]:
         for obj in objects:
             character.drop(obj, current_room)
     # The rest of your commands go here
@@ -259,11 +211,7 @@ match command.split():
         pass
     case ["go", direction]:
         print("Going:", direction)
-<<<<<<< HEAD
-    case ["NOT_YET_IMPLEMENTED_PatternMatchValue", *objects]:
-=======
-    case ["drop", *NOT_YET_IMPLEMENTED_PatternMatchStar]:
->>>>>>> main
+    case ["drop", *objects]:
         print("Dropping: ", *objects)
     case _:
         print(f"Sorry, I couldn't understand {command!r}")

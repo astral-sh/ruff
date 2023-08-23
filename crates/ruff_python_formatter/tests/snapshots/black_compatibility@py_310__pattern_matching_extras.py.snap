@@ -152,11 +152,7 @@ match bar1:
          pass
      case match:
          pass
-<<<<<<< HEAD
-@@ -23,23 +23,38 @@
-=======
 @@ -23,7 +23,7 @@
->>>>>>> main
  
  def func(match: case, case: match) -> case:
      match Something():
@@ -165,7 +161,7 @@ match bar1:
              ...
          case another:
              ...
-@@ -32,23 +32,32 @@
+@@ -32,14 +32,23 @@
  match maybe, multiple:
      case perhaps, 5:
          pass
@@ -192,7 +188,7 @@ match bar1:
          pass
      case _:
          pass
-@@ -48,7 +63,7 @@
+@@ -48,7 +57,7 @@
  match a, *b, c:
      case [*_]:
          assert "seq" == _
@@ -215,17 +211,7 @@ match bar1:
          pass
  
      case [a as match]:
-<<<<<<< HEAD
-@@ -85,35 +95,38 @@
-=======
-@@ -80,17 +84,14 @@
- 
- 
- match a, *b(), c:
--    case d, *f, g:
-+    case d, *NOT_YET_IMPLEMENTED_PatternMatchStar, g:
-         pass
->>>>>>> main
+@@ -85,12 +89,9 @@
  
  
  match something:
@@ -240,17 +226,12 @@ match bar1:
          pass
  
  
-@@ -101,19 +102,22 @@
+@@ -101,19 +102,17 @@
      case 2 as b, 3 as c:
          pass
  
 -    case 4 as d, (5 as e), (6 | 7 as g), *h:
-+    case (
-+        4 as d,
-+        5 as e,
-+        NOT_YET_IMPLEMENTED_PatternMatchOf | (y) as g,
-+        *h,
-+    ):
++    case 4 as d, 5 as e, NOT_YET_IMPLEMENTED_PatternMatchOf | (y) as g, *h:
          pass
  
  
@@ -377,12 +358,7 @@ match something:
     case 2 as b, 3 as c:
         pass
 
-    case (
-        4 as d,
-        5 as e,
-        NOT_YET_IMPLEMENTED_PatternMatchOf | (y) as g,
-        *h,
-    ):
+    case 4 as d, 5 as e, NOT_YET_IMPLEMENTED_PatternMatchOf | (y) as g, *h:
         pass
 
 

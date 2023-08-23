@@ -243,7 +243,32 @@ match foo:
     ]:
         pass
 
-<<<<<<< HEAD
+match foo:
+    case 1:
+        y = 0
+    case (1):
+        y = 1
+    case (("a")):
+        y = 1
+    case (  # comment
+        1
+    ):
+        y = 1
+    case (
+        # comment
+        1
+    ):
+        y = 1
+    case (
+        1  # comment
+    ):
+        y = 1
+    case (
+        1
+        # comment
+    ):
+        y = 1
+
 match foo:
     case [1, 2, *rest]:
         pass
@@ -270,36 +295,8 @@ match foo:
         pass
     case [* # comment
         _, 1, 2]:
-        pass```
-=======
-
-match foo:
-    case 1:
-        y = 0
-    case (1):
-        y = 1
-    case (("a")):
-        y = 1
-    case (  # comment
-        1
-    ):
-        y = 1
-    case (
-        # comment
-        1
-    ):
-        y = 1
-    case (
-        1  # comment
-    ):
-        y = 1
-    case (
-        1
-        # comment
-    ):
-        y = 1
+        pass
 ```
->>>>>>> main
 
 ## Output
 ```py
@@ -536,64 +533,6 @@ match foo:
     ]:
         pass
 
-<<<<<<< HEAD
-match foo:
-    case [
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-        *rest,
-    ]:
-        pass
-    case [
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-        *_,
-    ]:
-        pass
-    case [
-        *rest,
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-    ]:
-        pass
-    case [
-        *_,
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-    ]:
-        pass
-    case [
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-        *rest,
-    ]:
-        pass
-    case [
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-        *rest,  # comment
-    ]:
-        pass
-    case [
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-        *_,  # comment
-    ]:
-        pass
-    case [
-        *rest,  # comment
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-    ]:
-        pass
-    case [
-        *_,  # comment
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-    ]:
-        pass
-=======
-
 match foo:
     case 1:
         y = 0
@@ -619,7 +558,46 @@ match foo:
         # comment
     ):
         y = 1
->>>>>>> main
+
+match foo:
+    case [1, 2, *rest]:
+        pass
+    case [1, 2, *_]:
+        pass
+    case [*rest, 1, 2]:
+        pass
+    case [*_, 1, 2]:
+        pass
+    case [
+        1,
+        2,
+        *rest,
+    ]:
+        pass
+    case [
+        1,
+        2,
+        *rest,  # comment
+    ]:
+        pass
+    case [
+        1,
+        2,
+        *_,  # comment
+    ]:
+        pass
+    case [
+        *rest,  # comment
+        1,
+        2,
+    ]:
+        pass
+    case [
+        *_,  # comment
+        1,
+        2,
+    ]:
+        pass
 ```
 
 
