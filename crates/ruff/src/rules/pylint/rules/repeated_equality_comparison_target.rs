@@ -2,15 +2,16 @@ use std::hash::BuildHasherDefault;
 use std::ops::Deref;
 
 use itertools::{any, Itertools};
-use ruff_python_ast::{BoolOp, CmpOp, Expr, ExprBoolOp, ExprCompare, Ranged};
 use rustc_hash::FxHashMap;
 
-use crate::autofix::snippet::SourceCodeSnippet;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::hashable::HashableExpr;
+use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr, Ranged};
 use ruff_source_file::Locator;
 
+use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -63,7 +64,10 @@ impl Violation for RepeatedEqualityComparisonTarget {
 }
 
 /// PLR1714
-pub(crate) fn repeated_equality_comparison_target(checker: &mut Checker, bool_op: &ExprBoolOp) {
+pub(crate) fn repeated_equality_comparison_target(
+    checker: &mut Checker,
+    bool_op: &ast::ExprBoolOp,
+) {
     if bool_op
         .values
         .iter()
@@ -72,27 +76,45 @@ pub(crate) fn repeated_equality_comparison_target(checker: &mut Checker, bool_op
         return;
     }
 
-    let mut left_to_comparators: FxHashMap<HashableExpr, (usize, Vec<&Expr>)> =
-        FxHashMap::with_capacity_and_hasher(bool_op.values.len(), BuildHasherDefault::default());
+    let mut value_to_comparators: FxHashMap<HashableExpr, (usize, Vec<&Expr>)> =
+        FxHashMap::with_capacity_and_hasher(
+            bool_op.values.len() * 2,
+            BuildHasherDefault::default(),
+        );
+
     for value in &bool_op.values {
-        if let Expr::Compare(ExprCompare {
+        // Enforced via `is_allowed_value`.
+        let Expr::Compare(ast::ExprCompare {
             left, comparators, ..
         }) = value
-        {
-            let (count, matches) = left_to_comparators
-                .entry(left.deref().into())
-                .or_insert_with(|| (0, Vec::new()));
-            *count += 1;
-            matches.extend(comparators);
-        }
+        else {
+            return;
+        };
+
+        // Enforced via `is_allowed_value`.
+        let [right] = comparators.as_slice() else {
+            return;
+        };
+
+        let (left_count, left_matches) = value_to_comparators
+            .entry(left.deref().into())
+            .or_insert_with(|| (0, Vec::new()));
+        *left_count += 1;
+        left_matches.push(right);
+
+        let (right_count, right_matches) = value_to_comparators
+            .entry(right.into())
+            .or_insert_with(|| (0, Vec::new()));
+        *right_count += 1;
+        right_matches.push(left);
     }
 
-    for (left, (count, comparators)) in left_to_comparators {
+    for (value, (count, comparators)) in value_to_comparators {
         if count > 1 {
             checker.diagnostics.push(Diagnostic::new(
                 RepeatedEqualityComparisonTarget {
                     expression: SourceCodeSnippet::new(merged_membership_test(
-                        left.as_expr(),
+                        value.as_expr(),
                         bool_op.op,
                         &comparators,
                         checker.locator(),
@@ -108,7 +130,7 @@ pub(crate) fn repeated_equality_comparison_target(checker: &mut Checker, bool_op
 /// E.g., `==` operators can be joined with `or` and `!=` operators can be
 /// joined with `and`.
 fn is_allowed_value(bool_op: BoolOp, value: &Expr) -> bool {
-    let Expr::Compare(ExprCompare {
+    let Expr::Compare(ast::ExprCompare {
         left,
         ops,
         comparators,
@@ -127,6 +149,14 @@ fn is_allowed_value(bool_op: BoolOp, value: &Expr) -> bool {
         BoolOp::Or => !matches!(op, CmpOp::Eq),
         BoolOp::And => !matches!(op, CmpOp::NotEq),
     } {
+        return false;
+    }
+
+    // Ignore self-comparisons, e.g., `foo == foo`.
+    let [right] = comparators.as_slice() else {
+        return false;
+    };
+    if ComparableExpr::from(left) == ComparableExpr::from(right) {
         return false;
     }
 
