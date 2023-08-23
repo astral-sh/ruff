@@ -38,12 +38,12 @@ match (  # comment
         pass
 
 
-# match (  # comment
-#     # let's go
-#     yield foo
-# ):  # another comment
-#     case ["a", "b", "c"]:
-#         pass
+match (  # comment
+    # let's go
+    yield foo
+):  # another comment
+    case ["a", "b", "c"]:
+        pass
 
 
 match aaaaaaaaahhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh:  # comment
@@ -247,4 +247,10 @@ match foo:
         2,
         *rest,
     ]:
+        pass
+    case [1, 2, * # comment
+        rest]:
+        pass
+    case [1, 2, * # comment
+        _]:
         pass
