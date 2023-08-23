@@ -1,6 +1,6 @@
 use ruff_python_ast::{Expr, Keyword, Ranged};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
@@ -60,9 +60,9 @@ pub(crate) fn unnecessary_generator_set(
     if let Expr::GeneratorExp(_) = argument {
         let mut diagnostic = Diagnostic::new(UnnecessaryGeneratorSet, expr.range());
         if checker.patch(diagnostic.kind.rule()) {
-            #[allow(deprecated)]
-            diagnostic
-                .try_set_fix_from_edit(|| fixes::fix_unnecessary_generator_set(checker, expr));
+            diagnostic.try_set_fix(|| {
+                fixes::fix_unnecessary_generator_set(checker, expr).map(Fix::suggested)
+            });
         }
         checker.diagnostics.push(diagnostic);
     }

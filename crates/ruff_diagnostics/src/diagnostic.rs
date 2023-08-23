@@ -1,10 +1,11 @@
 use anyhow::Result;
 use log::error;
-use ruff_text_size::{TextRange, TextSize};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::{Edit, Fix};
+use ruff_text_size::{TextRange, TextSize};
+
+use crate::Fix;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -35,12 +36,6 @@ impl Diagnostic {
         }
     }
 
-    /// Set the [`Fix`] used to fix the diagnostic.
-    #[inline]
-    pub fn set_fix(&mut self, fix: Fix) {
-        self.fix = Some(fix);
-    }
-
     /// Consumes `self` and returns a new `Diagnostic` with the given `fix`.
     #[inline]
     #[must_use]
@@ -49,24 +44,18 @@ impl Diagnostic {
         self
     }
 
+    /// Set the [`Fix`] used to fix the diagnostic.
+    #[inline]
+    pub fn set_fix(&mut self, fix: Fix) {
+        self.fix = Some(fix);
+    }
+
     /// Set the [`Fix`] used to fix the diagnostic, if the provided function returns `Ok`.
     /// Otherwise, log the error.
     #[inline]
     pub fn try_set_fix(&mut self, func: impl FnOnce() -> Result<Fix>) {
         match func() {
             Ok(fix) => self.fix = Some(fix),
-            Err(err) => error!("Failed to create fix for {}: {}", self.kind.name, err),
-        }
-    }
-
-    /// Sets an [`Edit`] used to fix the diagnostic, if the provided function returns `Ok`.
-    /// Otherwise, log the error.
-    #[inline]
-    #[deprecated(note = "Use Diagnostic::try_set_fix instead")]
-    #[allow(deprecated)]
-    pub fn try_set_fix_from_edit(&mut self, func: impl FnOnce() -> Result<Edit>) {
-        match func() {
-            Ok(edit) => self.fix = Some(Fix::unspecified(edit)),
             Err(err) => error!("Failed to create fix for {}: {}", self.kind.name, err),
         }
     }
