@@ -572,8 +572,7 @@ match foo:
 
 
 match foo:
-    case [
-        # leading
+    case [  # leading
         # leading
         # leading
         # leading
@@ -685,9 +684,8 @@ match foo:
         2,
     ]:
         pass
-    case [
-        (  # outer
-            # inner
+    case [  # outer
+        (  # inner
             1
         ),
         2,
@@ -695,29 +693,25 @@ match foo:
         pass
     case [
         (  # outer
-            [
-                # inner
+            [  # inner
                 1,
             ]
         )
     ]:
         pass
-    case [
-        (  # outer
-            # inner outer
-            [
-                # inner
+    case [  # outer
+        (  # inner outer
+            [  # inner
                 1,
             ]
         )
     ]:
         pass
-    case [
-        (  # outer
+    case [  # outer
+        (
             # own line
             # inner outer
-            [
-                # inner
+            [  # inner
                 1,
             ]
         )

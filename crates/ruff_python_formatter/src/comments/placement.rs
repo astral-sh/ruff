@@ -15,6 +15,7 @@ use crate::expression::expr_tuple::is_tuple_parenthesized;
 use crate::other::parameters::{
     assign_argument_separator_comment_placement, find_parameter_separators,
 };
+use crate::pattern::pattern_match_sequence::SequenceType;
 
 /// Manually attach comments to nodes that the default placement gets wrong.
 pub(super) fn place_comment<'a>(
@@ -178,6 +179,15 @@ fn handle_enclosed_comment<'a>(
         }
         AnyNodeRef::Comprehension(comprehension) => {
             handle_comprehension_comment(comment, comprehension, locator)
+        }
+        AnyNodeRef::PatternMatchSequence(pattern_match_sequence) => {
+            if SequenceType::from_pattern(pattern_match_sequence, locator.contents())
+                .is_parenthesized()
+            {
+                handle_bracketed_end_of_line_comment(comment, locator)
+            } else {
+                CommentPlacement::Default(comment)
+            }
         }
         AnyNodeRef::ExprAttribute(attribute) => {
             handle_attribute_comment(comment, attribute, locator)
