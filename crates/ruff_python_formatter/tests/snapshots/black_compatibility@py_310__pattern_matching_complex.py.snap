@@ -170,11 +170,7 @@ match x:
          y = 0
  # case black_test_patma_073
  match x:
--    case 0 if 0:
-+    case "NOT_YET_IMPLEMENTED_PatternMatchValue" if 0:
-         y = 0
--    case 0 if 1:
-+    case "NOT_YET_IMPLEMENTED_PatternMatchValue" if 1:
+@@ -16,23 +16,23 @@
          y = 1
  # case black_test_patma_006
  match 3:
@@ -203,15 +199,7 @@ match x:
          y = 1
      case []:
          y = 2
- # case black_test_patma_107
- match x:
--    case 0.25 + 1.75j:
-+    case "NOT_YET_IMPLEMENTED_PatternMatchValue":
-         y = 0
- # case black_test_patma_097
- match x:
--    case -0j:
-+    case "NOT_YET_IMPLEMENTED_PatternMatchValue":
+@@ -46,7 +46,7 @@
          y = 0
  # case black_test_patma_007
  match 4:
@@ -220,8 +208,7 @@ match x:
          x = True
  # case black_test_patma_154
  match x:
--    case 0 if x:
-+    case "NOT_YET_IMPLEMENTED_PatternMatchValue" if x:
+@@ -54,15 +54,15 @@
          y = 0
  # case black_test_patma_134
  match x:
@@ -240,11 +227,7 @@ match x:
          y = 0
  # case black_test_patma_063
  match x:
--    case 1:
-+    case "NOT_YET_IMPLEMENTED_PatternMatchValue":
-         y = 0
--    case 1:
-+    case "NOT_YET_IMPLEMENTED_PatternMatchValue":
+@@ -72,11 +72,11 @@
          y = 1
  # case black_test_patma_248
  match x:
@@ -263,20 +246,7 @@ match x:
          y = 0
  # case black_test_patma_052
  match x:
--    case [0]:
-+    case ["NOT_YET_IMPLEMENTED_PatternMatchValue"]:
-         y = 0
--    case [1, 0] if (x := x[:0]):
-+    case [
-+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-+    ] if (x := x[:0]):
-         y = 1
--    case [1, 0]:
-+    case [
-+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-+    ]:
+@@ -88,7 +88,7 @@
          y = 2
  # case black_test_patma_191
  match w:
@@ -345,7 +315,7 @@ match x:
 
 # case black_test_patma_098
 match x:
-    case "NOT_YET_IMPLEMENTED_PatternMatchValue":
+    case -0j:
         y = 0
 # case black_test_patma_142
 match x:
@@ -353,9 +323,9 @@ match x:
         y = 0
 # case black_test_patma_073
 match x:
-    case "NOT_YET_IMPLEMENTED_PatternMatchValue" if 0:
+    case 0 if 0:
         y = 0
-    case "NOT_YET_IMPLEMENTED_PatternMatchValue" if 1:
+    case 0 if 1:
         y = 1
 # case black_test_patma_006
 match 3:
@@ -381,11 +351,11 @@ match x:
         y = 2
 # case black_test_patma_107
 match x:
-    case "NOT_YET_IMPLEMENTED_PatternMatchValue":
+    case 0.25 + 1.75j:
         y = 0
 # case black_test_patma_097
 match x:
-    case "NOT_YET_IMPLEMENTED_PatternMatchValue":
+    case -0j:
         y = 0
 # case black_test_patma_007
 match 4:
@@ -393,7 +363,7 @@ match 4:
         x = True
 # case black_test_patma_154
 match x:
-    case "NOT_YET_IMPLEMENTED_PatternMatchValue" if x:
+    case 0 if x:
         y = 0
 # case black_test_patma_134
 match x:
@@ -409,9 +379,9 @@ match Seq():
         y = 0
 # case black_test_patma_063
 match x:
-    case "NOT_YET_IMPLEMENTED_PatternMatchValue":
+    case 1:
         y = 0
-    case "NOT_YET_IMPLEMENTED_PatternMatchValue":
+    case 1:
         y = 1
 # case black_test_patma_248
 match x:
@@ -428,17 +398,11 @@ match (0, 1, 2):
         y = 0
 # case black_test_patma_052
 match x:
-    case ["NOT_YET_IMPLEMENTED_PatternMatchValue"]:
+    case [0]:
         y = 0
-    case [
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-    ] if (x := x[:0]):
+    case [1, 0] if (x := x[:0]):
         y = 1
-    case [
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-    ]:
+    case [1, 0]:
         y = 2
 # case black_test_patma_191
 match w:
@@ -446,7 +410,7 @@ match w:
         z = 0
 # case black_test_patma_110
 match x:
-    case "NOT_YET_IMPLEMENTED_PatternMatchValue":
+    case -0.25 - 1.75j:
         y = 0
 # case black_test_patma_151
 match (x,):
@@ -454,7 +418,7 @@ match (x,):
         z = 0
 # case black_test_patma_114
 match x:
-    case "NOT_YET_IMPLEMENTED_PatternMatchValue":
+    case A.B.C.D:
         y = 0
 # case black_test_patma_232
 match x:
@@ -462,7 +426,7 @@ match x:
         y = 0
 # case black_test_patma_058
 match x:
-    case "NOT_YET_IMPLEMENTED_PatternMatchValue":
+    case 0:
         y = 0
 # case black_test_patma_233
 match x:
@@ -472,9 +436,9 @@ match x:
 match x:
     case []:
         y = 0
-    case ["NOT_YET_IMPLEMENTED_PatternMatchValue"]:
+    case [""]:
         y = 1
-    case "NOT_YET_IMPLEMENTED_PatternMatchValue":
+    case "":
         y = 2
 # case black_test_patma_156
 match x:
