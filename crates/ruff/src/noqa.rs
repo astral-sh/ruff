@@ -562,7 +562,7 @@ fn add_noqa_inner(
     let mut prev_end = TextSize::default();
 
     for (offset, (rules, directive)) in matches_by_line {
-        output.push_str(&locator.contents()[TextRange::new(prev_end, offset)]);
+        output.push_str(locator.slice(TextRange::new(prev_end, offset)));
 
         let line = locator.full_line(offset);
 
@@ -619,7 +619,7 @@ fn add_noqa_inner(
         prev_end = offset + line.text_len();
     }
 
-    output.push_str(&locator.contents()[usize::from(prev_end)..]);
+    output.push_str(locator.after(prev_end));
 
     (count, output)
 }

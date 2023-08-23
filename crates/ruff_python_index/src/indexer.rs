@@ -39,7 +39,7 @@ impl Indexer {
         let mut line_start = TextSize::default();
 
         for (tok, range) in tokens.iter().flatten() {
-            let trivia = &locator.contents()[TextRange::new(prev_end, range.start())];
+            let trivia = locator.slice(TextRange::new(prev_end, range.start()));
 
             // Get the trivia between the previous and the current token and detect any newlines.
             // This is necessary because `RustPython` doesn't emit `[Tok::Newline]` tokens
@@ -250,13 +250,25 @@ impl Indexer {
         Some(continuation)
     }
 
-    /// Return `true` if a `Stmt` appears to be part of a multi-statement line, with
-    /// other statements preceding it.
+    /// Return `true` if a [`Stmt`] appears to be preceded by other statements in a multi-statement
+    /// line.
     pub fn preceded_by_multi_statement_line(&self, stmt: &Stmt, locator: &Locator) -> bool {
         has_leading_content(stmt.start(), locator)
             || self
                 .preceded_by_continuations(stmt.start(), locator)
                 .is_some()
+    }
+
+    /// Return `true` if a [`Stmt`] appears to be followed by other statements in a multi-statement
+    /// line.
+    pub fn followed_by_multi_statement_line(&self, stmt: &Stmt, locator: &Locator) -> bool {
+        has_trailing_content(stmt.end(), locator)
+    }
+
+    /// Return `true` if a [`Stmt`] appears to be part of a multi-statement line.
+    pub fn in_multi_statement_line(&self, stmt: &Stmt, locator: &Locator) -> bool {
+        self.followed_by_multi_statement_line(stmt, locator)
+            || self.preceded_by_multi_statement_line(stmt, locator)
     }
 }
 

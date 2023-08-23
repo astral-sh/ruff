@@ -60,6 +60,17 @@ impl Diagnostic {
         }
     }
 
+    /// Set the [`Fix`] used to fix the diagnostic, if the provided function returns `Ok`.
+    /// Otherwise, log the error.
+    #[inline]
+    pub fn try_set_optional_fix(&mut self, func: impl FnOnce() -> Result<Option<Fix>>) {
+        match func() {
+            Ok(None) => {}
+            Ok(Some(fix)) => self.fix = Some(fix),
+            Err(err) => error!("Failed to create fix for {}: {}", self.kind.name, err),
+        }
+    }
+
     pub const fn range(&self) -> TextRange {
         self.range
     }
