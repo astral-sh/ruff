@@ -57,7 +57,7 @@ pub(crate) fn unnecessary_coding_comment(
     // The coding comment must be on one of the first two lines. Since each comment spans at least
     // one line, we only need to check the first two comments at most.
     for comment_range in indexer.comment_ranges().iter().take(2) {
-        // If leading content is not whitspace then it's not a valid coding comment e.g.
+        // If leading content is not whitespace then it's not a valid coding comment e.g.
         // ```
         // print(x) # coding=utf8
         // ```
