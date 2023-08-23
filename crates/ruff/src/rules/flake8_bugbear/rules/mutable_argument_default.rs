@@ -152,21 +152,21 @@ fn move_initialization(
 
     // Find the position to insert the initialization after docstring and imports
     let mut pos = locator.line_start(statement.start());
-    while let Some(stmt) = body.next() {
-        if is_docstring_stmt(stmt) {
+    while let Some(statement) = body.next() {
+        if is_docstring_stmt(statement) {
             // // If the statement in the function is a docstring, insert _after_ it.
-            if let Some(stmt) = body.peek() {
-                if indexer.preceded_by_multi_statement_line(stmt, locator) {
+            if let Some(statement) = body.peek() {
+                if indexer.preceded_by_multi_statement_line(statement, locator) {
                     return None;
                 }
-                pos = locator.line_start(stmt.start());
+                pos = locator.line_start(statement.start());
             } else {
                 // If the docstring is the only statement, insert _before_ it.
-                pos = locator.full_line_end(stmt.end());
+                pos = locator.full_line_end(statement.end());
             }
-        } else if stmt.is_import_stmt() || stmt.is_import_from_stmt() {
+        } else if statement.is_import_stmt() || statement.is_import_from_stmt() {
             // If the statement in the function is an import, insert _after_ it.
-            pos = locator.full_line_end(stmt.end());
+            pos = locator.full_line_end(statement.end());
         } else {
             // Otherwise, insert before the first statement.
             break
