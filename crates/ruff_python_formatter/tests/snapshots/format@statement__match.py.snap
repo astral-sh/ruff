@@ -44,12 +44,12 @@ match (  # comment
         pass
 
 
-# match (  # comment
-#     # let's go
-#     yield foo
-# ):  # another comment
-#     case ["a", "b", "c"]:
-#         pass
+match (  # comment
+    # let's go
+    yield foo
+):  # another comment
+    case ["a", "b", "c"]:
+        pass
 
 
 match aaaaaaaaahhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh:  # comment
@@ -254,6 +254,12 @@ match foo:
         *rest,
     ]:
         pass
+    case [1, 2, * # comment
+        rest]:
+        pass
+    case [1, 2, * # comment
+        _]:
+        pass
 ```
 
 ## Output
@@ -305,12 +311,16 @@ match (  # comment
         pass
 
 
-# match (  # comment
-#     # let's go
-#     yield foo
-# ):  # another comment
-#     case ["a", "b", "c"]:
-#         pass
+match (  # comment
+    # let's go
+    yield foo
+):  # another comment
+    case [
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+    ]:
+        pass
 
 
 match aaaaaaaaahhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh:  # comment
@@ -533,6 +543,18 @@ match foo:
         "NOT_YET_IMPLEMENTED_PatternMatchValue",
         "NOT_YET_IMPLEMENTED_PatternMatchValue",
         *rest,
+    ]:
+        pass
+    case [
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        *rest,  # comment
+    ]:
+        pass
+    case [
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        *_,  # comment
     ]:
         pass
 ```
