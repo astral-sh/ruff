@@ -152,7 +152,7 @@ match bar1:
          pass
      case match:
          pass
-@@ -23,32 +23,47 @@
+@@ -23,23 +23,38 @@
  
  def func(match: case, case: match) -> case:
      match Something():
@@ -197,11 +197,9 @@ match bar1:
          pass
      case _:
          pass
- 
- 
+@@ -48,7 +63,7 @@
  match a, *b, c:
--    case [*_]:
-+    case [*NOT_YET_IMPLEMENTED_PatternMatchStar]:
+     case [*_]:
          assert "seq" == _
 -    case {}:
 +    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
@@ -222,13 +220,7 @@ match bar1:
          pass
  
      case [a as match]:
-@@ -80,40 +90,43 @@
- 
- 
- match a, *b(), c:
--    case d, *f, g:
-+    case d, *NOT_YET_IMPLEMENTED_PatternMatchStar, g:
-         pass
+@@ -85,35 +95,38 @@
  
  
  match something:
@@ -260,7 +252,7 @@ match bar1:
 +        "NOT_YET_IMPLEMENTED_PatternMatchValue" as d,
 +        "NOT_YET_IMPLEMENTED_PatternMatchValue" as e,
 +        NOT_YET_IMPLEMENTED_PatternMatchOf | (y) as g,
-+        *NOT_YET_IMPLEMENTED_PatternMatchStar,
++        *h,
 +    ):
          pass
  
@@ -347,7 +339,7 @@ match (
 
 
 match a, *b, c:
-    case [*NOT_YET_IMPLEMENTED_PatternMatchStar]:
+    case [*_]:
         assert "seq" == _
     case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
         assert "map" == b
@@ -376,7 +368,7 @@ match match:
 
 
 match a, *b(), c:
-    case d, *NOT_YET_IMPLEMENTED_PatternMatchStar, g:
+    case d, *f, g:
         pass
 
 
@@ -401,7 +393,7 @@ match something:
         "NOT_YET_IMPLEMENTED_PatternMatchValue" as d,
         "NOT_YET_IMPLEMENTED_PatternMatchValue" as e,
         NOT_YET_IMPLEMENTED_PatternMatchOf | (y) as g,
-        *NOT_YET_IMPLEMENTED_PatternMatchStar,
+        *h,
     ):
         pass
 

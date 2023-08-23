@@ -104,7 +104,7 @@ def where_is(point):
 ```diff
 --- Black
 +++ Ruff
-@@ -11,82 +11,97 @@
+@@ -11,82 +11,91 @@
          ...  # interpret action, obj
  
  match command.split():
@@ -125,10 +125,7 @@ def where_is(point):
  
  match command.split():
 -    case ["drop", *objects]:
-+    case [
-+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-+        *NOT_YET_IMPLEMENTED_PatternMatchStar,
-+    ]:
++    case ["NOT_YET_IMPLEMENTED_PatternMatchValue", *objects]:
          for obj in objects:
              character.drop(obj, current_room)
      # The rest of your commands go here
@@ -141,10 +138,7 @@ def where_is(point):
 +    case ["NOT_YET_IMPLEMENTED_PatternMatchValue", direction]:
          print("Going:", direction)
 -    case ["drop", *objects]:
-+    case [
-+        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-+        *NOT_YET_IMPLEMENTED_PatternMatchStar,
-+    ]:
++    case ["NOT_YET_IMPLEMENTED_PatternMatchValue", *objects]:
          print("Dropping: ", *objects)
      case _:
          print(f"Sorry, I couldn't understand {command!r}")
@@ -256,10 +250,7 @@ match command.split():
     # The rest of your commands go here
 
 match command.split():
-    case [
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-        *NOT_YET_IMPLEMENTED_PatternMatchStar,
-    ]:
+    case ["NOT_YET_IMPLEMENTED_PatternMatchValue", *objects]:
         for obj in objects:
             character.drop(obj, current_room)
     # The rest of your commands go here
@@ -269,10 +260,7 @@ match command.split():
         pass
     case ["NOT_YET_IMPLEMENTED_PatternMatchValue", direction]:
         print("Going:", direction)
-    case [
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-        *NOT_YET_IMPLEMENTED_PatternMatchStar,
-    ]:
+    case ["NOT_YET_IMPLEMENTED_PatternMatchValue", *objects]:
         print("Dropping: ", *objects)
     case _:
         print(f"Sorry, I couldn't understand {command!r}")
