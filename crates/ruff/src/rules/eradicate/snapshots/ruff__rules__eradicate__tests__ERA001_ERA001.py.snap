@@ -115,7 +115,8 @@ ERA001.py:26:5: ERA001 [*] Found commented-out code
 25 |     # "key1": 123,  # noqa: ERA001
 26 |     # "key2": 456,
    |     ^^^^^^^^^^^^^^ ERA001
-27 | }
+27 |     # "key3": 789,  # test
+28 | }
    |
    = help: Remove commented-out code
 
@@ -124,8 +125,27 @@ ERA001.py:26:5: ERA001 [*] Found commented-out code
 24 24 | dictionary = {
 25 25 |     # "key1": 123,  # noqa: ERA001
 26    |-    # "key2": 456,
-27 26 | }
-28 27 | 
-29 28 | #import os  # noqa
+27 26 |     # "key3": 789,  # test
+28 27 | }
+29 28 | 
+
+ERA001.py:27:5: ERA001 [*] Found commented-out code
+   |
+25 |     # "key1": 123,  # noqa: ERA001
+26 |     # "key2": 456,
+27 |     # "key3": 789,  # test
+   |     ^^^^^^^^^^^^^^^^^^^^^^ ERA001
+28 | }
+   |
+   = help: Remove commented-out code
+
+ℹ Possible fix
+24 24 | dictionary = {
+25 25 |     # "key1": 123,  # noqa: ERA001
+26 26 |     # "key2": 456,
+27    |-    # "key3": 789,  # test
+28 27 | }
+29 28 | 
+30 29 | #import os  # noqa
 
 
