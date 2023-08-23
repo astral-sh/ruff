@@ -19,6 +19,24 @@ pub fn first_non_trivia_token(offset: TextSize, code: &str) -> Option<SimpleToke
         .next()
 }
 
+/// Returns the only non-trivia, non-closing parenthesis token in `range`.
+///
+/// Includes debug assertions that the range only contains that single token.
+pub fn find_only_token_in_range(
+    range: TextRange,
+    token_kind: SimpleTokenKind,
+    code: &str,
+) -> SimpleToken {
+    let mut tokens = SimpleTokenizer::new(code, range)
+        .skip_trivia()
+        .skip_while(|token| token.kind == SimpleTokenKind::RParen);
+    let token = tokens.next().expect("Expected a token");
+    debug_assert_eq!(token.kind(), token_kind);
+    let mut tokens = tokens.skip_while(|token| token.kind == SimpleTokenKind::LParen);
+    debug_assert_eq!(tokens.next(), None);
+    token
+}
+
 /// Returns the number of newlines between `offset` and the first non whitespace character in the source code.
 pub fn lines_before(offset: TextSize, code: &str) -> u32 {
     let mut cursor = Cursor::new(&code[TextRange::up_to(offset)]);
