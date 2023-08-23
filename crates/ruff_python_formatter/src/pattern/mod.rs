@@ -1,5 +1,7 @@
+use crate::expression::parentheses::parenthesized;
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule};
 use ruff_python_ast::Pattern;
+use std::slice;
 
 use crate::prelude::*;
 
@@ -17,7 +19,7 @@ pub struct FormatPattern;
 
 impl FormatRule<Pattern, PyFormatContext<'_>> for FormatPattern {
     fn fmt(&self, item: &Pattern, f: &mut PyFormatter) -> FormatResult<()> {
-        match item {
+        let format_pattern = format_with(|f| match item {
             Pattern::MatchValue(p) => p.format().fmt(f),
             Pattern::MatchSingleton(p) => p.format().fmt(f),
             Pattern::MatchSequence(p) => p.format().fmt(f),
@@ -26,7 +28,9 @@ impl FormatRule<Pattern, PyFormatContext<'_>> for FormatPattern {
             Pattern::MatchStar(p) => p.format().fmt(f),
             Pattern::MatchAs(p) => p.format().fmt(f),
             Pattern::MatchOr(p) => p.format().fmt(f),
-        }
+        });
+
+        format_pattern.fmt(f)
     }
 }
 

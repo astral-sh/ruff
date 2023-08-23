@@ -10,7 +10,7 @@ pub struct FormatPatternMatchValue;
 impl FormatNodeRule<PatternMatchValue> for FormatPatternMatchValue {
     fn fmt_fields(&self, item: &PatternMatchValue, f: &mut PyFormatter) -> FormatResult<()> {
         let PatternMatchValue { value, range: _ } = item;
-        let formatted = value.format().with_options(Parentheses::Preserve);
+        let formatted = value.format();
         write!(f, [formatted])
     }
 }
