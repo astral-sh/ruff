@@ -23,6 +23,8 @@ foo != "a" and "b" != foo and foo != "c"
 
 foo == "a" or foo == "b" or "c" == bar or "d" == bar  # Multiple targets
 
+foo.bar == "a" or foo.bar == "b"  # Attributes.
+
 # OK
 foo == "a" and foo == "b" and foo == "c"  # `and` mixed with `==`.
 
@@ -45,3 +47,7 @@ foo == "a" == "b" or foo == "c"  # Multiple comparisons.
 foo == bar == "b" or foo == "c"  # Multiple comparisons.
 
 foo == foo or foo == bar  # Self-comparison.
+
+foo[0] == "a" or foo[0] == "b"  # Subscripts.
+
+foo() == "a" or foo() == "b"  # Calls.
