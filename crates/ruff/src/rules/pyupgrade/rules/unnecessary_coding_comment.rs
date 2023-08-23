@@ -5,6 +5,7 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_index::Indexer;
 use ruff_source_file::Locator;
+use ruff_text_size::TextRange;
 
 use crate::registry::AsRule;
 use crate::settings::Settings;
@@ -56,31 +57,36 @@ pub(crate) fn unnecessary_coding_comment(
     // The coding comment must be on one of the first two lines. Since each comment spans at least
     // one line, we only need to check the first two comments at most.
     for comment_range in indexer.comment_ranges().iter().take(2) {
+        // If leading content is not whitspace then it's not a valid coding comment e.g.
+        // ```
+        // print(x) # coding=utf8
+        // ```
         let line_range = locator.full_line_range(comment_range.start());
-        let line = locator.slice(line_range);
-        let comment = locator.slice(*comment_range);
+        if !locator
+            .slice(TextRange::new(line_range.start(), comment_range.start()))
+            .trim()
+            .is_empty()
+        {
+            continue;
+        }
 
-        // Both the line and the comment itself must match to prevent false positives
-        // where the comment is on a line that includes content that looks like a coding comment
-        // or the coding comment is preceded by non-whitespace
-        if CODING_COMMENT_REGEX.is_match(line) && CODING_COMMENT_REGEX.is_match(comment) {
+        // If the line is after a continuation then it's not a valid coding comment e.g.
+        // ```
+        // x = 1 \
+        //    # coding=utf8
+        // x = 2
+        // ```
+        if indexer
+            .preceded_by_continuations(line_range.start(), locator)
+            .is_some()
+        {
+            continue;
+        }
+
+        if CODING_COMMENT_REGEX.is_match(locator.slice(line_range)) {
             #[allow(deprecated)]
             let index = locator.compute_line_index(line_range.start());
             if index.to_zero_indexed() > 1 {
-                continue;
-            }
-
-            // Do not apply to lines with continuations; a fix will result in invalid syntax
-            // Ex)
-            // ```
-            // x = 1 \
-            //    # coding=utf8
-            // x = 2
-            // ```
-            if indexer
-                .preceded_by_continuations(line_range.start(), locator)
-                .is_some()
-            {
                 continue;
             }
 
