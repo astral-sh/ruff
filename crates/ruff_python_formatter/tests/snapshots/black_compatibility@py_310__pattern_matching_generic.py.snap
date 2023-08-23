@@ -128,15 +128,6 @@ with match() as match:
                  y = 0
          self.assertIs(x, False)
          self.assertEqual(y, 0)
-@@ -73,7 +73,7 @@
-         x = 0
-         y = None
-         match x:
--            case 1e1000:
-+            case "NOT_YET_IMPLEMENTED_PatternMatchValue":
-                 y = 0
-         self.assertEqual(x, 0)
-         self.assertIs(y, None)
 ```
 
 ## Ruff Output
@@ -217,7 +208,7 @@ def get_grammars(target_versions: Set[TargetVersion]) -> List[Grammar]:
         x = 0
         y = None
         match x:
-            case "NOT_YET_IMPLEMENTED_PatternMatchValue":
+            case 1e1000:
                 y = 0
         self.assertEqual(x, 0)
         self.assertIs(y, None)

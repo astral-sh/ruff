@@ -85,9 +85,9 @@ def http_error(status):
     match status   :  # fmt: skip
         case 400   :  # fmt: skip
             return "Bad request"
-        case "NOT_YET_IMPLEMENTED_PatternMatchValue":
+        case 404:
             return "Not found"
-        case "NOT_YET_IMPLEMENTED_PatternMatchValue":
+        case 418:
             return "I'm a teapot"
         case _:
             return "Something's wrong with the internet"
@@ -97,9 +97,9 @@ def http_error(status):
 match point:
     case (0,   0):  # fmt: skip
         print("Origin")
-    case ("NOT_YET_IMPLEMENTED_PatternMatchValue", y):
+    case (0, y):
         print(f"Y={y}")
-    case (x, "NOT_YET_IMPLEMENTED_PatternMatchValue"):
+    case (x, 0):
         print(f"X={x}")
     case (x, y):
         print(f"X={x}, Y={y}")
@@ -151,7 +151,7 @@ match test_variable:
             40
     ):  # fmt: skip
         print("A warning has been received.")
-    case ("NOT_YET_IMPLEMENTED_PatternMatchValue", code, _):
+    case ("error", code, _):
         print(f"An error {code} occurred.")
 
 

@@ -242,13 +242,40 @@ match foo:
         "b",
     ]:
         pass
+
+
+match foo:
+    case 1:
+        y = 0
+    case (1):
+        y = 1
+    case (("a")):
+        y = 1
+    case (  # comment
+        1
+    ):
+        y = 1
+    case (
+        # comment
+        1
+    ):
+        y = 1
+    case (
+        1  # comment
+    ):
+        y = 1
+    case (
+        1
+        # comment
+    ):
+        y = 1
 ```
 
 ## Output
 ```py
 # leading match comment
 match foo:  # dangling match comment
-    case "NOT_YET_IMPLEMENTED_PatternMatchValue":
+    case "bar":
         pass
 
 
@@ -258,7 +285,7 @@ match (  # leading expr comment
     foo  # trailing expr comment
     # another trailing expr comment
 ):  # dangling match comment
-    case "NOT_YET_IMPLEMENTED_PatternMatchValue":
+    case "bar":
         pass
 
 
@@ -266,7 +293,7 @@ match (  # leading expr comment
 match (  # hello
     foo,  # trailing expr comment  # another
 ):  # dangling match comment
-    case "NOT_YET_IMPLEMENTED_PatternMatchValue":
+    case "bar":
         pass
 
 
@@ -275,21 +302,13 @@ match [  # comment
     second,
     third,
 ]:  # another comment
-    case [
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-    ]:
+    case ["a", "b", "c"]:
         pass
 
 match (  # comment
     "a b c"
 ).split():  # another comment
-    case [
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-    ]:
+    case ["a", "b", "c"]:
         pass
 
 
@@ -297,69 +316,62 @@ match (  # comment
     # let's go
     yield foo
 ):  # another comment
-    case [
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-    ]:
+    case ["a", "b", "c"]:
         pass
 
 
 match aaaaaaaaahhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh:  # comment
-    case "NOT_YET_IMPLEMENTED_PatternMatchValue":
+    case "sshhhhhhhh":
         pass
 
 
 def foo():
     match inside_func:  # comment
-        case "NOT_YET_IMPLEMENTED_PatternMatchValue":
+        case "bar":
             pass
 
 
 match newlines:
     # case 1 leading comment
 
-    case "NOT_YET_IMPLEMENTED_PatternMatchValue":  # case dangling comment
+    case "top level case comment with newlines":  # case dangling comment
         # pass leading comment
         pass
         # pass trailing comment
 
     # case 2 leading comment
 
-    case "NOT_YET_IMPLEMENTED_PatternMatchValue" if foo == 2:  # second
+    case "case comment with newlines" if foo == 2:  # second
         pass
 
-    case (
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-    ) if (foo := 1):  # third
+    case "one", "newline" if (foo := 1):  # third
         pass
 
-    case "NOT_YET_IMPLEMENTED_PatternMatchValue":
+    case "two newlines":
         pass
 
-    case "NOT_YET_IMPLEMENTED_PatternMatchValue":
+    case "three newlines":
         pass
     case _:
         pass
 
 
 match long_lines:
-    case "NOT_YET_IMPLEMENTED_PatternMatchValue" if aaaaaaaaahhhhhhhh == 1 and bbbbbbaaaaaaaaaaa == 2:  # comment
+    case "this is a long line for if condition" if aaaaaaaaahhhhhhhh == 1 and bbbbbbaaaaaaaaaaa == 2:  # comment
         pass
 
-    case "NOT_YET_IMPLEMENTED_PatternMatchValue" if (
+    case "this is a long line for if condition with parentheses" if (
         aaaaaaaaahhhhhhhh == 1 and bbbbbbaaaaaaaaaaa == 2
     ):  # comment
         pass
 
-    case "NOT_YET_IMPLEMENTED_PatternMatchValue" if foo := 1:
+    case "named expressions aren't special" if foo := 1:
         pass
 
-    case "NOT_YET_IMPLEMENTED_PatternMatchValue" if (foo := 1):
+    case "named expressions aren't that special" if (foo := 1):
         pass
 
-    case "NOT_YET_IMPLEMENTED_PatternMatchValue" if (
+    case "but with already broken long lines" if (
         aaaaaaahhhhhhhhhhh == 1 and bbbbbbbbaaaaaahhhh == 2
     ):  # another comment
         pass
@@ -465,32 +477,18 @@ match pattern_singleton:
 
 
 match foo:
-    case (
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-    ):
+    case "a", "b":
         pass
     case (
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "a",
+        "b",
     ):
         pass
-    case (
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-    ):
+    case ("a", "b"):
         pass
-    case [
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
-    ]:
+    case ["a", "b"]:
         pass
-    case (
-        [
-            "NOT_YET_IMPLEMENTED_PatternMatchValue",
-            "NOT_YET_IMPLEMENTED_PatternMatchValue",
-        ]
-    ):
+    case (["a", "b"]):
         pass
 
 
@@ -500,13 +498,40 @@ match foo:
         # leading
         # leading
         # leading
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",  # trailing
+        "a",  # trailing
         # trailing
         # trailing
         # trailing
-        "NOT_YET_IMPLEMENTED_PatternMatchValue",
+        "b",
     ]:
         pass
+
+
+match foo:
+    case 1:
+        y = 0
+    case ((1)):
+        y = 1
+    case (("a")):
+        y = 1
+    case (  # comment
+        (1)
+    ):
+        y = 1
+    case (
+        # comment
+        (1)
+    ):
+        y = 1
+    case (
+        (1)  # comment
+    ):
+        y = 1
+    case (
+        (1)
+        # comment
+    ):
+        y = 1
 ```
 
 
