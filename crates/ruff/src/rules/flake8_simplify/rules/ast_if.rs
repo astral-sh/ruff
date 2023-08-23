@@ -11,8 +11,8 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::{ComparableConstant, ComparableExpr, ComparableStmt};
 use ruff_python_ast::helpers::{any_over_expr, contains_effect};
 use ruff_python_ast::stmt_if::{if_elif_branches, IfElifBranch};
-use ruff_python_parser::first_colon_range;
 use ruff_python_semantic::SemanticModel;
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::{Locator, UniversalNewlines};
 
 use crate::checkers::ast::Checker;
@@ -369,15 +369,9 @@ pub(crate) fn nested_if_statements(
     };
 
     // Find the deepest nested if-statement, to inform the range.
-    let Some((test, first_stmt)) = find_last_nested_if(body) else {
+    let Some((test, _first_stmt)) = find_last_nested_if(body) else {
         return;
     };
-
-    let colon = first_colon_range(
-        TextRange::new(test.end(), first_stmt.start()),
-        checker.locator().contents(),
-        checker.source_type.is_jupyter(),
-    );
 
     // Check if the parent is already emitting a larger diagnostic including this if statement
     if let Some(Stmt::If(stmt_if)) = parent {
@@ -392,10 +386,14 @@ pub(crate) fn nested_if_statements(
         }
     }
 
-    let mut diagnostic = Diagnostic::new(
-        CollapsibleIf,
-        colon.map_or(range, |colon| TextRange::new(range.start(), colon.end())),
-    );
+    let Some(colon) = SimpleTokenizer::starts_at(test.end(), checker.locator().contents())
+        .skip_trivia()
+        .find(|token| token.kind == SimpleTokenKind::Colon)
+    else {
+        return;
+    };
+
+    let mut diagnostic = Diagnostic::new(CollapsibleIf, TextRange::new(range.start(), colon.end()));
     if checker.patch(diagnostic.kind.rule()) {
         // The fixer preserves comments in the nested body, but removes comments between
         // the outer and inner if statements.
