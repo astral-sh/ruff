@@ -2340,6 +2340,7 @@ dependencies = [
  "insta",
  "is-macro",
  "itertools",
+ "memchr",
  "once_cell",
  "ruff_formatter",
  "ruff_python_ast",

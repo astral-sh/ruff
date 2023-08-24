@@ -1,6 +1,8 @@
 use super::string::{AnyString, FormatString};
 use crate::context::PyFormatContext;
-use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
+use memchr::memchr2;
+
+use crate::expression::parentheses::{should_use_best_fit, NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::FormatResult;
@@ -20,8 +22,16 @@ impl NeedsParentheses for ExprFString {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,
-        _context: &PyFormatContext,
+        context: &PyFormatContext,
     ) -> OptionalParentheses {
-        OptionalParentheses::Multiline
+        if self.implicit_concatenated {
+            OptionalParentheses::Multiline
+        } else if memchr2(b'\n', b'\r', context.source()[self.range].as_bytes()).is_none()
+            && should_use_best_fit(self, context)
+        {
+            OptionalParentheses::BestFit
+        } else {
+            OptionalParentheses::Never
+        }
     }
 }

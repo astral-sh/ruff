@@ -69,7 +69,10 @@ impl NeedsParentheses for ExprCall {
         {
             OptionalParentheses::Multiline
         } else {
-            self.func.needs_parentheses(self.into(), context)
+            match self.func.needs_parentheses(self.into(), context) {
+                OptionalParentheses::BestFit => OptionalParentheses::Never,
+                parentheses => parentheses,
+            }
         }
     }
 }
