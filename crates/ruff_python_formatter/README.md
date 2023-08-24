@@ -3,10 +3,205 @@
 The goal of our formatter is to be compatible with Black except for rare edge cases (mostly
 involving comment placement).
 
-## Implementing a node
+## Dev tools
 
-Formatting each node follows roughly the same structure. We start with a `Format{{Node}}` struct
-that implements Default (and `AsFormat`/`IntoFormat` impls in `generated.rs`, see orphan rules below).
+**Testing your changes** You can use the `ruff_python_formatter` binary to format individual files
+and show debug info. It's fast to compile because it doesn't depend on `ruff`. The easiest way is to
+create a `scratch.py` (or `scratch.pyi`) in the project root and run
+
+```shell
+cargo run --bin ruff_python_formatter -- --emit stdout scratch.py
+```
+
+which has `--print-ir` and `--print-comments` options. We especially recommend `--print-comments`.
+
+<details>
+<summary>Usage example</summary>
+
+Command
+
+```shell
+cargo run --bin ruff_python_formatter -- --emit stdout --print-comments --print-ir scratch.py
+```
+
+Input
+
+```python
+def f():  # a
+    pass
+```
+
+Output
+
+```text
+[
+  "def f",
+  group([group(["()"]), source_position(7)]),
+  ":",
+  line_suffix(["  # a"]),
+  expand_parent,
+  indent([hard_line_break, "pass", source_position(21)]),
+  hard_line_break,
+  source_position(21),
+  hard_line_break,
+  source_position(22)
+]
+{
+    Node {
+        kind: StmtFunctionDef,
+        range: 0..21,
+        source: `def f(): # a⏎`,
+    }: {
+        "leading": [],
+        "dangling": [
+            SourceComment {
+                text: "# a",
+                position: EndOfLine,
+                formatted: true,
+            },
+        ],
+        "trailing": [],
+    },
+}
+def f():  # a
+    pass
+```
+
+</details>
+
+The other option is to use the playground (also check the playground README):
+
+```shell
+cd playground && npm install && npm run dev:wasm && npm run dev
+```
+
+Run`npm run dev:wasm` and reload the page in the browser to refresh.
+
+**Tests** Running the entire ruff test suite is slow, `cargo test -p ruff_python_formatter` is a
+lot faster. We use [insta](https://insta.rs/) to create snapshots of all tests in
+`crates/ruff_python_formatter/resources/test/fixtures/ruff`. We have copied the majority of tests
+over from Black to check the difference between Ruff and Black output. Whenever we have no more
+differences on a Black input file, the snapshot is deleted.
+
+**Ecosystem checks** `scripts/formatter_ecosystem_checks.sh` runs Black compatibility and stability
+checks on a number of selected projects. It will print the similarity index, the percentage of lines
+that remains unchanged between Black's formatting and our formatting. You could compute it as the
+number of neutral lines in a diff divided by the neutral plus the removed lines. We run this script
+in CI, you can view the results in a PR page under "Checks" > "CI" > "Summary" at the bottom of the
+page. The stability checks catch for three common problems: The second
+formatting pass looks different than the first (formatter instability or lack of idempotency),
+printing invalid syntax (e.g. missing parentheses around multiline expressions) and panics (mostly
+in debug assertions). You should ensure that your changes don't decrease the similarity index.
+
+**Terminology** For `()`, `[]` and `{}` we use the following terminology:
+
+- Parentheses: `(`, `)` or all kind of parentheses (`()`, `[]` and `{}`, e.g.
+    `has_own_parentheses`)
+- Brackets: `[`, `]`
+- Braces: `{`, `}`
+
+## `format_dev`
+
+It's possible to format an entire project:
+
+```shell
+cargo run --bin ruff_dev -- format-dev --write /path/to/my_project
+```
+
+Available options:
+
+- `--write`: Format the files and write them back to disk.
+- `--stability-check`: Format twice (but don't write to disk without `--write`) and check for
+    differences and crashes.
+- `--multi-project`: Treat every subdirectory as a separate project. Useful for ecosystem checks.
+- `--error-file`: Write all errors to the given file.
+- `--log-file`: Write all messages to the given file.
+- `--stats-file`: Use together with `--multi-project`, this writes the similarity index as unicode
+    table to the given file.
+
+**Large ecosystem checks** It is also possible to check a large number of repositories. This dataset
+is large (~60GB), so we only do this occasionally:
+
+```shell
+# Get the list of projects
+curl https://raw.githubusercontent.com/akx/ruff-usage-aggregate/master/data/known-github-tomls-clean.jsonl > github_search.jsonl
+# Repurpose this script to download the repositories for us
+python scripts/check_ecosystem.py --checkouts target/checkouts --projects github_search.jsonl -v $(which true) $(which true)
+# Check each project for formatter stability
+cargo run --bin ruff_dev -- format-dev --stability-check --error-file target/formatter-ecosystem-errors.txt --multi-project target/checkouts
+```
+
+**Shrinking** To shrink a formatter error from an entire file to a minimal reproducible example,
+you can use `ruff_shrinking`:
+
+```shell
+cargo run --bin ruff_shrinking -- <your_file> target/shrinking.py "Unstable formatting" "target/debug/ruff_dev format-dev --stability-check target/shrinking.py"
+```
+
+The first argument is the input file, the second is the output file where the candidates
+and the eventual minimized version will be written to. The third argument is a regex matching the
+error message, e.g. "Unstable formatting" or "Formatter error". The last argument is the command
+with the error, e.g. running the stability check on the candidate file. The script will try various
+strategies to remove parts of the code. If the output of the command still matches, it will use that
+slightly smaller code as starting point for the next iteration, otherwise it will revert and try
+a different strategy until all strategies are exhausted.
+
+## Helper structs
+
+To abstract formatting something into a helper, create a new struct with the data you want to
+format and implement `Format<PyFormatContext<'_>> for MyStruct`. Below is a small dummy example.
+
+```rust
+/// Helper to hide the fields for the struct
+pub(crate) fn empty_parenthesized<'content>(
+    comments: &'content [SourceComment],
+    has_plus_prefix: bool,
+) -> FormatEmptyParenthesized<'content> {
+    FormatEmptyParenthesized {
+        comments,
+        has_plus_prefix,
+    }
+}
+
+/// The wrapper struct
+pub(crate) struct FormatEmptyParenthesized<'content> {
+    comments: &'content [SourceComment],
+    has_plus_prefix: bool,
+}
+
+impl Format<PyFormatContext<'_>> for FormatEmptyParenthesized<'_> {
+    /// Here we implement the actual formatting
+    fn fmt(&self, f: &mut Formatter<PyFormatContext>) -> FormatResult<()> {
+        if self.has_plus_prefix {
+            text("+").fmt(f)?; // This is equivalent to `write!(f, [text("*")])?;`
+        }
+        write!(
+            f,
+            [
+                text("("),
+                soft_block_indent(&dangling_comments(&self.comments)),
+                text(")")
+            ]
+        )
+    }
+}
+```
+
+If the struct is used across modules, also adds constructor function that hides the fields of the
+struct. Since it implements `Format`, you can directly use it in write calls:
+
+```rust
+write!(f, [empty_parenthesized(dangling_end_of_line_comments)])?;
+```
+
+Check the `builders` module for existing primitives.
+
+## Adding new syntax
+
+Occasionally, Python will add new syntax. After adding it to `ruff_python_ast`, run `generate.py`
+to generate stubs for node formatting. This will add a `Format{{Node}}` struct
+that implements `Default` (and `AsFormat`/`IntoFormat` impls in `generated.rs`, see orphan rules
+below).
 
 ```rust
 #[derive(Default)]
@@ -46,8 +241,6 @@ impl FormatNodeRule<StmtReturn> for FormatStmtReturn {
     }
 }
 ```
-
-Check the `builders` module for the primitives that you can use.
 
 If something such as list or a tuple can break into multiple lines if it is too long for a single
 line, wrap it into a `group`. Ignoring comments, we could format a tuple with two items like this:
@@ -177,10 +370,10 @@ the `break` and wrongly formatted as such. We can identify these cases by lookin
 between two bodies that have the same indentation level as the keyword, e.g. in our case the
 leading else comment is inside the `while` node (which spans the entire snippet) and on the same
 level as the `else`. We identify those case in
-[`handle_in_between_bodies_own_line_comment`](https://github.com/astral-sh/ruff/blob/be11cae619d5a24adb4da34e64d3c5f270f9727b/crates/ruff_python_formatter/src/comments/placement.rs#L196)
+[`handle_own_line_comment_around_body`](https://github.com/astral-sh/ruff/blob/4bdd99f8822d914a59f918fc46bbd17a88e2fe47/crates/ruff_python_formatter/src/comments/placement.rs#L390)
 and mark them as dangling for manual formatting later. Similarly, we find and mark comment after
 the colon(s) in
-[`handle_trailing_end_of_line_condition_comment`](https://github.com/astral-sh/ruff/blob/main/crates/ruff_python_formatter/src/comments/placement.rs#L518)
+[`handle_end_of_line_comment_around_body`](https://github.com/astral-sh/ruff/blob/4bdd99f8822d914a59f918fc46bbd17a88e2fe47/crates/ruff_python_formatter/src/comments/placement.rs#L238C4-L238C14)
 .
 
 The comments don't carry any extra information such as why we marked the comment as trailing,
@@ -220,95 +413,6 @@ fn fmt_fields(&self, item: &StmtWhile, f: &mut PyFormatter) -> FormatResult<()> 
     )?;
 }
 ```
-
-## Development notes
-
-Handling parentheses and comments are two major challenges in a Python formatter.
-
-We have copied the majority of tests over from Black and use [insta](https://insta.rs/docs/cli/) for
-snapshot testing with the diff between Ruff and Black, Black output and Ruff output. We put
-additional test cases in `resources/test/fixtures/ruff`.
-
-The full Ruff test suite is slow, `cargo test -p ruff_python_formatter` is a lot faster.
-
-You can check the black compatibility on a number of projects using
-`scripts/formatter_ecosystem_checks.sh`. It will print the similarity index, the percentage of lines
-that remains unchanged between black's formatting and our formatting. You could compute it as the
-number of neutral lines in a diff divided by the neutral plus the removed lines. It also checks for
-common problems such unstable formatting, internal formatter errors and printing invalid syntax. We
-run this script in CI and you can view the results in a PR page under "Checks" > "CI" > "Summary" at
-the bottom of the page.
-
-There is a `ruff_python_formatter` binary that avoid building and linking the main `ruff` crate.
-
-You can use `scratch.py` as a playground, e.g.
-`cargo run --bin ruff_python_formatter -- --emit stdout scratch.py`, which additional `--print-ir`
-and `--print-comments` options.
-
-The origin of Ruff's formatter is the [Rome formatter](https://github.com/rome/tools/tree/main/crates/rome_json_formatter),
-e.g. the ruff_formatter crate is forked from the [rome_formatter crate](https://github.com/rome/tools/tree/main/crates/rome_formatter).
-The Rome repository can be a helpful reference when implementing something in the Ruff formatter.
-
-### Checking entire projects
-
-It's possible to format an entire project:
-
-```shell
-cargo run --bin ruff_dev -- format-dev --write my_project
-```
-
-This will format all files that `ruff check` would lint and computes the similarity index, the
-fraction of changed lines. The similarity index is 1 if there were no changes at all, while 0 means
-we changed every single line. If you run this on a black formatted projects, this tells you how
-similar the ruff formatter is to black for the given project, with our goal being as close to 1 as
-possible.
-
-There are three common problems with the formatter: The second formatting pass looks different than
-the first (formatter instability or lack of idempotency), we print invalid syntax (e.g. missing
-parentheses around multiline expressions) and panics (mostly in debug assertions). We test for all
-of these using the `--stability-check` option in the `format-dev` subcommand:
-
-The easiest is to check CPython:
-
-```shell
-git clone --branch 3.10 https://github.com/python/cpython.git crates/ruff/resources/test/cpython
-cargo run --bin ruff_dev -- format-dev --stability-check crates/ruff/resources/test/cpython
-```
-
-Compared to `ruff check`, `cargo run --bin ruff_dev -- format-dev` has 4 additional options:
-
-- `--write`: Format the files and write them back to disk
-- `--stability-check`: Format twice (but don't write to disk) and check for differences and crashes
-- `--multi-project`: Treat every subdirectory as a separate project. Useful for ecosystem checks.
-- `--error-file`: Use together with `--multi-project`, this writes all errors (but not status
-    messages) to a file.
-
-It is also possible to check a large number of repositories. This dataset is large (~60GB), so we
-only do this occasionally:
-
-```shell
-# Get the list of projects
-curl https://raw.githubusercontent.com/akx/ruff-usage-aggregate/master/data/known-github-tomls-clean.jsonl > github_search.jsonl
-# Repurpose this script to download the repositories for us
-python scripts/check_ecosystem.py --checkouts target/checkouts --projects github_search.jsonl -v $(which true) $(which true)
-# Check each project for formatter stability
-cargo run --bin ruff_dev -- format-dev --stability-check --error-file target/formatter-ecosystem-errors.txt --multi-project target/checkouts
-```
-
-To shrink a formatter error from an entire file to a minimal reproducible example, you can use
-`ruff_shrinking`:
-
-```shell
-cargo run --bin ruff_shrinking -- <your_file> target/shrinking.py "Unstable formatting" "target/release/ruff_dev format-dev --stability-check target/shrinking.py"
-```
-
-The first argument is the input file, the second is the output file where the candidates
-and the eventual minimized version will be written to. The third argument is a regex matching the
-error message, e.g. "Unstable formatting" or "Formatter error". The last argument is the command
-with the error, e.g. running the stability check on the candidate file. The script will try various
-strategies to remove parts of the code. If the output of the command still matches, it will use that
-slightly smaller code as starting point for the next iteration, otherwise it will revert and try
-a different strategy until all strategies are exhausted.
 
 ## The orphan rules and trait structure
 
