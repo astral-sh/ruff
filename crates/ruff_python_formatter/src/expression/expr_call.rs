@@ -1,5 +1,6 @@
 use crate::expression::CallChainLayout;
-use ruff_formatter::FormatRuleWithOptions;
+
+use ruff_formatter::{format_args, write, FormatRuleWithOptions};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{Expr, ExprCall};
 
@@ -31,15 +32,11 @@ impl FormatNodeRule<ExprCall> for FormatExprCall {
 
         let call_chain_layout = self.call_chain_layout.apply_in_node(item, f);
 
-        let fmt_inner = format_with(|f| {
-            match func.as_ref() {
-                Expr::Attribute(expr) => expr.format().with_options(call_chain_layout).fmt(f)?,
-                Expr::Call(expr) => expr.format().with_options(call_chain_layout).fmt(f)?,
-                Expr::Subscript(expr) => expr.format().with_options(call_chain_layout).fmt(f)?,
-                _ => func.format().fmt(f)?,
-            }
-
-            arguments.format().fmt(f)
+        let fmt_func = format_with(|f| match func.as_ref() {
+            Expr::Attribute(expr) => expr.format().with_options(call_chain_layout).fmt(f),
+            Expr::Call(expr) => expr.format().with_options(call_chain_layout).fmt(f),
+            Expr::Subscript(expr) => expr.format().with_options(call_chain_layout).fmt(f),
+            _ => func.format().fmt(f),
         });
 
         // Allow to indent the parentheses while
@@ -51,9 +48,9 @@ impl FormatNodeRule<ExprCall> for FormatExprCall {
         if call_chain_layout == CallChainLayout::Fluent
             && self.call_chain_layout == CallChainLayout::Default
         {
-            group(&fmt_inner).fmt(f)
+            group(&format_args![fmt_func, arguments.format()]).fmt(f)
         } else {
-            fmt_inner.fmt(f)
+            write!(f, [fmt_func, arguments.format()])
         }
     }
 }
@@ -69,10 +66,7 @@ impl NeedsParentheses for ExprCall {
         {
             OptionalParentheses::Multiline
         } else {
-            match self.func.needs_parentheses(self.into(), context) {
-                OptionalParentheses::BestFit => OptionalParentheses::Never,
-                parentheses => parentheses,
-            }
+            self.func.needs_parentheses(self.into(), context)
         }
     }
 }

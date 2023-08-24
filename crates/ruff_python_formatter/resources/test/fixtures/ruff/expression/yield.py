@@ -66,6 +66,13 @@ def foo():
         1
     )
 
+    yield (
+        "#   * Make sure each ForeignKey and OneToOneField has `on_delete` set "
+        "to the desired behavior"
+    )
+
+    yield aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb + ccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+
 yield ("Cache key will cause errors if used with memcached: %r " "(longer than %s)" % (
     key,
     MEMCACHE_MAX_KEY_LENGTH,
