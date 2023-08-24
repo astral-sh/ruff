@@ -43,7 +43,10 @@ where
     //   of 5 characters to avoid it exceeding the line width by 1 reduces the readability.
     // * The text is know to never fit: The text can never fit even when parenthesizing if it is longer
     //   than the configured line width (minus indent).
-    text_len > 5 && text_len < context.options().line_width().value() as usize
+    text_len > 5
+        && text_len
+            <= context.options().line_width().value() as usize
+                - context.options().indent_width() as usize
 }
 
 pub(crate) trait NeedsParentheses {

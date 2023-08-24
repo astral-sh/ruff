@@ -44,6 +44,7 @@ with (a,):  # magic trailing comma
 ```
 indent-style            = Spaces, size: 4
 line-width              = 88
+tab-width               = 4
 quote-style             = Double
 magic-trailing-comma    = Respect
 ```
@@ -95,6 +96,7 @@ with (
 ```
 indent-style            = Spaces, size: 4
 line-width              = 88
+tab-width               = 4
 quote-style             = Double
 magic-trailing-comma    = Ignore
 ```

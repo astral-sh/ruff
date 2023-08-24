@@ -726,7 +726,7 @@ impl<'a> Printer<'a> {
 
             #[allow(clippy::cast_possible_truncation)]
             let char_width = if char == '\t' {
-                u32::from(self.options.tab_width)
+                self.options.tab_width.value()
             } else {
                 // SAFETY: A u32 is sufficient to represent the width of a file <= 4GB
                 char.width().unwrap_or(0) as u32
@@ -1277,13 +1277,12 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
 
     fn fits_text(&mut self, text: &str, args: PrintElementArgs) -> Fits {
         let indent = std::mem::take(&mut self.state.pending_indent);
-        self.state.line_width += u32::from(indent.level())
-            * u32::from(self.options().indent_width())
-            + u32::from(indent.align());
+        self.state.line_width +=
+            u32::from(indent.level()) * self.options().indent_width() + u32::from(indent.align());
 
         for c in text.chars() {
             let char_width = match c {
-                '\t' => u32::from(self.options().tab_width),
+                '\t' => self.options().tab_width.value(),
                 '\n' => {
                     if self.must_be_flat {
                         return Fits::No;
@@ -1422,7 +1421,9 @@ mod tests {
     use crate::prelude::*;
     use crate::printer::{LineEnding, PrintWidth, Printer, PrinterOptions};
     use crate::source_code::SourceCode;
-    use crate::{format_args, write, Document, FormatState, IndentStyle, Printed, VecBuffer};
+    use crate::{
+        format_args, write, Document, FormatState, IndentStyle, Printed, TabWidth, VecBuffer,
+    };
 
     fn format(root: &dyn Format<SimpleFormatContext>) -> Printed {
         format_with_options(
@@ -1572,7 +1573,7 @@ two lines`,
     fn it_use_the_indent_character_specified_in_the_options() {
         let options = PrinterOptions {
             indent_style: IndentStyle::Tab,
-            tab_width: 4,
+            tab_width: TabWidth::try_from(4).unwrap(),
             print_width: PrintWidth::new(19),
             ..PrinterOptions::default()
         };

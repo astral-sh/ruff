@@ -4,7 +4,7 @@ use crate::prelude::tag::GroupMode;
 use crate::prelude::*;
 use crate::printer::LineEnding;
 use crate::source_code::SourceCode;
-use crate::{format, write};
+use crate::{format, write, TabWidth};
 use crate::{
     BufferExtensions, Format, FormatContext, FormatElement, FormatOptions, FormatResult, Formatter,
     IndentStyle, LineWidth, PrinterOptions,
@@ -215,13 +215,17 @@ impl FormatOptions for IrFormatOptions {
         IndentStyle::Space(2)
     }
 
+    fn tab_width(&self) -> TabWidth {
+        TabWidth::default()
+    }
+
     fn line_width(&self) -> LineWidth {
         LineWidth(80)
     }
 
     fn as_print_options(&self) -> PrinterOptions {
         PrinterOptions {
-            tab_width: 2,
+            tab_width: TabWidth::default(),
             print_width: self.line_width().into(),
             line_ending: LineEnding::LineFeed,
             indent_style: IndentStyle::Space(2),
