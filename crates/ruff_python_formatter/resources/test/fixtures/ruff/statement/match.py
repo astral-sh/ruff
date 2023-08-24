@@ -290,3 +290,12 @@ match foo:
     case [* # comment
         _, 1, 2]:
         pass
+    case [* # end of line
+        # own line
+        _, 1, 2]:
+        pass
+    case [* # end of line
+        # own line
+        _, 1, 2]:
+        pass
+

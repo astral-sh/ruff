@@ -296,6 +296,15 @@ match foo:
     case [* # comment
         _, 1, 2]:
         pass
+    case [* # end of line
+        # own line
+        _, 1, 2]:
+        pass
+    case [* # end of line
+        # own line
+        _, 1, 2]:
+        pass
+
 ```
 
 ## Output
@@ -577,23 +586,43 @@ match foo:
     case [
         1,
         2,
-        *rest,  # comment
+        *  # comment
+        rest,
     ]:
         pass
     case [
         1,
         2,
-        *_,  # comment
+        *  # comment
+        _,
     ]:
         pass
     case [
-        *rest,  # comment
+        *  # comment
+        rest,
         1,
         2,
     ]:
         pass
     case [
-        *_,  # comment
+        *  # comment
+        _,
+        1,
+        2,
+    ]:
+        pass
+    case [
+        *  # end of line
+        # own line
+        _,
+        1,
+        2,
+    ]:
+        pass
+    case [
+        *  # end of line
+        # own line
+        _,
         1,
         2,
     ]:

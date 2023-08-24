@@ -1199,11 +1199,7 @@ fn handle_pattern_match_as_comment<'a>(
 /// ]: ...
 /// ```
 fn handle_pattern_match_star_comment(comment: DecoratedComment) -> CommentPlacement {
-    debug_assert!(comment.enclosing_node().is_pattern_match_star());
-    let AnyNodeRef::PatternMatchStar(range, ..) = comment.enclosing_node() else {
-        return CommentPlacement::Default(comment);
-    };
-    CommentPlacement::trailing(range, comment)
+    CommentPlacement::dangling(comment.enclosing_node(), comment)
 }
 
 /// Handles comments around the `:=` token in a named expression (walrus operator).
