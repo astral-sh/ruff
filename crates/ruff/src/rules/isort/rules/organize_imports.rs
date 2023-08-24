@@ -134,6 +134,7 @@ pub(crate) fn organize_imports(
         &settings.isort.force_to_top,
         &settings.isort.known_modules,
         settings.isort.order_by_type,
+        settings.isort.detect_same_package,
         settings.isort.relative_imports_order,
         &settings.isort.single_line_exclusions,
         settings.isort.split_on_trailing_comma,

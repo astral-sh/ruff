@@ -305,6 +305,21 @@ pub struct Options {
     )]
     /// Override in which order the sections should be output. Can be used to move custom sections.
     pub section_order: Option<Vec<ImportSection>>,
+    #[option(
+        default = r#"true"#,
+        value_type = "bool",
+        example = r#"
+            detect-same-package = false
+        "#
+    )]
+    /// Whether to automatically mark imports from within the same package as first-party.
+    /// For example, when `detect-same-package = true`, then when analyzing files within the
+    /// `foo` package, any imports from within the `foo` package will be considered first-party.
+    ///
+    /// This heuristic is often unnecessary when `src` is configured to detect all first-party
+    /// sources; however, if `src` is _not_ configured, this heuristic can be useful to detect
+    /// first-party imports from _within_ (but not _across_) first-party packages.
+    pub detect_same_package: Option<bool>,
     // Tables are required to go last.
     #[option(
         default = "{}",
@@ -331,6 +346,7 @@ pub struct Settings {
     pub force_wrap_aliases: bool,
     pub force_to_top: BTreeSet<String>,
     pub known_modules: KnownModules,
+    pub detect_same_package: bool,
     pub order_by_type: bool,
     pub relative_imports_order: RelativeImportsOrder,
     pub single_line_exclusions: BTreeSet<String>,
@@ -352,6 +368,7 @@ impl Default for Settings {
             combine_as_imports: false,
             force_single_line: false,
             force_sort_within_sections: false,
+            detect_same_package: true,
             case_sensitive: false,
             force_wrap_aliases: false,
             force_to_top: BTreeSet::new(),
@@ -509,6 +526,7 @@ impl TryFrom<Options> for Settings {
             force_sort_within_sections: options.force_sort_within_sections.unwrap_or(false),
             case_sensitive: options.case_sensitive.unwrap_or(false),
             force_wrap_aliases: options.force_wrap_aliases.unwrap_or(false),
+            detect_same_package: options.detect_same_package.unwrap_or(true),
             force_to_top: BTreeSet::from_iter(options.force_to_top.unwrap_or_default()),
             known_modules: KnownModules::new(
                 known_first_party,
@@ -595,6 +613,7 @@ impl From<Settings> for Options {
             force_sort_within_sections: Some(settings.force_sort_within_sections),
             case_sensitive: Some(settings.case_sensitive),
             force_wrap_aliases: Some(settings.force_wrap_aliases),
+            detect_same_package: Some(settings.detect_same_package),
             force_to_top: Some(settings.force_to_top.into_iter().collect()),
             known_first_party: Some(
                 settings
