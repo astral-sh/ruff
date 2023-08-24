@@ -209,11 +209,16 @@ impl FormatParse for FormatType {
 /// "hello {name:{fmt:{not_allowed}}}".format(name="test", fmt="<20")  # Syntax error
 /// ```
 ///
-/// When replacements are present in a format specification, we will parse them and
-/// store them in [`FormatSpec`] but will otherwise ignore them if they would introduce
-/// an invalid format specification at runtime.
+/// When replacements are present in a format specification, parsing will return a [`DynamicFormatSpec`]
+/// and avoid attempting to parse any of the clauses. Otherwise, a [`StaticFormatSpec`] will be used.
 #[derive(Debug, PartialEq)]
-pub struct FormatSpec {
+pub enum FormatSpec {
+    Static(StaticFormatSpec),
+    Dynamic(DynamicFormatSpec),
+}
+
+#[derive(Debug, PartialEq)]
+pub struct StaticFormatSpec {
     // Ex) `!s` in `'{!s}'`
     conversion: Option<FormatConversion>,
     // Ex) `*` in `'{:*^30}'`
@@ -232,8 +237,12 @@ pub struct FormatSpec {
     precision: Option<usize>,
     // Ex) `f` in `'{:+f}'`
     format_type: Option<FormatType>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct DynamicFormatSpec {
     // Ex) `x` and `y` in `'{:*{x},{y}b}'`
-    replacements: Vec<FormatPart>,
+    pub replacements: Vec<FormatPart>,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Default)]
@@ -334,27 +343,51 @@ fn parse_nested_placeholder<'a>(
     }
 }
 
+/// Parse and consume all placeholders in a format spec
+/// This will also consume any intermediate characters such as `x` and `y` in `"x{foo}y{bar}z"`
+/// If no placeholders are present, the text will be returned unmodified.
+fn consume_all_placeholders<'a>(
+    placeholders: &mut Vec<FormatPart>,
+    text: &'a str,
+) -> Result<&'a str, FormatSpecError> {
+    let mut chars = text.chars();
+    let mut text = text;
+    let mut placeholder_count = placeholders.len();
+
+    while chars.clone().contains(&'{') {
+        text = parse_nested_placeholder(placeholders, chars.as_str())?;
+        chars = text.chars();
+
+        dbg!(&text, &chars);
+        // If we did not parse a placeholder, consume a character
+        if placeholder_count == placeholders.len() {
+            chars.next();
+        } else {
+            placeholder_count = placeholders.len();
+        }
+    }
+    dbg!(&text);
+    Ok(text)
+}
+
 impl FormatSpec {
     pub fn parse(text: &str) -> Result<Self, FormatSpecError> {
         let mut replacements = vec![];
         // get_integer in CPython
-        let text = parse_nested_placeholder(&mut replacements, text)?;
+        let text = consume_all_placeholders(&mut replacements, text)?;
+
+        if !replacements.is_empty() {
+            return Ok(FormatSpec::Dynamic(DynamicFormatSpec { replacements }));
+        }
+
         let (conversion, text) = FormatConversion::parse(text);
-        let text = parse_nested_placeholder(&mut replacements, text)?;
         let (mut fill, mut align, text) = parse_fill_and_align(text);
-        let text = parse_nested_placeholder(&mut replacements, text)?;
         let (sign, text) = FormatSign::parse(text);
-        let text = parse_nested_placeholder(&mut replacements, text)?;
         let (alternate_form, text) = parse_alternate_form(text);
-        let text = parse_nested_placeholder(&mut replacements, text)?;
         let (zero, text) = parse_zero(text);
-        let text = parse_nested_placeholder(&mut replacements, text)?;
         let (width, text) = parse_number(text)?;
-        let text = parse_nested_placeholder(&mut replacements, text)?;
         let (grouping_option, text) = FormatGrouping::parse(text);
-        let text = parse_nested_placeholder(&mut replacements, text)?;
         let (precision, text) = parse_precision(text)?;
-        let text = parse_nested_placeholder(&mut replacements, text)?;
 
         let (format_type, _text) = if text.is_empty() {
             (None, text)
@@ -376,7 +409,7 @@ impl FormatSpec {
             align = align.or(Some(FormatAlign::AfterSign));
         }
 
-        Ok(FormatSpec {
+        Ok(FormatSpec::Static(StaticFormatSpec {
             conversion,
             fill,
             align,
@@ -386,12 +419,7 @@ impl FormatSpec {
             grouping_option,
             precision,
             format_type,
-            replacements,
-        })
-    }
-
-    pub fn replacements(&self) -> &[FormatPart] {
-        return self.replacements.as_slice();
+        }))
     }
 }
 
@@ -730,7 +758,7 @@ mod tests {
 
     #[test]
     fn test_width_only() {
-        let expected = Ok(FormatSpec {
+        let expected = Ok(FormatSpec::Static(StaticFormatSpec {
             conversion: None,
             fill: None,
             align: None,
@@ -740,14 +768,13 @@ mod tests {
             grouping_option: None,
             precision: None,
             format_type: None,
-            replacements: vec![],
-        });
+        }));
         assert_eq!(FormatSpec::parse("33"), expected);
     }
 
     #[test]
     fn test_fill_and_width() {
-        let expected = Ok(FormatSpec {
+        let expected = Ok(FormatSpec::Static(StaticFormatSpec {
             conversion: None,
             fill: Some('<'),
             align: Some(FormatAlign::Right),
@@ -757,44 +784,25 @@ mod tests {
             grouping_option: None,
             precision: None,
             format_type: None,
-            replacements: vec![],
-        });
+        }));
         assert_eq!(FormatSpec::parse("<>33"), expected);
     }
 
     #[test]
     fn test_format_part() {
-        let expected = Ok(FormatSpec {
-            conversion: None,
-            fill: None,
-            align: None,
-            sign: None,
-            alternate_form: false,
-            width: None,
-            grouping_option: None,
-            precision: None,
-            format_type: None,
+        let expected = Ok(FormatSpec::Dynamic(DynamicFormatSpec {
             replacements: vec![FormatPart::Field {
                 field_name: "x".to_string(),
                 conversion_spec: None,
                 format_spec: String::new(),
             }],
-        });
+        }));
         assert_eq!(FormatSpec::parse("{x}"), expected);
     }
 
     #[test]
-    fn test_format_parts() {
-        let expected = Ok(FormatSpec {
-            conversion: None,
-            fill: None,
-            align: None,
-            sign: None,
-            alternate_form: false,
-            width: None,
-            grouping_option: None,
-            precision: None,
-            format_type: None,
+    fn test_dynamic_format_spec() {
+        let expected = Ok(FormatSpec::Dynamic(DynamicFormatSpec {
             replacements: vec![
                 FormatPart::Field {
                     field_name: "x".to_string(),
@@ -812,34 +820,25 @@ mod tests {
                     format_spec: String::new(),
                 },
             ],
-        });
+        }));
         assert_eq!(FormatSpec::parse("{x}{y:<2}{z}"), expected);
     }
 
     #[test]
-    fn test_format_part_with_others() {
-        let expected = Ok(FormatSpec {
-            conversion: None,
-            fill: None,
-            align: Some(FormatAlign::Left),
-            sign: None,
-            alternate_form: false,
-            width: Some(20),
-            grouping_option: None,
-            precision: None,
-            format_type: Some(FormatType::Binary),
+    fn test_dynamic_format_spec_with_others() {
+        let expected = Ok(FormatSpec::Dynamic(DynamicFormatSpec {
             replacements: vec![FormatPart::Field {
                 field_name: "x".to_string(),
                 conversion_spec: None,
                 format_spec: String::new(),
             }],
-        });
+        }));
         assert_eq!(FormatSpec::parse("<{x}20b"), expected);
     }
 
     #[test]
     fn test_all() {
-        let expected = Ok(FormatSpec {
+        let expected = Ok(FormatSpec::Static(StaticFormatSpec {
             conversion: None,
             fill: Some('<'),
             align: Some(FormatAlign::Right),
@@ -849,8 +848,7 @@ mod tests {
             grouping_option: Some(FormatGrouping::Comma),
             precision: Some(11),
             format_type: Some(FormatType::Binary),
-            replacements: vec![],
-        });
+        }));
         assert_eq!(FormatSpec::parse("<>-#23,.11b"), expected);
     }
 
@@ -966,7 +964,15 @@ mod tests {
         );
         assert_eq!(
             FormatSpec::parse("{}}"),
-            Err(FormatSpecError::InvalidFormatType)
+            // Note this should be an `InvalidFormatType` but we give up
+            // on all other parsing validation when we see a replacement
+            Ok(FormatSpec::Dynamic(DynamicFormatSpec {
+                replacements: vec![FormatPart::Field {
+                    field_name: String::new(),
+                    conversion_spec: None,
+                    format_spec: String::new()
+                }]
+            }))
         );
         assert_eq!(
             FormatSpec::parse("{{x}}"),
