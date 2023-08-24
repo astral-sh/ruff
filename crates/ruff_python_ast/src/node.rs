@@ -3204,11 +3204,14 @@ impl AstNode for ast::PatternMatchMapping {
         let ast::PatternMatchMapping {
             keys,
             patterns,
+            rest,
             range: _,
-            rest: _,
         } = self;
         for (key, pattern) in keys.iter().zip(patterns) {
             visitor.visit_expr(key);
+            visitor.visit_pattern(pattern);
+        }
+        if let Some(pattern) = rest {
             visitor.visit_pattern(pattern);
         }
     }

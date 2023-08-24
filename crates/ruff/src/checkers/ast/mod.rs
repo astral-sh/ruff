@@ -1335,23 +1335,46 @@ where
 
     fn visit_pattern(&mut self, pattern: &'b Pattern) {
         // Step 1: Binding
-        if let Pattern::MatchAs(ast::PatternMatchAs {
-            name: Some(name), ..
-        })
-        | Pattern::MatchStar(ast::PatternMatchStar {
-            name: Some(name),
-            range: _,
-        })
-        | Pattern::MatchMapping(ast::PatternMatchMapping {
-            rest: Some(name), ..
-        }) = pattern
-        {
-            self.add_binding(
-                name,
-                name.range(),
-                BindingKind::Assignment,
-                BindingFlags::empty(),
-            );
+        match &pattern {
+            Pattern::MatchAs(ast::PatternMatchAs {
+                name: Some(name),
+                pattern: _,
+                range: _,
+            }) => {
+                self.add_binding(
+                    name,
+                    name.range(),
+                    BindingKind::Assignment,
+                    BindingFlags::empty(),
+                );
+            }
+            Pattern::MatchStar(ast::PatternMatchStar {
+                name: Some(name),
+                range: _,
+            }) => {
+                self.add_binding(
+                    name,
+                    name.range(),
+                    BindingKind::Assignment,
+                    BindingFlags::empty(),
+                );
+            }
+            Pattern::MatchMapping(ast::PatternMatchMapping {
+                rest: Some(rest), ..
+            }) => {
+                if let Pattern::MatchAs(ast::PatternMatchAs {
+                    name: Some(name), ..
+                }) = rest.as_ref()
+                {
+                    self.add_binding(
+                        name,
+                        name.range(),
+                        BindingKind::Assignment,
+                        BindingFlags::empty(),
+                    );
+                }
+            }
+            _ => {}
         }
 
         // Step 2: Traversal

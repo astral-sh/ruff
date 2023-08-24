@@ -1402,10 +1402,18 @@ expression: parse_ast
                             keys: [],
                             patterns: [],
                             rest: Some(
-                                Identifier {
-                                    id: "z",
-                                    range: 1081..1082,
-                                },
+                                MatchAs(
+                                    PatternMatchAs {
+                                        range: 1081..1082,
+                                        pattern: None,
+                                        name: Some(
+                                            Identifier {
+                                                id: "z",
+                                                range: 1081..1082,
+                                            },
+                                        ),
+                                    },
+                                ),
                             ),
                         },
                     ),

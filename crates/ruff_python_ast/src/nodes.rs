@@ -1886,7 +1886,7 @@ pub struct PatternMatchMapping {
     pub range: TextRange,
     pub keys: Vec<Expr>,
     pub patterns: Vec<Pattern>,
-    pub rest: Option<Identifier>,
+    pub rest: Option<Box<Pattern>>,
 }
 
 impl From<PatternMatchMapping> for Pattern {

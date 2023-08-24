@@ -172,7 +172,7 @@ pub struct PatternMatchSequence<'a> {
 pub struct PatternMatchMapping<'a> {
     keys: Vec<ComparableExpr<'a>>,
     patterns: Vec<ComparablePattern<'a>>,
-    rest: Option<&'a str>,
+    rest: Option<Box<ComparablePattern<'a>>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -238,7 +238,7 @@ impl<'a> From<&'a ast::Pattern> for ComparablePattern<'a> {
             }) => Self::MatchMapping(PatternMatchMapping {
                 keys: keys.iter().map(Into::into).collect(),
                 patterns: patterns.iter().map(Into::into).collect(),
-                rest: rest.as_deref(),
+                rest: rest.as_ref().map(Into::into),
             }),
             ast::Pattern::MatchClass(ast::PatternMatchClass {
                 cls,

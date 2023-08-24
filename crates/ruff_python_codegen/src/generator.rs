@@ -694,7 +694,7 @@ impl<'a> Generator<'a> {
                 if let Some(rest) = rest {
                     self.p_delim(&mut first, ", ");
                     self.p("**");
-                    self.p_id(rest);
+                    self.unparse_pattern(rest);
                 }
                 self.p("}");
             }

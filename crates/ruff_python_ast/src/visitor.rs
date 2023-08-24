@@ -666,12 +666,20 @@ pub fn walk_pattern<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, pattern: &'a P
                 visitor.visit_pattern(pattern);
             }
         }
-        Pattern::MatchMapping(ast::PatternMatchMapping { keys, patterns, .. }) => {
+        Pattern::MatchMapping(ast::PatternMatchMapping {
+            keys,
+            patterns,
+            rest,
+            ..
+        }) => {
             for expr in keys {
                 visitor.visit_expr(expr);
             }
             for pattern in patterns {
                 visitor.visit_pattern(pattern);
+            }
+            if let Some(rest) = rest {
+                visitor.visit_pattern(rest);
             }
         }
         Pattern::MatchClass(ast::PatternMatchClass {

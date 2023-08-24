@@ -47,10 +47,18 @@ expression: parse_ast
                             keys: [],
                             patterns: [],
                             rest: Some(
-                                Identifier {
-                                    id: "rest",
-                                    range: 41..45,
-                                },
+                                MatchAs(
+                                    PatternMatchAs {
+                                        range: 41..45,
+                                        pattern: None,
+                                        name: Some(
+                                            Identifier {
+                                                id: "rest",
+                                                range: 41..45,
+                                            },
+                                        ),
+                                    },
+                                ),
                             ),
                         },
                     ),

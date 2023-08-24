@@ -273,11 +273,19 @@ where
         Pattern::MatchSequence(ast::PatternMatchSequence { patterns, range: _ }) => patterns
             .iter()
             .any(|pattern| any_over_pattern(pattern, func)),
-        Pattern::MatchMapping(ast::PatternMatchMapping { keys, patterns, .. }) => {
+        Pattern::MatchMapping(ast::PatternMatchMapping {
+            keys,
+            patterns,
+            rest,
+            range: _,
+        }) => {
             keys.iter().any(|key| any_over_expr(key, func))
                 || patterns
                     .iter()
                     .any(|pattern| any_over_pattern(pattern, func))
+                || rest
+                    .as_ref()
+                    .is_some_and(|rest| any_over_pattern(rest, func))
         }
         Pattern::MatchClass(ast::PatternMatchClass {
             cls,

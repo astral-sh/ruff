@@ -769,22 +769,22 @@ MappingPattern: ast::Pattern = {
             range: (location..end_location).into()
         }.into()
     },
-    <location:@L> "{" "**" <rest:Identifier> ","? "}" <end_location:@R> => {
+    <location:@L> "{" "**" <rest:CapturePattern> ","? "}" <end_location:@R> => {
         ast::PatternMatchMapping {
             keys: vec![],
             patterns: vec![],
-            rest: Some(rest),
+            rest: Some(Box::new(rest)),
             range: (location..end_location).into()
         }.into()
     },
-    <location:@L> "{" <e:OneOrMore<MatchMappingEntry>> ","  "**" <rest:Identifier> ","? "}" <end_location:@R> => {
+    <location:@L> "{" <e:OneOrMore<MatchMappingEntry>> ","  "**" <rest:CapturePattern> ","? "}" <end_location:@R> => {
         let (keys, patterns) = e
             .into_iter()
             .unzip();
         ast::PatternMatchMapping {
             keys,
             patterns,
-            rest: Some(rest),
+            rest: Some(Box::new(rest)),
             range: (location..end_location).into()
         }.into()
     },
