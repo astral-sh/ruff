@@ -258,161 +258,139 @@ B006_B008.py:114:33: B006 [*] Do not use mutable data structures for argument de
 116 118 | 
 117 119 | 
 
-B006_B008.py:235:20: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:239:20: B006 [*] Do not use mutable data structures for argument defaults
     |
-233 | # B006 and B008
-234 | # We should handle arbitrary nesting of these B008.
-235 | def nested_combo(a=[float(3), dt.datetime.now()]):
+237 | # B006 and B008
+238 | # We should handle arbitrary nesting of these B008.
+239 | def nested_combo(a=[float(3), dt.datetime.now()]):
     |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B006
-236 |     pass
+240 |     pass
     |
     = help: Replace with `None`; initialize within function
 
 ℹ Possible fix
-232 232 | 
-233 233 | # B006 and B008
-234 234 | # We should handle arbitrary nesting of these B008.
-235     |-def nested_combo(a=[float(3), dt.datetime.now()]):
-    235 |+def nested_combo(a=None):
-    236 |+    if a is None:
-    237 |+        a = [float(3), dt.datetime.now()]
-236 238 |     pass
-237 239 | 
-238 240 | 
+236 236 | 
+237 237 | # B006 and B008
+238 238 | # We should handle arbitrary nesting of these B008.
+239     |-def nested_combo(a=[float(3), dt.datetime.now()]):
+    239 |+def nested_combo(a=None):
+    240 |+    if a is None:
+    241 |+        a = [float(3), dt.datetime.now()]
+240 242 |     pass
+241 243 | 
+242 244 | 
 
-B006_B008.py:272:27: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:276:27: B006 [*] Do not use mutable data structures for argument defaults
     |
-271 | def mutable_annotations(
-272 |     a: list[int] | None = [],
+275 | def mutable_annotations(
+276 |     a: list[int] | None = [],
     |                           ^^ B006
-273 |     b: Optional[Dict[int, int]] = {},
-274 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+277 |     b: Optional[Dict[int, int]] = {},
+278 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
     |
     = help: Replace with `None`; initialize within function
 
 ℹ Possible fix
-269 269 | 
-270 270 | 
-271 271 | def mutable_annotations(
-272     |-    a: list[int] | None = [],
-    272 |+    a: list[int] | None = None,
-273 273 |     b: Optional[Dict[int, int]] = {},
-274 274 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
-275 275 |     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
-276 276 | ):
-    277 |+    if a is None:
-    278 |+        a = []
-277 279 |     pass
-278 280 | 
-279 281 | 
-
-B006_B008.py:273:35: B006 [*] Do not use mutable data structures for argument defaults
-    |
-271 | def mutable_annotations(
-272 |     a: list[int] | None = [],
-273 |     b: Optional[Dict[int, int]] = {},
-    |                                   ^^ B006
-274 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
-275 |     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
-    |
-    = help: Replace with `None`; initialize within function
-
-ℹ Possible fix
-270 270 | 
-271 271 | def mutable_annotations(
-272 272 |     a: list[int] | None = [],
-273     |-    b: Optional[Dict[int, int]] = {},
-    273 |+    b: Optional[Dict[int, int]] = None,
-274 274 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
-275 275 |     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
-276 276 | ):
-    277 |+    if b is None:
-    278 |+        b = {}
-277 279 |     pass
-278 280 | 
-279 281 | 
-
-B006_B008.py:274:62: B006 [*] Do not use mutable data structures for argument defaults
-    |
-272 |     a: list[int] | None = [],
-273 |     b: Optional[Dict[int, int]] = {},
-274 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
-    |                                                              ^^^^^ B006
-275 |     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
-276 | ):
-    |
-    = help: Replace with `None`; initialize within function
-
-ℹ Possible fix
-271 271 | def mutable_annotations(
-272 272 |     a: list[int] | None = [],
-273 273 |     b: Optional[Dict[int, int]] = {},
-274     |-    c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
-    274 |+    c: Annotated[Union[Set[str], abc.Sized], "annotation"] = None,
-275 275 |     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
-276 276 | ):
-    277 |+    if c is None:
-    278 |+        c = set()
-277 279 |     pass
-278 280 | 
-279 281 | 
-
-B006_B008.py:275:80: B006 [*] Do not use mutable data structures for argument defaults
-    |
-273 |     b: Optional[Dict[int, int]] = {},
-274 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
-275 |     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
-    |                                                                                ^^^^^ B006
-276 | ):
-277 |     pass
-    |
-    = help: Replace with `None`; initialize within function
-
-ℹ Possible fix
-272 272 |     a: list[int] | None = [],
-273 273 |     b: Optional[Dict[int, int]] = {},
-274 274 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
-275     |-    d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
-    275 |+    d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = None,
-276 276 | ):
-    277 |+    if d is None:
-    278 |+        d = set()
-277 279 |     pass
-278 280 | 
-279 281 | 
-
-B006_B008.py:280:52: B006 [*] Do not use mutable data structures for argument defaults
-    |
-280 | def single_line_func_wrong(value: dict[str, str] = {}):
-    |                                                    ^^ B006
-281 |     """Docstring"""
-    |
-    = help: Replace with `None`; initialize within function
-
-ℹ Possible fix
-277 277 |     pass
-278 278 | 
-279 279 | 
-280     |-def single_line_func_wrong(value: dict[str, str] = {}):
-    280 |+def single_line_func_wrong(value: dict[str, str] = None):
-281 281 |     """Docstring"""
-    282 |+    if value is None:
-    283 |+        value = {}
+273 273 | 
+274 274 | 
+275 275 | def mutable_annotations(
+276     |-    a: list[int] | None = [],
+    276 |+    a: list[int] | None = None,
+277 277 |     b: Optional[Dict[int, int]] = {},
+278 278 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+279 279 |     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+280 280 | ):
+    281 |+    if a is None:
+    282 |+        a = []
+281 283 |     pass
 282 284 | 
 283 285 | 
-284 286 | def single_line_func_wrong(value: dict[str, str] = {}):
+
+B006_B008.py:277:35: B006 [*] Do not use mutable data structures for argument defaults
+    |
+275 | def mutable_annotations(
+276 |     a: list[int] | None = [],
+277 |     b: Optional[Dict[int, int]] = {},
+    |                                   ^^ B006
+278 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+279 |     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+    |
+    = help: Replace with `None`; initialize within function
+
+ℹ Possible fix
+274 274 | 
+275 275 | def mutable_annotations(
+276 276 |     a: list[int] | None = [],
+277     |-    b: Optional[Dict[int, int]] = {},
+    277 |+    b: Optional[Dict[int, int]] = None,
+278 278 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+279 279 |     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+280 280 | ):
+    281 |+    if b is None:
+    282 |+        b = {}
+281 283 |     pass
+282 284 | 
+283 285 | 
+
+B006_B008.py:278:62: B006 [*] Do not use mutable data structures for argument defaults
+    |
+276 |     a: list[int] | None = [],
+277 |     b: Optional[Dict[int, int]] = {},
+278 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+    |                                                              ^^^^^ B006
+279 |     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+280 | ):
+    |
+    = help: Replace with `None`; initialize within function
+
+ℹ Possible fix
+275 275 | def mutable_annotations(
+276 276 |     a: list[int] | None = [],
+277 277 |     b: Optional[Dict[int, int]] = {},
+278     |-    c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+    278 |+    c: Annotated[Union[Set[str], abc.Sized], "annotation"] = None,
+279 279 |     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+280 280 | ):
+    281 |+    if c is None:
+    282 |+        c = set()
+281 283 |     pass
+282 284 | 
+283 285 | 
+
+B006_B008.py:279:80: B006 [*] Do not use mutable data structures for argument defaults
+    |
+277 |     b: Optional[Dict[int, int]] = {},
+278 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+279 |     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+    |                                                                                ^^^^^ B006
+280 | ):
+281 |     pass
+    |
+    = help: Replace with `None`; initialize within function
+
+ℹ Possible fix
+276 276 |     a: list[int] | None = [],
+277 277 |     b: Optional[Dict[int, int]] = {},
+278 278 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+279     |-    d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+    279 |+    d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = None,
+280 280 | ):
+    281 |+    if d is None:
+    282 |+        d = set()
+281 283 |     pass
+282 284 | 
+283 285 | 
 
 B006_B008.py:284:52: B006 [*] Do not use mutable data structures for argument defaults
     |
 284 | def single_line_func_wrong(value: dict[str, str] = {}):
     |                                                    ^^ B006
 285 |     """Docstring"""
-286 |     ...
     |
     = help: Replace with `None`; initialize within function
 
 ℹ Possible fix
-281 281 |     """Docstring"""
+281 281 |     pass
 282 282 | 
 283 283 | 
 284     |-def single_line_func_wrong(value: dict[str, str] = {}):
@@ -420,59 +398,81 @@ B006_B008.py:284:52: B006 [*] Do not use mutable data structures for argument de
 285 285 |     """Docstring"""
     286 |+    if value is None:
     287 |+        value = {}
-286 288 |     ...
+286 288 | 
 287 289 | 
-288 290 | 
+288 290 | def single_line_func_wrong(value: dict[str, str] = {}):
 
-B006_B008.py:289:52: B006 Do not use mutable data structures for argument defaults
+B006_B008.py:288:52: B006 [*] Do not use mutable data structures for argument defaults
     |
-289 | def single_line_func_wrong(value: dict[str, str] = {}):
+288 | def single_line_func_wrong(value: dict[str, str] = {}):
     |                                                    ^^ B006
-290 |     """Docstring"""; ...
+289 |     """Docstring"""
+290 |     ...
     |
     = help: Replace with `None`; initialize within function
+
+ℹ Possible fix
+285 285 |     """Docstring"""
+286 286 | 
+287 287 | 
+288     |-def single_line_func_wrong(value: dict[str, str] = {}):
+    288 |+def single_line_func_wrong(value: dict[str, str] = None):
+289 289 |     """Docstring"""
+    290 |+    if value is None:
+    291 |+        value = {}
+290 292 |     ...
+291 293 | 
+292 294 | 
 
 B006_B008.py:293:52: B006 Do not use mutable data structures for argument defaults
     |
 293 | def single_line_func_wrong(value: dict[str, str] = {}):
     |                                                    ^^ B006
-294 |     """Docstring"""; \
-295 |         ...
+294 |     """Docstring"""; ...
     |
     = help: Replace with `None`; initialize within function
 
-B006_B008.py:298:52: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:297:52: B006 Do not use mutable data structures for argument defaults
     |
-298 |   def single_line_func_wrong(value: dict[str, str] = {
+297 | def single_line_func_wrong(value: dict[str, str] = {}):
+    |                                                    ^^ B006
+298 |     """Docstring"""; \
+299 |         ...
+    |
+    = help: Replace with `None`; initialize within function
+
+B006_B008.py:302:52: B006 [*] Do not use mutable data structures for argument defaults
+    |
+302 |   def single_line_func_wrong(value: dict[str, str] = {
     |  ____________________________________________________^
-299 | |     # This is a comment
-300 | | }):
+303 | |     # This is a comment
+304 | | }):
     | |_^ B006
-301 |       """Docstring"""
+305 |       """Docstring"""
     |
     = help: Replace with `None`; initialize within function
 
 ℹ Possible fix
-295 295 |         ...
-296 296 | 
-297 297 | 
-298     |-def single_line_func_wrong(value: dict[str, str] = {
-299     |-    # This is a comment
-300     |-}):
-    298 |+def single_line_func_wrong(value: dict[str, str] = None):
-301 299 |     """Docstring"""
-    300 |+    if value is None:
-    301 |+        value = {}
-302 302 | 
-303 303 | 
-304 304 | def single_line_func_wrong(value: dict[str, str] = {}) \
+299 299 |         ...
+300 300 | 
+301 301 | 
+302     |-def single_line_func_wrong(value: dict[str, str] = {
+303     |-    # This is a comment
+304     |-}):
+    302 |+def single_line_func_wrong(value: dict[str, str] = None):
+305 303 |     """Docstring"""
+    304 |+    if value is None:
+    305 |+        value = {}
+306 306 | 
+307 307 | 
+308 308 | def single_line_func_wrong(value: dict[str, str] = {}) \
 
-B006_B008.py:304:52: B006 Do not use mutable data structures for argument defaults
+B006_B008.py:308:52: B006 Do not use mutable data structures for argument defaults
     |
-304 | def single_line_func_wrong(value: dict[str, str] = {}) \
+308 | def single_line_func_wrong(value: dict[str, str] = {}) \
     |                                                    ^^ B006
-305 |     : \
-306 |     """Docstring"""
+309 |     : \
+310 |     """Docstring"""
     |
     = help: Replace with `None`; initialize within function
 

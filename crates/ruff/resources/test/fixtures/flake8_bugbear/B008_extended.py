@@ -1,6 +1,7 @@
 from typing import List
 
 import fastapi
+import custom
 from fastapi import Query
 
 
@@ -13,6 +14,10 @@ def okay(data: List[str] = fastapi.Query(None)):
 
 
 def okay(data: List[str] = Query(None)):
+    ...
+
+
+def okay(data: custom.ImmutableTypeA = foo()):
     ...
 
 

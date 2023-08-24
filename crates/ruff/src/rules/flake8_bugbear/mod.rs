@@ -99,6 +99,7 @@ mod tests {
                     extend_immutable_calls: vec![
                         "fastapi.Depends".to_string(),
                         "fastapi.Query".to_string(),
+                        "custom.ImmutableTypeA".to_string(),
                     ],
                 },
                 ..Settings::for_rule(Rule::FunctionCallInDefaultArgument)
