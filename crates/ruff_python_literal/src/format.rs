@@ -357,8 +357,6 @@ fn consume_all_placeholders<'a>(
     while chars.clone().contains(&'{') {
         text = parse_nested_placeholder(placeholders, chars.as_str())?;
         chars = text.chars();
-
-        dbg!(&text, &chars);
         // If we did not parse a placeholder, consume a character
         if placeholder_count == placeholders.len() {
             chars.next();
@@ -366,7 +364,6 @@ fn consume_all_placeholders<'a>(
             placeholder_count = placeholders.len();
         }
     }
-    dbg!(&text);
     Ok(text)
 }
 
