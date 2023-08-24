@@ -104,23 +104,7 @@ def where_is(point):
 ```diff
 --- Black
 +++ Ruff
-@@ -23,7 +23,7 @@
-     # The rest of your commands go here
- 
- match command.split():
--    case ["drop", *objects]:
-+    case ["drop", *NOT_YET_IMPLEMENTED_PatternMatchStar]:
-         for obj in objects:
-             character.drop(obj, current_room)
-     # The rest of your commands go here
-@@ -33,24 +33,24 @@
-         pass
-     case ["go", direction]:
-         print("Going:", direction)
--    case ["drop", *objects]:
-+    case ["drop", *NOT_YET_IMPLEMENTED_PatternMatchStar]:
-         print("Dropping: ", *objects)
-     case _:
+@@ -39,18 +39,18 @@
          print(f"Sorry, I couldn't understand {command!r}")
  
  match command.split():
@@ -217,7 +201,7 @@ match command.split():
     # The rest of your commands go here
 
 match command.split():
-    case ["drop", *NOT_YET_IMPLEMENTED_PatternMatchStar]:
+    case ["drop", *objects]:
         for obj in objects:
             character.drop(obj, current_room)
     # The rest of your commands go here
@@ -227,7 +211,7 @@ match command.split():
         pass
     case ["go", direction]:
         print("Going:", direction)
-    case ["drop", *NOT_YET_IMPLEMENTED_PatternMatchStar]:
+    case ["drop", *objects]:
         print("Dropping: ", *objects)
     case _:
         print(f"Sorry, I couldn't understand {command!r}")

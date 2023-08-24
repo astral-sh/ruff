@@ -237,7 +237,6 @@ match foo:
     ]:
         pass
 
-
 match foo:
     case 1:
         y = 0
@@ -263,3 +262,40 @@ match foo:
         # comment
     ):
         y = 1
+
+match foo:
+    case [1, 2, *rest]:
+        pass
+    case [1, 2, *_]:
+        pass
+    case [*rest, 1, 2]:
+        pass
+    case [*_, 1, 2]:
+        pass
+    case [
+        1,
+        2,
+        *rest,
+    ]:
+        pass
+    case [1, 2, * # comment
+        rest]:
+        pass
+    case [1, 2, * # comment
+        _]:
+        pass
+    case [* # comment
+        rest, 1, 2]:
+        pass
+    case [* # comment
+        _, 1, 2]:
+        pass
+    case [* # end of line
+        # own line
+        _, 1, 2]:
+        pass
+    case [* # end of line
+        # own line
+        _, 1, 2]:
+        pass
+

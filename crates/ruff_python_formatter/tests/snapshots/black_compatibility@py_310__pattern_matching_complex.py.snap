@@ -179,8 +179,7 @@ match x:
          y = 0
  # case black_check_sequence_then_mapping
  match x:
--    case [*_]:
-+    case [*NOT_YET_IMPLEMENTED_PatternMatchStar]:
+     case [*_]:
          return "seq"
 -    case {}:
 +    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
@@ -204,7 +203,7 @@ match x:
          x = True
  # case black_test_patma_154
  match x:
-@@ -54,15 +54,15 @@
+@@ -54,11 +54,11 @@
          y = 0
  # case black_test_patma_134
  match x:
@@ -219,12 +218,7 @@ match x:
          y = 2
  # case black_test_patma_185
  match Seq():
--    case [*_]:
-+    case [*NOT_YET_IMPLEMENTED_PatternMatchStar]:
-         y = 0
- # case black_test_patma_063
- match x:
-@@ -72,11 +72,11 @@
+@@ -72,7 +72,7 @@
          y = 1
  # case black_test_patma_248
  match x:
@@ -233,26 +227,7 @@ match x:
          y = bar
  # case black_test_patma_019
  match (0, 1, 2):
--    case [0, 1, *x, 2]:
-+    case [0, 1, *NOT_YET_IMPLEMENTED_PatternMatchStar, 2]:
-         y = 0
- # case black_test_patma_052
- match x:
-@@ -88,7 +88,7 @@
-         y = 2
- # case black_test_patma_191
- match w:
--    case [x, y, *_]:
-+    case [x, y, *NOT_YET_IMPLEMENTED_PatternMatchStar]:
-         z = 0
- # case black_test_patma_110
- match x:
-@@ -128,17 +128,17 @@
-         y = 0
- # case black_test_patma_189
- match w:
--    case [x, y, *rest]:
-+    case [x, y, *NOT_YET_IMPLEMENTED_PatternMatchStar]:
+@@ -132,13 +132,13 @@
          z = 0
  # case black_test_patma_042
  match x:
@@ -300,7 +275,7 @@ match x:
         y = 0
 # case black_check_sequence_then_mapping
 match x:
-    case [*NOT_YET_IMPLEMENTED_PatternMatchStar]:
+    case [*_]:
         return "seq"
     case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
         return "map"
@@ -338,7 +313,7 @@ match x:
         y = 2
 # case black_test_patma_185
 match Seq():
-    case [*NOT_YET_IMPLEMENTED_PatternMatchStar]:
+    case [*_]:
         y = 0
 # case black_test_patma_063
 match x:
@@ -352,7 +327,7 @@ match x:
         y = bar
 # case black_test_patma_019
 match (0, 1, 2):
-    case [0, 1, *NOT_YET_IMPLEMENTED_PatternMatchStar, 2]:
+    case [0, 1, *x, 2]:
         y = 0
 # case black_test_patma_052
 match x:
@@ -364,7 +339,7 @@ match x:
         y = 2
 # case black_test_patma_191
 match w:
-    case [x, y, *NOT_YET_IMPLEMENTED_PatternMatchStar]:
+    case [x, y, *_]:
         z = 0
 # case black_test_patma_110
 match x:
@@ -404,7 +379,7 @@ match x:
         y = 0
 # case black_test_patma_189
 match w:
-    case [x, y, *NOT_YET_IMPLEMENTED_PatternMatchStar]:
+    case [x, y, *rest]:
         z = 0
 # case black_test_patma_042
 match x:
