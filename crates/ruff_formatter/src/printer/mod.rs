@@ -60,11 +60,13 @@ impl<'a> Printer<'a> {
             let mut stack = PrintCallStack::new(PrintElementArgs::new(Indention::Level(indent)));
             let mut queue: PrintQueue<'a> = PrintQueue::new(document.as_ref());
 
-            while let Some(element) = queue.pop() {
-                self.print_element(&mut stack, &mut queue, element)?;
-
-                if queue.is_empty() {
-                    self.flush_line_suffixes(&mut queue, &mut stack, None);
+            loop {
+                if let Some(element) = queue.pop() {
+                    self.print_element(&mut stack, &mut queue, element)?;
+                } else {
+                    if !self.flush_line_suffixes(&mut queue, &mut stack, None) {
+                        break;
+                    }
                 }
             }
 
@@ -413,7 +415,7 @@ impl<'a> Printer<'a> {
         queue: &mut PrintQueue<'a>,
         stack: &mut PrintCallStack,
         line_break: Option<&'a FormatElement>,
-    ) {
+    ) -> bool {
         let suffixes = self.state.line_suffixes.take_pending();
 
         if suffixes.len() > 0 {
@@ -437,6 +439,10 @@ impl<'a> Printer<'a> {
                     }
                 }
             }
+
+            true
+        } else {
+            false
         }
     }
 
@@ -771,7 +777,7 @@ struct PrinterState<'a> {
     // Re-used queue to measure if a group fits. Optimisation to avoid re-allocating a new
     // vec every time a group gets measured
     fits_stack: Vec<StackFrame>,
-    fits_queue: Vec<&'a [FormatElement]>,
+    fits_queue: Vec<std::slice::Iter<'a, FormatElement>>,
 }
 
 impl<'a> PrinterState<'a> {
