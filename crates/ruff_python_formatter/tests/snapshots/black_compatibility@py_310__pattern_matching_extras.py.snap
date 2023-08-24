@@ -131,36 +131,6 @@ match bar1:
 ```diff
 --- Black
 +++ Ruff
-@@ -5,9 +5,9 @@
-         print(b)
-     case [a as b, c, d, e as f]:
-         print(f)
--    case Point(a as b):
-+    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
-         print(b)
--    case Point(int() as x, int() as y):
-+    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
-         print(x, y)
- 
- 
-@@ -15,7 +15,7 @@
- case: int = re.match(something)
- 
- match re.match(case):
--    case type("match", match):
-+    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
-         pass
-     case match:
-         pass
-@@ -23,7 +23,7 @@
- 
- def func(match: case, case: match) -> case:
-     match Something():
--        case func(match, case):
-+        case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
-             ...
-         case another:
-             ...
 @@ -32,23 +32,32 @@
  match maybe, multiple:
      case perhaps, 5:
@@ -199,21 +169,7 @@ match bar1:
          assert "map" == b
  
  
-@@ -59,12 +68,7 @@
-     ),
-     case,
- ):
--    case case(
--        match=case,
--        case=re.match(
--            loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong
--        ),
--    ):
-+    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
-         pass
- 
-     case [a as match]:
-@@ -80,17 +84,14 @@
+@@ -80,17 +89,14 @@
  
  
  match a, *b(), c:
@@ -234,7 +190,7 @@ match bar1:
          pass
  
  
-@@ -101,19 +102,22 @@
+@@ -101,7 +107,12 @@
      case 2 as b, 3 as c:
          pass
  
@@ -248,19 +204,16 @@ match bar1:
          pass
  
  
- match bar1:
--    case Foo(aa=Callable() as aa, bb=int()):
-+    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
-         print(bar1.aa, bar1.bb)
-     case _:
-         print("no match", "\n")
- 
+@@ -114,6 +125,9 @@
  
  match bar1:
--    case Foo(
+     case Foo(
 -        normal=x, perhaps=[list, {"x": d, "y": 1.0}] as y, otherwise=something, q=t as u
--    ):
-+    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
++        normal=x,
++        perhaps=[list, {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}] as y,
++        otherwise=something,
++        q=t as u,
+     ):
          pass
 ```
 
@@ -274,9 +227,9 @@ match something:
         print(b)
     case [a as b, c, d, e as f]:
         print(f)
-    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+    case Point(a as b):
         print(b)
-    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+    case Point(int() as x, int() as y):
         print(x, y)
 
 
@@ -284,7 +237,7 @@ match = 1
 case: int = re.match(something)
 
 match re.match(case):
-    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+    case type("match", match):
         pass
     case match:
         pass
@@ -292,7 +245,7 @@ match re.match(case):
 
 def func(match: case, case: match) -> case:
     match Something():
-        case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+        case func(match, case):
             ...
         case another:
             ...
@@ -337,7 +290,12 @@ match match(
     ),
     case,
 ):
-    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+    case case(
+        match=case,
+        case=re.match(
+            loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong
+        ),
+    ):
         pass
 
     case [a as match]:
@@ -381,14 +339,19 @@ match something:
 
 
 match bar1:
-    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+    case Foo(aa=Callable() as aa, bb=int()):
         print(bar1.aa, bar1.bb)
     case _:
         print("no match", "\n")
 
 
 match bar1:
-    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+    case Foo(
+        normal=x,
+        perhaps=[list, {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}] as y,
+        otherwise=something,
+        q=t as u,
+    ):
         pass
 ```
 

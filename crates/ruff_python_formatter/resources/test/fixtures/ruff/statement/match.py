@@ -263,3 +263,30 @@ match foo:
         # comment
     ):
         y = 1
+
+
+match pattern_match_class:
+    case Foo(
+            # own line
+            ):
+        ...
+
+    case Point2D(0, 0):
+        ...
+
+    case Point3D(x=0, y=0, z=000000000000000000000000000000000000000000000000000000000000000000000000000000000):
+        ...
+
+    case Bar(0, a=None, b="hello"):
+        ...
+
+    case FooBar(# leading
+# leading
+    # leading
+        # leading
+            0 # trailing
+# trailing
+    # trailing
+        # trailing
+            ):
+        ...

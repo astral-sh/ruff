@@ -156,15 +156,6 @@ match x:
 ```diff
 --- Black
 +++ Ruff
-@@ -6,7 +6,7 @@
-         y = 0
- # case black_test_patma_142
- match x:
--    case bytes(z):
-+    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
-         y = 0
- # case black_test_patma_073
- match x:
 @@ -16,23 +16,23 @@
          y = 1
  # case black_test_patma_006
@@ -282,7 +273,7 @@ match x:
         y = 0
 # case black_test_patma_142
 match x:
-    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+    case bytes(z):
         y = 0
 # case black_test_patma_073
 match x:
