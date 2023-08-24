@@ -283,6 +283,7 @@ pub(crate) fn typing_only_runtime_import(
                 None,
                 &checker.settings.src,
                 checker.package(),
+                checker.settings.isort.detect_same_package,
                 &checker.settings.isort.known_modules,
                 checker.settings.target_version,
             ) {
