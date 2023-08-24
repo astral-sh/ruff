@@ -477,8 +477,10 @@ mod tests {
     use crate::jupyter::schema::Cell;
     use crate::jupyter::Notebook;
     use crate::registry::Rule;
+    use crate::source_kind::SourceKind;
     use crate::test::{
-        read_jupyter_notebook, test_notebook_path, test_resource_path, TestedNotebook,
+        read_jupyter_notebook, test_contents, test_notebook_path, test_resource_path,
+        TestedNotebook,
     };
     use crate::{assert_messages, settings};
 
@@ -657,6 +659,24 @@ print("after empty cells")
         let string = String::from_utf8(writer)?;
         assert_eq!(string.ends_with('\n'), trailing_newline);
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_no_cell_id() -> Result<()> {
+        let path = "no_cell_id.ipynb".to_string();
+        let source_notebook = read_jupyter_notebook(path.as_ref())?;
+        let source_kind = SourceKind::Jupyter(source_notebook);
+        let (_, transformed) = test_contents(
+            &source_kind,
+            path.as_ref(),
+            &settings::Settings::for_rule(Rule::UnusedImport),
+        );
+        let linted_notebook = transformed.into_owned().expect_jupyter();
+        let mut writer = Vec::new();
+        linted_notebook.write_inner(&mut writer)?;
+        let actual = String::from_utf8(writer)?;
+        assert!(!actual.contains(r#""id":"#));
         Ok(())
     }
 }
