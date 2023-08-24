@@ -275,7 +275,7 @@ impl Notebook {
                 };
                 if id.is_none() {
                     // https://github.com/jupyter/enhancement-proposals/blob/master/62-cell-id/cell-id.md#questions
-                    *id = Some(Uuid::new_v4().to_string())
+                    *id = Some(Uuid::new_v4().to_string());
                 }
             }
         }
@@ -689,7 +689,7 @@ print("after empty cells")
         let source_kind = SourceKind::IpyNotebook(source_notebook);
         let (_, transformed) = test_contents(
             &source_kind,
-            path.as_ref(),
+            path,
             &settings::Settings::for_rule(Rule::UnusedImport),
         );
         let linted_notebook = transformed.into_owned().expect_ipy_notebook();
