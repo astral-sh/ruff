@@ -150,7 +150,7 @@ pub struct CodeCell {
     /// Technically, id isn't required (it's not even present) in schema v4.0 through v4.4, but
     /// it's required in v4.5. Main issue is that pycharm creates notebooks without an id
     /// <https://youtrack.jetbrains.com/issue/PY-59438/Jupyter-notebooks-created-with-PyCharm-are-missing-the-id-field-in-cells-in-the-.ipynb-json>
-    #[serialize_always]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
     /// Cell-level metadata.
     pub metadata: Value,
