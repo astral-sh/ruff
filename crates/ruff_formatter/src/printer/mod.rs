@@ -141,6 +141,10 @@ impl<'a> Printer<'a> {
                 // Handled in `Document::propagate_expands()
             }
 
+            FormatElement::GroupMode { id, mode } => {
+                self.state.group_modes.insert_print_mode(*id, *mode);
+            }
+
             FormatElement::SourcePosition(position) => {
                 self.state.source_position = *position;
                 self.push_marker();
@@ -1217,6 +1221,10 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                 if self.state.has_line_suffix {
                     return Ok(Fits::No);
                 }
+            }
+
+            FormatElement::GroupMode { id, mode } => {
+                self.group_modes_mut().insert_print_mode(*id, *mode);
             }
 
             FormatElement::ExpandParent => {

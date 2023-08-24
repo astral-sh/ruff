@@ -211,80 +211,69 @@ assert (
 
 
 def test():
-    assert (
-        {
-            key1: value1,
-            key2: value2,
-            key3: value3,
-            key4: value4,
-            key5: value5,
-            key6: value6,
-            key7: value7,
-            key8: value8,
-            key9: value9,
-        }
-        == expected
-    ), "Not what we expected and the message is too long to fit ineeeeee one line"
+    assert {
+        key1: value1,
+        key2: value2,
+        key3: value3,
+        key4: value4,
+        key5: value5,
+        key6: value6,
+        key7: value7,
+        key8: value8,
+        key9: value9,
+    } == expected, (
+        "Not what we expected and the message is too long to fit ineeeeee one line"
+    )
 
-    assert (
-        {
-            key1: value1,
-            key2: value2,
-            key3: value3,
-            key4: value4,
-            key5: value5,
-            key6: value6,
-            key7: value7,
-            key8: value8,
-            key9: value9,
-        }
-        == expected
-    ), "Not what we expected and the message is too long to fit in one lineeeee"
+    assert {
+        key1: value1,
+        key2: value2,
+        key3: value3,
+        key4: value4,
+        key5: value5,
+        key6: value6,
+        key7: value7,
+        key8: value8,
+        key9: value9,
+    } == expected, (
+        "Not what we expected and the message is too long to fit in one lineeeee"
+    )
 
-    assert (
-        {
-            key1: value1,
-            key2: value2,
-            key3: value3,
-            key4: value4,
-            key5: value5,
-            key6: value6,
-            key7: value7,
-            key8: value8,
-            key9: value9,
-        }
-        == expected
-    ), "Not what we expected and the message is too long to fit in one lineeeeeeeeeeeee"
+    assert {
+        key1: value1,
+        key2: value2,
+        key3: value3,
+        key4: value4,
+        key5: value5,
+        key6: value6,
+        key7: value7,
+        key8: value8,
+        key9: value9,
+    } == expected, "Not what we expected and the message is too long to fit in one lineeeeeeeeeeeee"
 
-    assert (
-        {
-            key1: value1,
-            key2: value2,
-            key3: value3,
-            key4: value4,
-            key5: value5,
-            key6: value6,
-            key7: value7,
-            key8: value8,
-            key9: value9,
-        }
-        == expectedeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
-    ), "Not what we expected and the message is too long to fit in one lin"
+    assert {
+        key1: value1,
+        key2: value2,
+        key3: value3,
+        key4: value4,
+        key5: value5,
+        key6: value6,
+        key7: value7,
+        key8: value8,
+        key9: value9,
+    } == expectedeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee, "Not what we expected and the message is too long to fit in one lin"
 
-    assert (
-        {
-            key1: value1,
-            key2: value2,
-            key3: value3,
-            key4: value4,
-            key5: value5,
-            key6: value6,
-            key7: value7,
-            key8: value8,
-            key9: value9,
-        }
-        == expectedeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
-    ), "Not what we expected and the message is too long to fit in one lineeeeeeeeeeeeeeeee"
+    assert {
+        key1: value1,
+        key2: value2,
+        key3: value3,
+        key4: value4,
+        key5: value5,
+        key6: value6,
+        key7: value7,
+        key8: value8,
+        key9: value9,
+    } == expectedeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee, "Not what we expected and the message is too long to fit in one lineeeeeeeeeeeeeeeee"
 
     assert expected == {
         key1: value1,
@@ -298,20 +287,17 @@ def test():
         key9: value9,
     }, "Not what we expected and the message is too long to fit ineeeeee one line"
 
-    assert (
-        expected
-        == {
-            key1: value1,
-            key2: value2,
-            key3: value3,
-            key4: value4,
-            key5: value5,
-            key6: value6,
-            key7: value7,
-            key8: value8,
-            key9: value9,
-        }
-    ), "Not what we expected and the message is too long to fit in one lineeeeeeeeeeeeeeeeeeee"
+    assert expected == {
+        key1: value1,
+        key2: value2,
+        key3: value3,
+        key4: value4,
+        key5: value5,
+        key6: value6,
+        key7: value7,
+        key8: value8,
+        key9: value9,
+    }, "Not what we expected and the message is too long to fit in one lineeeeeeeeeeeeeeeeeeee"
 
     assert (
         expectedeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
@@ -326,22 +312,21 @@ def test():
             key8: value8,
             key9: value9,
         }
-    ), "Not what we expected and the message is too long to fit in one lin"
+    ), (
+        "Not what we expected and the message is too long to fit in one lin"
+    )
 
-    assert (
-        expectedeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
-        == {
-            key1: value1,
-            key2: value2,
-            key3: value3,
-            key4: value4,
-            key5: value5,
-            key6: value6,
-            key7: value7,
-            key8: value8,
-            key9: value9,
-        }
-    ), "Not what we expected and the message is too long to fit in one lineeeeeeeeeeeeeee"
+    assert expectedeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee == {
+        key1: value1,
+        key2: value2,
+        key3: value3,
+        key4: value4,
+        key5: value5,
+        key6: value6,
+        key7: value7,
+        key8: value8,
+        key9: value9,
+    }, "Not what we expected and the message is too long to fit in one lineeeeeeeeeeeeeee"
 
 
 # Test for https://github.com/astral-sh/ruff/issues/7246

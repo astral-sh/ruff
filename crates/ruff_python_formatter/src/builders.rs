@@ -1,4 +1,4 @@
-use ruff_formatter::{format_args, write, Argument, Arguments};
+use ruff_formatter::{format_args, write, Argument, Arguments, GroupId};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::context::{NodeLevel, WithNodeLevel};
@@ -12,11 +12,28 @@ where
 {
     ParenthesizeIfExpands {
         inner: Argument::new(content),
+        group_id: None,
+        should_expand: false,
     }
 }
 
 pub(crate) struct ParenthesizeIfExpands<'a, 'ast> {
     inner: Argument<'a, PyFormatContext<'ast>>,
+    group_id: Option<GroupId>,
+    should_expand: bool,
+}
+
+impl ParenthesizeIfExpands<'_, '_> {
+    #[must_use]
+    pub(crate) fn should_expand(mut self, expand: bool) -> Self {
+        self.should_expand = expand;
+        self
+    }
+
+    pub(crate) fn with_group_id(mut self, group_id: GroupId) -> Self {
+        self.group_id = Some(group_id);
+        self
+    }
 }
 
 impl<'ast> Format<PyFormatContext<'ast>> for ParenthesizeIfExpands<'_, 'ast> {
@@ -30,7 +47,9 @@ impl<'ast> Format<PyFormatContext<'ast>> for ParenthesizeIfExpands<'_, 'ast> {
                     if_group_breaks(&token("(")),
                     soft_block_indent(&Arguments::from(&self.inner)),
                     if_group_breaks(&token(")")),
-                ])]
+                ])
+                .with_group_id(self.group_id)
+                .should_expand(self.should_expand)]
             )
         }
     }

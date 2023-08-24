@@ -12,7 +12,7 @@ use ruff_python_ast::{Constant, Expr, ExpressionRef, Operator};
 use ruff_python_trivia::CommentRanges;
 
 use crate::builders::parenthesize_if_expands;
-use crate::comments::leading_comments;
+use crate::comments::{leading_comments, LeadingDanglingTrailingComments};
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::parentheses::{
     is_expression_parenthesized, optional_parentheses, parenthesized, NeedsParentheses,
@@ -179,6 +179,45 @@ pub(crate) struct MaybeParenthesizeExpression<'a> {
     parenthesize: Parenthesize,
 }
 
+impl MaybeParenthesizeExpression<'_> {
+    pub(crate) fn needs_parentheses(
+        &self,
+        context: &PyFormatContext,
+        node_comments: &LeadingDanglingTrailingComments,
+    ) -> OptionalParentheses {
+        let MaybeParenthesizeExpression {
+            expression,
+            parent,
+            parenthesize,
+        } = self;
+
+        let preserve_parentheses = parenthesize.is_optional()
+            && is_expression_parenthesized(
+                (*expression).into(),
+                context.comments().ranges(),
+                context.source(),
+            );
+
+        let has_comments = node_comments.has_leading() || node_comments.has_trailing_own_line();
+
+        // If the expression has comments, we always want to preserve the parentheses. This also
+        // ensures that we correctly handle parenthesized comments, and don't need to worry about
+        // them in the implementation below.
+        if preserve_parentheses || has_comments {
+            OptionalParentheses::Always
+        } else {
+            match expression.needs_parentheses(*parent, context) {
+                OptionalParentheses::Always => OptionalParentheses::Always,
+                // The reason to add parentheses is to avoid a syntax error when breaking an expression over multiple lines.
+                // Therefore, it is unnecessary to add an additional pair of parentheses if an outer expression
+                // is parenthesized.
+                _ if context.node_level().is_parenthesized() => OptionalParentheses::Never,
+                needs_parentheses => needs_parentheses,
+            }
+        }
+    }
+}
+
 impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let MaybeParenthesizeExpression {
@@ -188,34 +227,9 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
         } = self;
 
         let comments = f.context().comments();
-        let preserve_parentheses = parenthesize.is_optional()
-            && is_expression_parenthesized(
-                (*expression).into(),
-                f.context().comments().ranges(),
-                f.context().source(),
-            );
-
         let node_comments = comments.leading_dangling_trailing(*expression);
 
-        let has_comments = node_comments.has_leading() || node_comments.has_trailing_own_line();
-
-        // If the expression has comments, we always want to preserve the parentheses. This also
-        // ensures that we correctly handle parenthesized comments, and don't need to worry about
-        // them in the implementation below.
-        if preserve_parentheses || has_comments {
-            return expression.format().with_options(Parentheses::Always).fmt(f);
-        }
-
-        let needs_parentheses = match expression.needs_parentheses(*parent, f.context()) {
-            OptionalParentheses::Always => OptionalParentheses::Always,
-            // The reason to add parentheses is to avoid a syntax error when breaking an expression over multiple lines.
-            // Therefore, it is unnecessary to add an additional pair of parentheses if an outer expression
-            // is parenthesized.
-            _ if f.context().node_level().is_parenthesized() => OptionalParentheses::Never,
-            needs_parentheses => needs_parentheses,
-        };
-
-        match needs_parentheses {
+        match self.needs_parentheses(f.context(), &node_comments) {
             OptionalParentheses::Multiline => match parenthesize {
                 Parenthesize::IfBreaksOrIfRequired => {
                     parenthesize_if_expands(&expression.format().with_options(Parentheses::Never))
@@ -342,7 +356,7 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Expr {
 /// * The expression contains at least one parenthesized sub expression (optimization to avoid unnecessary work)
 ///
 /// This mimics Black's [`_maybe_split_omitting_optional_parens`](https://github.com/psf/black/blob/d1248ca9beaf0ba526d265f4108836d89cf551b7/src/black/linegen.py#L746-L820)
-fn can_omit_optional_parentheses(expr: &Expr, context: &PyFormatContext) -> bool {
+pub(crate) fn can_omit_optional_parentheses(expr: &Expr, context: &PyFormatContext) -> bool {
     let mut visitor = CanOmitOptionalParenthesesVisitor::new(context);
     visitor.visit_subexpression(expr);
 

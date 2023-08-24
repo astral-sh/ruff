@@ -1,5 +1,5 @@
 use ruff_formatter::prelude::tag::Condition;
-use ruff_formatter::{format_args, write, Argument, Arguments};
+use ruff_formatter::{format_args, write, Argument, Arguments, GroupId};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::ExpressionRef;
 use ruff_python_trivia::CommentRanges;
@@ -196,18 +196,29 @@ where
 {
     FormatOptionalParentheses {
         content: Argument::new(content),
+        group_id: None,
     }
 }
 
 pub(crate) struct FormatOptionalParentheses<'content, 'ast> {
     content: Argument<'content, PyFormatContext<'ast>>,
+    group_id: Option<GroupId>,
+}
+
+impl FormatOptionalParentheses<'_, '_> {
+    pub(crate) fn with_group_id(mut self, group_id: GroupId) -> Self {
+        self.group_id = Some(group_id);
+        self
+    }
 }
 
 impl<'ast> Format<PyFormatContext<'ast>> for FormatOptionalParentheses<'_, 'ast> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
         // The group id is used as a condition in [`in_parentheses_only_group`] to create a
         // conditional group that is only active if the optional parentheses group expands.
-        let parens_id = f.group_id("optional_parentheses");
+        let parens_id = self
+            .group_id
+            .unwrap_or_else(|| f.group_id("optional_parentheses"));
 
         let mut f = WithNodeLevel::new(NodeLevel::Expression(Some(parens_id)), f);
 
