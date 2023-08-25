@@ -2213,6 +2213,7 @@ dependencies = [
  "similar",
  "strum",
  "tempfile",
+ "test-case",
  "thiserror",
  "tikv-jemallocator",
  "tracing",
