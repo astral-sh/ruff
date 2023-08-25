@@ -666,7 +666,7 @@ print("after empty cells")
     fn test_no_cell_id() -> Result<()> {
         let path = "no_cell_id.ipynb".to_string();
         let source_notebook = read_jupyter_notebook(path.as_ref())?;
-        let source_kind = SourceKind::Jupyter(source_notebook);
+        let source_kind = SourceKind::IpyNotebook(source_notebook);
         let (_, transformed) = test_contents(
             &source_kind,
             path.as_ref(),

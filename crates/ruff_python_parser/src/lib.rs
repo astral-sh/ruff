@@ -313,7 +313,7 @@ impl AsMode for PySourceType {
     fn as_mode(&self) -> Mode {
         match self {
             PySourceType::Python | PySourceType::Stub => Mode::Module,
-            PySourceType::Jupyter => Mode::Jupyter,
+            PySourceType::Ipynb => Mode::Jupyter,
         }
     }
 }

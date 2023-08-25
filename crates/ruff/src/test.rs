@@ -69,7 +69,7 @@ pub(crate) fn test_notebook_path(
 ) -> Result<TestedNotebook> {
     let source_notebook = read_jupyter_notebook(path.as_ref())?;
 
-    let source_kind = SourceKind::Jupyter(source_notebook);
+    let source_kind = SourceKind::IpyNotebook(source_notebook);
     let (messages, transformed) = test_contents(&source_kind, path.as_ref(), settings);
     let expected_notebook = read_jupyter_notebook(expected.as_ref())?;
     let linted_notebook = transformed.into_owned().expect_jupyter();
