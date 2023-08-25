@@ -4,7 +4,7 @@ use ruff_python_ast::{Constant, Expr, ExprAttribute, ExprConstant, Ranged};
 use ruff_python_trivia::{find_only_token_in_range, SimpleTokenKind};
 use ruff_text_size::TextRange;
 
-use crate::comments::{dangling_comments, trailing_comments, SourceComment};
+use crate::comments::{dangling_comments, SourceComment};
 use crate::expression::parentheses::{
     is_expression_parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
 };
@@ -88,10 +88,10 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
             // (
             //      (
             //          a
-            //      )  # `before_dot_end_of_line`
-            //      # `before_dot_own_line`
-            //      .  # `after_dot_end_of_line`
-            //      # `after_dot_own_line`
+            //      )  # `before_dot`
+            //      # `before_dot`
+            //      .  # `after_dot`
+            //      # `after_dot`
             //      b
             // )
             // ```
@@ -110,24 +110,12 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
                 )
             };
 
-            let (before_dot_end_of_line, before_dot_own_line) = before_dot.split_at(
-                before_dot.partition_point(|comment| comment.line_position().is_end_of_line()),
-            );
-
-            let (after_dot_end_of_line, after_dot_own_line) = after_dot.split_at(
-                after_dot.partition_point(|comment| comment.line_position().is_end_of_line()),
-            );
-
             write!(
                 f,
                 [
-                    trailing_comments(before_dot_end_of_line),
-                    (!before_dot.is_empty()).then_some(hard_line_break()),
-                    dangling_comments(before_dot_own_line),
+                    dangling_comments(before_dot),
                     text("."),
-                    trailing_comments(after_dot_end_of_line),
-                    (!after_dot.is_empty()).then_some(hard_line_break()),
-                    dangling_comments(after_dot_own_line),
+                    dangling_comments(after_dot),
                     attr.format()
                 ]
             )

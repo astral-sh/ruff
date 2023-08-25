@@ -227,6 +227,7 @@ fn handle_enclosed_comment<'a>(
         }
         AnyNodeRef::StmtImportFrom(import_from) => handle_import_from_comment(comment, import_from),
         AnyNodeRef::StmtWith(with_) => handle_with_comment(comment, with_),
+        AnyNodeRef::ExprCall(_) => handle_call_comment(comment),
         AnyNodeRef::ExprConstant(_) => {
             if let Some(AnyNodeRef::ExprFString(fstring)) = comment.enclosing_parent() {
                 CommentPlacement::dangling(fstring, comment)
@@ -982,6 +983,29 @@ fn handle_dict_unpacking_comment<'a>(
     } else {
         CommentPlacement::Default(comment)
     }
+}
+
+/// Handle comments between a function call and its arguments. For example, attach the following as
+/// dangling on the call:
+/// ```python
+/// (
+///   func
+///   # dangling
+///   ()
+/// )
+/// ```
+fn handle_call_comment(comment: DecoratedComment) -> CommentPlacement {
+    if comment.line_position().is_own_line() {
+        if comment.preceding_node().is_some_and(|preceding| {
+            comment.following_node().is_some_and(|following| {
+                preceding.end() < comment.start() && comment.end() < following.start()
+            })
+        }) {
+            return CommentPlacement::dangling(comment.enclosing_node(), comment);
+        }
+    }
+
+    CommentPlacement::Default(comment)
 }
 
 /// Own line comments coming after the node are always dangling comments
