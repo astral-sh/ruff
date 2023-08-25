@@ -377,7 +377,7 @@ impl StringPrefix {
     }
 
     pub(super) const fn is_raw_string(self) -> bool {
-        matches!(self, StringPrefix::RAW | StringPrefix::RAW_UPPER)
+        self.contains(StringPrefix::RAW) || self.contains(StringPrefix::RAW_UPPER)
     }
 }
 
