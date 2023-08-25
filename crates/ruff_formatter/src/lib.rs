@@ -37,6 +37,7 @@ use crate::group_id::UniqueGroupIdBuilder;
 use crate::prelude::TagKind;
 use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
+use std::num::{NonZeroU16, NonZeroU8, TryFromIntError};
 
 use crate::format_element::document::Document;
 use crate::printer::{Printer, PrinterOptions, SourceMapGeneration};
@@ -51,7 +52,6 @@ pub use crate::diagnostics::{ActualStart, FormatError, InvalidDocumentError, Pri
 pub use format_element::{normalize_newlines, FormatElement, LINE_TERMINATORS};
 pub use group_id::GroupId;
 use ruff_text_size::{TextRange, TextSize};
-use std::num::{NonZeroU8, ParseIntError, TryFromIntError};
 use std::str::FromStr;
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Hash)]
@@ -135,92 +135,48 @@ impl TryFrom<u8> for TabWidth {
     }
 }
 
-/// Validated value for the `line_width` formatter options
-///
-/// The allowed range of values is 1..=320
+/// The maximum visual width to which the formatter should try to limit a line.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub struct LineWidth(u16);
+pub struct LineWidth(NonZeroU16);
 
 impl LineWidth {
-    /// Maximum allowed value for a valid [`LineWidth`]
-    pub const MAX: u16 = 320;
-
     /// Return the numeric value for this [`LineWidth`]
-    pub fn value(&self) -> u16 {
-        self.0
+    pub const fn value(&self) -> u16 {
+        self.0.get()
     }
 }
 
 impl Default for LineWidth {
     fn default() -> Self {
-        Self(80)
+        Self(NonZeroU16::new(80).unwrap())
     }
 }
-
-/// Error type returned when parsing a [`LineWidth`] from a string fails
-pub enum ParseLineWidthError {
-    /// The string could not be parsed as a valid [u16]
-    ParseError(ParseIntError),
-    /// The [u16] value of the string is not a valid [LineWidth]
-    TryFromIntError(LineWidthFromIntError),
-}
-
-impl Debug for ParseLineWidthError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Display::fmt(self, f)
-    }
-}
-
-impl std::fmt::Display for ParseLineWidthError {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ParseLineWidthError::ParseError(err) => std::fmt::Display::fmt(err, fmt),
-            ParseLineWidthError::TryFromIntError(err) => std::fmt::Display::fmt(err, fmt),
-        }
-    }
-}
-
-impl FromStr for LineWidth {
-    type Err = ParseLineWidthError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let value = u16::from_str(s).map_err(ParseLineWidthError::ParseError)?;
-        let value = Self::try_from(value).map_err(ParseLineWidthError::TryFromIntError)?;
-        Ok(value)
-    }
-}
-
-/// Error type returned when converting a u16 to a [`LineWidth`] fails
-#[derive(Clone, Copy, Debug)]
-pub struct LineWidthFromIntError(pub u16);
 
 impl TryFrom<u16> for LineWidth {
-    type Error = LineWidthFromIntError;
+    type Error = TryFromIntError;
 
-    fn try_from(value: u16) -> Result<Self, Self::Error> {
-        if value > 0 && value <= Self::MAX {
-            Ok(Self(value))
-        } else {
-            Err(LineWidthFromIntError(value))
-        }
-    }
-}
-
-impl std::fmt::Display for LineWidthFromIntError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "The line width exceeds the maximum value ({})",
-            LineWidth::MAX
-        )
+    fn try_from(value: u16) -> Result<LineWidth, Self::Error> {
+        NonZeroU16::try_from(value).map(LineWidth)
     }
 }
 
 impl From<LineWidth> for u16 {
     fn from(value: LineWidth) -> Self {
-        value.0
+        value.0.get()
+    }
+}
+
+impl From<LineWidth> for u32 {
+    fn from(value: LineWidth) -> Self {
+        u32::from(value.0.get())
+    }
+}
+
+impl From<NonZeroU16> for LineWidth {
+    fn from(value: NonZeroU16) -> Self {
+        Self(value)
     }
 }
 
@@ -312,7 +268,7 @@ impl FormatOptions for SimpleFormatOptions {
 
     fn as_print_options(&self) -> PrinterOptions {
         PrinterOptions {
-            print_width: self.line_width.into(),
+            line_width: self.line_width,
             indent_style: self.indent_style,
             source_map_generation: SourceMapGeneration::Enabled,
             ..PrinterOptions::default()
@@ -489,7 +445,7 @@ pub type FormatResult<F> = Result<F, FormatError>;
 /// Implementing `Format` for a custom struct
 ///
 /// ```
-/// use ruff_formatter::{format, write, IndentStyle, LineWidth};
+/// use ruff_formatter::{format, write, IndentStyle};
 /// use ruff_formatter::prelude::*;
 /// use ruff_text_size::TextSize;
 ///

@@ -62,5 +62,10 @@ pub(crate) fn line_too_long(line: &Line, settings: &Settings) -> Option<Diagnost
         &settings.task_tags,
         settings.tab_size,
     )
-    .map(|overlong| Diagnostic::new(LineTooLong(overlong.width(), limit.get()), overlong.range()))
+    .map(|overlong| {
+        Diagnostic::new(
+            LineTooLong(overlong.width(), limit.value() as usize),
+            overlong.range(),
+        )
+    })
 }

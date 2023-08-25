@@ -1,4 +1,5 @@
 use std::io;
+use std::num::NonZeroU16;
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
@@ -49,12 +50,8 @@ pub(crate) fn format(cli: &Arguments, overrides: &Overrides) -> Result<ExitStatu
             }
 
             let line_length = resolver.resolve(path, &pyproject_config).line_length;
-            // TODO(konstin): Unify `LineWidth` and `LineLength`
-            let line_width = LineWidth::try_from(
-                u16::try_from(line_length.get()).expect("Line shouldn't be larger than 2**16"),
-            )
-            .expect("Configured line length is too large for the formatter");
-            let options = PyFormatOptions::from_extension(path).with_line_width(line_width);
+            let options = PyFormatOptions::from_extension(path)
+                .with_line_width(LineWidth::from(NonZeroU16::from(line_length)));
 
             format_path(path, options)
         })

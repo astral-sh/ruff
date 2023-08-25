@@ -11,6 +11,7 @@ use ruff_python_literal::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
 use ruff_python_parser::{lexer, Mode, Tok};
+
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -396,7 +397,7 @@ pub(crate) fn f_strings(
         // """.format(0, 1) -> offset = 0
         // ```
         let offset = if idx == 0 { col_offset.to_usize() } else { 0 };
-        offset + line.chars().count() > line_length.get()
+        offset + line.chars().count() > line_length.value() as usize
     }) {
         return;
     }

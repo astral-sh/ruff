@@ -1194,7 +1194,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
 
             FormatElement::Tag(StartLineSuffix { reserved_width }) => {
                 self.state.line_width += reserved_width;
-                if self.state.line_width > self.options().print_width.into() {
+                if self.state.line_width > self.options().line_width.into() {
                     return Ok(Fits::No);
                 }
                 self.queue.skip_content(TagKind::LineSuffix);
@@ -1320,7 +1320,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
             self.state.line_width += char_width;
         }
 
-        if self.state.line_width > self.options().print_width.into() {
+        if self.state.line_width > self.options().line_width.into() {
             return Fits::No;
         }
 
@@ -1437,10 +1437,11 @@ impl From<BestFittingMode> for MeasureMode {
 #[cfg(test)]
 mod tests {
     use crate::prelude::*;
-    use crate::printer::{LineEnding, PrintWidth, Printer, PrinterOptions};
+    use crate::printer::{LineEnding, Printer, PrinterOptions};
     use crate::source_code::SourceCode;
     use crate::{
-        format_args, write, Document, FormatState, IndentStyle, Printed, TabWidth, VecBuffer,
+        format_args, write, Document, FormatState, IndentStyle, LineWidth, Printed, TabWidth,
+        VecBuffer,
     };
 
     fn format(root: &dyn Format<SimpleFormatContext>) -> Printed {
@@ -1592,7 +1593,7 @@ two lines`,
         let options = PrinterOptions {
             indent_style: IndentStyle::Tab,
             tab_width: TabWidth::try_from(4).unwrap(),
-            print_width: PrintWidth::new(19),
+            line_width: LineWidth::try_from(19).unwrap(),
             ..PrinterOptions::default()
         };
 
@@ -1697,7 +1698,7 @@ two lines`,
 
         let printed = Printer::new(
             SourceCode::default(),
-            PrinterOptions::default().with_print_width(PrintWidth::new(10)),
+            PrinterOptions::default().with_line_width(LineWidth::try_from(10).unwrap()),
         )
         .print(&document)
         .unwrap();
