@@ -9,6 +9,7 @@ use itertools::Itertools;
 use once_cell::sync::OnceCell;
 use serde::Serialize;
 use serde_json::error::Category;
+use uuid::Uuid;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_parser::lexer::lex;
@@ -156,7 +157,7 @@ impl Notebook {
                 TextRange::default(),
             )
         })?;
-        let raw_notebook: RawNotebook = match serde_json::from_reader(reader.by_ref()) {
+        let mut raw_notebook: RawNotebook = match serde_json::from_reader(reader.by_ref()) {
             Ok(notebook) => notebook,
             Err(err) => {
                 // Translate the error into a diagnostic
@@ -260,6 +261,23 @@ impl Notebook {
             current_offset += TextSize::of(&cell_contents) + TextSize::new(1);
             contents.push(cell_contents);
             cell_offsets.push(current_offset);
+        }
+
+        // Add cell ids to 4.5+ notebooks if they are missing
+        // https://github.com/astral-sh/ruff/issues/6834
+        // https://github.com/jupyter/enhancement-proposals/blob/master/62-cell-id/cell-id.md#required-field
+        if raw_notebook.nbformat == 4 && raw_notebook.nbformat_minor >= 5 {
+            for cell in &mut raw_notebook.cells {
+                let id = match cell {
+                    Cell::Code(cell) => &mut cell.id,
+                    Cell::Markdown(cell) => &mut cell.id,
+                    Cell::Raw(cell) => &mut cell.id,
+                };
+                if id.is_none() {
+                    // https://github.com/jupyter/enhancement-proposals/blob/master/62-cell-id/cell-id.md#questions
+                    *id = Some(Uuid::new_v4().to_string());
+                }
+            }
         }
 
         Ok(Self {
@@ -662,21 +680,27 @@ print("after empty cells")
         Ok(())
     }
 
-    #[test]
-    fn test_no_cell_id() -> Result<()> {
-        let path = "no_cell_id.ipynb".to_string();
-        let source_notebook = read_jupyter_notebook(path.as_ref())?;
+    // Version <4.5, don't emit cell ids
+    #[test_case(Path::new("no_cell_id.ipynb"), false; "no_cell_id")]
+    // Version 4.5, cell ids are missing and need to be added
+    #[test_case(Path::new("add_missing_cell_id.ipynb"), true; "add_missing_cell_id")]
+    fn test_cell_id(path: &Path, has_id: bool) -> Result<()> {
+        let source_notebook = read_jupyter_notebook(path)?;
         let source_kind = SourceKind::IpyNotebook(source_notebook);
         let (_, transformed) = test_contents(
             &source_kind,
-            path.as_ref(),
+            path,
             &settings::Settings::for_rule(Rule::UnusedImport),
         );
         let linted_notebook = transformed.into_owned().expect_ipy_notebook();
         let mut writer = Vec::new();
         linted_notebook.write_inner(&mut writer)?;
         let actual = String::from_utf8(writer)?;
-        assert!(!actual.contains(r#""id":"#));
+        if has_id {
+            assert!(actual.contains(r#""id": ""#));
+        } else {
+            assert!(!actual.contains(r#""id":"#));
+        }
         Ok(())
     }
 }
