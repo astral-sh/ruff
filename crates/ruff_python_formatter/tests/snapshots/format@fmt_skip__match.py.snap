@@ -116,11 +116,11 @@ def location(point):
     match point:
         case Point(x=0, y =0  ) :  # fmt: skip
             print("Origin is the point's location.")
-        case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+        case Point(x=0, y=y):
             print(f"Y={y} and the point is on the y-axis.")
-        case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+        case Point(x=x, y=0):
             print(f"X={x} and the point is on the x-axis.")
-        case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+        case Point():
             print("The point is located somewhere else on the plane.")
         case _:
             print("Not a point")
@@ -133,12 +133,9 @@ match points:
         Point(0, 0)
     ]:  # fmt: skip
         print("The origin is the only point in the list.")
-    case [NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0)]:
+    case [Point(x, y)]:
         print(f"A single point {x}, {y} is in the list.")
-    case [
-        NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0),
-        NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0),
-    ]:
+    case [Point(0, y1), Point(0, y2)]:
         print(f"Two points on the Y axis at {y1}, {y2} are in the list.")
     case _:
         print("Something else is found in the list.")
@@ -158,7 +155,7 @@ match test_variable:
 match point:
     case Point(x, y) if x   == y:  # fmt: skip
         print(f"The point is located on the diagonal Y=X at {x}.")
-    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+    case Point(x, y):
         print(f"Point is not on the diagonal.")
 ```
 

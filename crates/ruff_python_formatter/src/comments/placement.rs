@@ -180,15 +180,7 @@ fn handle_enclosed_comment<'a>(
         AnyNodeRef::Comprehension(comprehension) => {
             handle_comprehension_comment(comment, comprehension, locator)
         }
-        AnyNodeRef::PatternMatchSequence(pattern_match_sequence) => {
-            if SequenceType::from_pattern(pattern_match_sequence, locator.contents())
-                .is_parenthesized()
-            {
-                handle_bracketed_end_of_line_comment(comment, locator)
-            } else {
-                CommentPlacement::Default(comment)
-            }
-        }
+
         AnyNodeRef::ExprAttribute(attribute) => {
             handle_attribute_comment(comment, attribute, locator)
         }
@@ -219,6 +211,18 @@ fn handle_enclosed_comment<'a>(
             handle_module_level_own_line_comment_before_class_or_function_comment(comment, locator)
         }
         AnyNodeRef::WithItem(_) => handle_with_item_comment(comment, locator),
+        AnyNodeRef::PatternMatchSequence(pattern_match_sequence) => {
+            if SequenceType::from_pattern(pattern_match_sequence, locator.contents())
+                .is_parenthesized()
+            {
+                handle_bracketed_end_of_line_comment(comment, locator)
+            } else {
+                CommentPlacement::Default(comment)
+            }
+        }
+        AnyNodeRef::PatternMatchClass(class) => {
+            handle_pattern_match_class_comment(comment, class, locator)
+        }
         AnyNodeRef::PatternMatchAs(_) => handle_pattern_match_as_comment(comment, locator),
         AnyNodeRef::PatternMatchStar(_) => handle_pattern_match_star_comment(comment),
         AnyNodeRef::PatternMatchMapping(pattern) => {
@@ -1227,6 +1231,77 @@ fn handle_with_item_comment<'a>(
     } else {
         CommentPlacement::leading(optional_vars, comment)
     }
+}
+
+/// Handles trailing comments after the `as` keyword of a pattern match item:
+///
+/// ```python
+/// case (
+///     Pattern
+///     # dangling
+///     (  # dangling
+///         # dangling
+///     )
+/// ): ...
+/// ```
+fn handle_pattern_match_class_comment<'a>(
+    comment: DecoratedComment<'a>,
+    class: &'a ast::PatternMatchClass,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    // Find the open parentheses on the arguments.
+    let Some(left_paren) = SimpleTokenizer::starts_at(class.cls.end(), locator.contents())
+        .skip_trivia()
+        .find(|token| token.kind == SimpleTokenKind::LParen)
+    else {
+        return CommentPlacement::Default(comment);
+    };
+
+    // If the comment appears before the open parenthesis, it's dangling:
+    // ```python
+    // case (
+    //     Pattern
+    //     # dangling
+    //     (...)
+    // ): ...
+    // ```
+    if comment.end() < left_paren.start() {
+        return CommentPlacement::dangling(comment.enclosing_node(), comment);
+    }
+
+    let Some(first_item) = class
+        .patterns
+        .first()
+        .map(Ranged::start)
+        .or_else(|| class.kwd_attrs.first().map(Ranged::start))
+    else {
+        // If there are no items, then the comment must be dangling:
+        // ```python
+        // case (
+        //     Pattern(
+        //         # dangling
+        //     )
+        // ): ...
+        // ```
+        return CommentPlacement::dangling(comment.enclosing_node(), comment);
+    };
+
+    // If the comment appears before the first item or its parentheses, then it's dangling:
+    // ```python
+    // case (
+    //     Pattern(  # dangling
+    //         0,
+    //         0,
+    //     )
+    // ): ...
+    // ```
+    if comment.line_position().is_end_of_line() {
+        if comment.end() < first_item {
+            return CommentPlacement::dangling(comment.enclosing_node(), comment);
+        }
+    }
+
+    CommentPlacement::Default(comment)
 }
 
 /// Handles trailing comments after the `as` keyword of a pattern match item:
