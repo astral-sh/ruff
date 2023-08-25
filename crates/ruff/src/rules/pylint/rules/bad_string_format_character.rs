@@ -63,13 +63,14 @@ pub(crate) fn call(checker: &mut Checker, string: &str, range: TextRange) {
                     ));
                 }
                 Err(_) => {}
-                Ok(format_spec) => {
-                    for replacement in format_spec.replacements() {
-                        let FormatPart::Field { format_spec, .. } = replacement else {
+                Ok(FormatSpec::Static(_)) => {}
+                Ok(FormatSpec::Dynamic(format_spec)) => {
+                    for placeholder in format_spec.placeholders {
+                        let FormatPart::Field { format_spec, .. } = placeholder else {
                             continue;
                         };
                         if let Err(FormatSpecError::InvalidFormatType) =
-                            FormatSpec::parse(format_spec)
+                            FormatSpec::parse(&format_spec)
                         {
                             checker.diagnostics.push(Diagnostic::new(
                                 BadStringFormatCharacter {
