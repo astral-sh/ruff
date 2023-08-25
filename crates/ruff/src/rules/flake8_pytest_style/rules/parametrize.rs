@@ -24,8 +24,8 @@ use super::helpers::{is_pytest_parametrize, split_names};
 /// ## Why is this bad?
 /// The `argnames` argument of `pytest.mark.parametrize` takes a string or
 /// a sequence of strings. For a single parameter, it's preferable to use a
-/// string, and for multiple parameters, it's preferable to use the style
-/// configured via the `flake8-pytest-style.parametrize-names-type` setting.
+/// string. For multiple parameters, it's preferable to use the style
+/// configured via the [`flake8-pytest-style.parametrize-names-type`] setting.
 ///
 /// ## Example
 /// ```python
@@ -95,10 +95,28 @@ impl Violation for PytestParametrizeNamesWrongType {
 ///
 /// ## Why is this bad?
 /// The `argvalues` argument of `pytest.mark.parametrize` takes an iterator of
-/// parameter values. For a single parameter, it's preferable to use a list,
-/// and for multiple parameters, it's preferable to use a list of rows with
-/// the type configured via the `flake8-pytest-style.parametrize-values-row-type`
-/// setting.
+/// parameter values, which can be provided as lists or tuples.
+///
+/// To aid in readability, it's recommended to use a consistent style for the
+/// list of values rows, and, in the case of multiple parameters, for each row
+/// of values.
+///
+/// The style for the list of values rows can be configured via the
+/// the [`flake8-pytest-style.parametrize-values-type`] setting, while the
+/// style for each row of values can be configured via the
+/// the [`flake8-pytest-style.parametrize-values-row-type`] setting.
+///
+/// For example, [`flake8-pytest-style.parametrize-values-type`] will lead to
+/// the following expectations:
+///
+/// - `tuple`: `@pytest.mark.parametrize("value", ("a", "b", "c"))`
+/// - `list`: `@pytest.mark.parametrize("value", ["a", "b", "c"])`
+///
+/// Similarly, [`flake8-pytest-style.parametrize-values-row-type`] will lead to
+/// the following expectations:
+///
+/// - `tuple`: `@pytest.mark.parametrize(("key", "value"), [("a", "b"), ("c", "d")])`
+/// - `list`: `@pytest.mark.parametrize(("key", "value"), [["a", "b"], ["c", "d"]])`
 ///
 /// ## Example
 /// ```python
@@ -151,6 +169,7 @@ impl Violation for PytestParametrizeNamesWrongType {
 /// ```
 ///
 /// ## Options
+/// - `flake8-pytest-style.parametrize-values-type`
 /// - `flake8-pytest-style.parametrize-values-row-type`
 ///
 /// ## References
