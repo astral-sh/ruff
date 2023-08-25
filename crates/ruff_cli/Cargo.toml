@@ -24,6 +24,7 @@ doc = false
 ruff = { path = "../ruff", features = ["clap"] }
 ruff_cache = { path = "../ruff_cache" }
 ruff_diagnostics = { path = "../ruff_diagnostics" }
+ruff_formatter = { path = "../ruff_formatter" }
 ruff_macros = { path = "../ruff_macros" }
 ruff_python_ast = { path = "../ruff_python_ast" }
 ruff_python_formatter = { path = "../ruff_python_formatter" }
@@ -59,6 +60,8 @@ serde_json = { workspace = true }
 shellexpand = { workspace = true }
 similar = { workspace = true }
 strum = { workspace = true, features = [] }
+thiserror = { workspace = true }
+tracing = { workspace = true }
 walkdir = { version = "2.3.2" }
 wild = { version = "2" }
 
