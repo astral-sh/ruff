@@ -59,3 +59,35 @@ def f() -> None:
     x = Union["str", "int"]
     x: Union[str, int]
     x: Union["str", "int"]
+
+
+def f(x: Union[int : float]) -> None:
+    ...
+
+
+def f(x: Union[str, int : float]) -> None:
+    ...
+
+
+def f(x: Union[x := int]) -> None:
+    ...
+
+
+def f(x: Union[str, x := int]) -> None:
+    ...
+
+
+def f(x: Union[lambda: int]) -> None:
+    ...
+
+
+def f(x: Union[str, lambda: int]) -> None:
+    ...
+
+
+def f(x: Optional[int : float]) -> None:
+    ...
+
+
+def f(x: Optional[str, int : float]) -> None:
+    ...
