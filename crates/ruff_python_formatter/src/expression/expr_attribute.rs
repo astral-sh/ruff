@@ -153,6 +153,8 @@ impl NeedsParentheses for ExprAttribute {
             OptionalParentheses::Multiline
         } else if context.comments().has_dangling(self) {
             OptionalParentheses::Always
+        } else if self.value.is_name_expr() {
+            OptionalParentheses::BestFit
         } else {
             self.value.needs_parentheses(self.into(), context)
         }
