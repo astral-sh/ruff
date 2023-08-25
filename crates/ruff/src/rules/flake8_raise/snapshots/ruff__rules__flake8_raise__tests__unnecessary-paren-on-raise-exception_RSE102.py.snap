@@ -179,4 +179,80 @@ RSE102.py:37:16: RSE102 [*] Unnecessary parentheses on raised exception
 41 39 | # OK
 42 40 | raise AssertionError
 
+RSE102.py:74:17: RSE102 [*] Unnecessary parentheses on raised exception
+   |
+73 | # RSE102
+74 | raise IndexError()from ZeroDivisionError
+   |                 ^^ RSE102
+75 | 
+76 | raise IndexError()\
+   |
+   = help: Remove unnecessary parentheses
+
+ℹ Fix
+71 71 | 
+72 72 | 
+73 73 | # RSE102
+74    |-raise IndexError()from ZeroDivisionError
+   74 |+raise IndexError from ZeroDivisionError
+75 75 | 
+76 76 | raise IndexError()\
+77 77 | from ZeroDivisionError
+
+RSE102.py:76:17: RSE102 [*] Unnecessary parentheses on raised exception
+   |
+74 | raise IndexError()from ZeroDivisionError
+75 | 
+76 | raise IndexError()\
+   |                 ^^ RSE102
+77 | from ZeroDivisionError
+   |
+   = help: Remove unnecessary parentheses
+
+ℹ Fix
+73 73 | # RSE102
+74 74 | raise IndexError()from ZeroDivisionError
+75 75 | 
+76    |-raise IndexError()\
+   76 |+raise IndexError\
+77 77 | from ZeroDivisionError
+78 78 | 
+79 79 | raise IndexError() from ZeroDivisionError
+
+RSE102.py:79:17: RSE102 [*] Unnecessary parentheses on raised exception
+   |
+77 | from ZeroDivisionError
+78 | 
+79 | raise IndexError() from ZeroDivisionError
+   |                 ^^ RSE102
+80 | 
+81 | raise IndexError();
+   |
+   = help: Remove unnecessary parentheses
+
+ℹ Fix
+76 76 | raise IndexError()\
+77 77 | from ZeroDivisionError
+78 78 | 
+79    |-raise IndexError() from ZeroDivisionError
+   79 |+raise IndexError from ZeroDivisionError
+80 80 | 
+81 81 | raise IndexError();
+
+RSE102.py:81:17: RSE102 [*] Unnecessary parentheses on raised exception
+   |
+79 | raise IndexError() from ZeroDivisionError
+80 | 
+81 | raise IndexError();
+   |                 ^^ RSE102
+   |
+   = help: Remove unnecessary parentheses
+
+ℹ Fix
+78 78 | 
+79 79 | raise IndexError() from ZeroDivisionError
+80 80 | 
+81    |-raise IndexError();
+   81 |+raise IndexError;
+
 
