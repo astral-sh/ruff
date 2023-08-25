@@ -252,33 +252,23 @@ self.assertEqual(
 
 def test():
     return (
-        (
-            "((TIME_TO_SEC(%(lhs)s) * 1000000 + MICROSECOND(%(lhs)s)) -"
-            " (TIME_TO_SEC(%(rhs)s) * 1000000 + MICROSECOND(%(rhs)s)))"
-        ) % {"lhs": lhs_sql, "rhs": rhs_sql},
-        tuple(lhs_params) * 2 + tuple(rhs_params) * 2,
-    )
+        "((TIME_TO_SEC(%(lhs)s) * 1000000 + MICROSECOND(%(lhs)s)) -"
+        " (TIME_TO_SEC(%(rhs)s) * 1000000 + MICROSECOND(%(rhs)s)))"
+    ) % {"lhs": lhs_sql, "rhs": rhs_sql}, tuple(lhs_params) * 2 + tuple(rhs_params) * 2
 
 
 def test2():
-    return (
-        "RETURNING %s INTO %s"
-        % (
-            ", ".join(field_names),
-            ", ".join(["%s"] * len(params)),
-        ),
-        tuple(params),
-    )
+    return "RETURNING %s INTO %s" % (
+        ", ".join(field_names),
+        ", ".join(["%s"] * len(params)),
+    ), tuple(params)
 
 
 def test3():
     return (
-        (
-            "(CASE WHEN JSON_TYPE(%s, %%s) IN (%s) "
-            "THEN JSON_TYPE(%s, %%s) ELSE JSON_EXTRACT(%s, %%s) END)"
-        ) % (lhs, datatype_values, lhs, lhs),
-        (tuple(params) + (json_path,)) * 3,
-    )
+        "(CASE WHEN JSON_TYPE(%s, %%s) IN (%s) "
+        "THEN JSON_TYPE(%s, %%s) ELSE JSON_EXTRACT(%s, %%s) END)"
+    ) % (lhs, datatype_values, lhs, lhs), (tuple(params) + (json_path,)) * 3
 ```
 
 

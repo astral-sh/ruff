@@ -1,0 +1,44 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/return.py
+---
+## Input
+```py
+
+return len(self.nodeseeeeeeeee), sum(
+    len(node.parents) for node in self.node_map.values()
+)
+
+
+return len(self.nodeseeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee), sum(
+    len(node.parents) for node in self.node_map.values()
+)
+
+
+return (
+    len(self.nodeseeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee), sum(
+    len(node.parents) for node in self.node_map.values()
+    )
+)
+```
+
+## Output
+```py
+return len(self.nodeseeeeeeeee), sum(
+    len(node.parents) for node in self.node_map.values()
+)
+
+
+return len(
+    self.nodeseeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+), sum(len(node.parents) for node in self.node_map.values())
+
+
+return (
+    len(self.nodeseeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee),
+    sum(len(node.parents) for node in self.node_map.values()),
+)
+```
+
+
+
