@@ -1,9 +1,8 @@
-use crate::prelude::*;
 use ruff_formatter::{format_args, write};
 use ruff_python_ast::StmtImport;
 
 use crate::comments::{SourceComment, SuppressionKind};
-use crate::FormatNodeRule;
+use crate::prelude::*;
 
 #[derive(Default)]
 pub struct FormatStmtImport;

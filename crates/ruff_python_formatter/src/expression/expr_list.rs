@@ -1,13 +1,12 @@
-use crate::comments::SourceComment;
 use ruff_formatter::prelude::format_with;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{ExprList, Ranged};
 
+use crate::comments::SourceComment;
 use crate::expression::parentheses::{
     empty_parenthesized, parenthesized, NeedsParentheses, OptionalParentheses,
 };
 use crate::prelude::*;
-use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatExprList;

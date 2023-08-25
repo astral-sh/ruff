@@ -1,13 +1,13 @@
-use super::string::{AnyString, FormatString};
-use crate::context::PyFormatContext;
 use memchr::memchr2;
 
-use crate::expression::parentheses::{should_use_best_fit, NeedsParentheses, OptionalParentheses};
-use crate::prelude::*;
-use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::FormatResult;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::ExprFString;
+
+use crate::expression::parentheses::{should_use_best_fit, NeedsParentheses, OptionalParentheses};
+use crate::prelude::*;
+
+use super::string::{AnyString, FormatString};
 
 #[derive(Default)]
 pub struct FormatExprFString;

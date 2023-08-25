@@ -6,7 +6,6 @@ use crate::builders::{parenthesize_if_expands, PyFormatterExtensions, TrailingCo
 use crate::comments::{SourceComment, SuppressionKind};
 use crate::expression::parentheses::parenthesized;
 use crate::prelude::*;
-use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatStmtImportFrom;

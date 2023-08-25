@@ -1,9 +1,3 @@
-use crate::comments::{
-    leading_alternate_branch_comments, trailing_comments, SourceComment, SuppressionKind,
-};
-use crate::prelude::*;
-use crate::statement::suite::{contains_only_an_ellipsis, SuiteKind};
-use crate::verbatim::write_suppressed_clause_header;
 use ruff_formatter::{write, Argument, Arguments, FormatError};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{
@@ -12,6 +6,13 @@ use ruff_python_ast::{
 };
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{TextRange, TextSize};
+
+use crate::comments::{
+    leading_alternate_branch_comments, trailing_comments, SourceComment, SuppressionKind,
+};
+use crate::prelude::*;
+use crate::statement::suite::{contains_only_an_ellipsis, SuiteKind};
+use crate::verbatim::write_suppressed_clause_header;
 
 /// The header of a compound statement clause.
 ///

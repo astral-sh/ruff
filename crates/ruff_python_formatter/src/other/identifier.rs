@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use crate::AsFormat;
+
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule};
 use ruff_python_ast::{Identifier, Ranged};
 

@@ -1,4 +1,4 @@
-use ruff_formatter::{write, Buffer, FormatResult};
+use ruff_formatter::write;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::PatternMatchStar;
 

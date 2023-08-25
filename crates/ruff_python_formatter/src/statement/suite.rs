@@ -1,4 +1,3 @@
-use crate::comments::{leading_comments, trailing_comments, Comments};
 use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
 use ruff_python_ast::helpers::is_compound_statement;
 use ruff_python_ast::node::AnyNodeRef;
@@ -6,6 +5,7 @@ use ruff_python_ast::{self as ast, Constant, Expr, ExprConstant, Ranged, Stmt, S
 use ruff_python_trivia::{lines_after_ignoring_trivia, lines_before};
 use ruff_text_size::TextRange;
 
+use crate::comments::{leading_comments, trailing_comments, Comments};
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::expr_constant::ExprConstantLayout;
 use crate::expression::string::StringLayout;

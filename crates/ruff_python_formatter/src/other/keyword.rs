@@ -1,7 +1,7 @@
-use crate::prelude::*;
-use crate::FormatNodeRule;
 use ruff_formatter::write;
 use ruff_python_ast::Keyword;
+
+use crate::prelude::*;
 
 #[derive(Default)]
 pub struct FormatKeyword;

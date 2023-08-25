@@ -1,9 +1,8 @@
-use crate::prelude::*;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{Constant, PatternMatchSingleton};
 
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
-use crate::{FormatNodeRule, PyFormatter};
+use crate::prelude::*;
 
 #[derive(Default)]
 pub struct FormatPatternMatchSingleton;

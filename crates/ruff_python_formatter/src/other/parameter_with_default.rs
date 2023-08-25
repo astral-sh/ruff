@@ -2,7 +2,6 @@ use ruff_formatter::write;
 use ruff_python_ast::ParameterWithDefault;
 
 use crate::prelude::*;
-use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatParameterWithDefault;
