@@ -65,17 +65,15 @@ match match(
 ```diff
 --- Black
 +++ Ruff
-@@ -2,7 +2,8 @@
-     case b():
-         print(1 + 1)
-     case c(
--        very_complex=True, perhaps_even_loooooooooooooooooooooooooooooooooooooong=-1
-+        very_complex=True,
-+        perhaps_even_loooooooooooooooooooooooooooooooooooooong=-1,
+@@ -6,30 +6,35 @@
      ):
          print(1)
      case c(
-@@ -13,20 +14,26 @@
+-        very_complex=True,
+-        perhaps_even_loooooooooooooooooooooooooooooooooooooong=-1,
++        very_complex=True, perhaps_even_loooooooooooooooooooooooooooooooooooooong=-1
+     ):
+         print(2)
      case a:
          pass
  
@@ -105,6 +103,10 @@ match match(
  re.match()
  match match():
      case case(
+-        arg,  # comment
++        arg  # comment
+     ):
+         pass
 ```
 
 ## Ruff Output
@@ -114,13 +116,11 @@ match something:
     case b():
         print(1 + 1)
     case c(
-        very_complex=True,
-        perhaps_even_loooooooooooooooooooooooooooooooooooooong=-1,
+        very_complex=True, perhaps_even_loooooooooooooooooooooooooooooooooooooong=-1
     ):
         print(1)
     case c(
-        very_complex=True,
-        perhaps_even_loooooooooooooooooooooooooooooooooooooong=-1,
+        very_complex=True, perhaps_even_loooooooooooooooooooooooooooooooooooooong=-1
     ):
         print(2)
     case a:
@@ -149,7 +149,7 @@ re.match(
 re.match()
 match match():
     case case(
-        arg,  # comment
+        arg  # comment
     ):
         pass
 ```

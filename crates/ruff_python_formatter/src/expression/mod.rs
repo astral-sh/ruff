@@ -1,7 +1,8 @@
+use itertools::Itertools;
 use std::cmp::Ordering;
 
 use ruff_formatter::{
-    write, FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions,
+    format_args, write, FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions,
 };
 use ruff_python_ast as ast;
 use ruff_python_ast::node::AnyNodeRef;
@@ -9,6 +10,7 @@ use ruff_python_ast::visitor::preorder::{walk_expr, PreorderVisitor};
 use ruff_python_ast::{Expr, ExpressionRef, Operator};
 
 use crate::builders::parenthesize_if_expands;
+use crate::comments::leading_comments;
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::parentheses::{
     is_expression_parenthesized, optional_parentheses, parenthesized, NeedsParentheses,
@@ -107,8 +109,6 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
         };
 
         if parenthesize {
-            let comments = f.context().comments().clone();
-
             // Any comments on the open parenthesis of a `node`.
             //
             // For example, `# comment` in:
@@ -117,18 +117,23 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             //    foo.bar
             // )
             // ```
-            let open_parenthesis_comment = comments
-                .leading(expression)
-                .first()
-                .filter(|comment| comment.line_position().is_end_of_line());
-
-            parenthesized("(", &format_expr, ")")
-                .with_dangling_comments(
-                    open_parenthesis_comment
-                        .map(std::slice::from_ref)
-                        .unwrap_or_default(),
+            let comments = f.context().comments().clone();
+            let leading = comments.leading(expression);
+            if let Some((index, open_parenthesis_comment)) = leading
+                .iter()
+                .find_position(|comment| comment.line_position().is_end_of_line())
+            {
+                write!(
+                    f,
+                    [
+                        leading_comments(&leading[..index]),
+                        parenthesized("(", &format_expr, ")")
+                            .with_dangling_comments(std::slice::from_ref(open_parenthesis_comment))
+                    ]
                 )
-                .fmt(f)
+            } else {
+                parenthesized("(", &format_expr, ")").fmt(f)
+            }
         } else {
             let level = match f.context().node_level() {
                 NodeLevel::TopLevel | NodeLevel::CompoundStatement => NodeLevel::Expression(None),
@@ -220,6 +225,64 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                     }
                 }
             },
+            OptionalParentheses::BestFit => match parenthesize {
+                Parenthesize::IfBreaksOrIfRequired => {
+                    parenthesize_if_expands(&expression.format().with_options(Parentheses::Never))
+                        .fmt(f)
+                }
+
+                Parenthesize::Optional | Parenthesize::IfRequired => {
+                    expression.format().with_options(Parentheses::Never).fmt(f)
+                }
+                Parenthesize::IfBreaks => {
+                    let group_id = f.group_id("optional_parentheses");
+                    let f = &mut WithNodeLevel::new(NodeLevel::Expression(Some(group_id)), f);
+                    let mut format_expression = expression
+                        .format()
+                        .with_options(Parentheses::Never)
+                        .memoized();
+
+                    // Don't use best fitting if it is known that the expression can never fit
+                    if format_expression.inspect(f)?.will_break() {
+                        // The group here is necessary because `format_expression` may contain IR elements
+                        // that refer to the group id
+                        group(&format_expression)
+                            .with_group_id(Some(group_id))
+                            .should_expand(true)
+                            .fmt(f)
+                    } else {
+                        // Only add parentheses if it makes the expression fit on the line.
+                        // Using the flat version as the most expanded version gives a left-to-right splitting behavior
+                        // which differs from when using regular groups, because they split right-to-left.
+                        best_fitting![
+                            // ---------------------------------------------------------------------
+                            // Variant 1:
+                            // Try to fit the expression without any parentheses
+                            group(&format_expression).with_group_id(Some(group_id)),
+                            // ---------------------------------------------------------------------
+                            // Variant 2:
+                            // Try to fit the expression by adding parentheses and indenting the expression.
+                            group(&format_args![
+                                text("("),
+                                soft_block_indent(&format_expression),
+                                text(")")
+                            ])
+                            .with_group_id(Some(group_id))
+                            .should_expand(true),
+                            // ---------------------------------------------------------------------
+                            // Variant 3: Fallback, no parentheses
+                            // Expression doesn't fit regardless of adding the parentheses. Remove the parentheses again.
+                            group(&format_expression)
+                                .with_group_id(Some(group_id))
+                                .should_expand(true)
+                        ]
+                        // Measure all lines, to avoid that the printer decides that this fits right after hitting
+                        // the `(`.
+                        .with_mode(BestFittingMode::AllLines)
+                        .fmt(f)
+                    }
+                }
+            },
             OptionalParentheses::Never => match parenthesize {
                 Parenthesize::IfBreaksOrIfRequired => {
                     parenthesize_if_expands(&expression.format().with_options(Parentheses::Never))
@@ -230,6 +293,7 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                     expression.format().with_options(Parentheses::Never).fmt(f)
                 }
             },
+
             OptionalParentheses::Always => {
                 expression.format().with_options(Parentheses::Always).fmt(f)
             }

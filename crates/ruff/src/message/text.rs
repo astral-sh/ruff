@@ -11,7 +11,7 @@ use ruff_source_file::{OneIndexed, SourceLocation};
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::fs::relativize_path;
-use crate::jupyter::{JupyterIndex, Notebook};
+use crate::jupyter::{Notebook, NotebookIndex};
 use crate::line_width::{LineWidth, TabSize};
 use crate::message::diff::Diff;
 use crate::message::{Emitter, EmitterContext, Message};
@@ -161,7 +161,7 @@ impl Display for RuleCodeAndBody<'_> {
 
 pub(super) struct MessageCodeFrame<'a> {
     pub(crate) message: &'a Message,
-    pub(crate) jupyter_index: Option<&'a JupyterIndex>,
+    pub(crate) jupyter_index: Option<&'a NotebookIndex>,
 }
 
 impl Display for MessageCodeFrame<'_> {

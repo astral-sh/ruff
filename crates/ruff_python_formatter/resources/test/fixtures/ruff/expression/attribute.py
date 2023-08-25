@@ -109,3 +109,19 @@ x6 = (
 # regression: https://github.com/astral-sh/ruff/issues/6181
 (#
 ()).a
+
+(
+    (
+        a # trailing end-of-line
+        # trailing own-line
+    ) # dangling before dot end-of-line
+    .b # trailing end-of-line
+)
+
+(
+    (
+        a
+    )
+            # dangling before dot own-line
+    .b
+)

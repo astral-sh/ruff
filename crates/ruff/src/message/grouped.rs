@@ -7,7 +7,7 @@ use colored::Colorize;
 use ruff_source_file::OneIndexed;
 
 use crate::fs::relativize_path;
-use crate::jupyter::{JupyterIndex, Notebook};
+use crate::jupyter::{Notebook, NotebookIndex};
 use crate::message::diff::calculate_print_width;
 use crate::message::text::{MessageCodeFrame, RuleCodeAndBody};
 use crate::message::{
@@ -92,7 +92,7 @@ struct DisplayGroupedMessage<'a> {
     show_source: bool,
     row_length: NonZeroUsize,
     column_length: NonZeroUsize,
-    jupyter_index: Option<&'a JupyterIndex>,
+    jupyter_index: Option<&'a NotebookIndex>,
 }
 
 impl Display for DisplayGroupedMessage<'_> {

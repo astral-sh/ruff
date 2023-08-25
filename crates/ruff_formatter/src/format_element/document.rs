@@ -122,8 +122,12 @@ impl Document {
             expands
         }
 
-        let mut enclosing: Vec<Enclosing> = Vec::new();
-        let mut interned: FxHashMap<&Interned, bool> = FxHashMap::default();
+        let mut enclosing = Vec::with_capacity(if self.is_empty() {
+            0
+        } else {
+            self.len().ilog2() as usize
+        });
+        let mut interned = FxHashMap::default();
         propagate_expands(self, &mut enclosing, &mut interned);
     }
 
@@ -657,18 +661,17 @@ impl Format<IrFormatContext<'_>> for ContentArrayEnd {
 
 impl FormatElements for [FormatElement] {
     fn will_break(&self) -> bool {
-        use Tag::{EndLineSuffix, StartLineSuffix};
         let mut ignore_depth = 0usize;
 
         for element in self {
             match element {
                 // Line suffix
                 // Ignore if any of its content breaks
-                FormatElement::Tag(StartLineSuffix) => {
+                FormatElement::Tag(Tag::StartLineSuffix | Tag::StartFitsExpanded(_)) => {
                     ignore_depth += 1;
                 }
-                FormatElement::Tag(EndLineSuffix) => {
-                    ignore_depth -= 1;
+                FormatElement::Tag(Tag::EndLineSuffix | Tag::EndFitsExpanded) => {
+                    ignore_depth = ignore_depth.saturating_sub(1);
                 }
                 FormatElement::Interned(interned) if ignore_depth == 0 => {
                     if interned.will_break() {

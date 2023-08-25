@@ -3,7 +3,7 @@ use ruff_python_ast::{ExprUnaryOp, Ranged};
 use ruff_text_size::{TextLen, TextRange};
 
 use ruff_formatter::prelude::{hard_line_break, space, text};
-use ruff_formatter::{Format, FormatContext, FormatResult};
+use ruff_formatter::{Format, FormatResult};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 
@@ -57,7 +57,7 @@ impl FormatNodeRule<ExprUnaryOp> for FormatExprUnaryOp {
         //  a)
         // ```
         if !leading_operand_comments.is_empty()
-            && !is_operand_parenthesized(item, f.context().source_code().as_str())
+            && !is_operand_parenthesized(item, f.context().source())
         {
             hard_line_break().fmt(f)?;
         } else if op.is_not() {

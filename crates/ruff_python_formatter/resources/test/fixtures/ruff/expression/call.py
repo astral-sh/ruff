@@ -164,3 +164,44 @@ func(
         []
     )
 )
+
+# Comments between the function and its arguments
+aaa = (
+    bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    # awkward comment
+    ()
+    .bbbbbbbbbbbbbbbb
+)
+
+aaa = (
+    # bar
+    bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    # awkward comment
+    ()
+    .bbbbbbbbbbbbbbbb
+)
+
+
+aaa = (
+    # bar
+    bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb # baz
+    # awkward comment
+    ()
+    .bbbbbbbbbbbbbbbb
+)
+
+aaa = (
+    (foo # awkward comment
+        )
+    ()
+    .bbbbbbbbbbbbbbbb
+)
+
+aaa = (
+    (
+        bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        # awkward comment
+    )
+    ()
+    .bbbbbbbbbbbbbbbb
+)

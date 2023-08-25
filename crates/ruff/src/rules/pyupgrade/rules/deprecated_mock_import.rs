@@ -335,10 +335,10 @@ pub(crate) fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(indent) = indentation(checker.locator(), stmt) {
-                        #[allow(deprecated)]
-                        diagnostic.try_set_fix_from_edit(|| {
+                        diagnostic.try_set_fix(|| {
                             format_import_from(stmt, indent, checker.locator(), checker.stylist())
                                 .map(|content| Edit::range_replacement(content, stmt.range()))
+                                .map(Fix::suggested)
                         });
                     }
                 }

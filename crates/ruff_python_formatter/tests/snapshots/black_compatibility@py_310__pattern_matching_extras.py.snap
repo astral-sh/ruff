@@ -131,7 +131,7 @@ match bar1:
 ```diff
 --- Black
 +++ Ruff
-@@ -32,23 +32,32 @@
+@@ -32,14 +32,23 @@
  match maybe, multiple:
      case perhaps, 5:
          pass
@@ -158,63 +158,24 @@ match bar1:
          pass
      case _:
          pass
- 
- 
- match a, *b, c:
--    case [*_]:
-+    case [*NOT_YET_IMPLEMENTED_PatternMatchStar]:
-         assert "seq" == _
--    case {}:
-+    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
-         assert "map" == b
- 
- 
-@@ -80,17 +89,14 @@
- 
- 
- match a, *b(), c:
--    case d, *f, g:
-+    case d, *NOT_YET_IMPLEMENTED_PatternMatchStar, g:
-         pass
- 
- 
+@@ -87,7 +96,7 @@
  match something:
--    case {
--        "key": key as key_1,
+     case {
+         "key": key as key_1,
 -        "password": PASS.ONE | PASS.TWO | PASS.THREE as password,
--    }:
-+    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
++        "password": NOT_YET_IMPLEMENTED_PatternMatchOf | (y) as password,
+     }:
          pass
--    case {"maybe": something(complicated as this) as that}:
-+    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
-         pass
- 
- 
-@@ -101,7 +107,12 @@
+     case {"maybe": something(complicated as this) as that}:
+@@ -101,7 +110,7 @@
      case 2 as b, 3 as c:
          pass
  
 -    case 4 as d, (5 as e), (6 | 7 as g), *h:
-+    case (
-+        4 as d,
-+        5 as e,
-+        NOT_YET_IMPLEMENTED_PatternMatchOf | (y) as g,
-+        *NOT_YET_IMPLEMENTED_PatternMatchStar,
-+    ):
++    case 4 as d, (5 as e), (NOT_YET_IMPLEMENTED_PatternMatchOf | (y) as g), *h:
          pass
  
  
-@@ -114,6 +125,9 @@
- 
- match bar1:
-     case Foo(
--        normal=x, perhaps=[list, {"x": d, "y": 1.0}] as y, otherwise=something, q=t as u
-+        normal=x,
-+        perhaps=[list, {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}] as y,
-+        otherwise=something,
-+        q=t as u,
-     ):
-         pass
 ```
 
 ## Ruff Output
@@ -277,9 +238,9 @@ match (
 
 
 match a, *b, c:
-    case [*NOT_YET_IMPLEMENTED_PatternMatchStar]:
+    case [*_]:
         assert "seq" == _
-    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
+    case {}:
         assert "map" == b
 
 
@@ -311,14 +272,17 @@ match match:
 
 
 match a, *b(), c:
-    case d, *NOT_YET_IMPLEMENTED_PatternMatchStar, g:
+    case d, *f, g:
         pass
 
 
 match something:
-    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
+    case {
+        "key": key as key_1,
+        "password": NOT_YET_IMPLEMENTED_PatternMatchOf | (y) as password,
+    }:
         pass
-    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
+    case {"maybe": something(complicated as this) as that}:
         pass
 
 
@@ -329,12 +293,7 @@ match something:
     case 2 as b, 3 as c:
         pass
 
-    case (
-        4 as d,
-        5 as e,
-        NOT_YET_IMPLEMENTED_PatternMatchOf | (y) as g,
-        *NOT_YET_IMPLEMENTED_PatternMatchStar,
-    ):
+    case 4 as d, (5 as e), (NOT_YET_IMPLEMENTED_PatternMatchOf | (y) as g), *h:
         pass
 
 
@@ -347,10 +306,7 @@ match bar1:
 
 match bar1:
     case Foo(
-        normal=x,
-        perhaps=[list, {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}] as y,
-        otherwise=something,
-        q=t as u,
+        normal=x, perhaps=[list, {"x": d, "y": 1.0}] as y, otherwise=something, q=t as u
     ):
         pass
 ```

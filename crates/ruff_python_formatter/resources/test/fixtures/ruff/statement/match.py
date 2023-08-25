@@ -237,7 +237,6 @@ match foo:
     ]:
         pass
 
-
 match foo:
     case 1:
         y = 0
@@ -265,13 +264,174 @@ match foo:
         y = 1
 
 
+
+match foo:
+    case [1, 2, *rest]:
+        pass
+    case [1, 2, *_]:
+        pass
+    case [*rest, 1, 2]:
+        pass
+    case [*_, 1, 2]:
+        pass
+    case [
+        1,
+        2,
+        *rest,
+    ]:
+        pass
+    case [1, 2, * # comment
+        rest]:
+        pass
+    case [1, 2, * # comment
+        _]:
+        pass
+    case [* # comment
+        rest, 1, 2]:
+        pass
+    case [* # comment
+        _, 1, 2]:
+        pass
+    case [* # end of line
+        # own line
+        _, 1, 2]:
+        pass
+    case [* # end of line
+        # own line
+        _, 1, 2]:
+        pass
+
+
+match foo:
+    case (1):
+        pass
+    case ((1)):
+        pass
+    case [(1), 2]:
+        pass
+    case [(  # comment
+        1
+      ), 2]:
+        pass
+    case [  # outer
+        (  # inner
+        1
+      ), 2]:
+        pass
+    case [
+		( # outer
+			[ # inner
+				1,
+			]
+		)
+	]:
+        pass
+    case [ # outer
+		( # inner outer
+			[ # inner
+				1,
+			]
+		)
+	]:
+        pass
+    case [ # outer
+        # own line
+		( # inner outer
+			[ # inner
+				1,
+			]
+		)
+	]:
+        pass
+    case [(*rest), (a as b)]:
+        pass
+
+
+match foo:
+    case {"a": 1, "b": 2}:
+        pass
+
+    case {
+        # own line
+        "a": 1,  # end-of-line
+        # own line
+        "b": 2,
+    }:
+        pass
+
+    case {  # open
+        1  # key
+        :  # colon
+            value  # value
+    }:
+        pass
+
+    case {**d}:
+        pass
+
+    case {
+        **  # middle with single item
+        b
+    }:
+        pass
+
+    case {
+        # before
+        **  # between
+        b,
+    }:
+        pass
+
+    case {
+        1: x,
+        # foo
+        ** # bop
+        # before
+        b, # boo
+        # baz
+    }:
+        pass
+
+    case {
+        1: x
+        # foo
+        ,
+        **
+        b,
+    }:
+        pass
+
+
 match pattern_match_class:
-    case Foo(
+    case Point2D(
             # own line
             ):
         ...
 
+    case (
+        Point2D
+        # own line
+        ()
+    ):
+        ...
+
+    case Point2D(  # end of line line
+            ):
+        ...
+
+    case Point2D(  # end of line
+        0, 0
+    ):
+        ...
+
     case Point2D(0, 0):
+        ...
+
+    case Point2D(
+        (  # end of line
+        # own line
+        0
+        ), 0):
         ...
 
     case Point3D(x=0, y=0, z=000000000000000000000000000000000000000000000000000000000000000000000000000000000):

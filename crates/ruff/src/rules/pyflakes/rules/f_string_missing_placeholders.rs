@@ -62,8 +62,7 @@ fn find_useless_f_strings<'a>(
                 kind: StringKind::FString | StringKind::RawFString,
                 ..
             } => {
-                let first_char =
-                    &locator.contents()[TextRange::at(range.start(), TextSize::from(1))];
+                let first_char = locator.slice(TextRange::at(range.start(), TextSize::from(1)));
                 // f"..."  => f_position = 0
                 // fr"..." => f_position = 0
                 // rf"..." => f_position = 1

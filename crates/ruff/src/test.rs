@@ -69,10 +69,10 @@ pub(crate) fn test_notebook_path(
 ) -> Result<TestedNotebook> {
     let source_notebook = read_jupyter_notebook(path.as_ref())?;
 
-    let source_kind = SourceKind::Jupyter(source_notebook);
+    let source_kind = SourceKind::IpyNotebook(source_notebook);
     let (messages, transformed) = test_contents(&source_kind, path.as_ref(), settings);
     let expected_notebook = read_jupyter_notebook(expected.as_ref())?;
-    let linted_notebook = transformed.into_owned().expect_jupyter();
+    let linted_notebook = transformed.into_owned().expect_ipy_notebook();
 
     assert_eq!(
         linted_notebook.cell_offsets(),
@@ -86,7 +86,7 @@ pub(crate) fn test_notebook_path(
 
     Ok(TestedNotebook {
         messages,
-        source_notebook: source_kind.expect_jupyter(),
+        source_notebook: source_kind.expect_ipy_notebook(),
         linted_notebook,
     })
 }
@@ -112,7 +112,7 @@ pub(crate) fn max_iterations() -> usize {
 
 /// A convenient wrapper around [`check_path`], that additionally
 /// asserts that autofixes converge after a fixed number of iterations.
-fn test_contents<'a>(
+pub(crate) fn test_contents<'a>(
     source_kind: &'a SourceKind,
     path: &Path,
     settings: &Settings,

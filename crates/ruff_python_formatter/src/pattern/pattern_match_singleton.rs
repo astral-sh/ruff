@@ -1,6 +1,8 @@
 use crate::prelude::*;
+use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{Constant, PatternMatchSingleton};
 
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::{FormatNodeRule, PyFormatter};
 
 #[derive(Default)]
@@ -14,5 +16,15 @@ impl FormatNodeRule<PatternMatchSingleton> for FormatPatternMatchSingleton {
             Constant::Bool(false) => text("False").fmt(f),
             _ => unreachable!(),
         }
+    }
+}
+
+impl NeedsParentheses for PatternMatchSingleton {
+    fn needs_parentheses(
+        &self,
+        _parent: AnyNodeRef,
+        _context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        OptionalParentheses::Never
     }
 }
