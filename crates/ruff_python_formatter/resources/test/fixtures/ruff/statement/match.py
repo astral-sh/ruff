@@ -344,3 +344,58 @@ match foo:
         pass
     case [(*rest), (a as b)]:
         pass
+
+
+match foo:
+    case {"a": 1, "b": 2}:
+        pass
+
+    case {
+        # own line
+        "a": 1,  # end-of-line
+        # own line
+        "b": 2,
+    }:
+        pass
+
+    case {  # open
+        1  # key
+        :  # colon
+            value  # value
+    }:
+        pass
+
+    case {**d}:
+        pass
+
+    case {
+        **  # middle with single item
+        b
+    }:
+        pass
+
+    case {
+        # before
+        **  # between
+        b,
+    }:
+        pass
+
+    case {
+        1: x,
+        # foo
+        ** # bop
+        # before
+        b, # boo
+        # baz
+    }:
+        pass
+
+    case {
+        1: x
+        # foo
+        ,
+        **
+        b,
+    }:
+        pass

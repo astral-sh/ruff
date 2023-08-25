@@ -165,7 +165,7 @@ match x:
          y = 0
  # case black_test_patma_073
  match x:
-@@ -16,23 +16,23 @@
+@@ -16,11 +16,11 @@
          y = 1
  # case black_test_patma_006
  match 3:
@@ -179,15 +179,9 @@ match x:
          y = 0
  # case black_check_sequence_then_mapping
  match x:
-     case [*_]:
-         return "seq"
--    case {}:
-+    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
-         return "map"
- # case black_test_patma_035
+@@ -32,7 +32,7 @@
  match x:
--    case {0: [1, 2, {}]}:
-+    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
+     case {0: [1, 2, {}]}:
          y = 0
 -    case {0: [1, 2, {}] | True} | {1: [[]]} | {0: [1, 2, {}]} | [] | "X" | {}:
 +    case NOT_YET_IMPLEMENTED_PatternMatchOf | (y):
@@ -203,30 +197,6 @@ match x:
          x = True
  # case black_test_patma_154
  match x:
-@@ -54,11 +54,11 @@
-         y = 0
- # case black_test_patma_134
- match x:
--    case {1: 0}:
-+    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
-         y = 0
--    case {0: 0}:
-+    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
-         y = 1
--    case {**z}:
-+    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
-         y = 2
- # case black_test_patma_185
- match Seq():
-@@ -72,7 +72,7 @@
-         y = 1
- # case black_test_patma_248
- match x:
--    case {"foo": bar}:
-+    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
-         y = bar
- # case black_test_patma_019
- match (0, 1, 2):
 @@ -132,13 +132,13 @@
          z = 0
  # case black_test_patma_042
@@ -236,8 +206,7 @@ match x:
          y = 0
  # case black_test_patma_034
  match x:
--    case {0: [1, 2, {}]}:
-+    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
+     case {0: [1, 2, {}]}:
          y = 0
 -    case {0: [1, 2, {}] | False} | {1: [[]]} | {0: [1, 2, {}]} | [] | "X" | {}:
 +    case NOT_YET_IMPLEMENTED_PatternMatchOf | (y):
@@ -277,11 +246,11 @@ match x:
 match x:
     case [*_]:
         return "seq"
-    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
+    case {}:
         return "map"
 # case black_test_patma_035
 match x:
-    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
+    case {0: [1, 2, {}]}:
         y = 0
     case NOT_YET_IMPLEMENTED_PatternMatchOf | (y):
         y = 1
@@ -305,11 +274,11 @@ match x:
         y = 0
 # case black_test_patma_134
 match x:
-    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
+    case {1: 0}:
         y = 0
-    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
+    case {0: 0}:
         y = 1
-    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
+    case {**z}:
         y = 2
 # case black_test_patma_185
 match Seq():
@@ -323,7 +292,7 @@ match x:
         y = 1
 # case black_test_patma_248
 match x:
-    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
+    case {"foo": bar}:
         y = bar
 # case black_test_patma_019
 match (0, 1, 2):
@@ -387,7 +356,7 @@ match x:
         y = 0
 # case black_test_patma_034
 match x:
-    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
+    case {0: [1, 2, {}]}:
         y = 0
     case NOT_YET_IMPLEMENTED_PatternMatchOf | (y):
         y = 1

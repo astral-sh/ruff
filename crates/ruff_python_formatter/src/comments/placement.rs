@@ -221,6 +221,10 @@ fn handle_enclosed_comment<'a>(
         AnyNodeRef::WithItem(_) => handle_with_item_comment(comment, locator),
         AnyNodeRef::PatternMatchAs(_) => handle_pattern_match_as_comment(comment, locator),
         AnyNodeRef::PatternMatchStar(_) => handle_pattern_match_star_comment(comment),
+        AnyNodeRef::PatternMatchMapping(pattern) => {
+            handle_bracketed_end_of_line_comment(comment, locator)
+                .or_else(|comment| handle_pattern_match_mapping_comment(comment, pattern, locator))
+        }
         AnyNodeRef::StmtFunctionDef(_) => handle_leading_function_with_decorators_comment(comment),
         AnyNodeRef::StmtClassDef(class_def) => {
             handle_leading_class_with_decorators_comment(comment, class_def)
@@ -1278,6 +1282,59 @@ fn handle_pattern_match_as_comment<'a>(
 /// ```
 fn handle_pattern_match_star_comment(comment: DecoratedComment) -> CommentPlacement {
     CommentPlacement::dangling(comment.enclosing_node(), comment)
+}
+
+/// Handles trailing comments after the `**` in a pattern match item. The comments can either
+/// appear between the `**` and the identifier, or after the identifier (which is just an
+/// identifier, not a node).
+///
+/// ```python
+/// case {
+///     **  # dangling end of line comment
+///     # dangling own line comment
+///     rest  # dangling end of line comment
+///     # dangling own line comment
+/// ): ...
+/// ```
+fn handle_pattern_match_mapping_comment<'a>(
+    comment: DecoratedComment<'a>,
+    pattern: &'a ast::PatternMatchMapping,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    // The `**` has to come at the end, so there can't be another node after it. (The identifier,
+    // like `rest` above, isn't a node.)
+    if comment.following_node().is_some() {
+        return CommentPlacement::Default(comment);
+    };
+
+    // If there's no rest pattern, no need to do anything special.
+    let Some(rest) = pattern.rest.as_ref() else {
+        return CommentPlacement::Default(comment);
+    };
+
+    // If the comment falls after the `**rest` entirely, treat it as dangling on the enclosing
+    // node.
+    if comment.start() > rest.end() {
+        return CommentPlacement::dangling(comment.enclosing_node(), comment);
+    }
+
+    // Look at the tokens between the previous node (or the start of the pattern) and the comment.
+    let preceding_end = match comment.preceding_node() {
+        Some(preceding) => preceding.end(),
+        None => comment.enclosing_node().start(),
+    };
+    let mut tokens = SimpleTokenizer::new(
+        locator.contents(),
+        TextRange::new(preceding_end, comment.start()),
+    )
+    .skip_trivia();
+
+    // If the remaining tokens from the previous node include `**`, mark as a dangling comment.
+    if tokens.any(|token| token.kind == SimpleTokenKind::DoubleStar) {
+        CommentPlacement::dangling(comment.enclosing_node(), comment)
+    } else {
+        CommentPlacement::Default(comment)
+    }
 }
 
 /// Handles comments around the `:=` token in a named expression (walrus operator).
