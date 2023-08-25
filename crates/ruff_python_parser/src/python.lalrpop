@@ -372,7 +372,7 @@ IpyHelpEndEscapeCommandStatement: ast::Stmt = {
     // We are permissive than the original implementation because we would allow whitespace
     // between the expression and the suffix while the IPython implementation doesn't allow it.
     // For example, `foo ?` would be valid in our case but invalid from IPython.
-    <location:@L> <e:Expression<"All">> <suffix:("?")+> <end_location:@R> =>? {
+    <location:@L> <e:Expression<"all">> <suffix:("?")+> <end_location:@R> =>? {
         fn unparse_expr(expr: &ast::Expr, buffer: &mut String) -> Result<(), LexicalError> {
             match expr {
                 ast::Expr::Name(ast::ExprName { id, .. }) => {
