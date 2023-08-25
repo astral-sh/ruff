@@ -458,3 +458,12 @@ match pattern_match_class:
         # e
     ):
         pass
+
+    case A(
+        # a
+        b # b
+        = # c
+        2 # d
+        # e
+    ):
+        pass

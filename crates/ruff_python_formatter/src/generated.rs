@@ -2256,6 +2256,78 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternMatchOr {
     }
 }
 
+impl FormatRule<ast::PatternArguments, PyFormatContext<'_>>
+    for crate::pattern::pattern_arguments::FormatPatternArguments
+{
+    #[inline]
+    fn fmt(&self, node: &ast::PatternArguments, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::PatternArguments>::fmt(self, node, f)
+    }
+}
+impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::PatternArguments {
+    type Format<'a> = FormatRefWithRule<
+        'a,
+        ast::PatternArguments,
+        crate::pattern::pattern_arguments::FormatPatternArguments,
+        PyFormatContext<'ast>,
+    >;
+    fn format(&self) -> Self::Format<'_> {
+        FormatRefWithRule::new(
+            self,
+            crate::pattern::pattern_arguments::FormatPatternArguments::default(),
+        )
+    }
+}
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternArguments {
+    type Format = FormatOwnedWithRule<
+        ast::PatternArguments,
+        crate::pattern::pattern_arguments::FormatPatternArguments,
+        PyFormatContext<'ast>,
+    >;
+    fn into_format(self) -> Self::Format {
+        FormatOwnedWithRule::new(
+            self,
+            crate::pattern::pattern_arguments::FormatPatternArguments::default(),
+        )
+    }
+}
+
+impl FormatRule<ast::PatternKeyword, PyFormatContext<'_>>
+    for crate::pattern::pattern_keyword::FormatPatternKeyword
+{
+    #[inline]
+    fn fmt(&self, node: &ast::PatternKeyword, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::PatternKeyword>::fmt(self, node, f)
+    }
+}
+impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::PatternKeyword {
+    type Format<'a> = FormatRefWithRule<
+        'a,
+        ast::PatternKeyword,
+        crate::pattern::pattern_keyword::FormatPatternKeyword,
+        PyFormatContext<'ast>,
+    >;
+    fn format(&self) -> Self::Format<'_> {
+        FormatRefWithRule::new(
+            self,
+            crate::pattern::pattern_keyword::FormatPatternKeyword::default(),
+        )
+    }
+}
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternKeyword {
+    type Format = FormatOwnedWithRule<
+        ast::PatternKeyword,
+        crate::pattern::pattern_keyword::FormatPatternKeyword,
+        PyFormatContext<'ast>,
+    >;
+    fn into_format(self) -> Self::Format {
+        FormatOwnedWithRule::new(
+            self,
+            crate::pattern::pattern_keyword::FormatPatternKeyword::default(),
+        )
+    }
+}
+
 impl FormatRule<ast::Comprehension, PyFormatContext<'_>>
     for crate::other::comprehension::FormatComprehension
 {
