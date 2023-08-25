@@ -327,51 +327,34 @@ fn parse_precision(text: &str) -> Result<(Option<usize>, &str), FormatSpecError>
     })
 }
 
-/// Parses a format part within a format spec
-fn parse_nested_placeholder<'a>(
-    placeholders: &mut Vec<FormatPart>,
-    text: &'a str,
-) -> Result<&'a str, FormatSpecError> {
+/// Parses a placeholder format part within a format specification
+fn parse_nested_placeholder(text: &str) -> Result<Option<(FormatPart, &str)>, FormatSpecError> {
     match FormatString::parse_spec(text, AllowPlaceholderNesting::No) {
         // Not a nested placeholder, OK
-        Err(FormatParseError::MissingStartBracket) => Ok(text),
+        Err(FormatParseError::MissingStartBracket) => Ok(None),
         Err(err) => Err(FormatSpecError::InvalidPlaceholder(err)),
-        Ok((format_part, text)) => {
-            placeholders.push(format_part);
-            Ok(text)
-        }
+        Ok((format_part, text)) => Ok(Some((format_part, text))),
     }
 }
 
-/// Parse and consume all placeholders in a format spec
-/// This will also consume any intermediate characters such as `x` and `y` in `"x{foo}y{bar}z"`
-/// If no placeholders are present, the text will be returned unmodified.
-fn consume_all_placeholders<'a>(
-    placeholders: &mut Vec<FormatPart>,
-    text: &'a str,
-) -> Result<&'a str, FormatSpecError> {
-    let mut chars = text.chars();
-    let mut text = text;
-    let mut placeholder_count = placeholders.len();
-
-    while chars.clone().contains(&'{') {
-        text = parse_nested_placeholder(placeholders, chars.as_str())?;
-        chars = text.chars();
-        // If we did not parse a placeholder, consume a character
-        if placeholder_count == placeholders.len() {
-            chars.next();
+/// Parse all placeholders in a format specification
+/// If no placeholders are present, an empty vector will be returned
+fn parse_nested_placeholders(mut text: &str) -> Result<Vec<FormatPart>, FormatSpecError> {
+    let mut placeholders = vec![];
+    while let Some(bracket) = text.find('{') {
+        if let Some((format_part, rest)) = parse_nested_placeholder(&text[bracket..])? {
+            text = rest;
+            placeholders.push(format_part);
         } else {
-            placeholder_count = placeholders.len();
+            text = &text[bracket + 1..];
         }
     }
-    Ok(text)
+    Ok(placeholders)
 }
 
 impl FormatSpec {
     pub fn parse(text: &str) -> Result<Self, FormatSpecError> {
-        let mut placeholders = vec![];
-        let text = consume_all_placeholders(&mut placeholders, text)?;
-
+        let placeholders = parse_nested_placeholders(text)?;
         if !placeholders.is_empty() {
             return Ok(FormatSpec::Dynamic(DynamicFormatSpec { placeholders }));
         }
