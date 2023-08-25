@@ -1295,7 +1295,6 @@ fn handle_pattern_match_class_comment<'a>(
     //     )
     // ): ...
     // ```
-    println!("comment: {:?}", comment);
     if comment.line_position().is_end_of_line() {
         if comment.end() < first_item {
             return CommentPlacement::dangling(comment.enclosing_node(), comment);

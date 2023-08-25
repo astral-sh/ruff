@@ -450,3 +450,11 @@ match pattern_match_class:
         # trailing
             ):
         ...
+
+    case A(
+        b # b
+        = # c
+        2 # d
+        # e
+    ):
+        pass
