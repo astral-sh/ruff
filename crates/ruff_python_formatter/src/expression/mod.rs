@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use std::cmp::Ordering;
 
 use ruff_formatter::{
@@ -9,6 +10,7 @@ use ruff_python_ast::visitor::preorder::{walk_expr, PreorderVisitor};
 use ruff_python_ast::{Expr, ExpressionRef, Operator};
 
 use crate::builders::parenthesize_if_expands;
+use crate::comments::leading_comments;
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::parentheses::{
     is_expression_parenthesized, optional_parentheses, parenthesized, NeedsParentheses,
@@ -107,8 +109,6 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
         };
 
         if parenthesize {
-            let comments = f.context().comments().clone();
-
             // Any comments on the open parenthesis of a `node`.
             //
             // For example, `# comment` in:
@@ -117,18 +117,23 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             //    foo.bar
             // )
             // ```
-            let open_parenthesis_comment = comments
-                .leading(expression)
-                .first()
-                .filter(|comment| comment.line_position().is_end_of_line());
-
-            parenthesized("(", &format_expr, ")")
-                .with_dangling_comments(
-                    open_parenthesis_comment
-                        .map(std::slice::from_ref)
-                        .unwrap_or_default(),
+            let comments = f.context().comments().clone();
+            let leading = comments.leading(expression);
+            if let Some((index, open_parenthesis_comment)) = leading
+                .iter()
+                .find_position(|comment| comment.line_position().is_end_of_line())
+            {
+                write!(
+                    f,
+                    [
+                        leading_comments(&leading[..index]),
+                        parenthesized("(", &format_expr, ")")
+                            .with_dangling_comments(std::slice::from_ref(open_parenthesis_comment))
+                    ]
                 )
-                .fmt(f)
+            } else {
+                parenthesized("(", &format_expr, ")").fmt(f)
+            }
         } else {
             let level = match f.context().node_level() {
                 NodeLevel::TopLevel | NodeLevel::CompoundStatement => NodeLevel::Expression(None),
