@@ -263,6 +263,7 @@ match foo:
     ):
         y = 1
 
+
 match foo:
     case [1, 2, *rest]:
         pass
@@ -299,3 +300,47 @@ match foo:
         _, 1, 2]:
         pass
 
+
+match foo:
+    case (1):
+        pass
+    case ((1)):
+        pass
+    case [(1), 2]:
+        pass
+    case [(  # comment
+        1
+      ), 2]:
+        pass
+    case [  # outer
+        (  # inner
+        1
+      ), 2]:
+        pass
+    case [
+		( # outer
+			[ # inner
+				1,
+			]
+		)
+	]:
+        pass
+    case [ # outer
+		( # inner outer
+			[ # inner
+				1,
+			]
+		)
+	]:
+        pass
+    case [ # outer
+        # own line
+		( # inner outer
+			[ # inner
+				1,
+			]
+		)
+	]:
+        pass
+    case [(*rest), (a as b)]:
+        pass

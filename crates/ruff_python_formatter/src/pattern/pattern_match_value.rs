@@ -1,14 +1,26 @@
+use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::PatternMatchValue;
 
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parentheses};
 use crate::prelude::*;
+use crate::{AsFormat, FormatNodeRule, PyFormatter};
 
 #[derive(Default)]
 pub struct FormatPatternMatchValue;
 
 impl FormatNodeRule<PatternMatchValue> for FormatPatternMatchValue {
     fn fmt_fields(&self, item: &PatternMatchValue, f: &mut PyFormatter) -> FormatResult<()> {
-        // TODO(charlie): Avoid double parentheses for parenthesized top-level `PatternMatchValue`.
         let PatternMatchValue { value, range: _ } = item;
-        value.format().fmt(f)
+        value.format().with_options(Parentheses::Never).fmt(f)
+    }
+}
+
+impl NeedsParentheses for PatternMatchValue {
+    fn needs_parentheses(
+        &self,
+        _parent: AnyNodeRef,
+        _context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        OptionalParentheses::Never
     }
 }
