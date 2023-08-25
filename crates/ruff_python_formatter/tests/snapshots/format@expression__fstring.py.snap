@@ -46,7 +46,7 @@ result_f = (
 (f"{one}" f"{two}")
 
 
-rf'Not-so-tricky "quote'
+rf"Not-so-tricky \"quote"
 
 # Regression test for fstrings dropping comments
 result_f = (

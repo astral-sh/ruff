@@ -9,6 +9,7 @@ use itertools::Itertools;
 use once_cell::sync::OnceCell;
 use serde::Serialize;
 use serde_json::error::Category;
+use uuid::Uuid;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_parser::lexer::lex;
@@ -17,7 +18,7 @@ use ruff_source_file::{NewlineWithTrailingNewline, UniversalNewlineIterator};
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::autofix::source_map::{SourceMap, SourceMarker};
-use crate::jupyter::index::JupyterIndex;
+use crate::jupyter::index::NotebookIndex;
 use crate::jupyter::schema::{Cell, RawNotebook, SortAlphabetically, SourceValue};
 use crate::rules::pycodestyle::rules::SyntaxError;
 use crate::IOError;
@@ -82,8 +83,8 @@ impl Cell {
             Cell::Code(cell) => &cell.source,
             _ => return false,
         };
-        // Ignore cells containing cell magic. This is different from line magic
-        // which is allowed and ignored by the parser.
+        // Ignore cells containing cell magic as they act on the entire cell
+        // as compared to line magic which acts on a single line.
         !match source {
             SourceValue::String(string) => string
                 .lines()
@@ -106,7 +107,7 @@ pub struct Notebook {
     source_code: String,
     /// The index of the notebook. This is used to map between the concatenated
     /// source code and the original notebook.
-    index: OnceCell<JupyterIndex>,
+    index: OnceCell<NotebookIndex>,
     /// The raw notebook i.e., the deserialized version of JSON string.
     raw: RawNotebook,
     /// The offsets of each cell in the concatenated source code. This includes
@@ -156,7 +157,7 @@ impl Notebook {
                 TextRange::default(),
             )
         })?;
-        let raw_notebook: RawNotebook = match serde_json::from_reader(reader.by_ref()) {
+        let mut raw_notebook: RawNotebook = match serde_json::from_reader(reader.by_ref()) {
             Ok(notebook) => notebook,
             Err(err) => {
                 // Translate the error into a diagnostic
@@ -260,6 +261,23 @@ impl Notebook {
             current_offset += TextSize::of(&cell_contents) + TextSize::new(1);
             contents.push(cell_contents);
             cell_offsets.push(current_offset);
+        }
+
+        // Add cell ids to 4.5+ notebooks if they are missing
+        // https://github.com/astral-sh/ruff/issues/6834
+        // https://github.com/jupyter/enhancement-proposals/blob/master/62-cell-id/cell-id.md#required-field
+        if raw_notebook.nbformat == 4 && raw_notebook.nbformat_minor >= 5 {
+            for cell in &mut raw_notebook.cells {
+                let id = match cell {
+                    Cell::Code(cell) => &mut cell.id,
+                    Cell::Markdown(cell) => &mut cell.id,
+                    Cell::Raw(cell) => &mut cell.id,
+                };
+                if id.is_none() {
+                    // https://github.com/jupyter/enhancement-proposals/blob/master/62-cell-id/cell-id.md#questions
+                    *id = Some(Uuid::new_v4().to_string());
+                }
+            }
         }
 
         Ok(Self {
@@ -368,7 +386,7 @@ impl Notebook {
     ///
     /// The index building is expensive as it needs to go through the content of
     /// every valid code cell.
-    fn build_index(&self) -> JupyterIndex {
+    fn build_index(&self) -> NotebookIndex {
         let mut row_to_cell = vec![0];
         let mut row_to_row_in_cell = vec![0];
 
@@ -395,7 +413,7 @@ impl Notebook {
             row_to_row_in_cell.extend(1..=line_count);
         }
 
-        JupyterIndex {
+        NotebookIndex {
             row_to_cell,
             row_to_row_in_cell,
         }
@@ -413,7 +431,7 @@ impl Notebook {
     /// The index is built only once when required. This is only used to
     /// report diagnostics, so by that time all of the autofixes must have
     /// been applied if `--fix` was passed.
-    pub(crate) fn index(&self) -> &JupyterIndex {
+    pub(crate) fn index(&self) -> &NotebookIndex {
         self.index.get_or_init(|| self.build_index())
     }
 
@@ -473,7 +491,7 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::jupyter::index::JupyterIndex;
+    use crate::jupyter::index::NotebookIndex;
     use crate::jupyter::schema::Cell;
     use crate::jupyter::Notebook;
     use crate::registry::Rule;
@@ -561,7 +579,7 @@ print("after empty cells")
         );
         assert_eq!(
             notebook.index(),
-            &JupyterIndex {
+            &NotebookIndex {
                 row_to_cell: vec![0, 1, 1, 1, 1, 1, 1, 3, 3, 3, 3, 3, 5, 7, 7, 8],
                 row_to_row_in_cell: vec![0, 1, 2, 3, 4, 5, 6, 1, 2, 3, 4, 5, 1, 1, 2, 1],
             }
@@ -662,21 +680,27 @@ print("after empty cells")
         Ok(())
     }
 
-    #[test]
-    fn test_no_cell_id() -> Result<()> {
-        let path = "no_cell_id.ipynb".to_string();
-        let source_notebook = read_jupyter_notebook(path.as_ref())?;
-        let source_kind = SourceKind::Jupyter(source_notebook);
+    // Version <4.5, don't emit cell ids
+    #[test_case(Path::new("no_cell_id.ipynb"), false; "no_cell_id")]
+    // Version 4.5, cell ids are missing and need to be added
+    #[test_case(Path::new("add_missing_cell_id.ipynb"), true; "add_missing_cell_id")]
+    fn test_cell_id(path: &Path, has_id: bool) -> Result<()> {
+        let source_notebook = read_jupyter_notebook(path)?;
+        let source_kind = SourceKind::IpyNotebook(source_notebook);
         let (_, transformed) = test_contents(
             &source_kind,
-            path.as_ref(),
+            path,
             &settings::Settings::for_rule(Rule::UnusedImport),
         );
-        let linted_notebook = transformed.into_owned().expect_jupyter();
+        let linted_notebook = transformed.into_owned().expect_ipy_notebook();
         let mut writer = Vec::new();
         linted_notebook.write_inner(&mut writer)?;
         let actual = String::from_utf8(writer)?;
-        assert!(!actual.contains(r#""id":"#));
+        if has_id {
+            assert!(actual.contains(r#""id": ""#));
+        } else {
+            assert!(!actual.contains(r#""id":"#));
+        }
         Ok(())
     }
 }

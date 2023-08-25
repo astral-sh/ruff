@@ -269,6 +269,7 @@ match foo:
     ):
         y = 1
 
+
 match foo:
     case [1, 2, *rest]:
         pass
@@ -305,6 +306,105 @@ match foo:
         _, 1, 2]:
         pass
 
+
+match foo:
+    case (1):
+        pass
+    case ((1)):
+        pass
+    case [(1), 2]:
+        pass
+    case [(  # comment
+        1
+      ), 2]:
+        pass
+    case [  # outer
+        (  # inner
+        1
+      ), 2]:
+        pass
+    case [
+		( # outer
+			[ # inner
+				1,
+			]
+		)
+	]:
+        pass
+    case [ # outer
+		( # inner outer
+			[ # inner
+				1,
+			]
+		)
+	]:
+        pass
+    case [ # outer
+        # own line
+		( # inner outer
+			[ # inner
+				1,
+			]
+		)
+	]:
+        pass
+    case [(*rest), (a as b)]:
+        pass
+
+
+match foo:
+    case {"a": 1, "b": 2}:
+        pass
+
+    case {
+        # own line
+        "a": 1,  # end-of-line
+        # own line
+        "b": 2,
+    }:
+        pass
+
+    case {  # open
+        1  # key
+        :  # colon
+            value  # value
+    }:
+        pass
+
+    case {**d}:
+        pass
+
+    case {
+        **  # middle with single item
+        b
+    }:
+        pass
+
+    case {
+        # before
+        **  # between
+        b,
+    }:
+        pass
+
+    case {
+        1: x,
+        # foo
+        ** # bop
+        # before
+        b, # boo
+        # baz
+    }:
+        pass
+
+    case {
+        1: x
+        # foo
+        ,
+        **
+        b,
+    }:
+        pass
 ```
 
 ## Output
@@ -440,7 +540,7 @@ match pattern_comments:
 
 
 match pattern_comments:
-    case (no_comments):
+    case no_comments:
         pass
 
 
@@ -504,9 +604,7 @@ match pattern_singleton:
         # trailing own 2
     ):
         pass
-    case (
-        True  # trailing
-    ):
+    case True:  # trailing
         ...
     case False:
         ...
@@ -524,13 +622,12 @@ match foo:
         pass
     case ["a", "b"]:
         pass
-    case (["a", "b"]):
+    case ["a", "b"]:
         pass
 
 
 match foo:
-    case [
-        # leading
+    case [  # leading
         # leading
         # leading
         # leading
@@ -545,28 +642,27 @@ match foo:
 match foo:
     case 1:
         y = 0
-    case ((1)):
+    case 1:
         y = 1
-    case (("a")):
+    case "a":
         y = 1
     case (  # comment
-        (1)
+        1
     ):
         y = 1
     case (
         # comment
-        (1)
+        1
     ):
         y = 1
-    case (
-        (1)  # comment
-    ):
+    case 1:  # comment
         y = 1
     case (
-        (1)
+        1
         # comment
     ):
         y = 1
+
 
 match foo:
     case [1, 2, *rest]:
@@ -626,6 +722,108 @@ match foo:
         1,
         2,
     ]:
+        pass
+
+
+match foo:
+    case 1:
+        pass
+    case 1:
+        pass
+    case [(1), 2]:
+        pass
+    case [
+        (  # comment
+            1
+        ),
+        2,
+    ]:
+        pass
+    case [  # outer
+        (  # inner
+            1
+        ),
+        2,
+    ]:
+        pass
+    case [
+        (  # outer
+            [  # inner
+                1,
+            ]
+        )
+    ]:
+        pass
+    case [  # outer
+        (  # inner outer
+            [  # inner
+                1,
+            ]
+        )
+    ]:
+        pass
+    case [  # outer
+        (
+            # own line
+            # inner outer
+            [  # inner
+                1,
+            ]
+        )
+    ]:
+        pass
+    case [(*rest), (a as b)]:
+        pass
+
+
+match foo:
+    case {"a": 1, "b": 2}:
+        pass
+
+    case {
+        # own line
+        "a": 1,  # end-of-line
+        # own line
+        "b": 2,
+    }:
+        pass
+
+    case {  # open
+        1: value  # key  # colon  # value
+    }:
+        pass
+
+    case {**d}:
+        pass
+
+    case {
+        # middle with single item
+        **b
+    }:
+        pass
+
+    case {
+        # before
+        # between
+        **b,
+    }:
+        pass
+
+    case {
+        1: x,
+        # foo
+        # bop
+        # before
+        **b,  # boo
+        # baz
+    }:
+        pass
+
+    case {
+        1: x,
+        # foo
+        **b,
+    }:
         pass
 ```
 

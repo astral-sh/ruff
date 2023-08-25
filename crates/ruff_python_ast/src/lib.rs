@@ -58,7 +58,7 @@ pub enum PySourceType {
     #[default]
     Python,
     Stub,
-    Jupyter,
+    Ipynb,
 }
 
 impl PySourceType {
@@ -70,8 +70,8 @@ impl PySourceType {
         matches!(self, PySourceType::Stub)
     }
 
-    pub const fn is_jupyter(&self) -> bool {
-        matches!(self, PySourceType::Jupyter)
+    pub const fn is_ipynb(&self) -> bool {
+        matches!(self, PySourceType::Ipynb)
     }
 }
 
@@ -79,7 +79,7 @@ impl From<&Path> for PySourceType {
     fn from(path: &Path) -> Self {
         match path.extension() {
             Some(ext) if ext == "pyi" => PySourceType::Stub,
-            Some(ext) if ext == "ipynb" => PySourceType::Jupyter,
+            Some(ext) if ext == "ipynb" => PySourceType::Ipynb,
             _ => PySourceType::Python,
         }
     }

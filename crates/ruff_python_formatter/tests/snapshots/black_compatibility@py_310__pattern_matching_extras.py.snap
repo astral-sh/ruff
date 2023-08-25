@@ -188,15 +188,6 @@ match bar1:
          pass
      case _:
          pass
-@@ -48,7 +57,7 @@
- match a, *b, c:
-     case [*_]:
-         assert "seq" == _
--    case {}:
-+    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
-         assert "map" == b
- 
- 
 @@ -59,12 +68,7 @@
      ),
      case,
@@ -211,27 +202,25 @@ match bar1:
          pass
  
      case [a as match]:
-@@ -85,12 +89,9 @@
- 
- 
+@@ -87,10 +91,10 @@
  match something:
--    case {
--        "key": key as key_1,
+     case {
+         "key": key as key_1,
 -        "password": PASS.ONE | PASS.TWO | PASS.THREE as password,
--    }:
-+    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
++        "password": NOT_YET_IMPLEMENTED_PatternMatchOf | (y) as password,
+     }:
          pass
 -    case {"maybe": something(complicated as this) as that}:
-+    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
++    case {"maybe": NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0) as that}:
          pass
  
  
-@@ -101,19 +102,17 @@
+@@ -101,19 +105,17 @@
      case 2 as b, 3 as c:
          pass
  
 -    case 4 as d, (5 as e), (6 | 7 as g), *h:
-+    case 4 as d, 5 as e, NOT_YET_IMPLEMENTED_PatternMatchOf | (y) as g, *h:
++    case 4 as d, (5 as e), (NOT_YET_IMPLEMENTED_PatternMatchOf | (y) as g), *h:
          pass
  
  
@@ -313,7 +302,7 @@ match (
 match a, *b, c:
     case [*_]:
         assert "seq" == _
-    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
+    case {}:
         assert "map" == b
 
 
@@ -345,9 +334,12 @@ match a, *b(), c:
 
 
 match something:
-    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
+    case {
+        "key": key as key_1,
+        "password": NOT_YET_IMPLEMENTED_PatternMatchOf | (y) as password,
+    }:
         pass
-    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
+    case {"maybe": NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0) as that}:
         pass
 
 
@@ -358,7 +350,7 @@ match something:
     case 2 as b, 3 as c:
         pass
 
-    case 4 as d, 5 as e, NOT_YET_IMPLEMENTED_PatternMatchOf | (y) as g, *h:
+    case 4 as d, (5 as e), (NOT_YET_IMPLEMENTED_PatternMatchOf | (y) as g), *h:
         pass
 
 

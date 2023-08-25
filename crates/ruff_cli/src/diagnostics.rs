@@ -293,7 +293,7 @@ pub(crate) fn lint_path(
                         SourceKind::Python(transformed) => {
                             write(path, transformed.as_bytes())?;
                         }
-                        SourceKind::Jupyter(notebook) => {
+                        SourceKind::IpyNotebook(notebook) => {
                             notebook.write(path)?;
                         }
                     },
@@ -308,10 +308,10 @@ pub(crate) fn lint_path(
                                 stdout.write_all(b"\n")?;
                                 stdout.flush()?;
                             }
-                            SourceKind::Jupyter(dest_notebook) => {
+                            SourceKind::IpyNotebook(dest_notebook) => {
                                 // We need to load the notebook again, since we might've
                                 // mutated it.
-                                let src_notebook = source_kind.as_jupyter().unwrap();
+                                let src_notebook = source_kind.as_ipy_notebook().unwrap();
                                 let mut stdout = io::stdout().lock();
                                 for ((idx, src_cell), dest_cell) in src_notebook
                                     .cells()
@@ -409,7 +409,7 @@ pub(crate) fn lint_path(
         );
     }
 
-    let notebooks = if let SourceKind::Jupyter(notebook) = source_kind {
+    let notebooks = if let SourceKind::IpyNotebook(notebook) = source_kind {
         FxHashMap::from_iter([(
             path.to_str()
                 .ok_or_else(|| anyhow!("Unable to parse filename: {:?}", path))?
@@ -567,9 +567,9 @@ impl LintSources {
         let source_type = PySourceType::from(path);
 
         // Read the file from disk.
-        if source_type.is_jupyter() {
+        if source_type.is_ipynb() {
             let notebook = notebook_from_path(path).map_err(SourceExtractionError::Diagnostics)?;
-            let source_kind = SourceKind::Jupyter(notebook);
+            let source_kind = SourceKind::IpyNotebook(notebook);
             Ok(LintSources {
                 source_type,
                 source_kind,
@@ -593,10 +593,10 @@ impl LintSources {
     ) -> Result<LintSources, SourceExtractionError> {
         let source_type = path.map(PySourceType::from).unwrap_or_default();
 
-        if source_type.is_jupyter() {
+        if source_type.is_ipynb() {
             let notebook = notebook_from_source_code(&source_code, path)
                 .map_err(SourceExtractionError::Diagnostics)?;
-            let source_kind = SourceKind::Jupyter(notebook);
+            let source_kind = SourceKind::IpyNotebook(notebook);
             Ok(LintSources {
                 source_type,
                 source_kind,
