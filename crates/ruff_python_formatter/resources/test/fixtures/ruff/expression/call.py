@@ -80,6 +80,21 @@ f(
     # oddly placed own line comment
     dict()
 )
+f(
+    session,
+    b=1,
+    **(# oddly placed own line comment
+    dict()
+    )
+)
+f(
+    session,
+    b=1,
+    **(
+        # oddly placed own line comment
+    dict()
+    )
+)
 
 # Don't add a magic trailing comma when there is only one entry
 # Minimized from https://github.com/django/django/blob/7eeadc82c2f7d7a778e3bb43c34d642e6275dacf/django/contrib/admin/checks.py#L674-L681
@@ -205,3 +220,25 @@ aaa = (
     ()
     .bbbbbbbbbbbbbbbb
 )
+
+# Comments around keywords
+f(x= # comment
+  1)
+
+f(x # comment
+ =
+  1)
+
+f(x=
+  # comment
+  1)
+
+f(x=(# comment
+  1
+))
+
+
+f(x=(
+  # comment
+  1
+))

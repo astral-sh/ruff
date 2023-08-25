@@ -191,7 +191,10 @@ fn handle_enclosed_comment<'a>(
                 locator,
             )
         }
-        AnyNodeRef::Keyword(_) => handle_dict_unpacking_comment(comment, locator),
+        AnyNodeRef::Keyword(keyword) => handle_keyword_comment(comment, keyword, locator),
+        AnyNodeRef::PatternKeyword(pattern_keyword) => {
+            handle_pattern_keyword_comment(comment, pattern_keyword, locator)
+        }
         AnyNodeRef::ExprNamedExpr(_) => handle_named_expr_comment(comment, locator),
         AnyNodeRef::ExprDict(_) => handle_dict_unpacking_comment(comment, locator)
             .or_else(|comment| handle_bracketed_end_of_line_comment(comment, locator)),
@@ -945,6 +948,74 @@ fn handle_leading_class_with_decorators_comment<'a>(
     CommentPlacement::Default(comment)
 }
 
+/// Handles comments between a keyword's identifier and value:
+/// ```python
+/// func(
+///     x  # dangling
+///     =  # dangling
+///     # dangling
+///     1,
+///     **  # dangling
+///     y
+/// )
+/// ```
+fn handle_keyword_comment<'a>(
+    comment: DecoratedComment<'a>,
+    keyword: &'a ast::Keyword,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    let start = keyword.arg.as_ref().map_or(keyword.start(), Ranged::end);
+
+    // If the comment is parenthesized, it should be attached to the value:
+    // ```python
+    // func(
+    //     x=(  # comment
+    //         1
+    //     )
+    // )
+    // ```
+    let mut tokenizer =
+        SimpleTokenizer::new(locator.contents(), TextRange::new(start, comment.start()));
+    if tokenizer.any(|token| token.kind == SimpleTokenKind::LParen) {
+        return CommentPlacement::Default(comment);
+    }
+
+    CommentPlacement::leading(comment.enclosing_node(), comment)
+}
+
+/// Handles comments between a pattern keyword's identifier and value:
+/// ```python
+/// case Point2D(
+///     x  # dangling
+///     =  # dangling
+///     # dangling
+///     1
+/// )
+/// ```
+fn handle_pattern_keyword_comment<'a>(
+    comment: DecoratedComment<'a>,
+    pattern_keyword: &'a ast::PatternKeyword,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    // If the comment is parenthesized, it should be attached to the value:
+    // ```python
+    // case Point2D(
+    //     x=(  # comment
+    //         1
+    //     )
+    // )
+    // ```
+    let mut tokenizer = SimpleTokenizer::new(
+        locator.contents(),
+        TextRange::new(pattern_keyword.attr.end(), comment.start()),
+    );
+    if tokenizer.any(|token| token.kind == SimpleTokenKind::LParen) {
+        return CommentPlacement::Default(comment);
+    }
+
+    CommentPlacement::leading(comment.enclosing_node(), comment)
+}
+
 /// Handles comments between `**` and the variable name in dict unpacking
 /// It attaches these to the appropriate value node.
 ///
@@ -959,10 +1030,7 @@ fn handle_dict_unpacking_comment<'a>(
     comment: DecoratedComment<'a>,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    debug_assert!(matches!(
-        comment.enclosing_node(),
-        AnyNodeRef::ExprDict(_) | AnyNodeRef::Keyword(_)
-    ));
+    debug_assert!(matches!(comment.enclosing_node(), AnyNodeRef::ExprDict(_)));
 
     // no node after our comment so we can't be between `**` and the name (node)
     let Some(following) = comment.following_node() else {
@@ -985,7 +1053,7 @@ fn handle_dict_unpacking_comment<'a>(
     // if the remaining tokens from the previous node are exactly `**`,
     // re-assign the comment to the one that follows the stars
     if tokens.any(|token| token.kind == SimpleTokenKind::DoubleStar) {
-        CommentPlacement::trailing(following, comment)
+        CommentPlacement::leading(following, comment)
     } else {
         CommentPlacement::Default(comment)
     }

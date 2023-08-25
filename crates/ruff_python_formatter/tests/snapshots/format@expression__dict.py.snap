@@ -80,22 +80,26 @@ x={  # dangling end of line comment
 
 {
     **a,  #  leading
-    **b,  # middle  # trailing
+    # middle
+    **b,  # trailing
 }
 
 {
-    **b  # middle with single item
+    # middle with single item
+    **b
 }
 
 {
     # before
-    **b,  # between
+    # between
+    **b,
 }
 
 {
     **a,  # comment before preceding node's comma
     # before
-    **b,  # between
+    # between
+    **b,
 }
 
 {}
