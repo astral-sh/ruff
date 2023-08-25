@@ -197,7 +197,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 match self.kind {
                     SuiteKind::TopLevel => {
                         match lines_after_ignoring_trivia(preceding.end(), source) {
-                            0 | 1 | 2 => empty_line().fmt(f)?,
+                            0..=2 => empty_line().fmt(f)?,
                             _ => write!(f, [empty_line(), empty_line()])?,
                         }
                     }
