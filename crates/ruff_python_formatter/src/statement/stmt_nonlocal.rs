@@ -1,10 +1,9 @@
-use crate::comments::{SourceComment, SuppressionKind};
 use ruff_formatter::{format_args, write};
 use ruff_python_ast::node::AstNode;
 use ruff_python_ast::StmtNonlocal;
 
+use crate::comments::{SourceComment, SuppressionKind};
 use crate::prelude::*;
-use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatStmtNonlocal;

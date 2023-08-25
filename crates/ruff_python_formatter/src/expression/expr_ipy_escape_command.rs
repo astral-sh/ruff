@@ -1,5 +1,6 @@
-use crate::prelude::*;
 use ruff_python_ast::{ExprIpyEscapeCommand, Ranged};
+
+use crate::prelude::*;
 
 #[derive(Default)]
 pub struct FormatExprIpyEscapeCommand;

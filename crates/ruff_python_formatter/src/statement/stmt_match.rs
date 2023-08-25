@@ -7,7 +7,6 @@ use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
 use crate::statement::clause::{clause_header, ClauseHeader};
-use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatStmtMatch;

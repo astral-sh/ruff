@@ -1,10 +1,10 @@
-use crate::comments::{dangling_comments, SourceComment};
 use ruff_formatter::write;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{Pattern, PatternMatchClass, Ranged};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{TextRange, TextSize};
 
+use crate::comments::{dangling_comments, SourceComment};
 use crate::expression::parentheses::{
     empty_parenthesized, parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
 };

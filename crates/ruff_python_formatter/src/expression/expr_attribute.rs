@@ -10,7 +10,6 @@ use crate::expression::parentheses::{
 };
 use crate::expression::CallChainLayout;
 use crate::prelude::*;
-use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatExprAttribute {

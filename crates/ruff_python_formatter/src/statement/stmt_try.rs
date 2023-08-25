@@ -8,7 +8,6 @@ use crate::other::except_handler_except_handler::ExceptHandlerKind;
 use crate::prelude::*;
 use crate::statement::clause::{clause_body, clause_header, ClauseHeader, ElseClause};
 use crate::statement::{FormatRefWithRule, Stmt};
-use crate::{FormatNodeRule, PyFormatter};
 
 #[derive(Default)]
 pub struct FormatStmtTry;

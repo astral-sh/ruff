@@ -3,7 +3,6 @@ use ruff_python_ast::PatternMatchValue;
 
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parentheses};
 use crate::prelude::*;
-use crate::{AsFormat, FormatNodeRule, PyFormatter};
 
 #[derive(Default)]
 pub struct FormatPatternMatchValue;

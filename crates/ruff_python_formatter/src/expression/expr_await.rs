@@ -1,12 +1,10 @@
-use ruff_python_ast::ExprAwait;
-
 use ruff_formatter::write;
 use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::ExprAwait;
 
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parenthesize};
 use crate::prelude::*;
-use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatExprAwait;
