@@ -72,7 +72,7 @@ pub(crate) fn test_notebook_path(
     let source_kind = SourceKind::IpyNotebook(source_notebook);
     let (messages, transformed) = test_contents(&source_kind, path.as_ref(), settings);
     let expected_notebook = read_jupyter_notebook(expected.as_ref())?;
-    let linted_notebook = transformed.into_owned().expect_jupyter();
+    let linted_notebook = transformed.into_owned().expect_ipy_notebook();
 
     assert_eq!(
         linted_notebook.cell_offsets(),
@@ -86,7 +86,7 @@ pub(crate) fn test_notebook_path(
 
     Ok(TestedNotebook {
         messages,
-        source_notebook: source_kind.expect_jupyter(),
+        source_notebook: source_kind.expect_ipy_notebook(),
         linted_notebook,
     })
 }
