@@ -158,24 +158,6 @@ match bar1:
          pass
      case _:
          pass
-@@ -87,7 +96,7 @@
- match something:
-     case {
-         "key": key as key_1,
--        "password": PASS.ONE | PASS.TWO | PASS.THREE as password,
-+        "password": NOT_YET_IMPLEMENTED_PatternMatchOf | (y) as password,
-     }:
-         pass
-     case {"maybe": something(complicated as this) as that}:
-@@ -101,7 +110,7 @@
-     case 2 as b, 3 as c:
-         pass
- 
--    case 4 as d, (5 as e), (6 | 7 as g), *h:
-+    case 4 as d, (5 as e), (NOT_YET_IMPLEMENTED_PatternMatchOf | (y) as g), *h:
-         pass
- 
- 
 ```
 
 ## Ruff Output
@@ -279,7 +261,7 @@ match a, *b(), c:
 match something:
     case {
         "key": key as key_1,
-        "password": NOT_YET_IMPLEMENTED_PatternMatchOf | (y) as password,
+        "password": PASS.ONE | PASS.TWO | PASS.THREE as password,
     }:
         pass
     case {"maybe": something(complicated as this) as that}:
@@ -293,7 +275,7 @@ match something:
     case 2 as b, 3 as c:
         pass
 
-    case 4 as d, (5 as e), (NOT_YET_IMPLEMENTED_PatternMatchOf | (y) as g), *h:
+    case 4 as d, (5 as e), (6 | 7 as g), *h:
         pass
 
 
