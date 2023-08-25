@@ -79,18 +79,6 @@ def foo():
 
     yield aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb + ccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
-    yield len(self.nodeseeeeeeeee), sum(
-        len(node.parents) for node in self.node_map.values()
-    )
-
-    a = (yield len(self.nodeseeeeeeeee), sum(
-        len(node.parents) for node in self.node_map.values()
-    ))
-
-    a = yield (yield len(self.nodeseeeeeeeee), sum(
-        len(node.parents) for node in self.node_map.values()
-    ))
-
 yield ("Cache key will cause errors if used with memcached: %r " "(longer than %s)" % (
     key,
     MEMCACHE_MAX_KEY_LENGTH,
@@ -196,21 +184,6 @@ def foo():
         aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
         + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
         + ccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-    )
-
-    yield len(self.nodeseeeeeeeee), sum(
-        len(node.parents) for node in self.node_map.values()
-    )
-
-    a = yield len(self.nodeseeeeeeeee), sum(
-        len(node.parents) for node in self.node_map.values()
-    )
-
-    a = yield (
-        yield (
-            len(self.nodeseeeeeeeee),
-            sum(len(node.parents) for node in self.node_map.values()),
-        )
     )
 
 
