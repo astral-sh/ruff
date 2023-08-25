@@ -372,7 +372,7 @@ IpyHelpEndEscapeCommandStatement: ast::Stmt = {
     // We are permissive than the original implementation because we would allow whitespace
     // between the expression and the suffix while the IPython implementation doesn't allow it.
     // For example, `foo ?` would be valid in our case but invalid from IPython.
-    <location:@L> <e:Expression<"All">> <suffix:("?")+> <end_location:@R> =>? {
+    <location:@L> <e:Expression<"all">> <suffix:("?")+> <end_location:@R> =>? {
         fn unparse_expr(expr: &ast::Expr, buffer: &mut String) -> Result<(), LexicalError> {
             match expr {
                 ast::Expr::Name(ast::ExprName { id, .. }) => {
@@ -1054,7 +1054,7 @@ WithStatement: ast::Stmt = {
 
 WithItems: Vec<ast::WithItem> = {
     "(" <WithItemsNoAs> ","? ")",
-    "(" <left:(<WithItemsNoAs> ",")?> <mid:WithItem<"as">> <right:("," <WithItem<"all">>)*> ","? ")" => {
+    "(" <left:(<WithItemsNoAs> ",")?> <mid:WithItemAs> <right:("," <WithItem<"all">>)*> ","? ")" => {
         left.into_iter().flatten().chain([mid]).chain(right).collect()
     },
     <WithItem<"no-withitems">> => vec![<>],
@@ -1071,12 +1071,16 @@ WithItemsNoAs: Vec<ast::WithItem> = {
 }
 
 WithItem<Goal>: ast::WithItem = {
-    <location:@L> <context_expr: Test<Goal>> <end_location:@R> if Goal != "as" => ast::WithItem { context_expr, optional_vars: None, range: (location..end_location).into() },
+    <location:@L> <context_expr: Test<Goal>> <end_location:@R> => ast::WithItem { context_expr, optional_vars: None, range: (location..end_location).into() },
+    <WithItemAs>,
+};
+
+WithItemAs: ast::WithItem = {
     <location:@L> <context_expr:Test<"all">> "as" <vars:Expression<"all">> <end_location:@R> => {
         let optional_vars = Some(Box::new(set_context(vars, ast::ExprContext::Store)));
         ast::WithItem { context_expr, optional_vars, range: (location..end_location).into() }
     },
-};
+}
 
 FuncDef: ast::Stmt = {
      <location:@L> <decorator_list:Decorator*> <is_async:"async"?> "def" <name:Identifier> <type_params:TypeParams?> <args:Parameters> <r:("->" <Test<"all">>)?> ":" <body:Suite> => {
