@@ -1,10 +1,10 @@
-use crate::{FormatOptions, IndentStyle, LineWidth};
+use crate::{FormatOptions, IndentStyle, LineWidth, TabWidth};
 
 /// Options that affect how the [`crate::Printer`] prints the format tokens
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Default)]
 pub struct PrinterOptions {
     /// Width of a single tab character (does it equal 2, 4, ... spaces?)
-    pub tab_width: u8,
+    pub tab_width: TabWidth,
 
     /// What's the max width of a line. Defaults to 80
     pub print_width: PrintWidth,
@@ -74,23 +74,31 @@ impl PrinterOptions {
         self
     }
 
+    #[must_use]
+    pub fn with_tab_width(mut self, width: TabWidth) -> Self {
+        self.tab_width = width;
+
+        self
+    }
+
     pub(crate) fn indent_style(&self) -> IndentStyle {
         self.indent_style
     }
 
     /// Width of an indent in characters.
-    pub(super) const fn indent_width(&self) -> u8 {
+    pub(super) const fn indent_width(&self) -> u32 {
         match self.indent_style {
-            IndentStyle::Tab => self.tab_width,
-            IndentStyle::Space(count) => count,
+            IndentStyle::Tab => self.tab_width.value(),
+            IndentStyle::Space(count) => count as u32,
         }
     }
 }
 
 #[allow(dead_code)]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Default)]
 pub enum LineEnding {
     ///  Line Feed only (\n), common on Linux and macOS as well as inside git repos
+    #[default]
     LineFeed,
 
     /// Carriage Return + Line Feed characters (\r\n), common on Windows
@@ -107,17 +115,6 @@ impl LineEnding {
             LineEnding::LineFeed => "\n",
             LineEnding::CarriageReturnLineFeed => "\r\n",
             LineEnding::CarriageReturn => "\r",
-        }
-    }
-}
-
-impl Default for PrinterOptions {
-    fn default() -> Self {
-        PrinterOptions {
-            tab_width: 2,
-            print_width: PrintWidth::default(),
-            indent_style: IndentStyle::default(),
-            line_ending: LineEnding::LineFeed,
         }
     }
 }

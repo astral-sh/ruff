@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use bitflags::bitflags;
 
-use ruff_formatter::{format_args, write, FormatError};
+use ruff_formatter::{format_args, write, FormatError, FormatOptions, TabWidth};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{self as ast, ExprConstant, ExprFString, Ranged};
 use ruff_python_parser::lexer::{lex_starts_at, LexicalError, LexicalErrorType};
@@ -682,13 +682,14 @@ fn normalize_string(
 /// to the next multiple of 8. This is effectively a port of
 /// [`str.expandtabs`](https://docs.python.org/3/library/stdtypes.html#str.expandtabs),
 /// which black [calls with the default tab width of 8](https://github.com/psf/black/blob/c36e468794f9256d5e922c399240d49782ba04f1/src/black/strings.py#L61)
-fn count_indentation_like_black(line: &str) -> TextSize {
-    let tab_width: u32 = 8;
+fn count_indentation_like_black(line: &str, tab_width: TabWidth) -> TextSize {
     let mut indentation = TextSize::default();
     for char in line.chars() {
         if char == '\t' {
             // Pad to the next multiple of tab_width
-            indentation += TextSize::from(tab_width - (indentation.to_u32().rem_euclid(tab_width)));
+            indentation += TextSize::from(
+                tab_width.value() - (indentation.to_u32().rem_euclid(tab_width.value())),
+            );
         } else if char.is_whitespace() {
             indentation += char.text_len();
         } else {
@@ -868,7 +869,7 @@ fn format_docstring(string_part: &FormatStringPart, f: &mut PyFormatter) -> Form
         .clone()
         // We don't want to count whitespace-only lines as miss-indented
         .filter(|line| !line.trim().is_empty())
-        .map(count_indentation_like_black)
+        .map(|line| count_indentation_like_black(line, f.options().tab_width()))
         .min()
         .unwrap_or_default();
 
@@ -943,7 +944,8 @@ fn format_docstring_line(
         // overindented, in which case we strip the additional whitespace (see example in
         // [`format_docstring`] doc comment). We then prepend the in-docstring indentation to the
         // string.
-        let indent_len = count_indentation_like_black(trim_end) - stripped_indentation;
+        let indent_len =
+            count_indentation_like_black(trim_end, f.options().tab_width()) - stripped_indentation;
         let in_docstring_indent = " ".repeat(indent_len.to_usize()) + trim_end.trim_start();
         dynamic_text(&in_docstring_indent, Some(offset)).fmt(f)?;
     } else {
@@ -976,12 +978,23 @@ fn format_docstring_line(
 #[cfg(test)]
 mod tests {
     use crate::expression::string::count_indentation_like_black;
+    use ruff_formatter::TabWidth;
 
     #[test]
     fn test_indentation_like_black() {
-        assert_eq!(count_indentation_like_black("\t \t  \t").to_u32(), 24);
-        assert_eq!(count_indentation_like_black("\t        \t").to_u32(), 24);
-        assert_eq!(count_indentation_like_black("\t\t\t").to_u32(), 24);
-        assert_eq!(count_indentation_like_black("    ").to_u32(), 4);
+        let tab_width = TabWidth::try_from(8).unwrap();
+        assert_eq!(
+            count_indentation_like_black("\t \t  \t", tab_width).to_u32(),
+            24
+        );
+        assert_eq!(
+            count_indentation_like_black("\t        \t", tab_width).to_u32(),
+            24
+        );
+        assert_eq!(
+            count_indentation_like_black("\t\t\t", tab_width).to_u32(),
+            24
+        );
+        assert_eq!(count_indentation_like_black("    ", tab_width).to_u32(), 4);
     }
 }
