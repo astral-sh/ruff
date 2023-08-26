@@ -333,9 +333,12 @@ pub(crate) fn blank_lines(
         if token.kind() == TokenKind::Def
             && tracked_vars.is_in_class
             && line.line.preceding_blank_lines == 0
+            && !tracked_vars.follows_decorator
             && prev_line
                 .and_then(|prev_line| prev_line.tokens_trimmed().first())
-                .map_or(false, |token| token.kind() != TokenKind::Class)
+                .map_or(false, |token| {
+                    !matches!(token.kind(), TokenKind::Def | TokenKind::Class)
+                })
         {
             // E301
             let mut diagnostic = Diagnostic::new(
