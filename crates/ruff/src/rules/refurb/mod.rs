@@ -1,4 +1,5 @@
 //! Rules from [refurb](https://pypi.org/project/refurb/)/
+mod helpers;
 pub(crate) mod rules;
 
 #[cfg(test)]
@@ -13,6 +14,7 @@ mod tests {
     use crate::{assert_messages, settings};
 
     #[test_case(Rule::RepeatedAppend, Path::new("FURB113.py"))]
+    #[test_case(Rule::DeleteFullSlice, Path::new("FURB131.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

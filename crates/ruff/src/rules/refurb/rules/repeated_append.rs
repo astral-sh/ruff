@@ -1,19 +1,17 @@
 use std::collections::HashMap;
 
-use ast::{traversal, ParameterWithDefault, Parameters, Ranged};
+use ast::{traversal, Ranged};
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, ExprName, Stmt};
 use ruff_python_codegen::Generator;
-use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
-use ruff_python_semantic::{
-    Binding, BindingId, BindingKind, Definition, DefinitionId, SemanticModel,
-};
+use ruff_python_semantic::{Binding, BindingId, Definition, DefinitionId, SemanticModel};
 use ruff_text_size::TextRange;
 
 use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
+use crate::rules::refurb::helpers::is_list;
 
 /// ## What it does
 /// Checks for consecutive calls to `append`.
@@ -366,87 +364,4 @@ fn match_append<'a>(semantic: &'a SemanticModel, stmt: &'a Stmt) -> Option<Appen
         stmt,
         argument,
     })
-}
-
-/// Test whether the given binding (and the given name) can be considered a list.
-/// For this, we check what value might be associated with it through it's initialization and
-/// what annotation it has (we consider `list` and `typing.List`).
-///
-/// NOTE: this function doesn't perform more serious type inference, so it won't be able
-///       to understand if the value gets initialized from a call to a function always returning
-///       lists. This also implies no interfile analysis.
-fn is_list<'a>(semantic: &'a SemanticModel, binding: &'a Binding, name: &str) -> bool {
-    assert!(binding.source.is_some());
-    let stmt = semantic.statement(binding.source.unwrap());
-
-    match binding.kind {
-        BindingKind::Assignment => match stmt {
-            Stmt::Assign(ast::StmtAssign { value, .. }) => {
-                let value_type: ResolvedPythonType = value.as_ref().into();
-                let ResolvedPythonType::Atom(candidate) = value_type else {
-                    return false;
-                };
-                matches!(candidate, PythonType::List)
-            }
-            Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. }) => {
-                is_list_annotation(semantic, annotation.as_ref())
-            }
-            _ => false,
-        },
-        BindingKind::Argument => match stmt {
-            Stmt::FunctionDef(ast::StmtFunctionDef { parameters, .. }) => {
-                let Some(parameter) = find_parameter_by_name(parameters.as_ref(), name) else {
-                    return false;
-                };
-                let Some(ref annotation) = parameter.parameter.annotation else {
-                    return false;
-                };
-                is_list_annotation(semantic, annotation.as_ref())
-            }
-            _ => false,
-        },
-        BindingKind::Annotation => match stmt {
-            Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. }) => {
-                is_list_annotation(semantic, annotation.as_ref())
-            }
-            _ => false,
-        },
-        _ => false,
-    }
-}
-
-#[inline]
-fn is_list_annotation(semantic: &SemanticModel, annotation: &Expr) -> bool {
-    let Expr::Subscript(ast::ExprSubscript { value, .. }) = annotation else {
-        return false;
-    };
-    match_builtin_list_type(semantic, value) || semantic.match_typing_expr(value, "List")
-}
-
-#[inline]
-fn match_builtin_list_type(semantic: &SemanticModel, type_expr: &Expr) -> bool {
-    let Expr::Name(ast::ExprName { id, .. }) = type_expr else {
-        return false;
-    };
-    id == "list" && semantic.is_builtin("list")
-}
-
-#[inline]
-fn find_parameter_by_name<'a>(
-    parameters: &'a Parameters,
-    name: &'a str,
-) -> Option<&'a ParameterWithDefault> {
-    find_parameter_by_name_impl(&parameters.args, name)
-        .or_else(|| find_parameter_by_name_impl(&parameters.posonlyargs, name))
-        .or_else(|| find_parameter_by_name_impl(&parameters.kwonlyargs, name))
-}
-
-#[inline]
-fn find_parameter_by_name_impl<'a>(
-    parameters: &'a [ParameterWithDefault],
-    name: &'a str,
-) -> Option<&'a ParameterWithDefault> {
-    parameters
-        .iter()
-        .find(|arg| arg.parameter.name.as_str() == name)
 }
