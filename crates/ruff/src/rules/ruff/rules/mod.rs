@@ -43,3 +43,6 @@ pub(crate) enum Context {
 pub(crate) use quadratic_list_summation::*;
 
 mod quadratic_list_summation;
+pub(crate) use invalid_decorator_permutation::*;
+
+mod invalid_decorator_permutation;
