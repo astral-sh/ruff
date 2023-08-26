@@ -868,6 +868,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         // refurb
         (Refurb, "113") => (RuleGroup::Unspecified, rules::refurb::rules::RepeatedAppend),
         (Refurb, "131") => (RuleGroup::Unspecified, rules::refurb::rules::DeleteFullSlice),
+        (Refurb, "132") => (RuleGroup::Unspecified, rules::refurb::rules::CheckAndRemoveFromSet),
 
         _ => return None,
     })
