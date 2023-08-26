@@ -247,10 +247,13 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                     if format_expression.inspect(f)?.will_break() {
                         // The group here is necessary because `format_expression` may contain IR elements
                         // that refer to the group id
-                        group(&format_expression)
-                            .with_group_id(Some(group_id))
-                            .should_expand(true)
-                            .fmt(f)
+                        group(&format_args![
+                            text("("),
+                            soft_block_indent(&format_expression),
+                            text(")")
+                        ])
+                        .with_group_id(Some(group_id))
+                        .fmt(f)
                     } else {
                         // Only add parentheses if it makes the expression fit on the line.
                         // Using the flat version as the most expanded version gives a left-to-right splitting behavior

@@ -1,9 +1,10 @@
 use ruff_python_ast::Ranged;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
-use ruff_formatter::{format_args, write, FormatError, SourceCode};
+use ruff_formatter::{format_args, write, FormatError, FormatOptions, SourceCode, TabWidth};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
 use ruff_python_trivia::{lines_after, lines_after_ignoring_trivia, lines_before};
+use unicode_width::UnicodeWidthChar;
 
 use crate::comments::{CommentLinePosition, SourceComment};
 use crate::context::NodeLevel;
@@ -151,18 +152,33 @@ impl Format<PyFormatContext<'_>> for FormatTrailingComments<'_> {
                 write!(
                     f,
                     [
-                        line_suffix(&format_args![
-                            empty_lines(lines_before_comment),
-                            format_comment(trailing)
-                        ]),
+                        line_suffix(
+                            &format_args![
+                                empty_lines(lines_before_comment),
+                                format_comment(trailing)
+                            ],
+                            0 // Reserving width isn't necessary because we don't split comments and the empty lines expand any enclosing group.
+                        ),
                         expand_parent()
                     ]
                 )?;
             } else {
+                // A trailing comment at the end of a line has a reserved width to consider during line measurement.
+                // ```python
+                // tup = (
+                //     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                // )  # Some comment
+                // ```
                 write!(
                     f,
                     [
-                        line_suffix(&format_args![space(), space(), format_comment(trailing)]),
+                        line_suffix(
+                            &format_args![space(), space(), format_comment(trailing)],
+                            measure_text(
+                                &f.context().source()[slice.range()],
+                                f.options().tab_width()
+                            ) + 2 // Account for two added spaces
+                        ),
                         expand_parent()
                     ]
                 )?;
@@ -264,10 +280,18 @@ impl Format<PyFormatContext<'_>> for FormatDanglingOpenParenthesisComments<'_> {
                 "Expected dangling comment to be at the end of the line"
             );
 
+            let slice = comment.slice();
             write!(
                 f,
                 [
-                    line_suffix(&format_args!(space(), space(), format_comment(comment))),
+                    line_suffix(
+                        &format_args!(space(), space(), format_comment(comment)),
+                        // Marking the comment as a line suffix with reserved width is safe since we expect the comment to be end of line.
+                        measure_text(
+                            &f.context().source()[slice.range()],
+                            f.options().tab_width()
+                        ) + 2 // Account for two added spaces
+                    ),
                     expand_parent()
                 ]
             )?;
@@ -373,4 +397,19 @@ impl Format<PyFormatContext<'_>> for FormatEmptyLines {
             }
         }
     }
+}
+
+/// Helper for measuring text.
+fn measure_text(text: &str, tab_width: TabWidth) -> u32 {
+    let mut width = 0;
+    for c in text.chars() {
+        let char_width = match c {
+            '\t' => tab_width.value(),
+            // SAFETY: A u32 is sufficient to format files <= 4GB
+            #[allow(clippy::cast_possible_truncation)]
+            c => c.width().unwrap_or(0) as u32,
+        };
+        width += char_width;
+    }
+    width
 }

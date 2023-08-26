@@ -435,46 +435,78 @@ fn debug_assert_no_newlines(text: &str) {
     debug_assert!(!text.contains('\r'), "The content '{text}' contains an unsupported '\\r' line terminator character but text must only use line feeds '\\n' as line separator. Use '\\n' instead of '\\r' and '\\r\\n' to insert a line break in strings.");
 }
 
-/// Pushes some content to the end of the current line
+/// Pushes some content to the end of the current line.
 ///
 /// ## Examples
 ///
-/// ```
-/// use ruff_formatter::{format};
+/// ```rust
+/// use ruff_formatter::format;
 /// use ruff_formatter::prelude::*;
 ///
-/// fn main() -> FormatResult<()> {
+/// # fn main() -> FormatResult<()> {
 /// let elements = format!(SimpleFormatContext::default(), [
 ///     text("a"),
-///     line_suffix(&text("c")),
+///     line_suffix(&text("c"), 0),
 ///     text("b")
 /// ])?;
 ///
-/// assert_eq!(
-///     "abc",
-///     elements.print()?.as_code()
-/// );
+/// assert_eq!("abc", elements.print()?.as_code());
+/// # Ok(())
+/// # }
+/// ```
+///
+/// Provide reserved width for the line suffix to include it during measurement.
+/// ```rust
+/// use ruff_formatter::{format, format_args, LineWidth, SimpleFormatContext, SimpleFormatOptions};
+/// use ruff_formatter::prelude::*;
+///
+/// # fn main() -> FormatResult<()> {
+/// let context = SimpleFormatContext::new(SimpleFormatOptions {
+///     line_width: LineWidth::try_from(10).unwrap(),
+///     ..SimpleFormatOptions::default()
+/// });
+///
+/// let elements = format!(context, [
+///     // Breaks
+///     group(&format_args![
+///         if_group_breaks(&text("(")),
+///         soft_block_indent(&format_args![text("a"), line_suffix(&text(" // a comment"), 13)]),
+///         if_group_breaks(&text(")"))
+///         ]),
+///
+///     // Fits
+///     group(&format_args![
+///         if_group_breaks(&text("(")),
+///         soft_block_indent(&format_args![text("a"), line_suffix(&text(" // a comment"), 0)]),
+///         if_group_breaks(&text(")"))
+///     ]),
+/// ])?;
+/// # assert_eq!("(\n\ta // a comment\n)a // a comment", elements.print()?.as_code());
 /// # Ok(())
 /// # }
 /// ```
 #[inline]
-pub fn line_suffix<Content, Context>(inner: &Content) -> LineSuffix<Context>
+pub fn line_suffix<Content, Context>(inner: &Content, reserved_width: u32) -> LineSuffix<Context>
 where
     Content: Format<Context>,
 {
     LineSuffix {
         content: Argument::new(inner),
+        reserved_width,
     }
 }
 
 #[derive(Copy, Clone)]
 pub struct LineSuffix<'a, Context> {
     content: Argument<'a, Context>,
+    reserved_width: u32,
 }
 
 impl<Context> Format<Context> for LineSuffix<'_, Context> {
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
-        f.write_element(FormatElement::Tag(StartLineSuffix));
+        f.write_element(FormatElement::Tag(StartLineSuffix {
+            reserved_width: self.reserved_width,
+        }));
         Arguments::from(&self.content).fmt(f)?;
         f.write_element(FormatElement::Tag(EndLineSuffix));
 
@@ -501,7 +533,7 @@ impl<Context> std::fmt::Debug for LineSuffix<'_, Context> {
 /// # fn  main() -> FormatResult<()> {
 /// let elements = format!(SimpleFormatContext::default(), [
 ///     text("a"),
-///     line_suffix(&text("c")),
+///     line_suffix(&text("c"), 0),
 ///     text("b"),
 ///     line_suffix_boundary(),
 ///     text("d")

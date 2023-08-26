@@ -63,8 +63,11 @@ pub enum Tag {
     StartEntry,
     EndEntry,
 
-    /// Delay the printing of its content until the next line break
-    StartLineSuffix,
+    /// Delay the printing of its content until the next line break. Using reserved width will include
+    /// the associated line suffix during measurement.
+    StartLineSuffix {
+        reserved_width: u32,
+    },
     EndLineSuffix,
 
     /// A token that tracks tokens/nodes that are printed as verbatim.
@@ -96,7 +99,7 @@ impl Tag {
                 | Tag::StartIndentIfGroupBreaks(_)
                 | Tag::StartFill
                 | Tag::StartEntry
-                | Tag::StartLineSuffix
+                | Tag::StartLineSuffix { reserved_width: _ }
                 | Tag::StartVerbatim(_)
                 | Tag::StartLabelled(_)
                 | Tag::StartFitsExpanded(_)
@@ -122,7 +125,7 @@ impl Tag {
             StartIndentIfGroupBreaks(_) | EndIndentIfGroupBreaks => TagKind::IndentIfGroupBreaks,
             StartFill | EndFill => TagKind::Fill,
             StartEntry | EndEntry => TagKind::Entry,
-            StartLineSuffix | EndLineSuffix => TagKind::LineSuffix,
+            StartLineSuffix { reserved_width: _ } | EndLineSuffix => TagKind::LineSuffix,
             StartVerbatim(_) | EndVerbatim => TagKind::Verbatim,
             StartLabelled(_) | EndLabelled => TagKind::Labelled,
             StartFitsExpanded { .. } | EndFitsExpanded => TagKind::FitsExpanded,

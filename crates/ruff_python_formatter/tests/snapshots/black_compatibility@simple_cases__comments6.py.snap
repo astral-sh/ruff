@@ -156,7 +156,7 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
      )
  
  
-@@ -108,11 +112,18 @@
+@@ -108,11 +112,20 @@
      "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
  )
  
@@ -176,7 +176,10 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 +    ],  # type: ignore
  )
  
- aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*items)))  # type: ignore[arg-type]
+-aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*items)))  # type: ignore[arg-type]
++aaaaaaaaaaaaa, bbbbbbbbb = map(
++    list, map(itertools.chain.from_iterable, zip(*items))
++)  # type: ignore[arg-type]
 ```
 
 ## Ruff Output
@@ -310,7 +313,9 @@ call_to_some_function_asdf(
     ],  # type: ignore
 )
 
-aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*items)))  # type: ignore[arg-type]
+aaaaaaaaaaaaa, bbbbbbbbb = map(
+    list, map(itertools.chain.from_iterable, zip(*items))
+)  # type: ignore[arg-type]
 ```
 
 ## Black Output
