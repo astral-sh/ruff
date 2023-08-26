@@ -1,7 +1,8 @@
 use std::time::Duration;
 
-use criterion::measurement::WallTime;
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use ruff_benchmark::criterion::{
+    criterion_group, criterion_main, measurement::WallTime, BenchmarkId, Criterion, Throughput,
+};
 use ruff_benchmark::{TestCase, TestCaseSpeed, TestFile, TestFileDownloadError};
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 use ruff_python_ast::Stmt;

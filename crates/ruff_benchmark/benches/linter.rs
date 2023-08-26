@@ -1,14 +1,12 @@
 use std::time::Duration;
 
-use criterion::measurement::WallTime;
-use criterion::{
-    criterion_group, criterion_main, BenchmarkGroup, BenchmarkId, Criterion, Throughput,
-};
-
 use ruff::linter::lint_only;
 use ruff::settings::{flags, Settings};
 use ruff::source_kind::SourceKind;
 use ruff::RuleSelector;
+use ruff_benchmark::criterion::{
+    criterion_group, criterion_main, BenchmarkGroup, BenchmarkId, Criterion, Throughput,
+};
 use ruff_benchmark::{TestCase, TestCaseSpeed, TestFile, TestFileDownloadError};
 use ruff_python_ast::PySourceType;
 
@@ -43,7 +41,7 @@ fn create_test_cases() -> Result<Vec<TestCase>, TestFileDownloadError> {
     ])
 }
 
-fn benchmark_linter(mut group: BenchmarkGroup<WallTime>, settings: &Settings) {
+fn benchmark_linter(mut group: BenchmarkGroup, settings: &Settings) {
     let test_cases = create_test_cases().unwrap();
 
     for case in test_cases {
