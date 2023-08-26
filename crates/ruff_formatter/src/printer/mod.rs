@@ -233,7 +233,8 @@ impl<'a> Printer<'a> {
                 stack.push(TagKind::IndentIfGroupBreaks, args);
             }
 
-            FormatElement::Tag(StartLineSuffix) => {
+            FormatElement::Tag(StartLineSuffix(reserved_width)) => {
+                self.state.line_width += reserved_width;
                 self.state
                     .line_suffixes
                     .extend(args, queue.iter_content(TagKind::LineSuffix));
@@ -1184,7 +1185,11 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                 }
             }
 
-            FormatElement::Tag(StartLineSuffix) => {
+            FormatElement::Tag(StartLineSuffix(reserved_width)) => {
+                self.state.line_width += reserved_width;
+                if self.state.line_width > self.options().print_width.into() {
+                    return Ok(Fits::No);
+                }
                 self.queue.skip_content(TagKind::LineSuffix);
                 self.state.has_line_suffix = true;
             }
@@ -1720,7 +1725,7 @@ two lines`,
                 text("]")
             ]),
             text(";"),
-            line_suffix(&format_args![space(), text("// trailing")])
+            line_suffix(&format_args![space(), text("// trailing")], 0)
         ]);
 
         assert_eq!(printed.as_code(), "[1, 2, 3]; // trailing");

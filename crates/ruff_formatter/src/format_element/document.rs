@@ -458,8 +458,16 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                             )?;
                         }
 
-                        StartLineSuffix => {
-                            write!(f, [text("line_suffix(")])?;
+                        StartLineSuffix(reserved_width) => {
+                            write!(
+                                f,
+                                [
+                                    text("line_suffix("),
+                                    dynamic_text(&std::format!("{reserved_width:?}"), None),
+                                    text(","),
+                                    space(),
+                                ]
+                            )?;
                         }
 
                         StartVerbatim(_) => {
@@ -671,7 +679,7 @@ impl FormatElements for [FormatElement] {
             match element {
                 // Line suffix
                 // Ignore if any of its content breaks
-                FormatElement::Tag(Tag::StartLineSuffix | Tag::StartFitsExpanded(_)) => {
+                FormatElement::Tag(Tag::StartLineSuffix(_) | Tag::StartFitsExpanded(_)) => {
                     ignore_depth += 1;
                 }
                 FormatElement::Tag(Tag::EndLineSuffix | Tag::EndFitsExpanded) => {

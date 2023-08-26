@@ -434,7 +434,8 @@ fn debug_assert_no_newlines(text: &str) {
     debug_assert!(!text.contains('\r'), "The content '{text}' contains an unsupported '\\r' line terminator character but text must only use line feeds '\\n' as line separator. Use '\\n' instead of '\\r' and '\\r\\n' to insert a line break in strings.");
 }
 
-/// Pushes some content to the end of the current line
+/// Pushes some content to the end of the current line. Provide a reserved width in
+/// order to include the line suffix content during measurement.
 ///
 /// ## Examples
 ///
@@ -445,7 +446,7 @@ fn debug_assert_no_newlines(text: &str) {
 /// fn main() -> FormatResult<()> {
 /// let elements = format!(SimpleFormatContext::default(), [
 ///     text("a"),
-///     line_suffix(&text("c")),
+///     line_suffix(&text("c"), 0),
 ///     text("b")
 /// ])?;
 ///
@@ -457,23 +458,25 @@ fn debug_assert_no_newlines(text: &str) {
 /// # }
 /// ```
 #[inline]
-pub fn line_suffix<Content, Context>(inner: &Content) -> LineSuffix<Context>
+pub fn line_suffix<Content, Context>(inner: &Content, reserved_width: u32) -> LineSuffix<Context>
 where
     Content: Format<Context>,
 {
     LineSuffix {
         content: Argument::new(inner),
+        reserved_width,
     }
 }
 
 #[derive(Copy, Clone)]
 pub struct LineSuffix<'a, Context> {
     content: Argument<'a, Context>,
+    reserved_width: u32,
 }
 
 impl<Context> Format<Context> for LineSuffix<'_, Context> {
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
-        f.write_element(FormatElement::Tag(StartLineSuffix));
+        f.write_element(FormatElement::Tag(StartLineSuffix(self.reserved_width)));
         Arguments::from(&self.content).fmt(f)?;
         f.write_element(FormatElement::Tag(EndLineSuffix));
 
@@ -500,7 +503,7 @@ impl<Context> std::fmt::Debug for LineSuffix<'_, Context> {
 /// # fn  main() -> FormatResult<()> {
 /// let elements = format!(SimpleFormatContext::default(), [
 ///     text("a"),
-///     line_suffix(&text("c")),
+///     line_suffix(&text("c"), 0),
 ///     text("b"),
 ///     line_suffix_boundary(),
 ///     text("d")

@@ -64,7 +64,7 @@ pub enum Tag {
     EndEntry,
 
     /// Delay the printing of its content until the next line break
-    StartLineSuffix,
+    StartLineSuffix(u32),
     EndLineSuffix,
 
     /// A token that tracks tokens/nodes that are printed as verbatim.
@@ -96,7 +96,7 @@ impl Tag {
                 | Tag::StartIndentIfGroupBreaks(_)
                 | Tag::StartFill
                 | Tag::StartEntry
-                | Tag::StartLineSuffix
+                | Tag::StartLineSuffix(_)
                 | Tag::StartVerbatim(_)
                 | Tag::StartLabelled(_)
                 | Tag::StartFitsExpanded(_)
@@ -122,7 +122,7 @@ impl Tag {
             StartIndentIfGroupBreaks(_) | EndIndentIfGroupBreaks => TagKind::IndentIfGroupBreaks,
             StartFill | EndFill => TagKind::Fill,
             StartEntry | EndEntry => TagKind::Entry,
-            StartLineSuffix | EndLineSuffix => TagKind::LineSuffix,
+            StartLineSuffix(_) | EndLineSuffix => TagKind::LineSuffix,
             StartVerbatim(_) | EndVerbatim => TagKind::Verbatim,
             StartLabelled(_) | EndLabelled => TagKind::Labelled,
             StartFitsExpanded { .. } | EndFitsExpanded => TagKind::FitsExpanded,
