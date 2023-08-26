@@ -434,26 +434,53 @@ fn debug_assert_no_newlines(text: &str) {
     debug_assert!(!text.contains('\r'), "The content '{text}' contains an unsupported '\\r' line terminator character but text must only use line feeds '\\n' as line separator. Use '\\n' instead of '\\r' and '\\r\\n' to insert a line break in strings.");
 }
 
-/// Pushes some content to the end of the current line. Provide a reserved width in
-/// order to include the line suffix content during measurement.
+/// Pushes some content to the end of the current line.
 ///
 /// ## Examples
 ///
-/// ```
-/// use ruff_formatter::{format};
+/// ```rust
+/// use ruff_formatter::format;
 /// use ruff_formatter::prelude::*;
 ///
-/// fn main() -> FormatResult<()> {
+/// # fn main() -> FormatResult<()> {
 /// let elements = format!(SimpleFormatContext::default(), [
 ///     text("a"),
 ///     line_suffix(&text("c"), 0),
 ///     text("b")
 /// ])?;
 ///
-/// assert_eq!(
-///     "abc",
-///     elements.print()?.as_code()
-/// );
+/// assert_eq!("abc", elements.print()?.as_code());
+/// # Ok(())
+/// # }
+/// ```
+///
+/// Provide reserved width for the line suffix to include it during measurement.
+/// ```rust
+/// use ruff_formatter::{format, format_args, LineWidth, SimpleFormatContext, SimpleFormatOptions};
+/// use ruff_formatter::prelude::*;
+///
+/// # fn main() -> FormatResult<()> {
+/// let context = SimpleFormatContext::new(SimpleFormatOptions {
+///     line_width: LineWidth::try_from(10).unwrap(),
+///     ..SimpleFormatOptions::default()
+/// });
+///
+/// let elements = format!(context, [
+///     // Breaks
+///     group(&format_args![
+///         if_group_breaks(&text("(")),
+///         soft_block_indent(&format_args![text("a"), line_suffix(&text(" // a comment"), 13)]),
+///         if_group_breaks(&text(")"))
+///         ]),
+///
+///     // Fits
+///     group(&format_args![
+///         if_group_breaks(&text("(")),
+///         soft_block_indent(&format_args![text("a"), line_suffix(&text(" // a comment"), 0)]),
+///         if_group_breaks(&text(")"))
+///     ]),
+/// ])?;
+/// # assert_eq!("(\n\ta // a comment\n)a // a comment", elements.print()?.as_code());
 /// # Ok(())
 /// # }
 /// ```

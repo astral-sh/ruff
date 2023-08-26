@@ -1732,6 +1732,36 @@ two lines`,
     }
 
     #[test]
+    fn line_suffix_with_reserved_width() {
+        let printed = format(&format_args![
+            group(&format_args![
+                text("["),
+                soft_block_indent(&format_with(|f| {
+                    f.fill()
+                        .entry(
+                            &soft_line_break_or_space(),
+                            &format_args!(text("1"), text(",")),
+                        )
+                        .entry(
+                            &soft_line_break_or_space(),
+                            &format_args!(text("2"), text(",")),
+                        )
+                        .entry(
+                            &soft_line_break_or_space(),
+                            &format_args!(text("3"), if_group_breaks(&text(","))),
+                        )
+                        .finish()
+                })),
+                text("]")
+            ]),
+            text(";"),
+            line_suffix(&format_args![space(), text("// Using reserved width causes this content to not fit even though it's a line suffix element")], 93)
+        ]);
+
+        assert_eq!(printed.as_code(), "[\n  1, 2, 3\n]; // Using reserved width causes this content to not fit even though it's a line suffix element");
+    }
+
+    #[test]
     fn conditional_with_group_id_in_fits() {
         let content = format_with(|f| {
             let group_id = f.group_id("test");
