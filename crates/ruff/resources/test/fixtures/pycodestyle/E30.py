@@ -357,6 +357,11 @@ def baz():
 # E302
 def f():
     pass
+
+# comment
+@decorator
+def g():
+    pass
 # end
 
 

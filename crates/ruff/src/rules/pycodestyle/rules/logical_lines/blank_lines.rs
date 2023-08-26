@@ -351,9 +351,17 @@ pub(crate) fn blank_lines(
             )));
             context.push_diagnostic(diagnostic);
         } else if matches!(token.kind(), TokenKind::Def | TokenKind::Class)
-            && !tracked_vars.follows_decorator
-            && !tracked_vars.is_in_class
-            && !tracked_vars.is_in_fn
+            && !(tracked_vars.follows_decorator
+                || tracked_vars.is_in_class
+                || tracked_vars.is_in_fn
+                || tracked_vars.follows_def
+                    && line
+                        .tokens_trimmed()
+                        .last()
+                        .map_or(false, |token| !matches!(token.kind(), TokenKind::Colon)))
+            && prev_line
+                .and_then(|prev_line| prev_line.tokens_trimmed().first())
+                .map_or(false, |token| !matches!(token.kind(), TokenKind::Except))
             && line.line.preceding_blank_lines < 2
             && prev_line.is_some()
         {
