@@ -13,6 +13,7 @@ pub(crate) use static_key_dict_comprehension::*;
 pub(crate) use unnecessary_iterable_allocation_for_first_element::*;
 #[cfg(feature = "unreachable-code")]
 pub(crate) use unreachable::*;
+pub(crate) use unused_conditional_expression_result::*;
 pub(crate) use unused_noqa::*;
 
 mod ambiguous_unicode_character;
@@ -32,6 +33,7 @@ mod static_key_dict_comprehension;
 mod unnecessary_iterable_allocation_for_first_element;
 #[cfg(feature = "unreachable-code")]
 pub(crate) mod unreachable;
+mod unused_conditional_expression_result;
 mod unused_noqa;
 
 #[derive(Clone, Copy)]

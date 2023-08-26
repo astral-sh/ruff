@@ -1485,6 +1485,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::AsyncioDanglingTask) {
                 ruff::rules::asyncio_dangling_task(checker, value);
             }
+            if checker.enabled(Rule::UnusedConditionalExpressionResult) {
+                ruff::rules::unused_conditional_expression_result(checker, value);
+            }
         }
         _ => {}
     }
