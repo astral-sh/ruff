@@ -8,6 +8,8 @@ use crate::expression::parentheses::{
 };
 use crate::prelude::*;
 
+pub(crate) mod pattern_arguments;
+pub(crate) mod pattern_keyword;
 pub(crate) mod pattern_match_as;
 pub(crate) mod pattern_match_class;
 pub(crate) mod pattern_match_mapping;
