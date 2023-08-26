@@ -1,17 +1,19 @@
-use super::tag::Tag;
+use std::collections::HashMap;
+use std::ops::Deref;
+
+use rustc_hash::FxHashMap;
+
 use crate::format_element::tag::{Condition, DedentMode};
 use crate::prelude::tag::GroupMode;
 use crate::prelude::*;
-use crate::printer::LineEnding;
 use crate::source_code::SourceCode;
 use crate::{format, write, TabWidth};
 use crate::{
     BufferExtensions, Format, FormatContext, FormatElement, FormatOptions, FormatResult, Formatter,
     IndentStyle, LineWidth, PrinterOptions,
 };
-use rustc_hash::FxHashMap;
-use std::collections::HashMap;
-use std::ops::Deref;
+
+use super::tag::Tag;
 
 /// A formatted document.
 #[derive(Debug, Clone, Eq, PartialEq, Default)]
@@ -225,10 +227,9 @@ impl FormatOptions for IrFormatOptions {
 
     fn as_print_options(&self) -> PrinterOptions {
         PrinterOptions {
-            tab_width: TabWidth::default(),
             print_width: self.line_width().into(),
-            line_ending: LineEnding::LineFeed,
             indent_style: IndentStyle::Space(2),
+            ..PrinterOptions::default()
         }
     }
 }
@@ -781,10 +782,11 @@ impl Format<IrFormatContext<'_>> for Condition {
 
 #[cfg(test)]
 mod tests {
+    use ruff_text_size::{TextRange, TextSize};
+
     use crate::prelude::*;
     use crate::{format, format_args, write};
     use crate::{SimpleFormatContext, SourceCode};
-    use ruff_text_size::{TextRange, TextSize};
 
     #[test]
     fn display_elements() {

@@ -39,7 +39,7 @@ use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
 
 use crate::format_element::document::Document;
-use crate::printer::{Printer, PrinterOptions};
+use crate::printer::{Printer, PrinterOptions, SourceMapGeneration};
 pub use arguments::{Argument, Arguments};
 pub use buffer::{
     Buffer, BufferExtensions, BufferSnapshot, Inspect, RemoveSoftLinesBuffer, VecBuffer,
@@ -311,10 +311,12 @@ impl FormatOptions for SimpleFormatOptions {
     }
 
     fn as_print_options(&self) -> PrinterOptions {
-        PrinterOptions::default()
-            .with_indent(self.indent_style)
-            .with_tab_width(self.tab_width())
-            .with_print_width(self.line_width.into())
+        PrinterOptions {
+            print_width: self.line_width.into(),
+            indent_style: self.indent_style,
+            source_map_generation: SourceMapGeneration::Enabled,
+            ..PrinterOptions::default()
+        }
     }
 }
 

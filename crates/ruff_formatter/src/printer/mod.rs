@@ -396,6 +396,10 @@ impl<'a> Printer<'a> {
     }
 
     fn push_marker(&mut self) {
+        if self.options.source_map_generation.is_disabled() {
+            return;
+        }
+
         let marker = SourceMarker {
             source: self.state.source_position,
             dest: self.state.buffer.text_len(),
