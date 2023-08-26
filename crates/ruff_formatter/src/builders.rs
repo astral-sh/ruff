@@ -476,7 +476,9 @@ pub struct LineSuffix<'a, Context> {
 
 impl<Context> Format<Context> for LineSuffix<'_, Context> {
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
-        f.write_element(FormatElement::Tag(StartLineSuffix(self.reserved_width)));
+        f.write_element(FormatElement::Tag(StartLineSuffix {
+            reserved_width: self.reserved_width,
+        }));
         Arguments::from(&self.content).fmt(f)?;
         f.write_element(FormatElement::Tag(EndLineSuffix));
 

@@ -458,7 +458,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                             )?;
                         }
 
-                        StartLineSuffix(reserved_width) => {
+                        StartLineSuffix { reserved_width } => {
                             write!(
                                 f,
                                 [
@@ -679,7 +679,9 @@ impl FormatElements for [FormatElement] {
             match element {
                 // Line suffix
                 // Ignore if any of its content breaks
-                FormatElement::Tag(Tag::StartLineSuffix(_) | Tag::StartFitsExpanded(_)) => {
+                FormatElement::Tag(
+                    Tag::StartLineSuffix { reserved_width: _ } | Tag::StartFitsExpanded(_),
+                ) => {
                     ignore_depth += 1;
                 }
                 FormatElement::Tag(Tag::EndLineSuffix | Tag::EndFitsExpanded) => {

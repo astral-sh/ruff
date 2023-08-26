@@ -233,7 +233,7 @@ impl<'a> Printer<'a> {
                 stack.push(TagKind::IndentIfGroupBreaks, args);
             }
 
-            FormatElement::Tag(StartLineSuffix(reserved_width)) => {
+            FormatElement::Tag(StartLineSuffix { reserved_width }) => {
                 self.state.line_width += reserved_width;
                 self.state
                     .line_suffixes
@@ -1185,7 +1185,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                 }
             }
 
-            FormatElement::Tag(StartLineSuffix(reserved_width)) => {
+            FormatElement::Tag(StartLineSuffix { reserved_width }) => {
                 self.state.line_width += reserved_width;
                 if self.state.line_width > self.options().print_width.into() {
                     return Ok(Fits::No);
