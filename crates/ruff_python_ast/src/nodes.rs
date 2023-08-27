@@ -1900,15 +1900,35 @@ impl From<PatternMatchMapping> for Pattern {
 pub struct PatternMatchClass {
     pub range: TextRange,
     pub cls: Box<Expr>,
-    pub patterns: Vec<Pattern>,
-    pub kwd_attrs: Vec<Identifier>,
-    pub kwd_patterns: Vec<Pattern>,
+    pub arguments: PatternArguments,
 }
 
 impl From<PatternMatchClass> for Pattern {
     fn from(payload: PatternMatchClass) -> Self {
         Pattern::MatchClass(payload)
     }
+}
+
+/// An AST node to represent the arguments to a [`PatternMatchClass`], i.e., the
+/// parenthesized contents in `case Point(1, x=0, y=0)`.
+///
+/// Like [`Arguments`], but for [`PatternMatchClass`].
+#[derive(Clone, Debug, PartialEq)]
+pub struct PatternArguments {
+    pub range: TextRange,
+    pub patterns: Vec<Pattern>,
+    pub keywords: Vec<PatternKeyword>,
+}
+
+/// An AST node to represent the keyword arguments to a [`PatternMatchClass`], i.e., the
+/// `x=0` and `y=0` in `case Point(x=0, y=0)`.
+///
+/// Like [`Keyword`], but for [`PatternMatchClass`].
+#[derive(Clone, Debug, PartialEq)]
+pub struct PatternKeyword {
+    pub range: TextRange,
+    pub attr: Identifier,
+    pub pattern: Pattern,
 }
 
 /// See also [MatchStar](https://docs.python.org/3/library/ast.html#ast.MatchStar)
@@ -3002,6 +3022,16 @@ impl Ranged for crate::Pattern {
             Self::MatchAs(node) => node.range(),
             Self::MatchOr(node) => node.range(),
         }
+    }
+}
+impl Ranged for crate::nodes::PatternArguments {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+impl Ranged for crate::nodes::PatternKeyword {
+    fn range(&self) -> TextRange {
+        self.range
     }
 }
 

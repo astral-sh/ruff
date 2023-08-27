@@ -1,14 +1,15 @@
 use ruff_formatter::{write, FormatRuleWithOptions};
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{Constant, Expr, ExprAttribute, ExprConstant};
+use ruff_python_ast::{Constant, Expr, ExprAttribute, ExprConstant, Ranged};
+use ruff_python_trivia::{find_only_token_in_range, SimpleTokenKind};
+use ruff_text_size::TextRange;
 
-use crate::comments::{leading_comments, trailing_comments, SourceComment};
+use crate::comments::{dangling_comments, SourceComment};
 use crate::expression::parentheses::{
     is_expression_parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
 };
 use crate::expression::CallChainLayout;
 use crate::prelude::*;
-use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatExprAttribute {
@@ -43,13 +44,6 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
                     ..
                 })
             );
-
-            let comments = f.context().comments().clone();
-            let dangling_comments = comments.dangling(item);
-            let leading_attribute_comments_start = dangling_comments
-                .partition_point(|comment| comment.line_position().is_end_of_line());
-            let (trailing_dot_comments, leading_attribute_comments) =
-                dangling_comments.split_at(leading_attribute_comments_start);
 
             if needs_parentheses {
                 value.format().with_options(Parentheses::Always).fmt(f)?;
@@ -88,55 +82,42 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
                 value.format().fmt(f)?;
             }
 
-            if comments.has_trailing_own_line(value.as_ref()) {
-                hard_line_break().fmt(f)?;
-            }
-
-            if call_chain_layout == CallChainLayout::Fluent {
-                // Fluent style has line breaks before the dot
-                // ```python
-                // blogs3 = (
-                //     Blog.objects.filter(
-                //         entry__headline__contains="Lennon",
-                //     )
-                //     .filter(
-                //         entry__pub_date__year=2008,
-                //     )
-                //     .filter(
-                //         entry__pub_date__year=2008,
-                //     )
-                // )
-                // ```
-                write!(
-                    f,
-                    [
-                        (!leading_attribute_comments.is_empty()).then_some(hard_line_break()),
-                        leading_comments(leading_attribute_comments),
-                        text("."),
-                        trailing_comments(trailing_dot_comments),
-                        attr.format()
-                    ]
-                )
+            // Identify dangling comments before and after the dot:
+            // ```python
+            // (
+            //      (
+            //          a
+            //      )  # `before_dot`
+            //      # `before_dot`
+            //      .  # `after_dot`
+            //      # `after_dot`
+            //      b
+            // )
+            // ```
+            let comments = f.context().comments().clone();
+            let dangling = comments.dangling(item);
+            let (before_dot, after_dot) = if dangling.is_empty() {
+                (dangling, dangling)
             } else {
-                // Regular style
-                // ```python
-                // blogs2 = Blog.objects.filter(
-                //     entry__headline__contains="Lennon",
-                // ).filter(
-                //     entry__pub_date__year=2008,
-                // )
-                // ```
-                write!(
-                    f,
-                    [
-                        text("."),
-                        trailing_comments(trailing_dot_comments),
-                        (!leading_attribute_comments.is_empty()).then_some(hard_line_break()),
-                        leading_comments(leading_attribute_comments),
-                        attr.format()
-                    ]
+                let dot_token = find_only_token_in_range(
+                    TextRange::new(item.value.end(), item.attr.start()),
+                    SimpleTokenKind::Dot,
+                    f.context().source(),
+                );
+                dangling.split_at(
+                    dangling.partition_point(|comment| comment.start() < dot_token.start()),
                 )
-            }
+            };
+
+            write!(
+                f,
+                [
+                    dangling_comments(before_dot),
+                    text("."),
+                    dangling_comments(after_dot),
+                    attr.format()
+                ]
+            )
         });
 
         let is_call_chain_root = self.call_chain_layout == CallChainLayout::Default
@@ -169,14 +150,10 @@ impl NeedsParentheses for ExprAttribute {
             == CallChainLayout::Fluent
         {
             OptionalParentheses::Multiline
-        } else if context
-            .comments()
-            .dangling(self)
-            .iter()
-            .any(|comment| comment.line_position().is_own_line())
-            || context.comments().has_trailing_own_line(self)
-        {
+        } else if context.comments().has_dangling(self) {
             OptionalParentheses::Always
+        } else if self.value.is_name_expr() {
+            OptionalParentheses::BestFit
         } else {
             self.value.needs_parentheses(self.into(), context)
         }

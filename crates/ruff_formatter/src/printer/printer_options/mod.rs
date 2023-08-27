@@ -1,10 +1,10 @@
-use crate::{FormatOptions, IndentStyle, LineWidth};
+use crate::{FormatOptions, IndentStyle, LineWidth, TabWidth};
 
 /// Options that affect how the [`crate::Printer`] prints the format tokens
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Default)]
 pub struct PrinterOptions {
     /// Width of a single tab character (does it equal 2, 4, ... spaces?)
-    pub tab_width: u8,
+    pub tab_width: TabWidth,
 
     /// What's the max width of a line. Defaults to 80
     pub print_width: PrintWidth,
@@ -14,6 +14,55 @@ pub struct PrinterOptions {
 
     /// Whether the printer should use tabs or spaces to indent code and if spaces, by how many.
     pub indent_style: IndentStyle,
+
+    /// Whether the printer should build a source map that allows mapping positions in the source document
+    /// to positions in the formatted document.
+    pub source_map_generation: SourceMapGeneration,
+}
+
+impl<'a, O> From<&'a O> for PrinterOptions
+where
+    O: FormatOptions,
+{
+    fn from(options: &'a O) -> Self {
+        PrinterOptions::default()
+            .with_indent(options.indent_style())
+            .with_print_width(options.line_width().into())
+    }
+}
+
+impl PrinterOptions {
+    #[must_use]
+    pub fn with_print_width(mut self, width: PrintWidth) -> Self {
+        self.print_width = width;
+        self
+    }
+
+    #[must_use]
+    pub fn with_indent(mut self, style: IndentStyle) -> Self {
+        self.indent_style = style;
+
+        self
+    }
+
+    #[must_use]
+    pub fn with_tab_width(mut self, width: TabWidth) -> Self {
+        self.tab_width = width;
+
+        self
+    }
+
+    pub(crate) fn indent_style(&self) -> IndentStyle {
+        self.indent_style
+    }
+
+    /// Width of an indent in characters.
+    pub(super) const fn indent_width(&self) -> u32 {
+        match self.indent_style {
+            IndentStyle::Tab => self.tab_width.value(),
+            IndentStyle::Space(count) => count as u32,
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -49,48 +98,36 @@ impl From<PrintWidth> for u32 {
     }
 }
 
-impl<'a, O> From<&'a O> for PrinterOptions
-where
-    O: FormatOptions,
-{
-    fn from(options: &'a O) -> Self {
-        PrinterOptions::default()
-            .with_indent(options.indent_style())
-            .with_print_width(options.line_width().into())
-    }
+/// Configures whether the formatter and printer generate a source map that allows mapping
+/// positions in the source document to positions in the formatted code.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum SourceMapGeneration {
+    /// The formatter generates no source map.
+    #[default]
+    Disabled,
+
+    /// The formatter generates a source map that allows mapping positions in the source document
+    /// to positions in the formatted document. The ability to map positions is useful for range formatting
+    /// or when trying to identify where to move the cursor so that it matches its position in the source document.
+    Enabled,
 }
 
-impl PrinterOptions {
-    #[must_use]
-    pub fn with_print_width(mut self, width: PrintWidth) -> Self {
-        self.print_width = width;
-        self
+impl SourceMapGeneration {
+    pub const fn is_enabled(self) -> bool {
+        matches!(self, SourceMapGeneration::Enabled)
     }
 
-    #[must_use]
-    pub fn with_indent(mut self, style: IndentStyle) -> Self {
-        self.indent_style = style;
-
-        self
-    }
-
-    pub(crate) fn indent_style(&self) -> IndentStyle {
-        self.indent_style
-    }
-
-    /// Width of an indent in characters.
-    pub(super) const fn indent_width(&self) -> u8 {
-        match self.indent_style {
-            IndentStyle::Tab => self.tab_width,
-            IndentStyle::Space(count) => count,
-        }
+    pub const fn is_disabled(self) -> bool {
+        matches!(self, SourceMapGeneration::Disabled)
     }
 }
 
 #[allow(dead_code)]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Default)]
 pub enum LineEnding {
     ///  Line Feed only (\n), common on Linux and macOS as well as inside git repos
+    #[default]
     LineFeed,
 
     /// Carriage Return + Line Feed characters (\r\n), common on Windows
@@ -107,17 +144,6 @@ impl LineEnding {
             LineEnding::LineFeed => "\n",
             LineEnding::CarriageReturnLineFeed => "\r\n",
             LineEnding::CarriageReturn => "\r",
-        }
-    }
-}
-
-impl Default for PrinterOptions {
-    fn default() -> Self {
-        PrinterOptions {
-            tab_width: 2,
-            print_width: PrintWidth::default(),
-            indent_style: IndentStyle::default(),
-            line_ending: LineEnding::LineFeed,
         }
     }
 }

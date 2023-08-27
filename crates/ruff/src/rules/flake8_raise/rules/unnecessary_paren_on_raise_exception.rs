@@ -1,10 +1,6 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, PySourceType, Ranged};
-use ruff_python_parser::{lexer, AsMode, Tok};
-use ruff_text_size::{TextRange, TextSize};
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_source_file::Locator;
+use ruff_python_ast::{self as ast, Expr, Ranged};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -49,19 +45,14 @@ impl AlwaysAutofixableViolation for UnnecessaryParenOnRaiseException {
 pub(crate) fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: &Expr) {
     let Expr::Call(ast::ExprCall {
         func,
-        arguments:
-            Arguments {
-                args,
-                keywords,
-                range: _,
-            },
+        arguments,
         range: _,
     }) = expr
     else {
         return;
     };
 
-    if args.is_empty() && keywords.is_empty() {
+    if arguments.is_empty() {
         // `raise func()` still requires parentheses; only `raise Class()` does not.
         if checker
             .semantic()
@@ -71,49 +62,38 @@ pub(crate) fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: 
             return;
         }
 
-        let range = match_parens(func.end(), checker.locator(), checker.source_type)
-            .expect("Expected call to include parentheses");
-        let mut diagnostic = Diagnostic::new(UnnecessaryParenOnRaiseException, range);
+        // `ctypes.WinError()` is a function, not a class. It's part of the standard library, so
+        // we might as well get it right.
+        if checker
+            .semantic()
+            .resolve_call_path(func)
+            .is_some_and(|call_path| matches!(call_path.as_slice(), ["ctypes", "WinError"]))
+        {
+            return;
+        }
+
+        let mut diagnostic = Diagnostic::new(UnnecessaryParenOnRaiseException, arguments.range());
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Fix::automatic(Edit::deletion(func.end(), range.end())));
+            // If the arguments are immediately followed by a `from`, insert whitespace to avoid
+            // a syntax error, as in:
+            // ```python
+            // raise IndexError()from ZeroDivisionError
+            // ```
+            if checker
+                .locator()
+                .after(arguments.end())
+                .chars()
+                .next()
+                .is_some_and(char::is_alphanumeric)
+            {
+                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+                    " ".to_string(),
+                    arguments.range(),
+                )));
+            } else {
+                diagnostic.set_fix(Fix::automatic(Edit::range_deletion(arguments.range())));
+            }
         }
         checker.diagnostics.push(diagnostic);
-    }
-}
-
-/// Return the range of the first parenthesis pair after a given [`TextSize`].
-fn match_parens(
-    start: TextSize,
-    locator: &Locator,
-    source_type: PySourceType,
-) -> Option<TextRange> {
-    let contents = &locator.contents()[usize::from(start)..];
-
-    let mut fix_start = None;
-    let mut fix_end = None;
-    let mut count = 0u32;
-
-    for (tok, range) in lexer::lex_starts_at(contents, source_type.as_mode(), start).flatten() {
-        match tok {
-            Tok::Lpar => {
-                if count == 0 {
-                    fix_start = Some(range.start());
-                }
-                count = count.saturating_add(1);
-            }
-            Tok::Rpar => {
-                count = count.saturating_sub(1);
-                if count == 0 {
-                    fix_end = Some(range.end());
-                    break;
-                }
-            }
-            _ => {}
-        }
-    }
-
-    match (fix_start, fix_end) {
-        (Some(start), Some(end)) => Some(TextRange::new(start, end)),
-        _ => None,
     }
 }

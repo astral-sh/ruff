@@ -50,3 +50,11 @@ c1 = [ # trailing open bracket
     second,
     third
 ]  # outer comment
+
+[  # inner comment
+    # own-line comment
+    (  # end-of-line comment
+        # own-line comment
+        first,
+    ),
+]  # outer comment

@@ -1,13 +1,11 @@
+use ruff_formatter::write;
+use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::ExprStarred;
 
 use crate::comments::{dangling_comments, SourceComment};
-use ruff_formatter::write;
-use ruff_python_ast::node::AnyNodeRef;
 
-use crate::context::PyFormatContext;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
-use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatExprStarred;

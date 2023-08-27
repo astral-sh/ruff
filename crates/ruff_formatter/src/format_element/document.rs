@@ -1,17 +1,19 @@
-use super::tag::Tag;
+use std::collections::HashMap;
+use std::ops::Deref;
+
+use rustc_hash::FxHashMap;
+
 use crate::format_element::tag::{Condition, DedentMode};
 use crate::prelude::tag::GroupMode;
 use crate::prelude::*;
-use crate::printer::LineEnding;
 use crate::source_code::SourceCode;
-use crate::{format, write};
+use crate::{format, write, TabWidth};
 use crate::{
     BufferExtensions, Format, FormatContext, FormatElement, FormatOptions, FormatResult, Formatter,
     IndentStyle, LineWidth, PrinterOptions,
 };
-use rustc_hash::FxHashMap;
-use std::collections::HashMap;
-use std::ops::Deref;
+
+use super::tag::Tag;
 
 /// A formatted document.
 #[derive(Debug, Clone, Eq, PartialEq, Default)]
@@ -81,7 +83,7 @@ impl Document {
                             interned_expands
                         }
                     }
-                    FormatElement::BestFitting { variants } => {
+                    FormatElement::BestFitting { variants, mode: _ } => {
                         enclosing.push(Enclosing::BestFitting);
 
                         for variant in variants {
@@ -122,8 +124,12 @@ impl Document {
             expands
         }
 
-        let mut enclosing: Vec<Enclosing> = Vec::new();
-        let mut interned: FxHashMap<&Interned, bool> = FxHashMap::default();
+        let mut enclosing = Vec::with_capacity(if self.is_empty() {
+            0
+        } else {
+            self.len().ilog2() as usize
+        });
+        let mut interned = FxHashMap::default();
         propagate_expands(self, &mut enclosing, &mut interned);
     }
 
@@ -211,16 +217,19 @@ impl FormatOptions for IrFormatOptions {
         IndentStyle::Space(2)
     }
 
+    fn tab_width(&self) -> TabWidth {
+        TabWidth::default()
+    }
+
     fn line_width(&self) -> LineWidth {
         LineWidth(80)
     }
 
     fn as_print_options(&self) -> PrinterOptions {
         PrinterOptions {
-            tab_width: 2,
             print_width: self.line_width().into(),
-            line_ending: LineEnding::LineFeed,
             indent_style: IndentStyle::Space(2),
+            ..PrinterOptions::default()
         }
     }
 }
@@ -326,7 +335,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                     write!(f, [text("line_suffix_boundary")])?;
                 }
 
-                FormatElement::BestFitting { variants } => {
+                FormatElement::BestFitting { variants, mode } => {
                     write!(f, [text("best_fitting([")])?;
                     f.write_elements([
                         FormatElement::Tag(StartIndent),
@@ -342,7 +351,13 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                         FormatElement::Line(LineMode::Hard),
                     ]);
 
-                    write!(f, [text("])")])?;
+                    write!(f, [text("]")])?;
+
+                    if *mode != BestFittingMode::FirstLine {
+                        write!(f, [dynamic_text(&std::format!(", mode: {mode:?}"), None),])?;
+                    }
+
+                    write!(f, [text(")")])?;
                 }
 
                 FormatElement::Interned(interned) => {
@@ -651,18 +666,17 @@ impl Format<IrFormatContext<'_>> for ContentArrayEnd {
 
 impl FormatElements for [FormatElement] {
     fn will_break(&self) -> bool {
-        use Tag::{EndLineSuffix, StartLineSuffix};
         let mut ignore_depth = 0usize;
 
         for element in self {
             match element {
                 // Line suffix
                 // Ignore if any of its content breaks
-                FormatElement::Tag(StartLineSuffix) => {
+                FormatElement::Tag(Tag::StartLineSuffix | Tag::StartFitsExpanded(_)) => {
                     ignore_depth += 1;
                 }
-                FormatElement::Tag(EndLineSuffix) => {
-                    ignore_depth -= 1;
+                FormatElement::Tag(Tag::EndLineSuffix | Tag::EndFitsExpanded) => {
+                    ignore_depth = ignore_depth.saturating_sub(1);
                 }
                 FormatElement::Interned(interned) if ignore_depth == 0 => {
                     if interned.will_break() {
@@ -768,10 +782,11 @@ impl Format<IrFormatContext<'_>> for Condition {
 
 #[cfg(test)]
 mod tests {
+    use ruff_text_size::{TextRange, TextSize};
+
     use crate::prelude::*;
     use crate::{format, format_args, write};
     use crate::{SimpleFormatContext, SourceCode};
-    use ruff_text_size::{TextRange, TextSize};
 
     #[test]
     fn display_elements() {

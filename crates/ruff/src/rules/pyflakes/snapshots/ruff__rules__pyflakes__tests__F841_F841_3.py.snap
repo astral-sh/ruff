@@ -601,5 +601,76 @@ F841_3.py:155:17: F841 [*] Local variable `e` is assigned to but never used
 155     |-    except A as e :
     155 |+    except A:
 156 156 |         print("oh no!")
+157 157 | 
+158 158 | 
+
+F841_3.py:160:5: F841 [*] Local variable `x` is assigned to but never used
+    |
+159 | def f():
+160 |     x = 1
+    |     ^ F841
+161 |     y = 2
+    |
+    = help: Remove assignment to unused variable `x`
+
+ℹ Suggested fix
+157 157 | 
+158 158 | 
+159 159 | def f():
+160     |-    x = 1
+161 160 |     y = 2
+162 161 | 
+163 162 | 
+
+F841_3.py:161:5: F841 [*] Local variable `y` is assigned to but never used
+    |
+159 | def f():
+160 |     x = 1
+161 |     y = 2
+    |     ^ F841
+    |
+    = help: Remove assignment to unused variable `y`
+
+ℹ Suggested fix
+158 158 | 
+159 159 | def f():
+160 160 |     x = 1
+161     |-    y = 2
+162 161 | 
+163 162 | 
+164 163 | def f():
+
+F841_3.py:165:5: F841 [*] Local variable `x` is assigned to but never used
+    |
+164 | def f():
+165 |     x = 1
+    |     ^ F841
+166 | 
+167 |     y = 2
+    |
+    = help: Remove assignment to unused variable `x`
+
+ℹ Suggested fix
+162 162 | 
+163 163 | 
+164 164 | def f():
+165     |-    x = 1
+166 165 | 
+167 166 |     y = 2
+
+F841_3.py:167:5: F841 [*] Local variable `y` is assigned to but never used
+    |
+165 |     x = 1
+166 | 
+167 |     y = 2
+    |     ^ F841
+    |
+    = help: Remove assignment to unused variable `y`
+
+ℹ Suggested fix
+164 164 | def f():
+165 165 |     x = 1
+166 166 | 
+167     |-    y = 2
 
 

@@ -1,22 +1,31 @@
-import math  # not checked
+def not_checked():
+    import math
 
-import altair  # unconventional
-import matplotlib.pyplot  # unconventional
-import numpy  # unconventional
-import pandas  # unconventional
-import seaborn  # unconventional
-import tkinter  # unconventional
 
-import altair as altr  # unconventional
-import matplotlib.pyplot as plot  # unconventional
-import numpy as nmp  # unconventional
-import pandas as pdas  # unconventional
-import seaborn as sbrn  # unconventional
-import tkinter as tkr  # unconventional
+def unconventional():
+    import altair
+    import matplotlib.pyplot
+    import numpy
+    import pandas
+    import seaborn
+    import tkinter
+    import networkx
 
-import altair as alt  # conventional
-import matplotlib.pyplot as plt  # conventional
-import numpy as np  # conventional
-import pandas as pd  # conventional
-import seaborn as sns  # conventional
-import tkinter as tk  # conventional
+
+def unconventional_aliases():
+    import altair as altr
+    import matplotlib.pyplot as plot
+    import numpy as nmp
+    import pandas as pdas
+    import seaborn as sbrn
+    import tkinter as tkr
+    import networkx as nxy
+
+def conventional_aliases():
+    import altair as alt
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import pandas as pd
+    import seaborn as sns
+    import tkinter as tk
+    import networkx as nx

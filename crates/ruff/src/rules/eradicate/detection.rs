@@ -28,7 +28,7 @@ static HASH_NUMBER: Lazy<Regex> = Lazy::new(|| Regex::new(r"#\d").unwrap());
 static MULTILINE_ASSIGNMENT_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^\s*([(\[]\s*)?(\w+\s*,\s*)*\w+\s*([)\]]\s*)?=.*[(\[{]$").unwrap());
 static PARTIAL_DICTIONARY_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"^\s*['"]\w+['"]\s*:.+[,{]\s*$"#).unwrap());
+    Lazy::new(|| Regex::new(r#"^\s*['"]\w+['"]\s*:.+[,{]\s*(#.*)?$"#).unwrap());
 static PRINT_RETURN_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^(print|return)\b\s*").unwrap());
 
 /// Returns `true` if a comment contains Python code.

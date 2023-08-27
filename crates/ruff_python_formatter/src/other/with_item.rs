@@ -1,11 +1,10 @@
-use ruff_formatter::{write, Buffer, FormatResult};
+use ruff_formatter::write;
 use ruff_python_ast::WithItem;
 
 use crate::comments::SourceComment;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{parenthesized, Parentheses, Parenthesize};
 use crate::prelude::*;
-use crate::{FormatNodeRule, PyFormatter};
 
 #[derive(Default)]
 pub struct FormatWithItem;

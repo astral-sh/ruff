@@ -1,10 +1,9 @@
-use crate::comments::SourceComment;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{ExprSet, Ranged};
 
+use crate::comments::SourceComment;
 use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
-use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatExprSet;

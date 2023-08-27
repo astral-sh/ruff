@@ -146,3 +146,23 @@ except (
     # comment
 ):
     pass
+
+
+try:
+    pass
+
+finally:
+    pass
+
+
+try:
+    pass
+
+except ZeroDivisonError:
+    pass
+
+else:
+    pass
+
+finally:
+    pass

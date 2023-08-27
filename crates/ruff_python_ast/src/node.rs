@@ -1,8 +1,9 @@
 use crate::visitor::preorder::PreorderVisitor;
 use crate::{
     self as ast, Alias, Arguments, Comprehension, Decorator, ExceptHandler, Expr, Keyword,
-    MatchCase, Mod, Parameter, ParameterWithDefault, Parameters, Pattern, Ranged, Stmt, TypeParam,
-    TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, TypeParams, WithItem,
+    MatchCase, Mod, Parameter, ParameterWithDefault, Parameters, Pattern, PatternArguments,
+    PatternKeyword, Ranged, Stmt, TypeParam, TypeParamParamSpec, TypeParamTypeVar,
+    TypeParamTypeVarTuple, TypeParams, WithItem,
 };
 use ruff_text_size::TextRange;
 use std::ptr::NonNull;
@@ -90,6 +91,8 @@ pub enum AnyNode {
     PatternMatchStar(ast::PatternMatchStar),
     PatternMatchAs(ast::PatternMatchAs),
     PatternMatchOr(ast::PatternMatchOr),
+    PatternArguments(PatternArguments),
+    PatternKeyword(PatternKeyword),
     Comprehension(Comprehension),
     Arguments(Arguments),
     Parameters(Parameters),
@@ -175,6 +178,8 @@ impl AnyNode {
             | AnyNode::PatternMatchStar(_)
             | AnyNode::PatternMatchAs(_)
             | AnyNode::PatternMatchOr(_)
+            | AnyNode::PatternArguments(_)
+            | AnyNode::PatternKeyword(_)
             | AnyNode::Comprehension(_)
             | AnyNode::Arguments(_)
             | AnyNode::Parameters(_)
@@ -260,6 +265,8 @@ impl AnyNode {
             | AnyNode::PatternMatchStar(_)
             | AnyNode::PatternMatchAs(_)
             | AnyNode::PatternMatchOr(_)
+            | AnyNode::PatternArguments(_)
+            | AnyNode::PatternKeyword(_)
             | AnyNode::Comprehension(_)
             | AnyNode::Arguments(_)
             | AnyNode::Parameters(_)
@@ -345,6 +352,8 @@ impl AnyNode {
             | AnyNode::PatternMatchStar(_)
             | AnyNode::PatternMatchAs(_)
             | AnyNode::PatternMatchOr(_)
+            | AnyNode::PatternArguments(_)
+            | AnyNode::PatternKeyword(_)
             | AnyNode::Comprehension(_)
             | AnyNode::Arguments(_)
             | AnyNode::Parameters(_)
@@ -430,6 +439,8 @@ impl AnyNode {
             | AnyNode::ExprSlice(_)
             | AnyNode::ExprIpyEscapeCommand(_)
             | AnyNode::ExceptHandlerExceptHandler(_)
+            | AnyNode::PatternArguments(_)
+            | AnyNode::PatternKeyword(_)
             | AnyNode::Comprehension(_)
             | AnyNode::Arguments(_)
             | AnyNode::Parameters(_)
@@ -515,6 +526,8 @@ impl AnyNode {
             | AnyNode::PatternMatchStar(_)
             | AnyNode::PatternMatchAs(_)
             | AnyNode::PatternMatchOr(_)
+            | AnyNode::PatternArguments(_)
+            | AnyNode::PatternKeyword(_)
             | AnyNode::Comprehension(_)
             | AnyNode::Arguments(_)
             | AnyNode::Parameters(_)
@@ -619,6 +632,8 @@ impl AnyNode {
             Self::PatternMatchStar(node) => AnyNodeRef::PatternMatchStar(node),
             Self::PatternMatchAs(node) => AnyNodeRef::PatternMatchAs(node),
             Self::PatternMatchOr(node) => AnyNodeRef::PatternMatchOr(node),
+            Self::PatternArguments(node) => AnyNodeRef::PatternArguments(node),
+            Self::PatternKeyword(node) => AnyNodeRef::PatternKeyword(node),
             Self::Comprehension(node) => AnyNodeRef::Comprehension(node),
             Self::Arguments(node) => AnyNodeRef::Arguments(node),
             Self::Parameters(node) => AnyNodeRef::Parameters(node),
@@ -3247,19 +3262,11 @@ impl AstNode for ast::PatternMatchClass {
     {
         let ast::PatternMatchClass {
             cls,
-            patterns,
-            kwd_attrs: _,
-            kwd_patterns,
+            arguments: parameters,
             range: _,
         } = self;
         visitor.visit_expr(cls);
-        for pattern in patterns {
-            visitor.visit_pattern(pattern);
-        }
-
-        for pattern in kwd_patterns {
-            visitor.visit_pattern(pattern);
-        }
+        visitor.visit_pattern_arguments(parameters);
     }
 }
 impl AstNode for ast::PatternMatchStar {
@@ -3376,6 +3383,94 @@ impl AstNode for ast::PatternMatchOr {
         for pattern in patterns {
             visitor.visit_pattern(pattern);
         }
+    }
+}
+impl AstNode for PatternArguments {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::PatternArguments(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::PatternArguments(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let PatternArguments {
+            range: _,
+            patterns,
+            keywords,
+        } = self;
+
+        for pattern in patterns {
+            visitor.visit_pattern(pattern);
+        }
+
+        for keyword in keywords {
+            visitor.visit_pattern_keyword(keyword);
+        }
+    }
+}
+impl AstNode for PatternKeyword {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::PatternKeyword(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::PatternKeyword(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let PatternKeyword {
+            range: _,
+            attr: _,
+            pattern,
+        } = self;
+
+        visitor.visit_pattern(pattern);
     }
 }
 
@@ -4475,6 +4570,18 @@ impl From<ast::PatternMatchOr> for AnyNode {
     }
 }
 
+impl From<PatternArguments> for AnyNode {
+    fn from(node: PatternArguments) -> Self {
+        AnyNode::PatternArguments(node)
+    }
+}
+
+impl From<PatternKeyword> for AnyNode {
+    fn from(node: PatternKeyword) -> Self {
+        AnyNode::PatternKeyword(node)
+    }
+}
+
 impl From<Comprehension> for AnyNode {
     fn from(node: Comprehension) -> Self {
         AnyNode::Comprehension(node)
@@ -4615,6 +4722,8 @@ impl Ranged for AnyNode {
             AnyNode::PatternMatchStar(node) => node.range(),
             AnyNode::PatternMatchAs(node) => node.range(),
             AnyNode::PatternMatchOr(node) => node.range(),
+            AnyNode::PatternArguments(node) => node.range(),
+            AnyNode::PatternKeyword(node) => node.range(),
             AnyNode::Comprehension(node) => node.range(),
             AnyNode::Arguments(node) => node.range(),
             AnyNode::Parameters(node) => node.range(),
@@ -4700,6 +4809,8 @@ pub enum AnyNodeRef<'a> {
     PatternMatchStar(&'a ast::PatternMatchStar),
     PatternMatchAs(&'a ast::PatternMatchAs),
     PatternMatchOr(&'a ast::PatternMatchOr),
+    PatternArguments(&'a ast::PatternArguments),
+    PatternKeyword(&'a ast::PatternKeyword),
     Comprehension(&'a Comprehension),
     Arguments(&'a Arguments),
     Parameters(&'a Parameters),
@@ -4784,6 +4895,8 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::PatternMatchStar(node) => NonNull::from(*node).cast(),
             AnyNodeRef::PatternMatchAs(node) => NonNull::from(*node).cast(),
             AnyNodeRef::PatternMatchOr(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::PatternArguments(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::PatternKeyword(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Comprehension(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Arguments(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Parameters(node) => NonNull::from(*node).cast(),
@@ -4874,6 +4987,8 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::PatternMatchStar(_) => NodeKind::PatternMatchStar,
             AnyNodeRef::PatternMatchAs(_) => NodeKind::PatternMatchAs,
             AnyNodeRef::PatternMatchOr(_) => NodeKind::PatternMatchOr,
+            AnyNodeRef::PatternArguments(_) => NodeKind::PatternArguments,
+            AnyNodeRef::PatternKeyword(_) => NodeKind::PatternKeyword,
             AnyNodeRef::Comprehension(_) => NodeKind::Comprehension,
             AnyNodeRef::Arguments(_) => NodeKind::Arguments,
             AnyNodeRef::Parameters(_) => NodeKind::Parameters,
@@ -4959,6 +5074,8 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::PatternMatchStar(_)
             | AnyNodeRef::PatternMatchAs(_)
             | AnyNodeRef::PatternMatchOr(_)
+            | AnyNodeRef::PatternArguments(_)
+            | AnyNodeRef::PatternKeyword(_)
             | AnyNodeRef::Comprehension(_)
             | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Parameters(_)
@@ -5044,6 +5161,8 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::PatternMatchStar(_)
             | AnyNodeRef::PatternMatchAs(_)
             | AnyNodeRef::PatternMatchOr(_)
+            | AnyNodeRef::PatternArguments(_)
+            | AnyNodeRef::PatternKeyword(_)
             | AnyNodeRef::Comprehension(_)
             | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Parameters(_)
@@ -5128,6 +5247,8 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::PatternMatchStar(_)
             | AnyNodeRef::PatternMatchAs(_)
             | AnyNodeRef::PatternMatchOr(_)
+            | AnyNodeRef::PatternArguments(_)
+            | AnyNodeRef::PatternKeyword(_)
             | AnyNodeRef::Comprehension(_)
             | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Parameters(_)
@@ -5212,6 +5333,8 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::ExprTuple(_)
             | AnyNodeRef::ExprSlice(_)
             | AnyNodeRef::ExprIpyEscapeCommand(_)
+            | AnyNodeRef::PatternArguments(_)
+            | AnyNodeRef::PatternKeyword(_)
             | AnyNodeRef::ExceptHandlerExceptHandler(_)
             | AnyNodeRef::Comprehension(_)
             | AnyNodeRef::Arguments(_)
@@ -5298,6 +5421,8 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::PatternMatchStar(_)
             | AnyNodeRef::PatternMatchAs(_)
             | AnyNodeRef::PatternMatchOr(_)
+            | AnyNodeRef::PatternArguments(_)
+            | AnyNodeRef::PatternKeyword(_)
             | AnyNodeRef::Comprehension(_)
             | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Parameters(_)
@@ -5411,6 +5536,8 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::PatternMatchStar(node) => node.visit_preorder(visitor),
             AnyNodeRef::PatternMatchAs(node) => node.visit_preorder(visitor),
             AnyNodeRef::PatternMatchOr(node) => node.visit_preorder(visitor),
+            AnyNodeRef::PatternArguments(node) => node.visit_preorder(visitor),
+            AnyNodeRef::PatternKeyword(node) => node.visit_preorder(visitor),
             AnyNodeRef::Comprehension(node) => node.visit_preorder(visitor),
             AnyNodeRef::Arguments(node) => node.visit_preorder(visitor),
             AnyNodeRef::Parameters(node) => node.visit_preorder(visitor),
@@ -5820,6 +5947,18 @@ impl<'a> From<&'a ast::PatternMatchOr> for AnyNodeRef<'a> {
     }
 }
 
+impl<'a> From<&'a ast::PatternArguments> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::PatternArguments) -> Self {
+        AnyNodeRef::PatternArguments(node)
+    }
+}
+
+impl<'a> From<&'a ast::PatternKeyword> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::PatternKeyword) -> Self {
+        AnyNodeRef::PatternKeyword(node)
+    }
+}
+
 impl<'a> From<&'a Decorator> for AnyNodeRef<'a> {
     fn from(node: &'a Decorator) -> Self {
         AnyNodeRef::Decorator(node)
@@ -6073,6 +6212,8 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::PatternMatchStar(node) => node.range(),
             AnyNodeRef::PatternMatchAs(node) => node.range(),
             AnyNodeRef::PatternMatchOr(node) => node.range(),
+            AnyNodeRef::PatternArguments(node) => node.range(),
+            AnyNodeRef::PatternKeyword(node) => node.range(),
             AnyNodeRef::Comprehension(node) => node.range(),
             AnyNodeRef::Arguments(node) => node.range(),
             AnyNodeRef::Parameters(node) => node.range(),
@@ -6160,6 +6301,8 @@ pub enum NodeKind {
     PatternMatchStar,
     PatternMatchAs,
     PatternMatchOr,
+    PatternArguments,
+    PatternKeyword,
     TypeIgnoreTypeIgnore,
     Comprehension,
     Arguments,

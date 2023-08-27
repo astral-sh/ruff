@@ -1,15 +1,12 @@
+use ruff_formatter::{write, FormatError};
+use ruff_python_ast::node::{AnyNodeRef, AstNode};
 use ruff_python_ast::{Expr, ExprSlice, ExprUnaryOp, UnaryOp};
+use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::TextRange;
 
-use ruff_formatter::prelude::{hard_line_break, line_suffix_boundary, space, text};
-use ruff_formatter::{write, Buffer, Format, FormatError, FormatResult};
-use ruff_python_ast::node::{AnyNodeRef, AstNode};
-use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
-
 use crate::comments::{dangling_comments, SourceComment};
-use crate::context::PyFormatContext;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
-use crate::{AsFormat, FormatNodeRule, PyFormatter};
+use crate::prelude::*;
 
 #[derive(Default)]
 pub struct FormatExprSlice;

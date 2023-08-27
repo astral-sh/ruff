@@ -19,3 +19,12 @@ def foo(x, y, z):
 class A():
     pass
     # b = c
+
+
+dictionary = {
+    # "key1": 123,  # noqa: ERA001
+    # "key2": 456,
+    # "key3": 789,  # test
+}
+
+#import os  # noqa

@@ -9,7 +9,6 @@ use crate::prelude::*;
 use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
 use crate::statement::stmt_class_def::FormatDecorators;
 use crate::statement::suite::SuiteKind;
-use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatStmtFunctionDef;

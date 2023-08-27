@@ -13,6 +13,7 @@ use crate::registry::{AsRule, Rule};
 
 pub(crate) mod codemods;
 pub(crate) mod edits;
+pub(crate) mod snippet;
 pub(crate) mod source_map;
 
 pub(crate) struct FixResult {

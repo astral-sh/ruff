@@ -1,11 +1,8 @@
 use thiserror::Error;
 
 use ruff_formatter::format_element::tag;
-use ruff_formatter::prelude::{source_position, text, Formatter, Tag};
-use ruff_formatter::{
-    format, write, Buffer, Format, FormatElement, FormatError, FormatResult, PrintError,
-};
-use ruff_formatter::{Formatted, Printed, SourceCode};
+use ruff_formatter::prelude::*;
+use ruff_formatter::{format, FormatError, Formatted, PrintError, Printed, SourceCode};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
 use ruff_python_ast::Mod;
 use ruff_python_index::{CommentRanges, CommentRangesBuilder};
@@ -55,16 +52,21 @@ where
             suppressed_node(node.as_any_node_ref()).fmt(f)
         } else {
             leading_comments(node_comments.leading).fmt(f)?;
+
+            let is_source_map_enabled = f.options().source_map_generation().is_enabled();
+
+            if is_source_map_enabled {
+                source_position(node.start()).fmt(f)?;
+            }
+
             self.fmt_fields(node, f)?;
             self.fmt_dangling_comments(node_comments.dangling, f)?;
 
-            write!(
-                f,
-                [
-                    source_position(node.end()),
-                    trailing_comments(node_comments.trailing)
-                ]
-            )
+            if is_source_map_enabled {
+                source_position(node.end()).fmt(f)?;
+            }
+
+            trailing_comments(node_comments.trailing).fmt(f)
         }
     }
 
@@ -243,12 +245,10 @@ if True:
     #[test]
     fn quick_test() {
         let src = r#"
-@MyDecorator(list = a) # fmt: skip
-# trailing comment
-class Test:
-    pass
-
-
+for converter in connection.ops.get_db_converters(
+    expression
+) + expression.get_db_converters(connection):
+    ...
 "#;
         // Tokenize once
         let mut tokens = Vec::new();
@@ -285,9 +285,10 @@ class Test:
 
         assert_eq!(
             printed.as_code(),
-            r#"while True:
-    if something.changed:
-        do.stuff()  # trailing comment
+            r#"for converter in connection.ops.get_db_converters(
+    expression
+) + expression.get_db_converters(connection):
+    ...
 "#
         );
     }

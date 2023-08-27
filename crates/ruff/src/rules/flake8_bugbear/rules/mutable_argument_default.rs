@@ -1,3 +1,4 @@
+use ast::call_path::{from_qualified_name, CallPath};
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_docstring_stmt;
@@ -25,6 +26,10 @@ use crate::registry::AsRule;
 /// default, and initialize a new mutable object inside the function body
 /// for each call.
 ///
+/// Arguments with immutable type annotations will be ignored by this rule.
+/// Types outside of the standard library can be marked as immutable with the
+/// [`flake8-bugbear.extend-immutable-calls`] configuration option.
+///
 /// ## Example
 /// ```python
 /// def add_to_list(item, some_list=[]):
@@ -48,6 +53,9 @@ use crate::registry::AsRule;
 /// l1 = add_to_list(0)  # [0]
 /// l2 = add_to_list(1)  # [1]
 /// ```
+///
+/// ## Options
+/// - `flake8-bugbear.extend-immutable-calls`
 ///
 /// ## References
 /// - [Python documentation: Default Argument Values](https://docs.python.org/3/tutorial/controlflow.html#default-argument-values)
@@ -84,11 +92,18 @@ pub(crate) fn mutable_argument_default(checker: &mut Checker, function_def: &ast
             continue;
         };
 
+        let extend_immutable_calls: Vec<CallPath> = checker
+            .settings
+            .flake8_bugbear
+            .extend_immutable_calls
+            .iter()
+            .map(|target| from_qualified_name(target))
+            .collect();
+
         if is_mutable_expr(default, checker.semantic())
-            && !parameter
-                .annotation
-                .as_ref()
-                .is_some_and(|expr| is_immutable_annotation(expr, checker.semantic()))
+            && !parameter.annotation.as_ref().is_some_and(|expr| {
+                is_immutable_annotation(expr, checker.semantic(), extend_immutable_calls.as_slice())
+            })
         {
             let mut diagnostic = Diagnostic::new(MutableArgumentDefault, default.range());
 
@@ -125,7 +140,7 @@ fn move_initialization(
     let mut body = function_def.body.iter().peekable();
 
     let statement = body.peek()?;
-    if indexer.preceded_by_multi_statement_line(statement, locator) {
+    if indexer.in_multi_statement_line(statement, locator) {
         return None;
     }
 
@@ -156,7 +171,7 @@ fn move_initialization(
         if is_docstring_stmt(statement) {
             // // If the statement in the function is a docstring, insert _after_ it.
             if let Some(statement) = body.peek() {
-                if indexer.preceded_by_multi_statement_line(statement, locator) {
+                if indexer.in_multi_statement_line(statement, locator) {
                     return None;
                 }
                 pos = locator.line_start(statement.start());

@@ -1,8 +1,7 @@
-use crate::comments::{SourceComment, SuppressionKind};
 use ruff_python_ast::StmtPass;
 
+use crate::comments::{SourceComment, SuppressionKind};
 use crate::prelude::*;
-use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatStmtPass;

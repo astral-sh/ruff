@@ -5,7 +5,7 @@ use ruff_formatter::{format_args, write, FormatError, SourceCode};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
 use ruff_python_trivia::{lines_after, lines_after_ignoring_trivia, lines_before};
 
-use crate::comments::SourceComment;
+use crate::comments::{CommentLinePosition, SourceComment};
 use crate::context::NodeLevel;
 use crate::prelude::*;
 
@@ -206,8 +206,15 @@ impl Format<PyFormatContext<'_>> for FormatDanglingComments<'_> {
             .iter()
             .filter(|comment| comment.is_unformatted())
         {
-            if first && comment.line_position().is_end_of_line() {
-                write!(f, [space(), space()])?;
+            if first {
+                match comment.line_position {
+                    CommentLinePosition::OwnLine => {
+                        write!(f, [hard_line_break()])?;
+                    }
+                    CommentLinePosition::EndOfLine => {
+                        write!(f, [space(), space()])?;
+                    }
+                }
             }
 
             write!(

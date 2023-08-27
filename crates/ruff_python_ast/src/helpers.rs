@@ -279,19 +279,16 @@ where
                     .iter()
                     .any(|pattern| any_over_pattern(pattern, func))
         }
-        Pattern::MatchClass(ast::PatternMatchClass {
-            cls,
-            patterns,
-            kwd_patterns,
-            ..
-        }) => {
+        Pattern::MatchClass(ast::PatternMatchClass { cls, arguments, .. }) => {
             any_over_expr(cls, func)
-                || patterns
+                || arguments
+                    .patterns
                     .iter()
                     .any(|pattern| any_over_pattern(pattern, func))
-                || kwd_patterns
+                || arguments
+                    .keywords
                     .iter()
-                    .any(|pattern| any_over_pattern(pattern, func))
+                    .any(|keyword| any_over_pattern(&keyword.pattern, func))
         }
         Pattern::MatchStar(_) => false,
         Pattern::MatchAs(ast::PatternMatchAs { pattern, .. }) => pattern

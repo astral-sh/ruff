@@ -2,16 +2,15 @@ use anyhow::{bail, Result};
 use libcst_native::{
     ConcatenatedString, Expression, FormattedStringContent, FormattedStringExpression,
 };
-use ruff_python_ast::{self as ast, Arguments, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Arguments, Expr, Ranged};
 use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
 
-use crate::autofix::codemods::CodegenStylist;
 use crate::checkers::ast::Checker;
-use crate::cst::matchers::{match_call_mut, match_expression, match_name};
+use crate::cst::matchers::{match_call_mut, match_name, transform_expression};
 use crate::registry::AsRule;
 
 /// ## What it does
@@ -139,36 +138,28 @@ fn convert_call_to_conversion_flag(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Fix> {
-    // Parenthesize the expression, to support implicit concatenation.
-    let range = expr.range();
-    let content = locator.slice(range);
-    let parenthesized_content = format!("({content})");
-    let mut expression = match_expression(&parenthesized_content)?;
-
-    // Replace the formatted call expression at `index` with a conversion flag.
-    let formatted_string_expression = match_part(index, &mut expression)?;
-    let call = match_call_mut(&mut formatted_string_expression.expression)?;
-    let name = match_name(&call.func)?;
-    match name.value {
-        "str" => {
-            formatted_string_expression.conversion = Some("s");
+    let source_code = locator.slice(expr.range());
+    transform_expression(source_code, stylist, |mut expression| {
+        // Replace the formatted call expression at `index` with a conversion flag.
+        let formatted_string_expression = match_part(index, &mut expression)?;
+        let call = match_call_mut(&mut formatted_string_expression.expression)?;
+        let name = match_name(&call.func)?;
+        match name.value {
+            "str" => {
+                formatted_string_expression.conversion = Some("s");
+            }
+            "repr" => {
+                formatted_string_expression.conversion = Some("r");
+            }
+            "ascii" => {
+                formatted_string_expression.conversion = Some("a");
+            }
+            _ => bail!("Unexpected function call: `{:?}`", name.value),
         }
-        "repr" => {
-            formatted_string_expression.conversion = Some("r");
-        }
-        "ascii" => {
-            formatted_string_expression.conversion = Some("a");
-        }
-        _ => bail!("Unexpected function call: `{:?}`", name.value),
-    }
-    formatted_string_expression.expression = call.args[0].value.clone();
-
-    // Remove the parentheses (first and last characters).
-    let mut content = expression.codegen_stylist(stylist);
-    content.remove(0);
-    content.pop();
-
-    Ok(Fix::automatic(Edit::range_replacement(content, range)))
+        formatted_string_expression.expression = call.args[0].value.clone();
+        Ok(expression)
+    })
+    .map(|output| Fix::automatic(Edit::range_replacement(output, expr.range())))
 }
 
 /// Return the [`FormattedStringContent`] at the given index in an f-string or implicit

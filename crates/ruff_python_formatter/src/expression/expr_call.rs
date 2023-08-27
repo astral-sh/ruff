@@ -1,11 +1,11 @@
-use crate::expression::CallChainLayout;
 use ruff_formatter::FormatRuleWithOptions;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{Expr, ExprCall};
 
+use crate::comments::{dangling_comments, SourceComment};
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
+use crate::expression::CallChainLayout;
 use crate::prelude::*;
-use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatExprCall {
@@ -29,16 +29,24 @@ impl FormatNodeRule<ExprCall> for FormatExprCall {
             arguments,
         } = item;
 
+        let comments = f.context().comments().clone();
+        let dangling = comments.dangling(item);
+
         let call_chain_layout = self.call_chain_layout.apply_in_node(item, f);
 
-        let fmt_inner = format_with(|f| {
+        let fmt_func = format_with(|f| {
+            // Format the function expression.
             match func.as_ref() {
-                Expr::Attribute(expr) => expr.format().with_options(call_chain_layout).fmt(f)?,
-                Expr::Call(expr) => expr.format().with_options(call_chain_layout).fmt(f)?,
-                Expr::Subscript(expr) => expr.format().with_options(call_chain_layout).fmt(f)?,
-                _ => func.format().fmt(f)?,
-            }
+                Expr::Attribute(expr) => expr.format().with_options(call_chain_layout).fmt(f),
+                Expr::Call(expr) => expr.format().with_options(call_chain_layout).fmt(f),
+                Expr::Subscript(expr) => expr.format().with_options(call_chain_layout).fmt(f),
+                _ => func.format().fmt(f),
+            }?;
 
+            // Format comments between the function and its arguments.
+            dangling_comments(dangling).fmt(f)?;
+
+            // Format the arguments.
             arguments.format().fmt(f)
         });
 
@@ -51,10 +59,18 @@ impl FormatNodeRule<ExprCall> for FormatExprCall {
         if call_chain_layout == CallChainLayout::Fluent
             && self.call_chain_layout == CallChainLayout::Default
         {
-            group(&fmt_inner).fmt(f)
+            group(&fmt_func).fmt(f)
         } else {
-            fmt_inner.fmt(f)
+            fmt_func.fmt(f)
         }
+    }
+
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        Ok(())
     }
 }
 
@@ -68,6 +84,8 @@ impl NeedsParentheses for ExprCall {
             == CallChainLayout::Fluent
         {
             OptionalParentheses::Multiline
+        } else if context.comments().has_dangling(self) {
+            OptionalParentheses::Always
         } else {
             self.func.needs_parentheses(self.into(), context)
         }

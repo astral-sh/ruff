@@ -26,3 +26,13 @@ def test  [
     B,
 ]  (): # fmt: skip
     ...
+
+def test  [
+    # comment
+    A,
+
+    # another
+
+    B,
+]  () -> str: # fmt: skip
+    ...

@@ -1,10 +1,10 @@
+use ruff_formatter::write;
+use ruff_python_ast::StmtAnnAssign;
+
 use crate::comments::{SourceComment, SuppressionKind};
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
-use crate::FormatNodeRule;
-use ruff_formatter::write;
-use ruff_python_ast::StmtAnnAssign;
 
 #[derive(Default)]
 pub struct FormatStmtAnnAssign;

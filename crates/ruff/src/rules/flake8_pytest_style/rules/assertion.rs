@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
-use anyhow::bail;
 use anyhow::Result;
+use anyhow::{bail, Context};
 use libcst_native::{
     self, Assert, BooleanOp, CompoundStatement, Expression, ParenthesizableWhitespace,
     ParenthesizedNode, SimpleStatementLine, SimpleWhitespace, SmallStatement, Statement,
@@ -635,9 +635,8 @@ fn parenthesize<'a>(expression: Expression<'a>, parent: &Expression<'a>) -> Expr
 /// `assert a == "hello"` and `assert b == "world"`.
 fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) -> Result<Edit> {
     // Infer the indentation of the outer block.
-    let Some(outer_indent) = whitespace::indentation(locator, stmt) else {
-        bail!("Unable to fix multiline statement");
-    };
+    let outer_indent =
+        whitespace::indentation(locator, stmt).context("Unable to fix multiline statement")?;
 
     // Extract the module text.
     let contents = locator.lines(stmt.range());
@@ -672,11 +671,11 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
         &mut indented_block.body
     };
 
-    let [Statement::Simple(simple_statement_line)] = &statements[..] else {
+    let [Statement::Simple(simple_statement_line)] = statements.as_slice() else {
         bail!("Expected one simple statement")
     };
 
-    let [SmallStatement::Assert(assert_statement)] = &simple_statement_line.body[..] else {
+    let [SmallStatement::Assert(assert_statement)] = simple_statement_line.body.as_slice() else {
         bail!("Expected simple statement to be an assert")
     };
 
@@ -754,10 +753,13 @@ pub(crate) fn composite_condition(
             if matches!(composite, CompositionKind::Simple)
                 && msg.is_none()
                 && !checker.indexer().comment_ranges().intersects(stmt.range())
+                && !checker
+                    .indexer()
+                    .in_multi_statement_line(stmt, checker.locator())
             {
-                #[allow(deprecated)]
-                diagnostic.try_set_fix_from_edit(|| {
+                diagnostic.try_set_fix(|| {
                     fix_composite_condition(stmt, checker.locator(), checker.stylist())
+                        .map(Fix::suggested)
                 });
             }
         }

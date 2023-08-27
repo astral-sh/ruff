@@ -1,19 +1,62 @@
-use ruff_formatter::{write, Buffer, FormatResult};
+use ruff_formatter::write;
+use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::PatternMatchClass;
 
-use crate::{not_yet_implemented_custom_text, FormatNodeRule, PyFormatter};
+use crate::comments::{dangling_comments, SourceComment};
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
+use crate::prelude::*;
 
 #[derive(Default)]
 pub struct FormatPatternMatchClass;
 
 impl FormatNodeRule<PatternMatchClass> for FormatPatternMatchClass {
     fn fmt_fields(&self, item: &PatternMatchClass, f: &mut PyFormatter) -> FormatResult<()> {
+        let PatternMatchClass {
+            range: _,
+            cls,
+            arguments,
+        } = item;
+
+        let comments = f.context().comments().clone();
+        let dangling = comments.dangling(item);
+
         write!(
             f,
-            [not_yet_implemented_custom_text(
-                "NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0)",
-                item
-            )]
+            [
+                cls.format(),
+                dangling_comments(dangling),
+                arguments.format()
+            ]
         )
+    }
+
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        Ok(())
+    }
+}
+
+impl NeedsParentheses for PatternMatchClass {
+    fn needs_parentheses(
+        &self,
+        _parent: AnyNodeRef,
+        context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        // If there are any comments outside of the class parentheses, break:
+        // ```python
+        // case (
+        //     Pattern
+        //     # dangling
+        //     (...)
+        // ): ...
+        // ```
+        if context.comments().has_dangling(self) {
+            OptionalParentheses::Multiline
+        } else {
+            OptionalParentheses::Never
+        }
     }
 }

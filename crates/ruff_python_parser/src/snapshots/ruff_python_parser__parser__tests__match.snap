@@ -168,9 +168,11 @@ expression: parse_ast
                                                                         ctx: Load,
                                                                     },
                                                                 ),
-                                                                patterns: [],
-                                                                kwd_attrs: [],
-                                                                kwd_patterns: [],
+                                                                arguments: PatternArguments {
+                                                                    range: 130..132,
+                                                                    patterns: [],
+                                                                    keywords: [],
+                                                                },
                                                             },
                                                         ),
                                                         MatchSingleton(

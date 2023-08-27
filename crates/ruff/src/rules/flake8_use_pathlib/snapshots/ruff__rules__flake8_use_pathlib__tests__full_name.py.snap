@@ -240,7 +240,7 @@ full_name.py:30:1: PTH121 `os.path.samefile()` should be replaced by `Path.samef
 32 | with open(p) as fp:
    |
 
-full_name.py:31:1: PTH122 `os.path.splitext()` should be replaced by `Path.suffix`
+full_name.py:31:1: PTH122 `os.path.splitext()` should be replaced by `Path.suffix`, `Path.stem`, and `Path.parent`
    |
 29 | os.path.dirname(p)
 30 | os.path.samefile(p)

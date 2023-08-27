@@ -1,6 +1,6 @@
 use itertools::Itertools;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, IsolationLevel, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::{self as ast, PySourceType, Ranged, Stmt};
@@ -203,14 +203,10 @@ where
 
 /// Generate a [`Edit`] to remove an unused variable assignment to a [`Binding`].
 fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
-    let statement_id = binding.source?;
-    let statement = checker.semantic().statement(statement_id);
-    let parent = checker.semantic().parent_statement(statement_id);
-    let isolation = checker
-        .semantic()
-        .parent_statement_id(statement_id)
-        .map(|node_id| IsolationLevel::Group(node_id.into()))
-        .unwrap_or_default();
+    let node_id = binding.source?;
+    let statement = checker.semantic().statement(node_id);
+    let parent = checker.semantic().parent_statement(node_id);
+    let isolation = Checker::isolation(checker.semantic().parent_statement_id(node_id));
 
     // First case: simple assignment (`x = 1`)
     if let Stmt::Assign(ast::StmtAssign { targets, value, .. }) = statement {

@@ -43,3 +43,12 @@ message
 assert something  # OK
 assert something and something_else  # Error
 assert something and something_else and something_third  # Error
+
+
+def test_multiline():
+    assert something and something_else; x = 1
+
+    x = 1; assert something and something_else
+
+    x = 1; \
+        assert something and something_else

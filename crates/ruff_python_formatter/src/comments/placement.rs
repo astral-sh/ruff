@@ -3,7 +3,9 @@ use std::cmp::Ordering;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{self as ast, Comprehension, Expr, MatchCase, Parameters, Ranged};
-use ruff_python_trivia::{indentation_at_offset, SimpleToken, SimpleTokenKind, SimpleTokenizer};
+use ruff_python_trivia::{
+    find_only_token_in_range, indentation_at_offset, SimpleToken, SimpleTokenKind, SimpleTokenizer,
+};
 use ruff_source_file::Locator;
 use ruff_text_size::{TextLen, TextRange};
 
@@ -13,6 +15,7 @@ use crate::expression::expr_tuple::is_tuple_parenthesized;
 use crate::other::parameters::{
     assign_argument_separator_comment_placement, find_parameter_separators,
 };
+use crate::pattern::pattern_match_sequence::SequenceType;
 
 /// Manually attach comments to nodes that the default placement gets wrong.
 pub(super) fn place_comment<'a>(
@@ -171,13 +174,16 @@ fn handle_enclosed_comment<'a>(
                 }
             })
         }
-        AnyNodeRef::Arguments(_) | AnyNodeRef::TypeParams(_) => {
+        AnyNodeRef::Arguments(_) | AnyNodeRef::TypeParams(_) | AnyNodeRef::PatternArguments(_) => {
             handle_bracketed_end_of_line_comment(comment, locator)
         }
         AnyNodeRef::Comprehension(comprehension) => {
             handle_comprehension_comment(comment, comprehension, locator)
         }
-        AnyNodeRef::ExprAttribute(attribute) => handle_attribute_comment(comment, attribute),
+
+        AnyNodeRef::ExprAttribute(attribute) => {
+            handle_attribute_comment(comment, attribute, locator)
+        }
         AnyNodeRef::ExprBinOp(binary_expression) => {
             handle_trailing_binary_expression_left_or_operator_comment(
                 comment,
@@ -205,12 +211,29 @@ fn handle_enclosed_comment<'a>(
             handle_module_level_own_line_comment_before_class_or_function_comment(comment, locator)
         }
         AnyNodeRef::WithItem(_) => handle_with_item_comment(comment, locator),
+        AnyNodeRef::PatternMatchSequence(pattern_match_sequence) => {
+            if SequenceType::from_pattern(pattern_match_sequence, locator.contents())
+                .is_parenthesized()
+            {
+                handle_bracketed_end_of_line_comment(comment, locator)
+            } else {
+                CommentPlacement::Default(comment)
+            }
+        }
+        AnyNodeRef::PatternMatchClass(class) => handle_pattern_match_class_comment(comment, class),
+        AnyNodeRef::PatternMatchAs(_) => handle_pattern_match_as_comment(comment, locator),
+        AnyNodeRef::PatternMatchStar(_) => handle_pattern_match_star_comment(comment),
+        AnyNodeRef::PatternMatchMapping(pattern) => {
+            handle_bracketed_end_of_line_comment(comment, locator)
+                .or_else(|comment| handle_pattern_match_mapping_comment(comment, pattern, locator))
+        }
         AnyNodeRef::StmtFunctionDef(_) => handle_leading_function_with_decorators_comment(comment),
         AnyNodeRef::StmtClassDef(class_def) => {
             handle_leading_class_with_decorators_comment(comment, class_def)
         }
         AnyNodeRef::StmtImportFrom(import_from) => handle_import_from_comment(comment, import_from),
         AnyNodeRef::StmtWith(with_) => handle_with_comment(comment, with_),
+        AnyNodeRef::ExprCall(_) => handle_call_comment(comment),
         AnyNodeRef::ExprConstant(_) => {
             if let Some(AnyNodeRef::ExprFString(fstring)) = comment.enclosing_parent() {
                 CommentPlacement::dangling(fstring, comment)
@@ -352,7 +375,7 @@ fn is_first_statement_in_body(statement: AnyNodeRef, has_body: AnyNodeRef) -> bo
         | AnyNodeRef::ExceptHandlerExceptHandler(ast::ExceptHandlerExceptHandler {
             body, ..
         })
-        | AnyNodeRef::MatchCase(ast::MatchCase { body, .. })
+        | AnyNodeRef::MatchCase(MatchCase { body, .. })
         | AnyNodeRef::StmtFunctionDef(ast::StmtFunctionDef { body, .. })
         | AnyNodeRef::StmtClassDef(ast::StmtClassDef { body, .. }) => {
             are_same_optional(statement, body.first())
@@ -968,50 +991,114 @@ fn handle_dict_unpacking_comment<'a>(
     }
 }
 
+/// Handle comments between a function call and its arguments. For example, attach the following as
+/// dangling on the call:
+/// ```python
+/// (
+///   func
+///   # dangling
+///   ()
+/// )
+/// ```
+fn handle_call_comment(comment: DecoratedComment) -> CommentPlacement {
+    if comment.line_position().is_own_line() {
+        if comment.preceding_node().is_some_and(|preceding| {
+            comment.following_node().is_some_and(|following| {
+                preceding.end() < comment.start() && comment.end() < following.start()
+            })
+        }) {
+            return CommentPlacement::dangling(comment.enclosing_node(), comment);
+        }
+    }
+
+    CommentPlacement::Default(comment)
+}
+
 /// Own line comments coming after the node are always dangling comments
 /// ```python
 /// (
-///      a
-///      # trailing a comment
-///      . # dangling comment
-///      # or this
+///      a  # trailing comment on `a`
+///      # dangling comment on the attribute
+///      . # dangling comment on the attribute
+///      # dangling comment on the attribute
 ///      b
 /// )
 /// ```
 fn handle_attribute_comment<'a>(
     comment: DecoratedComment<'a>,
     attribute: &'a ast::ExprAttribute,
+    locator: &Locator,
 ) -> CommentPlacement<'a> {
     if comment.preceding_node().is_none() {
         // ```text
         // (    value)   .   attr
         //  ^^^^ we're in this range
         // ```
-
         return CommentPlacement::leading(attribute.value.as_ref(), comment);
     }
 
-    // ```text
-    // value   .   attr
-    //      ^^^^^^^ we're in this range
+    // If the comment is parenthesized, use the parentheses to either attach it as a trailing
+    // comment on the value or a dangling comment on the attribute.
+    // For example, treat this as trailing:
+    // ```python
+    // (
+    //     (
+    //         value
+    //         # comment
+    //     )
+    //     .attribute
+    // )
     // ```
-    debug_assert!(
-        TextRange::new(attribute.value.end(), attribute.attr.start())
-            .contains(comment.slice().start())
-    );
-    if comment.line_position().is_end_of_line() {
-        // Attach as trailing comment to a. The specific placement is only relevant for fluent style
-        // ```python
-        // x322 = (
-        //     a
-        //     . # end-of-line dot comment 2
-        //     b
-        // )
-        // ```
-        CommentPlacement::trailing(attribute.value.as_ref(), comment)
-    } else {
-        CommentPlacement::dangling(attribute, comment)
+    //
+    // However, treat this as dangling:
+    // ```python
+    // (
+    //     (value)
+    //     # comment
+    //     .attribute
+    // )
+    // ```
+    if let Some(right_paren) = SimpleTokenizer::starts_at(attribute.value.end(), locator.contents())
+        .skip_trivia()
+        .take_while(|token| token.kind == SimpleTokenKind::RParen)
+        .last()
+    {
+        return if comment.start() < right_paren.start() {
+            CommentPlacement::trailing(attribute.value.as_ref(), comment)
+        } else {
+            CommentPlacement::dangling(comment.enclosing_node(), comment)
+        };
     }
+
+    // If the comment precedes the `.`, treat it as trailing _if_ it's on the same line as the
+    // value. For example, treat this as trailing:
+    // ```python
+    // (
+    //     value  # comment
+    //     .attribute
+    // )
+    // ```
+    //
+    // However, treat this as dangling:
+    // ```python
+    // (
+    //     value
+    //     # comment
+    //     .attribute
+    // )
+    // ```
+    if comment.line_position().is_end_of_line() {
+        let dot_token = find_only_token_in_range(
+            TextRange::new(attribute.value.end(), attribute.attr.start()),
+            SimpleTokenKind::Dot,
+            locator.contents(),
+        );
+        if comment.end() < dot_token.start() {
+            return CommentPlacement::trailing(attribute.value.as_ref(), comment);
+        }
+    }
+
+    CommentPlacement::dangling(comment.enclosing_node(), comment)
 }
 
 /// Assign comments between `if` and `test` and `else` and `orelse` as leading to the respective
@@ -1048,7 +1135,7 @@ fn handle_expr_if_comment<'a>(
     let if_token = find_only_token_in_range(
         TextRange::new(body.end(), test.start()),
         SimpleTokenKind::If,
-        locator,
+        locator.contents(),
     );
     // Between `if` and `test`
     if if_token.range.start() < comment.slice().start() && comment.slice().start() < test.start() {
@@ -1058,7 +1145,7 @@ fn handle_expr_if_comment<'a>(
     let else_token = find_only_token_in_range(
         TextRange::new(test.end(), orelse.start()),
         SimpleTokenKind::Else,
-        locator,
+        locator.contents(),
     );
     // Between `else` and `orelse`
     if else_token.range.start() < comment.slice().start()
@@ -1130,7 +1217,7 @@ fn handle_with_item_comment<'a>(
     let as_token = find_only_token_in_range(
         TextRange::new(context_expr.end(), optional_vars.start()),
         SimpleTokenKind::As,
-        locator,
+        locator.contents(),
     );
 
     if comment.end() < as_token.start() {
@@ -1141,6 +1228,133 @@ fn handle_with_item_comment<'a>(
         CommentPlacement::dangling(comment.enclosing_node(), comment)
     } else {
         CommentPlacement::leading(optional_vars, comment)
+    }
+}
+
+/// Handles trailing comments between the class name and its arguments in:
+/// ```python
+/// case (
+///     Pattern
+///     # dangling
+///     (...)
+/// ): ...
+/// ```
+fn handle_pattern_match_class_comment<'a>(
+    comment: DecoratedComment<'a>,
+    class: &'a ast::PatternMatchClass,
+) -> CommentPlacement<'a> {
+    if class.cls.end() < comment.start() && comment.end() < class.arguments.start() {
+        CommentPlacement::dangling(comment.enclosing_node(), comment)
+    } else {
+        CommentPlacement::Default(comment)
+    }
+}
+
+/// Handles trailing comments after the `as` keyword of a pattern match item:
+///
+/// ```python
+/// case (
+///     pattern
+///     as # dangling end of line comment
+///     # dangling own line comment
+///     name
+/// ): ...
+/// ```
+fn handle_pattern_match_as_comment<'a>(
+    comment: DecoratedComment<'a>,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    debug_assert!(comment.enclosing_node().is_pattern_match_as());
+
+    let Some(pattern) = comment.preceding_node() else {
+        return CommentPlacement::Default(comment);
+    };
+
+    let mut tokens = SimpleTokenizer::starts_at(pattern.end(), locator.contents())
+        .skip_trivia()
+        .skip_while(|token| token.kind == SimpleTokenKind::RParen);
+
+    let Some(as_token) = tokens
+        .next()
+        .filter(|token| token.kind == SimpleTokenKind::As)
+    else {
+        return CommentPlacement::Default(comment);
+    };
+
+    if comment.end() < as_token.start() {
+        // If before the `as` keyword, then it must be a trailing comment of the pattern.
+        CommentPlacement::trailing(pattern, comment)
+    } else {
+        // Otherwise, must be a dangling comment. (Any comments that follow the name will be
+        // trailing comments on the pattern match item, rather than enclosed by it.)
+        CommentPlacement::dangling(comment.enclosing_node(), comment)
+    }
+}
+
+/// Handles dangling comments between the `*` token and identifier of a pattern match star:
+///
+/// ```python
+/// case [
+///   ...,
+///   *  # dangling end of line comment
+///   # dangling end of line comment
+///   rest,
+/// ]: ...
+/// ```
+fn handle_pattern_match_star_comment(comment: DecoratedComment) -> CommentPlacement {
+    CommentPlacement::dangling(comment.enclosing_node(), comment)
+}
+
+/// Handles trailing comments after the `**` in a pattern match item. The comments can either
+/// appear between the `**` and the identifier, or after the identifier (which is just an
+/// identifier, not a node).
+///
+/// ```python
+/// case {
+///     **  # dangling end of line comment
+///     # dangling own line comment
+///     rest  # dangling end of line comment
+///     # dangling own line comment
+/// ): ...
+/// ```
+fn handle_pattern_match_mapping_comment<'a>(
+    comment: DecoratedComment<'a>,
+    pattern: &'a ast::PatternMatchMapping,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    // The `**` has to come at the end, so there can't be another node after it. (The identifier,
+    // like `rest` above, isn't a node.)
+    if comment.following_node().is_some() {
+        return CommentPlacement::Default(comment);
+    };
+
+    // If there's no rest pattern, no need to do anything special.
+    let Some(rest) = pattern.rest.as_ref() else {
+        return CommentPlacement::Default(comment);
+    };
+
+    // If the comment falls after the `**rest` entirely, treat it as dangling on the enclosing
+    // node.
+    if comment.start() > rest.end() {
+        return CommentPlacement::dangling(comment.enclosing_node(), comment);
+    }
+
+    // Look at the tokens between the previous node (or the start of the pattern) and the comment.
+    let preceding_end = match comment.preceding_node() {
+        Some(preceding) => preceding.end(),
+        None => comment.enclosing_node().start(),
+    };
+    let mut tokens = SimpleTokenizer::new(
+        locator.contents(),
+        TextRange::new(preceding_end, comment.start()),
+    )
+    .skip_trivia();
+
+    // If the remaining tokens from the previous node include `**`, mark as a dangling comment.
+    if tokens.any(|token| token.kind == SimpleTokenKind::DoubleStar) {
+        CommentPlacement::dangling(comment.enclosing_node(), comment)
+    } else {
+        CommentPlacement::Default(comment)
     }
 }
 
@@ -1174,7 +1388,7 @@ fn handle_named_expr_comment<'a>(
     let colon_equal = find_only_token_in_range(
         TextRange::new(target.end(), value.start()),
         SimpleTokenKind::ColonEqual,
-        locator,
+        locator.contents(),
     );
 
     if comment.end() < colon_equal.start() {
@@ -1185,23 +1399,6 @@ fn handle_named_expr_comment<'a>(
         // Otherwise, treat it as dangling. We effectively treat it as a comment on the `:=` itself.
         CommentPlacement::dangling(comment.enclosing_node(), comment)
     }
-}
-
-/// Looks for a token in the range that contains no other tokens except for parentheses outside
-/// the expression ranges
-fn find_only_token_in_range(
-    range: TextRange,
-    token_kind: SimpleTokenKind,
-    locator: &Locator,
-) -> SimpleToken {
-    let mut tokens = SimpleTokenizer::new(locator.contents(), range)
-        .skip_trivia()
-        .skip_while(|token| token.kind == SimpleTokenKind::RParen);
-    let token = tokens.next().expect("Expected a token");
-    debug_assert_eq!(token.kind(), token_kind);
-    let mut tokens = tokens.skip_while(|token| token.kind == SimpleTokenKind::LParen);
-    debug_assert_eq!(tokens.next(), None);
-    token
 }
 
 /// Attach an end-of-line comment immediately following an open bracket as a dangling comment on
@@ -1376,7 +1573,7 @@ fn handle_comprehension_comment<'a>(
     let in_token = find_only_token_in_range(
         TextRange::new(comprehension.target.end(), comprehension.iter.start()),
         SimpleTokenKind::In,
-        locator,
+        locator.contents(),
     );
 
     // Comments between the target and the `in`
@@ -1439,7 +1636,7 @@ fn handle_comprehension_comment<'a>(
         let if_token = find_only_token_in_range(
             TextRange::new(last_end, if_node.start()),
             SimpleTokenKind::If,
-            locator,
+            locator.contents(),
         );
         if is_own_line {
             if last_end < comment.slice().start() && comment.slice().start() < if_token.start() {

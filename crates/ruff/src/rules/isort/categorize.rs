@@ -69,6 +69,7 @@ pub(crate) fn categorize<'a>(
     level: Option<u32>,
     src: &[PathBuf],
     package: Option<&Path>,
+    detect_same_package: bool,
     known_modules: &'a KnownModules,
     target_version: PythonVersion,
 ) -> &'a ImportSection {
@@ -88,7 +89,7 @@ pub(crate) fn categorize<'a>(
                 &ImportSection::Known(ImportType::StandardLibrary),
                 Reason::KnownStandardLibrary,
             )
-        } else if same_package(package, module_base) {
+        } else if detect_same_package && same_package(package, module_base) {
             (
                 &ImportSection::Known(ImportType::FirstParty),
                 Reason::SamePackage,
@@ -137,6 +138,7 @@ pub(crate) fn categorize_imports<'a>(
     block: ImportBlock<'a>,
     src: &[PathBuf],
     package: Option<&Path>,
+    detect_same_package: bool,
     known_modules: &'a KnownModules,
     target_version: PythonVersion,
 ) -> BTreeMap<&'a ImportSection, ImportBlock<'a>> {
@@ -148,6 +150,7 @@ pub(crate) fn categorize_imports<'a>(
             None,
             src,
             package,
+            detect_same_package,
             known_modules,
             target_version,
         );
@@ -164,6 +167,7 @@ pub(crate) fn categorize_imports<'a>(
             import_from.level,
             src,
             package,
+            detect_same_package,
             known_modules,
             target_version,
         );
@@ -180,6 +184,7 @@ pub(crate) fn categorize_imports<'a>(
             import_from.level,
             src,
             package,
+            detect_same_package,
             known_modules,
             target_version,
         );
@@ -196,6 +201,7 @@ pub(crate) fn categorize_imports<'a>(
             import_from.level,
             src,
             package,
+            detect_same_package,
             known_modules,
             target_version,
         );

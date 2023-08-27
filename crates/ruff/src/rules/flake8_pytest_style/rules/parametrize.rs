@@ -1,18 +1,16 @@
-use rustc_hash::FxHashMap;
 use std::hash::BuildHasherDefault;
 
-use ruff_python_ast::{
-    self as ast, Arguments, Constant, Decorator, Expr, ExprContext, PySourceType, Ranged,
-};
-use ruff_python_parser::{lexer, AsMode, Tok};
-use ruff_text_size::{TextRange, TextSize};
+use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::node::AstNode;
+use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::{self as ast, Arguments, Constant, Decorator, Expr, ExprContext, Ranged};
 use ruff_python_codegen::Generator;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
-use ruff_source_file::Locator;
+use ruff_text_size::{TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
@@ -26,8 +24,8 @@ use super::helpers::{is_pytest_parametrize, split_names};
 /// ## Why is this bad?
 /// The `argnames` argument of `pytest.mark.parametrize` takes a string or
 /// a sequence of strings. For a single parameter, it's preferable to use a
-/// string, and for multiple parameters, it's preferable to use the style
-/// configured via the `flake8-pytest-style.parametrize-names-type` setting.
+/// string. For multiple parameters, it's preferable to use the style
+/// configured via the [`flake8-pytest-style.parametrize-names-type`] setting.
 ///
 /// ## Example
 /// ```python
@@ -74,7 +72,7 @@ use super::helpers::{is_pytest_parametrize, split_names};
 /// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
 #[violation]
 pub struct PytestParametrizeNamesWrongType {
-    pub expected: types::ParametrizeNameType,
+    expected: types::ParametrizeNameType,
 }
 
 impl Violation for PytestParametrizeNamesWrongType {
@@ -97,10 +95,28 @@ impl Violation for PytestParametrizeNamesWrongType {
 ///
 /// ## Why is this bad?
 /// The `argvalues` argument of `pytest.mark.parametrize` takes an iterator of
-/// parameter values. For a single parameter, it's preferable to use a list,
-/// and for multiple parameters, it's preferable to use a list of rows with
-/// the type configured via the `flake8-pytest-style.parametrize-values-row-type`
-/// setting.
+/// parameter values, which can be provided as lists or tuples.
+///
+/// To aid in readability, it's recommended to use a consistent style for the
+/// list of values rows, and, in the case of multiple parameters, for each row
+/// of values.
+///
+/// The style for the list of values rows can be configured via the
+/// the [`flake8-pytest-style.parametrize-values-type`] setting, while the
+/// style for each row of values can be configured via the
+/// the [`flake8-pytest-style.parametrize-values-row-type`] setting.
+///
+/// For example, [`flake8-pytest-style.parametrize-values-type`] will lead to
+/// the following expectations:
+///
+/// - `tuple`: `@pytest.mark.parametrize("value", ("a", "b", "c"))`
+/// - `list`: `@pytest.mark.parametrize("value", ["a", "b", "c"])`
+///
+/// Similarly, [`flake8-pytest-style.parametrize-values-row-type`] will lead to
+/// the following expectations:
+///
+/// - `tuple`: `@pytest.mark.parametrize(("key", "value"), [("a", "b"), ("c", "d")])`
+/// - `list`: `@pytest.mark.parametrize(("key", "value"), [["a", "b"], ["c", "d"]])`
 ///
 /// ## Example
 /// ```python
@@ -153,14 +169,15 @@ impl Violation for PytestParametrizeNamesWrongType {
 /// ```
 ///
 /// ## Options
+/// - `flake8-pytest-style.parametrize-values-type`
 /// - `flake8-pytest-style.parametrize-values-row-type`
 ///
 /// ## References
 /// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
 #[violation]
 pub struct PytestParametrizeValuesWrongType {
-    pub values: types::ParametrizeValuesType,
-    pub row: types::ParametrizeValuesRowType,
+    values: types::ParametrizeValuesType,
+    row: types::ParametrizeValuesRowType,
 }
 
 impl Violation for PytestParametrizeValuesWrongType {
@@ -283,34 +300,12 @@ fn elts_to_csv(elts: &[Expr], generator: Generator) -> Option<String> {
 fn get_parametrize_name_range(
     decorator: &Decorator,
     expr: &Expr,
-    locator: &Locator,
-    source_type: PySourceType,
-) -> TextRange {
-    let mut locations = Vec::new();
-    let mut name_range = None;
-
-    // The parenthesis are not part of the AST, so we need to tokenize the
-    // decorator to find them.
-    for (tok, range) in lexer::lex_starts_at(
-        locator.slice(decorator.range()),
-        source_type.as_mode(),
-        decorator.start(),
-    )
-    .flatten()
-    {
-        match tok {
-            Tok::Lpar => locations.push(range.start()),
-            Tok::Rpar => {
-                if let Some(start) = locations.pop() {
-                    name_range = Some(TextRange::new(start, range.end()));
-                }
-            }
-            // Stop after the first argument.
-            Tok::Comma => break,
-            _ => (),
-        }
-    }
-    name_range.unwrap_or_else(|| expr.range())
+    source: &str,
+) -> Option<TextRange> {
+    decorator
+        .expression
+        .as_call_expr()
+        .and_then(|call| parenthesized_range(expr.into(), call.arguments.as_any_node_ref(), source))
 }
 
 /// PT006
@@ -329,9 +324,9 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                         let name_range = get_parametrize_name_range(
                             decorator,
                             expr,
-                            checker.locator(),
-                            checker.source_type,
-                        );
+                            checker.locator().contents(),
+                        )
+                        .unwrap_or(expr.range());
                         let mut diagnostic = Diagnostic::new(
                             PytestParametrizeNamesWrongType {
                                 expected: names_type,
@@ -364,9 +359,9 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                         let name_range = get_parametrize_name_range(
                             decorator,
                             expr,
-                            checker.locator(),
-                            checker.source_type,
-                        );
+                            checker.locator().contents(),
+                        )
+                        .unwrap_or(expr.range());
                         let mut diagnostic = Diagnostic::new(
                             PytestParametrizeNamesWrongType {
                                 expected: names_type,

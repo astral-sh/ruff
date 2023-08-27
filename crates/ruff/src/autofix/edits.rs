@@ -11,7 +11,7 @@ use ruff_python_trivia::{
     has_leading_content, is_python_whitespace, PythonWhitespace, SimpleTokenKind, SimpleTokenizer,
 };
 use ruff_source_file::{Locator, NewlineWithTrailingNewline};
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use ruff_text_size::{TextLen, TextSize};
 
 use crate::autofix::codemods;
 
@@ -48,7 +48,7 @@ pub(crate) fn delete_stmt(
         } else if has_leading_content(stmt.start(), locator) {
             Edit::range_deletion(stmt.range())
         } else if let Some(start) = indexer.preceded_by_continuations(stmt.start(), locator) {
-            Edit::range_deletion(TextRange::new(start, stmt.end()))
+            Edit::deletion(start, stmt.end())
         } else {
             let range = locator.full_lines_range(stmt.range());
             Edit::range_deletion(range)
@@ -133,10 +133,8 @@ pub(crate) fn remove_argument<T: Ranged>(
         // Case 3: argument or keyword is the only node, so delete the arguments (but preserve
         // parentheses, if needed).
         Ok(match parentheses {
-            Parentheses::Remove => Edit::deletion(arguments.start(), arguments.end()),
-            Parentheses::Preserve => {
-                Edit::replacement("()".to_string(), arguments.start(), arguments.end())
-            }
+            Parentheses::Remove => Edit::range_deletion(arguments.range()),
+            Parentheses::Preserve => Edit::range_replacement("()".to_string(), arguments.range()),
         })
     }
 }
@@ -228,25 +226,25 @@ fn trailing_semicolon(offset: TextSize, locator: &Locator) -> Option<TextSize> {
 fn next_stmt_break(semicolon: TextSize, locator: &Locator) -> TextSize {
     let start_location = semicolon + TextSize::from(1);
 
-    let contents = &locator.contents()[usize::from(start_location)..];
-    for line in NewlineWithTrailingNewline::from(contents) {
+    for line in
+        NewlineWithTrailingNewline::with_offset(locator.after(start_location), start_location)
+    {
         let trimmed = line.trim_whitespace();
         // Skip past any continuations.
         if trimmed.starts_with('\\') {
             continue;
         }
 
-        return start_location
-            + if trimmed.is_empty() {
-                // If the line is empty, then despite the previous statement ending in a
-                // semicolon, we know that it's not a multi-statement line.
-                line.start()
-            } else {
-                // Otherwise, find the start of the next statement. (Or, anything that isn't
-                // whitespace.)
-                let relative_offset = line.find(|c: char| !is_python_whitespace(c)).unwrap();
-                line.start() + TextSize::try_from(relative_offset).unwrap()
-            };
+        return if trimmed.is_empty() {
+            // If the line is empty, then despite the previous statement ending in a
+            // semicolon, we know that it's not a multi-statement line.
+            line.start()
+        } else {
+            // Otherwise, find the start of the next statement. (Or, anything that isn't
+            // whitespace.)
+            let relative_offset = line.find(|c: char| !is_python_whitespace(c)).unwrap();
+            line.start() + TextSize::try_from(relative_offset).unwrap()
+        };
     }
 
     locator.line_end(start_location)

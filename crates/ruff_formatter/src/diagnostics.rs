@@ -1,4 +1,5 @@
 use crate::prelude::TagKind;
+use crate::GroupId;
 use ruff_text_size::TextRange;
 use std::error::Error;
 
@@ -86,7 +87,9 @@ pub enum InvalidDocumentError {
     /// Text
     /// EndGroup
     /// ```
-    StartTagMissing { kind: TagKind },
+    StartTagMissing {
+        kind: TagKind,
+    },
 
     /// Expected a specific start tag but instead is:
     /// - at the end of the document
@@ -95,6 +98,10 @@ pub enum InvalidDocumentError {
     ExpectedStart {
         expected_start: TagKind,
         actual: ActualStart,
+    },
+
+    UnknownGroupId {
+        group_id: GroupId,
     },
 }
 
@@ -147,6 +154,9 @@ impl std::fmt::Display for InvalidDocumentError {
                         std::write!(f, "Expected start tag of kind {expected_start:?} but found non-tag element.")
                     }
                 }
+            }
+            InvalidDocumentError::UnknownGroupId { group_id } => {
+                std::write!(f, "Encountered unknown group id {group_id:?}. Ensure that the group with the id {group_id:?} exists and that the group is a parent of or comes before the element referring to it.")
             }
         }
     }

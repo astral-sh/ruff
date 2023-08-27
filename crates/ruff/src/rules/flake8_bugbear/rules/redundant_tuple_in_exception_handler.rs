@@ -79,7 +79,6 @@ pub(crate) fn redundant_tuple_in_exception_handler(
             type_.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
-            #[allow(deprecated)]
             diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                 checker.generator().expr(elt),
                 type_.range(),

@@ -1,9 +1,3 @@
-use crate::comments::{
-    leading_alternate_branch_comments, trailing_comments, SourceComment, SuppressionKind,
-};
-use crate::prelude::*;
-use crate::statement::suite::{contains_only_an_ellipsis, SuiteKind};
-use crate::verbatim::write_suppressed_clause_header;
 use ruff_formatter::{write, Argument, Arguments, FormatError};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::{
@@ -12,6 +6,13 @@ use ruff_python_ast::{
 };
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{TextRange, TextSize};
+
+use crate::comments::{
+    leading_alternate_branch_comments, trailing_comments, SourceComment, SuppressionKind,
+};
+use crate::prelude::*;
+use crate::statement::suite::{contains_only_an_ellipsis, SuiteKind};
+use crate::verbatim::write_suppressed_clause_header;
 
 /// The header of a compound statement clause.
 ///
@@ -108,13 +109,17 @@ impl<'a> ClauseHeader<'a> {
                 is_async: _,
                 decorator_list: _,
                 name: _,
-                returns: _,
+                returns,
                 body: _,
             }) => {
                 if let Some(type_params) = type_params.as_ref() {
                     visit(type_params, visitor);
                 }
                 visit(parameters.as_ref(), visitor);
+
+                if let Some(returns) = returns.as_deref() {
+                    visit(returns, visitor);
+                }
             }
             ClauseHeader::If(StmtIf {
                 test,

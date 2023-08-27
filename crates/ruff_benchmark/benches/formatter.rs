@@ -1,8 +1,10 @@
 use std::path::Path;
+use std::time::Duration;
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-
-use ruff_benchmark::{TestCase, TestFile, TestFileDownloadError};
+use ruff_benchmark::criterion::{
+    criterion_group, criterion_main, BenchmarkId, Criterion, Throughput,
+};
+use ruff_benchmark::{TestCase, TestCaseSpeed, TestFile, TestFileDownloadError};
 use ruff_python_formatter::{format_node, PyFormatOptions};
 use ruff_python_index::CommentRangesBuilder;
 use ruff_python_parser::lexer::lex;
@@ -45,6 +47,12 @@ fn benchmark_formatter(criterion: &mut Criterion) {
 
     for case in test_cases {
         group.throughput(Throughput::Bytes(case.code().len() as u64));
+
+        group.measurement_time(match case.speed() {
+            TestCaseSpeed::Fast => Duration::from_secs(5),
+            TestCaseSpeed::Normal => Duration::from_secs(10),
+            TestCaseSpeed::Slow => Duration::from_secs(20),
+        });
 
         group.bench_with_input(
             BenchmarkId::from_parameter(case.name()),

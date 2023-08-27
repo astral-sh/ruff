@@ -130,6 +130,12 @@ test_particular = [
     'c'
     )
 }
+
+
+# Regression test for https://github.com/astral-sh/ruff/issues/5893
+x = ("""aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa""" """bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb""")
+x = (f"""aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa""" f"""bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb""")
+x = (b"""aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa""" b"""bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb""")
 ```
 
 ## Outputs
@@ -137,6 +143,7 @@ test_particular = [
 ```
 indent-style            = Spaces, size: 4
 line-width              = 88
+tab-width               = 4
 quote-style             = Double
 magic-trailing-comma    = Respect
 ```
@@ -284,6 +291,21 @@ test_particular = [
 
 # Parenthesized string continuation with messed up indentation
 {"key": ([], "a" "b" "c")}
+
+
+# Regression test for https://github.com/astral-sh/ruff/issues/5893
+x = (
+    """aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"""
+    """bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"""
+)
+x = (
+    f"""aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"""
+    f"""bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"""
+)
+x = (
+    b"""aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"""
+    b"""bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"""
+)
 ```
 
 
@@ -291,6 +313,7 @@ test_particular = [
 ```
 indent-style            = Spaces, size: 4
 line-width              = 88
+tab-width               = 4
 quote-style             = Single
 magic-trailing-comma    = Respect
 ```
@@ -438,6 +461,21 @@ test_particular = [
 
 # Parenthesized string continuation with messed up indentation
 {'key': ([], 'a' 'b' 'c')}
+
+
+# Regression test for https://github.com/astral-sh/ruff/issues/5893
+x = (
+    '''aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'''
+    '''bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'''
+)
+x = (
+    f'''aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'''
+    f'''bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'''
+)
+x = (
+    b'''aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'''
+    b'''bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'''
+)
 ```
 
 

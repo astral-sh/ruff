@@ -299,6 +299,8 @@ PT018.py:44:1: PT018 [*] Assertion should be broken down into multiple parts
    44 |+assert something
    45 |+assert something_else
 45 46 | assert something and something_else and something_third  # Error
+46 47 | 
+47 48 | 
 
 PT018.py:45:1: PT018 [*] Assertion should be broken down into multiple parts
    |
@@ -316,5 +318,37 @@ PT018.py:45:1: PT018 [*] Assertion should be broken down into multiple parts
 45    |-assert something and something_else and something_third  # Error
    45 |+assert something and something_else
    46 |+assert something_third
+46 47 | 
+47 48 | 
+48 49 | def test_multiline():
+
+PT018.py:49:5: PT018 Assertion should be broken down into multiple parts
+   |
+48 | def test_multiline():
+49 |     assert something and something_else; x = 1
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
+50 | 
+51 |     x = 1; assert something and something_else
+   |
+   = help: Break down assertion into multiple parts
+
+PT018.py:51:12: PT018 Assertion should be broken down into multiple parts
+   |
+49 |     assert something and something_else; x = 1
+50 | 
+51 |     x = 1; assert something and something_else
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
+52 | 
+53 |     x = 1; \
+   |
+   = help: Break down assertion into multiple parts
+
+PT018.py:54:9: PT018 Assertion should be broken down into multiple parts
+   |
+53 |     x = 1; \
+54 |         assert something and something_else
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
+   |
+   = help: Break down assertion into multiple parts
 
 

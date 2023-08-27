@@ -9,7 +9,6 @@ use crate::expression::parentheses::{
     empty_parenthesized, parenthesized, NeedsParentheses, OptionalParentheses,
 };
 use crate::prelude::*;
-use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatExprDict;

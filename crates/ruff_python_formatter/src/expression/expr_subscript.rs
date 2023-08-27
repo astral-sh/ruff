@@ -3,13 +3,12 @@ use ruff_python_ast::node::{AnyNodeRef, AstNode};
 use ruff_python_ast::{Expr, ExprSubscript};
 
 use crate::comments::{trailing_comments, SourceComment};
-use crate::context::PyFormatContext;
+
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::expr_tuple::TupleParentheses;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::expression::CallChainLayout;
 use crate::prelude::*;
-use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatExprSubscript {
@@ -101,7 +100,10 @@ impl NeedsParentheses for ExprSubscript {
             {
                 OptionalParentheses::Multiline
             } else {
-                self.value.needs_parentheses(self.into(), context)
+                match self.value.needs_parentheses(self.into(), context) {
+                    OptionalParentheses::BestFit => OptionalParentheses::Never,
+                    parentheses => parentheses,
+                }
             }
         }
     }

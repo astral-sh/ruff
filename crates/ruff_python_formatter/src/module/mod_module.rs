@@ -1,8 +1,9 @@
-use crate::statement::suite::SuiteKind;
-use crate::{AsFormat, FormatNodeRule, PyFormatter};
 use ruff_formatter::prelude::hard_line_break;
-use ruff_formatter::{write, Buffer, FormatResult};
+use ruff_formatter::write;
 use ruff_python_ast::ModModule;
+
+use crate::prelude::*;
+use crate::statement::suite::SuiteKind;
 
 #[derive(Default)]
 pub struct FormatModModule;

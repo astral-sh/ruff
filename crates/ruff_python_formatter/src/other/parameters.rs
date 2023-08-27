@@ -13,7 +13,6 @@ use crate::comments::{
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::parentheses::empty_parenthesized;
 use crate::prelude::*;
-use crate::FormatNodeRule;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
 pub enum ParametersParentheses {
