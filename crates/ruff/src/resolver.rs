@@ -1,13 +1,12 @@
 //! Discover Python files, and their corresponding [`Settings`], from the
 //! filesystem.
 
-use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use path_absolutize::path_dedot;
 
 use crate::fs;
-use crate::settings::{AllSettings, Settings};
+use crate::settings::AllSettings;
 
 /// The configuration information from a `pyproject.toml` file.
 pub struct PyprojectConfig {
@@ -66,47 +65,5 @@ impl Relativity {
                 .to_path_buf(),
             Relativity::Cwd => path_dedot::CWD.clone(),
         }
-    }
-}
-
-#[derive(Default)]
-pub struct Resolver {
-    settings: BTreeMap<PathBuf, AllSettings>,
-}
-
-impl Resolver {
-    /// Add a resolved [`Settings`] under a given [`PathBuf`] scope.
-    pub fn add(&mut self, path: PathBuf, settings: AllSettings) {
-        self.settings.insert(path, settings);
-    }
-
-    /// Return the appropriate [`AllSettings`] for a given [`Path`].
-    pub fn resolve_all<'a>(
-        &'a self,
-        path: &Path,
-        pyproject_config: &'a PyprojectConfig,
-    ) -> &'a AllSettings {
-        match pyproject_config.strategy {
-            PyprojectDiscoveryStrategy::Fixed => &pyproject_config.settings,
-            PyprojectDiscoveryStrategy::Hierarchical => self
-                .settings
-                .iter()
-                .rev()
-                .find_map(|(root, settings)| path.starts_with(root).then_some(settings))
-                .unwrap_or(&pyproject_config.settings),
-        }
-    }
-
-    pub fn resolve<'a>(
-        &'a self,
-        path: &Path,
-        pyproject_config: &'a PyprojectConfig,
-    ) -> &'a Settings {
-        &self.resolve_all(path, pyproject_config).lib
-    }
-
-    /// Return an iterator over the resolved [`Settings`] in this [`Resolver`].
-    pub fn iter(&self) -> impl Iterator<Item = &AllSettings> {
-        self.settings.values()
     }
 }

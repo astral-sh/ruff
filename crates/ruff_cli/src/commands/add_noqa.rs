@@ -8,7 +8,7 @@ use rayon::prelude::*;
 
 use ruff::linter::add_noqa_to_path;
 use ruff::resolver::PyprojectConfig;
-use ruff::{packaging, warn_user_once};
+use ruff::warn_user_once;
 use ruff_python_stdlib::path::{is_jupyter_notebook, is_project_toml};
 use ruff_workspace::resolver::python_files_in_path;
 
@@ -32,13 +32,12 @@ pub(crate) fn add_noqa(
     }
 
     // Discover the package root for each Python file.
-    let package_roots = packaging::detect_package_roots(
+    let package_roots = resolver.package_roots(
         &paths
             .iter()
             .flatten()
             .map(ignore::DirEntry::path)
             .collect::<Vec<_>>(),
-        &resolver,
         pyproject_config,
     );
 

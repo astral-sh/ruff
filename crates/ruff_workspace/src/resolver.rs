@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 
@@ -6,13 +7,118 @@ use anyhow::{anyhow, bail};
 use ignore::{DirEntry, WalkBuilder, WalkState};
 use itertools::Itertools;
 use log::debug;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff::fs;
-use ruff::resolver::{PyprojectConfig, Relativity, Resolver};
+use ruff::packaging::is_package;
+use ruff::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy, Relativity};
 use ruff::settings::configuration::Configuration;
 use ruff::settings::pyproject::settings_toml;
-use ruff::settings::{pyproject, AllSettings};
+use ruff::settings::{pyproject, AllSettings, Settings};
+
+#[derive(Default)]
+pub struct Resolver {
+    settings: BTreeMap<PathBuf, AllSettings>,
+}
+
+impl Resolver {
+    /// Add a resolved [`Settings`] under a given [`PathBuf`] scope.
+    pub fn add(&mut self, path: PathBuf, settings: AllSettings) {
+        self.settings.insert(path, settings);
+    }
+
+    /// Return the appropriate [`AllSettings`] for a given [`Path`].
+    pub fn resolve_all<'a>(
+        &'a self,
+        path: &Path,
+        pyproject_config: &'a PyprojectConfig,
+    ) -> &'a AllSettings {
+        match pyproject_config.strategy {
+            PyprojectDiscoveryStrategy::Fixed => &pyproject_config.settings,
+            PyprojectDiscoveryStrategy::Hierarchical => self
+                .settings
+                .iter()
+                .rev()
+                .find_map(|(root, settings)| path.starts_with(root).then_some(settings))
+                .unwrap_or(&pyproject_config.settings),
+        }
+    }
+
+    pub fn resolve<'a>(
+        &'a self,
+        path: &Path,
+        pyproject_config: &'a PyprojectConfig,
+    ) -> &'a Settings {
+        &self.resolve_all(path, pyproject_config).lib
+    }
+
+    /// Return a mapping from Python package to its package root.
+    pub fn package_roots<'a>(
+        &'a self,
+        files: &[&'a Path],
+        pyproject_config: &'a PyprojectConfig,
+    ) -> FxHashMap<&'a Path, Option<&'a Path>> {
+        // Pre-populate the module cache, since the list of files could (but isn't
+        // required to) contain some `__init__.py` files.
+        let mut package_cache: FxHashMap<&Path, bool> = FxHashMap::default();
+        for file in files {
+            if file.ends_with("__init__.py") {
+                if let Some(parent) = file.parent() {
+                    package_cache.insert(parent, true);
+                }
+            }
+        }
+
+        // Search for the package root for each file.
+        let mut package_roots: FxHashMap<&Path, Option<&Path>> = FxHashMap::default();
+        for file in files {
+            let namespace_packages = &self.resolve(file, pyproject_config).namespace_packages;
+            if let Some(package) = file.parent() {
+                if package_roots.contains_key(package) {
+                    continue;
+                }
+                package_roots.insert(
+                    package,
+                    detect_package_root_with_cache(package, namespace_packages, &mut package_cache),
+                );
+            }
+        }
+
+        package_roots
+    }
+
+    /// Return an iterator over the resolved [`Settings`] in this [`Resolver`].
+    pub fn iter(&self) -> impl Iterator<Item = &AllSettings> {
+        self.settings.values()
+    }
+}
+
+/// A wrapper around `detect_package_root` to cache filesystem lookups.
+fn detect_package_root_with_cache<'a>(
+    path: &'a Path,
+    namespace_packages: &'a [PathBuf],
+    package_cache: &mut FxHashMap<&'a Path, bool>,
+) -> Option<&'a Path> {
+    let mut current = None;
+    for parent in path.ancestors() {
+        if !is_package_with_cache(parent, namespace_packages, package_cache) {
+            return current;
+        }
+        current = Some(parent);
+    }
+    current
+}
+
+/// A wrapper around `is_package` to cache filesystem lookups.
+fn is_package_with_cache<'a>(
+    path: &'a Path,
+    namespace_packages: &'a [PathBuf],
+    package_cache: &mut FxHashMap<&'a Path, bool>,
+) -> bool {
+    *package_cache
+        .entry(path)
+        .or_insert_with(|| is_package(path, namespace_packages))
+}
 
 pub trait ConfigProcessor: Sync {
     fn process_config(&self, config: &mut Configuration);
@@ -323,7 +429,7 @@ mod tests {
     use path_absolutize::Absolutize;
     use tempfile::TempDir;
 
-    use ruff::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy, Relativity, Resolver};
+    use ruff::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy, Relativity};
     use ruff::settings::configuration::Configuration;
     use ruff::settings::pyproject::find_settings_toml;
     use ruff::settings::types::FilePattern;
@@ -331,7 +437,7 @@ mod tests {
 
     use crate::resolver::{
         is_file_excluded, match_exclusion, python_files_in_path, resolve_settings_with_processor,
-        ConfigProcessor,
+        ConfigProcessor, Resolver,
     };
     use crate::tests::test_resource_path;
 

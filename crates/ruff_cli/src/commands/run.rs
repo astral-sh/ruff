@@ -16,7 +16,7 @@ use ruff::message::Message;
 use ruff::registry::Rule;
 use ruff::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
 use ruff::settings::{flags, AllSettings};
-use ruff::{fs, packaging, warn_user_once, IOError};
+use ruff::{fs, warn_user_once, IOError};
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::imports::ImportMap;
 use ruff_source_file::SourceFileBuilder;
@@ -69,13 +69,12 @@ pub(crate) fn run(
     };
 
     // Discover the package root for each Python file.
-    let package_roots = packaging::detect_package_roots(
+    let package_roots = resolver.package_roots(
         &paths
             .iter()
             .flatten()
             .map(ignore::DirEntry::path)
             .collect::<Vec<_>>(),
-        &resolver,
         pyproject_config,
     );
 
