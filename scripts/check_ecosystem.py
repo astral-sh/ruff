@@ -130,6 +130,7 @@ REPOSITORIES: list[Repository] = [
     Repository("mlflow", "mlflow", "master"),
     Repository("model-bakers", "model_bakery", "main"),
     Repository("pandas-dev", "pandas", "main"),
+    Repository("prefecthq", "prefect", "main"),
     Repository("pypa", "build", "main"),
     Repository("pypa", "cibuildwheel", "main"),
     Repository("pypa", "pip", "main"),
