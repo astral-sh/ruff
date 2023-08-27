@@ -2,12 +2,12 @@ use anyhow::{anyhow, Result};
 use memchr::memchr_iter;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff_text_size::TextSize;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_index::Indexer;
 use ruff_source_file::Locator;
+use ruff_text_size::TextSize;
 
 /// ## What it does
 /// Check for `type: ignore` annotations that suppress all type warnings, as

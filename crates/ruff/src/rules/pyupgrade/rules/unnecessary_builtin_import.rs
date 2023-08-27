@@ -1,8 +1,9 @@
 use itertools::Itertools;
-use ruff_python_ast::{Alias, Ranged, Stmt};
+use ruff_python_ast::{Alias, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 use crate::autofix;
 use crate::checkers::ast::Checker;

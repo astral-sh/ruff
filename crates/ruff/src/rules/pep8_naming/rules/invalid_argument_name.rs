@@ -1,8 +1,9 @@
-use ruff_python_ast::{Parameter, Ranged};
+use ruff_python_ast::Parameter;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_stdlib::str;
+use ruff_text_size::Ranged;
 
 use crate::settings::types::IdentifierPattern;
 

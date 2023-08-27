@@ -1,10 +1,10 @@
-use bitflags::bitflags;
-use ruff_text_size::TextRange;
 use std::ops::Deref;
 
+use bitflags::bitflags;
+
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
-use ruff_python_ast::Ranged;
 use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::context::ExecutionContext;
 use crate::scope::ScopeId;

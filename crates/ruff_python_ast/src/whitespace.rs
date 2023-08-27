@@ -1,8 +1,8 @@
 use ruff_python_trivia::{indentation_at_offset, is_python_whitespace, PythonWhitespace};
 use ruff_source_file::{newlines::UniversalNewlineIterator, Locator};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::{Ranged, Stmt};
+use crate::Stmt;
 
 /// Extract the leading indentation from a line.
 #[inline]

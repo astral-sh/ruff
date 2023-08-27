@@ -1,5 +1,5 @@
-use ruff_python_ast::{self as ast, PySourceType, Ranged, Stmt};
-use ruff_text_size::TextRange;
+use ruff_python_ast::{self as ast, PySourceType, Stmt};
+use ruff_text_size::{Ranged, TextRange};
 
 use ruff_source_file::Locator;
 

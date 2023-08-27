@@ -1,9 +1,8 @@
 use log::error;
 use ruff_python_ast::{
-    self as ast, Arguments, CmpOp, Constant, ElifElseClause, Expr, ExprContext, Identifier, Ranged,
-    Stmt,
+    self as ast, Arguments, CmpOp, Constant, ElifElseClause, Expr, ExprContext, Identifier, Stmt,
 };
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};

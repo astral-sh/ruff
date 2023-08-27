@@ -1,6 +1,7 @@
 use ruff_formatter::{format_args, write};
 use ruff_python_ast::node::AstNode;
-use ruff_python_ast::{Ranged, Stmt, StmtWhile};
+use ruff_python_ast::{Stmt, StmtWhile};
+use ruff_text_size::Ranged;
 
 use crate::comments::SourceComment;
 use crate::expression::maybe_parenthesize_expression;

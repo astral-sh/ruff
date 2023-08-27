@@ -1,7 +1,7 @@
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr, Parameter, ParameterWithDefault, Ranged, Stmt};
-use ruff_text_size::TextSize;
+use ruff_python_ast::{self as ast, Expr, Parameter, ParameterWithDefault, Stmt};
+use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;

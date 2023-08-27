@@ -4,9 +4,8 @@
 
 use std::ops::Index;
 
-use ruff_python_ast as ast;
-use ruff_python_ast::{Ranged, Stmt};
-use ruff_text_size::TextRange;
+use ruff_python_ast::{self as ast, Stmt};
+use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
 
 use ruff_index::{newtype_index, IndexVec};

@@ -32,10 +32,10 @@ use itertools::Itertools;
 use log::error;
 use ruff_python_ast::{
     self as ast, Arguments, Comprehension, Constant, ElifElseClause, ExceptHandler, Expr,
-    ExprContext, Keyword, MatchCase, Parameter, ParameterWithDefault, Parameters, Pattern, Ranged,
-    Stmt, Suite, UnaryOp,
+    ExprContext, Keyword, MatchCase, Parameter, ParameterWithDefault, Parameters, Pattern, Stmt,
+    Suite, UnaryOp,
 };
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, IsolationLevel};
 use ruff_python_ast::all::{extract_all_names, DunderAllFlags};

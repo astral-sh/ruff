@@ -1,11 +1,12 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
-use crate::Ranged;
-use num_bigint::BigInt;
-use ruff_text_size::{TextRange, TextSize};
 use std::fmt;
 use std::fmt::Debug;
 use std::ops::Deref;
+
+use num_bigint::BigInt;
+
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 /// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
@@ -3087,9 +3088,10 @@ impl Ranged for crate::nodes::ParameterWithDefault {
 
 #[cfg(target_pointer_width = "64")]
 mod size_assertions {
+    use static_assertions::assert_eq_size;
+
     #[allow(clippy::wildcard_imports)]
     use super::*;
-    use static_assertions::assert_eq_size;
 
     assert_eq_size!(Stmt, [u8; 144]);
     assert_eq_size!(StmtFunctionDef, [u8; 144]);

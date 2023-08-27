@@ -1,8 +1,8 @@
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::node::AnyNodeRef;
-use crate::{ExpressionRef, Ranged};
+use crate::ExpressionRef;
 
 /// Returns the [`TextRange`] of a given expression including parentheses, if the expression is
 /// parenthesized; or `None`, if the expression is not parenthesized.

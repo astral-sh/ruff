@@ -1,11 +1,12 @@
 use anyhow::{Context, Ok, Result};
 
 use ruff_diagnostics::Edit;
-use ruff_python_ast::{self as ast, Ranged};
+use ruff_python_ast as ast;
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::Binding;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
 use crate::cst::matchers::{match_call_mut, match_dict, transform_expression};
 

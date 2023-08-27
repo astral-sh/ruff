@@ -1,6 +1,6 @@
 use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::Tok;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};

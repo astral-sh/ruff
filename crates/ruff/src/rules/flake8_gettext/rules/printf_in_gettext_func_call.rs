@@ -1,8 +1,9 @@
-use ruff_python_ast::{self as ast, Constant, Expr, Operator, Ranged};
+use ruff_python_ast::{self as ast, Constant, Expr, Operator};
 
 use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for printf-style formatted strings in `gettext` function calls.

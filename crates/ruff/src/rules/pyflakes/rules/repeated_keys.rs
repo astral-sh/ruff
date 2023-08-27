@@ -1,11 +1,12 @@
 use std::hash::BuildHasherDefault;
 
-use ruff_python_ast::{Expr, Ranged};
+use ruff_python_ast::Expr;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
