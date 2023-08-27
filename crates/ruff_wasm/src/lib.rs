@@ -12,7 +12,7 @@ use ruff::settings::types::PythonVersion;
 use ruff::settings::{defaults, flags, Settings};
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
-use ruff_python_formatter::{format_module, format_node, PyFormatOptions};
+use ruff_python_formatter::{format_module, format_node, pretty_comments, PyFormatOptions};
 use ruff_python_index::{CommentRangesBuilder, Indexer};
 use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::AsMode;
@@ -254,6 +254,25 @@ impl Workspace {
             format_node(&module, &comment_ranges, contents, options).map_err(into_error)?;
 
         Ok(format!("{formatted}"))
+    }
+
+    pub fn comments(&self, contents: &str) -> Result<String, Error> {
+        let tokens: Vec<_> = ruff_python_parser::lexer::lex(contents, Mode::Module).collect();
+        let mut comment_ranges = CommentRangesBuilder::default();
+
+        for (token, range) in tokens.iter().flatten() {
+            comment_ranges.visit_token(token, *range);
+        }
+        let comment_ranges = comment_ranges.finish();
+        let module = parse_tokens(tokens, Mode::Module, ".").map_err(into_error)?;
+
+        // TODO(konstin): Add an options for py/pyi to the UI (2/2)
+        let options = PyFormatOptions::from_source_type(PySourceType::default());
+        let formatted =
+            format_node(&module, &comment_ranges, contents, options).map_err(into_error)?;
+        let comments = pretty_comments(&formatted, contents);
+
+        Ok(comments)
     }
 
     /// Parses the content and returns its AST

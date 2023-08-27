@@ -138,6 +138,13 @@ export default function Editor() {
               content: workspace.format_ir(pythonSource),
             };
             break;
+          
+          case "Comments":
+            secondary = {
+              status: "ok",
+              content: workspace.comments(pythonSource),
+            };
+            break;
 
           case "Tokens":
             secondary = {
