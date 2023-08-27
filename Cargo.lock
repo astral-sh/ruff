@@ -2531,6 +2531,7 @@ dependencies = [
  "ruff_python_index",
  "ruff_python_parser",
  "ruff_source_file",
+ "ruff_text_size",
  "serde",
  "serde-wasm-bindgen",
  "wasm-bindgen",

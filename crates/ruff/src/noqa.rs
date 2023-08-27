@@ -536,7 +536,7 @@ fn add_noqa_inner(
                     let rule = diagnostic.kind.rule();
                     if !includes(rule, codes) {
                         matches_by_line
-                            .entry(directive_line.range.start())
+                            .entry(directive_line.start())
                             .or_insert_with(|| {
                                 (RuleSet::default(), Some(&directive_line.directive))
                             })
@@ -642,6 +642,13 @@ pub(crate) struct NoqaDirectiveLine<'a> {
     pub(crate) directive: Directive<'a>,
     /// The codes that are ignored by the directive.
     pub(crate) matches: Vec<NoqaCode>,
+}
+
+impl Ranged for NoqaDirectiveLine<'_> {
+    /// The range of the `noqa` directive.
+    fn range(&self) -> TextRange {
+        self.range
+    }
 }
 
 #[derive(Debug, Default)]

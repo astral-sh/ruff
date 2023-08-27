@@ -15,13 +15,13 @@ mod tests {
 
     use test_case::test_case;
 
-    use ruff_diagnostics::Diagnostic;
     use ruff_python_ast::PySourceType;
     use ruff_python_codegen::Stylist;
     use ruff_python_index::Indexer;
     use ruff_python_parser::AsMode;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::Locator;
+    use ruff_text_size::Ranged;
 
     use crate::linter::{check_path, LinterResult};
     use crate::registry::{AsRule, Linter, Rule};
@@ -535,7 +535,7 @@ mod tests {
             None,
             source_type,
         );
-        diagnostics.sort_by_key(Diagnostic::start);
+        diagnostics.sort_by_key(Ranged::start);
         let actual = diagnostics
             .iter()
             .map(|diagnostic| diagnostic.kind.rule())

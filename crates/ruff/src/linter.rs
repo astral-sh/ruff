@@ -17,6 +17,7 @@ use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 
 use ruff_source_file::{Locator, SourceFileBuilder};
+use ruff_text_size::Ranged;
 
 use crate::autofix::{fix_file, FixResult};
 use crate::checkers::ast::check_ast;

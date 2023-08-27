@@ -1,4 +1,4 @@
-use ruff_text_size::TextSize;
+use ruff_text_size::{Ranged, TextSize};
 
 use ruff_diagnostics::Edit;
 
