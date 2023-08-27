@@ -4,12 +4,10 @@ use anyhow::Result;
 use log::debug;
 use path_absolutize::path_dedot;
 
-use ruff::resolver::{
-    resolve_settings_with_processor, ConfigProcessor, PyprojectConfig, PyprojectDiscoveryStrategy,
-    Relativity,
-};
+use ruff::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy, Relativity};
 use ruff::settings::configuration::Configuration;
 use ruff::settings::{pyproject, AllSettings};
+use ruff_workspace::resolver::{resolve_settings_with_processor, ConfigProcessor};
 
 use crate::args::Overrides;
 

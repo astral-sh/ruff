@@ -11,16 +11,17 @@ use itertools::Itertools;
 use log::{debug, error, warn};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
-use ruff_text_size::{TextRange, TextSize};
 
 use ruff::message::Message;
 use ruff::registry::Rule;
 use ruff::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
 use ruff::settings::{flags, AllSettings};
-use ruff::{fs, packaging, resolver, warn_user_once, IOError};
+use ruff::{fs, packaging, warn_user_once, IOError};
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::imports::ImportMap;
 use ruff_source_file::SourceFileBuilder;
+use ruff_text_size::{TextRange, TextSize};
+use ruff_workspace::resolver::python_files_in_path;
 
 use crate::args::Overrides;
 use crate::cache::{self, Cache};
@@ -38,7 +39,7 @@ pub(crate) fn run(
 ) -> Result<Diagnostics> {
     // Collect all the Python files to check.
     let start = Instant::now();
-    let (paths, resolver) = resolver::python_files_in_path(files, pyproject_config, overrides)?;
+    let (paths, resolver) = python_files_in_path(files, pyproject_config, overrides)?;
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
@@ -230,17 +231,21 @@ with the relevant file contents, the `pyproject.toml` settings, and the followin
 #[cfg(test)]
 #[cfg(unix)]
 mod test {
-    use super::run;
-    use crate::args::Overrides;
+    use std::fs;
+    use std::os::unix::fs::OpenOptionsExt;
+
     use anyhow::Result;
+    use rustc_hash::FxHashMap;
+    use tempfile::TempDir;
+
     use ruff::message::{Emitter, EmitterContext, TextEmitter};
     use ruff::registry::Rule;
     use ruff::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
     use ruff::settings::{flags, AllSettings, CliSettings, Settings};
-    use rustc_hash::FxHashMap;
-    use std::fs;
-    use std::os::unix::fs::OpenOptionsExt;
-    use tempfile::TempDir;
+
+    use crate::args::Overrides;
+
+    use super::run;
 
     /// We check that regular python files, pyproject.toml and jupyter notebooks all handle io
     /// errors gracefully

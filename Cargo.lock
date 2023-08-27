@@ -2227,6 +2227,7 @@ dependencies = [
  "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
+ "ruff_workspace",
  "rustc-hash",
  "serde",
  "serde_json",
@@ -2269,6 +2270,7 @@ dependencies = [
  "ruff_python_parser",
  "ruff_python_stdlib",
  "ruff_python_trivia",
+ "ruff_workspace",
  "schemars",
  "serde",
  "serde_json",
@@ -2539,6 +2541,21 @@ dependencies = [
  "serde-wasm-bindgen",
  "wasm-bindgen",
  "wasm-bindgen-test",
+]
+
+[[package]]
+name = "ruff_workspace"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "globset",
+ "ignore",
+ "itertools",
+ "log",
+ "path-absolutize",
+ "ruff",
+ "rustc-hash",
+ "tempfile",
 ]
 
 [[package]]

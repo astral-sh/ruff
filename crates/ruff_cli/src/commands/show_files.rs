@@ -5,7 +5,8 @@ use anyhow::Result;
 use itertools::Itertools;
 
 use ruff::resolver::PyprojectConfig;
-use ruff::{resolver, warn_user_once};
+use ruff::warn_user_once;
+use ruff_workspace::resolver::python_files_in_path;
 
 use crate::args::Overrides;
 
@@ -17,7 +18,7 @@ pub(crate) fn show_files(
     writer: &mut impl Write,
 ) -> Result<()> {
     // Collect all files in the hierarchy.
-    let (paths, _resolver) = resolver::python_files_in_path(files, pyproject_config, overrides)?;
+    let (paths, _resolver) = python_files_in_path(files, pyproject_config, overrides)?;
 
     if paths.is_empty() {
         warn_user_once!("No Python files found under the given path(s)");

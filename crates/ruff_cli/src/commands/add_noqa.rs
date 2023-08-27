@@ -8,8 +8,9 @@ use rayon::prelude::*;
 
 use ruff::linter::add_noqa_to_path;
 use ruff::resolver::PyprojectConfig;
-use ruff::{packaging, resolver, warn_user_once};
+use ruff::{packaging, warn_user_once};
 use ruff_python_stdlib::path::{is_jupyter_notebook, is_project_toml};
+use ruff_workspace::resolver::python_files_in_path;
 
 use crate::args::Overrides;
 
@@ -21,7 +22,7 @@ pub(crate) fn add_noqa(
 ) -> Result<usize> {
     // Collect all the files to check.
     let start = Instant::now();
-    let (paths, resolver) = resolver::python_files_in_path(files, pyproject_config, overrides)?;
+    let (paths, resolver) = python_files_in_path(files, pyproject_config, overrides)?;
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 

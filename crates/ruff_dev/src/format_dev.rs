@@ -8,7 +8,6 @@ use indicatif::ProgressStyle;
 #[cfg_attr(feature = "singlethreaded", allow(unused_imports))]
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use ruff::logging::LogLevel;
-use ruff::resolver::python_files_in_path;
 use ruff::settings::types::{FilePattern, FilePatternSet};
 use ruff_cli::args::{CheckArgs, LogLevelArgs};
 use ruff_cli::resolve::resolve;
@@ -16,6 +15,7 @@ use ruff_formatter::{FormatError, LineWidth, PrintError};
 use ruff_python_formatter::{
     format_module, FormatModuleError, MagicTrailingComma, PyFormatOptions,
 };
+use ruff_workspace::resolver::python_files_in_path;
 use serde::Deserialize;
 use similar::{ChangeTag, TextDiff};
 use std::fmt::{Display, Formatter};
