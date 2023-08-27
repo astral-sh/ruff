@@ -1,15 +1,13 @@
 use thiserror::Error;
 
-use ruff_formatter::format_element::tag;
 use ruff_formatter::prelude::*;
 use ruff_formatter::{format, FormatError, Formatted, PrintError, Printed, SourceCode};
-use ruff_python_ast::node::{AnyNodeRef, AstNode};
+use ruff_python_ast::node::AstNode;
 use ruff_python_ast::Mod;
 use ruff_python_index::{CommentRanges, CommentRangesBuilder};
 use ruff_python_parser::lexer::{lex, LexicalError};
 use ruff_python_parser::{parse_tokens, Mode, ParseError};
 use ruff_source_file::Locator;
-use ruff_text_size::TextLen;
 
 use crate::comments::{
     dangling_comments, leading_comments, trailing_comments, Comments, SourceComment,
@@ -176,45 +174,6 @@ pub fn pretty_comments(formatted: &Formatted<PyFormatContext>, source: &str) -> 
         "{comments:#?}",
         comments = comments.debug(SourceCode::new(source))
     )
-}
-
-pub(crate) struct NotYetImplementedCustomText<'a> {
-    text: &'static str,
-    node: AnyNodeRef<'a>,
-}
-
-/// Formats a placeholder for nodes that have not yet been implemented
-pub(crate) fn not_yet_implemented_custom_text<'a, T>(
-    text: &'static str,
-    node: T,
-) -> NotYetImplementedCustomText<'a>
-where
-    T: Into<AnyNodeRef<'a>>,
-{
-    NotYetImplementedCustomText {
-        text,
-        node: node.into(),
-    }
-}
-
-impl Format<PyFormatContext<'_>> for NotYetImplementedCustomText<'_> {
-    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        f.write_element(FormatElement::Tag(Tag::StartVerbatim(
-            tag::VerbatimKind::Verbatim {
-                length: self.text.text_len(),
-            },
-        )));
-
-        text(self.text).fmt(f)?;
-
-        f.write_element(FormatElement::Tag(Tag::EndVerbatim));
-
-        f.context()
-            .comments()
-            .mark_verbatim_node_comments_formatted(self.node);
-
-        Ok(())
-    }
 }
 
 #[cfg(test)]
