@@ -1,13 +1,16 @@
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions};
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{Pattern, Ranged};
+use ruff_python_ast::Pattern;
 use ruff_python_trivia::{first_non_trivia_token, SimpleToken, SimpleTokenKind, SimpleTokenizer};
+use ruff_text_size::Ranged;
 
 use crate::expression::parentheses::{
     parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
 };
 use crate::prelude::*;
 
+pub(crate) mod pattern_arguments;
+pub(crate) mod pattern_keyword;
 pub(crate) mod pattern_match_as;
 pub(crate) mod pattern_match_class;
 pub(crate) mod pattern_match_mapping;

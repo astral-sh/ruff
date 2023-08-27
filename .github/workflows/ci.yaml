@@ -341,3 +341,28 @@ jobs:
         run: cat target/progress_projects_stats.txt > $GITHUB_STEP_SUMMARY
       - name: "Remove checkouts from cache"
         run: rm -r target/progress_projects
+
+  benchmarks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Checkout Branch"
+        uses: actions/checkout@v3
+
+      - name: "Install Rust toolchain"
+        run: rustup show
+
+      - name: "Install codspeed"
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-codspeed
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: "Build benchmarks"
+        run: cargo codspeed build --features codspeed -p ruff_benchmark
+
+      - name: "Run benchmarks"
+        uses: CodSpeedHQ/action@v1
+        with:
+          run: cargo codspeed run
+          token: ${{ secrets.CODSPEED_TOKEN }}

@@ -1,11 +1,12 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
-use crate::Ranged;
-use num_bigint::BigInt;
-use ruff_text_size::{TextRange, TextSize};
 use std::fmt;
 use std::fmt::Debug;
 use std::ops::Deref;
+
+use num_bigint::BigInt;
+
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 /// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
@@ -1900,15 +1901,35 @@ impl From<PatternMatchMapping> for Pattern {
 pub struct PatternMatchClass {
     pub range: TextRange,
     pub cls: Box<Expr>,
-    pub patterns: Vec<Pattern>,
-    pub kwd_attrs: Vec<Identifier>,
-    pub kwd_patterns: Vec<Pattern>,
+    pub arguments: PatternArguments,
 }
 
 impl From<PatternMatchClass> for Pattern {
     fn from(payload: PatternMatchClass) -> Self {
         Pattern::MatchClass(payload)
     }
+}
+
+/// An AST node to represent the arguments to a [`PatternMatchClass`], i.e., the
+/// parenthesized contents in `case Point(1, x=0, y=0)`.
+///
+/// Like [`Arguments`], but for [`PatternMatchClass`].
+#[derive(Clone, Debug, PartialEq)]
+pub struct PatternArguments {
+    pub range: TextRange,
+    pub patterns: Vec<Pattern>,
+    pub keywords: Vec<PatternKeyword>,
+}
+
+/// An AST node to represent the keyword arguments to a [`PatternMatchClass`], i.e., the
+/// `x=0` and `y=0` in `case Point(x=0, y=0)`.
+///
+/// Like [`Keyword`], but for [`PatternMatchClass`].
+#[derive(Clone, Debug, PartialEq)]
+pub struct PatternKeyword {
+    pub range: TextRange,
+    pub attr: Identifier,
+    pub pattern: Pattern,
 }
 
 /// See also [MatchStar](https://docs.python.org/3/library/ast.html#ast.MatchStar)
@@ -3004,6 +3025,16 @@ impl Ranged for crate::Pattern {
         }
     }
 }
+impl Ranged for crate::nodes::PatternArguments {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+impl Ranged for crate::nodes::PatternKeyword {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
 
 impl Ranged for crate::nodes::TypeParams {
     fn range(&self) -> TextRange {
@@ -3057,9 +3088,10 @@ impl Ranged for crate::nodes::ParameterWithDefault {
 
 #[cfg(target_pointer_width = "64")]
 mod size_assertions {
+    use static_assertions::assert_eq_size;
+
     #[allow(clippy::wildcard_imports)]
     use super::*;
-    use static_assertions::assert_eq_size;
 
     assert_eq_size!(Stmt, [u8; 144]);
     assert_eq_size!(StmtFunctionDef, [u8; 144]);

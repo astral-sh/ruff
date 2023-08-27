@@ -1,8 +1,7 @@
-use ruff_python_ast::Ranged;
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::map_subscript;
+use ruff_text_size::Ranged;
 
 use ruff_python_semantic::{Definition, Member, MemberKind};
 

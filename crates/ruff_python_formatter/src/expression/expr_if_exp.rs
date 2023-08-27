@@ -1,13 +1,13 @@
+use ruff_formatter::{format_args, write};
+use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::ExprIfExp;
+
 use crate::comments::leading_comments;
 use crate::expression::parentheses::{
     in_parentheses_only_group, in_parentheses_only_soft_line_break_or_space, NeedsParentheses,
     OptionalParentheses,
 };
 use crate::prelude::*;
-use crate::FormatNodeRule;
-use ruff_formatter::{format_args, write};
-use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::ExprIfExp;
 
 #[derive(Default)]
 pub struct FormatExprIfExp;

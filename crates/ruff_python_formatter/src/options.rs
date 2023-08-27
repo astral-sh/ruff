@@ -1,5 +1,5 @@
-use ruff_formatter::printer::{LineEnding, PrinterOptions};
-use ruff_formatter::{FormatOptions, IndentStyle, LineWidth};
+use ruff_formatter::printer::{LineEnding, PrinterOptions, SourceMapGeneration};
+use ruff_formatter::{FormatOptions, IndentStyle, LineWidth, TabWidth};
 use ruff_python_ast::PySourceType;
 use std::path::Path;
 use std::str::FromStr;
@@ -24,11 +24,19 @@ pub struct PyFormatOptions {
     #[cfg_attr(feature = "serde", serde(default = "default_line_width"))]
     line_width: LineWidth,
 
+    /// The visual width of a tab character.
+    #[cfg_attr(feature = "serde", serde(default = "default_tab_width"))]
+    tab_width: TabWidth,
+
     /// The preferred quote style to use (single vs double quotes).
     quote_style: QuoteStyle,
 
     /// Whether to expand lists or elements if they have a trailing comma such as `(a, b,)`.
     magic_trailing_comma: MagicTrailingComma,
+
+    /// Should the formatter generate a source map that allows mapping source positions to positions
+    /// in the formatted document.
+    source_map_generation: SourceMapGeneration,
 }
 
 fn default_line_width() -> LineWidth {
@@ -39,14 +47,20 @@ fn default_indent_style() -> IndentStyle {
     IndentStyle::Space(4)
 }
 
+fn default_tab_width() -> TabWidth {
+    TabWidth::try_from(4).unwrap()
+}
+
 impl Default for PyFormatOptions {
     fn default() -> Self {
         Self {
             source_type: PySourceType::default(),
             indent_style: default_indent_style(),
             line_width: default_line_width(),
+            tab_width: default_tab_width(),
             quote_style: QuoteStyle::default(),
             magic_trailing_comma: MagicTrailingComma::default(),
+            source_map_generation: SourceMapGeneration::default(),
         }
     }
 }
@@ -74,6 +88,10 @@ impl PyFormatOptions {
 
     pub fn source_type(&self) -> PySourceType {
         self.source_type
+    }
+
+    pub fn source_map_generation(&self) -> SourceMapGeneration {
+        self.source_map_generation
     }
 
     #[must_use]
@@ -106,16 +124,21 @@ impl FormatOptions for PyFormatOptions {
         self.indent_style
     }
 
+    fn tab_width(&self) -> TabWidth {
+        self.tab_width
+    }
+
     fn line_width(&self) -> LineWidth {
         self.line_width
     }
 
     fn as_print_options(&self) -> PrinterOptions {
         PrinterOptions {
-            tab_width: 4,
+            tab_width: self.tab_width,
             print_width: self.line_width.into(),
             line_ending: LineEnding::LineFeed,
             indent_style: self.indent_style,
+            source_map_generation: self.source_map_generation,
         }
     }
 }

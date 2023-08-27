@@ -8,8 +8,7 @@ use std::path::Path;
 use anyhow::Result;
 use itertools::Itertools;
 use log::warn;
-use ruff_python_ast::Ranged;
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_trivia::indentation_at_offset;

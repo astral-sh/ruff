@@ -154,6 +154,36 @@ impl<'a> From<&'a ast::WithItem> for ComparableWithItem<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ComparablePatternArguments<'a> {
+    patterns: Vec<ComparablePattern<'a>>,
+    keywords: Vec<ComparablePatternKeyword<'a>>,
+}
+
+impl<'a> From<&'a ast::PatternArguments> for ComparablePatternArguments<'a> {
+    fn from(parameters: &'a ast::PatternArguments) -> Self {
+        Self {
+            patterns: parameters.patterns.iter().map(Into::into).collect(),
+            keywords: parameters.keywords.iter().map(Into::into).collect(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ComparablePatternKeyword<'a> {
+    attr: &'a str,
+    pattern: ComparablePattern<'a>,
+}
+
+impl<'a> From<&'a ast::PatternKeyword> for ComparablePatternKeyword<'a> {
+    fn from(keyword: &'a ast::PatternKeyword) -> Self {
+        Self {
+            attr: keyword.attr.as_str(),
+            pattern: (&keyword.pattern).into(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct PatternMatchValue<'a> {
     value: ComparableExpr<'a>,
 }
@@ -178,9 +208,7 @@ pub struct PatternMatchMapping<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct PatternMatchClass<'a> {
     cls: ComparableExpr<'a>,
-    patterns: Vec<ComparablePattern<'a>>,
-    kwd_attrs: Vec<&'a str>,
-    kwd_patterns: Vec<ComparablePattern<'a>>,
+    arguments: ComparablePatternArguments<'a>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -240,18 +268,12 @@ impl<'a> From<&'a ast::Pattern> for ComparablePattern<'a> {
                 patterns: patterns.iter().map(Into::into).collect(),
                 rest: rest.as_deref(),
             }),
-            ast::Pattern::MatchClass(ast::PatternMatchClass {
-                cls,
-                patterns,
-                kwd_attrs,
-                kwd_patterns,
-                ..
-            }) => Self::MatchClass(PatternMatchClass {
-                cls: cls.into(),
-                patterns: patterns.iter().map(Into::into).collect(),
-                kwd_attrs: kwd_attrs.iter().map(ast::Identifier::as_str).collect(),
-                kwd_patterns: kwd_patterns.iter().map(Into::into).collect(),
-            }),
+            ast::Pattern::MatchClass(ast::PatternMatchClass { cls, arguments, .. }) => {
+                Self::MatchClass(PatternMatchClass {
+                    cls: cls.into(),
+                    arguments: arguments.into(),
+                })
+            }
             ast::Pattern::MatchStar(ast::PatternMatchStar { name, .. }) => {
                 Self::MatchStar(PatternMatchStar {
                     name: name.as_deref(),

@@ -1,5 +1,5 @@
+use ruff_formatter::write;
 use ruff_formatter::FormatRuleWithOptions;
-use ruff_formatter::{write, Buffer, FormatResult};
 use ruff_python_ast::ExceptHandlerExceptHandler;
 
 use crate::comments::SourceComment;
@@ -7,7 +7,6 @@ use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
 use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
-use crate::{FormatNodeRule, PyFormatter};
 
 #[derive(Copy, Clone, Default)]
 pub enum ExceptHandlerKind {

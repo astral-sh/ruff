@@ -1,15 +1,12 @@
-use ruff_python_ast::{Expr, ExprSlice, ExprUnaryOp, UnaryOp};
-use ruff_text_size::TextRange;
-
-use ruff_formatter::prelude::{hard_line_break, line_suffix_boundary, space, text};
-use ruff_formatter::{write, Buffer, Format, FormatError, FormatResult};
+use ruff_formatter::{write, FormatError};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
+use ruff_python_ast::{Expr, ExprSlice, ExprUnaryOp, UnaryOp};
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{dangling_comments, SourceComment};
-use crate::context::PyFormatContext;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
-use crate::{AsFormat, FormatNodeRule, PyFormatter};
+use crate::prelude::*;
 
 #[derive(Default)]
 pub struct FormatExprSlice;
@@ -161,9 +158,7 @@ pub(crate) fn find_colons(
     lower: Option<&Expr>,
     upper: Option<&Expr>,
 ) -> FormatResult<(SimpleToken, Option<SimpleToken>)> {
-    let after_lower = lower
-        .as_ref()
-        .map_or(range.start(), ruff_python_ast::Ranged::end);
+    let after_lower = lower.as_ref().map_or(range.start(), Ranged::end);
     let mut tokens = SimpleTokenizer::new(contents, TextRange::new(after_lower, range.end()))
         .skip_trivia()
         .skip_while(|token| token.kind == SimpleTokenKind::RParen);
@@ -176,9 +171,7 @@ pub(crate) fn find_colons(
         ));
     }
 
-    let after_upper = upper
-        .as_ref()
-        .map_or(first_colon.end(), ruff_python_ast::Ranged::end);
+    let after_upper = upper.as_ref().map_or(first_colon.end(), Ranged::end);
     let mut tokens = SimpleTokenizer::new(contents, TextRange::new(after_upper, range.end()))
         .skip_trivia()
         .skip_while(|token| token.kind == SimpleTokenKind::RParen);

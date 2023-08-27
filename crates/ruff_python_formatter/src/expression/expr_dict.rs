@@ -1,15 +1,13 @@
 use ruff_formatter::{format_args, write};
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::Ranged;
 use ruff_python_ast::{Expr, ExprDict};
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{leading_comments, SourceComment};
 use crate::expression::parentheses::{
     empty_parenthesized, parenthesized, NeedsParentheses, OptionalParentheses,
 };
 use crate::prelude::*;
-use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatExprDict;

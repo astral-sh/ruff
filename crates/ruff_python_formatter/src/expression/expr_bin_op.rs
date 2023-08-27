@@ -18,7 +18,6 @@ use crate::expression::parentheses::{
 };
 use crate::expression::string::StringLayout;
 use crate::prelude::*;
-use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatExprBinOp;

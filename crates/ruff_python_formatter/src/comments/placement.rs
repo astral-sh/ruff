@@ -2,12 +2,12 @@ use std::cmp::Ordering;
 
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::{self as ast, Comprehension, Expr, MatchCase, Parameters, Ranged};
+use ruff_python_ast::{self as ast, Comprehension, Expr, MatchCase, Parameters};
 use ruff_python_trivia::{
     find_only_token_in_range, indentation_at_offset, SimpleToken, SimpleTokenKind, SimpleTokenizer,
 };
 use ruff_source_file::Locator;
-use ruff_text_size::{TextLen, TextRange};
+use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
 use crate::expression::expr_slice::{assign_comment_in_slice, ExprSliceCommentSection};
@@ -174,21 +174,13 @@ fn handle_enclosed_comment<'a>(
                 }
             })
         }
-        AnyNodeRef::Arguments(_) | AnyNodeRef::TypeParams(_) => {
+        AnyNodeRef::Arguments(_) | AnyNodeRef::TypeParams(_) | AnyNodeRef::PatternArguments(_) => {
             handle_bracketed_end_of_line_comment(comment, locator)
         }
         AnyNodeRef::Comprehension(comprehension) => {
             handle_comprehension_comment(comment, comprehension, locator)
         }
-        AnyNodeRef::PatternMatchSequence(pattern_match_sequence) => {
-            if SequenceType::from_pattern(pattern_match_sequence, locator.contents())
-                .is_parenthesized()
-            {
-                handle_bracketed_end_of_line_comment(comment, locator)
-            } else {
-                CommentPlacement::Default(comment)
-            }
-        }
+
         AnyNodeRef::ExprAttribute(attribute) => {
             handle_attribute_comment(comment, attribute, locator)
         }
@@ -219,6 +211,16 @@ fn handle_enclosed_comment<'a>(
             handle_module_level_own_line_comment_before_class_or_function_comment(comment, locator)
         }
         AnyNodeRef::WithItem(_) => handle_with_item_comment(comment, locator),
+        AnyNodeRef::PatternMatchSequence(pattern_match_sequence) => {
+            if SequenceType::from_pattern(pattern_match_sequence, locator.contents())
+                .is_parenthesized()
+            {
+                handle_bracketed_end_of_line_comment(comment, locator)
+            } else {
+                CommentPlacement::Default(comment)
+            }
+        }
+        AnyNodeRef::PatternMatchClass(class) => handle_pattern_match_class_comment(comment, class),
         AnyNodeRef::PatternMatchAs(_) => handle_pattern_match_as_comment(comment, locator),
         AnyNodeRef::PatternMatchStar(_) => handle_pattern_match_star_comment(comment),
         AnyNodeRef::PatternMatchMapping(pattern) => {
@@ -1226,6 +1228,25 @@ fn handle_with_item_comment<'a>(
         CommentPlacement::dangling(comment.enclosing_node(), comment)
     } else {
         CommentPlacement::leading(optional_vars, comment)
+    }
+}
+
+/// Handles trailing comments between the class name and its arguments in:
+/// ```python
+/// case (
+///     Pattern
+///     # dangling
+///     (...)
+/// ): ...
+/// ```
+fn handle_pattern_match_class_comment<'a>(
+    comment: DecoratedComment<'a>,
+    class: &'a ast::PatternMatchClass,
+) -> CommentPlacement<'a> {
+    if class.cls.end() < comment.start() && comment.end() < class.arguments.start() {
+        CommentPlacement::dangling(comment.enclosing_node(), comment)
+    } else {
+        CommentPlacement::Default(comment)
     }
 }
 

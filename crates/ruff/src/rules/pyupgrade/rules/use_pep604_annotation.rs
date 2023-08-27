@@ -1,11 +1,12 @@
 use itertools::Either::{Left, Right};
 use itertools::Itertools;
-use ruff_python_ast::{self as ast, Expr, Ranged};
+use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::analyze::typing::Pep604Operator;
 use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -66,9 +67,11 @@ pub(crate) fn use_pep604_annotation(
     slice: &Expr,
     operator: Pep604Operator,
 ) {
-    // Avoid fixing forward references, or types not in an annotation.
+    // Avoid fixing forward references, types not in an annotation, and expressions that would
+    // lead to invalid syntax.
     let fixable = checker.semantic().in_type_definition()
-        && !checker.semantic().in_complex_string_type_definition();
+        && !checker.semantic().in_complex_string_type_definition()
+        && is_allowed_value(slice);
 
     match operator {
         Pep604Operator::Optional => {
@@ -126,5 +129,54 @@ fn union(elts: &[Expr], locator: &Locator) -> String {
         "()".to_string()
     } else {
         elts.map(|expr| locator.slice(expr.range())).join(" | ")
+    }
+}
+
+/// Returns `true` if the expression is valid for use in a bitwise union (e.g., `X | Y`). Returns
+/// `false` for lambdas, yield expressions, and other expressions that are invalid in such a
+/// context.
+fn is_allowed_value(expr: &Expr) -> bool {
+    // TODO(charlie): If the expression requires parentheses when multi-line, and the annotation
+    // itself is not parenthesized, this should return `false`. Consider, for example:
+    // ```python
+    // x: Union[
+    //     "Sequence["
+    //         "int"
+    //     "]",
+    //     float,
+    // ]
+    // ```
+    // Converting this to PEP 604 syntax requires that the multiline string is parenthesized.
+    match expr {
+        Expr::BoolOp(_)
+        | Expr::BinOp(_)
+        | Expr::UnaryOp(_)
+        | Expr::IfExp(_)
+        | Expr::Dict(_)
+        | Expr::Set(_)
+        | Expr::ListComp(_)
+        | Expr::SetComp(_)
+        | Expr::DictComp(_)
+        | Expr::GeneratorExp(_)
+        | Expr::Compare(_)
+        | Expr::Call(_)
+        | Expr::FormattedValue(_)
+        | Expr::FString(_)
+        | Expr::Constant(_)
+        | Expr::Attribute(_)
+        | Expr::Subscript(_)
+        | Expr::Name(_)
+        | Expr::List(_) => true,
+        Expr::Tuple(tuple) => tuple.elts.iter().all(is_allowed_value),
+        // Maybe require parentheses.
+        Expr::NamedExpr(_) => false,
+        // Invalid in binary expressions.
+        Expr::Await(_)
+        | Expr::Lambda(_)
+        | Expr::Yield(_)
+        | Expr::YieldFrom(_)
+        | Expr::Starred(_)
+        | Expr::Slice(_)
+        | Expr::IpyEscapeCommand(_) => false,
     }
 }

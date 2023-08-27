@@ -1,0 +1,69 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/tab_width.py
+---
+## Input
+```py
+# Fits with tab width 2
+1 + "	012345678901234567890123456789012345678901234567890123456789012345678901234567890"
+
+# Fits with tab width 4
+1 + "	0123456789012345678901234567890123456789012345678901234567890123456789012345678"
+
+# Fits with tab width 8
+1 + "	012345678901234567890123456789012345678901234567890123456789012345678901234"
+```
+
+## Outputs
+### Output 1
+```
+indent-style            = Spaces, size: 4
+line-width              = 88
+tab-width               = 2
+quote-style             = Double
+magic-trailing-comma    = Respect
+```
+
+```py
+# Fits with tab width 2
+(
+    1
+    + "	012345678901234567890123456789012345678901234567890123456789012345678901234567890"
+)
+
+# Fits with tab width 4
+1 + "	0123456789012345678901234567890123456789012345678901234567890123456789012345678"
+
+# Fits with tab width 8
+1 + "	012345678901234567890123456789012345678901234567890123456789012345678901234"
+```
+
+
+### Output 2
+```
+indent-style            = Spaces, size: 4
+line-width              = 88
+tab-width               = 4
+quote-style             = Double
+magic-trailing-comma    = Respect
+```
+
+```py
+# Fits with tab width 2
+(
+    1
+    + "	012345678901234567890123456789012345678901234567890123456789012345678901234567890"
+)
+
+# Fits with tab width 4
+(
+    1
+    + "	0123456789012345678901234567890123456789012345678901234567890123456789012345678"
+)
+
+# Fits with tab width 8
+1 + "	012345678901234567890123456789012345678901234567890123456789012345678901234"
+```
+
+
+

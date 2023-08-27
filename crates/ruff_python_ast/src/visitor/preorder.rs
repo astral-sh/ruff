@@ -2,7 +2,8 @@ use crate::node::{AnyNodeRef, AstNode};
 use crate::{
     Alias, Arguments, BoolOp, CmpOp, Comprehension, Constant, Decorator, ElifElseClause,
     ExceptHandler, Expr, Keyword, MatchCase, Mod, Operator, Parameter, ParameterWithDefault,
-    Parameters, Pattern, Stmt, TypeParam, TypeParams, UnaryOp, WithItem,
+    Parameters, Pattern, PatternArguments, PatternKeyword, Stmt, TypeParam, TypeParams, UnaryOp,
+    WithItem,
 };
 
 /// Visitor that traverses all nodes recursively in pre-order.
@@ -130,6 +131,17 @@ pub trait PreorderVisitor<'a> {
     #[inline]
     fn visit_pattern(&mut self, pattern: &'a Pattern) {
         walk_pattern(self, pattern);
+    }
+
+    #[inline]
+    fn visit_pattern_arguments(&mut self, pattern_arguments: &'a PatternArguments) {
+        walk_pattern_arguments(self, pattern_arguments);
+    }
+
+    #[inline]
+
+    fn visit_pattern_keyword(&mut self, pattern_keyword: &'a PatternKeyword) {
+        walk_pattern_keyword(self, pattern_keyword);
     }
 
     #[inline]
@@ -456,6 +468,33 @@ where
             Pattern::MatchAs(pattern) => pattern.visit_preorder(visitor),
             Pattern::MatchOr(pattern) => pattern.visit_preorder(visitor),
         }
+    }
+    visitor.leave_node(node);
+}
+
+pub fn walk_pattern_arguments<'a, V>(visitor: &mut V, pattern_arguments: &'a PatternArguments)
+where
+    V: PreorderVisitor<'a> + ?Sized,
+{
+    let node = AnyNodeRef::from(pattern_arguments);
+    if visitor.enter_node(node).is_traverse() {
+        for pattern in &pattern_arguments.patterns {
+            visitor.visit_pattern(pattern);
+        }
+        for keyword in &pattern_arguments.keywords {
+            visitor.visit_pattern_keyword(keyword);
+        }
+    }
+    visitor.leave_node(node);
+}
+
+pub fn walk_pattern_keyword<'a, V>(visitor: &mut V, pattern_keyword: &'a PatternKeyword)
+where
+    V: PreorderVisitor<'a> + ?Sized,
+{
+    let node = AnyNodeRef::from(pattern_keyword);
+    if visitor.enter_node(node).is_traverse() {
+        visitor.visit_pattern(&pattern_keyword.pattern);
     }
     visitor.leave_node(node);
 }

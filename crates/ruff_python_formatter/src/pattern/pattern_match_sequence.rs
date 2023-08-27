@@ -1,16 +1,13 @@
-use ruff_formatter::prelude::format_with;
 use ruff_formatter::{Format, FormatResult};
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{PatternMatchSequence, Ranged};
+use ruff_python_ast::PatternMatchSequence;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
-use crate::builders::PyFormatterExtensions;
-use crate::context::PyFormatContext;
 use crate::expression::parentheses::{
     empty_parenthesized, optional_parentheses, parenthesized, NeedsParentheses, OptionalParentheses,
 };
-use crate::{FormatNodeRule, PyFormatter};
+use crate::prelude::*;
 
 #[derive(Default)]
 pub struct FormatPatternMatchSequence;

@@ -1,16 +1,15 @@
-use crate::comments::SourceComment;
 use ruff_formatter::FormatRuleWithOptions;
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{Constant, ExprConstant, Ranged};
-use ruff_text_size::{TextLen, TextRange};
+use ruff_python_ast::{Constant, ExprConstant};
+use ruff_text_size::{Ranged, TextLen, TextRange};
 
+use crate::comments::SourceComment;
 use crate::expression::number::{FormatComplex, FormatFloat, FormatInt};
 use crate::expression::parentheses::{should_use_best_fit, NeedsParentheses, OptionalParentheses};
 use crate::expression::string::{
     AnyString, FormatString, StringLayout, StringPrefix, StringQuotes,
 };
 use crate::prelude::*;
-use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatExprConstant {

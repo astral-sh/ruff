@@ -28,7 +28,7 @@ mod schemars_impls;
 #[cfg(feature = "serde")]
 mod serde_impls;
 
-pub use crate::{range::TextRange, size::TextSize, traits::TextLen};
+pub use crate::{range::TextRange, size::TextSize, traits::Ranged, traits::TextLen};
 
 #[cfg(target_pointer_width = "16")]
 compile_error!("text-size assumes usize >= u32 and does not work on 16-bit targets");

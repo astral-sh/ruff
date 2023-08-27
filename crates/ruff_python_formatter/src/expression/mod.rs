@@ -1,5 +1,6 @@
-use itertools::Itertools;
 use std::cmp::Ordering;
+
+use itertools::Itertools;
 
 use ruff_formatter::{
     format_args, write, FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions,

@@ -1,11 +1,10 @@
-use ruff_formatter::{write, Buffer, FormatResult};
+use ruff_formatter::write;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::PatternMatchAs;
 
 use crate::comments::{dangling_comments, SourceComment};
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
-use crate::{FormatNodeRule, PyFormatter};
 
 #[derive(Default)]
 pub struct FormatPatternMatchAs;

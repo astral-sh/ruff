@@ -1,9 +1,9 @@
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Keyword, PySourceType, Ranged};
+use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Keyword, PySourceType};
 use ruff_python_parser::{lexer, AsMode, Tok};
 use ruff_source_file::Locator;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::autofix::edits::{remove_argument, Parentheses};
 use crate::checkers::ast::Checker;

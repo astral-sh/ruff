@@ -1,10 +1,10 @@
+use ruff_formatter::{format_args, write, Buffer, FormatResult};
+use ruff_python_ast::{Comprehension, Expr};
+use ruff_text_size::Ranged;
+
 use crate::comments::{leading_comments, trailing_comments, SourceComment};
 use crate::expression::expr_tuple::TupleParentheses;
 use crate::prelude::*;
-use crate::AsFormat;
-use crate::{FormatNodeRule, PyFormatter};
-use ruff_formatter::{format_args, write, Buffer, FormatResult};
-use ruff_python_ast::{Comprehension, Expr, Ranged};
 
 #[derive(Default)]
 pub struct FormatComprehension;

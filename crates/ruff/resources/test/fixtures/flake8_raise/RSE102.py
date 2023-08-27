@@ -68,3 +68,14 @@ import ctypes
 
 # OK
 raise ctypes.WinError(1)
+
+
+# RSE102
+raise IndexError()from ZeroDivisionError
+
+raise IndexError()\
+from ZeroDivisionError
+
+raise IndexError() from ZeroDivisionError
+
+raise IndexError();

@@ -1,13 +1,12 @@
 use ruff_formatter::write;
-use ruff_python_ast::{Decorator, Ranged, StmtClassDef};
+use ruff_python_ast::{Decorator, StmtClassDef};
 use ruff_python_trivia::lines_after_ignoring_trivia;
+use ruff_text_size::Ranged;
 
 use crate::comments::{leading_comments, trailing_comments, SourceComment};
 use crate::prelude::*;
-use crate::statement::suite::SuiteKind;
-
 use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
-use crate::FormatNodeRule;
+use crate::statement::suite::SuiteKind;
 
 #[derive(Default)]
 pub struct FormatStmtClassDef;

@@ -270,6 +270,7 @@ match foo:
         y = 1
 
 
+
 match foo:
     case [1, 2, *rest]:
         pass
@@ -404,6 +405,73 @@ match foo:
         **
         b,
     }:
+        pass
+
+
+match pattern_match_class:
+    case Point2D(
+            # own line
+            ):
+        ...
+
+    case (
+        Point2D
+        # own line
+        ()
+    ):
+        ...
+
+    case Point2D(  # end of line line
+            ):
+        ...
+
+    case Point2D(  # end of line
+        0, 0
+    ):
+        ...
+
+    case Point2D(0, 0):
+        ...
+
+    case Point2D(
+        (  # end of line
+        # own line
+        0
+        ), 0):
+        ...
+
+    case Point3D(x=0, y=0, z=000000000000000000000000000000000000000000000000000000000000000000000000000000000):
+        ...
+
+    case Bar(0, a=None, b="hello"):
+        ...
+
+    case FooBar(# leading
+# leading
+    # leading
+        # leading
+            0 # trailing
+# trailing
+    # trailing
+        # trailing
+            ):
+        ...
+
+    case A(
+        b # b
+        = # c
+        2 # d
+        # e
+    ):
+        pass
+
+    case A(
+        # a
+        b # b
+        = # c
+        2 # d
+        # e
+    ):
         pass
 ```
 
@@ -824,6 +892,79 @@ match foo:
         # foo
         **b,
     }:
+        pass
+
+
+match pattern_match_class:
+    case Point2D(
+        # own line
+    ):
+        ...
+
+    case (
+        Point2D
+        # own line
+        ()
+    ):
+        ...
+
+    case Point2D(  # end of line line
+    ):
+        ...
+
+    case Point2D(  # end of line
+        0, 0
+    ):
+        ...
+
+    case Point2D(0, 0):
+        ...
+
+    case Point2D(
+        (  # end of line
+            # own line
+            0
+        ),
+        0,
+    ):
+        ...
+
+    case Point3D(
+        x=0,
+        y=0,
+        z=000000000000000000000000000000000000000000000000000000000000000000000000000000000,
+    ):
+        ...
+
+    case Bar(0, a=None, b="hello"):
+        ...
+
+    case FooBar(  # leading
+        # leading
+        # leading
+        # leading
+        0  # trailing
+        # trailing
+        # trailing
+        # trailing
+    ):
+        ...
+
+    case A(
+        b=# b
+        # c
+        2  # d
+        # e
+    ):
+        pass
+
+    case A(
+        # a
+        b=# b
+        # c
+        2  # d
+        # e
+    ):
         pass
 ```
 

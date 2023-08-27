@@ -1,6 +1,7 @@
 use ruff_formatter::write;
-use ruff_python_ast::{Parameters, Ranged, StmtFunctionDef};
+use ruff_python_ast::{Parameters, StmtFunctionDef};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
+use ruff_text_size::Ranged;
 
 use crate::comments::SourceComment;
 use crate::expression::maybe_parenthesize_expression;
@@ -9,7 +10,6 @@ use crate::prelude::*;
 use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
 use crate::statement::stmt_class_def::FormatDecorators;
 use crate::statement::suite::SuiteKind;
-use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatStmtFunctionDef;

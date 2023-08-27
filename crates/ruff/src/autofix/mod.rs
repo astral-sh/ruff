@@ -140,9 +140,7 @@ fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Orderi
 mod tests {
     use ruff_text_size::TextSize;
 
-    use ruff_diagnostics::Diagnostic;
-    use ruff_diagnostics::Edit;
-    use ruff_diagnostics::Fix;
+    use ruff_diagnostics::{Diagnostic, Edit, Fix};
     use ruff_source_file::Locator;
 
     use crate::autofix::source_map::SourceMarker;

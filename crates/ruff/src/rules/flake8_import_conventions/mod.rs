@@ -20,7 +20,7 @@ mod tests {
             Path::new("flake8_import_conventions/defaults.py"),
             &Settings::for_rule(Rule::UnconventionalImportAlias),
         )?;
-        assert_messages!("defaults", diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -42,7 +42,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnconventionalImportAlias)
             },
         )?;
-        assert_messages!("custom", diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -75,7 +75,7 @@ mod tests {
                 ..Settings::for_rule(Rule::BannedImportAlias)
             },
         )?;
-        assert_messages!("custom_banned", diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -98,7 +98,7 @@ mod tests {
                 ..Settings::for_rule(Rule::BannedImportFrom)
             },
         )?;
-        assert_messages!("custom_banned_from", diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -122,7 +122,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnconventionalImportAlias)
             },
         )?;
-        assert_messages!("remove_default", diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -144,7 +144,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnconventionalImportAlias)
             },
         )?;
-        assert_messages!("override_default", diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -169,7 +169,17 @@ mod tests {
                 ..Settings::for_rule(Rule::UnconventionalImportAlias)
             },
         )?;
-        assert_messages!("from_imports", diagnostics);
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn tricky() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_import_conventions/tricky.py"),
+            &Settings::for_rule(Rule::UnconventionalImportAlias),
+        )?;
+        assert_messages!(diagnostics);
         Ok(())
     }
 }

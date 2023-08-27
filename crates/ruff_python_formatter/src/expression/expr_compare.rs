@@ -1,13 +1,13 @@
+use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule};
+use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::{CmpOp, ExprCompare};
+
 use crate::comments::{leading_comments, SourceComment};
 use crate::expression::parentheses::{
     in_parentheses_only_group, in_parentheses_only_soft_line_break_or_space, NeedsParentheses,
     OptionalParentheses,
 };
 use crate::prelude::*;
-use crate::FormatNodeRule;
-use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule};
-use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{CmpOp, ExprCompare};
 
 #[derive(Default)]
 pub struct FormatExprCompare;

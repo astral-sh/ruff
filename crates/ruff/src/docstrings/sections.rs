@@ -2,8 +2,7 @@ use std::fmt::{Debug, Formatter};
 use std::iter::FusedIterator;
 
 use ruff_python_ast::docstrings::{leading_space, leading_words};
-use ruff_python_ast::Ranged;
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use strum_macros::EnumIter;
 
 use ruff_source_file::{Line, UniversalNewlineIterator, UniversalNewlines};

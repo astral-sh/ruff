@@ -90,22 +90,24 @@ expression: parse_ast
                                     ctx: Load,
                                 },
                             ),
-                            patterns: [
-                                MatchAs(
-                                    PatternMatchAs {
-                                        range: 150..151,
-                                        pattern: None,
-                                        name: Some(
-                                            Identifier {
-                                                id: "z",
-                                                range: 150..151,
-                                            },
-                                        ),
-                                    },
-                                ),
-                            ],
-                            kwd_attrs: [],
-                            kwd_patterns: [],
+                            arguments: PatternArguments {
+                                range: 149..152,
+                                patterns: [
+                                    MatchAs(
+                                        PatternMatchAs {
+                                            range: 150..151,
+                                            pattern: None,
+                                            name: Some(
+                                                Identifier {
+                                                    id: "z",
+                                                    range: 150..151,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
                         },
                     ),
                     guard: None,

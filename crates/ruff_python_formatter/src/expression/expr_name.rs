@@ -1,10 +1,10 @@
-use crate::comments::SourceComment;
-use crate::expression::parentheses::{should_use_best_fit, NeedsParentheses, OptionalParentheses};
-use crate::prelude::*;
-use crate::FormatNodeRule;
 use ruff_formatter::{write, FormatContext};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::ExprName;
+
+use crate::comments::SourceComment;
+use crate::expression::parentheses::{should_use_best_fit, NeedsParentheses, OptionalParentheses};
+use crate::prelude::*;
 
 #[derive(Default)]
 pub struct FormatExprName;
@@ -50,9 +50,8 @@ impl NeedsParentheses for ExprName {
 
 #[cfg(test)]
 mod tests {
-    use ruff_python_ast::Ranged;
     use ruff_python_parser::parse_program;
-    use ruff_text_size::{TextRange, TextSize};
+    use ruff_text_size::{Ranged, TextRange, TextSize};
 
     #[test]
     fn name_range_with_comments() {

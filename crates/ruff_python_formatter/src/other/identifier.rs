@@ -1,7 +1,8 @@
-use crate::prelude::*;
-use crate::AsFormat;
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule};
-use ruff_python_ast::{Identifier, Ranged};
+use ruff_python_ast::Identifier;
+use ruff_text_size::Ranged;
+
+use crate::prelude::*;
 
 pub struct FormatIdentifier;
 

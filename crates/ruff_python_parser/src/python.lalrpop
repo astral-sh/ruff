@@ -4,8 +4,8 @@
 // See also: https://greentreesnakes.readthedocs.io/en/latest/nodes.html#keyword
 
 use num_bigint::BigInt;
-use ruff_text_size::TextSize;
-use ruff_python_ast::{self as ast, Ranged, IpyEscapeKind};
+use ruff_text_size::{Ranged, TextSize};
+use ruff_python_ast::{self as ast, IpyEscapeKind};
 use crate::{
     Mode,
     lexer::{LexicalError, LexicalErrorType},
@@ -790,96 +790,61 @@ MappingPattern: ast::Pattern = {
     },
 }
 
-MatchKeywordEntry: (ast::Identifier, ast::Pattern) = {
-    <k:Identifier> "=" <v:Pattern> => (k, v),
+MatchKeywordEntry: ast::PatternKeyword = {
+    <location:@L> <attr:Identifier> "=" <pattern:Pattern> <end_location:@R> => ast::PatternKeyword {
+        attr,
+        pattern,
+        range: (location..end_location).into()
+    },
 };
 
 ClassPattern: ast::Pattern = {
-    <location:@L> <e:MatchName> "(" <patterns: OneOrMore<Pattern>> "," <kwds:OneOrMore<MatchKeywordEntry>> ","? ")" <end_location:@R> => {
-        let (kwd_attrs, kwd_patterns) = kwds
-            .into_iter()
-            .unzip();
+    <location:@L> <cls:MatchName> <arguments:PatternArguments> <end_location:@R> => {
         ast::PatternMatchClass {
-            cls: Box::new(e),
-            patterns,
-            kwd_attrs,
-            kwd_patterns,
+            cls: Box::new(cls),
+            arguments,
             range: (location..end_location).into()
         }.into()
     },
-    <location:@L> <e:MatchName> "(" <patterns: OneOrMore<Pattern>> ","? ")" <end_location:@R> => {
+    <location:@L> <cls:MatchNameOrAttr> <arguments:PatternArguments> <end_location:@R> => {
         ast::PatternMatchClass {
-            cls: Box::new(e),
-            patterns,
-            kwd_attrs: vec![],
-            kwd_patterns: vec![],
-            range: (location..end_location).into()
-        }.into()
-    },
-    <location:@L> <e:MatchName> "(" <kwds:OneOrMore<MatchKeywordEntry>> ","? ")" <end_location:@R> => {
-         let (kwd_attrs, kwd_patterns) = kwds
-            .into_iter()
-            .unzip();
-        ast::PatternMatchClass {
-            cls: Box::new(e),
-            patterns: vec![],
-            kwd_attrs,
-            kwd_patterns,
-            range: (location..end_location).into()
-        }.into()
-    },
-    <location:@L> <e:MatchName> "(" ")" <end_location:@R> => {
-        ast::PatternMatchClass {
-            cls: Box::new(e),
-            patterns: vec![],
-            kwd_attrs: vec![],
-            kwd_patterns: vec![],
-            range: (location..end_location).into()
-        }.into()
-    },
-    <location:@L> <e:MatchNameOrAttr> "(" <patterns: OneOrMore<Pattern>> "," <kwds:OneOrMore<MatchKeywordEntry>> ","? ")" <end_location:@R> => {
-        let (kwd_attrs, kwd_patterns) = kwds
-            .into_iter()
-            .unzip();
-        ast::PatternMatchClass {
-            cls: Box::new(e),
-            patterns,
-            kwd_attrs,
-            kwd_patterns,
-            range: (location..end_location).into()
-        }.into()
-    },
-    <location:@L> <e:MatchNameOrAttr> "(" <patterns: OneOrMore<Pattern>> ","? ")" <end_location:@R> => {
-        ast::PatternMatchClass {
-            cls: Box::new(e),
-            patterns,
-            kwd_attrs: vec![],
-            kwd_patterns: vec![],
-            range: (location..end_location).into()
-        }.into()
-    },
-    <location:@L> <e:MatchNameOrAttr> "(" <kwds:OneOrMore<MatchKeywordEntry>> ","? ")" <end_location:@R> => {
-         let (kwd_attrs, kwd_patterns) = kwds
-            .into_iter()
-            .unzip();
-        ast::PatternMatchClass {
-            cls: Box::new(e),
-            patterns: vec![],
-            kwd_attrs,
-            kwd_patterns,
-            range: (location..end_location).into()
-        }.into()
-    },
-    <location:@L> <e:MatchNameOrAttr> "(" ")" <end_location:@R> => {
-        ast::PatternMatchClass {
-            cls: Box::new(e),
-            patterns: vec![],
-            kwd_attrs: vec![],
-            kwd_patterns: vec![],
+            cls: Box::new(cls),
+            arguments,
             range: (location..end_location).into()
         }.into()
     },
 }
+
+PatternArguments: ast::PatternArguments = {
+    <location:@L> "(" <patterns: OneOrMore<Pattern>> "," <keywords:OneOrMore<MatchKeywordEntry>> ","? ")" <end_location:@R> => {
+        ast::PatternArguments {
+            patterns,
+            keywords,
+            range: (location..end_location).into()
+        }
+    },
+    <location:@L> "(" <patterns: OneOrMore<Pattern>> ","? ")" <end_location:@R> => {
+        ast::PatternArguments {
+            patterns,
+            keywords: vec![],
+            range: (location..end_location).into()
+        }
+    },
+    <location:@L> "(" <keywords:OneOrMore<MatchKeywordEntry>> ","? ")" <end_location:@R> => {
+        ast::PatternArguments {
+            patterns: vec![],
+            keywords,
+            range: (location..end_location).into()
+        }
+    },
+    <location:@L> "(" ")" <end_location:@R> => {
+        ast::PatternArguments {
+            patterns: vec![],
+            keywords: vec![],
+            range: (location..end_location).into()
+        }
+    },
+};
 
 IfStatement: ast::Stmt = {
     <location:@L> "if" <test:NamedExpressionTest> ":" <body:Suite> <s2:(<@L> "elif" <NamedExpressionTest> ":" <Suite>)*> <s3:(<@L> "else" ":" <Suite>)?> => {

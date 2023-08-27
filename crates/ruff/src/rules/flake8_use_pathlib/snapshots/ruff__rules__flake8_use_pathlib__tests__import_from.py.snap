@@ -240,7 +240,7 @@ import_from.py:32:1: PTH121 `os.path.samefile()` should be replaced by `Path.sam
 34 | with open(p) as fp:
    |
 
-import_from.py:33:1: PTH122 `os.path.splitext()` should be replaced by `Path.suffix`
+import_from.py:33:1: PTH122 `os.path.splitext()` should be replaced by `Path.suffix`, `Path.stem`, and `Path.parent`
    |
 31 | dirname(p)
 32 | samefile(p)

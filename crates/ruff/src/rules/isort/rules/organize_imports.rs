@@ -5,12 +5,12 @@ use itertools::{EitherOrBoth, Itertools};
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::whitespace::trailing_lines_end;
-use ruff_python_ast::{PySourceType, Ranged, Stmt};
+use ruff_python_ast::{PySourceType, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_trivia::{leading_indentation, textwrap::indent, PythonWhitespace};
 use ruff_source_file::{Locator, UniversalNewlines};
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::line_width::LineWidth;
 use crate::registry::AsRule;

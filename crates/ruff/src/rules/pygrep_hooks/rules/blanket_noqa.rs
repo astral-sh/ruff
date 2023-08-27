@@ -1,9 +1,8 @@
-use ruff_python_ast::Ranged;
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_index::Indexer;
 use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
 use crate::noqa::Directive;
 

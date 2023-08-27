@@ -1,15 +1,16 @@
+use std::cell::Cell;
+use std::marker::PhantomData;
+use std::num::NonZeroU8;
+
+use ruff_text_size::TextRange;
+#[allow(clippy::enum_glob_use)]
+use Tag::*;
+
 use crate::format_element::tag::{Condition, Tag};
 use crate::prelude::tag::{DedentMode, GroupMode, LabelId};
 use crate::prelude::*;
 use crate::{format_element, write, Argument, Arguments, FormatContext, GroupId, TextSize};
 use crate::{Buffer, VecBuffer};
-
-use ruff_text_size::TextRange;
-use std::cell::Cell;
-use std::marker::PhantomData;
-use std::num::NonZeroU8;
-#[allow(clippy::enum_glob_use)]
-use Tag::*;
 
 /// A line break that only gets printed if the enclosing `Group` doesn't fit on a single line.
 /// It's omitted if the enclosing `Group` fits on a single line.
@@ -283,7 +284,6 @@ impl std::fmt::Debug for StaticText {
 /// ## Examples
 ///
 /// ```
-/// /// ```
 /// use ruff_formatter::format;
 /// use ruff_formatter::prelude::*;
 ///
@@ -329,6 +329,7 @@ pub struct SourcePosition(TextSize);
 impl<Context> Format<Context> for SourcePosition {
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         f.write_element(FormatElement::SourcePosition(self.0));
+
         Ok(())
     }
 }

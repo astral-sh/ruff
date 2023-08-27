@@ -3,8 +3,8 @@ use std::iter;
 
 use itertools::Either::{Left, Right};
 use itertools::Itertools;
-use ruff_python_ast::{self as ast, Arguments, BoolOp, CmpOp, Expr, ExprContext, Ranged, UnaryOp};
-use ruff_text_size::TextRange;
+use ruff_python_ast::{self as ast, Arguments, BoolOp, CmpOp, Expr, ExprContext, UnaryOp};
+use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};

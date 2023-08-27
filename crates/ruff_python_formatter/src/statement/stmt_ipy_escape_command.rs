@@ -1,6 +1,8 @@
+use ruff_python_ast::StmtIpyEscapeCommand;
+use ruff_text_size::Ranged;
+
 use crate::comments::{SourceComment, SuppressionKind};
 use crate::prelude::*;
-use ruff_python_ast::{Ranged, StmtIpyEscapeCommand};
 
 #[derive(Default)]
 pub struct FormatStmtIpyEscapeCommand;

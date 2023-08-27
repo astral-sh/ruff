@@ -1,12 +1,12 @@
 use ruff_formatter::write;
 use ruff_python_ast::node::AstNode;
-use ruff_python_ast::{Ranged, StmtImportFrom};
+use ruff_python_ast::StmtImportFrom;
+use ruff_text_size::Ranged;
 
 use crate::builders::{parenthesize_if_expands, PyFormatterExtensions, TrailingComma};
 use crate::comments::{SourceComment, SuppressionKind};
 use crate::expression::parentheses::parenthesized;
 use crate::prelude::*;
-use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatStmtImportFrom;

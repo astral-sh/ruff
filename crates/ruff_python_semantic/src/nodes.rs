@@ -1,8 +1,8 @@
 use std::ops::Index;
 
 use ruff_index::{newtype_index, IndexVec};
-use ruff_python_ast::{Expr, Ranged, Stmt};
-use ruff_text_size::TextRange;
+use ruff_python_ast::{Expr, Stmt};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::BranchId;
 

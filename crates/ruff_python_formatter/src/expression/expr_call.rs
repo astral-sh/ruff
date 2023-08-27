@@ -6,7 +6,6 @@ use crate::comments::{dangling_comments, SourceComment};
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::expression::CallChainLayout;
 use crate::prelude::*;
-use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatExprCall {

@@ -5,12 +5,12 @@ use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_dunder;
 use ruff_python_ast::{
-    self as ast, Arguments, Constant, Expr, ExprContext, Identifier, Keyword, Ranged, Stmt,
+    self as ast, Arguments, Constant, Expr, ExprContext, Identifier, Keyword, Stmt,
 };
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::identifiers::is_identifier;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;

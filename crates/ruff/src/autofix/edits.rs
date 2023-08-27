@@ -3,15 +3,14 @@
 use anyhow::{Context, Result};
 
 use ruff_diagnostics::Edit;
-use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Expr, Keyword, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Expr, Keyword, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-
 use ruff_python_trivia::{
     has_leading_content, is_python_whitespace, PythonWhitespace, SimpleTokenKind, SimpleTokenizer,
 };
 use ruff_source_file::{Locator, NewlineWithTrailingNewline};
-use ruff_text_size::{TextLen, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextSize};
 
 use crate::autofix::codemods;
 
@@ -254,10 +253,9 @@ fn next_stmt_break(semicolon: TextSize, locator: &Locator) -> TextSize {
 mod tests {
     use anyhow::Result;
 
-    use ruff_python_ast::Ranged;
     use ruff_python_parser::parse_suite;
     use ruff_source_file::Locator;
-    use ruff_text_size::TextSize;
+    use ruff_text_size::{Ranged, TextSize};
 
     use crate::autofix::edits::{next_stmt_break, trailing_semicolon};
 

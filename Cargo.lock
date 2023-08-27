@@ -415,6 +415,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "codspeed"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5aeec2fbed4969dc38b5ca201115dd5c2614b8ef78e0a7221dd5f0977fb1552b"
+dependencies = [
+ "colored",
+ "libc",
+ "serde_json",
+]
+
+[[package]]
+name = "codspeed-criterion-compat"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b13f0a08d40ce7c95bdf288f725b975e62fcadfa8ba152340943bab6de43af7"
+dependencies = [
+ "codspeed",
+ "colored",
+ "criterion",
+]
+
+[[package]]
 name = "colorchoice"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -812,7 +834,7 @@ checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flake8-to-ruff"
-version = "0.0.285"
+version = "0.0.286"
 dependencies = [
  "anyhow",
  "clap",
@@ -2066,7 +2088,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.0.285"
+version = "0.0.286"
 dependencies = [
  "annotate-snippets 0.9.1",
  "anyhow",
@@ -2138,6 +2160,7 @@ dependencies = [
 name = "ruff_benchmark"
 version = "0.0.0"
 dependencies = [
+ "codspeed-criterion-compat",
  "criterion",
  "mimalloc",
  "once_cell",
@@ -2167,7 +2190,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_cli"
-version = "0.0.285"
+version = "0.0.286"
 dependencies = [
  "annotate-snippets 0.9.1",
  "anyhow",
@@ -2699,9 +2722,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.100"
+version = "1.0.105"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f1e14e89be7aa4c4b78bdbdc9eb5bf8517829a600ae8eaa39a6e1d960b5185c"
+checksum = "693151e1ac27563d6dbcec9dee9fbd5da8539b20fa14ad3752b2e6d363ace360"
 dependencies = [
  "itoa",
  "ryu",

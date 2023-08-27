@@ -1,11 +1,11 @@
-use crate::comments::{leading_comments, trailing_comments, Comments};
 use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
 use ruff_python_ast::helpers::is_compound_statement;
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{self as ast, Constant, Expr, ExprConstant, Ranged, Stmt, Suite};
+use ruff_python_ast::{self as ast, Constant, Expr, ExprConstant, Stmt, Suite};
 use ruff_python_trivia::{lines_after_ignoring_trivia, lines_before};
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
+use crate::comments::{leading_comments, trailing_comments, Comments};
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::expr_constant::ExprConstantLayout;
 use crate::expression::string::StringLayout;
@@ -197,7 +197,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 match self.kind {
                     SuiteKind::TopLevel => {
                         match lines_after_ignoring_trivia(preceding.end(), source) {
-                            0 | 1 | 2 => empty_line().fmt(f)?,
+                            0..=2 => empty_line().fmt(f)?,
                             _ => write!(f, [empty_line(), empty_line()])?,
                         }
                     }

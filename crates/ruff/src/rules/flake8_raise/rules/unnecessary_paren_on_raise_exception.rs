@@ -1,6 +1,7 @@
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr, Ranged};
+use ruff_python_ast::{self as ast, Expr};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -74,7 +75,25 @@ pub(crate) fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: 
 
         let mut diagnostic = Diagnostic::new(UnnecessaryParenOnRaiseException, arguments.range());
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Fix::automatic(Edit::range_deletion(arguments.range())));
+            // If the arguments are immediately followed by a `from`, insert whitespace to avoid
+            // a syntax error, as in:
+            // ```python
+            // raise IndexError()from ZeroDivisionError
+            // ```
+            if checker
+                .locator()
+                .after(arguments.end())
+                .chars()
+                .next()
+                .is_some_and(char::is_alphanumeric)
+            {
+                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+                    " ".to_string(),
+                    arguments.range(),
+                )));
+            } else {
+                diagnostic.set_fix(Fix::automatic(Edit::range_deletion(arguments.range())));
+            }
         }
         checker.diagnostics.push(diagnostic);
     }
