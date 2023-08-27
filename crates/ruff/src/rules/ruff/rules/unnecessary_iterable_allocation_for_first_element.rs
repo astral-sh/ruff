@@ -217,7 +217,29 @@ fn match_iteration_target(expr: &Expr, semantic: &SemanticModel) -> Option<Itera
                 iterable: true,
             },
         },
-
+        Expr::List(ast::ExprList { elts, .. }) => {
+            // println!("{:?}", elts);
+            let [elt] = elts.as_slice() else {
+                return None;
+            };
+            match elt {
+                Expr::Starred(ast::ExprStarred { value, .. }) => {
+                    let range: TextRange = expr
+                        .range()
+                        // Remove the `[*`
+                        .add_start(TextSize::from(2))
+                        // Remove the `]`
+                        .sub_end(TextSize::from(1));
+                    let iterable = if value.is_call_expr() {
+                        is_func_builtin_iterator(&value.as_call_expr()?.func, semantic)
+                    } else {
+                        false
+                    };
+                    return Some(IterationTarget { range, iterable });
+                }
+                _ => return None,
+            }
+        }
         _ => return None,
     };
 
