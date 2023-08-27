@@ -682,18 +682,6 @@ impl Flake8AnnotationsOptions {
     }
 }
 
-impl From<ruff::rules::flake8_annotations::settings::Settings> for Flake8AnnotationsOptions {
-    fn from(settings: ruff::rules::flake8_annotations::settings::Settings) -> Self {
-        Self {
-            mypy_init_return: Some(settings.mypy_init_return),
-            suppress_dummy_args: Some(settings.suppress_dummy_args),
-            suppress_none_returning: Some(settings.suppress_none_returning),
-            allow_star_arg_any: Some(settings.allow_star_arg_any),
-            ignore_fully_untyped: Some(settings.ignore_fully_untyped),
-        }
-    }
-}
-
 #[derive(
     Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
 )]
@@ -740,16 +728,6 @@ impl Flake8BanditOptions {
     }
 }
 
-impl From<ruff::rules::flake8_bandit::settings::Settings> for Flake8BanditOptions {
-    fn from(settings: ruff::rules::flake8_bandit::settings::Settings) -> Self {
-        Self {
-            hardcoded_tmp_directory: Some(settings.hardcoded_tmp_directory),
-            hardcoded_tmp_directory_extend: None,
-            check_typed_exception: Some(settings.check_typed_exception),
-        }
-    }
-}
-
 #[derive(
     Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
 )]
@@ -780,15 +758,6 @@ impl Flake8BugbearOptions {
         }
     }
 }
-
-impl From<ruff::rules::flake8_bugbear::settings::Settings> for Flake8BugbearOptions {
-    fn from(settings: ruff::rules::flake8_bugbear::settings::Settings) -> Self {
-        Self {
-            extend_immutable_calls: Some(settings.extend_immutable_calls),
-        }
-    }
-}
-
 #[derive(
     Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
 )]
@@ -811,15 +780,6 @@ impl Flake8BuiltinsOptions {
         }
     }
 }
-
-impl From<ruff::rules::flake8_builtins::settings::Settings> for Flake8BuiltinsOptions {
-    fn from(settings: ruff::rules::flake8_builtins::settings::Settings) -> Self {
-        Self {
-            builtins_ignorelist: Some(settings.builtins_ignorelist),
-        }
-    }
-}
-
 #[derive(
     Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
 )]
@@ -841,16 +801,6 @@ impl Flake8ComprehensionsOptions {
             allow_dict_calls_with_keyword_arguments: self
                 .allow_dict_calls_with_keyword_arguments
                 .unwrap_or_default(),
-        }
-    }
-}
-
-impl From<ruff::rules::flake8_comprehensions::settings::Settings> for Flake8ComprehensionsOptions {
-    fn from(settings: ruff::rules::flake8_comprehensions::settings::Settings) -> Self {
-        Self {
-            allow_dict_calls_with_keyword_arguments: Some(
-                settings.allow_dict_calls_with_keyword_arguments,
-            ),
         }
     }
 }
@@ -907,16 +857,6 @@ impl Flake8CopyrightOptions {
     }
 }
 
-impl From<flake8_copyright::settings::Settings> for Flake8CopyrightOptions {
-    fn from(settings: flake8_copyright::settings::Settings) -> Self {
-        Self {
-            notice_rgx: Some(settings.notice_rgx.to_string()),
-            author: settings.author,
-            min_file_size: Some(settings.min_file_size),
-        }
-    }
-}
-
 #[derive(
     Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
 )]
@@ -932,14 +872,6 @@ impl Flake8ErrMsgOptions {
     pub fn into_settings(self) -> flake8_errmsg::settings::Settings {
         flake8_errmsg::settings::Settings {
             max_string_length: self.max_string_length.unwrap_or_default(),
-        }
-    }
-}
-
-impl From<flake8_errmsg::settings::Settings> for Flake8ErrMsgOptions {
-    fn from(settings: flake8_errmsg::settings::Settings) -> Self {
-        Self {
-            max_string_length: Some(settings.max_string_length),
         }
     }
 }
@@ -980,15 +912,6 @@ impl Flake8GetTextOptions {
     }
 }
 
-impl From<flake8_gettext::settings::Settings> for Flake8GetTextOptions {
-    fn from(settings: flake8_gettext::settings::Settings) -> Self {
-        Self {
-            function_names: Some(settings.functions_names),
-            extend_function_names: Some(Vec::new()),
-        }
-    }
-}
-
 #[derive(
     Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
 )]
@@ -1018,14 +941,6 @@ impl Flake8ImplicitStrConcatOptions {
     pub fn into_settings(self) -> flake8_implicit_str_concat::settings::Settings {
         flake8_implicit_str_concat::settings::Settings {
             allow_multiline: self.allow_multiline.unwrap_or(true),
-        }
-    }
-}
-
-impl From<flake8_implicit_str_concat::settings::Settings> for Flake8ImplicitStrConcatOptions {
-    fn from(settings: flake8_implicit_str_concat::settings::Settings) -> Self {
-        Self {
-            allow_multiline: Some(settings.allow_multiline),
         }
     }
 }
@@ -1105,18 +1020,6 @@ impl Flake8ImportConventionsOptions {
         }
     }
 }
-
-impl From<flake8_import_conventions::settings::Settings> for Flake8ImportConventionsOptions {
-    fn from(settings: flake8_import_conventions::settings::Settings) -> Self {
-        Self {
-            aliases: Some(settings.aliases),
-            extend_aliases: None,
-            banned_aliases: None,
-            banned_from: None,
-        }
-    }
-}
-
 #[derive(
     Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
 )]
@@ -1247,32 +1150,6 @@ impl Flake8PytestStyleOptions {
     }
 }
 
-impl From<flake8_pytest_style::settings::Settings> for Flake8PytestStyleOptions {
-    fn from(settings: flake8_pytest_style::settings::Settings) -> Self {
-        Self {
-            fixture_parentheses: Some(settings.fixture_parentheses),
-            parametrize_names_type: Some(settings.parametrize_names_type),
-            parametrize_values_type: Some(settings.parametrize_values_type),
-            parametrize_values_row_type: Some(settings.parametrize_values_row_type),
-            raises_require_match_for: Some(
-                settings
-                    .raises_require_match_for
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect(),
-            ),
-            raises_extend_require_match_for: Some(
-                settings
-                    .raises_extend_require_match_for
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect(),
-            ),
-            mark_parentheses: Some(settings.mark_parentheses),
-        }
-    }
-}
-
 #[derive(
     Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
 )]
@@ -1333,17 +1210,6 @@ impl Flake8QuotesOptions {
     }
 }
 
-impl From<flake8_quotes::settings::Settings> for Flake8QuotesOptions {
-    fn from(settings: flake8_quotes::settings::Settings) -> Self {
-        Self {
-            inline_quotes: Some(settings.inline_quotes),
-            multiline_quotes: Some(settings.multiline_quotes),
-            docstring_quotes: Some(settings.docstring_quotes),
-            avoid_escape: Some(settings.avoid_escape),
-        }
-    }
-}
-
 #[derive(
     Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
 )]
@@ -1369,14 +1235,6 @@ impl Flake8SelfOptions {
                     .map(String::from)
                     .to_vec()
             }),
-        }
-    }
-}
-
-impl From<flake8_self::settings::Settings> for Flake8SelfOptions {
-    fn from(settings: flake8_self::settings::Settings) -> Self {
-        Self {
-            ignore_names: Some(settings.ignore_names),
         }
     }
 }
@@ -1432,16 +1290,6 @@ impl Flake8TidyImportsOptions {
             ban_relative_imports: self.ban_relative_imports.unwrap_or(Strictness::Parents),
             banned_api: self.banned_api.unwrap_or_default(),
             banned_module_level_imports: self.banned_module_level_imports.unwrap_or_default(),
-        }
-    }
-}
-
-impl From<flake8_tidy_imports::settings::Settings> for Flake8TidyImportsOptions {
-    fn from(settings: flake8_tidy_imports::settings::Settings) -> Self {
-        Self {
-            ban_relative_imports: Some(settings.ban_relative_imports),
-            banned_api: Some(settings.banned_api),
-            banned_module_level_imports: Some(settings.banned_module_level_imports),
         }
     }
 }
@@ -1517,17 +1365,6 @@ impl Flake8TypeCheckingOptions {
     }
 }
 
-impl From<flake8_type_checking::settings::Settings> for Flake8TypeCheckingOptions {
-    fn from(settings: flake8_type_checking::settings::Settings) -> Self {
-        Self {
-            strict: Some(settings.strict),
-            exempt_modules: Some(settings.exempt_modules),
-            runtime_evaluated_base_classes: Some(settings.runtime_evaluated_base_classes),
-            runtime_evaluated_decorators: Some(settings.runtime_evaluated_decorators),
-        }
-    }
-}
-
 #[derive(
     Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
 )]
@@ -1547,14 +1384,6 @@ impl Flake8UnusedArgumentsOptions {
     pub fn into_settings(self) -> flake8_unused_arguments::settings::Settings {
         flake8_unused_arguments::settings::Settings {
             ignore_variadic_names: self.ignore_variadic_names.unwrap_or_default(),
-        }
-    }
-}
-
-impl From<flake8_unused_arguments::settings::Settings> for Flake8UnusedArgumentsOptions {
-    fn from(settings: flake8_unused_arguments::settings::Settings) -> Self {
-        Self {
-            ignore_variadic_names: Some(settings.ignore_variadic_names),
         }
     }
 }
@@ -2018,74 +1847,6 @@ impl IsortOptions {
     }
 }
 
-impl From<isort::settings::Settings> for IsortOptions {
-    fn from(settings: isort::settings::Settings) -> Self {
-        Self {
-            required_imports: Some(settings.required_imports.into_iter().collect()),
-            combine_as_imports: Some(settings.combine_as_imports),
-            extra_standard_library: Some(
-                settings
-                    .known_modules
-                    .modules_for_known_type(ImportType::StandardLibrary)
-                    .map(ToString::to_string)
-                    .collect(),
-            ),
-            force_single_line: Some(settings.force_single_line),
-            force_sort_within_sections: Some(settings.force_sort_within_sections),
-            case_sensitive: Some(settings.case_sensitive),
-            force_wrap_aliases: Some(settings.force_wrap_aliases),
-            detect_same_package: Some(settings.detect_same_package),
-            force_to_top: Some(settings.force_to_top.into_iter().collect()),
-            known_first_party: Some(
-                settings
-                    .known_modules
-                    .modules_for_known_type(ImportType::FirstParty)
-                    .map(ToString::to_string)
-                    .collect(),
-            ),
-            known_third_party: Some(
-                settings
-                    .known_modules
-                    .modules_for_known_type(ImportType::ThirdParty)
-                    .map(ToString::to_string)
-                    .collect(),
-            ),
-            known_local_folder: Some(
-                settings
-                    .known_modules
-                    .modules_for_known_type(ImportType::LocalFolder)
-                    .map(ToString::to_string)
-                    .collect(),
-            ),
-            order_by_type: Some(settings.order_by_type),
-            relative_imports_order: Some(settings.relative_imports_order),
-            single_line_exclusions: Some(settings.single_line_exclusions.into_iter().collect()),
-            split_on_trailing_comma: Some(settings.split_on_trailing_comma),
-            classes: Some(settings.classes.into_iter().collect()),
-            constants: Some(settings.constants.into_iter().collect()),
-            variables: Some(settings.variables.into_iter().collect()),
-            no_lines_before: Some(settings.no_lines_before.into_iter().collect()),
-            lines_after_imports: Some(settings.lines_after_imports),
-            lines_between_types: Some(settings.lines_between_types),
-            forced_separate: Some(settings.forced_separate.into_iter().collect()),
-            section_order: Some(settings.section_order.into_iter().collect()),
-            sections: Some(
-                settings
-                    .known_modules
-                    .user_defined()
-                    .into_iter()
-                    .map(|(section, modules)| {
-                        (
-                            ImportSection::UserDefined(section.to_string()),
-                            modules.into_iter().map(ToString::to_string).collect(),
-                        )
-                    })
-                    .collect(),
-            ),
-        }
-    }
-}
-
 #[derive(
     Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
 )]
@@ -2110,14 +1871,6 @@ impl McCabeOptions {
             max_complexity: self
                 .max_complexity
                 .unwrap_or(mccabe::settings::DEFAULT_MAX_COMPLEXITY),
-        }
-    }
-}
-
-impl From<mccabe::settings::Settings> for McCabeOptions {
-    fn from(settings: mccabe::settings::Settings) -> Self {
-        Self {
-            max_complexity: Some(settings.max_complexity),
         }
     }
 }
@@ -2198,23 +1951,6 @@ impl Pep8NamingOptions {
     }
 }
 
-impl From<pep8_naming::settings::Settings> for Pep8NamingOptions {
-    fn from(settings: pep8_naming::settings::Settings) -> Self {
-        Self {
-            ignore_names: Some(
-                settings
-                    .ignore_names
-                    .into_iter()
-                    .map(|pattern| pattern.as_str().to_owned())
-                    .collect(),
-            ),
-            extend_ignore_names: None,
-            classmethod_decorators: Some(settings.classmethod_decorators),
-            staticmethod_decorators: Some(settings.staticmethod_decorators),
-        }
-    }
-}
-
 #[derive(
     Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
 )]
@@ -2252,15 +1988,6 @@ impl PycodestyleOptions {
         pycodestyle::settings::Settings {
             max_doc_length: self.max_doc_length,
             ignore_overlong_task_comments: self.ignore_overlong_task_comments.unwrap_or_default(),
-        }
-    }
-}
-
-impl From<pycodestyle::settings::Settings> for PycodestyleOptions {
-    fn from(settings: pycodestyle::settings::Settings) -> Self {
-        Self {
-            max_doc_length: settings.max_doc_length,
-            ignore_overlong_task_comments: Some(settings.ignore_overlong_task_comments),
         }
     }
 }
@@ -2344,16 +2071,6 @@ impl PydocstyleOptions {
     }
 }
 
-impl From<pydocstyle::settings::Settings> for PydocstyleOptions {
-    fn from(settings: pydocstyle::settings::Settings) -> Self {
-        Self {
-            convention: settings.convention,
-            ignore_decorators: Some(settings.ignore_decorators.into_iter().collect()),
-            property_decorators: Some(settings.property_decorators.into_iter().collect()),
-        }
-    }
-}
-
 #[derive(
     Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
 )]
@@ -2378,14 +2095,6 @@ impl PyflakesOptions {
     pub fn into_settings(self) -> pyflakes::settings::Settings {
         pyflakes::settings::Settings {
             extend_generics: self.extend_generics.unwrap_or_default(),
-        }
-    }
-}
-
-impl From<pyflakes::settings::Settings> for PyflakesOptions {
-    fn from(settings: pyflakes::settings::Settings) -> Self {
-        Self {
-            extend_generics: Some(settings.extend_generics),
         }
     }
 }
@@ -2434,18 +2143,6 @@ impl PylintOptions {
             max_returns: self.max_returns.unwrap_or(defaults.max_returns),
             max_branches: self.max_branches.unwrap_or(defaults.max_branches),
             max_statements: self.max_statements.unwrap_or(defaults.max_statements),
-        }
-    }
-}
-
-impl From<pylint::settings::Settings> for PylintOptions {
-    fn from(settings: pylint::settings::Settings) -> Self {
-        Self {
-            allow_magic_value_types: Some(settings.allow_magic_value_types),
-            max_args: Some(settings.max_args),
-            max_returns: Some(settings.max_returns),
-            max_branches: Some(settings.max_branches),
-            max_statements: Some(settings.max_statements),
         }
     }
 }
@@ -2501,14 +2198,6 @@ impl PyUpgradeOptions {
     pub fn into_settings(self) -> pyupgrade::settings::Settings {
         pyupgrade::settings::Settings {
             keep_runtime_typing: self.keep_runtime_typing.unwrap_or_default(),
-        }
-    }
-}
-
-impl From<pyupgrade::settings::Settings> for PyUpgradeOptions {
-    fn from(settings: pyupgrade::settings::Settings) -> Self {
-        Self {
-            keep_runtime_typing: Some(settings.keep_runtime_typing),
         }
     }
 }
