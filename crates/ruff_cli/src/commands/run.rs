@@ -14,14 +14,13 @@ use rayon::prelude::*;
 
 use ruff::message::Message;
 use ruff::registry::Rule;
-use ruff::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
 use ruff::settings::{flags, AllSettings};
 use ruff::{fs, warn_user_once, IOError};
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::imports::ImportMap;
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::{TextRange, TextSize};
-use ruff_workspace::resolver::python_files_in_path;
+use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig, PyprojectDiscoveryStrategy};
 
 use crate::args::Overrides;
 use crate::cache::{self, Cache};
@@ -61,7 +60,9 @@ pub(crate) fn run(
                 init_cache(&pyproject_config.settings.cli.cache_dir);
             }
             PyprojectDiscoveryStrategy::Hierarchical => {
-                for settings in std::iter::once(&pyproject_config.settings).chain(resolver.iter()) {
+                for settings in
+                    std::iter::once(&pyproject_config.settings).chain(resolver.settings())
+                {
                     init_cache(&settings.cli.cache_dir);
                 }
             }
@@ -239,8 +240,8 @@ mod test {
 
     use ruff::message::{Emitter, EmitterContext, TextEmitter};
     use ruff::registry::Rule;
-    use ruff::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
     use ruff::settings::{flags, AllSettings, CliSettings, Settings};
+    use ruff_workspace::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
 
     use crate::args::Overrides;
 

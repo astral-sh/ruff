@@ -7,10 +7,9 @@ use log::{debug, error};
 use rayon::prelude::*;
 
 use ruff::linter::add_noqa_to_path;
-use ruff::resolver::PyprojectConfig;
 use ruff::warn_user_once;
 use ruff_python_stdlib::path::{is_jupyter_notebook, is_project_toml};
-use ruff_workspace::resolver::python_files_in_path;
+use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig};
 
 use crate::args::Overrides;
 

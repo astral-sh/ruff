@@ -1,3 +1,6 @@
+//! Discover Python files, and their corresponding [`Settings`], from the
+//! filesystem.
+
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
@@ -12,10 +15,57 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff::fs;
 use ruff::packaging::is_package;
-use ruff::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
 use ruff::settings::configuration::Configuration;
 use ruff::settings::pyproject::settings_toml;
 use ruff::settings::{pyproject, AllSettings, Settings};
+
+/// The configuration information from a `pyproject.toml` file.
+pub struct PyprojectConfig {
+    /// The strategy used to discover the relevant `pyproject.toml` file for
+    /// each Python file.
+    pub strategy: PyprojectDiscoveryStrategy,
+    /// All settings from the `pyproject.toml` file.
+    pub settings: AllSettings,
+    /// Absolute path to the `pyproject.toml` file. This would be `None` when
+    /// either using the default settings or the `--isolated` flag is set.
+    pub path: Option<PathBuf>,
+}
+
+impl PyprojectConfig {
+    pub fn new(
+        strategy: PyprojectDiscoveryStrategy,
+        settings: AllSettings,
+        path: Option<PathBuf>,
+    ) -> Self {
+        Self {
+            strategy,
+            settings,
+            path: path.map(fs::normalize_path),
+        }
+    }
+}
+
+/// The strategy used to discover the relevant `pyproject.toml` file for each
+/// Python file.
+#[derive(Debug, Copy, Clone)]
+pub enum PyprojectDiscoveryStrategy {
+    /// Use a fixed `pyproject.toml` file for all Python files (i.e., one
+    /// provided on the command-line).
+    Fixed,
+    /// Use the closest `pyproject.toml` file in the filesystem hierarchy, or
+    /// the default settings.
+    Hierarchical,
+}
+
+impl PyprojectDiscoveryStrategy {
+    pub const fn is_fixed(self) -> bool {
+        matches!(self, PyprojectDiscoveryStrategy::Fixed)
+    }
+
+    pub const fn is_hierarchical(self) -> bool {
+        matches!(self, PyprojectDiscoveryStrategy::Hierarchical)
+    }
+}
 
 /// The strategy for resolving file paths in a `pyproject.toml`.
 #[derive(Copy, Clone)]
@@ -46,7 +96,7 @@ pub struct Resolver {
 
 impl Resolver {
     /// Add a resolved [`Settings`] under a given [`PathBuf`] scope.
-    pub fn add(&mut self, path: PathBuf, settings: AllSettings) {
+    fn add(&mut self, path: PathBuf, settings: AllSettings) {
         self.settings.insert(path, settings);
     }
 
@@ -111,7 +161,7 @@ impl Resolver {
     }
 
     /// Return an iterator over the resolved [`Settings`] in this [`Resolver`].
-    pub fn iter(&self) -> impl Iterator<Item = &AllSettings> {
+    pub fn settings(&self) -> impl Iterator<Item = &AllSettings> {
         self.settings.values()
     }
 }
@@ -452,7 +502,6 @@ mod tests {
     use path_absolutize::Absolutize;
     use tempfile::TempDir;
 
-    use ruff::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
     use ruff::settings::configuration::Configuration;
     use ruff::settings::pyproject::find_settings_toml;
     use ruff::settings::types::FilePattern;
@@ -460,7 +509,7 @@ mod tests {
 
     use crate::resolver::{
         is_file_excluded, match_exclusion, python_files_in_path, resolve_settings_with_processor,
-        ConfigProcessor, Relativity, Resolver,
+        ConfigProcessor, PyprojectConfig, PyprojectDiscoveryStrategy, Relativity, Resolver,
     };
     use crate::tests::test_resource_path;
 
