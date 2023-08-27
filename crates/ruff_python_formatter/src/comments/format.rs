@@ -1,10 +1,11 @@
+use std::borrow::Cow;
+
 use ruff_python_ast::Ranged;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
-use ruff_formatter::{format_args, write, FormatError, FormatOptions, SourceCode, TabWidth};
+use ruff_formatter::{format_args, write, FormatError, SourceCode};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
 use ruff_python_trivia::{lines_after, lines_after_ignoring_trivia, lines_before};
-use unicode_width::UnicodeWidthChar;
 
 use crate::comments::{CommentLinePosition, SourceComment};
 use crate::context::NodeLevel;
@@ -169,15 +170,16 @@ impl Format<PyFormatContext<'_>> for FormatTrailingComments<'_> {
                 //     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 // )  # Some comment
                 // ```
+                let source = SourceCode::new(f.context().source());
+                // SAFETY: Ruff only supports formatting files <= 4GB
+                #[allow(clippy::cast_possible_truncation)]
+                let comment_len = normalize_comment(trailing, source).len() as u32;
                 write!(
                     f,
                     [
                         line_suffix(
                             &format_args![space(), space(), format_comment(trailing)],
-                            measure_text(
-                                &f.context().source()[slice.range()],
-                                f.options().tab_width()
-                            ) + 2 // Account for two added spaces
+                            comment_len + 2 // Account for two added spaces
                         ),
                         expand_parent()
                     ]
@@ -280,17 +282,17 @@ impl Format<PyFormatContext<'_>> for FormatDanglingOpenParenthesisComments<'_> {
                 "Expected dangling comment to be at the end of the line"
             );
 
-            let slice = comment.slice();
+            let source = SourceCode::new(f.context().source());
+            // SAFETY: Ruff only supports formatting files <= 4GB
+            #[allow(clippy::cast_possible_truncation)]
+            let comment_len = normalize_comment(comment, source).len() as u32;
             write!(
                 f,
                 [
                     line_suffix(
                         &format_args!(space(), space(), format_comment(comment)),
                         // Marking the comment as a line suffix with reserved width is safe since we expect the comment to be end of line.
-                        measure_text(
-                            &f.context().source()[slice.range()],
-                            f.options().tab_width()
-                        ) + 2 // Account for two added spaces
+                        comment_len + 2 // Account for two added spaces
                     ),
                     expand_parent()
                 ]
@@ -399,17 +401,43 @@ impl Format<PyFormatContext<'_>> for FormatEmptyLines {
     }
 }
 
-/// Helper for measuring text.
-fn measure_text(text: &str, tab_width: TabWidth) -> u32 {
-    let mut width = 0;
-    for c in text.chars() {
-        let char_width = match c {
-            '\t' => tab_width.value(),
-            // SAFETY: A u32 is sufficient to format files <= 4GB
-            #[allow(clippy::cast_possible_truncation)]
-            c => c.width().unwrap_or(0) as u32,
-        };
-        width += char_width;
+// TODO(cnpryer): Alternatively could just duplicate the range tracking from normalization instead
+//   of costly String operations and allocations.
+//   Could abstract the comment behind `NormalizedComment`
+fn normalize_comment<'a>(comment: &'a SourceComment, source: SourceCode<'a>) -> Cow<'a, str> {
+    let slice = comment.slice();
+    let comment_text = slice.text(source);
+
+    // If the comment isn't leading with '#' it's invalid, so we return the text as-is borrowed.
+    // TODO(cnpryer): If this is always used alongside `.fmt()` on comments this should be safe, but
+    //   we can probably do better here.
+    let Some(content) = comment_text.strip_prefix('#') else {
+        return Cow::Borrowed(comment_text);
+    };
+
+    // Make the content mutable in case we need to normalize it. Any normalization is done with lazy operations.
+    let mut content = Cow::Borrowed(content);
+
+    // If the comment has trailing whitespace then we take ownership of a string to make mutations to
+    let trimmed = content.trim_end();
+    let trailing_whitespace_len = content.text_len() - trimmed.text_len();
+    if trailing_whitespace_len > TextSize::new(0) {
+        content = Cow::Owned(trimmed.to_owned());
     }
-    width
+
+    // Fast path for correctly formatted comments:
+    // * Start with a `# '.
+    // * Have no trailing whitespace.
+    if trailing_whitespace_len == TextSize::new(0) && content.starts_with(' ') {
+        return Cow::Borrowed(comment_text);
+    }
+
+    // Formatted comments start with '# '. We perform this normalization if it's necessary.
+    if !content.is_empty() && !content.starts_with([' ', '!', ':', '#', '\'', '\u{A0}']) {
+        Cow::Owned(std::format!("# {content}"))
+    } else if trailing_whitespace_len > TextSize::new(0) {
+        Cow::Owned(std::format!("#{content}"))
+    } else {
+        Cow::Borrowed(comment_text)
+    }
 }
