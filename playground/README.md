@@ -4,11 +4,11 @@ In-browser playground for Ruff. Available [https://play.ruff.rs/](https://play.r
 
 ## Getting started
 
-First, build the WASM module by running `npm run build:wasm` (release build) or
-`npm run build:wasm` (debug build) from the `./playground` directory.
+In order to build the WASM module install [`wasm-pack`](https://rustwasm.github.io/wasm-pack/).
 
-Then, install TypeScript dependencies with `npm install`, and run the development server with
-`npm run dev`.
+Next, build the WASM module by running `npm run build:wasm` (release build) or `npm run dev:wasm` (debug build) from the `./playground` directory.
+
+Finally, install TypeScript dependencies with `npm install`, and run the development server with `npm run dev`.
 
 To run the datastore, which is based on [Workers KV](https://developers.cloudflare.com/workers/runtime-apis/kv/),
 install the [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/install-and-update/),
