@@ -38,6 +38,9 @@ y = range(10)
 list(range(10))[0]
 list(x.y)[0]
 list(x["y"])[0]
+[*range(10)][0]
+[*x.y][0]
+[*x["y"]][0]
 
 # RUF015 (multi-line)
 revision_heads_map_ast = [
@@ -48,3 +51,4 @@ revision_heads_map_ast = [
 
 # RUF015 (zip)
 list(zip(x, y))[0]
+[*zip(x, y)][0]
