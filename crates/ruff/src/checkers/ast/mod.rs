@@ -1895,6 +1895,8 @@ impl<'a> Checker<'a> {
         for (name, range) in exports {
             if let Some(binding_id) = self.semantic.global_scope().get(name) {
                 // Mark anything referenced in `__all__` as used.
+                // TODO(charlie): `range` here should be the range of the name in `__all__`, not
+                // the range of `__all__` itself.
                 self.semantic.add_global_reference(binding_id, range);
             } else {
                 if self.semantic.global_scope().uses_star_imports() {

@@ -5,7 +5,7 @@
 use std::ops::Index;
 
 use ruff_python_ast as ast;
-use ruff_python_ast::Stmt;
+use ruff_python_ast::{Ranged, Stmt};
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
 
@@ -75,9 +75,9 @@ impl<'a> GlobalsVisitor<'a> {
 impl<'a> StatementVisitor<'a> for GlobalsVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
-            Stmt::Global(ast::StmtGlobal { names, range }) => {
+            Stmt::Global(ast::StmtGlobal { names, range: _ }) => {
                 for name in names {
-                    self.0.insert(name.as_str(), *range);
+                    self.0.insert(name.as_str(), name.range());
                 }
             }
             Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {
