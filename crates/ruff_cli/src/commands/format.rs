@@ -1,35 +1,24 @@
-#![allow(clippy::print_stderr)]
+use std::io;
+use std::path::{Path, PathBuf};
+
+use anyhow::Result;
+use colored::Colorize;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use thiserror::Error;
+use tracing::{span, Level};
+
+use ruff::resolver::python_files_in_path;
+use ruff::warn_user_once;
+use ruff_formatter::LineWidth;
+use ruff_python_ast::PySourceType;
+use ruff_python_formatter::{format_module, FormatModuleError, PyFormatOptions};
 
 use crate::args::{Arguments, Overrides};
 use crate::resolve::resolve;
 use crate::ExitStatus;
-use anyhow::bail;
-use colored::Colorize;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use ruff::resolver::python_files_in_path;
-use ruff_formatter::LineWidth;
-use ruff_python_ast::PySourceType;
-use ruff_python_formatter::{format_module, FormatModuleError, PyFormatOptions};
-use std::io;
-use std::path::{Path, PathBuf};
-use thiserror::Error;
-use tracing::span;
-use tracing::Level;
 
-/// The inner errors are all flat, i.e. none of them has a source
-#[derive(Error, Debug)]
-enum FormatterIterationError {
-    #[error("Failed to traverse the inputs paths: {0}")]
-    Ignore(#[from] ignore::Error),
-    #[error("Failed to read {0}: {1}")]
-    Read(PathBuf, io::Error),
-    #[error("Failed to write {0}: {1}")]
-    Write(PathBuf, io::Error),
-    #[error("Failed to format {0}: {1}")]
-    FormatModule(PathBuf, FormatModuleError),
-}
-
-pub(crate) fn format(cli: &Arguments, overrides: &Overrides) -> anyhow::Result<ExitStatus> {
+/// Format a set of files, and return the exit status.
+pub(crate) fn format(cli: &Arguments, overrides: &Overrides) -> Result<ExitStatus> {
     let pyproject_config = resolve(
         cli.isolated,
         cli.config.as_deref(),
@@ -37,8 +26,10 @@ pub(crate) fn format(cli: &Arguments, overrides: &Overrides) -> anyhow::Result<E
         cli.stdin_filename.as_deref(),
     )?;
     let (paths, resolver) = python_files_in_path(&cli.files, &pyproject_config, overrides)?;
+
     if paths.is_empty() {
-        bail!("no python files in TODO(@konstin) pass them in")
+        warn_user_once!("No Python files found under the given path(s)");
+        return Ok(ExitStatus::Success);
     }
 
     let all_success = paths
@@ -56,7 +47,7 @@ pub(crate) fn format(cli: &Arguments, overrides: &Overrides) -> anyhow::Result<E
             }
 
             let line_length = resolver.resolve(path, &pyproject_config).line_length;
-            // TODO(@konstin): Unify `LineWidth` and `LineLength`
+            // TODO(konstin): Unify `LineWidth` and `LineLength`
             let line_width = LineWidth::try_from(
                 u16::try_from(line_length.get()).expect("Line shouldn't be larger than 2**16"),
             )
@@ -69,8 +60,11 @@ pub(crate) fn format(cli: &Arguments, overrides: &Overrides) -> anyhow::Result<E
             match result {
                 Ok(()) => true,
                 Err(err) => {
-                    // The inner errors are all flat, i.e. none of them has a source
-                    eprintln!("{}", err.to_string().red().bold());
+                    // The inner errors are all flat, i.e., none of them has a source.
+                    #[allow(clippy::print_stderr)]
+                    {
+                        eprintln!("{}", err.to_string().red().bold());
+                    }
                     false
                 }
             }
@@ -82,6 +76,19 @@ pub(crate) fn format(cli: &Arguments, overrides: &Overrides) -> anyhow::Result<E
     } else {
         Ok(ExitStatus::Error)
     }
+}
+
+/// An error that can occur while formatting a set of files.
+#[derive(Error, Debug)]
+enum FormatterIterationError {
+    #[error("Failed to traverse the inputs paths: {0}")]
+    Ignore(#[from] ignore::Error),
+    #[error("Failed to read {0}: {1}")]
+    Read(PathBuf, io::Error),
+    #[error("Failed to write {0}: {1}")]
+    Write(PathBuf, io::Error),
+    #[error("Failed to format {0}: {1}")]
+    FormatModule(PathBuf, FormatModuleError),
 }
 
 #[tracing::instrument(skip_all, fields(path = %path.display()))]
