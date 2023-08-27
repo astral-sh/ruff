@@ -3,10 +3,12 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use colored::Colorize;
+use log::warn;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use thiserror::Error;
 use tracing::{span, Level};
 
+use ruff::fs;
 use ruff::resolver::python_files_in_path;
 use ruff::warn_user_once;
 use ruff_formatter::LineWidth;
@@ -57,14 +59,10 @@ pub(crate) fn format(cli: &Arguments, overrides: &Overrides) -> Result<ExitStatu
             format_path(path, options)
         })
         .map(|result| {
-            if let Err(err) = result.as_ref() {
-                // The inner errors are all flat, i.e., none of them has a source.
-                #[allow(clippy::print_stderr)]
-                {
-                    eprintln!("{}", err.to_string().red().bold());
-                }
-            }
-            result
+            result.map_err(|err| {
+                err.show_user();
+                err
+            })
         })
         .collect::<Result<Vec<_>, _>>();
 
@@ -73,19 +71,6 @@ pub(crate) fn format(cli: &Arguments, overrides: &Overrides) -> Result<ExitStatu
     } else {
         Ok(ExitStatus::Error)
     }
-}
-
-/// An error that can occur while formatting a set of files.
-#[derive(Error, Debug)]
-enum FormatterIterationError {
-    #[error("Failed to traverse the inputs paths: {0}")]
-    Ignore(#[from] ignore::Error),
-    #[error("Failed to read {0}: {1}")]
-    Read(PathBuf, io::Error),
-    #[error("Failed to write {0}: {1}")]
-    Write(PathBuf, io::Error),
-    #[error("Failed to format {0}: {1}")]
-    FormatModule(PathBuf, FormatModuleError),
 }
 
 #[tracing::instrument(skip_all, fields(path = %path.display()))]
@@ -101,4 +86,68 @@ fn format_path(path: &Path, options: PyFormatOptions) -> Result<(), FormatterIte
     std::fs::write(path, formatted.as_code().as_bytes())
         .map_err(|err| FormatterIterationError::Write(path.to_path_buf(), err))?;
     Ok(())
+}
+
+/// An error that can occur while formatting a set of files.
+#[derive(Error, Debug)]
+enum FormatterIterationError {
+    #[error("Failed to traverse: {0}")]
+    Ignore(#[from] ignore::Error),
+    #[error("Failed to read {0}: {1}")]
+    Read(PathBuf, io::Error),
+    #[error("Failed to write {0}: {1}")]
+    Write(PathBuf, io::Error),
+    #[error("Failed to format {0}: {1}")]
+    FormatModule(PathBuf, FormatModuleError),
+}
+
+impl FormatterIterationError {
+    /// Pretty-print a [`FormatterIterationError`] for user-facing display.
+    fn show_user(&self) {
+        match self {
+            Self::Ignore(err) => {
+                if let ignore::Error::WithPath { path, .. } = err {
+                    warn!(
+                        "{}{}{} {}",
+                        "Failed to format ".bold(),
+                        fs::relativize_path(path).bold(),
+                        ":".bold(),
+                        err.io_error()
+                            .map_or_else(|| err.to_string(), std::string::ToString::to_string)
+                    );
+                } else {
+                    warn!(
+                        "{} {}",
+                        "Encountered error:".bold(),
+                        err.io_error()
+                            .map_or_else(|| err.to_string(), std::string::ToString::to_string)
+                    );
+                }
+            }
+            Self::Read(path, err) => {
+                warn!(
+                    "{}{}{} {err}",
+                    "Failed to read ".bold(),
+                    fs::relativize_path(path).bold(),
+                    ":".bold()
+                );
+            }
+            Self::Write(path, err) => {
+                warn!(
+                    "{}{}{} {err}",
+                    "Failed to write ".bold(),
+                    fs::relativize_path(path).bold(),
+                    ":".bold()
+                );
+            }
+            Self::FormatModule(path, err) => {
+                warn!(
+                    "{}{}{} {err}",
+                    "Failed to format ".bold(),
+                    fs::relativize_path(path).bold(),
+                    ":".bold()
+                );
+            }
+        }
+    }
 }
