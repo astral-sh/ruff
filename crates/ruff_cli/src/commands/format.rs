@@ -32,7 +32,7 @@ pub(crate) fn format(cli: &Arguments, overrides: &Overrides) -> Result<ExitStatu
         return Ok(ExitStatus::Success);
     }
 
-    let all_success = paths
+    let result = paths
         .into_par_iter()
         .map(|dir_entry| {
             let dir_entry = dir_entry?;
@@ -57,21 +57,18 @@ pub(crate) fn format(cli: &Arguments, overrides: &Overrides) -> Result<ExitStatu
             format_path(path, options)
         })
         .map(|result| {
-            match result {
-                Ok(()) => true,
-                Err(err) => {
-                    // The inner errors are all flat, i.e., none of them has a source.
-                    #[allow(clippy::print_stderr)]
-                    {
-                        eprintln!("{}", err.to_string().red().bold());
-                    }
-                    false
+            if let Err(err) = result.as_ref() {
+                // The inner errors are all flat, i.e., none of them has a source.
+                #[allow(clippy::print_stderr)]
+                {
+                    eprintln!("{}", err.to_string().red().bold());
                 }
             }
+            result
         })
-        .all(|success| success);
+        .collect::<Result<Vec<_>, _>>();
 
-    if all_success {
+    if result.is_ok() {
         Ok(ExitStatus::Success)
     } else {
         Ok(ExitStatus::Error)
