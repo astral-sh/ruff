@@ -20,9 +20,9 @@ ignore = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
 globset = { workspace = true }
+path-absolutize = { workspace = true }
 rustc-hash = { workspace = true }
 
 
 [dev-dependencies]
 tempfile = "3.6.0"
-path-absolutize = { workspace = true }

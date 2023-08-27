@@ -1,9 +1,7 @@
 //! Discover Python files, and their corresponding [`Settings`], from the
 //! filesystem.
 
-use std::path::{Path, PathBuf};
-
-use path_absolutize::path_dedot;
+use std::path::PathBuf;
 
 use crate::fs;
 use crate::settings::AllSettings;
@@ -44,26 +42,4 @@ pub enum PyprojectDiscoveryStrategy {
     /// Use the closest `pyproject.toml` file in the filesystem hierarchy, or
     /// the default settings.
     Hierarchical,
-}
-
-/// The strategy for resolving file paths in a `pyproject.toml`.
-#[derive(Copy, Clone)]
-pub enum Relativity {
-    /// Resolve file paths relative to the current working directory.
-    Cwd,
-    /// Resolve file paths relative to the directory containing the
-    /// `pyproject.toml`.
-    Parent,
-}
-
-impl Relativity {
-    pub fn resolve(&self, path: &Path) -> PathBuf {
-        match self {
-            Relativity::Parent => path
-                .parent()
-                .expect("Expected pyproject.toml file to be in parent directory")
-                .to_path_buf(),
-            Relativity::Cwd => path_dedot::CWD.clone(),
-        }
-    }
 }

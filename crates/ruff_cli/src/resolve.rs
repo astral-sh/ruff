@@ -4,10 +4,10 @@ use anyhow::Result;
 use log::debug;
 use path_absolutize::path_dedot;
 
-use ruff::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy, Relativity};
+use ruff::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
 use ruff::settings::configuration::Configuration;
 use ruff::settings::{pyproject, AllSettings};
-use ruff_workspace::resolver::{resolve_settings_with_processor, ConfigProcessor};
+use ruff_workspace::resolver::{resolve_settings_with_processor, ConfigProcessor, Relativity};
 
 use crate::args::Overrides;
 
@@ -40,7 +40,7 @@ pub fn resolve(
         .map(|config| shellexpand::full(&config).map(|config| PathBuf::from(config.as_ref())))
         .transpose()?
     {
-        let settings = resolve_settings_with_processor(&pyproject, &Relativity::Cwd, overrides)?;
+        let settings = resolve_settings_with_processor(&pyproject, Relativity::Cwd, overrides)?;
         debug!(
             "Using user specified pyproject.toml at {}",
             pyproject.display()
@@ -63,7 +63,7 @@ pub fn resolve(
             .unwrap_or(&path_dedot::CWD.as_path()),
     )? {
         debug!("Using pyproject.toml (parent) at {}", pyproject.display());
-        let settings = resolve_settings_with_processor(&pyproject, &Relativity::Parent, overrides)?;
+        let settings = resolve_settings_with_processor(&pyproject, Relativity::Parent, overrides)?;
         return Ok(PyprojectConfig::new(
             PyprojectDiscoveryStrategy::Hierarchical,
             settings,
@@ -77,7 +77,7 @@ pub fn resolve(
     // these act as the "default" settings.)
     if let Some(pyproject) = pyproject::find_user_settings_toml() {
         debug!("Using pyproject.toml (cwd) at {}", pyproject.display());
-        let settings = resolve_settings_with_processor(&pyproject, &Relativity::Cwd, overrides)?;
+        let settings = resolve_settings_with_processor(&pyproject, Relativity::Cwd, overrides)?;
         return Ok(PyprojectConfig::new(
             PyprojectDiscoveryStrategy::Hierarchical,
             settings,

@@ -7,14 +7,37 @@ use anyhow::{anyhow, bail};
 use ignore::{DirEntry, WalkBuilder, WalkState};
 use itertools::Itertools;
 use log::debug;
+use path_absolutize::path_dedot;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff::fs;
 use ruff::packaging::is_package;
-use ruff::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy, Relativity};
+use ruff::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
 use ruff::settings::configuration::Configuration;
 use ruff::settings::pyproject::settings_toml;
 use ruff::settings::{pyproject, AllSettings, Settings};
+
+/// The strategy for resolving file paths in a `pyproject.toml`.
+#[derive(Copy, Clone)]
+pub enum Relativity {
+    /// Resolve file paths relative to the current working directory.
+    Cwd,
+    /// Resolve file paths relative to the directory containing the
+    /// `pyproject.toml`.
+    Parent,
+}
+
+impl Relativity {
+    pub fn resolve(self, path: &Path) -> PathBuf {
+        match self {
+            Relativity::Parent => path
+                .parent()
+                .expect("Expected pyproject.toml file to be in parent directory")
+                .to_path_buf(),
+            Relativity::Cwd => path_dedot::CWD.clone(),
+        }
+    }
+}
 
 #[derive(Default)]
 pub struct Resolver {
@@ -132,7 +155,7 @@ pub trait ConfigProcessor: Sync {
 // resolving the "default" configuration).
 fn resolve_configuration(
     pyproject: &Path,
-    relativity: &Relativity,
+    relativity: Relativity,
     processor: &dyn ConfigProcessor,
 ) -> Result<Configuration> {
     let mut seen = FxHashSet::default();
@@ -178,7 +201,7 @@ fn resolve_configuration(
 /// `pyproject.toml`.
 fn resolve_scoped_settings(
     pyproject: &Path,
-    relativity: &Relativity,
+    relativity: Relativity,
     processor: &dyn ConfigProcessor,
 ) -> Result<(PathBuf, AllSettings)> {
     let configuration = resolve_configuration(pyproject, relativity, processor)?;
@@ -191,7 +214,7 @@ fn resolve_scoped_settings(
 /// configuration with the given [`ConfigProcessor`].
 pub fn resolve_settings_with_processor(
     pyproject: &Path,
-    relativity: &Relativity,
+    relativity: Relativity,
     processor: &dyn ConfigProcessor,
 ) -> Result<AllSettings> {
     let (_project_root, settings) = resolve_scoped_settings(pyproject, relativity, processor)?;
@@ -216,7 +239,7 @@ pub fn python_files_in_path(
                 if seen.insert(ancestor) {
                     if let Some(pyproject) = settings_toml(ancestor)? {
                         let (root, settings) =
-                            resolve_scoped_settings(&pyproject, &Relativity::Parent, processor)?;
+                            resolve_scoped_settings(&pyproject, Relativity::Parent, processor)?;
                         resolver.add(root, settings);
                     }
                 }
@@ -288,7 +311,7 @@ pub fn python_files_in_path(
                         match settings_toml(entry.path()) {
                             Ok(Some(pyproject)) => match resolve_scoped_settings(
                                 &pyproject,
-                                &Relativity::Parent,
+                                Relativity::Parent,
                                 processor,
                             ) {
                                 Ok((root, settings)) => {
@@ -363,7 +386,7 @@ pub fn python_file_at_path(
         for ancestor in path.ancestors() {
             if let Some(pyproject) = settings_toml(ancestor)? {
                 let (root, settings) =
-                    resolve_scoped_settings(&pyproject, &Relativity::Parent, processor)?;
+                    resolve_scoped_settings(&pyproject, Relativity::Parent, processor)?;
                 resolver.add(root, settings);
             }
         }
@@ -429,7 +452,7 @@ mod tests {
     use path_absolutize::Absolutize;
     use tempfile::TempDir;
 
-    use ruff::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy, Relativity};
+    use ruff::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
     use ruff::settings::configuration::Configuration;
     use ruff::settings::pyproject::find_settings_toml;
     use ruff::settings::types::FilePattern;
@@ -437,7 +460,7 @@ mod tests {
 
     use crate::resolver::{
         is_file_excluded, match_exclusion, python_files_in_path, resolve_settings_with_processor,
-        ConfigProcessor, Resolver,
+        ConfigProcessor, Relativity, Resolver,
     };
     use crate::tests::test_resource_path;
 
@@ -455,7 +478,7 @@ mod tests {
             PyprojectDiscoveryStrategy::Hierarchical,
             resolve_settings_with_processor(
                 &find_settings_toml(&package_root)?.unwrap(),
-                &Relativity::Parent,
+                Relativity::Parent,
                 &NoOpProcessor,
             )?,
             None,
