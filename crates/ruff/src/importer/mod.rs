@@ -319,7 +319,7 @@ impl<'a> Importer<'a> {
 
     /// Add the given member to an existing `Stmt::ImportFrom` statement.
     fn add_member(&self, stmt: &Stmt, member: &str) -> Result<Edit> {
-        let mut statement = match_statement(self.locator.slice(stmt.range()))?;
+        let mut statement = match_statement(self.locator.slice(stmt))?;
         let import_from = match_import_from(&mut statement)?;
         let aliases = match_aliases(import_from)?;
         aliases.push(ImportAlias {

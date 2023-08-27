@@ -78,7 +78,7 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
             UnnecessaryTypeUnion {
                 members: type_exprs
                     .into_iter()
-                    .map(|type_expr| checker.locator().slice(type_expr.range()).to_string())
+                    .map(|type_expr| checker.locator().slice(type_expr.as_ref()).to_string())
                     .collect(),
                 is_pep604_union,
             },

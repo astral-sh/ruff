@@ -249,7 +249,7 @@ fn is_valid_default_value_with_annotation(
                     ..
                 }) = left.as_ref()
                 {
-                    return locator.slice(left.range()).len() <= 10;
+                    return locator.slice(left.as_ref()).len() <= 10;
                 } else if let Expr::UnaryOp(ast::ExprUnaryOp {
                     op: UnaryOp::USub,
                     operand,
@@ -262,7 +262,7 @@ fn is_valid_default_value_with_annotation(
                         ..
                     }) = operand.as_ref()
                     {
-                        return locator.slice(operand.range()).len() <= 10;
+                        return locator.slice(operand.as_ref()).len() <= 10;
                     }
                 }
             }

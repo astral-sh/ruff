@@ -8,7 +8,6 @@ use libcst_native::{
 use ruff_python_ast::Stmt;
 use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
-use ruff_text_size::Ranged;
 
 use crate::cst::helpers::compose_module_path;
 use crate::cst::matchers::match_statement;
@@ -39,7 +38,7 @@ pub(crate) fn remove_imports<'a>(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Option<String>> {
-    let module_text = locator.slice(stmt.range());
+    let module_text = locator.slice(stmt);
     let mut tree = match_statement(module_text)?;
 
     let Statement::Simple(body) = &mut tree else {
@@ -118,7 +117,7 @@ pub(crate) fn retain_imports(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<String> {
-    let module_text = locator.slice(stmt.range());
+    let module_text = locator.slice(stmt);
     let mut tree = match_statement(module_text)?;
 
     let Statement::Simple(body) = &mut tree else {

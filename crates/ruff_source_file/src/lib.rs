@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -56,8 +56,8 @@ impl<'src, 'index> SourceCode<'src, 'index> {
     }
 
     /// Take the source code between the given [`TextRange`].
-    pub fn slice(&self, range: TextRange) -> &'src str {
-        &self.text[range]
+    pub fn slice<T: Ranged>(&self, ranged: T) -> &'src str {
+        &self.text[ranged.range()]
     }
 
     pub fn line_start(&self, line: OneIndexed) -> TextSize {

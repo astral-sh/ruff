@@ -788,12 +788,12 @@ fn format_docstring(string_part: &FormatStringPart, f: &mut PyFormatter) -> Form
     let locator = f.context().locator();
 
     // Black doesn't change the indentation of docstrings that contain an escaped newline
-    if locator.slice(string_part.range()).contains("\\\n") {
+    if locator.slice(string_part).contains("\\\n") {
         return string_part.fmt(f);
     }
 
     let (normalized, _) = normalize_string(
-        locator.slice(string_part.range()),
+        locator.slice(string_part),
         string_part.preferred_quotes,
         string_part.is_raw_string,
     );
