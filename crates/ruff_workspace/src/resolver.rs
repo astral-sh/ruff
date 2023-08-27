@@ -13,11 +13,12 @@ use log::debug;
 use path_absolutize::path_dedot;
 use rustc_hash::{FxHashMap, FxHashSet};
 
+use crate::configuration::Configuration;
+use crate::pyproject;
+use crate::pyproject::settings_toml;
 use ruff::fs;
 use ruff::packaging::is_package;
-use ruff::settings::configuration::Configuration;
-use ruff::settings::pyproject::settings_toml;
-use ruff::settings::{pyproject, AllSettings, Settings};
+use ruff::settings::{AllSettings, Settings};
 
 /// The configuration information from a `pyproject.toml` file.
 pub struct PyprojectConfig {
@@ -256,7 +257,7 @@ fn resolve_scoped_settings(
 ) -> Result<(PathBuf, AllSettings)> {
     let configuration = resolve_configuration(pyproject, relativity, processor)?;
     let project_root = relativity.resolve(pyproject);
-    let settings = AllSettings::from_configuration(configuration, &project_root)?;
+    let settings = configuration.into_all_settings(&project_root)?;
     Ok((project_root, settings))
 }
 
@@ -502,8 +503,8 @@ mod tests {
     use path_absolutize::Absolutize;
     use tempfile::TempDir;
 
-    use ruff::settings::configuration::Configuration;
-    use ruff::settings::pyproject::find_settings_toml;
+    use crate::configuration::Configuration;
+    use crate::pyproject::find_settings_toml;
     use ruff::settings::types::FilePattern;
     use ruff::settings::AllSettings;
 

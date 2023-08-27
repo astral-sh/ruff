@@ -15,8 +15,6 @@ use ruff::rules::{
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
     pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
 };
-use ruff::settings::configuration::Configuration;
-use ruff::settings::options::Options;
 use ruff::settings::types::PythonVersion;
 use ruff::settings::{defaults, flags, Settings};
 use ruff_python_ast::PySourceType;
@@ -28,6 +26,8 @@ use ruff_python_parser::AsMode;
 use ruff_python_parser::{parse_tokens, Mode};
 use ruff_source_file::{Locator, SourceLocation};
 use ruff_text_size::Ranged;
+use ruff_workspace::configuration::Configuration;
+use ruff_workspace::options::Options;
 
 #[wasm_bindgen(typescript_custom_section)]
 const TYPES: &'static str = r#"
@@ -113,8 +113,9 @@ impl Workspace {
         let options: Options = serde_wasm_bindgen::from_value(options).map_err(into_error)?;
         let configuration =
             Configuration::from_options(options, Path::new(".")).map_err(into_error)?;
-        let settings =
-            Settings::from_configuration(configuration, Path::new(".")).map_err(into_error)?;
+        let settings = configuration
+            .into_settings(Path::new("."))
+            .map_err(into_error)?;
 
         Ok(Workspace { settings })
     }

@@ -22,7 +22,7 @@ ruff_python_literal = { path = "../ruff_python_literal" }
 ruff_python_parser = { path = "../ruff_python_parser" }
 ruff_python_stdlib = { path = "../ruff_python_stdlib" }
 ruff_python_trivia = { path = "../ruff_python_trivia" }
-ruff_workspace = { path = "../ruff_workspace" }
+ruff_workspace = { path = "../ruff_workspace", features = ["schemars"]}
 
 anyhow = { workspace = true }
 clap = { workspace = true }

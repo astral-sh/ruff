@@ -8,11 +8,11 @@ use rustc_hash::FxHashMap;
 use ruff::line_width::LineLength;
 use ruff::logging::LogLevel;
 use ruff::registry::Rule;
-use ruff::settings::configuration::RuleSelection;
 use ruff::settings::types::{
     FilePattern, PatternPrefixPair, PerFileIgnore, PythonVersion, SerializationFormat,
 };
 use ruff::RuleSelector;
+use ruff_workspace::configuration::{Configuration, RuleSelection};
 use ruff_workspace::resolver::ConfigProcessor;
 
 #[derive(Debug, Parser)]
@@ -514,7 +514,7 @@ pub struct Overrides {
 }
 
 impl ConfigProcessor for Overrides {
-    fn process_config(&self, config: &mut ruff::settings::configuration::Configuration) {
+    fn process_config(&self, config: &mut Configuration) {
         if let Some(cache_dir) = &self.cache_dir {
             config.cache_dir = Some(cache_dir.clone());
         }

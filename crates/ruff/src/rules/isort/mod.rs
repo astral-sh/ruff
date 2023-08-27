@@ -26,7 +26,7 @@ use crate::settings::types::PythonVersion;
 
 mod annotate;
 pub(crate) mod block;
-mod categorize;
+pub mod categorize;
 mod comments;
 mod format;
 mod helpers;

@@ -445,7 +445,7 @@
       "description": "Options for the `pycodestyle` plugin.",
       "anyOf": [
         {
-          "$ref": "#/definitions/Pycodestyle"
+          "$ref": "#/definitions/PycodestyleOptions"
         },
         {
           "type": "null"
@@ -456,7 +456,7 @@
       "description": "Options for the `pydocstyle` plugin.",
       "anyOf": [
         {
-          "$ref": "#/definitions/Pydocstyle"
+          "$ref": "#/definitions/PydocstyleOptions"
         },
         {
           "type": "null"
@@ -1487,7 +1487,7 @@
       },
       "additionalProperties": false
     },
-    "Pycodestyle": {
+    "PycodestyleOptions": {
       "type": "object",
       "properties": {
         "ignore-overlong-task-comments": {
@@ -1511,7 +1511,7 @@
       },
       "additionalProperties": false
     },
-    "Pydocstyle": {
+    "PydocstyleOptions": {
       "type": "object",
       "properties": {
         "convention": {

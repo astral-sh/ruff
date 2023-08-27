@@ -2,13 +2,12 @@
 
 use std::path::{Path, PathBuf};
 
+use crate::options::Options;
 use anyhow::Result;
 use log::debug;
+use pep440_rs::VersionSpecifiers;
+use ruff::settings::types::PythonVersion;
 use serde::{Deserialize, Serialize};
-
-use crate::flake8_to_ruff::pep621::Project;
-use crate::settings::options::Options;
-use crate::settings::types::PythonVersion;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 struct Tools {
@@ -16,6 +15,12 @@ struct Tools {
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+struct Project {
+    #[serde(alias = "requires-python", alias = "requires_python")]
+    requires_python: Option<VersionSpecifiers>,
+}
+
+#[derive(Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct Pyproject {
     tool: Option<Tools>,
     project: Option<Project>,
@@ -147,18 +152,18 @@ pub fn load_options<P: AsRef<Path>>(path: P) -> Result<Options> {
 mod tests {
     use std::str::FromStr;
 
+    use crate::options::Options;
+    use crate::pyproject::{find_settings_toml, parse_pyproject_toml, Pyproject, Tools};
+    use crate::tests::test_resource_path;
     use anyhow::Result;
+    use ruff::codes;
+    use ruff::codes::RuleCodePrefix;
+    use ruff::line_width::LineLength;
+    use ruff::settings::types::PatternPrefixPair;
     use rustc_hash::FxHashMap;
 
-    use crate::codes::{self, RuleCodePrefix};
-    use crate::line_width::LineLength;
-    use crate::settings::pyproject::{
-        find_settings_toml, parse_pyproject_toml, Options, Pyproject, Tools,
-    };
-    use crate::settings::types::PatternPrefixPair;
-    use crate::test::test_resource_path;
-
     #[test]
+
     fn deserialize() -> Result<()> {
         let pyproject: Pyproject = toml::from_str(r#""#)?;
         assert_eq!(pyproject.tool, None);

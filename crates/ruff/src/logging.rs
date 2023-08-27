@@ -15,7 +15,7 @@ use crate::fs;
 use crate::jupyter::Notebook;
 use crate::source_kind::SourceKind;
 
-pub(crate) static WARNINGS: Lazy<Mutex<Vec<&'static str>>> = Lazy::new(Mutex::default);
+pub static WARNINGS: Lazy<Mutex<Vec<&'static str>>> = Lazy::new(Mutex::default);
 
 /// Warn a user once, with uniqueness determined by the given ID.
 #[macro_export]
