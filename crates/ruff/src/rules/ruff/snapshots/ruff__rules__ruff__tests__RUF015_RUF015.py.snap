@@ -236,6 +236,8 @@ RUF015.py:43:26: RUF015 [*] Prefer `next(...)` over single element slice
 46 | |     if isinstance(a, ast.Assign) and a.targets[0].id == "REVISION_HEADS_MAP"
 47 | | ][0]
    | |____^ RUF015
+48 |   
+49 |   # RUF015 (zip)
    |
    = help: Replace with `next(...)`
 
@@ -250,5 +252,23 @@ RUF015.py:43:26: RUF015 [*] Prefer `next(...)` over single element slice
 46 46 |     if isinstance(a, ast.Assign) and a.targets[0].id == "REVISION_HEADS_MAP"
 47    |-][0]
    47 |+)
+48 48 | 
+49 49 | # RUF015 (zip)
+50 50 | list(zip(x, y))[0]
+
+RUF015.py:50:1: RUF015 [*] Prefer `next(zip(x, y))` over single element slice
+   |
+49 | # RUF015 (zip)
+50 | list(zip(x, y))[0]
+   | ^^^^^^^^^^^^^^^^^^ RUF015
+   |
+   = help: Replace with `next(zip(x, y))`
+
+ℹ Suggested fix
+47 47 | ][0]
+48 48 | 
+49 49 | # RUF015 (zip)
+50    |-list(zip(x, y))[0]
+   50 |+next(zip(x, y))
 
 

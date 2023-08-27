@@ -45,3 +45,6 @@ revision_heads_map_ast = [
     for a in revision_heads_map_ast_obj.body
     if isinstance(a, ast.Assign) and a.targets[0].id == "REVISION_HEADS_MAP"
 ][0]
+
+# RUF015 (zip)
+list(zip(x, y))[0]

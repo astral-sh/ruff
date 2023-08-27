@@ -189,6 +189,10 @@ fn match_iteration_target(expr: &Expr, semantic: &SemanticModel) -> Option<Itera
                         iterable: true,
                     },
                 },
+                Expr::Call(ast::ExprCall { func, .. }) => IterationTarget {
+                    range: arg.range(),
+                    iterable: is_func_builtin_iterator(func, semantic),
+                },
                 _ => IterationTarget {
                     range: arg.range(),
                     iterable: false,
@@ -243,4 +247,13 @@ fn match_simple_comprehension(elt: &Expr, generators: &[Comprehension]) -> Optio
     }
 
     Some(generator.iter.range())
+}
+
+// Returns true if the function is a builtin iterator
+// The list of iterators is: enumerate, filter, map, reversed, zip, and range
+fn is_func_builtin_iterator(func: &Box<ast::Expr>, semantic: &SemanticModel) -> bool {
+    let builtins = ["enumerate", "filter", "map", "reversed", "zip", "range"];
+    func.as_name_expr().map_or(false, |func_name| {
+        semantic.is_builtin(func_name.id.as_str()) && builtins.contains(&func_name.id.as_str())
+    })
 }
