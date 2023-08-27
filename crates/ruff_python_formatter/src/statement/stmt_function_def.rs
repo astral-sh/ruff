@@ -1,6 +1,7 @@
 use ruff_formatter::write;
-use ruff_python_ast::{Parameters, Ranged, StmtFunctionDef};
+use ruff_python_ast::{Parameters, StmtFunctionDef};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
+use ruff_text_size::Ranged;
 
 use crate::comments::SourceComment;
 use crate::expression::maybe_parenthesize_expression;

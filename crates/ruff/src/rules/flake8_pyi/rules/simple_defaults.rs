@@ -2,11 +2,12 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violat
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::CallPath;
 use ruff_python_ast::{
-    self as ast, Arguments, Constant, Expr, Operator, ParameterWithDefault, Parameters, Ranged,
-    Stmt, UnaryOp,
+    self as ast, Arguments, Constant, Expr, Operator, ParameterWithDefault, Parameters, Stmt,
+    UnaryOp,
 };
 use ruff_python_semantic::{ScopeKind, SemanticModel};
 use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;

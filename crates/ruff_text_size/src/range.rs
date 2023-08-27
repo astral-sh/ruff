@@ -352,7 +352,7 @@ impl TextRange {
     /// ## Examples
     ///
     /// ```
-    /// use ruff_text_size::{TextRange, TextSize};
+    /// use ruff_text_size::{Ranged, TextRange, TextSize};
     ///
     /// let range = TextRange::new(TextSize::from(5), TextSize::from(10));
     /// assert_eq!(range.sub_start(TextSize::from(2)), TextRange::new(TextSize::from(3), TextSize::from(10)));
@@ -371,7 +371,7 @@ impl TextRange {
     /// ## Examples
     ///
     /// ```
-    /// use ruff_text_size::{TextRange, TextSize};
+    /// use ruff_text_size::{Ranged, TextRange, TextSize};
     ///
     /// let range = TextRange::new(TextSize::from(5), TextSize::from(10));
     /// assert_eq!(range.add_start(TextSize::from(3)), TextRange::new(TextSize::from(8), TextSize::from(10)));
@@ -391,7 +391,7 @@ impl TextRange {
     /// ## Examples
     ///
     /// ```
-    /// use ruff_text_size::{TextRange, TextSize};
+    /// use ruff_text_size::{Ranged, TextRange, TextSize};
     ///
     /// let range = TextRange::new(TextSize::from(5), TextSize::from(10));
     /// assert_eq!(range.sub_end(TextSize::from(2)), TextRange::new(TextSize::from(5), TextSize::from(8)));
@@ -411,7 +411,7 @@ impl TextRange {
     /// ## Examples
     ///
     /// ```
-    /// use ruff_text_size::{TextRange, TextSize};
+    /// use ruff_text_size::{Ranged, TextRange, TextSize};
     ///
     /// let range = TextRange::new(TextSize::from(5), TextSize::from(10));
     /// assert_eq!(range.add_end(TextSize::from(2)), TextRange::new(TextSize::from(5), TextSize::from(12)));

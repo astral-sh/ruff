@@ -2,9 +2,9 @@ use unicode_width::UnicodeWidthStr;
 
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_python_ast::{CmpOp, Expr, Ranged};
+use ruff_python_ast::{CmpOp, Expr};
 use ruff_source_file::{Line, Locator};
-use ruff_text_size::{TextLen, TextRange};
+use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::line_width::{LineLength, LineWidth, TabSize};
 

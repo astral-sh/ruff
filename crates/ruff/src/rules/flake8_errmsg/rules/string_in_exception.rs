@@ -1,5 +1,5 @@
-use ruff_python_ast::{self as ast, Arguments, Constant, Expr, ExprContext, Ranged, Stmt};
-use ruff_text_size::TextRange;
+use ruff_python_ast::{self as ast, Arguments, Constant, Expr, ExprContext, Stmt};
+use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};

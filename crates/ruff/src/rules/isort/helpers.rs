@@ -1,8 +1,8 @@
-use ruff_python_ast::{PySourceType, Ranged, Stmt};
+use ruff_python_ast::{PySourceType, Stmt};
 use ruff_python_parser::{lexer, AsMode, Tok};
-
 use ruff_python_trivia::PythonWhitespace;
 use ruff_source_file::{Locator, UniversalNewlines};
+use ruff_text_size::Ranged;
 
 use crate::rules::isort::types::TrailingComma;
 

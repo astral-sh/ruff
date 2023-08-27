@@ -1,10 +1,11 @@
-use ruff_python_ast::{self as ast, Constant, ExceptHandler, Expr, Ranged, Stmt};
+use ruff_python_ast::{self as ast, Constant, ExceptHandler, Expr, Stmt};
 use ruff_text_size::{TextLen, TextRange};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::compose_call_path;
 use ruff_python_ast::helpers;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;

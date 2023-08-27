@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, Ranged};
+use ruff_python_ast::{self as ast, Expr};
 use rustc_hash::FxHashSet;
 use std::collections::HashSet;
 
@@ -8,6 +8,7 @@ use crate::rules::flake8_pyi::helpers::traverse_union;
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
+use ruff_text_size::Ranged;
 
 #[violation]
 pub struct DuplicateUnionMember {

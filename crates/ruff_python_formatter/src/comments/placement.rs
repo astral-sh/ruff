@@ -2,12 +2,12 @@ use std::cmp::Ordering;
 
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::{self as ast, Comprehension, Expr, MatchCase, Parameters, Ranged};
+use ruff_python_ast::{self as ast, Comprehension, Expr, MatchCase, Parameters};
 use ruff_python_trivia::{
     find_only_token_in_range, indentation_at_offset, SimpleToken, SimpleTokenKind, SimpleTokenizer,
 };
 use ruff_source_file::Locator;
-use ruff_text_size::{TextLen, TextRange};
+use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
 use crate::expression::expr_slice::{assign_comment_in_slice, ExprSliceCommentSection};

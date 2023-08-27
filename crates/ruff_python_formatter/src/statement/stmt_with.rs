@@ -1,8 +1,8 @@
 use ruff_formatter::{format_args, write, FormatError};
 use ruff_python_ast::node::AstNode;
-use ruff_python_ast::{Ranged, StmtWith};
+use ruff_python_ast::StmtWith;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::builders::parenthesize_if_expands;
 use crate::comments::SourceComment;
@@ -12,7 +12,7 @@ use crate::expression::parentheses::{
 use crate::other::commas;
 use crate::prelude::*;
 use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
-use crate::{FormatNodeRule, PyFormatOptions};
+use crate::PyFormatOptions;
 
 #[derive(Default)]
 pub struct FormatStmtWith;

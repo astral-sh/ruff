@@ -1,8 +1,7 @@
 use ruff_python_ast::{
-    self as ast, Arguments, CmpOp, Comprehension, Constant, Expr, ExprContext, Ranged, Stmt,
-    UnaryOp,
+    self as ast, Arguments, CmpOp, Comprehension, Constant, Expr, ExprContext, Stmt, UnaryOp,
 };
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};

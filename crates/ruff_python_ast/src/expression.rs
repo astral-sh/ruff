@@ -1,7 +1,7 @@
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::node::AnyNodeRef;
-use crate::{self as ast, Expr, Ranged};
+use crate::{self as ast, Expr};
 
 /// Unowned pendant to [`ast::Expr`] that stores a reference instead of a owned value.
 #[derive(Copy, Clone, Debug, PartialEq)]

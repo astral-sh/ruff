@@ -2,10 +2,10 @@ use std::{fmt, iter, usize};
 
 use log::error;
 use ruff_python_ast::{
-    Expr, Identifier, MatchCase, Pattern, PatternMatchAs, Ranged, Stmt, StmtFor, StmtMatch,
-    StmtReturn, StmtTry, StmtWhile, StmtWith,
+    Expr, Identifier, MatchCase, Pattern, PatternMatchAs, Stmt, StmtFor, StmtMatch, StmtReturn,
+    StmtTry, StmtWhile, StmtWith,
 };
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_index::{IndexSlice, IndexVec};
@@ -1020,8 +1020,8 @@ mod tests {
     use std::fs;
     use std::path::PathBuf;
 
-    use ruff_python_ast::Ranged;
     use ruff_python_parser::{parse, Mode};
+    use ruff_text_size::Ranged;
     use std::fmt::Write;
     use test_case::test_case;
 

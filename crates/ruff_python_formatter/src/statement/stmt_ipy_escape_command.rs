@@ -1,4 +1,5 @@
-use ruff_python_ast::{Ranged, StmtIpyEscapeCommand};
+use ruff_python_ast::StmtIpyEscapeCommand;
+use ruff_text_size::Ranged;
 
 use crate::comments::{SourceComment, SuppressionKind};
 use crate::prelude::*;

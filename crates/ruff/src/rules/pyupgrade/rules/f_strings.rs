@@ -6,13 +6,13 @@ use rustc_hash::FxHashMap;
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
-use ruff_python_ast::{self as ast, Constant, Expr, Keyword, Ranged};
+use ruff_python_ast::{self as ast, Constant, Expr, Keyword};
 use ruff_python_literal::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
 use ruff_python_parser::{lexer, Mode, Tok};
 use ruff_source_file::Locator;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::line_width::LineLength;

@@ -3,8 +3,8 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_python_ast::{self as ast, Arguments, CmpOp, Comprehension, Expr, Ranged};
-use ruff_text_size::TextRange;
+use ruff_python_ast::{self as ast, Arguments, CmpOp, Comprehension, Expr};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;

@@ -7,8 +7,8 @@ use libcst_native::{
     RightParen, RightSquareBracket, Set, SetComp, SimpleString, SimpleWhitespace,
     TrailingWhitespace, Tuple,
 };
-use ruff_python_ast::{Expr, Ranged};
-use ruff_text_size::TextRange;
+use ruff_python_ast::Expr;
+use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_codegen::Stylist;

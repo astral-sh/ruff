@@ -1,9 +1,10 @@
-use ruff_python_ast::{self as ast, ExceptHandler, Expr, Ranged};
+use ruff_python_ast::{self as ast, ExceptHandler, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_semantic::analyze::logging::exc_info;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;

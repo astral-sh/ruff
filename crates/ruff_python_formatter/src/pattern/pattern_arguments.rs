@@ -1,8 +1,8 @@
 use ruff_formatter::write;
 use ruff_python_ast::node::AstNode;
-use ruff_python_ast::{Pattern, PatternArguments, Ranged};
+use ruff_python_ast::{Pattern, PatternArguments};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::SourceComment;
 use crate::expression::parentheses::{empty_parenthesized, parenthesized, Parentheses};

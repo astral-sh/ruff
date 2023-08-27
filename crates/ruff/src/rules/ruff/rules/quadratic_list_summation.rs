@@ -2,8 +2,9 @@ use anyhow::Result;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Arguments, Expr, Ranged};
+use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_python_semantic::SemanticModel;
+use ruff_text_size::Ranged;
 
 use crate::importer::ImportRequest;
 use crate::{checkers::ast::Checker, registry::Rule};
