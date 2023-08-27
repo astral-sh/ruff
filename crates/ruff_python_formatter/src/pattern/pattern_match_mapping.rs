@@ -1,9 +1,9 @@
 use ruff_formatter::{format_args, write};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::PatternMatchMapping;
-use ruff_python_ast::{Expr, Identifier, Pattern, Ranged};
+use ruff_python_ast::{Expr, Identifier, Pattern};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{leading_comments, trailing_comments, SourceComment};
 use crate::expression::parentheses::{

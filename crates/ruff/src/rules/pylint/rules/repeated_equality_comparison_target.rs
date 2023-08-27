@@ -8,8 +8,9 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::hashable::HashableExpr;
-use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr, Ranged};
+use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr};
 use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
 use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;

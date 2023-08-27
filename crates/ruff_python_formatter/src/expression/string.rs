@@ -4,11 +4,11 @@ use bitflags::bitflags;
 
 use ruff_formatter::{format_args, write, FormatError, FormatOptions, TabWidth};
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{self as ast, ExprConstant, ExprFString, Ranged};
+use ruff_python_ast::{self as ast, ExprConstant, ExprFString};
 use ruff_python_parser::lexer::{lex_starts_at, LexicalError, LexicalErrorType};
 use ruff_python_parser::{Mode, Tok};
 use ruff_source_file::Locator;
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::comments::{leading_comments, trailing_comments};
 use crate::expression::parentheses::{

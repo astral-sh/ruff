@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
-use ruff_python_ast::{ExprConstant, Ranged};
-use ruff_text_size::TextSize;
+use ruff_python_ast::ExprConstant;
+use ruff_text_size::{Ranged, TextSize};
 
 use crate::prelude::*;
 

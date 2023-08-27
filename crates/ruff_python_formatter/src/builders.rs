@@ -1,6 +1,5 @@
 use ruff_formatter::{format_args, write, Argument, Arguments};
-use ruff_python_ast::Ranged;
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::other::commas::has_magic_trailing_comma;

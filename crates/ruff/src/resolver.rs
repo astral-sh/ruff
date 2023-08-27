@@ -119,12 +119,13 @@ impl Resolver {
     }
 }
 
-pub trait ConfigProcessor: Copy + Send + Sync {
+pub trait ConfigProcessor: Sync {
     fn process_config(&self, config: &mut Configuration);
 }
 
 struct NoOpProcessor;
-impl ConfigProcessor for &NoOpProcessor {
+
+impl ConfigProcessor for NoOpProcessor {
     fn process_config(&self, _config: &mut Configuration) {}
 }
 
@@ -137,7 +138,7 @@ impl ConfigProcessor for &NoOpProcessor {
 pub fn resolve_configuration(
     pyproject: &Path,
     relativity: &Relativity,
-    processor: impl ConfigProcessor,
+    processor: &dyn ConfigProcessor,
 ) -> Result<Configuration> {
     let mut seen = FxHashSet::default();
     let mut stack = vec![];
@@ -183,7 +184,7 @@ pub fn resolve_configuration(
 pub fn resolve_scoped_settings(
     pyproject: &Path,
     relativity: &Relativity,
-    processor: impl ConfigProcessor,
+    processor: &dyn ConfigProcessor,
 ) -> Result<(PathBuf, AllSettings)> {
     let configuration = resolve_configuration(pyproject, relativity, processor)?;
     let project_root = relativity.resolve(pyproject);
@@ -191,18 +192,12 @@ pub fn resolve_scoped_settings(
     Ok((project_root, settings))
 }
 
-/// Extract the [`Settings`] from a given `pyproject.toml`.
-pub fn resolve_settings(pyproject: &Path, relativity: &Relativity) -> Result<AllSettings> {
-    let (_project_root, settings) = resolve_scoped_settings(pyproject, relativity, &NoOpProcessor)?;
-    Ok(settings)
-}
-
 /// Extract the [`Settings`] from a given `pyproject.toml` and process the
 /// configuration with the given [`ConfigProcessor`].
 pub fn resolve_settings_with_processor(
     pyproject: &Path,
     relativity: &Relativity,
-    processor: impl ConfigProcessor,
+    processor: &dyn ConfigProcessor,
 ) -> Result<AllSettings> {
     let (_project_root, settings) = resolve_scoped_settings(pyproject, relativity, processor)?;
     Ok(settings)
@@ -222,7 +217,7 @@ fn match_exclusion<P: AsRef<Path>, R: AsRef<Path>>(
 pub fn python_files_in_path(
     paths: &[PathBuf],
     pyproject_config: &PyprojectConfig,
-    processor: impl ConfigProcessor,
+    processor: &dyn ConfigProcessor,
 ) -> Result<(Vec<Result<DirEntry, ignore::Error>>, Resolver)> {
     // Normalize every path (e.g., convert from relative to absolute).
     let mut paths: Vec<PathBuf> = paths.iter().map(fs::normalize_path).unique().collect();
@@ -368,7 +363,7 @@ pub fn python_files_in_path(
 pub fn python_file_at_path(
     path: &Path,
     pyproject_config: &PyprojectConfig,
-    processor: impl ConfigProcessor,
+    processor: &dyn ConfigProcessor,
 ) -> Result<bool> {
     if !pyproject_config.settings.lib.force_exclude {
         return Ok(true);

@@ -1,6 +1,6 @@
 use ruff_python_ast as ast;
-use ruff_python_ast::{Expr, Ranged, Stmt};
-use ruff_text_size::TextSize;
+use ruff_python_ast::{Expr, Stmt};
+use ruff_text_size::{Ranged, TextSize};
 
 use ruff_source_file::{Locator, UniversalNewlines};
 

@@ -1,7 +1,8 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
-use ruff_python_ast::{Decorator, ParameterWithDefault, Parameters, Ranged};
+use ruff_python_ast::{Decorator, ParameterWithDefault, Parameters};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_boolean_trap::helpers::{is_allowed_func_def, is_boolean};

@@ -4,13 +4,12 @@ use std::path::Path;
 use num_traits::Zero;
 use smallvec::SmallVec;
 
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::call_path::CallPath;
 use crate::statement_visitor::{walk_body, walk_stmt, StatementVisitor};
 use crate::{
-    self as ast, Arguments, Constant, ExceptHandler, Expr, MatchCase, Pattern, Ranged, Stmt,
-    TypeParam,
+    self as ast, Arguments, Constant, ExceptHandler, Expr, MatchCase, Pattern, Stmt, TypeParam,
 };
 
 /// Return `true` if the `Stmt` is a compound statement (as opposed to a simple statement).
@@ -114,10 +113,7 @@ where
 
 /// Call `func` over every `Expr` in `expr`, returning `true` if any expression
 /// returns `true`..
-pub fn any_over_expr<F>(expr: &Expr, func: &F) -> bool
-where
-    F: Fn(&Expr) -> bool,
-{
+pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
     if func(expr) {
         return true;
     }
@@ -248,10 +244,7 @@ where
     }
 }
 
-pub fn any_over_type_param<F>(type_param: &TypeParam, func: &F) -> bool
-where
-    F: Fn(&Expr) -> bool,
-{
+pub fn any_over_type_param(type_param: &TypeParam, func: &dyn Fn(&Expr) -> bool) -> bool {
     match type_param {
         TypeParam::TypeVar(ast::TypeParamTypeVar { bound, .. }) => bound
             .as_ref()
@@ -261,10 +254,7 @@ where
     }
 }
 
-pub fn any_over_pattern<F>(pattern: &Pattern, func: &F) -> bool
-where
-    F: Fn(&Expr) -> bool,
-{
+pub fn any_over_pattern(pattern: &Pattern, func: &dyn Fn(&Expr) -> bool) -> bool {
     match pattern {
         Pattern::MatchValue(ast::PatternMatchValue { value, range: _ }) => {
             any_over_expr(value, func)
@@ -300,10 +290,7 @@ where
     }
 }
 
-pub fn any_over_stmt<F>(stmt: &Stmt, func: &F) -> bool
-where
-    F: Fn(&Expr) -> bool,
-{
+pub fn any_over_stmt(stmt: &Stmt, func: &dyn Fn(&Expr) -> bool) -> bool {
     match stmt {
         Stmt::FunctionDef(ast::StmtFunctionDef {
             parameters,
@@ -526,10 +513,7 @@ where
     }
 }
 
-pub fn any_over_body<F>(body: &[Stmt], func: &F) -> bool
-where
-    F: Fn(&Expr) -> bool,
-{
+pub fn any_over_body(body: &[Stmt], func: &dyn Fn(&Expr) -> bool) -> bool {
     body.iter().any(|stmt| any_over_stmt(stmt, func))
 }
 

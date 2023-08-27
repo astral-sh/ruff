@@ -513,7 +513,7 @@ pub struct Overrides {
     pub show_fixes: Option<bool>,
 }
 
-impl ConfigProcessor for &Overrides {
+impl ConfigProcessor for Overrides {
     fn process_config(&self, config: &mut ruff::settings::configuration::Configuration) {
         if let Some(cache_dir) = &self.cache_dir {
             config.cache_dir = Some(cache_dir.clone());

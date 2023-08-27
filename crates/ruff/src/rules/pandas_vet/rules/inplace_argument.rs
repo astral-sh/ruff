@@ -1,8 +1,9 @@
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_true;
-use ruff_python_ast::{self as ast, Keyword, Ranged};
+use ruff_python_ast::{self as ast, Keyword};
 use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
 use crate::autofix::edits::{remove_argument, Parentheses};
 use crate::checkers::ast::Checker;

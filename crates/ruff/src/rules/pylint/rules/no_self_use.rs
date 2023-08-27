@@ -1,11 +1,12 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::{from_qualified_name, CallPath};
-use ruff_python_ast::{self as ast, ParameterWithDefault, Ranged};
+use ruff_python_ast::{self as ast, ParameterWithDefault};
 use ruff_python_semantic::{
     analyze::{function_type, visibility},
     Scope, ScopeKind,
 };
+use ruff_text_size::Ranged;
 
 use crate::{checkers::ast::Checker, rules::flake8_unused_arguments::helpers};
 

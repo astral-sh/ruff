@@ -5,9 +5,8 @@ use bitflags::bitflags;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
 use ruff_python_ast::call_path::format_call_path;
-use ruff_python_ast::Ranged;
 use ruff_source_file::Locator;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::context::ExecutionContext;
 use crate::model::SemanticModel;

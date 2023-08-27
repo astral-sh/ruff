@@ -1,7 +1,7 @@
 use ruff_formatter::write;
 use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{Expr, ExprYield, ExprYieldFrom, Ranged};
-use ruff_text_size::TextRange;
+use ruff_python_ast::{Expr, ExprYield, ExprYieldFrom};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parenthesize};

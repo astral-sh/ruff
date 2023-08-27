@@ -2,10 +2,11 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::map_subscript;
-use ruff_python_ast::{Decorator, Expr, Parameters, Ranged, TypeParam, TypeParams};
+use ruff_python_ast::{Decorator, Expr, Parameters, TypeParam, TypeParams};
 use ruff_python_semantic::analyze::visibility::{
     is_abstract, is_classmethod, is_new, is_overload, is_staticmethod,
 };
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
