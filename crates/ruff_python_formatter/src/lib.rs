@@ -99,9 +99,9 @@ where
 
 #[derive(Error, Debug)]
 pub enum FormatModuleError {
-    #[error("source contains syntax errors (lexer error): {0:?}")]
+    #[error("source contains syntax errors: {0:?}")]
     LexError(LexicalError),
-    #[error("source contains syntax errors (parser error): {0:?}")]
+    #[error("source contains syntax errors: {0:?}")]
     ParseError(ParseError),
     #[error(transparent)]
     FormatError(#[from] FormatError),
