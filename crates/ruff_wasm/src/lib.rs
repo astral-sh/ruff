@@ -1,9 +1,6 @@
 use std::path::Path;
 
 use js_sys::Error;
-
-use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::{parse_tokens, Mode};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -26,8 +23,11 @@ use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_python_formatter::{format_module, format_node, PyFormatOptions};
 use ruff_python_index::{CommentRangesBuilder, Indexer};
+use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::AsMode;
+use ruff_python_parser::{parse_tokens, Mode};
 use ruff_source_file::{Locator, SourceLocation};
+use ruff_text_size::Ranged;
 
 #[wasm_bindgen(typescript_custom_section)]
 const TYPES: &'static str = r#"

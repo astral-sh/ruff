@@ -317,11 +317,11 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use ruff_text_size::Ranged;
     use rustc_hash::FxHashMap;
     use test_case::test_case;
 
     use crate::assert_messages;
-    use crate::message::Message;
     use crate::registry::Rule;
     use crate::rules::isort::categorize::{ImportSection, KnownModules};
     use crate::settings::Settings;
@@ -660,7 +660,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Message::start);
+        diagnostics.sort_by_key(Ranged::start);
         assert_messages!(snapshot, diagnostics);
         Ok(())
     }
@@ -688,7 +688,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Message::start);
+        diagnostics.sort_by_key(Ranged::start);
         assert_messages!(snapshot, diagnostics);
         Ok(())
     }
@@ -718,7 +718,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Message::start);
+        diagnostics.sort_by_key(Ranged::start);
         assert_messages!(snapshot, diagnostics);
         Ok(())
     }
@@ -746,7 +746,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Message::start);
+        diagnostics.sort_by_key(Ranged::start);
         assert_messages!(snapshot, diagnostics);
         Ok(())
     }
@@ -766,7 +766,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Message::start);
+        diagnostics.sort_by_key(Ranged::start);
         assert_messages!(snapshot, diagnostics);
         Ok(())
     }
@@ -937,7 +937,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Message::start);
+        diagnostics.sort_by_key(Ranged::start);
         assert_messages!(snapshot, diagnostics);
         Ok(())
     }
@@ -962,7 +962,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Message::start);
+        diagnostics.sort_by_key(Ranged::start);
         assert_messages!(snapshot, diagnostics);
         Ok(())
     }
@@ -983,7 +983,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Message::start);
+        diagnostics.sort_by_key(Ranged::start);
         assert_messages!(snapshot, diagnostics);
         Ok(())
     }
@@ -1002,7 +1002,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Message::start);
+        diagnostics.sort_by_key(Ranged::start);
         assert_messages!(snapshot, diagnostics);
         Ok(())
     }

@@ -1,8 +1,10 @@
-mod call_stack;
-mod line_suffixes;
-mod printer_options;
-mod queue;
-mod stack;
+use std::num::NonZeroU8;
+
+use drop_bomb::DebugDropBomb;
+use unicode_width::UnicodeWidthChar;
+
+pub use printer_options::*;
+use ruff_text_size::{Ranged, TextLen, TextSize};
 
 use crate::format_element::document::Document;
 use crate::format_element::tag::{Condition, GroupMode};
@@ -21,11 +23,12 @@ use crate::{
     ActualStart, FormatElement, GroupId, IndentStyle, InvalidDocumentError, PrintError,
     PrintResult, Printed, SourceMarker, TextRange,
 };
-use drop_bomb::DebugDropBomb;
-pub use printer_options::*;
-use ruff_text_size::{TextLen, TextSize};
-use std::num::NonZeroU8;
-use unicode_width::UnicodeWidthChar;
+
+mod call_stack;
+mod line_suffixes;
+mod printer_options;
+mod queue;
+mod stack;
 
 /// Prints the format elements into a string
 #[derive(Debug, Default)]
