@@ -2648,7 +2648,6 @@ impl AstNode for ast::FStringLiteralElement {
     where
         V: PreorderVisitor<'a> + ?Sized,
     {
-        // TODO: is this correct?
     }
 }
 impl AstNode for ast::ExprFString {
