@@ -1,6 +1,8 @@
+use std::borrow::Cow;
+
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use ruff_formatter::{format_args, write, FormatError, FormatState, SourceCode, VecBuffer};
+use ruff_formatter::{format_args, write, FormatError, SourceCode};
 use ruff_python_ast::node::{AnyNodeRef, AstNode};
 use ruff_python_trivia::{lines_after, lines_after_ignoring_trivia, lines_before};
 
@@ -155,28 +157,22 @@ impl Format<PyFormatContext<'_>> for FormatTrailingComments<'_> {
                                 empty_lines(lines_before_comment),
                                 format_comment(trailing)
                             ],
-                            0 // Reserving width isn't necessary because we don't split comments and the empty lines expand any enclosing group.
+                            // Reserving width isn't necessary because we don't split
+                            // comments and the empty lines expand any enclosing group.
+                            0
                         ),
                         expand_parent()
                     ]
                 )?;
             } else {
-                // A trailing comment at the end of a line has a reserved width to consider during line measurement.
+                // A trailing comment at the end of a line has a reserved width to
+                // consider during line measurement.
                 // ```python
                 // tup = (
                 //     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 // )  # Some comment
                 // ```
-                write!(
-                    f,
-                    [
-                        line_suffix(
-                            &format_args![space(), space(), format_comment(trailing)],
-                            measure_comment(trailing, f.context())? + 2 // Account for two added spaces
-                        ),
-                        expand_parent()
-                    ]
-                )?;
+                trailing_end_of_line_comment(trailing).fmt(f)?;
             }
 
             trailing.mark_formatted();
@@ -275,17 +271,7 @@ impl Format<PyFormatContext<'_>> for FormatDanglingOpenParenthesisComments<'_> {
                 "Expected dangling comment to be at the end of the line"
             );
 
-            write!(
-                f,
-                [
-                    line_suffix(
-                        &format_args!(space(), space(), format_comment(comment)),
-                        // Marking the comment as a line suffix with reserved width is safe since we expect the comment to be end of line.
-                        measure_comment(comment, f.context())? + 2 // Account for two added spaces
-                    ),
-                    expand_parent()
-                ]
-            )?;
+            trailing_end_of_line_comment(comment).fmt(f)?;
             comment.mark_formatted();
         }
 
@@ -307,9 +293,12 @@ pub(crate) struct FormatComment<'a> {
 
 impl Format<PyFormatContext<'_>> for FormatComment<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        // We don't need the formatted comment's width.
-        let _ = write_comment(f, self.comment)?;
-        Ok(())
+        let slice = self.comment.slice();
+        let source = SourceCode::new(f.context().source());
+
+        let normalized_comment = normalize_comment(self.comment, source)?;
+
+        format_normalized_comment(normalized_comment, slice.start()).fmt(f)
     }
 }
 
@@ -348,24 +337,95 @@ impl Format<PyFormatContext<'_>> for FormatEmptyLines {
     }
 }
 
-/// A helper used to measure formatted comments.
+/// A helper that constructs a formattable element using a reserved-width line-suffix
+/// for normalized comments.
 ///
-/// Use a temporary formatter to write a normalized, formatted comment
-/// to in order to compute its width for a reserved-width line suffix element.
-fn measure_comment(comment: &SourceComment, context: &PyFormatContext) -> FormatResult<u32> {
-    let mut state = FormatState::new(context.clone());
-    let mut buffer = VecBuffer::new(&mut state);
-    let comment_len = write_comment(&mut Formatter::new(&mut buffer), comment)?;
-    Ok(comment_len)
+/// * Black normalization of `SourceComment`.
+/// * Line suffix with reserved width for the final, normalized content.
+/// * Expands parent node.
+pub(crate) const fn trailing_end_of_line_comment(
+    comment: &SourceComment,
+) -> FormatTrailingEndOfLineComment {
+    FormatTrailingEndOfLineComment { comment }
 }
 
-/// Write a comment to a formatter and return the normalized comment's width.
-fn write_comment(f: &mut PyFormatter, comment: &SourceComment) -> FormatResult<u32> {
-    let slice = comment.slice();
-    let comment_text = slice.text(SourceCode::new(f.context().source()));
+pub(crate) struct FormatTrailingEndOfLineComment<'a> {
+    comment: &'a SourceComment,
+}
 
-    // Track any additional width the formatted comment will have after normalization.
-    let mut added_width = TextSize::new(0);
+impl Format<PyFormatContext<'_>> for FormatTrailingEndOfLineComment<'_> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
+        let slice = self.comment.slice();
+        let source = SourceCode::new(f.context().source());
+
+        let normalized_comment = normalize_comment(self.comment, source)?;
+        let reserved_width = normalized_comment.text_len().to_u32() + 2; // Account for two added spaces
+
+        write!(
+            f,
+            [
+                line_suffix(
+                    &format_args![
+                        space(),
+                        space(),
+                        format_normalized_comment(normalized_comment, slice.start())
+                    ],
+                    reserved_width
+                ),
+                expand_parent()
+            ]
+        )
+    }
+}
+
+/// A helper that constructs formattable normalized comment text as efficiently as
+/// possible.
+///
+/// * If the content is unaltered then format with source text slice strategy and no
+///   unnecessary allocations.
+/// * If the content is modified then make as few allocations as possible and use
+///   a dynamic text element at the original slice's start position.
+pub(crate) const fn format_normalized_comment(
+    comment: Cow<'_, str>,
+    start_position: TextSize,
+) -> FormatNormalizedComment<'_> {
+    FormatNormalizedComment {
+        comment,
+        start_position,
+    }
+}
+
+pub(crate) struct FormatNormalizedComment<'a> {
+    comment: Cow<'a, str>,
+    start_position: TextSize,
+}
+
+impl Format<PyFormatContext<'_>> for FormatNormalizedComment<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext>) -> FormatResult<()> {
+        match self.comment {
+            Cow::Borrowed(borrowed) => source_text_slice(
+                TextRange::at(self.start_position, borrowed.text_len()),
+                ContainsNewlines::No,
+            )
+            .fmt(f),
+
+            Cow::Owned(ref owned) => dynamic_text(owned, Some(self.start_position)).fmt(f),
+        }
+    }
+}
+
+/// A helper for normalizing comments efficiently.
+///
+/// * Return as fast as possible without making unnecessary allocations.
+/// * Trim any trailing whitespace.
+/// * Normalize for a leading '# '.
+/// * Retain non-breaking spaces for 'type:' pragmas by leading with '# \u{A0}'.
+fn normalize_comment<'a>(
+    comment: &'a SourceComment,
+    source: SourceCode<'a>,
+) -> FormatResult<Cow<'a, str>> {
+    let slice = comment.slice();
+    let comment_text = slice.text(source);
 
     let trimmed = comment_text.trim_end();
     let trailing_whitespace_len = comment_text.text_len() - trimmed.text_len();
@@ -376,41 +436,35 @@ fn write_comment(f: &mut PyFormatter, comment: &SourceComment) -> FormatResult<u
         ));
     };
 
+    if content.is_empty() {
+        return Ok(Cow::Borrowed("#"));
+    }
+
     // Fast path for correctly formatted comments:
-    // * Start with a `#` and are followed by a space
+    // * Start with a `# '.
     // * Have no trailing whitespace.
     if trailing_whitespace_len == TextSize::new(0) && content.starts_with(' ') {
-        source_text_slice(slice.range(), ContainsNewlines::No).fmt(f)?;
-        return Ok(slice.range().len().into());
+        return Ok(Cow::Borrowed(comment_text));
     }
 
-    write!(f, [source_position(slice.start()), text("#")])?;
+    if content.starts_with('\u{A0}') {
+        let trimmed = content.trim_start_matches('\u{A0}');
 
-    // Starts with a non breaking space
-    let start_offset =
-        if content.starts_with('\u{A0}') && !content.trim_start().starts_with("type:") {
-            // Replace non-breaking space with a space (if not followed by a normal space)
-            "#\u{A0}".text_len()
-        } else {
-            '#'.text_len()
-        };
+        // Black adds a space before the non-breaking space if part of a type pragma.
+        if trimmed.trim_start().starts_with("type:") {
+            return Ok(Cow::Borrowed(comment_text));
+        }
 
-    // Add a space between the `#` and the text if the source contains none.
-    if !content.is_empty() && !content.starts_with([' ', '!', ':', '#', '\'']) {
-        write!(f, [space()])?;
-        added_width += TextSize::new(1);
+        // Black replaces the non-breaking space with a space if followed by a space.
+        if trimmed.starts_with(' ') {
+            return Ok(Cow::Owned(std::format!("# {trimmed}")));
+        }
     }
 
-    let start = slice.start() + start_offset;
-    let end = slice.end() - trailing_whitespace_len;
+    // We normalize the leading space if we can.
+    if !content.starts_with([' ', '!', ':', '#', '\'']) {
+        return Ok(Cow::Owned(std::format!("# {}", content.trim_start())));
+    }
 
-    write!(
-        f,
-        [
-            source_text_slice(TextRange::new(start, end), ContainsNewlines::No),
-            source_position(slice.end())
-        ]
-    )?;
-
-    Ok((end - slice.start() + added_width).into())
+    Ok(Cow::Owned(std::format!("#{content}")))
 }
