@@ -24,32 +24,63 @@ pub mod types;
 pub mod visitor;
 pub mod whitespace;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum PySourceType {
-    #[default]
-    Python,
-    Stub,
-    Ipynb,
+/// The type of a source file.
+#[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]
+pub enum SourceType {
+    /// The file contains Python source code.
+    Python(PySourceType),
+    /// The file contains TOML.
+    Toml(TomlSourceType),
 }
 
-impl PySourceType {
-    pub const fn is_python(&self) -> bool {
-        matches!(self, PySourceType::Python)
+impl Default for SourceType {
+    fn default() -> Self {
+        Self::Python(PySourceType::Python)
     }
+}
 
-    pub const fn is_stub(&self) -> bool {
-        matches!(self, PySourceType::Stub)
+impl From<&Path> for SourceType {
+    fn from(path: &Path) -> Self {
+        match path.file_name() {
+            Some(filename) if filename == "pyproject.toml" => Self::Toml(TomlSourceType::Pyproject),
+            Some(filename) if filename == "Pipfile" => Self::Toml(TomlSourceType::Pipfile),
+            Some(filename) if filename == "poetry.lock" => Self::Toml(TomlSourceType::Poetry),
+            _ => match path.extension() {
+                Some(ext) if ext == "toml" => Self::Toml(TomlSourceType::Unrecognized),
+                _ => Self::Python(PySourceType::from(path)),
+            },
+        }
     }
+}
 
-    pub const fn is_ipynb(&self) -> bool {
-        matches!(self, PySourceType::Ipynb)
-    }
+#[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]
+pub enum TomlSourceType {
+    /// The source is a `pyproject.toml`.
+    Pyproject,
+    /// The source is a `Pipfile`.
+    Pipfile,
+    /// The source is a `poetry.lock`.
+    Poetry,
+    /// The source is an unrecognized TOML file.
+    Unrecognized,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, is_macro::Is)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum PySourceType {
+    /// The source is a Python file (`.py`).
+    #[default]
+    Python,
+    /// The source is a Python stub file (`.pyi`).
+    Stub,
+    /// The source is a Jupyter notebook (`.ipynb`).
+    Ipynb,
 }
 
 impl From<&Path> for PySourceType {
     fn from(path: &Path) -> Self {
         match path.extension() {
+            Some(ext) if ext == "py" => PySourceType::Python,
             Some(ext) if ext == "pyi" => PySourceType::Stub,
             Some(ext) if ext == "ipynb" => PySourceType::Ipynb,
             _ => PySourceType::Python,

@@ -12,7 +12,7 @@ use tracing::{span, Level};
 use ruff::fs;
 use ruff::warn_user_once;
 use ruff_formatter::LineWidth;
-use ruff_python_ast::PySourceType;
+use ruff_python_ast::{PySourceType, SourceType};
 use ruff_python_formatter::{format_module, FormatModuleError, PyFormatOptions};
 use ruff_workspace::resolver::python_files_in_path;
 
@@ -37,23 +37,21 @@ pub(crate) fn format(cli: &Arguments, overrides: &Overrides) -> Result<ExitStatu
 
     let result = paths
         .into_par_iter()
-        .map(|dir_entry| {
-            let dir_entry = dir_entry?;
-            let path = dir_entry.path();
-            let source_type = PySourceType::from(path);
-            if !(source_type.is_python() || source_type.is_stub())
-                || path
-                    .extension()
-                    .is_some_and(|extension| extension == "toml")
-            {
-                return Ok(());
+        .map(|entry| {
+            let entry = entry?;
+            let path = entry.path();
+            if matches!(
+                SourceType::from(path),
+                SourceType::Python(PySourceType::Python | PySourceType::Stub)
+            ) {
+                let line_length = resolver.resolve(path, &pyproject_config).line_length;
+                let options = PyFormatOptions::from_extension(path)
+                    .with_line_width(LineWidth::from(NonZeroU16::from(line_length)));
+
+                format_path(path, options)
+            } else {
+                Ok(())
             }
-
-            let line_length = resolver.resolve(path, &pyproject_config).line_length;
-            let options = PyFormatOptions::from_extension(path)
-                .with_line_width(LineWidth::from(NonZeroU16::from(line_length)));
-
-            format_path(path, options)
         })
         .map(|result| {
             result.map_err(|err| {
