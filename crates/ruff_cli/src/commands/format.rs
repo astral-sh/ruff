@@ -42,7 +42,7 @@ pub(crate) fn format(cli: &Arguments, overrides: &Overrides) -> Result<ExitStatu
             let path = entry.path();
             if matches!(
                 SourceType::from(path),
-                SourceType::Python(PySourceType::Python | PySourceType::Stub)
+                SourceType::Python(PySourceType::Py | PySourceType::Pyi | PySourceType::Pyw)
             ) {
                 let line_length = resolver.resolve(path, &pyproject_config).line_length;
                 let options = PyFormatOptions::from_extension(path)

@@ -35,7 +35,7 @@ pub enum SourceType {
 
 impl Default for SourceType {
     fn default() -> Self {
-        Self::Python(PySourceType::Python)
+        Self::Python(PySourceType::Py)
     }
 }
 
@@ -70,20 +70,32 @@ pub enum TomlSourceType {
 pub enum PySourceType {
     /// The source is a Python file (`.py`).
     #[default]
-    Python,
+    Py,
     /// The source is a Python stub file (`.pyi`).
-    Stub,
+    Pyi,
+    /// The source is a Python script with a graphical user interface (`.pyw`).
+    Pyw,
     /// The source is a Jupyter notebook (`.ipynb`).
     Ipynb,
+    /// The source is an unrecognized Python file.
+    Unrecognized,
+}
+
+impl PySourceType {
+    /// Return `true` if the source type is a stub file.
+    pub const fn is_stub(self) -> bool {
+        matches!(self, Self::Pyi)
+    }
 }
 
 impl From<&Path> for PySourceType {
     fn from(path: &Path) -> Self {
         match path.extension() {
-            Some(ext) if ext == "py" => PySourceType::Python,
-            Some(ext) if ext == "pyi" => PySourceType::Stub,
+            Some(ext) if ext == "py" => PySourceType::Py,
+            Some(ext) if ext == "pyi" => PySourceType::Pyi,
+            Some(ext) if ext == "pyw" => PySourceType::Pyw,
             Some(ext) if ext == "ipynb" => PySourceType::Ipynb,
-            _ => PySourceType::Python,
+            _ => PySourceType::Py,
         }
     }
 }

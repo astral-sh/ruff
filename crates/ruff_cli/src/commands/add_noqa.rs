@@ -46,8 +46,9 @@ pub(crate) fn add_noqa(
         .flatten()
         .filter_map(|entry| {
             let path = entry.path();
-            let SourceType::Python(source_type @ (PySourceType::Python | PySourceType::Stub)) =
-                SourceType::from(path)
+            let SourceType::Python(
+                source_type @ (PySourceType::Py | PySourceType::Pyi | PySourceType::Pyw),
+            ) = SourceType::from(path)
             else {
                 return None;
             };
