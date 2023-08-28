@@ -236,7 +236,8 @@ impl<'a> Printer<'a> {
                 stack.push(TagKind::IndentIfGroupBreaks, args);
             }
 
-            FormatElement::Tag(StartLineSuffix) => {
+            FormatElement::Tag(StartLineSuffix { reserved_width }) => {
+                self.state.line_width += reserved_width;
                 self.state
                     .line_suffixes
                     .extend(args, queue.iter_content(TagKind::LineSuffix));
@@ -1191,7 +1192,11 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                 }
             }
 
-            FormatElement::Tag(StartLineSuffix) => {
+            FormatElement::Tag(StartLineSuffix { reserved_width }) => {
+                self.state.line_width += reserved_width;
+                if self.state.line_width > self.options().print_width.into() {
+                    return Ok(Fits::No);
+                }
                 self.queue.skip_content(TagKind::LineSuffix);
                 self.state.has_line_suffix = true;
             }
@@ -1727,10 +1732,40 @@ two lines`,
                 text("]")
             ]),
             text(";"),
-            line_suffix(&format_args![space(), text("// trailing")])
+            line_suffix(&format_args![space(), text("// trailing")], 0)
         ]);
 
         assert_eq!(printed.as_code(), "[1, 2, 3]; // trailing");
+    }
+
+    #[test]
+    fn line_suffix_with_reserved_width() {
+        let printed = format(&format_args![
+            group(&format_args![
+                text("["),
+                soft_block_indent(&format_with(|f| {
+                    f.fill()
+                        .entry(
+                            &soft_line_break_or_space(),
+                            &format_args!(text("1"), text(",")),
+                        )
+                        .entry(
+                            &soft_line_break_or_space(),
+                            &format_args!(text("2"), text(",")),
+                        )
+                        .entry(
+                            &soft_line_break_or_space(),
+                            &format_args!(text("3"), if_group_breaks(&text(","))),
+                        )
+                        .finish()
+                })),
+                text("]")
+            ]),
+            text(";"),
+            line_suffix(&format_args![space(), text("// Using reserved width causes this content to not fit even though it's a line suffix element")], 93)
+        ]);
+
+        assert_eq!(printed.as_code(), "[\n  1, 2, 3\n]; // Using reserved width causes this content to not fit even though it's a line suffix element");
     }
 
     #[test]
